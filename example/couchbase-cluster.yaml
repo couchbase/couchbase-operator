@@ -1,0 +1,16 @@
+apiVersion: "couchbase.database.couchbase.com/v1beta1"
+kind: "CouchbaseCluster"
+metadata:
+  name: "cb-example"
+spec:
+  size: 1
+  baseImage: couchbase/server
+  version: "enterprise-4.5.1"
+  settings:
+    username: "Administrator"
+    password: "password"
+    services: "data,index,query,fts"
+    dataServiceMemoryQuota: 256
+    indexServiceMemoryQuota: 256
+    searchServiceMemoryQuota: 256
+    indexStorageSetting: default

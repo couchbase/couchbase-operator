@@ -1,0 +1,232 @@
+package spec
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+import (
+	"encoding/json"
+
+	"k8s.io/api/core/v1"
+)
+
+// CouchbaseClusterList is a list of Couchbase clusters.
+type CouchbaseClusterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseCluster `json:"items"`
+}
+
+type CouchbaseCluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              ClusterSpec   `json:"spec"`
+	Status            ClusterStatus `json:"status"`
+}
+
+func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
+	trueVar := true
+	return metav1.OwnerReference{
+		APIVersion: SchemeGroupVersion.String(),
+		Kind:       CRDResourceKind,
+		Name:       c.Name,
+		UID:        c.UID,
+		Controller: &trueVar,
+	}
+}
+
+type PVSource struct {
+	// VolumeSizeInMB specifies the required volume size.
+	VolumeSizeInMB int `json:"volumeSizeInMB"`
+
+	// StorageClass indicates what Kubernetes storage class will be used.
+	// This enables the user to have fine-grained control over how persistent
+	// volumes are created since it uses the existing StorageClass mechanism in
+	// Kubernetes.
+	StorageClass string `json:"storageClass"`
+}
+
+type ClusterSpec struct {
+	// Size is the expected size of the couchbase cluster. The
+	// couchbase-operator will eventually make the size of the running
+	// cluster equal to the expected size. The vaild range of the size is
+	// from 1 to 50.
+	Size int `json:"size"`
+
+	// BaseImage is the base couchbase image name that will be used to launch
+	// couchbase clusters. This is useful for private registries, etc.
+	BaseImage string `json:"baseImage"`
+
+	// Version is the expected version of the couchbase cluster.
+	// The couchbase-operator will eventually make the couchbase cluster version
+	// equal to the expected version.
+	//
+	// The version must follow the [semver]( http://semver.org) format, for
+	// example "3.1.8".
+	Version string `json:"version,omitempty"`
+
+	// Paused is to pause the control of the operator for the couchbase cluster.
+	Paused bool `json:"paused,omitempty"`
+	// Pod defines the policy to create pod for the etcd pod.
+	//
+	// Updating Pod does not take effect on any existing couchbase pods.
+	Pod *PodPolicy `json:"pod,omitempty"`
+
+	// Cluster specific settings
+	ClusterSettings *ClusterConfig `json:"settings"`
+}
+
+type ClusterConfig struct {
+	// The username for the Administrator user
+	AdminUsername string `json:"username"`
+
+	// The password for the Administrator user
+	AdminPassword string `json:"password"`
+
+	// The services to run on each node in the cluster
+	Services string `json:"services"`
+
+	// The amount of memory that should be allocated to the data service
+	DataServiceMemQuota int `json:"dataServiceMemoryQuota"`
+
+	// The amount of memory that should be allocated to the index service
+	IndexServiceMemQuota int `json:"indexServiceMemoryQuota"`
+
+	// The amount of memory that should be allocated to the search service
+	SearchServiceMemQuota int `json:"searchServiceMemoryQuota"`
+
+	// The index storage mode to use for secondary indexing
+	IndexStorageSetting string `json:"indexStorageSetting"`
+}
+
+// PodPolicy defines the policy to create pod for the couchbase container.
+type PodPolicy struct {
+	// Labels specifies the labels to attach to pods the operator creates for the
+	// couchbase cluster.
+	// "app" and "couchbase_*" labels are reserved for the internal use of the couchbase operator.
+	// Do not overwrite them.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// NodeSelector specifies a map of key-value pairs. For the pod to be eligible
+	// to run on a node, the node must have each of the indicated key-value pairs as
+	// labels.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// AntiAffinity determines if the couchbase-operator tries to avoid putting
+	// the couchbase members in the same cluster onto the same node.
+	AntiAffinity bool `json:"antiAffinity,omitempty"`
+
+	// Resources is the resource requirements for the couchbase container.
+	// This field cannot be updated once the cluster is created.
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Tolerations specifies the pod's tolerations.
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+
+	// List of environment variables to set in the etcd container.
+	// This is used to configure etcd process. couchbase cluster cannot be created, when
+	// bad environement variables are provided. Do not overwrite any flags used to
+	// bootstrap the cluster (for example `--initial-cluster` flag).
+	// This field cannot be updated.
+	CouchbaseEnv []v1.EnvVar `json:"couchbaseEnv,omitempty"`
+
+	// PV represents a Persistent Volume resource.
+	// If defined new pods will use a persistent volume to store etcd data.
+	// TODO(sgotti) unimplemented
+	PV *PVSource `json:"pv,omitempty"`
+
+	// By default, kubernetes will mount a service account token into the couchbase pods.
+	// AutomountServiceAccountToken indicates whether pods running with the service account should have an API token automatically mounted.
+	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
+}
+
+func (c *ClusterSpec) Cleanup() {
+
+}
+
+type ClusterPhase string
+
+const (
+	ClusterPhaseNone     ClusterPhase = ""
+	ClusterPhaseCreating              = "Creating"
+	ClusterPhaseRunning               = "Running"
+	ClusterPhaseFailed                = "Failed"
+)
+
+type ClusterCondition struct {
+	Type ClusterConditionType `json:"type"`
+
+	Reason string `json:"reason"`
+
+	TransitionTime string `json:"transitionTime"`
+}
+
+type ClusterConditionType string
+
+const (
+	ClusterConditionReady = "Ready"
+
+	ClusterConditionRemovingDeadMember = "RemovingDeadMember"
+
+	ClusterConditionRecovering = "Recovering"
+
+	ClusterConditionScalingUp   = "ScalingUp"
+	ClusterConditionScalingDown = "ScalingDown"
+
+	ClusterConditionUpgrading = "Upgrading"
+)
+
+type ClusterStatus struct {
+	// Phase is the cluster running phase
+	Phase  ClusterPhase `json:"phase"`
+	Reason string       `json:"reason"`
+
+	// ControlPuased indicates the operator pauses the control of the cluster.
+	ControlPaused bool `json:"controlPaused"`
+
+	// Condition keeps ten most recent cluster conditions
+	Conditions []ClusterCondition `json:"conditions"`
+
+	// Size is the current size of the cluster
+	Size int `json:"size"`
+	// Members are the etcd members in the cluster
+	//Members MembersStatus `json:"members"`
+	// CurrentVersion is the current cluster version
+	CurrentVersion string `json:"currentVersion"`
+	// TargetVersion is the version the cluster upgrading to.
+	// If the cluster is not upgrading, TargetVersion is empty.
+	TargetVersion string `json:"targetVersion"`
+}
+
+func (cs ClusterStatus) Copy() ClusterStatus {
+	newCS := ClusterStatus{}
+	b, err := json.Marshal(cs)
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(b, &newCS)
+	if err != nil {
+		panic(err)
+	}
+	return newCS
+}
+
+func (c *ClusterStatus) IsFailed() bool {
+	return false
+}
+
+func (cs *ClusterStatus) SetPhase(p ClusterPhase) {
+	cs.Phase = p
+}
+
+func (cs *ClusterStatus) PauseControl() {
+	cs.ControlPaused = true
+}
+
+func (cs *ClusterStatus) Control() {
+	cs.ControlPaused = false
+}
+
+func (cs *ClusterStatus) SetReason(r string) {
+	cs.Reason = r
+}
