@@ -8,10 +8,13 @@ import (
 
 	"github.com/couchbaselabs/couchbase-operator/pkg/client"
 	"github.com/couchbaselabs/couchbase-operator/pkg/garbagecollection"
+	"github.com/couchbaselabs/couchbase-operator/pkg/job"
 	"github.com/couchbaselabs/couchbase-operator/pkg/spec"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/kubernetes"
 )
@@ -23,6 +26,7 @@ var (
 type clusterEventType string
 
 const (
+	eventCreateCluster clusterEventType = "Create"
 	eventDeleteCluster clusterEventType = "Delete"
 	eventModifyCluster clusterEventType = "Modify"
 )
@@ -47,20 +51,24 @@ type Cluster struct {
 	eventCh       chan *clusterEvent
 	stopCh        chan struct{}
 	gc            *garbagecollection.GC
+	jobSched      *job.Scheduler
 }
 
 func New(config Config, cl *spec.CouchbaseCluster) *Cluster {
+
 	c := &Cluster{
 		logger: logrus.WithFields(logrus.Fields{
 			"module":       "cluster",
 			"cluster-name": cl.Name,
 		}),
-		config:  config,
-		status:  cl.Status.Copy(),
-		cluster: cl,
-		eventCh: make(chan *clusterEvent, 100),
-		stopCh:  make(chan struct{}),
-		gc:      garbagecollection.New(config.KubeCli, cl.Namespace),
+		config:        config,
+		status:        cl.Status.Copy(),
+		memberCounter: 0,
+		cluster:       cl,
+		eventCh:       make(chan *clusterEvent, 100),
+		stopCh:        make(chan struct{}),
+		gc:            garbagecollection.New(config.KubeCli, cl.Namespace),
+		jobSched:      job.NewScheduler(config.KubeCli, cl.Namespace),
 	}
 	c.logger.Info("Watching new cluster")
 
@@ -80,6 +88,16 @@ func New(config Config, cl *spec.CouchbaseCluster) *Cluster {
 		c.run()
 	}()
 
+	// start job watcher
+	go func() {
+		c.watchScedulerStatusUpdates()
+	}()
+
+	// send notification that cluster is created so that it can be initialized
+	c.send(&clusterEvent{
+		typ:     eventCreateCluster,
+		cluster: cl,
+	})
 	return c
 }
 
@@ -138,11 +156,26 @@ func (c *Cluster) run() {
 	}
 	c.logger.Infof("start running...")
 
-	//var rerr error
 	for {
 		select {
 		case event := <-c.eventCh:
 			switch event.typ {
+			case eventCreateCluster:
+
+				pod, err := c.getMemberPod(c.memberCounter - 1)
+				if err != nil {
+					c.logger.Errorf("Unable to get Pod for member: %d", c.memberCounter)
+				}
+
+				// get jobs required to enforce desired state
+				jobsToSchedule := c.jobsForDesiredState(pod, event.cluster)
+
+				// dispatch via scheduler
+				err = c.jobSched.Dispatch(jobsToSchedule)
+				if err != nil {
+					c.logger.Errorf("Error occurred dispatching jobs: %v", err)
+				}
+
 			case eventModifyCluster:
 				/*if isSpecEqual(event.cluster.Spec, c.cluster.Spec) {
 					break
@@ -151,6 +184,7 @@ func (c *Cluster) run() {
 				c.logSpecUpdate(event.cluster.Spec)
 
 				*/
+
 				c.cluster = event.cluster
 			case eventDeleteCluster:
 				c.logger.Infof("cluster is deleted by the user")
@@ -160,7 +194,6 @@ func (c *Cluster) run() {
 			}
 
 		case <-time.After(reconcileInterval):
-			//start := time.Now()
 
 			if c.cluster.Spec.Paused {
 				c.status.PauseControl()
@@ -168,65 +201,16 @@ func (c *Cluster) run() {
 				continue
 			} else {
 				c.status.Control()
+
+				// DEBUGGING - periodically prints cluster status
+				// data, err := json.Marshal(c.cluster)
+				// if err == nil {
+				// 	c.logger.Info(string(data))
+				// }
 			}
-			/*
-				running, pending, err := c.pollPods()
-				if err != nil {
-					c.logger.Errorf("fail to poll pods: %v", err)
-					reconcileFailed.WithLabelValues("failed to poll pods").Inc()
-					continue
-				}
 
-				if len(pending) > 0 {
-					// Pod startup might take long, e.g. pulling image. It would deterministically become running or succeeded/failed later.
-					c.logger.Infof("skip reconciliation: running (%v), pending (%v)", k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
-					reconcileFailed.WithLabelValues("not all pods are running").Inc()
-					continue
-				}
-				if len(running) == 0 {
-					c.logger.Warningf("all etcd pods are dead. Trying to recover from a previous backup")
-					rerr = c.disasterRecovery(nil)
-					if rerr != nil {
-						c.logger.Errorf("fail to do disaster recovery: %v", rerr)
-					}
-					// On normal recovery case, we need backoff. On error case, this could be either backoff or leading to cluster delete.
-					break
-				}
-
-				// On controller restore, we could have "members == nil"
-				if rerr != nil || c.members == nil {
-					rerr = c.updateMembers(podsToMemberSet(running, c.isSecureClient()))
-					if rerr != nil {
-						c.logger.Errorf("failed to update members: %v", rerr)
-						break
-					}
-				}
-				rerr = c.reconcile(running)
-				if rerr != nil {
-					c.logger.Errorf("failed to reconcile: %v", rerr)
-					break
-				}
-
-				if err := c.updateLocalBackupStatus(); err != nil {
-					c.logger.Warningf("failed to update local backup service status: %v", err)
-				}
-				c.updateMemberStatus(c.members)
-				if err := c.updateCRStatus(); err != nil {
-					c.logger.Warningf("periodic update CR status failed: %v", err)
-				}
-
-				reconcileHistogram.WithLabelValues(c.name()).Observe(time.Since(start).Seconds())*/
 		}
-		/*
-			if rerr != nil {
-				reconcileFailed.WithLabelValues(rerr.Error()).Inc()
-			}*/
 
-		/*		if isFatalError(rerr) {
-				c.status.SetReason(rerr.Error())
-				c.logger.Errorf("cluster failed: %v", rerr)
-				return
-			}*/
 	}
 }
 
@@ -255,5 +239,90 @@ func (c *Cluster) createPod(members couchbaseutil.MemberSet, m *couchbaseutil.Me
 
 	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec, c.cluster.AsOwner())
 	_, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
+	c.memberCounter += 1
 	return err
+}
+
+// Get Pod representing the member counter
+func (c *Cluster) getMemberPod(mc int) (*v1.Pod, error) {
+	podName := couchbaseutil.CreateMemberName(c.cluster.Name, mc)
+	pod, err := c.config.KubeCli.CoreV1().Pods(c.cluster.Namespace).
+		Get(podName, metav1.GetOptions{})
+	return pod, err
+}
+
+// make sure the pod has an IP.  If no IP is found then
+// watcher will track updates until IP is present
+// TODO: timeout/retry-count
+func (c *Cluster) getPodIP(pod *v1.Pod) (string, error) {
+	var err error
+	var podIP string
+
+	selector := "couchbase_node=" + pod.Name
+	c.logger.Infof("Selector: %s", selector)
+	watcher, err := c.config.
+		KubeCli.
+		Core().
+		Pods(c.cluster.Namespace).
+		Watch(metav1.ListOptions{LabelSelector: selector})
+
+	if err != nil {
+		c.logger.Errorf("Unable to watch Pod %s, %v", pod.Name, err)
+	} else {
+		for event := range watcher.ResultChan() {
+			evPod := event.Object.(*v1.Pod)
+			podIP = evPod.Status.PodIP
+			c.logger.Infof("Pod-%s: %v", podIP, evPod)
+			if podIP != "" {
+				break
+			}
+		}
+	}
+
+	return podIP, err
+}
+
+// Creates jobs required to bring current spec
+// in sync with desired state
+func (c *Cluster) jobsForDesiredState(pod *v1.Pod, couchbaseCluster *spec.CouchbaseCluster) []job.JobRunner {
+	jobs := []job.JobRunner{}
+	clusterSpec := couchbaseCluster.Spec
+	clusterStatus := c.status
+
+	podIP, err := c.getPodIP(pod)
+	if err != nil {
+		return jobs
+	}
+
+	switch {
+	case clusterSpec.Size > clusterStatus.Size:
+		// Is a new node to the cluster which needs to be initialized
+		jobs = append(jobs, job.NewNodeInitJob(podIP, c.cluster))
+		fallthrough
+	case clusterSpec.Size == (clusterStatus.Size + 1):
+		// this is last node to be added to cluster. Run cluster-init
+		jobs = append(jobs, job.NewClusterInitJob(podIP, c.cluster))
+	}
+
+	return jobs
+}
+
+// Watch for status update originating from job scheduler.
+// Depending on the type of status being received,
+// the spec can be updated.
+//
+// For instance, status that node-init has completed implies
+// a node was initizlied and added to cluster
+func (c *Cluster) watchScedulerStatusUpdates() {
+	for {
+		status := <-c.jobSched.StatusCh
+		if status.Phase == job.Completed {
+			if status.Type == job.NodeInit {
+				c.status.Size = 1
+			}
+		}
+
+		// update cr status
+		c.updateCRStatus()
+	}
 }
