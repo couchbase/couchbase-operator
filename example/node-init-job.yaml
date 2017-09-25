@@ -1,0 +1,31 @@
+# This is an example job which can be run stand-alone:
+#     kubectl create -f example/node-init-job.yaml 
+#
+# Note: the controller creates this exact structure
+#       when configuring cluster. EXCEPT, at run time
+#       the -c <ip_address> is replaced with actual PodIP
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cli
+spec:
+  template:
+    metadata:
+      name: cli
+      labels:
+        op: node-init
+    spec:
+      containers:
+      - name: couchbase-cli
+        image: couchbase/couchbase-cli
+        command: ["/couchbase-cli/couchbase-cli",
+                  "node-init",
+                  "-c", "172.17.0.8",
+                  "-u", "Administrator",
+                  "-p", "password",
+                  "--node-init-data-path", "/opt/couchbase/var/lib/couchbase/data",
+                  "--node-init-index-path", "/opt/couchbase/var/lib/couchbase/data"]
+        imagePullPolicy: IfNotPresent
+      restartPolicy: Never
+
