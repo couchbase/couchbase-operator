@@ -106,6 +106,24 @@ func (c *Cluster) send(ev *clusterEvent) {
 }
 
 func (c *Cluster) setup() error {
+	var shouldCreateCluster bool
+	switch c.status.Phase {
+	case spec.ClusterPhaseNone:
+		shouldCreateCluster = true
+	case spec.ClusterPhaseCreating:
+		return errCreatedCluster
+	case spec.ClusterPhaseRunning:
+		shouldCreateCluster = false
+	}
+
+	if shouldCreateCluster {
+		return c.create()
+	}
+
+	return nil
+}
+
+func (c *Cluster) create() error {
 	c.status.SetPhase(spec.ClusterPhaseCreating)
 	if err := c.updateCRStatus(); err != nil {
 		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
