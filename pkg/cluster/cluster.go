@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
@@ -11,8 +12,10 @@ import (
 	"github.com/couchbaselabs/couchbase-operator/pkg/spec"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
 	"github.com/sirupsen/logrus"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -146,7 +149,7 @@ func (c *Cluster) create() error {
 func (c *Cluster) run() {
 	defer func() {
 		c.logger.Infof("deleting the failed cluster")
-		//c.reportFailedStatus()
+		c.reportFailedStatus()
 		c.delete()
 	}()
 
@@ -274,4 +277,38 @@ func (c *Cluster) createPod(members couchbaseutil.MemberSet, m *couchbaseutil.Me
 	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec, c.cluster.AsOwner())
 	_, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
 	return err
+}
+
+func (c *Cluster) reportFailedStatus() {
+	retryInterval := 5 * time.Second
+
+	f := func() (bool, error) {
+		c.status.SetPhase(spec.ClusterPhaseFailed)
+		err := c.updateCRStatus()
+		if err == nil || k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return true, nil
+		}
+
+		if !apierrors.IsConflict(err) {
+			c.logger.Warningf("retry report status in %v: fail to update: %v", retryInterval, err)
+			return false, nil
+		}
+
+		cl, err := c.config.CouchbaseCRCli.Get(context.TODO(), c.cluster.Namespace, c.cluster.Name)
+		if err != nil {
+			// Update (PUT) will return conflict even if object is deleted since we have UID set in object.
+			// Because it will check UID first and return something like:
+			// "Precondition failed: UID in precondition: 0xc42712c0f0, UID in object meta: ".
+			if k8sutil.IsKubernetesResourceNotFoundError(err) {
+				return true, nil
+			}
+			c.logger.Warningf("retry report status in %v: fail to get latest version: %v", retryInterval, err)
+			return false, nil
+		}
+		c.cluster = cl
+		return false, nil
+
+	}
+
+	retryutil.Retry(retryInterval, math.MaxInt64, f)
 }
