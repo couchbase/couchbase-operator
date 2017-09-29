@@ -1,0 +1,58 @@
+apiVersion: "couchbase.database.couchbase.com/v1beta1"
+kind: "CouchbaseCluster"
+metadata:
+  name: cb-example
+  namespace: default
+spec:
+  image: couchbase/server
+  version: "enterprise-4.5.1"
+  paused: false
+  antiAffinity: true
+  cluster:
+    dataServiceMemoryQuota: 256
+    indexServiceMemoryQuota: 256
+    searchServiceMemoryQuota: 256
+    indexStorageSetting: default
+  buckets:
+    - name: default
+      type: couchbase
+      memoryQuota: 1024
+      replicas: 1
+      ioPriority: high
+      evictionPolicy: value-eviction
+      conflictResolution: seqno
+      enableFlush: true
+      enableIndexReplica: false
+  nodeSpecifications:
+  - size: 1
+    services:
+      - kv
+      - index
+      - query
+      - search
+    dataPath: /opt/couchbase/var/lib/couchbase/data
+    indexPath: /opt/couchbase/var/lib/couchbase/data
+    persistentVolumes:
+      volumeSize: 40960
+      storageClass: standard
+    couchabseEnv:
+      ENV1: value
+    resources:
+      limits:
+        cpu: 4GHz
+        memory: 8GiB
+        storage: 100GiB
+      requests:
+        cpu: 2GHz
+        memory: 8GiB
+        storage: 50GiB
+    podPolicy:
+      labels:
+        couchbase_services: all
+      nodeSelector:
+        instanceType: large
+      tolerations:
+        key: app
+        operator: Equal
+        value: cbapp
+        effect: NoSchedule
