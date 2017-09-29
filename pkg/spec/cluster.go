@@ -1,11 +1,14 @@
 package spec
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 import (
 	"encoding/json"
+	"time"
 
 	"k8s.io/api/core/v1"
 )
@@ -71,6 +74,9 @@ type ClusterSpec struct {
 	//
 	// Updating Pod does not take effect on any existing couchbase pods.
 	Pod *PodPolicy `json:"pod,omitempty"`
+
+	// couchbase cluster TLS configuration
+	TLS *TLSPolicy `json:"TLS,omitempty"`
 
 	// Cluster specific settings
 	ClusterSettings *ClusterConfig `json:"settings"`
@@ -189,13 +195,21 @@ type ClusterStatus struct {
 
 	// Size is the current size of the cluster
 	Size int `json:"size"`
-	// Members are the etcd members in the cluster
-	//Members MembersStatus `json:"members"`
+	// Members are the couchbase members in the cluster
+	Members MembersStatus `json:"members"`
 	// CurrentVersion is the current cluster version
 	CurrentVersion string `json:"currentVersion"`
 	// TargetVersion is the version the cluster upgrading to.
 	// If the cluster is not upgrading, TargetVersion is empty.
 	TargetVersion string `json:"targetVersion"`
+}
+
+type MembersStatus struct {
+	// Ready are the couchbase members that are ready to serve requests
+	// The member names are the same as the couchbase pod names
+	Ready []string `json:"ready,omitempty"`
+	// Unready are the couchbase members not ready to serve requests
+	Unready []string `json:"unready,omitempty"`
 }
 
 func (cs ClusterStatus) Copy() ClusterStatus {
@@ -209,6 +223,11 @@ func (cs ClusterStatus) Copy() ClusterStatus {
 		panic(err)
 	}
 	return newCS
+}
+
+func (cs *ClusterStatus) SetVersion(v string) {
+	cs.TargetVersion = ""
+	cs.CurrentVersion = v
 }
 
 func (c *ClusterStatus) IsFailed() bool {
@@ -229,4 +248,62 @@ func (cs *ClusterStatus) Control() {
 
 func (cs *ClusterStatus) SetReason(r string) {
 	cs.Reason = r
+}
+
+func (cs *ClusterStatus) AppendScalingUpCondition(from, to int) {
+	c := ClusterCondition{
+		Type:           ClusterConditionScalingUp,
+		Reason:         scalingReason(from, to),
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) AppendScalingDownCondition(from, to int) {
+	c := ClusterCondition{
+		Type:           ClusterConditionScalingDown,
+		Reason:         scalingReason(from, to),
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) AppendRemovingDeadMember(name string) {
+	reason := fmt.Sprintf("removing dead member %s", name)
+
+	c := ClusterCondition{
+		Type:           ClusterConditionRemovingDeadMember,
+		Reason:         reason,
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) SetReadyCondition() {
+	c := ClusterCondition{
+		Type:           ClusterConditionReady,
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+
+	if len(cs.Conditions) == 0 {
+		cs.appendCondition(c)
+		return
+	}
+
+	lastc := cs.Conditions[len(cs.Conditions)-1]
+	if lastc.Type == ClusterConditionReady {
+		return
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
+	cs.Conditions = append(cs.Conditions, c)
+	if len(cs.Conditions) > 10 {
+		cs.Conditions = cs.Conditions[1:]
+	}
+}
+
+func scalingReason(from, to int) string {
+	return fmt.Sprintf("Current cluster size: %d, desired cluster size: %d", from, to)
 }

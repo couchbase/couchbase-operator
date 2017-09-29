@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"math"
 	"reflect"
@@ -15,12 +16,15 @@ import (
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
 	"github.com/sirupsen/logrus"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 var (
 	reconcileInterval = 8 * time.Second
+	podTerminationGracePeriod = int64(5)
 )
 
 type clusterEventType string
@@ -49,6 +53,8 @@ type Cluster struct {
 	memberCounter int
 	eventCh       chan *clusterEvent
 	stopCh        chan struct{}
+	members       couchbaseutil.MemberSet
+	tlsConfig     *tls.Config
 	gc            *garbagecollection.GC
 }
 
@@ -134,13 +140,17 @@ func (c *Cluster) create() error {
 	}
 
 	m := &couchbaseutil.Member{
-		Name:      couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter),
-		Namespace: c.cluster.Namespace,
+		Name:         couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter),
+		Namespace:    c.cluster.Namespace,
+		SecureClient: false,
 	}
 	ms := couchbaseutil.NewMemberSet(m)
 	if err := c.createPod(ms, m); err != nil {
 		return err
 	}
+
+	c.memberCounter++
+	c.members = ms
 
 	return k8sutil.CreateCouchbaseService(c.config.KubeCli, c.cluster.Name,
 		c.cluster.Namespace, c.cluster.AsOwner())
@@ -159,7 +169,7 @@ func (c *Cluster) run() {
 	}
 	c.logger.Infof("start running...")
 
-	//var rerr error
+	var rerr error
 	for {
 		select {
 		case event := <-c.eventCh:
@@ -181,8 +191,6 @@ func (c *Cluster) run() {
 			}
 
 		case <-time.After(reconcileInterval):
-			//start := time.Now()
-
 			if c.cluster.Spec.Paused {
 				c.status.PauseControl()
 				c.logger.Infof("control is paused, skipping reconciliation")
@@ -190,64 +198,49 @@ func (c *Cluster) run() {
 			} else {
 				c.status.Control()
 			}
-			/*
-				running, pending, err := c.pollPods()
-				if err != nil {
-					c.logger.Errorf("fail to poll pods: %v", err)
-					reconcileFailed.WithLabelValues("failed to poll pods").Inc()
-					continue
-				}
 
-				if len(pending) > 0 {
-					// Pod startup might take long, e.g. pulling image. It would deterministically become running or succeeded/failed later.
-					c.logger.Infof("skip reconciliation: running (%v), pending (%v)", k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
-					reconcileFailed.WithLabelValues("not all pods are running").Inc()
-					continue
-				}
-				if len(running) == 0 {
-					c.logger.Warningf("all etcd pods are dead. Trying to recover from a previous backup")
-					rerr = c.disasterRecovery(nil)
-					if rerr != nil {
-						c.logger.Errorf("fail to do disaster recovery: %v", rerr)
-					}
-					// On normal recovery case, we need backoff. On error case, this could be either backoff or leading to cluster delete.
-					break
-				}
+			running, pending, err := c.pollPods()
+			if err != nil {
+				c.logger.Errorf("fail to poll pods: %v", err)
+				continue
+			}
 
-				// On controller restore, we could have "members == nil"
-				if rerr != nil || c.members == nil {
-					rerr = c.updateMembers(podsToMemberSet(running, c.isSecureClient()))
-					if rerr != nil {
-						c.logger.Errorf("failed to update members: %v", rerr)
-						break
-					}
-				}
-				rerr = c.reconcile(running)
+			if len(pending) > 0 {
+				// Pod startup might take long, e.g. pulling image. It would
+				// deterministically become running or succeeded/failed later.
+				c.logger.Infof("skip reconciliation: running (%v), pending (%v)",
+					k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
+				continue
+			}
+
+			// On controller restore, we could have "members == nil"
+			if rerr != nil || c.members == nil {
+				rerr = c.updateMembers(podsToMemberSet(running, c.isSecureClient()))
 				if rerr != nil {
-					c.logger.Errorf("failed to reconcile: %v", rerr)
+					c.logger.Errorf("failed to update members: %v", rerr)
 					break
 				}
+			}
 
-				if err := c.updateLocalBackupStatus(); err != nil {
-					c.logger.Warningf("failed to update local backup service status: %v", err)
-				}
-				c.updateMemberStatus(c.members)
-				if err := c.updateCRStatus(); err != nil {
-					c.logger.Warningf("periodic update CR status failed: %v", err)
-				}
-
-				reconcileHistogram.WithLabelValues(c.name()).Observe(time.Since(start).Seconds())*/
-		}
-		/*
+			rerr = c.reconcile(running)
 			if rerr != nil {
-				reconcileFailed.WithLabelValues(rerr.Error()).Inc()
-			}*/
+				c.logger.Errorf("failed to reconcile: %v", rerr)
+				break
+			}
 
-		/*		if isFatalError(rerr) {
-				c.status.SetReason(rerr.Error())
-				c.logger.Errorf("cluster failed: %v", rerr)
-				return
-			}*/
+			c.updateMemberStatus(c.members)
+			if err := c.updateCRStatus(); err != nil {
+				c.logger.Warningf("periodic update CR status failed: %v", err)
+			}
+
+		}
+
+		/*
+		if isFatalError(rerr) {
+			c.status.SetReason(rerr.Error())
+			c.logger.Errorf("cluster failed: %v", rerr)
+			return
+		}*/
 	}
 }
 
@@ -272,11 +265,76 @@ func (c *Cluster) updateCRStatus() error {
 	return nil
 }
 
+func (c *Cluster) isSecureClient() bool {
+	return c.cluster.Spec.TLS.IsSecureClient()
+}
+
 func (c *Cluster) createPod(members couchbaseutil.MemberSet, m *couchbaseutil.Member) error {
 
 	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec, c.cluster.AsOwner())
 	_, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
 	return err
+}
+
+func (c *Cluster) removePod(name string) error {
+	ns := c.cluster.Namespace
+	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
+	err := c.config.KubeCli.Core().Pods(ns).Delete(name, opts)
+	if err != nil {
+		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return err
+		}
+		c.logger.Warnf("pod (%s) not found while trying to delete it", name)
+	}
+
+	c.logger.Infof("deleted pod (%s)", name)
+	return nil
+}
+
+func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
+	podList, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Name))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list running pods: %v", err)
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if len(pod.OwnerReferences) < 1 {
+			c.logger.Warningf("pollPods: ignore pod %v: no owner", pod.Name)
+			continue
+		}
+		if pod.OwnerReferences[0].UID != c.cluster.UID {
+			c.logger.Warningf("pollPods: ignore pod %v: owner (%v) is not %v",
+				pod.Name, pod.OwnerReferences[0].UID, c.cluster.UID)
+			continue
+		}
+		switch pod.Status.Phase {
+		case v1.PodRunning:
+			running = append(running, pod)
+		case v1.PodPending:
+			pending = append(pending, pod)
+		}
+	}
+
+	return running, pending, nil
+}
+
+func (c *Cluster) updateMemberStatus(members couchbaseutil.MemberSet) {
+	var ready, unready []string
+	for _, m := range members {
+		url := m.ClientURL()
+		healthy, err := couchbaseutil.CheckHealth(url, c.tlsConfig)
+		if err != nil {
+			c.logger.Warningf("health check of couchbase member (%s) failed: %v", url, err)
+		}
+		if healthy {
+			ready = append(ready, m.Name)
+		} else {
+			unready = append(unready, m.Name)
+		}
+	}
+	c.status.Members.Ready = ready
+	c.status.Members.Unready = unready
 }
 
 func (c *Cluster) reportFailedStatus() {

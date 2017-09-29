@@ -57,6 +57,17 @@ func MustNewKubeClient() kubernetes.Interface {
 	return kubernetes.NewForConfigOrDie(cfg)
 }
 
+func GetPodNames(pods []*v1.Pod) []string {
+	if len(pods) == 0 {
+		return nil
+	}
+	res := []string{}
+	for _, p := range pods {
+		res = append(res, p.Name)
+	}
+	return res
+}
+
 func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
@@ -67,14 +78,6 @@ func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs spec.Clu
 		"couchbase_node":    m.Name,
 		"couchbase_cluster": clusterName,
 	}
-	/*
-		commands := fmt.Sprintf("sleep 15 && /opt/couchbase/bin/couchbase-cli cluster-init -c 127.0.0.1 " +
-			"--cluster-username %s --cluster-password %s --services %s --cluster-ramsize %d " +
-			"--cluster-index-ramsize %d --cluster-fts-ramsize %d --index-storage-setting %s " +
-			"--cluster-name %s", cs.ClusterSettings.AdminUsername, cs.ClusterSettings.AdminPassword,
-			cs.ClusterSettings.Services, cs.ClusterSettings.DataServiceMemQuota,
-			cs.ClusterSettings.IndexServiceMemQuota, cs.ClusterSettings.SearchServiceMemQuota,
-			cs.ClusterSettings.IndexStorageSetting, clusterName)*/
 
 	container := containerWithLivenessProbe(couchbaseContainer("", cs.BaseImage, cs.Version),
 		couchbaseLivenessProbe())
