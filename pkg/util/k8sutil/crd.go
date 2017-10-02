@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/couchbaselabs/couchbase-operator/pkg/spec"
+	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -15,15 +15,15 @@ import (
 func CreateCRD(clientset apiextensionsclient.Interface) error {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: spec.CRDName,
+			Name: cbapi.CRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   spec.SchemeGroupVersion.Group,
-			Version: spec.SchemeGroupVersion.Version,
+			Group:   cbapi.SchemeGroupVersion.Group,
+			Version: cbapi.SchemeGroupVersion.Version,
 			Scope:   apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:     spec.CRDResourcePlural,
-				Kind:       spec.CRDResourceKind,
+				Plural:     cbapi.CRDResourcePlural,
+				Kind:       cbapi.CRDResourceKind,
 				ShortNames: []string{"couchbase"},
 			},
 		},
@@ -34,7 +34,7 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 
 func WaitCRDReady(clientset apiextensionsclient.Interface) error {
 	err := retryutil.Retry(5*time.Second, 20, func() (bool, error) {
-		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(spec.CRDName, metav1.GetOptions{})
+		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(cbapi.CRDName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"time"
 
+	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/client"
 	"github.com/couchbaselabs/couchbase-operator/pkg/garbagecollection"
-	"github.com/couchbaselabs/couchbase-operator/pkg/spec"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
@@ -36,7 +36,7 @@ const (
 
 type clusterEvent struct {
 	typ     clusterEventType
-	cluster *spec.CouchbaseCluster
+	cluster *cbapi.CouchbaseCluster
 }
 
 type Config struct {
@@ -48,8 +48,8 @@ type Config struct {
 type Cluster struct {
 	logger        *logrus.Entry
 	config        Config
-	cluster       *spec.CouchbaseCluster
-	status        spec.ClusterStatus
+	cluster       *cbapi.CouchbaseCluster
+	status        cbapi.ClusterStatus
 	memberCounter int
 	eventCh       chan *clusterEvent
 	stopCh        chan struct{}
@@ -58,7 +58,7 @@ type Cluster struct {
 	gc            *garbagecollection.GC
 }
 
-func New(config Config, cl *spec.CouchbaseCluster) *Cluster {
+func New(config Config, cl *cbapi.CouchbaseCluster) *Cluster {
 	c := &Cluster{
 		logger: logrus.WithFields(logrus.Fields{
 			"module":       "cluster",
@@ -76,12 +76,12 @@ func New(config Config, cl *spec.CouchbaseCluster) *Cluster {
 	go func() {
 		if err := c.setup(); err != nil {
 			c.logger.Errorf("cluster failed to setup: %v", err)
-			if c.status.Phase != spec.ClusterPhaseFailed {
+			if c.status.Phase != cbapi.ClusterPhaseFailed {
 				c.status.SetReason(err.Error())
-				c.status.SetPhase(spec.ClusterPhaseFailed)
+				c.status.SetPhase(cbapi.ClusterPhaseFailed)
 				if err := c.updateCRStatus(); err != nil {
 					c.logger.Errorf("failed to update cluster phase (%v): %v",
-						spec.ClusterPhaseFailed, err)
+						cbapi.ClusterPhaseFailed, err)
 				}
 			}
 			return
@@ -92,7 +92,7 @@ func New(config Config, cl *spec.CouchbaseCluster) *Cluster {
 	return c
 }
 
-func (c *Cluster) Update(cl *spec.CouchbaseCluster) {
+func (c *Cluster) Update(cl *cbapi.CouchbaseCluster) {
 	c.send(&clusterEvent{
 		typ:     eventModifyCluster,
 		cluster: cl,
@@ -117,11 +117,11 @@ func (c *Cluster) send(ev *clusterEvent) {
 func (c *Cluster) setup() error {
 	var shouldCreateCluster bool
 	switch c.status.Phase {
-	case spec.ClusterPhaseNone:
+	case cbapi.ClusterPhaseNone:
 		shouldCreateCluster = true
-	case spec.ClusterPhaseCreating:
+	case cbapi.ClusterPhaseCreating:
 		return errCreatedCluster
-	case spec.ClusterPhaseRunning:
+	case cbapi.ClusterPhaseRunning:
 		shouldCreateCluster = false
 	}
 
@@ -133,10 +133,10 @@ func (c *Cluster) setup() error {
 }
 
 func (c *Cluster) create() error {
-	c.status.SetPhase(spec.ClusterPhaseCreating)
+	c.status.SetPhase(cbapi.ClusterPhaseCreating)
 	if err := c.updateCRStatus(); err != nil {
 		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
-			spec.ClusterPhaseCreating, err)
+			cbapi.ClusterPhaseCreating, err)
 	}
 
 	m := &couchbaseutil.Member{
@@ -163,7 +163,7 @@ func (c *Cluster) run() {
 		c.delete()
 	}()
 
-	c.status.SetPhase(spec.ClusterPhaseRunning)
+	c.status.SetPhase(cbapi.ClusterPhaseRunning)
 	if err := c.updateCRStatus(); err != nil {
 		c.logger.Warningf("update initial CR status failed: %v", err)
 	}
@@ -341,7 +341,7 @@ func (c *Cluster) reportFailedStatus() {
 	retryInterval := 5 * time.Second
 
 	f := func() (bool, error) {
-		c.status.SetPhase(spec.ClusterPhaseFailed)
+		c.status.SetPhase(cbapi.ClusterPhaseFailed)
 		err := c.updateCRStatus()
 		if err == nil || k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return true, nil

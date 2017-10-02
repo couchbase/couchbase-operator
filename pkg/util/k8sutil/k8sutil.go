@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/couchbaselabs/couchbase-operator/pkg/spec"
+	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
@@ -72,7 +72,7 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
 
-func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs spec.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
+func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
 	labels := map[string]string{
 		"app":               "couchbase",
 		"couchbase_node":    m.Name,

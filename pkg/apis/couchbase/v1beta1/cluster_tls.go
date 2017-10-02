@@ -1,4 +1,4 @@
-package spec
+package v1beta1
 
 import "errors"
 

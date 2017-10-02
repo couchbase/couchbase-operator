@@ -3,7 +3,7 @@ package k8sutil
 import (
 	"fmt"
 
-	"github.com/couchbaselabs/couchbase-operator/pkg/spec"
+	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -125,7 +125,7 @@ func PodWithNodeSelector(p *v1.Pod, ns map[string]string) *v1.Pod {
 	return p
 }
 
-func applyPodPolicy(clusterName string, pod *v1.Pod, policy *spec.PodPolicy) {
+func applyPodPolicy(clusterName string, pod *v1.Pod, policy *cbapi.PodPolicy) {
 	if policy == nil {
 		return
 	}
