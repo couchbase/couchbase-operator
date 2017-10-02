@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	reconcileInterval = 8 * time.Second
+	reconcileInterval         = 8 * time.Second
 	podTerminationGracePeriod = int64(5)
 )
 
@@ -151,9 +151,21 @@ func (c *Cluster) create() error {
 
 	c.memberCounter++
 	c.members = ms
+	if err := c.setupServices(); err != nil {
+		return fmt.Errorf("cluster create: fail to create client service LB: %v", err)
+	}
 
-	return k8sutil.CreateCouchbaseService(c.config.KubeCli, c.cluster.Name,
+	return nil
+}
+
+func (c *Cluster) setupServices() error {
+	err := k8sutil.CreateCouchbaseService(c.config.KubeCli, c.cluster.Name,
 		c.cluster.Namespace, c.cluster.AsOwner())
+	if err != nil {
+		return err
+	}
+
+	return k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
 }
 
 func (c *Cluster) run() {
@@ -235,12 +247,6 @@ func (c *Cluster) run() {
 
 		}
 
-		/*
-		if isFatalError(rerr) {
-			c.status.SetReason(rerr.Error())
-			c.logger.Errorf("cluster failed: %v", rerr)
-			return
-		}*/
 	}
 }
 

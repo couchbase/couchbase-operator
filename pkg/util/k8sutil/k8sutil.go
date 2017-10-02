@@ -143,7 +143,21 @@ func CreateCouchbaseService(kubecli kubernetes.Interface, clusterName, ns string
 		Protocol:   v1.ProtocolTCP,
 	}}
 
-	svc := createCouchbaseServiceManifest(ClientServiceName(clusterName), clusterName, "", ports)
+	return createService(kubecli, ClientServiceName(clusterName), clusterName, ns, "", ports, owner)
+}
+
+func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
+	ports := []v1.ServicePort{{
+		Name:       "peer",
+		Port:       8091,
+		TargetPort: intstr.FromInt(8091),
+		Protocol:   v1.ProtocolTCP,
+	}}
+	return createService(kubecli, clusterName, clusterName, ns, v1.ClusterIPNone, ports, owner)
+}
+
+func createService(kubecli kubernetes.Interface, svcName, clusterName, ns, clusterIP string, ports []v1.ServicePort, owner metav1.OwnerReference) error {
+	svc := createCouchbaseServiceManifest(svcName, clusterName, clusterIP, ports)
 	addOwnerRefToObject(svc.GetObjectMeta(), owner)
 	_, err := kubecli.CoreV1().Services(ns).Create(svc)
 	return err
