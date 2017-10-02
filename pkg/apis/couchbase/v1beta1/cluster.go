@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -83,11 +84,7 @@ type ClusterSpec struct {
 }
 
 type ClusterConfig struct {
-	// The username for the Administrator user
-	AdminUsername string `json:"username"`
-
-	// The password for the Administrator user
-	AdminPassword string `json:"password"`
+	ClusterAuth
 
 	// The services to run on each node in the cluster
 	Services string `json:"services"`
@@ -103,6 +100,14 @@ type ClusterConfig struct {
 
 	// The index storage mode to use for secondary indexing
 	IndexStorageSetting string `json:"indexStorageSetting"`
+}
+
+type ClusterAuth struct {
+	// The username for the Administrator user
+	AdminUsername string `json:"username"`
+
+	// The password for the Administrator user
+	AdminPassword string `json:"password"`
 }
 
 // PodPolicy defines the policy to create pod for the couchbase container.
@@ -212,6 +217,11 @@ type MembersStatus struct {
 	Unready []string `json:"unready,omitempty"`
 }
 
+func (cl *CouchbaseCluster) Auth() (string, string) {
+	auth := cl.Spec.ClusterSettings.ClusterAuth
+	return auth.AdminUsername, auth.AdminPassword
+}
+
 func (cs ClusterStatus) Copy() ClusterStatus {
 	newCS := ClusterStatus{}
 	b, err := json.Marshal(cs)
@@ -302,6 +312,10 @@ func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
 	if len(cs.Conditions) > 10 {
 		cs.Conditions = cs.Conditions[1:]
 	}
+}
+
+func (cc *ClusterConfig) ServicesArr() []string {
+	return strings.Split(cc.Services, ",")
 }
 
 func scalingReason(from, to int) string {

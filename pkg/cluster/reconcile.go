@@ -2,10 +2,10 @@ package cluster
 
 import (
 	"fmt"
-
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
+	"time"
 )
 
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
@@ -89,9 +89,6 @@ func (c *Cluster) resize() error {
 func (c *Cluster) addOneMember() error {
 	c.status.AppendScalingUpCondition(c.members.Size(), c.cluster.Spec.Size)
 
-	// TODO - Add the Couchbase API calls to add the new server to the existing
-	// cluster here.
-
 	newMember := c.newMember(c.memberCounter)
 	c.members.Add(newMember)
 
@@ -101,6 +98,24 @@ func (c *Cluster) addOneMember() error {
 	c.memberCounter++
 	c.logger.Infof("added member (%s)", newMember.Name)
 	return nil
+}
+
+// initializes member with cluster settings
+func (c *Cluster) initMember(m *couchbaseutil.Member) error {
+	// create client
+	username, password := c.cluster.Auth()
+	couchbaseClient, err := couchbaseutil.
+		NewClientForMember(m, username, password)
+
+	// make sure node is ready
+	_, err = couchbaseClient.IsReady(m.ClientURL(), 30*time.Second)
+	if err != nil {
+		return err
+	}
+
+	// init node
+	services := c.cluster.Spec.ClusterSettings.ServicesArr()
+	return couchbaseClient.Initialize(m.Addr(), services, c.cluster.Namespace)
 }
 
 func (c *Cluster) removeOneMember() error {

@@ -155,7 +155,7 @@ func (c *Cluster) create() error {
 		return fmt.Errorf("cluster create: fail to create client service LB: %v", err)
 	}
 
-	return nil
+	return c.initMember(m)
 }
 
 func (c *Cluster) setupServices() error {
