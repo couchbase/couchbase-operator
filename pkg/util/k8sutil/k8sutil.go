@@ -135,20 +135,9 @@ func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, port
 	return svc
 }
 
-func CreateCouchbaseService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
-	ports := []v1.ServicePort{{
-		Name:       "cb-admin",
-		Port:       8091,
-		TargetPort: intstr.FromInt(8091),
-		Protocol:   v1.ProtocolTCP,
-	}}
-
-	return createService(kubecli, ClientServiceName(clusterName), clusterName, ns, "", ports, owner)
-}
-
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
 	ports := []v1.ServicePort{{
-		Name:       "peer",
+		Name:       "cb-admin",
 		Port:       8091,
 		TargetPort: intstr.FromInt(8091),
 		Protocol:   v1.ProtocolTCP,

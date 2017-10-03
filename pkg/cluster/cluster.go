@@ -152,19 +152,13 @@ func (c *Cluster) create() error {
 	c.memberCounter++
 	c.members = ms
 	if err := c.setupServices(); err != nil {
-		return fmt.Errorf("cluster create: fail to create client service LB: %v", err)
+		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}
 
 	return c.initMember(m)
 }
 
 func (c *Cluster) setupServices() error {
-	err := k8sutil.CreateCouchbaseService(c.config.KubeCli, c.cluster.Name,
-		c.cluster.Namespace, c.cluster.AsOwner())
-	if err != nil {
-		return err
-	}
-
 	return k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
 }
 
