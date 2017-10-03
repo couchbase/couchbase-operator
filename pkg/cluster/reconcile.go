@@ -5,7 +5,6 @@ import (
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
-	"time"
 )
 
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
@@ -97,25 +96,88 @@ func (c *Cluster) addOneMember() error {
 	}
 	c.memberCounter++
 	c.logger.Infof("added member (%s)", newMember.Name)
+
+	// add node to cluster
+	if err := c.addClusterNode(newMember); err != nil {
+		return err
+	}
+
+	// rebalance if this is last node to add to cluster
+	if c.memberCounter == c.cluster.Spec.Size {
+		//TODO: watch for rebalance complete and handle failures
+		return c.rebalanceInNodes()
+	}
+
 	return nil
 }
 
-// initializes member with cluster settings
-func (c *Cluster) initMember(m *couchbaseutil.Member) error {
+// Rebalance in nodes added to cluster.  This method will collect
+// all the otpNodes as known nodes and run the rebalance on cluster
+func (c *Cluster) rebalanceInNodes() error {
+
+	// TODO: orchestrator api
+	m := c.members.First(c.cluster.Name)
+	username, password := c.cluster.Auth()
+	couchbaseClient, err := couchbaseutil.NewClient(m.ClientURL(), username, password)
+	if err != nil {
+		return nil
+	}
+
+	// get known nodes being added to cluster
+	knownNodes, err := couchbaseClient.KnownOTPNodes()
+	if err != nil {
+		return nil
+	}
+	return couchbaseClient.Rebalance(knownNodes, []string{})
+}
+
+// initializes node with cluster settings
+func (c *Cluster) initClusterNode(m *couchbaseutil.Member) error {
+
 	// create client
 	username, password := c.cluster.Auth()
-	couchbaseClient, err := couchbaseutil.
-		NewClientForMember(m, username, password)
-
-	// make sure node is ready
-	_, err = couchbaseClient.IsReady(m.ClientURL(), 30*time.Second)
+	couchbaseClient, err := couchbaseutil.NewReadyClient(m.ClientURL(), username, password)
 	if err != nil {
 		return err
 	}
 
 	// init node
 	services := c.cluster.Spec.ClusterSettings.ServicesArr()
-	return couchbaseClient.Initialize(m.Addr(), services, c.cluster.Namespace)
+	settings := c.cluster.Spec.ClusterSettings
+	return couchbaseClient.Initialize(m.Addr(),
+		services,
+		settings.DataServiceMemQuota,
+		settings.IndexServiceMemQuota,
+		settings.SearchServiceMemQuota)
+}
+
+// adds a node to the cluster
+func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
+
+	// create client for node currently active in cluster
+	// TODO: orchestrator api
+	activeMember := c.members.First(c.cluster.Name)
+	username, password := c.cluster.Auth()
+	currentNodeClient, err := couchbaseutil.NewReadyClient(activeMember.ClientURL(), username, password)
+	if err != nil {
+		return err
+	}
+
+	// make sure node is ready to be added
+	newNodeClient, err := couchbaseutil.NewReadyClient(m.ClientURL(), username, password)
+	if err != nil {
+		return err
+	}
+
+	// add node to cluster
+	services := c.cluster.Spec.ClusterSettings.ServicesArr()
+	err = currentNodeClient.RetryableAddNode(m.Addr(), username, password, services, c.cluster.Namespace, 5)
+	if err != nil {
+		return err
+	}
+
+	// make sure node being added is healthy
+	return newNodeClient.Healthy(couchbaseutil.RestTimeout)
 }
 
 func (c *Cluster) removeOneMember() error {

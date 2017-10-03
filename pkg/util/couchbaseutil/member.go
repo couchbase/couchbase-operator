@@ -79,6 +79,12 @@ func (ms MemberSet) PickOne() *Member {
 	panic("empty")
 }
 
+// retrieve the member at index 0 of the memberset
+func (ms MemberSet) First(clusterName string) *Member {
+	memberName := CreateMemberName(clusterName, 0)
+	return ms[memberName]
+}
+
 func CreateMemberName(clusterName string, member int) string {
 	return fmt.Sprintf("%s-%04d", clusterName, member)
 }

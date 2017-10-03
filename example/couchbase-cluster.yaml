@@ -3,13 +3,13 @@ kind: "CouchbaseCluster"
 metadata:
   name: "cb-example"
 spec:
-  size: 1
+  size: 3
   baseImage: couchbase/server
   version: "enterprise-4.5.1"
   cluster:
     username: "Administrator"
     password: "password"
-    services: "data,index,query,fts"
+    services: "kv,index,n1ql"
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256

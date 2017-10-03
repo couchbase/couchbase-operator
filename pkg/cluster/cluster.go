@@ -155,7 +155,7 @@ func (c *Cluster) create() error {
 		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}
 
-	return c.initMember(m)
+	return c.initClusterNode(m)
 }
 
 func (c *Cluster) setupServices() error {
