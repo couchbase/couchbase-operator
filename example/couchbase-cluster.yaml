@@ -14,3 +14,13 @@ spec:
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
     indexStorageSetting: default
+  buckets:
+    - name: default
+      type: couchbase
+      memoryQuota: 128
+      replicas: 0
+      ioPriority: high
+      evictionPolicy: fullEviction
+      conflictResolution: sequence
+      enableFlush: true
+      enableIndexReplica: false

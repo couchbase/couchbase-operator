@@ -81,6 +81,9 @@ type ClusterSpec struct {
 
 	// Cluster specific settings
 	ClusterSettings *ClusterConfig `json:"cluster"`
+
+	// Bucket specific settings
+	BucketSettings *[]BucketConfig `json:"buckets"`
 }
 
 type ClusterConfig struct {
@@ -108,6 +111,35 @@ type ClusterAuth struct {
 
 	// The password for the Administrator user
 	AdminPassword string `json:"password"`
+}
+
+type BucketConfig struct {
+	// The bucket name
+	BucketName string `json:"name"`
+
+	// The type of bucket to use
+	BucketType string `json:"type"`
+
+	// The amount of memory that should be allocated to the bucket
+	BucketMemoryQuota int `json:"memoryQuota"`
+
+	// The number of bucket replicates
+	BucketReplicas int `json:"replicas"`
+
+	// The priority when compared to other buckets
+	IoPriority string `json:"ioPriority"`
+
+	// The bucket eviction policy which determines behavior during expire and high mem usage
+	EvictionPolicy string `json:"evictionPolicy"`
+
+	// The bucket's conflict resolution mechanism; which is to be used if a conflict occurs during Cross Data-Center Replication (XDCR). Sequence-based and timestamp-based mechanisms are supported.
+	ConflictResolution string `json:"conflictResolution"`
+
+	// The enable flush option denotes wether the data in the bucket can be flushed
+	EnableFlush bool `json:"enableFlush"`
+
+	// Enable Index replica specifies whether or not to enable view index replicas for this bucket. This parameter defaults to false if it is not specified. This parameter only affects Couchbase buckets.
+	EnableIndexReplica bool `json:"enableIndexReplica"`
 }
 
 // PodPolicy defines the policy to create pod for the couchbase container.
@@ -207,6 +239,9 @@ type ClusterStatus struct {
 	// TargetVersion is the version the cluster upgrading to.
 	// If the cluster is not upgrading, TargetVersion is empty.
 	TargetVersion string `json:"targetVersion"`
+
+	// Name of buckets active within cluster
+	Buckets []string
 }
 
 type MembersStatus struct {
@@ -220,6 +255,16 @@ type MembersStatus struct {
 func (cl *CouchbaseCluster) Auth() (string, string) {
 	auth := cl.Spec.ClusterSettings.ClusterAuth
 	return auth.AdminUsername, auth.AdminPassword
+}
+
+// diff spec and status buckets to determine
+// which should be added and which removed
+func (cl *CouchbaseCluster) BucketDiff() ([]string, []string) {
+	specBuckets := cl.Spec.BucketNames()
+	statusBuckets := cl.Status.Buckets
+	bucketsToAdd := MissingItems(specBuckets, statusBuckets)
+	bucketsToRemove := MissingItems(statusBuckets, specBuckets)
+	return bucketsToAdd, bucketsToRemove
 }
 
 func (cs ClusterStatus) Copy() ClusterStatus {
@@ -314,10 +359,44 @@ func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
 	}
 }
 
+// list of bucket names from config
+func (cs *ClusterSpec) BucketNames() []string {
+	buckets := []string{}
+	if cs.BucketSettings == nil {
+		return buckets
+	}
+	for _, b := range *(cs.BucketSettings) {
+		buckets = append(buckets, b.BucketName)
+	}
+	return buckets
+}
+
 func (cc *ClusterConfig) ServicesArr() []string {
 	return strings.Split(cc.Services, ",")
 }
-
 func scalingReason(from, to int) string {
 	return fmt.Sprintf("Current cluster size: %d, desired cluster size: %d", from, to)
+}
+
+// check wether item exists within array
+func HasItem(itm string, arr []string) bool {
+	for _, a := range arr {
+		if a == itm {
+			return true
+		}
+	}
+	return false
+}
+
+// get list of items which are in first array but not in second
+func MissingItems(a1, a2 []string) []string {
+	missingItems := []string{}
+	for _, a := range a1 {
+		// checking if item is also in a2
+		if !HasItem(a, a2) {
+			// add to missing
+			missingItems = append(missingItems, a)
+		}
+	}
+	return missingItems
 }

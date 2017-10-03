@@ -32,6 +32,15 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	// TODO: We should add, delete or edit buckets here.
+	// create any buckets that do not exist
+
+	bucketsToAdd, bucketsToRemove := c.cluster.BucketDiff()
+	if len(bucketsToAdd) > 0 {
+		// TODO: add bucket
+	}
+	if len(bucketsToRemove) > 0 {
+		// TODO: rm bucket
+	}
 
 	// TODO: We should upgrade any nodes in the cluster here.
 
