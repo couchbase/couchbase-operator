@@ -189,7 +189,10 @@ func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 
 	// add node to cluster
 	services := c.cluster.Spec.ClusterSettings.ServicesArr()
-	err = currentNodeClient.RetryableAddNode(m.Addr(), username, password, services, c.cluster.Namespace, 5)
+	f := func() (bool, error) {
+		return true, currentNodeClient.AddNode(m.Addr(), username, password, services, c.cluster.Namespace)
+	}
+	err = retryutil.RetryOnErr(3*time.Second, 5, f, "add-node", c.cluster.Name)
 	if err != nil {
 		return err
 	}
@@ -226,7 +229,7 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 	f := func() (bool, error) {
 		return client.BucketReady(bucketName)
 	}
-	return retryutil.Retry(5*time.Second, 60, f)
+	return retryutil.RetryOnErr(5*time.Second, 60, f, "check-bucket-ready", c.cluster.Name)
 }
 
 func (c *Cluster) removeOneMember() error {

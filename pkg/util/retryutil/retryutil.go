@@ -46,3 +46,21 @@ func Retry(interval time.Duration, maxRetries int, f ConditionFunc) error {
 	}
 	return &RetryError{maxRetries}
 }
+
+// Retry function that can return an error and log instead as warning
+// until actual maxRetries occurs.
+func RetryOnErr(interval time.Duration, maxRetries int, f ConditionFunc, task string, clusterName string) error {
+	return Retry(interval, maxRetries, func() (bool, error) {
+
+		// run f() and check for err
+		if _, err := f(); err != nil {
+
+			// failed, log attempt
+			Log(clusterName).Warningf("%s: failed with error %v ...retrying", task, err)
+			return false, nil
+		}
+
+		// ok
+		return true, nil
+	})
+}
