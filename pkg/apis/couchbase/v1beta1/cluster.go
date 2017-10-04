@@ -289,6 +289,15 @@ func (cs *ClusterStatus) AddBucket(b string) {
 	cs.Buckets = append(cs.Buckets, b)
 }
 
+// get index of bucket name within status and remove
+func (cs *ClusterStatus) RemoveBucket(b string) {
+	i, _ := HasItem(b, cs.Buckets)
+	if i != -1 {
+		// rm bucket from arr at index 'i'
+		cs.Buckets = append(cs.Buckets[:i], cs.Buckets[i+1:]...)
+	}
+}
+
 func (c *ClusterStatus) IsFailed() bool {
 	return false
 }
@@ -366,9 +375,10 @@ func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
 // list of bucket names from config
 func (cs *ClusterSpec) BucketNames() []string {
 	buckets := []string{}
-
-	for _, b := range *(cs.BucketSettings) {
-		buckets = append(buckets, b.BucketName)
+	if cs.BucketSettings != nil {
+		for _, b := range *(cs.BucketSettings) {
+			buckets = append(buckets, b.BucketName)
+		}
 	}
 	return buckets
 }
@@ -393,21 +403,21 @@ func scalingReason(from, to int) string {
 }
 
 // check wether item exists within array
-func HasItem(itm string, arr []string) bool {
-	for _, a := range arr {
+func HasItem(itm string, arr []string) (int, bool) {
+	for i, a := range arr {
 		if a == itm {
-			return true
+			return i, true
 		}
 	}
-	return false
+	return -1, false
 }
 
 // get list of items which are in first array but not in second
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}
 	for _, a := range a1 {
-		// checking if item is also in a2
-		if !HasItem(a, a2) {
+		// checking if item from a1 is missing from a2
+		if _, ok := HasItem(a, a2); ok == false {
 			// add to missing
 			missingItems = append(missingItems, a)
 		}

@@ -48,7 +48,12 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		// update status
 		c.status.AddBucket(bucketName)
 	} else if len(bucketsToRemove) > 0 {
-		// TODO: rm bucket
+		bucketName := bucketsToRemove[0]
+		err := c.deleteClusterBucket(bucketName)
+		if err != nil {
+			return err
+		}
+		c.status.RemoveBucket(bucketName)
 	}
 
 	// TODO: We should upgrade any nodes in the cluster here.
@@ -230,6 +235,21 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 		return client.BucketReady(bucketName)
 	}
 	return retryutil.RetryOnErr(5*time.Second, 60, f, "check-bucket-ready", c.cluster.Name)
+}
+
+func (c *Cluster) deleteClusterBucket(bucketName string) error {
+
+	// establish cluster connection
+	activeMember := c.members.First(c.cluster.Name)
+	username, password := c.cluster.Auth()
+	client, err :=
+		couchbaseutil.NewReadyClient(activeMember.ClientURL(), username, password)
+	if err != nil {
+		return err
+	}
+
+	// TODO: timeout if hangs
+	return client.BucketDelete(bucketName)
 }
 
 func (c *Cluster) removeOneMember() error {
