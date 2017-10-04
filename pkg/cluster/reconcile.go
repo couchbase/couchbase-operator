@@ -1,8 +1,11 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
+	"time"
 
 	"k8s.io/api/core/v1"
 )
@@ -31,14 +34,20 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return c.reconcileMembers(running)
 	}
 
-	// TODO: We should add, delete or edit buckets here.
-	// create any buckets that do not exist
-
 	bucketsToAdd, bucketsToRemove := c.cluster.BucketDiff()
 	if len(bucketsToAdd) > 0 {
-		// TODO: add bucket
-	}
-	if len(bucketsToRemove) > 0 {
+		// create one of the buckets to add
+		bucketName := bucketsToAdd[0]
+		err := c.createClusterBucket(bucketName)
+		if err != nil {
+			// TODO: eventually may not want to retry bucket create
+			// TODO: check if error is 'bucket-exists' (ie created same name?)
+			return err
+		}
+
+		// update status
+		c.status.AddBucket(bucketName)
+	} else if len(bucketsToRemove) > 0 {
 		// TODO: rm bucket
 	}
 
@@ -187,6 +196,37 @@ func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 
 	// make sure node being added is healthy
 	return newNodeClient.Healthy(couchbaseutil.RestTimeout)
+}
+
+// create bucket on cluster
+func (c *Cluster) createClusterBucket(bucketName string) error {
+
+	// establish cluster connection
+	activeMember := c.members.First(c.cluster.Name)
+	username, password := c.cluster.Auth()
+	client, err :=
+		couchbaseutil.NewReadyClient(activeMember.ClientURL(), username, password)
+	if err != nil {
+		return err
+	}
+
+	// marshalling spec into json
+	config := c.cluster.Spec.GetBucketByName(bucketName)
+	js, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	// create bucket
+	if err = client.CreateBucketFromSpec(js); err != nil {
+		return err
+	}
+
+	// make sure bucket exists
+	f := func() (bool, error) {
+		return client.BucketReady(bucketName)
+	}
+	return retryutil.Retry(5*time.Second, 60, f)
 }
 
 func (c *Cluster) removeOneMember() error {

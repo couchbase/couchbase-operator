@@ -367,6 +367,5 @@ func (c *Cluster) reportFailedStatus() {
 		return false, nil
 
 	}
-
 	retryutil.Retry(retryInterval, math.MaxInt64, f)
 }

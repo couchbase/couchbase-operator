@@ -285,6 +285,10 @@ func (cs *ClusterStatus) SetVersion(v string) {
 	cs.CurrentVersion = v
 }
 
+func (cs *ClusterStatus) AddBucket(b string) {
+	cs.Buckets = append(cs.Buckets, b)
+}
+
 func (c *ClusterStatus) IsFailed() bool {
 	return false
 }
@@ -362,13 +366,23 @@ func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
 // list of bucket names from config
 func (cs *ClusterSpec) BucketNames() []string {
 	buckets := []string{}
-	if cs.BucketSettings == nil {
-		return buckets
-	}
+
 	for _, b := range *(cs.BucketSettings) {
 		buckets = append(buckets, b.BucketName)
 	}
 	return buckets
+}
+
+// Get bucket config by name of bucket
+func (cs *ClusterSpec) GetBucketByName(name string) *BucketConfig {
+	if cs.BucketSettings != nil {
+		for _, b := range *(cs.BucketSettings) {
+			if b.BucketName == name {
+				return &b
+			}
+		}
+	}
+	return nil
 }
 
 func (cc *ClusterConfig) ServicesArr() []string {
