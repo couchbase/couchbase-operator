@@ -126,7 +126,7 @@ func (c *Cluster) addOneMember() error {
 	}
 
 	// rebalance if this is last node to add to cluster
-	if c.memberCounter == c.cluster.Spec.Size {
+	if len(c.members) == c.cluster.Spec.Size {
 		//TODO: watch for rebalance complete and handle failures
 		return c.rebalanceInNodes()
 	}
