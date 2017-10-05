@@ -79,10 +79,16 @@ func (ms MemberSet) PickOne() *Member {
 	panic("empty")
 }
 
-// retrieve the member at index 0 of the memberset
+// retrieve the member with lowest index
 func (ms MemberSet) First(clusterName string) *Member {
-	memberName := CreateMemberName(clusterName, 0)
-	return ms[memberName]
+	for i := 0; i < len(ms); i++ {
+		name := CreateMemberName(clusterName, i)
+		m := ms[name]
+		if m != nil {
+			return m
+		}
+	}
+	panic("empty")
 }
 
 func CreateMemberName(clusterName string, member int) string {

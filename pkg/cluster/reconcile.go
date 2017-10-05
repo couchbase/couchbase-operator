@@ -266,12 +266,28 @@ func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
 }
 
 func (c *Cluster) removeMember(toRemove *couchbaseutil.Member) error {
-	// TODO - Add the Couchbase API calls to remove nodes from the cluster
+	nodeName := toRemove.Name
 
-	c.members.Remove(toRemove.Name)
-	if err := c.removePod(toRemove.Name); err != nil {
+	// establish client to member not being removed
+	otherMembers := c.members.Diff(couchbaseutil.NewMemberSet(toRemove))
+	m := otherMembers.PickOne()
+	username, password := c.cluster.Auth()
+	client, err := couchbaseutil.NewClient(m.ClientURL(), username, password)
+	if err != nil {
+		return nil
+	}
+
+	// remove node from cluster
+	err = client.RemoveNodes([]string{toRemove.Addr()})
+	if err != nil {
 		return err
 	}
-	c.logger.Infof("removed member (%v)", toRemove.Name)
+
+	// remove member from operator
+	c.members.Remove(nodeName)
+	if err := c.removePod(nodeName); err != nil {
+		return err
+	}
+	c.logger.Infof("removed member (%v)", nodeName)
 	return nil
 }
