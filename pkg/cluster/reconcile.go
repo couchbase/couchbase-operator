@@ -32,7 +32,14 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	bucketsToAdd, bucketsToRemove := c.cluster.BucketDiff()
-	if len(bucketsToAdd) > 0 {
+	if len(bucketsToRemove) > 0 {
+		bucketName := bucketsToRemove[0]
+		err := c.deleteClusterBucket(bucketName)
+		if err != nil {
+			return err
+		}
+		c.status.RemoveBucket(bucketName)
+	} else if len(bucketsToAdd) > 0 {
 		// create one of the buckets to add
 		bucketName := bucketsToAdd[0]
 		err := c.createClusterBucket(bucketName)
@@ -44,13 +51,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 		// update status
 		c.status.AddBucket(bucketName)
-	} else if len(bucketsToRemove) > 0 {
-		bucketName := bucketsToRemove[0]
-		err := c.deleteClusterBucket(bucketName)
-		if err != nil {
-			return err
-		}
-		c.status.RemoveBucket(bucketName)
 	}
 
 	// TODO: We should upgrade any nodes in the cluster here.
