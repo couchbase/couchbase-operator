@@ -80,8 +80,8 @@ func (ms MemberSet) PickOne() *Member {
 }
 
 // retrieve the member with lowest index
-func (ms MemberSet) First(clusterName string) *Member {
-	for i := 0; i < len(ms); i++ {
+func (ms MemberSet) First(clusterName string, max int) *Member {
+	for i := 0; i < max; i++ {
 		name := CreateMemberName(clusterName, i)
 		m := ms[name]
 		if m != nil {

@@ -136,7 +136,7 @@ func (c *Cluster) addOneMember() error {
 func (c *Cluster) rebalanceInNodes() error {
 
 	// TODO: orchestrator api
-	m := c.members.First(c.cluster.Name)
+	m := c.members.First(c.cluster.Name, c.memberCounter)
 	username, password := c.cluster.Auth()
 	couchbaseClient, err := couchbaseutil.NewClient(m.ClientURL(), username, password)
 	if err != nil {
@@ -153,7 +153,10 @@ func (c *Cluster) rebalanceInNodes() error {
 
 // adds a node to the cluster
 func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
-	activeMember := c.members.First(c.cluster.Name)
+
+	// create client for node currently active in cluster
+	// TODO: orchestrator api
+	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
 	username, password := c.cluster.Auth()
 	services := c.cluster.Spec.ClusterSettings.ServicesArr()
 	return couchbaseutil.AddNode(activeMember, c.cluster.Name, m.ClientURL(), username, password, services)
@@ -161,7 +164,9 @@ func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 
 // create bucket on cluster
 func (c *Cluster) createClusterBucket(bucketName string) error {
-	activeMember := c.members.First(c.cluster.Name)
+
+	// establish cluster connection
+	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
 	username, password := c.cluster.Auth()
 	config := c.cluster.Spec.GetBucketByName(bucketName)
 	return couchbaseutil.CreateBucket(activeMember, username, password, config)
@@ -170,7 +175,7 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 func (c *Cluster) deleteClusterBucket(bucketName string) error {
 
 	// establish cluster connection
-	activeMember := c.members.First(c.cluster.Name)
+	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
 	username, password := c.cluster.Auth()
 	client, err :=
 		couchbaseutil.NewReadyClient(activeMember.ClientURL(), username, password)
