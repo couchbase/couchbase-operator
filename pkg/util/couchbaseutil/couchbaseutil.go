@@ -2,8 +2,10 @@ package couchbaseutil
 
 import (
 	"crypto/tls"
-	"github.com/couchbaselabs/gocbmgr"
 	"time"
+
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbaselabs/gocbmgr"
 )
 
 var (
@@ -46,4 +48,28 @@ func NewReadyClient(url, username, password string) (*cbmgr.Couchbase, error) {
 func CheckHealth(url string, tc *tls.Config) (bool, error) {
 	// TODO: check the health of a particular Couchbase node.
 	return true, nil
+}
+
+func InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
+	searchMemQuota int, services []string, indexStorageMode string) error {
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+
+	svcs, err := cbmgr.ServiceListFromStringArray(services)
+	if err != nil {
+		return err
+	}
+
+	return retryutil.Retry(5 *time.Second, 36, func() (bool, error) {
+		err := client.ClusterInitialize(username, password, name, dataMemQuota,
+			indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
+
+		if err == nil {
+			return true, nil
+		}
+
+		return false, nil
+	})
 }

@@ -154,26 +154,6 @@ func (c *Cluster) rebalanceInNodes() error {
 	return couchbaseClient.Rebalance(knownNodes, []string{})
 }
 
-// initializes node with cluster settings
-func (c *Cluster) initClusterNode(m *couchbaseutil.Member) error {
-
-	// create client
-	username, password := c.cluster.Auth()
-	couchbaseClient, err := couchbaseutil.NewReadyClient(m.ClientURL(), username, password)
-	if err != nil {
-		return err
-	}
-
-	// init node
-	services := c.cluster.Spec.ClusterSettings.ServicesArr()
-	settings := c.cluster.Spec.ClusterSettings
-	return couchbaseClient.Initialize(m.Addr(),
-		services,
-		settings.DataServiceMemQuota,
-		settings.IndexServiceMemQuota,
-		settings.SearchServiceMemQuota)
-}
-
 // adds a node to the cluster
 func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 
@@ -250,6 +230,15 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 
 	// TODO: timeout if hangs
 	return client.BucketDelete(bucketName)
+}
+
+// initializes member with cluster settings
+func (c *Cluster) initMember(m *couchbaseutil.Member) error {
+	username, password := c.cluster.Auth()
+	settings := c.cluster.Spec.ClusterSettings
+	return couchbaseutil.InitializeCluster(m, username, password, c.cluster.Name,
+		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
+		settings.ServicesArr(), settings.IndexStorageSetting)
 }
 
 func (c *Cluster) removeOneMember() error {
