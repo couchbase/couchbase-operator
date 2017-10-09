@@ -96,3 +96,12 @@ func clusterNameFromMemberName(mn string) string {
 	}
 	return mn[:i]
 }
+
+func (ms MemberSet) String() string {
+	var mstring []string
+
+	for m := range ms {
+		mstring = append(mstring, m)
+	}
+	return strings.Join(mstring, ",")
+}
