@@ -103,6 +103,12 @@ type ClusterConfig struct {
 
 	// The index storage mode to use for secondary indexing
 	IndexStorageSetting string `json:"indexStorageSetting"`
+
+	// The path on each node to store key-value data
+	DataPath string `json:"dataPath"`
+
+	// The path on each node to store index data
+	IndexPath string `json:"indexPath"`
 }
 
 type ClusterAuth struct {

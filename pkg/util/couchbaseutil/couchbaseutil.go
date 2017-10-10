@@ -70,8 +70,17 @@ func AddNode(m *Member, clusterName, hostname, username, password string, servic
 }
 
 func InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
-	searchMemQuota int, services []string, indexStorageMode string) error {
+	searchMemQuota int, services []string, dataPath, indexPath, indexStorageMode string) error {
 	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+
+	err = retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+		err := client.NodeInitialize(m.Addr(), dataPath, indexPath)
+		return true, err
+	}, "node init", name)
+
 	if err != nil {
 		return err
 	}
@@ -81,14 +90,9 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 		return err
 	}
 
-	return retryutil.Retry(5 *time.Second, 36, func() (bool, error) {
+	return retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
 		err := client.ClusterInitialize(username, password, name, dataMemQuota,
 			indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
-
-		if err == nil {
-			return true, nil
-		}
-
-		return false, nil
-	})
+		return true, err
+	}, "cluster init", name)
 }

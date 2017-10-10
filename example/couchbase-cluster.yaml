@@ -14,6 +14,8 @@ spec:
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
     indexStorageSetting: memory_optimized
+    dataPath: /opt/couchbase/var/lib/couchbase/data
+    indexPath: /opt/couchbase/var/lib/couchbase/data
   buckets:
     - name: default
       type: couchbase

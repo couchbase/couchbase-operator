@@ -214,7 +214,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member) error {
 	settings := c.cluster.Spec.ClusterSettings
 	return couchbaseutil.InitializeCluster(m, username, password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
-		settings.ServicesArr(), settings.IndexStorageSetting)
+		settings.ServicesArr(), settings.DataPath, settings.IndexPath, settings.IndexStorageSetting)
 }
 
 func (c *Cluster) removeOneMember() error {
