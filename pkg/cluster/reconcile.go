@@ -156,34 +156,10 @@ func (c *Cluster) rebalanceInNodes() error {
 
 // adds a node to the cluster
 func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
-
-	// create client for node currently active in cluster
-	// TODO: orchestrator api
 	activeMember := c.members.First(c.cluster.Name)
 	username, password := c.cluster.Auth()
-	currentNodeClient, err := couchbaseutil.NewReadyClient(activeMember.ClientURL(), username, password)
-	if err != nil {
-		return err
-	}
-
-	// make sure node is ready to be added
-	newNodeClient, err := couchbaseutil.NewReadyClient(m.ClientURL(), username, password)
-	if err != nil {
-		return err
-	}
-
-	// add node to cluster
 	services := c.cluster.Spec.ClusterSettings.ServicesArr()
-	f := func() (bool, error) {
-		return true, currentNodeClient.AddNode(m.Addr(), username, password, services, c.cluster.Namespace)
-	}
-	err = retryutil.RetryOnErr(3*time.Second, 5, f, "add-node", c.cluster.Name)
-	if err != nil {
-		return err
-	}
-
-	// make sure node being added is healthy
-	return newNodeClient.Healthy(couchbaseutil.RestTimeout)
+	return couchbaseutil.AddNode(activeMember, c.cluster.Name, m.ClientURL(), username, password, services)
 }
 
 // create bucket on cluster

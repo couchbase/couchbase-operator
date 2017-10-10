@@ -50,6 +50,25 @@ func CheckHealth(url string, tc *tls.Config) (bool, error) {
 	return true, nil
 }
 
+func AddNode(m *Member, clusterName, hostname, username, password string, services []string) error {
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+
+	client.Username = username
+	client.Password = password
+	svcs, err := cbmgr.ServiceListFromStringArray(services)
+	if err != nil {
+		return err
+	}
+
+	return retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+		err := client.AddNode(hostname, username, password, svcs)
+		return true, err
+	}, "add node", clusterName)
+}
+
 func InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
 	searchMemQuota int, services []string, indexStorageMode string) error {
 	client, err := cbmgr.New(m.ClientURL())
