@@ -99,12 +99,30 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 	}, "cluster init", name)
 }
 
-func CreateBucket(m *Member, username, password string, config *cbapi.BucketConfig) error {
-
+func Rebalance(m *Member, username, password, clusterName string, nodesToRemove []string, wait bool) error {
 	client, err := cbmgr.New(m.ClientURL())
 	if err != nil {
 		return err
 	}
+
+	client.Username = username
+	client.Password = password
+	return retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+		status, err := client.Rebalance(nodesToRemove)
+		if wait {
+			status.SetLogger(retryutil.Log(clusterName))
+			return true, status.Wait()
+		}
+		return true, err
+	}, "rebalance", clusterName)
+}
+
+func CreateBucket(m *Member, username, password string, config *cbapi.BucketConfig) error {
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+
 	client.Username = username
 	client.Password = password
 

@@ -9,4 +9,4 @@ import:
 - package: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - package: github.com/couchbaselabs/gocbmgr
-  version: c89872c9ec4a07c376f7352e769eb4d6728ae815
+  version: 5d06fcb46c394dd47704579b67a609c40f4177ae

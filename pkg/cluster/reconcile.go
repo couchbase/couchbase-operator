@@ -125,30 +125,17 @@ func (c *Cluster) addOneMember() error {
 	// rebalance if this is last node to add to cluster
 	if len(c.members) == c.cluster.Spec.Size {
 		//TODO: watch for rebalance complete and handle failures
-		return c.rebalanceInNodes()
+		return c.rebalance([]string{})
 	}
 
 	return nil
 }
 
-// Rebalance in nodes added to cluster.  This method will collect
-// all the otpNodes as known nodes and run the rebalance on cluster
-func (c *Cluster) rebalanceInNodes() error {
-
-	// TODO: orchestrator api
+// Rebalance nodes in the cluster
+func (c *Cluster) rebalance(nodesToRemove []string) error {
 	m := c.members.First(c.cluster.Name, c.memberCounter)
 	username, password := c.cluster.Auth()
-	couchbaseClient, err := couchbaseutil.NewClient(m.ClientURL(), username, password)
-	if err != nil {
-		return nil
-	}
-
-	// get known nodes being added to cluster
-	knownNodes, err := couchbaseClient.KnownOTPNodes()
-	if err != nil {
-		return nil
-	}
-	return couchbaseClient.Rebalance(knownNodes, []string{})
+	return couchbaseutil.Rebalance(m, username, password, c.cluster.Name, nodesToRemove, true)
 }
 
 // adds a node to the cluster
@@ -211,18 +198,7 @@ func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
 
 func (c *Cluster) removeMember(toRemove *couchbaseutil.Member) error {
 	nodeName := toRemove.Name
-
-	// establish client to member not being removed
-	otherMembers := c.members.Diff(couchbaseutil.NewMemberSet(toRemove))
-	m := otherMembers.PickOne()
-	username, password := c.cluster.Auth()
-	client, err := couchbaseutil.NewClient(m.ClientURL(), username, password)
-	if err != nil {
-		return nil
-	}
-
-	// remove node from cluster
-	err = client.RemoveNodes([]string{toRemove.Addr()})
+	err := c.rebalance([]string{toRemove.Addr() + ":8091"})
 	if err != nil {
 		return err
 	}
