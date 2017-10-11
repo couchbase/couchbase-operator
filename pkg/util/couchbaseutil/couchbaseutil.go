@@ -146,3 +146,15 @@ func CreateBucket(m *Member, username, password string, config *cbapi.BucketConf
 			return client.BucketReady(bucket.BucketName)
 		})
 }
+
+func DeleteBucket(m *Member, username, password, bucketName string) error {
+
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+	client.Username = username
+	client.Password = password
+
+	return client.DeleteBucket(bucketName)
+}

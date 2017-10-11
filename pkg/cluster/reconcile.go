@@ -164,14 +164,7 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 	// establish cluster connection
 	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
 	username, password := c.cluster.Auth()
-	client, err :=
-		couchbaseutil.NewReadyClient(activeMember.ClientURL(), username, password)
-	if err != nil {
-		return err
-	}
-
-	// TODO: timeout if hangs
-	return client.BucketDelete(bucketName)
+	return couchbaseutil.DeleteBucket(activeMember, username, password, bucketName)
 }
 
 // initializes member with cluster settings
