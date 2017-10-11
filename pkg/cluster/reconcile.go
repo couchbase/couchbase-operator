@@ -15,6 +15,13 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		c.status.Size = c.members.Size()
 	}()
 
+	sp := c.cluster.Spec
+	running := podsToMemberSet(pods, c.isSecureClient())
+	running, err := c.removeUnknownMembers(running)
+	if err != nil {
+		return err
+	}
+
 	// TODO: We should check to see if the cluster is rebalancing here
 
 	// TODO: We should check to see if there are any Couchbase nodes marked as
@@ -25,13 +32,12 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	// Ensure that the actual cluster size matches the desired cluster size. Also
 	// clean up and failed pods.
-	sp := c.cluster.Spec
-	running := podsToMemberSet(pods, c.isSecureClient())
+
 	if !running.IsEqual(c.members) || c.members.Size() != sp.Size {
 		return c.reconcileMembers(running)
 	}
 
-	err := c.reconcileBuckets()
+	err = c.reconcileBuckets()
 	if err != nil {
 		return err
 	}
@@ -56,24 +62,13 @@ func (c *Cluster) reconcileMembers(running couchbaseutil.MemberSet) error {
 	c.logger.Infof("running members: %s", running)
 	c.logger.Infof("cluster membership: %s", c.members)
 
-	unknownMembers := running.Diff(c.members)
-	if unknownMembers.Size() > 0 {
-		c.logger.Infof("removing unexpected pods: %v", unknownMembers)
-		for _, m := range unknownMembers {
-			if err := c.removePod(m.Name); err != nil {
-				return err
-			}
-		}
-	}
-	L := running.Diff(unknownMembers)
-
-	if L.Size() == c.members.Size() {
+	if running.Size() == c.members.Size() {
 		return c.resize()
 	}
 
 	c.logger.Infof("removing one dead member")
 	// remove dead members that doesn't have any running pods before doing resizing.
-	return c.removeDeadMember(c.members.Diff(L).PickOne())
+	return c.removeDeadMember(c.members.Diff(running).PickOne())
 }
 
 func (c *Cluster) resize() error {
@@ -232,4 +227,18 @@ func (c *Cluster) removeMember(toRemove *couchbaseutil.Member) error {
 	}
 	c.logger.Infof("removed member (%v)", nodeName)
 	return nil
+}
+
+// Remove all pods from running set that does not belong to member set.
+func (c *Cluster) removeUnknownMembers(running couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
+	unknownMembers := running.Diff(c.members)
+	if unknownMembers.Size() > 0 {
+		c.logger.Infof("removing unexpected pods: %v", unknownMembers)
+		for _, m := range unknownMembers {
+			if err := c.removePod(m.Name); err != nil {
+				return running, err
+			}
+		}
+	}
+	return running.Diff(unknownMembers), nil
 }
