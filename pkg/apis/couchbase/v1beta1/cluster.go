@@ -263,16 +263,6 @@ func (cl *CouchbaseCluster) Auth() (string, string) {
 	return auth.AdminUsername, auth.AdminPassword
 }
 
-// diff spec and status buckets to determine
-// which should be added and which removed
-func (cl *CouchbaseCluster) BucketDiff() ([]string, []string) {
-	specBuckets := cl.Spec.BucketNames()
-	statusBuckets := cl.Status.Buckets
-	bucketsToAdd := MissingItems(specBuckets, statusBuckets)
-	bucketsToRemove := MissingItems(statusBuckets, specBuckets)
-	return bucketsToAdd, bucketsToRemove
-}
-
 func (cs ClusterStatus) Copy() ClusterStatus {
 	newCS := ClusterStatus{}
 	b, err := json.Marshal(cs)
@@ -399,6 +389,15 @@ func (cs *ClusterSpec) GetBucketByName(name string) *BucketConfig {
 		}
 	}
 	return nil
+}
+
+// diff spec and existing buckets to determine
+// which should be added and which removed
+func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string) {
+	specBuckets := cs.BucketNames()
+	bucketsToAdd := MissingItems(specBuckets, existingBuckets)
+	bucketsToRemove := MissingItems(existingBuckets, specBuckets)
+	return bucketsToAdd, bucketsToRemove
 }
 
 func (cc *ClusterConfig) ServicesArr() []string {

@@ -107,7 +107,7 @@ func Rebalance(m *Member, username, password, clusterName string, nodesToRemove 
 
 	client.Username = username
 	client.Password = password
-	return retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
 		status, err := client.Rebalance(nodesToRemove)
 		if wait {
 			status.SetLogger(retryutil.Log(clusterName))
@@ -157,4 +157,26 @@ func DeleteBucket(m *Member, username, password, bucketName string) error {
 	client.Password = password
 
 	return client.DeleteBucket(bucketName)
+}
+
+func GetBucketNames(m *Member, username, password string) ([]string, error) {
+
+	bucketNames := []string{}
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return bucketNames, err
+	}
+	client.Username = username
+	client.Password = password
+
+	buckets, err := client.GetBuckets()
+	if err != nil {
+		return bucketNames, err
+	}
+
+	for _, b := range buckets {
+		bucketNames = append(bucketNames, b.BucketName)
+	}
+
+	return bucketNames, nil
 }

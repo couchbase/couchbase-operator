@@ -31,26 +31,9 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return c.reconcileMembers(running)
 	}
 
-	bucketsToAdd, bucketsToRemove := c.cluster.BucketDiff()
-	if len(bucketsToRemove) > 0 {
-		bucketName := bucketsToRemove[0]
-		err := c.deleteClusterBucket(bucketName)
-		if err != nil {
-			return err
-		}
-		c.status.RemoveBucket(bucketName)
-	} else if len(bucketsToAdd) > 0 {
-		// create one of the buckets to add
-		bucketName := bucketsToAdd[0]
-		err := c.createClusterBucket(bucketName)
-		if err != nil {
-			// TODO: eventually may not want to retry bucket create
-			// TODO: check if error is 'bucket-exists' (ie created same name?)
-			return err
-		}
-
-		// update status
-		c.status.AddBucket(bucketName)
+	err := c.reconcileBuckets()
+	if err != nil {
+		return err
 	}
 
 	// TODO: We should upgrade any nodes in the cluster here.
@@ -147,6 +130,46 @@ func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 	username, password := c.cluster.Auth()
 	services := c.cluster.Spec.ClusterSettings.ServicesArr()
 	return couchbaseutil.AddNode(activeMember, c.cluster.Name, m.ClientURL(), username, password, services)
+}
+
+// reconcile buckets by adding or removing
+// buckets one at a time based on comparison
+// of existing buckets to cluster spec
+func (c *Cluster) reconcileBuckets() error {
+
+	// set status buckets to existing buckets
+	username, password := c.cluster.Auth()
+	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
+	existingBuckets, err := couchbaseutil.
+		GetBucketNames(activeMember, username, password)
+	if err != nil {
+		return err
+	}
+	c.status.Buckets = existingBuckets
+
+	// when reconciling buckets, any buckets in cluster
+	// created outside of operator are removed,
+	// and any buckets removed by user are recreated
+	// if still present in active spec
+	spec := c.cluster.Spec
+	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
+	if len(bucketsToRemove) > 0 {
+		bucketName := bucketsToRemove[0]
+		err := c.deleteClusterBucket(bucketName)
+		if err != nil {
+			return err
+		}
+		c.status.RemoveBucket(bucketName)
+	} else if len(bucketsToAdd) > 0 {
+		bucketName := bucketsToAdd[0]
+		err := c.createClusterBucket(bucketName)
+		if err != nil {
+			return err
+		}
+		c.status.AddBucket(bucketName)
+	}
+
+	return nil
 }
 
 // create bucket on cluster
