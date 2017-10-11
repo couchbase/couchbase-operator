@@ -2,8 +2,10 @@ package couchbaseutil
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"time"
 
+	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbaselabs/gocbmgr"
 )
@@ -63,7 +65,7 @@ func AddNode(m *Member, clusterName, hostname, username, password string, servic
 		return err
 	}
 
-	return retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
 		err := client.AddNode(hostname, username, password, svcs)
 		return true, err
 	}, "add node", clusterName)
@@ -76,7 +78,7 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 		return err
 	}
 
-	err = retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+	err = retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
 		err := client.NodeInitialize(m.Addr(), dataPath, indexPath)
 		return true, err
 	}, "node init", name)
@@ -90,9 +92,39 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 		return err
 	}
 
-	return retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
 		err := client.ClusterInitialize(username, password, name, dataMemQuota,
 			indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
 		return true, err
 	}, "cluster init", name)
+}
+
+func CreateBucket(m *Member, username, password string, config *cbapi.BucketConfig) error {
+
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+	client.Username = username
+	client.Password = password
+
+	// convert bucket config to cbmgr bucket type
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	bucket := cbmgr.Bucket{}
+	if err := json.Unmarshal(data, &bucket); err != nil {
+		return err
+	}
+
+	if err = client.CreateBucket(&bucket); err != nil {
+		return err
+	}
+
+	// make sure bucket exists
+	return retryutil.Retry(5*time.Second, 60,
+		func() (bool, error) {
+			return client.BucketReady(bucket.BucketName)
+		})
 }

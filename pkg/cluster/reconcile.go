@@ -1,12 +1,9 @@
 package cluster
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
-	"time"
 
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"k8s.io/api/core/v1"
 )
 
@@ -164,33 +161,10 @@ func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 
 // create bucket on cluster
 func (c *Cluster) createClusterBucket(bucketName string) error {
-
-	// establish cluster connection
 	activeMember := c.members.First(c.cluster.Name)
 	username, password := c.cluster.Auth()
-	client, err :=
-		couchbaseutil.NewReadyClient(activeMember.ClientURL(), username, password)
-	if err != nil {
-		return err
-	}
-
-	// marshalling spec into json
 	config := c.cluster.Spec.GetBucketByName(bucketName)
-	js, err := json.Marshal(config)
-	if err != nil {
-		return err
-	}
-
-	// create bucket
-	if err = client.CreateBucketFromSpec(js); err != nil {
-		return err
-	}
-
-	// make sure bucket exists
-	f := func() (bool, error) {
-		return client.BucketReady(bucketName)
-	}
-	return retryutil.RetryOnErr(5*time.Second, 60, f, "check-bucket-ready", c.cluster.Name)
+	return couchbaseutil.CreateBucket(activeMember, username, password, config)
 }
 
 func (c *Cluster) deleteClusterBucket(bucketName string) error {
