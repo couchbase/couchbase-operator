@@ -239,6 +239,8 @@ type ClusterStatus struct {
 	// Condition keeps ten most recent cluster conditions
 	Conditions []ClusterCondition `json:"conditions"`
 
+	// A unique cluster identifier
+	ClusterID string `json:"clusterId"`
 	// Size is the current size of the cluster
 	Size int `json:"size"`
 	// Members are the couchbase members in the cluster
@@ -303,6 +305,10 @@ func (c *ClusterStatus) IsFailed() bool {
 
 func (cs *ClusterStatus) SetPhase(p ClusterPhase) {
 	cs.Phase = p
+}
+
+func (cs *ClusterStatus) SetClusterID(uuid string) {
+	cs.ClusterID = uuid
 }
 
 func (cs *ClusterStatus) PauseControl() {

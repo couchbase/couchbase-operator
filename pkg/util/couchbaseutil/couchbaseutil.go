@@ -71,6 +71,24 @@ func AddNode(m *Member, clusterName, hostname, username, password string, servic
 	}, "add node", clusterName)
 }
 
+func ClusterUUID(m *Member, username, password, clusterName string) (string, error) {
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return "", err
+	}
+
+	client.Username = username
+	client.Password = password
+
+	var uuid string
+	err = retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+		uuid, err = client.ClusterUUID()
+		return true, err
+	}, "cluster uuid", clusterName)
+
+	return uuid, err
+}
+
 func InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
 	searchMemQuota int, services []string, dataPath, indexPath, indexStorageMode string) error {
 	client, err := cbmgr.New(m.ClientURL())

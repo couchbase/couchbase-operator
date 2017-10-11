@@ -155,7 +155,18 @@ func (c *Cluster) create() error {
 		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}
 
-	return c.initMember(m)
+	if err := c.initMember(m); err != nil {
+		return err
+	}
+
+	username, password := c.cluster.Auth()
+	uuid, err := couchbaseutil.ClusterUUID(m, username, password, c.cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	c.status.SetClusterID(uuid)
+	return c.updateCRStatus()
 }
 
 func (c *Cluster) setupServices() error {
