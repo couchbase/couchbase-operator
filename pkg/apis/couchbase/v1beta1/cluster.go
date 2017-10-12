@@ -109,6 +109,9 @@ type ClusterConfig struct {
 
 	// The path on each node to store index data
 	IndexPath string `json:"indexPath"`
+
+	// Timeout that expires to trigger the auto failover.
+	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout"`
 }
 
 type ClusterAuth struct {

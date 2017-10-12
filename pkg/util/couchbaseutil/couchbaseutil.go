@@ -180,3 +180,16 @@ func GetBucketNames(m *Member, username, password string) ([]string, error) {
 
 	return bucketNames, nil
 }
+
+func SetAutoFailoverTimeout(m *Member, username, password, clusterName string, enabled bool, timeout uint64) error {
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+	client.Username = username
+	client.Password = password
+
+	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
+		return true, client.SetAutoFailoverTimeout(enabled, timeout)
+	}, "set autofailover timeout", clusterName)
+}

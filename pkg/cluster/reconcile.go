@@ -194,9 +194,15 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 func (c *Cluster) initMember(m *couchbaseutil.Member) error {
 	username, password := c.cluster.Auth()
 	settings := c.cluster.Spec.ClusterSettings
-	return couchbaseutil.InitializeCluster(m, username, password, c.cluster.Name,
+	err := couchbaseutil.InitializeCluster(m, username, password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
 		settings.ServicesArr(), settings.DataPath, settings.IndexPath, settings.IndexStorageSetting)
+	if err != nil {
+		return err
+	}
+
+	// enables autofailover by default
+	return couchbaseutil.SetAutoFailoverTimeout(m, username, password, c.cluster.Name, true, settings.AutoFailoverTimeout)
 }
 
 func (c *Cluster) removeOneMember() error {

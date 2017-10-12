@@ -16,6 +16,7 @@ spec:
     indexStorageSetting: memory_optimized
     dataPath: /opt/couchbase/var/lib/couchbase/data
     indexPath: /opt/couchbase/var/lib/couchbase/data
+    autoFailoverTimeout: 30
   buckets:
     - name: default
       type: couchbase
