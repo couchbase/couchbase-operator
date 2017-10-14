@@ -6,9 +6,8 @@ spec:
   size: 3
   baseImage: couchbase/server
   version: enterprise-4.5.1
+  authSecret: cb-example-auth
   cluster:
-    username: Administrator
-    password: password
     services: data,index,query,fts
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256

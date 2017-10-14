@@ -15,13 +15,21 @@ func TestCreateCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2eutil.NewCluster("test-couchbase-", 3))
+	secret, err := e2eutil.CreateSecret(t, f.KubeClient, f.Namespace, e2eutil.BasicSecret(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2eutil.NewCluster("test-couchbase-", secret.Name, 3))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	defer func() {
 		if err := e2eutil.DeleteCluster(t, f.CRClient, f.KubeClient, testCouchbase); err != nil {
+			t.Fatal(err)
+		}
+		if err := e2eutil.DeleteSecret(t, f.KubeClient, f.Namespace, secret.Name, nil); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -39,12 +47,20 @@ func TestPauseControl(t *testing.T) {
 	}
 
 	f := framework.Global
-	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2eutil.NewCluster("test-couchbase-", 3))
+	secret, err := e2eutil.CreateSecret(t, f.KubeClient, f.Namespace, e2eutil.BasicSecret(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2eutil.NewCluster("test-couchbase-", secret.Name, 3))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		if err := e2eutil.DeleteCluster(t, f.CRClient, f.KubeClient, testCouchbase); err != nil {
+			t.Fatal(err)
+		}
+		if err := e2eutil.DeleteSecret(t, f.KubeClient, f.Namespace, secret.Name, nil); err != nil {
 			t.Fatal(err)
 		}
 	}()

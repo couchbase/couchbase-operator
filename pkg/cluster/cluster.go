@@ -10,6 +10,7 @@ import (
 	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/garbagecollection"
 	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/constants"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
@@ -55,6 +56,8 @@ type Cluster struct {
 	members       couchbaseutil.MemberSet
 	tlsConfig     *tls.Config
 	gc            *garbagecollection.GC
+	username      string
+	password      string
 }
 
 func New(config Config, cl *cbapi.CouchbaseCluster) *Cluster {
@@ -126,6 +129,10 @@ func (c *Cluster) setup() error {
 		return fmt.Errorf("unexpected cluster phase: %s", c.status.Phase)
 	}
 
+	if err := c.setupAuth(c.cluster.Spec.AuthSecret); err != nil {
+		return err
+	}
+
 	if shouldCreateCluster {
 		return c.create()
 	}
@@ -160,8 +167,7 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	username, password := c.cluster.Auth()
-	uuid, err := couchbaseutil.ClusterUUID(m, username, password, c.cluster.Name)
+	uuid, err := couchbaseutil.ClusterUUID(m, c.username, c.password, c.cluster.Name)
 	if err != nil {
 		return err
 	}
@@ -382,4 +388,27 @@ func (c *Cluster) reportFailedStatus() {
 
 	}
 	retryutil.Retry(retryInterval, math.MaxInt64, f)
+}
+
+// Use username and password from secret store
+func (c *Cluster) setupAuth(authSecret string) error {
+	opts := metav1.GetOptions{}
+	secret, err := c.config.KubeCli.CoreV1().Secrets(c.cluster.Namespace).Get(authSecret, opts)
+	if err != nil {
+		return err
+	}
+
+	data := secret.Data
+	if username, ok := data[constants.AuthSecretUsernameKey]; ok {
+		c.username = string(username[:])
+	} else {
+		return ErrSecretMissingUsername(authSecret)
+	}
+	if password, ok := data[constants.AuthSecretPasswordKey]; ok {
+		c.password = string(password[:])
+	} else {
+		return ErrSecretMissingPassword(authSecret)
+	}
+
+	return nil
 }

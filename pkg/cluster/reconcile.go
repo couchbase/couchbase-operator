@@ -135,15 +135,13 @@ func (c *Cluster) addOneMember() error {
 
 func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
 	m := c.members.First(c.cluster.Name, c.memberCounter)
-	username, password := c.cluster.Auth()
-	return couchbaseutil.GetClusterStatus(m, c.members, username, password, c.cluster.Name)
+	return couchbaseutil.GetClusterStatus(m, c.members, c.username, c.password, c.cluster.Name)
 }
 
 // Rebalance nodes in the cluster
 func (c *Cluster) rebalance(nodesToRemove []string) error {
 	m := c.members.First(c.cluster.Name, c.memberCounter)
-	username, password := c.cluster.Auth()
-	return couchbaseutil.Rebalance(m, username, password, c.cluster.Name, nodesToRemove, true)
+	return couchbaseutil.Rebalance(m, c.username, c.password, c.cluster.Name, nodesToRemove, true)
 }
 
 // adds a node to the cluster
@@ -152,9 +150,8 @@ func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 	// create client for node currently active in cluster
 	// TODO: orchestrator api
 	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
-	username, password := c.cluster.Auth()
 	services := c.cluster.Spec.ClusterSettings.ServicesArr()
-	return couchbaseutil.AddNode(activeMember, c.cluster.Name, m.ClientURL(), username, password, services)
+	return couchbaseutil.AddNode(activeMember, c.cluster.Name, m.ClientURL(), c.username, c.password, services)
 }
 
 // reconcile buckets by adding or removing
@@ -163,10 +160,9 @@ func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
 func (c *Cluster) reconcileBuckets() error {
 
 	// set status buckets to existing buckets
-	username, password := c.cluster.Auth()
 	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
 	existingBuckets, err := couchbaseutil.
-		GetBucketNames(activeMember, username, password)
+		GetBucketNames(activeMember, c.username, c.password)
 	if err != nil {
 		return err
 	}
@@ -207,9 +203,8 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 
 	// establish cluster connection
 	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
-	username, password := c.cluster.Auth()
 	config := c.cluster.Spec.GetBucketByName(bucketName)
-	err := couchbaseutil.CreateBucket(activeMember, username, password, config)
+	err := couchbaseutil.CreateBucket(activeMember, c.username, c.password, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 	}
@@ -220,8 +215,7 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 
 	// establish cluster connection
 	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
-	username, password := c.cluster.Auth()
-	err := couchbaseutil.DeleteBucket(activeMember, username, password, bucketName)
+	err := couchbaseutil.DeleteBucket(activeMember, c.username, c.password, bucketName)
 	if err == nil {
 		c.status.RemoveBucket(bucketName)
 	}
@@ -233,9 +227,8 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 
 	// establish cluster connection
 	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
-	username, password := c.cluster.Auth()
 	config := c.cluster.Spec.GetBucketByName(bucketName)
-	err := couchbaseutil.EditBucket(activeMember, username, password, config)
+	err := couchbaseutil.EditBucket(activeMember, c.username, c.password, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 	}
@@ -244,9 +237,8 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 
 // initializes member with cluster settings
 func (c *Cluster) initMember(m *couchbaseutil.Member) error {
-	username, password := c.cluster.Auth()
 	settings := c.cluster.Spec.ClusterSettings
-	err := couchbaseutil.InitializeCluster(m, username, password, c.cluster.Name,
+	err := couchbaseutil.InitializeCluster(m, c.username, c.password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
 		settings.ServicesArr(), settings.DataPath, settings.IndexPath, settings.IndexStorageSetting)
 	if err != nil {
@@ -254,7 +246,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member) error {
 	}
 
 	// enables autofailover by default
-	return couchbaseutil.SetAutoFailoverTimeout(m, username, password, c.cluster.Name, true, settings.AutoFailoverTimeout)
+	return couchbaseutil.SetAutoFailoverTimeout(m, c.username, c.password, c.cluster.Name, true, settings.AutoFailoverTimeout)
 }
 
 func (c *Cluster) removeOneMember() error {

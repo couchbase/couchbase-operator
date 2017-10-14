@@ -11,7 +11,6 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // CouchbaseClusterList is a list of Couchbase clusters.
 type CouchbaseClusterList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -85,10 +84,12 @@ type ClusterSpec struct {
 
 	// Bucket specific settings
 	BucketSettings []BucketConfig `json:"buckets"`
+
+	// AuthSecret is the name of a kube secret to use for authentication
+	AuthSecret string `json:"authSecret"`
 }
 
 type ClusterConfig struct {
-	ClusterAuth
 
 	// The services to run on each node in the cluster
 	Services string `json:"services"`
@@ -113,14 +114,6 @@ type ClusterConfig struct {
 
 	// Timeout that expires to trigger the auto failover.
 	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout"`
-}
-
-type ClusterAuth struct {
-	// The username for the Administrator user
-	AdminUsername string `json:"username"`
-
-	// The password for the Administrator user
-	AdminPassword string `json:"password"`
 }
 
 type BucketConfig struct {
@@ -262,11 +255,6 @@ type MembersStatus struct {
 	Ready []string `json:"ready,omitempty"`
 	// Unready are the couchbase members not ready to serve requests
 	Unready []string `json:"unready,omitempty"`
-}
-
-func (cl *CouchbaseCluster) Auth() (string, string) {
-	auth := cl.Spec.ClusterSettings.ClusterAuth
-	return auth.AdminUsername, auth.AdminPassword
 }
 
 func (cs *ClusterStatus) SetVersion(v string) {
