@@ -3,6 +3,7 @@ package couchbaseutil
 import (
 	"crypto/tls"
 	"encoding/json"
+	"strings"
 	"time"
 
 	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
@@ -10,9 +11,15 @@ import (
 	"github.com/couchbaselabs/gocbmgr"
 )
 
-var (
-	RestTimeout = 30 * time.Second
-)
+type ClusterStatus struct {
+	TotalNodes        int
+	NumHealthyNodes   int
+	NumUnhealthyNodes int
+	NumWarmupNodes    int
+	AutoFailedNodes   MemberSet
+	IsRebalancing     bool
+	NeedsRebalance    bool
+}
 
 // New client for managing couchbase node at <url>
 func NewClient(url, username, password string) (*cbmgr.Couchbase, error) {
@@ -29,21 +36,6 @@ func NewClient(url, username, password string) (*cbmgr.Couchbase, error) {
 func NewClientForMemberSet(ms MemberSet, username, password string) (*cbmgr.Couchbase, error) {
 	m := ms.PickOne()
 	return NewClient(m.ClientURL(), username, password)
-}
-
-// Create a client that ensures url is servicable
-func NewReadyClient(url, username, password string) (*cbmgr.Couchbase, error) {
-
-	// create new client
-	couchbaseClient, err := NewClient(url, username, password)
-
-	// make sure node is ready
-	_, err = couchbaseClient.IsReady(url, RestTimeout)
-	if err != nil {
-		return nil, err
-	}
-
-	return couchbaseClient, nil
 }
 
 // check the health of a particular Couchbase node.
@@ -87,6 +79,52 @@ func ClusterUUID(m *Member, username, password, clusterName string) (string, err
 	}, "cluster uuid", clusterName)
 
 	return uuid, err
+}
+
+func GetClusterStatus(m *Member, ms MemberSet, username, password, clusterName string) (*ClusterStatus, error) {
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return nil, err
+	}
+
+	client.Username = username
+	client.Password = password
+
+	status := &ClusterStatus{}
+	err = retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+		info, err := client.ClusterInfo()
+		if err != nil {
+			return true, err
+		}
+
+		status.TotalNodes = 0
+		status.NumHealthyNodes = 0
+		status.NumUnhealthyNodes = 0
+		status.NumWarmupNodes = 0
+		status.AutoFailedNodes = NewMemberSet()
+		status.IsRebalancing = (info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
+		status.NeedsRebalance = info.Balanced
+
+		for _, node := range info.Nodes {
+			status.TotalNodes++
+			if node.Status == "healthy" {
+				status.NumHealthyNodes++
+			} else if node.Status == "warmup" {
+				status.NumWarmupNodes++
+			} else if node.Status == "unhealthy" {
+				status.NumUnhealthyNodes++
+				if node.Membership == "inactiveFailed" {
+					host := strings.Split(node.HostName, ".")[0]
+					m := ms[host]
+					status.AutoFailedNodes.Add(m)
+				}
+			}
+		}
+
+		return true, nil
+	}, "cluster status", clusterName)
+
+	return status, err
 }
 
 func InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,

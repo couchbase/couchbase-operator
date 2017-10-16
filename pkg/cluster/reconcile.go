@@ -22,11 +22,36 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	// TODO: We should check to see if the cluster is rebalancing here
+	status, err := c.getClusterStatus()
+	if err != nil {
+		return err
+	}
 
-	// TODO: We should check to see if there are any Couchbase nodes marked as
-	// failed here. If so we should return and reconcile the cluster later once
-	// the failure has been handled by the Couchbase cluster manager.
+	if status.IsRebalancing {
+		c.logger.Infoln("Skipping reconcile loop because the cluster is currently rebalancing")
+		// TODO - Should track the status of rebalance here
+		return nil
+	}
+
+	if status.NumUnhealthyNodes > status.AutoFailedNodes.Size() {
+		c.logger.Infoln("Skipping reconcile loop to allow autofilover to take place")
+		return nil
+	}
+
+	if status.AutoFailedNodes.Size() > 0 {
+		c.logger.Infoln("An autofailover has taken place, rebalancing nodes")
+		for _, m := range status.AutoFailedNodes {
+			c.removeMember(m)
+			running.Remove(m.Name)
+		}
+	}
+
+	if status.NeedsRebalance {
+		c.logger.Infoln("The cluster is unbalanced, starting rebalance")
+		if err := c.rebalance([]string{}); err != nil {
+			return err
+		}
+	}
 
 	// TODO: We should update any cluster confiugration parameters here.
 
@@ -102,11 +127,16 @@ func (c *Cluster) addOneMember() error {
 
 	// rebalance if this is last node to add to cluster
 	if len(c.members) == c.cluster.Spec.Size {
-		//TODO: watch for rebalance complete and handle failures
 		return c.rebalance([]string{})
 	}
 
 	return nil
+}
+
+func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
+	m := c.members.First(c.cluster.Name, c.memberCounter)
+	username, password := c.cluster.Auth()
+	return couchbaseutil.GetClusterStatus(m, c.members, username, password, c.cluster.Name)
 }
 
 // Rebalance nodes in the cluster
