@@ -1,17 +1,14 @@
 package v1beta1
 
 import (
-	"fmt"
-	"strings"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-import (
 	"encoding/json"
+	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CouchbaseClusterList is a list of Couchbase clusters.
@@ -252,7 +249,7 @@ type ClusterStatus struct {
 	TargetVersion string `json:"targetVersion"`
 
 	// Name of buckets active within cluster
-	Buckets []string
+	Buckets map[string]*BucketConfig `json:"buckets"`
 }
 
 type MembersStatus struct {
@@ -278,6 +275,7 @@ func (cs ClusterStatus) Copy() ClusterStatus {
 	if err != nil {
 		panic(err)
 	}
+	newCS.Buckets = make(map[string]*BucketConfig)
 	return newCS
 }
 
@@ -286,17 +284,13 @@ func (cs *ClusterStatus) SetVersion(v string) {
 	cs.CurrentVersion = v
 }
 
-func (cs *ClusterStatus) AddBucket(b string) {
-	cs.Buckets = append(cs.Buckets, b)
+func (cs *ClusterStatus) UpdateBuckets(name string, config *BucketConfig) {
+	cs.Buckets[name] = config
 }
 
 // get index of bucket name within status and remove
 func (cs *ClusterStatus) RemoveBucket(b string) {
-	i, _ := HasItem(b, cs.Buckets)
-	if i != -1 {
-		// rm bucket from arr at index 'i'
-		cs.Buckets = append(cs.Buckets[:i], cs.Buckets[i+1:]...)
-	}
+	delete(cs.Buckets, b)
 }
 
 func (c *ClusterStatus) IsFailed() bool {
@@ -406,7 +400,25 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 	specBuckets := cs.BucketNames()
 	bucketsToAdd := MissingItems(specBuckets, existingBuckets)
 	bucketsToRemove := MissingItems(existingBuckets, specBuckets)
+
 	return bucketsToAdd, bucketsToRemove
+}
+
+// compare bucket status revisions with spec revisions
+// and return list of buckets that have changed
+func (c *CouchbaseCluster) CompareBucketSpecs() []string {
+	bucketsChanged := []string{}
+	specBuckets := c.Spec.BucketSettings
+	statusBuckets := c.Status.Buckets
+
+	for _, b := range *(specBuckets) {
+		if statusBucket, ok := statusBuckets[b.BucketName]; ok {
+			if reflect.DeepEqual(*statusBucket, b) == false {
+				bucketsChanged = append(bucketsChanged, b.BucketName)
+			}
+		}
+	}
+	return bucketsChanged
 }
 
 func (cc *ClusterConfig) ServicesArr() []string {
