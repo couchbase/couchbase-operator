@@ -184,17 +184,12 @@ func CreateBucket(m *Member, username, password string, config *cbapi.BucketConf
 	client.Username = username
 	client.Password = password
 
-	// convert bucket config to cbmgr bucket type
-	data, err := json.Marshal(config)
+	bucket, err := apiBucketToCbmgr(config)
 	if err != nil {
 		return err
 	}
-	bucket := cbmgr.Bucket{}
-	if err := json.Unmarshal(data, &bucket); err != nil {
-		return err
-	}
 
-	if err = client.CreateBucket(&bucket); err != nil {
+	if err = client.CreateBucket(bucket); err != nil {
 		return err
 	}
 
@@ -215,6 +210,23 @@ func DeleteBucket(m *Member, username, password, bucketName string) error {
 	client.Password = password
 
 	return client.DeleteBucket(bucketName)
+}
+
+func EditBucket(m *Member, username, password string, config *cbapi.BucketConfig) error {
+	client, err := cbmgr.New(m.ClientURL())
+	if err != nil {
+		return err
+	}
+
+	client.Username = username
+	client.Password = password
+
+	bucket, err := apiBucketToCbmgr(config)
+	if err != nil {
+		return err
+	}
+
+	return client.EditBucket(bucket)
 }
 
 func GetBucketNames(m *Member, username, password string) ([]string, error) {
@@ -251,4 +263,20 @@ func SetAutoFailoverTimeout(m *Member, username, password, clusterName string, e
 		func() error {
 			return client.SetAutoFailoverTimeout(enabled, timeout)
 		})
+}
+
+func apiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
+
+	// convert bucket config to cbmgr bucket type
+	data, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+
+	bucket := cbmgr.Bucket{}
+	if err := json.Unmarshal(data, &bucket); err != nil {
+		return nil, err
+	}
+
+	return &bucket, nil
 }

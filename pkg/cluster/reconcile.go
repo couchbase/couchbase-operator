@@ -178,9 +178,16 @@ func (c *Cluster) reconcileBuckets() error {
 	spec := c.cluster.Spec
 	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
 	bucketsToEdit := c.cluster.CompareBucketSpecs()
+
 	if len(bucketsToRemove) > 0 {
 		bucketName := bucketsToRemove[0]
 		err := c.deleteClusterBucket(bucketName)
+		if err != nil {
+			return err
+		}
+	} else if len(bucketsToEdit) > 0 {
+		bucketName := bucketsToEdit[0]
+		err := c.editClusterBucket(bucketName)
 		if err != nil {
 			return err
 		}
@@ -190,8 +197,6 @@ func (c *Cluster) reconcileBuckets() error {
 		if err != nil {
 			return err
 		}
-	} else if len(bucketsToEdit) > 0 {
-		// TODO
 	}
 
 	return nil
@@ -219,6 +224,20 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 	err := couchbaseutil.DeleteBucket(activeMember, username, password, bucketName)
 	if err == nil {
 		c.status.RemoveBucket(bucketName)
+	}
+	return err
+}
+
+// edit bucket on cluster
+func (c *Cluster) editClusterBucket(bucketName string) error {
+
+	// establish cluster connection
+	activeMember := c.members.First(c.cluster.Name, c.memberCounter)
+	username, password := c.cluster.Auth()
+	config := c.cluster.Spec.GetBucketByName(bucketName)
+	err := couchbaseutil.EditBucket(activeMember, username, password, config)
+	if err == nil {
+		c.status.UpdateBuckets(bucketName, config)
 	}
 	return err
 }

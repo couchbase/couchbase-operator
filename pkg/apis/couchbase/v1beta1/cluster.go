@@ -404,7 +404,7 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 	return bucketsToAdd, bucketsToRemove
 }
 
-// compare bucket status revisions with spec revisions
+// compare bucket status with new spec
 // and return list of buckets that have changed
 func (c *CouchbaseCluster) CompareBucketSpecs() []string {
 	bucketsChanged := []string{}
