@@ -57,10 +57,10 @@ func AddNode(m *Member, clusterName, hostname, username, password string, servic
 		return err
 	}
 
-	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
-		err := client.AddNode(hostname, username, password, svcs)
-		return true, err
-	}, "add node", clusterName)
+	return retryutil.RetryOnErr(5*time.Second, 36, "add node", clusterName,
+		func() error {
+			return client.AddNode(hostname, username, password, svcs)
+		})
 }
 
 func ClusterUUID(m *Member, username, password, clusterName string) (string, error) {
@@ -73,10 +73,11 @@ func ClusterUUID(m *Member, username, password, clusterName string) (string, err
 	client.Password = password
 
 	var uuid string
-	err = retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
-		uuid, err = client.ClusterUUID()
-		return true, err
-	}, "cluster uuid", clusterName)
+	err = retryutil.RetryOnErr(5*time.Second, 36, "cluster uuid", clusterName,
+		func() error {
+			uuid, err = client.ClusterUUID()
+			return err
+		})
 
 	return uuid, err
 }
@@ -91,10 +92,10 @@ func GetClusterStatus(m *Member, ms MemberSet, username, password, clusterName s
 	client.Password = password
 
 	status := &ClusterStatus{}
-	err = retryutil.RetryOnErr(5 *time.Second, 36, func() (bool, error) {
+	err = retryutil.RetryOnErr(5*time.Second, 36, "cluster status", clusterName, func() error {
 		info, err := client.ClusterInfo()
 		if err != nil {
-			return true, err
+			return err
 		}
 
 		status.TotalNodes = 0
@@ -121,8 +122,8 @@ func GetClusterStatus(m *Member, ms MemberSet, username, password, clusterName s
 			}
 		}
 
-		return true, nil
-	}, "cluster status", clusterName)
+		return nil
+	})
 
 	return status, err
 }
@@ -134,10 +135,10 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 		return err
 	}
 
-	err = retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
-		err := client.NodeInitialize(m.Addr(), dataPath, indexPath)
-		return true, err
-	}, "node init", name)
+	err = retryutil.RetryOnErr(5*time.Second, 36, "node init", name,
+		func() error {
+			return client.NodeInitialize(m.Addr(), dataPath, indexPath)
+		})
 
 	if err != nil {
 		return err
@@ -148,11 +149,11 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 		return err
 	}
 
-	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
-		err := client.ClusterInitialize(username, password, name, dataMemQuota,
-			indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
-		return true, err
-	}, "cluster init", name)
+	return retryutil.RetryOnErr(5*time.Second, 36, "cluster init", name,
+		func() error {
+			return client.ClusterInitialize(username, password, name, dataMemQuota,
+				indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
+		})
 }
 
 func Rebalance(m *Member, username, password, clusterName string, nodesToRemove []string, wait bool) error {
@@ -163,14 +164,15 @@ func Rebalance(m *Member, username, password, clusterName string, nodesToRemove 
 
 	client.Username = username
 	client.Password = password
-	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
-		status, err := client.Rebalance(nodesToRemove)
-		if wait {
-			status.SetLogger(retryutil.Log(clusterName))
-			return true, status.Wait()
-		}
-		return true, err
-	}, "rebalance", clusterName)
+	return retryutil.RetryOnErr(5*time.Second, 36, "rebalance", clusterName,
+		func() error {
+			status, err := client.Rebalance(nodesToRemove)
+			if wait {
+				status.SetLogger(retryutil.Log(clusterName))
+				return status.Wait()
+			}
+			return err
+		})
 }
 
 func CreateBucket(m *Member, username, password string, config *cbapi.BucketConfig) error {
@@ -245,7 +247,8 @@ func SetAutoFailoverTimeout(m *Member, username, password, clusterName string, e
 	client.Username = username
 	client.Password = password
 
-	return retryutil.RetryOnErr(5*time.Second, 36, func() (bool, error) {
-		return true, client.SetAutoFailoverTimeout(enabled, timeout)
-	}, "set autofailover timeout", clusterName)
+	return retryutil.RetryOnErr(5*time.Second, 36, "set autofailover timeout", clusterName,
+		func() error {
+			return client.SetAutoFailoverTimeout(enabled, timeout)
+		})
 }
