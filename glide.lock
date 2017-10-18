@@ -1,5 +1,5 @@
 hash: 4ca3dd107c5f32926ddaca728c8341b6bc68e4669f041c0a39d68703eb561bcc
-updated: 2017-10-19T12:59:40.879096685-07:00
+updated: 2017-10-19T13:01:03.047428589-07:00
 imports:
 - name: github.com/couchbaselabs/gocbmgr
   version: 15ae85327d847a5d815755f8e9a689b3ee984b89
@@ -115,6 +115,10 @@ imports:
   - unicode/bidi
   - unicode/norm
   - width
+- name: golang.org/x/time
+  version: 6dc17368e09b0e8634d71cac8168d853e869a0c7
+  subpackages:
+  - rate
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2

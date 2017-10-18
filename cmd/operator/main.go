@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/couchbaselabs/couchbase-operator/pkg/chaos"
 	"github.com/couchbaselabs/couchbase-operator/pkg/client"
 	"github.com/couchbaselabs/couchbase-operator/pkg/controller"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
@@ -15,8 +17,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"golang.org/x/time/rate"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -32,12 +37,16 @@ var (
 	name         string
 	namespace    string
 	printVersion bool
+
+	chaosLevel int
+
 	mainLogger   *logrus.Entry
 )
 
 // parse command-line args and initialise config
 func init() {
 	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
+	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
@@ -107,7 +116,7 @@ func run(stop <-chan struct{}) {
 
 	//go periodicFullGC(cfg.KubeCli, cfg.Namespace, gcInterval)
 
-	//startChaos(context.Background(), cfg.KubeCli, cfg.Namespace, chaosLevel)
+	startChaos(context.Background(), cfg.KubeCli, cfg.Namespace, chaosLevel)
 
 	c := controller.New(cfg)
 	err := c.Start()
@@ -150,6 +159,43 @@ func getMyPodServiceAccount(kubecli kubernetes.Interface) (string, error) {
 		mainLogger.Infof("Found pod service account: %s", sa)
 	}
 	return sa, err
+}
+
+func startChaos(ctx context.Context, kubecli kubernetes.Interface, ns string, chaosLevel int) {
+	m := chaos.NewMonkeys(kubecli)
+	ls := labels.SelectorFromSet(map[string]string{"app": "couchbase"})
+
+	switch chaosLevel {
+	case 1:
+		logrus.Info("chaos level = 1: randomly kill one couchbase pod every 30 seconds at 50%")
+		c := &chaos.CrashConfig{
+			Namespace: ns,
+			Selector:  ls,
+
+			KillRate:        rate.Every(30 * time.Second),
+			KillProbability: 0.5,
+			KillMax:         1,
+		}
+		go func() {
+			time.Sleep(60 * time.Second) // don't start until quorum up
+			m.CrushPods(ctx, c)
+		}()
+
+	case 2:
+		logrus.Info("chaos level = 2: randomly kill at most five couchbase pods every 30 seconds at 50%")
+		c := &chaos.CrashConfig{
+			Namespace: ns,
+			Selector:  ls,
+
+			KillRate:        rate.Every(30 * time.Second),
+			KillProbability: 0.5,
+			KillMax:         5,
+		}
+
+		go m.CrushPods(ctx, c)
+
+	default:
+	}
 }
 
 func createRecorder(kubecli kubernetes.Interface, name, namespace string) record.EventRecorder {
