@@ -1,8 +1,11 @@
 PREFIX ?= $(shell pwd)
 
-pkgs = $(shell go list ./... | grep -v /vendor/)
+kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
+operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
+namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
+testname = $(E2E_TEST)
 
-.PHONY: all build container
+.PHONY: all build container test test-indv
 
 all: build
 
@@ -12,3 +15,13 @@ build:
 
 container: build
 	docker build -t couchbase/couchbase-operator:v1 .
+
+test:
+	go test github.com/couchbaselabs/couchbase-operator/test/e2e -v -timeout 30m \
+		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
+		--namespace $(namespace)
+
+test-indv:
+	go test github.com/couchbaselabs/couchbase-operator/test/e2e -run $(testname) \
+		-v -timeout 30m --race --kubeconfig $(kubeconfig) --operator-image \
+		$(operatorImage) --namespace $(namespace)

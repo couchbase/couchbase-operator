@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -12,18 +12,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// CouchbaseClusterCRUpdateFunc is a function to be used when atomically
+// updating a Cluster CR.
+type CouchbaseClusterCRUpdateFunc func(*api.CouchbaseCluster)
+
 func CreateCRD(clientset apiextensionsclient.Interface) error {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: cbapi.CRDName,
+			Name: api.CRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   cbapi.SchemeGroupVersion.Group,
-			Version: cbapi.SchemeGroupVersion.Version,
+			Group:   api.SchemeGroupVersion.Group,
+			Version: api.SchemeGroupVersion.Version,
 			Scope:   apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:     cbapi.CRDResourcePlural,
-				Kind:       cbapi.CRDResourceKind,
+				Plural:     api.CRDResourcePlural,
+				Kind:       api.CRDResourceKind,
 				ShortNames: []string{"couchbase"},
 			},
 		},
@@ -34,7 +38,7 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 
 func WaitCRDReady(clientset apiextensionsclient.Interface) error {
 	err := retryutil.Retry(5*time.Second, 20, func() (bool, error) {
-		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(cbapi.CRDName, metav1.GetOptions{})
+		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(api.CRDName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

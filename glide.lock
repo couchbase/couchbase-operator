@@ -1,5 +1,5 @@
 hash: 4ca3dd107c5f32926ddaca728c8341b6bc68e4669f041c0a39d68703eb561bcc
-updated: 2017-10-18T12:08:25.396585355-07:00
+updated: 2017-10-19T12:59:40.879096685-07:00
 imports:
 - name: github.com/couchbaselabs/gocbmgr
   version: 15ae85327d847a5d815755f8e9a689b3ee984b89
@@ -60,6 +60,10 @@ imports:
   version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
   subpackages:
   - simplelru
+- name: github.com/howeyc/gopass
+  version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
+- name: github.com/imdario/mergo
+  version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/json-iterator/go
   version: 36b14963da70d11297d313183d7e6388c8510e1e
 - name: github.com/juju/ratelimit
@@ -232,8 +236,12 @@ imports:
   - rest
   - rest/watch
   - testing
+  - tools/auth
   - tools/cache
+  - tools/clientcmd
   - tools/clientcmd/api
+  - tools/clientcmd/api/latest
+  - tools/clientcmd/api/v1
   - tools/leaderelection
   - tools/leaderelection/resourcelock
   - tools/metrics
@@ -243,6 +251,7 @@ imports:
   - transport
   - util/cert
   - util/flowcontrol
+  - util/homedir
   - util/integer
 - name: k8s.io/kube-openapi
   version: 868f2f29720b192240e18284659231b440f9cda5

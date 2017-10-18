@@ -177,3 +177,18 @@ func couchbaseLivenessProbe() *v1.Probe {
 		FailureThreshold:    3,
 	}
 }
+
+// IsPodReady returns false if the Pod Status is nil
+func IsPodReady(pod *v1.Pod) bool {
+	condition := getPodReadyCondition(&pod.Status)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == v1.PodReady {
+			return &status.Conditions[i]
+		}
+	}
+	return nil
+}
