@@ -10,6 +10,7 @@ import (
 	"github.com/couchbaselabs/couchbase-operator/pkg/cluster"
 	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/probe"
 
 	"github.com/sirupsen/logrus"
 
@@ -76,6 +77,7 @@ func (c *Controller) Start() error {
 	}
 
 	c.logger.Infof("CRD initialized, listening for events...")
+	probe.SetReady()
 	c.run()
 	panic("unreachable")
 }

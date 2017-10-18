@@ -21,3 +21,13 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        ports:
+          - name: readiness-port
+            containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: readiness-port
+          initialDelaySeconds: 3
+          periodSeconds: 3
+          failureThreshold: 19

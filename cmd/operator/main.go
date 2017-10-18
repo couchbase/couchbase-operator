@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/couchbaselabs/couchbase-operator/pkg/client"
 	"github.com/couchbaselabs/couchbase-operator/pkg/controller"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/probe"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
 
 	"github.com/sirupsen/logrus"
@@ -26,25 +28,17 @@ import (
 const version = "0.8.0"
 
 var (
-	caFile       string
-	certFile     string
-	keyFile      string
-	masterHost   string
+	listenAddr   string
 	name         string
 	namespace    string
 	printVersion bool
-	tlsInsecure  bool
 	mainLogger   *logrus.Entry
 )
 
 // parse command-line args and initialise config
 func init() {
-	flag.StringVar(&masterHost, "master", "", "API Server addr, e.g. ' - NOT RECOMMENDED FOR PRODUCTION - http://127.0.0.1:8080'. Omit parameter to run in on-cluster mode and utilize the service account token.")
-	flag.StringVar(&certFile, "cert-file", "", " - NOT RECOMMENDED FOR PRODUCTION - Path to public TLS certificate file.")
-	flag.StringVar(&keyFile, "key-file", "", "- NOT RECOMMENDED FOR PRODUCTION - Path to private TLS certificate file.")
-	flag.StringVar(&caFile, "ca-file", "", "- NOT RECOMMENDED FOR PRODUCTION - Path to TLS CA file.")
+	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
-	flag.BoolVar(&tlsInsecure, "tls-insecure", false, "- NOT RECOMMENDED FOR PRODUCTION - Don't verify API server's CA certificate.")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
 	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
@@ -62,7 +56,7 @@ func main() {
 	}
 
 	if printVersion {
-		fmt.Println("postgres-operator", version)
+		fmt.Println("couchbase-operator", version)
 		os.Exit(0)
 	}
 
@@ -72,6 +66,9 @@ func main() {
 	}
 
 	kubecli := k8sutil.MustNewKubeClient()
+
+	http.HandleFunc(probe.HTTPReadyzEndpoint, probe.ReadyzHandler)
+	go http.ListenAndServe(listenAddr, nil)
 
 	mainLogger.Info("Obtaining resource lock")
 	rl, err := resourcelock.New(resourcelock.EndpointsResourceLock,
@@ -127,7 +124,6 @@ func newControllerConfig() controller.Config {
 	}
 
 	cfg := controller.Config{
-		MasterHost:     masterHost,
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
 		KubeCli:        kubecli,
