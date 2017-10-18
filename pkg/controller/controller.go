@@ -7,8 +7,8 @@ import (
 	"time"
 
 	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/client"
 	"github.com/couchbaselabs/couchbase-operator/pkg/cluster"
+	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/sirupsen/logrus"
@@ -48,7 +48,7 @@ type Config struct {
 	ServiceAccount string
 	KubeCli        kubernetes.Interface
 	KubeExtCli     apiextensionsclient.Interface
-	CouchbaseCRCli client.CouchbaseClusterCR
+	CouchbaseCRCli versioned.Interface
 }
 
 func (c *Config) Validate() error {
@@ -82,7 +82,7 @@ func (c *Controller) Start() error {
 
 func (c *Controller) run() {
 	source := cache.NewListWatchFromClient(
-		c.Config.CouchbaseCRCli.RESTClient(),
+		c.Config.CouchbaseCRCli.CouchbaseV1beta1().RESTClient(),
 		cbapi.CRDResourcePlural,
 		c.Config.Namespace,
 		fields.Everything())

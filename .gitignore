@@ -3,6 +3,8 @@
 .settings
 
 *~
+*.deepcopy.go
 
 /build/
 /vendor/
+/pkg/generated/

@@ -77,7 +77,7 @@ func main() {
 	rl, err := resourcelock.New(resourcelock.EndpointsResourceLock,
 		namespace,
 		"couchbase-operator",
-		kubecli.(*kubernetes.Clientset),
+		kubecli.CoreV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: createRecorder(kubecli, name, namespace),
@@ -132,7 +132,7 @@ func newControllerConfig() controller.Config {
 		ServiceAccount: serviceAccount,
 		KubeCli:        kubecli,
 		KubeExtCli:     k8sutil.MustNewKubeExtClient(),
-		CouchbaseCRCli: client.MustNewCRInCluster(),
+		CouchbaseCRCli: client.MustNewInCluster(),
 	}
 
 	return cfg

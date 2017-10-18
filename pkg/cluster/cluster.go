@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"math"
@@ -9,8 +8,8 @@ import (
 	"time"
 
 	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/client"
 	"github.com/couchbaselabs/couchbase-operator/pkg/garbagecollection"
+	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
@@ -42,7 +41,7 @@ type clusterEvent struct {
 type Config struct {
 	ServiceAccount string
 	KubeCli        kubernetes.Interface
-	CouchbaseCRCli client.CouchbaseClusterCR
+	CouchbaseCRCli versioned.Interface
 }
 
 type Cluster struct {
@@ -65,7 +64,7 @@ func New(config Config, cl *cbapi.CouchbaseCluster) *Cluster {
 			"cluster-name": cl.Name,
 		}),
 		config:  config,
-		status:  cl.Status.Copy(),
+		status:  *(cl.Status.DeepCopy()),
 		cluster: cl,
 		eventCh: make(chan *clusterEvent, 100),
 		stopCh:  make(chan struct{}),
@@ -266,7 +265,8 @@ func (c *Cluster) updateCRStatus() error {
 
 	newCluster := c.cluster
 	newCluster.Status = c.status
-	newCluster, err := c.config.CouchbaseCRCli.Update(context.TODO(), c.cluster)
+	newCluster, err := c.config.CouchbaseCRCli.CouchbaseV1beta1().CouchbaseClusters(c.cluster.Namespace).Update(c.cluster)
+
 	if err != nil {
 		return fmt.Errorf("failed to update CR status: %v", err)
 	}
@@ -363,7 +363,8 @@ func (c *Cluster) reportFailedStatus() {
 			return false, nil
 		}
 
-		cl, err := c.config.CouchbaseCRCli.Get(context.TODO(), c.cluster.Namespace, c.cluster.Name)
+		cl, err := c.config.CouchbaseCRCli.CouchbaseV1beta1().CouchbaseClusters(c.cluster.Namespace).
+			Get(c.cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			// Update (PUT) will return conflict even if object is deleted since we have UID set in object.
 			// Because it will check UID first and return something like:

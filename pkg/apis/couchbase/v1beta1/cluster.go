@@ -1,7 +1,6 @@
 package v1beta1
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -11,12 +10,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // CouchbaseClusterList is a list of Couchbase clusters.
 type CouchbaseClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CouchbaseCluster `json:"items"`
 }
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type CouchbaseCluster struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -265,20 +269,6 @@ func (cl *CouchbaseCluster) Auth() (string, string) {
 	return auth.AdminUsername, auth.AdminPassword
 }
 
-func (cs ClusterStatus) Copy() ClusterStatus {
-	newCS := ClusterStatus{}
-	b, err := json.Marshal(cs)
-	if err != nil {
-		panic(err)
-	}
-	err = json.Unmarshal(b, &newCS)
-	if err != nil {
-		panic(err)
-	}
-	newCS.Buckets = make(map[string]*BucketConfig)
-	return newCS
-}
-
 func (cs *ClusterStatus) SetVersion(v string) {
 	cs.TargetVersion = ""
 	cs.CurrentVersion = v
@@ -423,7 +413,7 @@ func (c *CouchbaseCluster) CompareBucketSpecs() []string {
 	specBuckets := c.Spec.BucketSettings
 	statusBuckets := c.Status.Buckets
 
-	for _, b := range *(specBuckets) {
+	for _, b := range specBuckets {
 		if statusBucket, ok := statusBuckets[b.BucketName]; ok {
 			if reflect.DeepEqual(*statusBucket, b) == false {
 				bucketsChanged = append(bucketsChanged, b.BucketName)
