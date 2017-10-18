@@ -135,6 +135,10 @@ func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, port
 	return svc
 }
 
+// creates a service of Type ClusterIP which is only resolvable internally.
+// futhermore the ClusterIP is "None" allowing the service to run "headless"
+// (sans load balancing middleware) which allows the operator to resolve
+// addresses of individual pods instead of a proxy
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
 	ports := []v1.ServicePort{{
 		Name:       "cb-admin",
