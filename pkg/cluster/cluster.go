@@ -122,6 +122,8 @@ func (c *Cluster) setup() error {
 		return errCreatedCluster
 	case cbapi.ClusterPhaseRunning:
 		shouldCreateCluster = false
+	default:
+		return fmt.Errorf("unexpected cluster phase: %s", c.status.Phase)
 	}
 
 	if shouldCreateCluster {
