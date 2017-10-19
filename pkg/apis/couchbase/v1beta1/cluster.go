@@ -285,11 +285,19 @@ func (cs *ClusterStatus) SetVersion(v string) {
 }
 
 func (cs *ClusterStatus) UpdateBuckets(name string, config *BucketConfig) {
+	if cs.Buckets == nil {
+		cs.Buckets = make(map[string]*BucketConfig)
+	}
+
 	cs.Buckets[name] = config
 }
 
 // get index of bucket name within status and remove
 func (cs *ClusterStatus) RemoveBucket(b string) {
+	if cs.Buckets == nil {
+		cs.Buckets = make(map[string]*BucketConfig)
+	}
+
 	delete(cs.Buckets, b)
 }
 
@@ -407,6 +415,10 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 // compare bucket status with new spec
 // and return list of buckets that have changed
 func (c *CouchbaseCluster) CompareBucketSpecs() []string {
+	if c.Status.Buckets == nil {
+		c.Status.Buckets = make(map[string]*BucketConfig)
+	}
+
 	bucketsChanged := []string{}
 	specBuckets := c.Spec.BucketSettings
 	statusBuckets := c.Status.Buckets
