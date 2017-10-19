@@ -80,7 +80,7 @@ type ClusterSpec struct {
 	ClusterSettings *ClusterConfig `json:"cluster"`
 
 	// Bucket specific settings
-	BucketSettings *[]BucketConfig `json:"buckets"`
+	BucketSettings []BucketConfig `json:"buckets"`
 }
 
 type ClusterConfig struct {
@@ -375,7 +375,7 @@ func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
 func (cs *ClusterSpec) BucketNames() []string {
 	buckets := []string{}
 	if cs.BucketSettings != nil {
-		for _, b := range *(cs.BucketSettings) {
+		for _, b := range cs.BucketSettings {
 			buckets = append(buckets, b.BucketName)
 		}
 	}
@@ -385,7 +385,7 @@ func (cs *ClusterSpec) BucketNames() []string {
 // Get bucket config by name of bucket
 func (cs *ClusterSpec) GetBucketByName(name string) *BucketConfig {
 	if cs.BucketSettings != nil {
-		for _, b := range *(cs.BucketSettings) {
+		for _, b := range cs.BucketSettings {
 			if b.BucketName == name {
 				return &b
 			}
