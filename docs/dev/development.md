@@ -21,7 +21,34 @@ you can undo this change by running the command below.
 
 	eval $(minikube docker-env -u)
 
-Then run make command to build the docker image.
+
+###Configuring MiniKube:
+
+Note: If you are not using minikube you can skip this step.
+
+Building the code requires mounting your development directory inside a docker container.
+This task is automated, but if your development directory is not located inside your home
+directory then you may need to configure minikube's docker to recognize your development
+directory as a shared folder.
+
+If you need to mount your development directory then you will need to share the root directory of your
+$GOPATH (ie../opt). This allows containers being started within the vm to access your dev
+environment when generating helper code used to build the operator.
+
+Make sure minikube is stopped.
+	minikube stop
+
+Add the /opt directory as a shared folder to the minikube vm within virtualbox.
+	Settings -> Shared Folders -> (click '+' to add folder)
+Set the 'Folder Path' to '/opt' and check the 'Auto-Mount' box.
+
+Start minikube.
+	minikube start
+
+
+###Building the operator:
+
+Run make command to build the docker image.
 
 	make container
 
