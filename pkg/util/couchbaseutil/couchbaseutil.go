@@ -3,6 +3,7 @@ package couchbaseutil
 import (
 	"crypto/tls"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"time"
 
@@ -167,15 +168,38 @@ func EditBucket(ms MemberSet, username, password string, config *cbapi.BucketCon
 }
 
 func GetBucketNames(ms MemberSet, username, password string) ([]string, error) {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
-	buckets, err := client.GetBuckets()
-	if err != nil {
-		return nil, err
-	}
 
 	bucketNames := []string{}
+
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	buckets, err := client.GetBuckets()
+	if err == nil {
+		for _, b := range buckets {
+			bucketNames = append(bucketNames, b.BucketName)
+		}
+	}
+
+	return bucketNames, err
+}
+
+// compare spec buckets to couchbase buckets and add to list of buckets
+// that need editing
+func GetBucketsToEdit(ms MemberSet, username, password string, spec *cbapi.ClusterSpec) ([]string, error) {
+
+	bucketNames := []string{}
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+
+	buckets, err := client.GetBuckets()
+	if err != nil {
+		return bucketNames, err
+	}
 	for _, b := range buckets {
-		bucketNames = append(bucketNames, b.BucketName)
+		config := spec.GetBucketByName(b.BucketName)
+		if config != nil {
+			if !bucketStatusEqualsConfig(b, config) {
+				bucketNames = append(bucketNames, config.BucketName)
+			}
+		}
 	}
 
 	return bucketNames, nil
@@ -203,4 +227,17 @@ func apiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
 	}
 
 	return &bucket, nil
+}
+
+// transforms bucket status into bucketConfig type and compares the two
+func bucketStatusEqualsConfig(statusConfig *cbmgr.Bucket, specConfig *cbapi.BucketConfig) bool {
+
+	// consider type couchbase = membase
+	if specConfig.BucketType == "couchbase" && statusConfig.BucketType == "membase" {
+		statusConfig.BucketType = "couchbase"
+	}
+	// TODO: status doesn't seem to return conflict resolution
+	//statusConfig.ConflictResolution = specConfig.ConflictResolution
+
+	return reflect.DeepEqual(statusConfig, specConfig)
 }

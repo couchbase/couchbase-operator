@@ -17,6 +17,13 @@ type (
 	ErrRunningPod            string
 )
 
+type ErrInvalidBucketParamChange struct {
+	bucket string
+	param  string
+	from   string
+	to     string
+}
+
 func (e ErrSecretMissingUsername) Error() string {
 	return fmt.Sprintf("secret is missing username key: %s", e)
 }
@@ -31,4 +38,9 @@ func (e ErrCreatingPod) Error() string {
 
 func (e ErrRunningPod) Error() string {
 	return fmt.Sprintf("failed to run pod: %s", e)
+}
+
+func (e ErrInvalidBucketParamChange) Error() string {
+	return fmt.Sprintf("cannot change (%s) bucket param='%s' from '%s' to '%s'",
+		e.bucket, e.param, e.from, e.to)
 }

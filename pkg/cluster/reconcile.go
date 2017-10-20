@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 
+	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"k8s.io/api/core/v1"
 )
@@ -164,7 +165,10 @@ func (c *Cluster) reconcileBuckets() error {
 	// if still present in active spec
 	spec := c.cluster.Spec
 	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
-	bucketsToEdit := c.cluster.CompareBucketSpecs()
+	bucketsToEdit, err := couchbaseutil.GetBucketsToEdit(c.members, c.username, c.password, &spec)
+	if err != nil {
+		return err
+	}
 
 	if len(bucketsToRemove) > 0 {
 		bucketName := bucketsToRemove[0]
@@ -210,11 +214,40 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 // edit bucket on cluster
 func (c *Cluster) editClusterBucket(bucketName string) error {
 	config := c.cluster.Spec.GetBucketByName(bucketName)
+
+	if err := c.validateEditBucket(config); err != nil {
+		return err
+	}
 	err := couchbaseutil.EditBucket(c.members, c.username, c.password, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 	}
 	return err
+}
+
+// Validate edit bucket returns error on attempts
+// to change immutable attributes
+func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
+
+	bucketName := config.BucketName
+	if statusBucket, ok := c.status.Buckets[bucketName]; ok {
+		if config.ConflictResolution != statusBucket.ConflictResolution {
+			return ErrInvalidBucketParamChange{
+				bucketName,
+				"conflictResolution",
+				statusBucket.ConflictResolution,
+				config.ConflictResolution}
+		}
+		if config.BucketType != statusBucket.BucketType {
+			return ErrInvalidBucketParamChange{
+				bucketName,
+				"type",
+				statusBucket.BucketType,
+				config.BucketType}
+		}
+	}
+
+	return nil
 }
 
 // initializes member with cluster settings

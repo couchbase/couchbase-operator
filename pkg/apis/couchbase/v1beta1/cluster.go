@@ -1,7 +1,6 @@
 package v1beta1
 
 import (
-	"reflect"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -219,27 +218,6 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 	bucketsToRemove := MissingItems(existingBuckets, specBuckets)
 
 	return bucketsToAdd, bucketsToRemove
-}
-
-// compare bucket status with new spec
-// and return list of buckets that have changed
-func (c *CouchbaseCluster) CompareBucketSpecs() []string {
-	if c.Status.Buckets == nil {
-		c.Status.Buckets = make(map[string]*BucketConfig)
-	}
-
-	bucketsChanged := []string{}
-	specBuckets := c.Spec.BucketSettings
-	statusBuckets := c.Status.Buckets
-
-	for _, b := range specBuckets {
-		if statusBucket, ok := statusBuckets[b.BucketName]; ok {
-			if reflect.DeepEqual(*statusBucket, b) == false {
-				bucketsChanged = append(bucketsChanged, b.BucketName)
-			}
-		}
-	}
-	return bucketsChanged
 }
 
 func (cc *ClusterConfig) ServicesArr() []string {
