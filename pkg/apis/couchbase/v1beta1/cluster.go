@@ -71,7 +71,7 @@ type ClusterSpec struct {
 
 	// Paused is to pause the control of the operator for the couchbase cluster.
 	Paused bool `json:"paused,omitempty"`
-	// Pod defines the policy to create pod for the etcd pod.
+	// Pod defines the policy to create pod for the couchbase pod.
 	//
 	// Updating Pod does not take effect on any existing couchbase pods.
 	Pod *PodPolicy `json:"pod,omitempty"`
@@ -169,15 +169,15 @@ type PodPolicy struct {
 	// Tolerations specifies the pod's tolerations.
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 
-	// List of environment variables to set in the etcd container.
-	// This is used to configure etcd process. couchbase cluster cannot be created, when
-	// bad environement variables are provided. Do not overwrite any flags used to
-	// bootstrap the cluster (for example `--initial-cluster` flag).
-	// This field cannot be updated.
+	// List of environment variables to set in the couchbase container.
+	// This is used to configure couchbase process. couchbase cluster cannot be
+	// created, when bad environement variables are provided. Do not overwrite
+	// any flags used to bootstrap the cluster (for example `--initial-cluster`
+	// flag). This field cannot be updated.
 	CouchbaseEnv []v1.EnvVar `json:"couchbaseEnv,omitempty"`
 
 	// PV represents a Persistent Volume resource.
-	// If defined new pods will use a persistent volume to store etcd data.
+	// If defined new pods will use a persistent volume to store couchbase data.
 	// TODO(sgotti) unimplemented
 	PV *PVSource `json:"pv,omitempty"`
 
