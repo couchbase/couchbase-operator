@@ -1,10 +1,6 @@
 package chaos
 
 import (
-
-)
-
-import (
 	"context"
 	"math/rand"
 

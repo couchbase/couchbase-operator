@@ -40,7 +40,7 @@ var (
 
 	chaosLevel int
 
-	mainLogger   *logrus.Entry
+	mainLogger *logrus.Entry
 )
 
 // parse command-line args and initialise config
