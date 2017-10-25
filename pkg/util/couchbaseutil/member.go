@@ -72,6 +72,14 @@ func (ms MemberSet) Remove(name string) {
 	delete(ms, name)
 }
 
+func (ms MemberSet) ClientURLs() []string {
+	endpoints := make([]string, 0, len(ms))
+	for _, m := range ms {
+		endpoints = append(endpoints, m.ClientURL())
+	}
+	return endpoints
+}
+
 func (ms MemberSet) PickOne() *Member {
 	for _, m := range ms {
 		return m

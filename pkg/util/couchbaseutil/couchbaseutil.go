@@ -21,37 +21,14 @@ type ClusterStatus struct {
 	NeedsRebalance    bool
 }
 
-// New client for managing couchbase node at <url>
-func NewClient(url, username, password string) (*cbmgr.Couchbase, error) {
-	client, err := cbmgr.New(url)
-	if err != nil {
-		return nil, err
-	}
-	client.Username = username
-	client.Password = password
-	return client, nil
-}
-
-// New client associated with any member within a set
-func NewClientForMemberSet(ms MemberSet, username, password string) (*cbmgr.Couchbase, error) {
-	m := ms.PickOne()
-	return NewClient(m.ClientURL(), username, password)
-}
-
 // check the health of a particular Couchbase node.
 func CheckHealth(url string, tc *tls.Config) (bool, error) {
 	// TODO: check the health of a particular Couchbase node.
 	return true, nil
 }
 
-func AddNode(m *Member, clusterName, hostname, username, password string, services []string) error {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return err
-	}
-
-	client.Username = username
-	client.Password = password
+func AddNode(ms MemberSet, clusterName, hostname, username, password string, services []string) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 	svcs, err := cbmgr.ServiceListFromStringArray(services)
 	if err != nil {
 		return err
@@ -64,14 +41,9 @@ func AddNode(m *Member, clusterName, hostname, username, password string, servic
 }
 
 func ClusterUUID(m *Member, username, password, clusterName string) (string, error) {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return "", err
-	}
+	client := cbmgr.New([]string{m.ClientURL()}, username, password)
 
-	client.Username = username
-	client.Password = password
-
+	var err error
 	var uuid string
 	err = retryutil.RetryOnErr(5*time.Second, 36, "cluster uuid", clusterName,
 		func() error {
@@ -82,17 +54,11 @@ func ClusterUUID(m *Member, username, password, clusterName string) (string, err
 	return uuid, err
 }
 
-func GetClusterStatus(m *Member, ms MemberSet, username, password, clusterName string) (*ClusterStatus, error) {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return nil, err
-	}
-
-	client.Username = username
-	client.Password = password
+func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*ClusterStatus, error) {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 
 	status := &ClusterStatus{}
-	err = retryutil.RetryOnErr(5*time.Second, 36, "cluster status", clusterName, func() error {
+	err := retryutil.RetryOnErr(5*time.Second, 36, "cluster status", clusterName, func() error {
 		info, err := client.ClusterInfo()
 		if err != nil {
 			return err
@@ -130,12 +96,9 @@ func GetClusterStatus(m *Member, ms MemberSet, username, password, clusterName s
 
 func InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
 	searchMemQuota int, services []string, dataPath, indexPath, indexStorageMode string) error {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return err
-	}
+	client := cbmgr.New([]string{m.ClientURL()}, "", "")
 
-	err = retryutil.RetryOnErr(5*time.Second, 36, "node init", name,
+	err := retryutil.RetryOnErr(5*time.Second, 36, "node init", name,
 		func() error {
 			return client.NodeInitialize(m.Addr(), dataPath, indexPath)
 		})
@@ -156,14 +119,8 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 		})
 }
 
-func Rebalance(m *Member, username, password, clusterName string, nodesToRemove []string, wait bool) error {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return err
-	}
-
-	client.Username = username
-	client.Password = password
+func Rebalance(ms MemberSet, username, password, clusterName string, nodesToRemove []string, wait bool) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 	return retryutil.RetryOnErr(5*time.Second, 36, "rebalance", clusterName,
 		func() error {
 			status, err := client.Rebalance(nodesToRemove)
@@ -175,14 +132,8 @@ func Rebalance(m *Member, username, password, clusterName string, nodesToRemove 
 		})
 }
 
-func CreateBucket(m *Member, username, password string, config *cbapi.BucketConfig) error {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return err
-	}
-
-	client.Username = username
-	client.Password = password
+func CreateBucket(ms MemberSet, username, password string, config *cbapi.BucketConfig) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 
 	bucket, err := apiBucketToCbmgr(config)
 	if err != nil {
@@ -200,27 +151,13 @@ func CreateBucket(m *Member, username, password string, config *cbapi.BucketConf
 		})
 }
 
-func DeleteBucket(m *Member, username, password, bucketName string) error {
-
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return err
-	}
-	client.Username = username
-	client.Password = password
-
+func DeleteBucket(ms MemberSet, username, password, bucketName string) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 	return client.DeleteBucket(bucketName)
 }
 
-func EditBucket(m *Member, username, password string, config *cbapi.BucketConfig) error {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return err
-	}
-
-	client.Username = username
-	client.Password = password
-
+func EditBucket(ms MemberSet, username, password string, config *cbapi.BucketConfig) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 	bucket, err := apiBucketToCbmgr(config)
 	if err != nil {
 		return err
@@ -229,21 +166,14 @@ func EditBucket(m *Member, username, password string, config *cbapi.BucketConfig
 	return client.EditBucket(bucket)
 }
 
-func GetBucketNames(m *Member, username, password string) ([]string, error) {
-
-	bucketNames := []string{}
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return bucketNames, err
-	}
-	client.Username = username
-	client.Password = password
-
+func GetBucketNames(ms MemberSet, username, password string) ([]string, error) {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 	buckets, err := client.GetBuckets()
 	if err != nil {
-		return bucketNames, err
+		return nil, err
 	}
 
+	bucketNames := []string{}
 	for _, b := range buckets {
 		bucketNames = append(bucketNames, b.BucketName)
 	}
@@ -251,14 +181,8 @@ func GetBucketNames(m *Member, username, password string) ([]string, error) {
 	return bucketNames, nil
 }
 
-func SetAutoFailoverTimeout(m *Member, username, password, clusterName string, enabled bool, timeout uint64) error {
-	client, err := cbmgr.New(m.ClientURL())
-	if err != nil {
-		return err
-	}
-	client.Username = username
-	client.Password = password
-
+func SetAutoFailoverTimeout(ms MemberSet, username, password, clusterName string, enabled bool, timeout uint64) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
 	return retryutil.RetryOnErr(5*time.Second, 36, "set autofailover timeout", clusterName,
 		func() error {
 			return client.SetAutoFailoverTimeout(enabled, timeout)
