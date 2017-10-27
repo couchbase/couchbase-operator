@@ -104,7 +104,7 @@ func GetClusterStatus(m *Member, ms MemberSet, username, password, clusterName s
 		status.NumWarmupNodes = 0
 		status.AutoFailedNodes = NewMemberSet()
 		status.IsRebalancing = (info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
-		status.NeedsRebalance = info.Balanced
+		status.NeedsRebalance = !info.Balanced
 
 		for _, node := range info.Nodes {
 			status.TotalNodes++
