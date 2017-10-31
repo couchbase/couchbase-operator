@@ -19,7 +19,7 @@ func NewCluster(genName, secretName string, size int) *api.CouchbaseCluster {
 		Spec: api.ClusterSpec{
 			Size:       size,
 			BaseImage:  "couchbase/server",
-			Version:    "enterprise-4.5.1",
+			Version:    "enterprise-5.0.0",
 			AuthSecret: secretName,
 			ClusterSettings: &api.ClusterConfig{
 				Services:              "kv,n1ql,index",

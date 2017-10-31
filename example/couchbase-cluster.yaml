@@ -5,7 +5,7 @@ metadata:
 spec:
   size: 3
   baseImage: couchbase/server
-  version: enterprise-4.5.1
+  version: enterprise-5.0.0
   authSecret: cb-example-auth
   cluster:
     services: data,index,query,fts
@@ -23,6 +23,6 @@ spec:
       replicas: 1
       ioPriority: high
       evictionPolicy: fullEviction
-      conflictResolution: sequence
+      conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
