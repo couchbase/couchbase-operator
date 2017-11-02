@@ -111,7 +111,7 @@ func (c *Cluster) resize() error {
 }
 
 func (c *Cluster) addOneMember() error {
-	c.status.AppendScalingUpCondition(c.members.Size(), c.cluster.Spec.Size)
+	c.status.SetScalingUpCondition(c.members.Size(), c.cluster.Spec.Size)
 
 	newMember := c.newMember(c.memberCounter)
 	c.members.Add(newMember)
@@ -267,14 +267,13 @@ func (c *Cluster) initMember(m *couchbaseutil.Member) error {
 }
 
 func (c *Cluster) removeOneMember() error {
-	c.status.AppendScalingDownCondition(c.members.Size(), c.cluster.Spec.Size)
+	c.status.SetScalingDownCondition(c.members.Size(), c.cluster.Spec.Size)
 
 	return c.removeMember(c.members.PickOne())
 }
 
 func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
 	c.logger.Infof("removing dead member %q", toRemove.Name)
-	c.status.AppendRemovingDeadMember(toRemove.Name)
 
 	return c.removeMember(toRemove)
 }
