@@ -110,11 +110,11 @@ func (c *Controller) initResource() error {
 }
 
 func (c *Controller) onAddCouchbaseCluster(obj interface{}) {
-	c.syncEtcdClus(obj.(*cbapi.CouchbaseCluster))
+	c.syncCouchbaseClus(obj.(*cbapi.CouchbaseCluster))
 }
 
 func (c *Controller) onUpdateCouchbaseCluster(oldObj, newObj interface{}) {
-	c.syncEtcdClus(newObj.(*cbapi.CouchbaseCluster))
+	c.syncCouchbaseClus(newObj.(*cbapi.CouchbaseCluster))
 }
 
 func (c *Controller) onDeleteCouchbaseCluster(obj interface{}) {
@@ -122,11 +122,11 @@ func (c *Controller) onDeleteCouchbaseCluster(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			panic(fmt.Sprintf("unknown object from EtcdCluster delete event: %#v", obj))
+			panic(fmt.Sprintf("unknown object from CouchbaseCluster delete event: %#v", obj))
 		}
 		clus, ok = tombstone.Obj.(*cbapi.CouchbaseCluster)
 		if !ok {
-			panic(fmt.Sprintf("Tombstone contained object that is not an EtcdCluster: %#v", obj))
+			panic(fmt.Sprintf("Tombstone contained object that is not an CouchbaseCluster: %#v", obj))
 		}
 	}
 	ev := &Event{
@@ -142,7 +142,7 @@ func (c *Controller) onDeleteCouchbaseCluster(obj interface{}) {
 	pt.stop()
 }
 
-func (c *Controller) syncEtcdClus(clus *cbapi.CouchbaseCluster) {
+func (c *Controller) syncCouchbaseClus(clus *cbapi.CouchbaseCluster) {
 	ev := &Event{
 		Type:   kwatch.Added,
 		Object: clus,
