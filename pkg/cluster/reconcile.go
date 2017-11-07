@@ -55,6 +55,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	// TODO: We should update any cluster confiugration parameters here.
+	c.reconcileClusterSettings()
 
 	// Ensure that the actual cluster size matches the desired cluster size. Also
 	// clean up and failed pods.
@@ -306,4 +307,32 @@ func (c *Cluster) removeUnknownMembers(running couchbaseutil.MemberSet) (couchba
 		}
 	}
 	return running.Diff(unknownMembers), nil
+}
+
+func (c *Cluster) reconcileClusterSettings() error {
+
+	err := c.reconcileAutoFailoverSettings()
+
+	//TODO: reconcile other cluster settings
+
+	return err
+}
+
+// ensure autofailover timeout matches spec setting
+func (c *Cluster) reconcileAutoFailoverSettings() error {
+	failoverSettings, err := couchbaseutil.GetAutoFailoverSettings(c.members, c.username, c.password, c.cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	clusterSettings := c.cluster.Spec.ClusterSettings
+	if (failoverSettings.Timeout != clusterSettings.AutoFailoverTimeout) ||
+		(failoverSettings.Enabled != true) {
+
+		// reset autofailover timeout
+		return couchbaseutil.SetAutoFailoverTimeout(c.members, c.username, c.password,
+			c.cluster.Name, true, clusterSettings.AutoFailoverTimeout)
+	}
+
+	return nil
 }

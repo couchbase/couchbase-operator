@@ -213,6 +213,17 @@ func SetAutoFailoverTimeout(ms MemberSet, username, password, clusterName string
 		})
 }
 
+func GetAutoFailoverSettings(ms MemberSet, username, password, clusterName string) (*cbmgr.AutoFailoverSettings, error) {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	var settings *cbmgr.AutoFailoverSettings
+
+	return settings, retryutil.RetryOnErr(5*time.Second, 10, "get autofailover settings", clusterName,
+		func() (e error) {
+			settings, e = client.GetAutoFailoverSettings()
+			return e
+		})
+}
+
 func apiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
 
 	// convert bucket config to cbmgr bucket type
