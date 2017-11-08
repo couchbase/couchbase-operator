@@ -16,4 +16,4 @@ With that complete you can run an AKS command with the Azure CLI 2.0 to create a
 
 ## Deploying the Operator
 
-With this done, you can follow the instructions in [op_guide.md](op_guide.md).
+With this done, you can follow the instructions in [operationGuide.md](operationGuide.md).

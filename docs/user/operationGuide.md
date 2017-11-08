@@ -1,8 +1,8 @@
 # Operation Guide
 
-## Install couchbase operator
+## Install the Couchbase Operator
 
-OPTIONAL: If you are using a private registry, make sure to deploy the registrykey secret first.Create the 'registrykey' secret
+OPTIONAL: If you are using a private registry, make sure to deploy the registrykey secret first.  Create the 'registrykey' secret:
 
 ```bash
 $ kubectl apply -f example/registrykeysecret.yaml
@@ -20,7 +20,6 @@ Create the 'cb-example-auth' secret
 ```bash
 $ kubectl apply -f example/secret.yaml
 ```
-
 
 Now objects with "kind: CouchbaseCluster" can be created.  Create a cluster:
 
