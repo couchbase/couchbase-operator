@@ -2,6 +2,12 @@
 
 ## Install couchbase operator
 
+OPTIONAL: If you are using a private registry, make sure to deploy the registrykey secret first.Create the 'registrykey' secret
+
+```bash
+$ kubectl apply -f example/registrykeysecret.yaml
+```
+
 Create deployment: In order to run a couchbase cluster you'll first need to deploy a custom resource definition
 which will allow for the creation of a 'couchbasecluster' type within the kubernetes cluster.
 
