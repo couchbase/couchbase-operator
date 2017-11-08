@@ -17,3 +17,9 @@ With that complete you can run an AKS command with the Azure CLI 2.0 to create a
 ## Deploying the Operator
 
 With this done, you can follow the instructions in [operationGuide.md](operationGuide.md).
+
+## ACI
+
+[Azure Container Instances (ACI)](https://azure.microsoft.com/en-us/blog/announcing-azure-container-instances/) are serverless Docker containers on Azure.  The [ACI connector](https://github.com/Azure/aci-connector-k8s) enables Kubernetes clusters to make use of ACI.
+
+The connector doesn't currently support secrets, so using ACI is not possible.  We're going to have discussions to explore the roadmap here.
