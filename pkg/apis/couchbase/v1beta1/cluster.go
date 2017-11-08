@@ -1,8 +1,6 @@
 package v1beta1
 
 import (
-	"strings"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -89,7 +87,7 @@ type ClusterSpec struct {
 type ClusterConfig struct {
 
 	// The services to run on each node in the cluster
-	Services string `json:"services"`
+	Services []string `json:"services"`
 
 	// The amount of memory that should be allocated to the data service
 	DataServiceMemQuota int `json:"dataServiceMemoryQuota"`
@@ -218,10 +216,6 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 	bucketsToRemove := MissingItems(existingBuckets, specBuckets)
 
 	return bucketsToAdd, bucketsToRemove
-}
-
-func (cc *ClusterConfig) ServicesArr() []string {
-	return strings.Split(cc.Services, ",")
 }
 
 // check wether item exists within array

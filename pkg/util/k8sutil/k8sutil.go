@@ -116,8 +116,7 @@ func createCouchbasePodLabels(memberName, clusterName string, cs cbapi.ClusterSp
 		"couchbase_cluster": clusterName,
 	}
 	if cs.ClusterSettings != nil {
-		services := cs.ClusterSettings.ServicesArr()
-		for _, s := range services {
+		for _, s := range cs.ClusterSettings.Services {
 			k := "couchbase_service_" + s
 			labels[k] = "enabled"
 		}

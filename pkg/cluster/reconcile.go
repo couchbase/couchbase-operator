@@ -116,9 +116,9 @@ func (c *Cluster) addOneMember() (*couchbaseutil.Member, error) {
 	c.memberCounter++
 	c.logger.Infof("added member (%s)", newMember.Name)
 
-	services := c.cluster.Spec.ClusterSettings.ServicesArr()
 	return newMember, couchbaseutil.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
-		c.cluster.Name, newMember.ClientURL(), c.username, c.password, services)
+		c.cluster.Name, newMember.ClientURL(), c.username, c.password,
+		c.cluster.Spec.ClusterSettings.Services)
 }
 
 func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
@@ -235,7 +235,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member) error {
 	settings := c.cluster.Spec.ClusterSettings
 	err := couchbaseutil.InitializeCluster(m, c.username, c.password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
-		settings.ServicesArr(), settings.DataPath, settings.IndexPath, settings.IndexStorageSetting)
+		settings.Services, settings.DataPath, settings.IndexPath, settings.IndexStorageSetting)
 	if err != nil {
 		return err
 	}
