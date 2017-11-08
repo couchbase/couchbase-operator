@@ -1,4 +1,3 @@
-
 ###Developing:
 
 To install dependencies run the following command:
