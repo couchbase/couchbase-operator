@@ -14,13 +14,10 @@ var (
 // cluster settings
 var (
 	basicClusterSettings = &api.ClusterConfig{
-		Services:              []string{"kv", "n1ql", "index"},
 		DataServiceMemQuota:   256,
 		IndexServiceMemQuota:  256,
 		SearchServiceMemQuota: 256,
 		IndexStorageSetting:   "memory_optimized",
-		DataPath:              "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath:             "/opt/couchbase/var/lib/couchbase/data",
 		AutoFailoverTimeout:   30,
 	}
 )
@@ -40,14 +37,23 @@ var (
 	}
 )
 
+func defaultServerSettings(size int) api.ServerConfig {
+	return api.ServerConfig{
+		Size:      size,
+		Services:  []string{"data", "n1ql", "index"},
+		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+	}
+}
+
 func NewBasicCluster(genName, secretName string, size int) *api.CouchbaseCluster {
 	spec := api.ClusterSpec{
-		Size:            size,
 		BaseImage:       baseImage,
 		Version:         version,
 		AuthSecret:      secretName,
 		ClusterSettings: basicClusterSettings,
 		BucketSettings:  []api.BucketConfig{},
+		ServerSettings:  defaultServerSettings(size),
 	}
 	return NewClusterCRD(genName, spec)
 }
@@ -57,12 +63,12 @@ func NewSingleBucketCluster(genName, secretName, bucketName string, size int) *a
 	bucketSettings.BucketName = bucketName
 
 	spec := api.ClusterSpec{
-		Size:            size,
 		BaseImage:       baseImage,
 		Version:         version,
 		AuthSecret:      secretName,
 		ClusterSettings: basicClusterSettings,
 		BucketSettings:  []api.BucketConfig{bucketSettings},
+		ServerSettings:  defaultServerSettings(size),
 	}
 	return NewClusterCRD(genName, spec)
 }

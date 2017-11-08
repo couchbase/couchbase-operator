@@ -31,7 +31,7 @@ type ReconcileMachine struct {
 func (r *ReconcileMachine) handleInit(c *Cluster) {
 	if r.couchbase.PendingAddNodes.Empty() && r.couchbase.FailedNodes.Empty() &&
 		r.couchbase.DownNodes.Empty() && r.couchbase.FailedAddNodes.Empty() &&
-		r.couchbase.ActiveNodes.Size() == c.cluster.Spec.Size &&
+		r.couchbase.ActiveNodes.Size() == c.cluster.Spec.TotalSize() &&
 		r.couchbase.UnknownNodes.Empty() && r.runningPods.Equal(c.members) &&
 		!r.couchbase.IsRebalancing && !r.couchbase.NeedsRebalance {
 		r.transitionState(ReconcileFinished)
@@ -128,9 +128,9 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
 }
 
 func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
-	if r.knownNodes.Size() > c.cluster.Spec.Size {
+	if r.knownNodes.Size() > c.cluster.Spec.TotalSize() {
 		originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
-		c.status.SetScalingDownCondition(originalSize, c.cluster.Spec.Size)
+		c.status.SetScalingDownCondition(originalSize, c.cluster.Spec.TotalSize())
 
 		r.couchbase.NeedsRebalance = true
 		toRemove := r.knownNodes.PickOne()
@@ -142,9 +142,9 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
 }
 
 func (r *ReconcileMachine) handleAddNode(c *Cluster) {
-	if r.knownNodes.Size() < c.cluster.Spec.Size {
+	if r.knownNodes.Size() < c.cluster.Spec.TotalSize() {
 		originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
-		c.status.SetScalingUpCondition(originalSize, c.cluster.Spec.Size)
+		c.status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
 
 		r.couchbase.NeedsRebalance = true
 		m, err := c.addOneMember()

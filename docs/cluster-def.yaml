@@ -32,21 +32,21 @@ spec:
       - search
     dataPath: /opt/couchbase/var/lib/couchbase/data
     indexPath: /opt/couchbase/var/lib/couchbase/data
-    persistentVolumes:
-      volumeSize: 40960
-      storageClass: standard
-    couchabseEnv:
-      ENV1: value
-    resources:
-      limits:
-        cpu: 4GHz
-        memory: 8GiB
-        storage: 100GiB
-      requests:
-        cpu: 2GHz
-        memory: 8GiB
-        storage: 50GiB
     podPolicy:
+      persistentVolumes:
+        volumeSize: 40960
+        storageClass: standard
+      couchabseEnv:
+        ENV1: value
+      resources:
+        limits:
+          cpu: 4GHz
+          memory: 8GiB
+          storage: 100GiB
+        requests:
+          cpu: 2GHz
+          memory: 8GiB
+          storage: 50GiB
       labels:
         couchbase_services: all
       nodeSelector:

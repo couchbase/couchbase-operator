@@ -3,7 +3,6 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  size: 3
   baseImage: couchbase/server
   version: enterprise-5.0.0
   authSecret: cb-example-auth
@@ -17,8 +16,6 @@ spec:
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
     indexStorageSetting: memory_optimized
-    dataPath: /opt/couchbase/var/lib/couchbase/data
-    indexPath: /opt/couchbase/var/lib/couchbase/data
     autoFailoverTimeout: 30
   buckets:
     - name: default
@@ -30,3 +27,12 @@ spec:
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
+  servers:
+    size: 3
+    services:
+      - data
+      - index
+      - query
+      - search
+    dataPath: /opt/couchbase/var/lib/couchbase/data
+    indexPath: /opt/couchbase/var/lib/couchbase/data

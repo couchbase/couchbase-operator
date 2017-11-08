@@ -71,15 +71,15 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
 
-func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
+func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, ns cbapi.ServerConfig, owner metav1.OwnerReference) *v1.Pod {
 
-	labels := createCouchbasePodLabels(m.Name, clusterName, cs)
+	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
 	container := containerWithLivenessProbe(couchbaseContainer("", cs.BaseImage, cs.Version),
 		couchbaseLivenessProbe())
 
-	if cs.Pod != nil {
-		container = containerWithRequirements(container, cs.Pod.Resources)
+	if ns.Pod != nil {
+		container = containerWithRequirements(container, ns.Pod.Resources)
 	}
 
 	volumes := []v1.Volume{
@@ -101,7 +101,7 @@ func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.Cl
 		},
 	}
 
-	applyPodPolicy(clusterName, pod, cs.Pod)
+	applyPodPolicy(clusterName, pod, ns.Pod)
 
 	SetCouchbaseVersion(pod, cs.Version)
 
@@ -109,17 +109,16 @@ func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.Cl
 	return pod
 }
 
-func createCouchbasePodLabels(memberName, clusterName string, cs cbapi.ClusterSpec) map[string]string {
+func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
 	labels := map[string]string{
 		"app":               "couchbase",
 		"couchbase_node":    memberName,
 		"couchbase_cluster": clusterName,
 	}
-	if cs.ClusterSettings != nil {
-		for _, s := range cs.ClusterSettings.Services {
-			k := "couchbase_service_" + s
-			labels[k] = "enabled"
-		}
+
+	for _, s := range ns.Services {
+		k := "couchbase_service_" + s
+		labels[k] = "enabled"
 	}
 
 	return labels

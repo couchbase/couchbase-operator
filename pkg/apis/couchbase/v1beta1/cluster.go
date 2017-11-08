@@ -46,12 +46,6 @@ type PVSource struct {
 }
 
 type ClusterSpec struct {
-	// Size is the expected size of the couchbase cluster. The
-	// couchbase-operator will eventually make the size of the running
-	// cluster equal to the expected size. The vaild range of the size is
-	// from 1 to 50.
-	Size int `json:"size"`
-
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
 	BaseImage string `json:"baseImage"`
@@ -66,10 +60,6 @@ type ClusterSpec struct {
 
 	// Paused is to pause the control of the operator for the couchbase cluster.
 	Paused bool `json:"paused,omitempty"`
-	// Pod defines the policy to create pod for the couchbase pod.
-	//
-	// Updating Pod does not take effect on any existing couchbase pods.
-	Pod *PodPolicy `json:"pod,omitempty"`
 
 	// couchbase cluster TLS configuration
 	TLS *TLSPolicy `json:"TLS,omitempty"`
@@ -80,15 +70,14 @@ type ClusterSpec struct {
 	// Bucket specific settings
 	BucketSettings []BucketConfig `json:"buckets"`
 
+	// A specificaion for the way nodes should be configured in the cluster
+	ServerSettings ServerConfig `json:"servers,omitempty"`
+
 	// AuthSecret is the name of a kube secret to use for authentication
 	AuthSecret string `json:"authSecret"`
 }
 
 type ClusterConfig struct {
-
-	// The services to run on each node in the cluster
-	Services []string `json:"services"`
-
 	// The amount of memory that should be allocated to the data service
 	DataServiceMemQuota int `json:"dataServiceMemoryQuota"`
 
@@ -100,12 +89,6 @@ type ClusterConfig struct {
 
 	// The index storage mode to use for secondary indexing
 	IndexStorageSetting string `json:"indexStorageSetting"`
-
-	// The path on each node to store key-value data
-	DataPath string `json:"dataPath"`
-
-	// The path on each node to store index data
-	IndexPath string `json:"indexPath"`
 
 	// Timeout that expires to trigger the auto failover.
 	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout"`
@@ -138,6 +121,28 @@ type BucketConfig struct {
 
 	// Enable Index replica specifies whether or not to enable view index replicas for this bucket. This parameter defaults to false if it is not specified. This parameter only affects Couchbase buckets.
 	EnableIndexReplica bool `json:"enableIndexReplica"`
+}
+
+type ServerConfig struct {
+	// Size is the expected size of the couchbase cluster. The
+	// couchbase-operator will eventually make the size of the running
+	// cluster equal to the expected size. The vaild range of the size is
+	// from 1 to 50.
+	Size int `json:"size"`
+
+	// The services to run on nodes created with this spec
+	Services []string `json:"services"`
+
+	// The path on each node to store key-value data
+	DataPath string `json:"dataPath"`
+
+	// The path on each node to store index data
+	IndexPath string `json:"indexPath"`
+
+	// Pod defines the policy to create pod for the couchbase pod.
+	//
+	// Updating Pod does not take effect on any existing couchbase pods.
+	Pod *PodPolicy `json:"pod,omitempty"`
 }
 
 // PodPolicy defines the policy to create pod for the couchbase container.
@@ -183,6 +188,10 @@ type PodPolicy struct {
 
 func (c *ClusterSpec) Cleanup() {
 
+}
+
+func (c *ClusterSpec) TotalSize() int {
+	return c.ServerSettings.Size
 }
 
 // list of bucket names from config

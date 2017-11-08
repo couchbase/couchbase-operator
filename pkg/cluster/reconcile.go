@@ -118,7 +118,7 @@ func (c *Cluster) addOneMember() (*couchbaseutil.Member, error) {
 
 	return newMember, couchbaseutil.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
 		c.cluster.Name, newMember.ClientURL(), c.username, c.password,
-		c.cluster.Spec.ClusterSettings.Services)
+		c.cluster.Spec.ServerSettings.Services)
 }
 
 func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
@@ -233,9 +233,10 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 // initializes member with cluster settings
 func (c *Cluster) initMember(m *couchbaseutil.Member) error {
 	settings := c.cluster.Spec.ClusterSettings
+	nodeSpec := c.cluster.Spec.ServerSettings
 	err := couchbaseutil.InitializeCluster(m, c.username, c.password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
-		settings.Services, settings.DataPath, settings.IndexPath, settings.IndexStorageSetting)
+		nodeSpec.Services, nodeSpec.DataPath, nodeSpec.IndexPath, settings.IndexStorageSetting)
 	if err != nil {
 		return err
 	}

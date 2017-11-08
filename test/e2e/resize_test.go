@@ -41,7 +41,7 @@ func TestResizeClusterUp(t *testing.T) {
 	fmt.Println("initialized 3 members in the cluster")
 
 	updateFunc := func(cl *api.CouchbaseCluster) {
-		cl.Spec.Size = 5
+		cl.Spec.ServerSettings.Size = 5
 	}
 	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, 10, updateFunc); err != nil {
 		t.Fatal(err)
@@ -88,7 +88,7 @@ func TestResizeClusterDown(t *testing.T) {
 	fmt.Println("initialized 5 members in the cluster")
 
 	updateFunc := func(cl *api.CouchbaseCluster) {
-		cl.Spec.Size = 3
+		cl.Spec.ServerSettings.Size = 3
 	}
 	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, 10, updateFunc); err != nil {
 		t.Fatal(err)

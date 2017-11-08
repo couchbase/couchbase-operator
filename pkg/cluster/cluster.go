@@ -319,7 +319,8 @@ func (c *Cluster) isSecureClient() bool {
 
 func (c *Cluster) createPod(members couchbaseutil.MemberSet, m *couchbaseutil.Member) error {
 
-	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec, c.cluster.AsOwner())
+	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec,
+		c.cluster.Spec.ServerSettings, c.cluster.AsOwner())
 	_, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
 	return err
 }
