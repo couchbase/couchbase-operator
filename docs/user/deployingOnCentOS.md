@@ -1,4 +1,8 @@
-# Kubernetes Centos 7 Install Guide
+# Deploying on CentOS
+
+These instructions describe how to setup a Kubernetes cluster on CentOS.
+
+## Overview
 
 Kubernetes is a cluster and orchestration engine for docker containers. In other words Kubernetes is  an open source software or tool which is used to orchestrate and manage docker containers in cluster environment. Kubernetes is also known as k8s and it was developed by Google and donated to “Cloud Native Computing foundation”
 
@@ -12,7 +16,7 @@ Kubernetes can be installed and deployed using following methods:
 
 In this guide we will install latest version of Kubernetes on CentOS 7 / RHEL 7 with kubeadm utility. In my setup I am taking three CentOS 7 servers with minimal installation. One server will acts master node and rest two servers will be minion or worker nodes.
 
-###On the Master Node following components will be installed
+## The following components will be installed on the master node
 
 * API Server  – It provides kubernetes API using Jason / Yaml over http, states of API objects are stored in etcd
 * Scheduler  – It is a program on master node which performs the scheduling tasks like launching containers in worker nodes based on resource availability
@@ -20,17 +24,17 @@ In this guide we will install latest version of Kubernetes on CentOS 7 / RHEL 7 
 etcd – It is a Key value pair data base. It stores configuration data of cluster and cluster state.
 * Kubectl utility – It is a command line utility which connects to API Server on port 6443. It is used by administrators to create pods, services etc.
 
-###On Worker Nodes following components will be installed
+## The following components will be installed on the worker nodes
 
 * Kubelet – It is an agent which runs on every worker node, it connects to docker  and takes care of creating, starting, deleting containers.
 * Kube-Proxy – It routes the traffic to appropriate containers based on ip address and port number of the incoming request. In other words we can say it is used for port translation.
 * Pod – Pod can be defined as a multi-tier or group of containers that are deployed on a single worker node or docker host.
 
-##Installations Steps of Kubernetes 1.7 on CentOS 7 / RHEL 7
+## Installations Steps of Kubernetes 1.7 on CentOS 7 / RHEL 7
 
 **Perform the following steps on Master Node**
 
-###Step 1: Disable SELinux & setup firewall rules
+### Step 1: Disable SELinux & setup firewall rules
 
 Login to your kubernetes master node and set the hostname and disable selinux using following commands
 
@@ -51,7 +55,7 @@ Note: In case you don’t have your own dns server then update /etc/hosts file o
     192.168.1.50 worker-node-2
     192.168.1.60 worker-node-3
 
-###Step 2: Configure Kubernetes Repository
+### Step 2: Configure Kubernetes Repository
 
 Kubernetes packages are not available in the default CentOS 7 & RHEL 7 repositories, Use below command to configure its package repositories.
 
@@ -68,7 +72,7 @@ And add the text below to this file.
     gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
            https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 
-###Step 3: Install Kubeadm and Docker
+### Step 3: Install Kubeadm and Docker
 
 Once the package repositories are configured, run the beneath command to install kubeadm and docker packages.
 
@@ -80,7 +84,7 @@ And then make sure that docker and kubelet will automatically start when the sys
     [root@k8s-master ~]# systemctl restart docker && systemctl enable docker
     [root@k8s-master ~]# systemctl  restart kubelet && systemctl enable kubelet
 
-###Step 4: Initialize Kubernetes Master with ‘kubeadm init’
+### Step 4: Initialize Kubernetes Master with ‘kubeadm init’
 
 Run the beneath command to  initialize and setup kubernetes master.
 
@@ -92,7 +96,7 @@ Kubernetes should now be running. Run the commands below to use the cluster as r
     [root@k8s-master ~]# cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
     [root@k8s-master ~]# chown $(id -u):$(id -g) $HOME/.kube/config
 
-###Step 5: Deploy pod network to the cluster
+### Step 5: Deploy pod network to the cluster
 
 Run the beneath command to deploy network.
 
@@ -122,9 +126,9 @@ Now run the following commands to verify the status
 
 Now let’s add worker nodes to the Kubernetes master nodes.
 
-##Perform the following steps on each worker node
+## Perform the following steps on each worker node
 
-###Step 1: Disable SELinux & setup firewall rules
+### Step 1: Disable SELinux & setup firewall rules
 
 Login to a kubernetes worker node and set the hostname and disable selinux using following commands
 
@@ -145,7 +149,7 @@ Note: In case you don’t have your own dns server then update /etc/hosts file o
     192.168.1.50 worker-node-2
     192.168.1.60 worker-node-3
 
-###Step 2: Configure Kubernetes Repository
+### Step 2: Configure Kubernetes Repository
 
 Kubernetes packages are not available in the default CentOS 7 & RHEL 7 repositories, Use below command to configure its package repositories.
 
@@ -162,14 +166,14 @@ And add the text below to this file.
     gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
            https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 
-###Step 3: Install kubeadm and docker package on both nodes
+### Step 3: Install kubeadm and docker package on both nodes
 
     [root@worker-node1 ~]# yum  install kubeadm docker -y
     Start and enable docker service
 
     [root@worker-node1 ~]# systemctl restart docker && systemctl enable docker
 
-###Step 4: Now Join worker nodes to master node
+### Step 4: Now Join worker nodes to master node
 
 To join worker nodes to Master node, a token is required. Whenever kubernetes master initialized , then in the output we get command and token.  Copy that command and run on both nodes.
 

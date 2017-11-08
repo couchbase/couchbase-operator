@@ -1,6 +1,6 @@
-# Administration
+# Administration Guide
 
-## Accessing the Administration Console:
+## Accessing the Administration Console
 
 To access the administration console you can run the following command on any pod, for example:
 

@@ -1,4 +1,4 @@
-# Operation Guide
+# Operations Guide
 
 ## Install the Couchbase Operator
 

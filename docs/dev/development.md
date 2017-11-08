@@ -1,6 +1,6 @@
 # Development
 
-These are instrutions to create the Docker image and build the operator.  As a user, you should not need to do this.
+These are instructions to create the Docker image and build the operator.  As a user, you should not need to do this.
 
 ## Install Dependencies
 
