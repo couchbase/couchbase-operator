@@ -9,3 +9,5 @@ As a user of the operator, the first step is to create a cluster.  Instructions 
 Once you have a Kuberentes cluster, you can follow the instructions in the:
 * [Operations Guide](docs/user/operationsGuide.md) to create a Couchbase cluster.  
 * With that complete, the [Administration Guide](docs/user/administrationGuide.md) provides detail on connecting to the cluster.
+
+Some feedback from the Hackfest is [here](docs/feedback.md)
