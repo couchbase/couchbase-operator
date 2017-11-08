@@ -22,4 +22,11 @@ With this done, you can follow the instructions in [operationsGuide.md](operatio
 
 [Azure Container Instances (ACI)](https://azure.microsoft.com/en-us/blog/announcing-azure-container-instances/) are serverless Docker containers on Azure.  The [ACI connector](https://github.com/Azure/aci-connector-k8s) enables Kubernetes clusters to make use of ACI.
 
+To setup ACI run:
+    git clone git@github.com:Azure/aci-connector-k8s.git
+    cd aci-connector-k8s
+    kubectl create -f examples/example-aci-connector.yaml
+
+It's unclear to me how to point the operator at ACI.
+
 The connector doesn't currently support secrets, so using ACI is not possible at this time.  We're going to have discussions to explore the roadmap here.
