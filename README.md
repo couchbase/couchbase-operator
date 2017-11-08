@@ -4,7 +4,7 @@ This is a Kubernetes [operator](https://coreos.com/operators) for Couchbase.  Th
 
 As a user of the operator, the first step is to create a cluster.  Instructions for doing that are available on:
 * [CentOS](docs/user/deployingOnCentOS.md)
-* [Azure Kubernetes Service (AKS)](docs/user/deployingWithAKS.md)  
+* [Azure](docs/user/deployingOnAzure.md)  
 
 Once you have a Kuberentes cluster, you can follow the instructions in the:
 * [Operations Guide](docs/user/operationsGuide.md) to create a Couchbase cluster.  
