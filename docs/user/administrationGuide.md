@@ -8,6 +8,8 @@ To access the administration console you can run the following command on any po
 
 This command will make the Administration available on 127.0.0.1:8091. Note that you will not be able to access other nodes in your cluster since this command will only proxy you through to the specified node.
 
+The username and password for Couchbase on port 8091 are set in your secret.yaml file.  By default they are Administrator and password.
+
 ## Getting Server Logs
 
 The easiest way to get cbcollect logs is to access the administration console and click the "Collect Logs" button in the Logs tab. This will give you the path to the corresponding zip file for each node in the cluster. You can then run a command like the one below against each node in the cluster to collect their logs.
