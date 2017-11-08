@@ -18,7 +18,7 @@ With that complete you can run an AKS command with the Azure CLI 2.0 to create a
 
 With this done, you can follow the instructions in [operationsGuide.md](operationsGuide.md).
 
-## Azure Container Instance (ACI)
+## Azure Container Instances (ACI)
 
 [Azure Container Instances (ACI)](https://azure.microsoft.com/en-us/blog/announcing-azure-container-instances/) are serverless Docker containers on Azure.  The [ACI connector](https://github.com/Azure/aci-connector-k8s) enables Kubernetes clusters to make use of ACI.
 

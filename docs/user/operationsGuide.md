@@ -34,3 +34,5 @@ $ kubectl get couchbasecluster
 NAME         KIND
 cb-example   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
 ```
+
+With these steps complete, you can follow the steps in the [Operations Guide](docs/user/administrationGuide.md) to connect to the cluster.
