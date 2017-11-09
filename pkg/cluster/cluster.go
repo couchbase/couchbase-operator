@@ -165,6 +165,13 @@ func (c *Cluster) create() error {
 
 	c.memberCounter++
 	c.members = ms
+	if err := c.setupServices(""); err != nil {
+		return fmt.Errorf("cluster create: fail to create services: %v", err)
+	}
+	c.logger.Infof("sleeping now")
+	time.Sleep(60 * time.Second)
+	c.logger.Infof("waking up now")
+
 	if err := c.setupServices(memberName); err != nil {
 		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}

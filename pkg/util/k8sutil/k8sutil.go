@@ -126,15 +126,21 @@ func createCouchbasePodLabels(memberName, clusterName string, cs cbapi.ClusterSp
 	return labels
 }
 
-func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, ports []v1.ServicePort, memberName string) *v1.Service {
+func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, ports []v1.ServicePort, portName string) *v1.Service {
 	labels := map[string]string{
 		"app":               "couchbase",
 		"couchbase_cluster": clusterName,
-		"couchbase_node":    memberName,
+		"couchbase_node":    portName,
+	}
+	if portName == "cb-admin" {
+		labels = map[string]string{
+			"app":               "couchbase",
+			"couchbase_cluster": clusterName,
+		}
 	}
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   memberName,
+			Name:   portName,
 			Labels: labels,
 			Annotations: map[string]string{
 				TolerateUnreadyEndpointsAnnotation: "true",
@@ -146,6 +152,22 @@ func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, port
 			Selector:  labels,
 		},
 	}
+	if portName == "cb-admin" {
+		svc = &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   svcName,
+				Labels: labels,
+				Annotations: map[string]string{
+					TolerateUnreadyEndpointsAnnotation: "true",
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Ports:     ports,
+				Selector:  labels,
+				ClusterIP: clusterIP,
+			},
+		}
+	}
 	return svc
 }
 
@@ -154,17 +176,23 @@ func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, port
 // (sans load balancing middleware) which allows the operator to resolve
 // addresses of individual pods instead of a proxy
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference, memberName string) error {
+	portName := "cb-admin"
+
+	if memberName != "" {
+		portName = memberName
+	}
+
 	ports := []v1.ServicePort{{
-		Name:       memberName,
+		Name:       portName,
 		Port:       8091,
 		TargetPort: intstr.FromInt(8091),
 		Protocol:   v1.ProtocolTCP,
 	}}
-	return createService(kubecli, clusterName, clusterName, ns, "", ports, owner, memberName)
+	return createService(kubecli, clusterName, clusterName, ns, v1.ClusterIPNone, ports, owner, portName)
 }
 
-func createService(kubecli kubernetes.Interface, svcName, clusterName, ns, clusterIP string, ports []v1.ServicePort, owner metav1.OwnerReference, memberName string) error {
-	svc := createCouchbaseServiceManifest(svcName, clusterName, clusterIP, ports, memberName)
+func createService(kubecli kubernetes.Interface, svcName, clusterName, ns, clusterIP string, ports []v1.ServicePort, owner metav1.OwnerReference, portName string) error {
+	svc := createCouchbaseServiceManifest(svcName, clusterName, clusterIP, ports, portName)
 	addOwnerRefToObject(svc.GetObjectMeta(), owner)
 	_, err := kubecli.CoreV1().Services(ns).Create(svc)
 	return err
