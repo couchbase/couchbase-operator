@@ -147,9 +147,10 @@ func (c *Cluster) create() error {
 		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
 			cbapi.ClusterPhaseCreating, err)
 	}
+	memberName := couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter);
 
 	m := &couchbaseutil.Member{
-		Name:         couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter),
+		Name:         memberName,
 		Namespace:    c.cluster.Namespace,
 		SecureClient: false,
 	}
@@ -164,9 +165,12 @@ func (c *Cluster) create() error {
 
 	c.memberCounter++
 	c.members = ms
-	if err := c.setupServices(); err != nil {
+	if err := c.setupServices(memberName); err != nil {
 		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}
+	c.logger.Infof("sleeping now")
+	time.Sleep(120 * time.Second)
+	c.logger.Infof("waking up now")
 
 	if err := c.initMember(m); err != nil {
 		return err
@@ -181,8 +185,8 @@ func (c *Cluster) create() error {
 	return c.updateCRStatus()
 }
 
-func (c *Cluster) setupServices() error {
-	return k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
+func (c *Cluster) setupServices(memberName string) error {
+	return k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner(), memberName)
 }
 
 func (c *Cluster) run() {

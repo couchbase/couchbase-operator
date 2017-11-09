@@ -126,6 +126,10 @@ func (c *Cluster) addOneMember() error {
 	if err := c.addClusterNode(newMember); err != nil {
 		return err
 	}
+	
+	if err := c.setupServices(newMember.Name); err != nil {
+		return fmt.Errorf("cluster create: fail to create services: %v", err)
+	}
 
 	// rebalance if this is last node to add to cluster
 	if len(c.members) == c.cluster.Spec.Size {
