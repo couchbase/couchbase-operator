@@ -14,7 +14,7 @@ build:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
 
 container: build
-	docker build -t couchbase/couchbase-operator:v1 .
+	docker build -t ritak8s18reg.azurecr.io/couchbase-operator:v1.0.2 .
 
 test:
 	go test github.com/couchbaselabs/couchbase-operator/test/e2e -v -timeout 30m \
