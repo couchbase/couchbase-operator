@@ -25,6 +25,21 @@ var (
 	}
 )
 
+// bucket settings
+var (
+	defaultBucketSettings = api.BucketConfig{
+		BucketName:         "default",
+		BucketType:         "couchbase",
+		BucketMemoryQuota:  256,
+		BucketReplicas:     1,
+		IoPriority:         "high",
+		EvictionPolicy:     "fullEviction",
+		ConflictResolution: "seqno",
+		EnableFlush:        true,
+		EnableIndexReplica: false,
+	}
+)
+
 func NewBasicCluster(genName, secretName string, size int) *api.CouchbaseCluster {
 	spec := api.ClusterSpec{
 		Size:            size,
@@ -33,6 +48,21 @@ func NewBasicCluster(genName, secretName string, size int) *api.CouchbaseCluster
 		AuthSecret:      secretName,
 		ClusterSettings: basicClusterSettings,
 		BucketSettings:  []api.BucketConfig{},
+	}
+	return NewClusterCRD(genName, spec)
+}
+
+func NewSingleBucketCluster(genName, secretName, bucketName string, size int) *api.CouchbaseCluster {
+	bucketSettings := api.BucketConfig(defaultBucketSettings)
+	bucketSettings.BucketName = bucketName
+
+	spec := api.ClusterSpec{
+		Size:            size,
+		BaseImage:       baseImage,
+		Version:         version,
+		AuthSecret:      secretName,
+		ClusterSettings: basicClusterSettings,
+		BucketSettings:  []api.BucketConfig{bucketSettings},
 	}
 	return NewClusterCRD(genName, spec)
 }

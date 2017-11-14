@@ -82,6 +82,35 @@ func waitSizeReachedWithAccept(t *testing.T, crClient versioned.Interface, size,
 	return names, nil
 }
 
+func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
+	err := retryutil.Retry(retryInterval, retries, func() (done bool, err error) {
+		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		for _, accept := range accepts {
+			if !accept(currCluster) {
+				return false, nil
+			}
+		}
+
+		LogfWithTimestamp(t, "waiting for buckets (%v)", buckets)
+		for _, b := range buckets {
+			if _, ok := currCluster.Status.Buckets[b]; !ok {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
 func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) error {
 	undeletedPods, err := WaitPodsDeleted(kubeClient, cl.Namespace, 3, k8sutil.ClusterListOpt(cl.Name))
 	if err != nil {
