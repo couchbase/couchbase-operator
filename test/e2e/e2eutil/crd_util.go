@@ -59,3 +59,8 @@ func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubern
 	}
 	return waitResourcesDeleted(t, kubeClient, cl)
 }
+
+// NameLabelSelector returns a label selector of the form name=<name>
+func NameLabelSelector(name string) map[string]string {
+	return map[string]string{"name": name}
+}

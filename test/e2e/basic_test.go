@@ -6,6 +6,7 @@ import (
 	"time"
 
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbaselabs/couchbase-operator/test/e2e/framework"
 )
@@ -15,12 +16,12 @@ func TestCreateCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	secret, err := e2eutil.CreateSecret(t, f.KubeClient, f.Namespace, e2eutil.BasicSecret(f.Namespace))
+	secret, err := e2eutil.CreateSecret(t, f.KubeClient, f.Namespace, e2espec.NewBasicSecret(f.Namespace))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2eutil.NewCluster("test-couchbase-", secret.Name, 3))
+	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2espec.NewBasicCluster("test-couchbase-", secret.Name, 3))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,12 +48,12 @@ func TestPauseControl(t *testing.T) {
 	}
 
 	f := framework.Global
-	secret, err := e2eutil.CreateSecret(t, f.KubeClient, f.Namespace, e2eutil.BasicSecret(f.Namespace))
+	secret, err := e2eutil.CreateSecret(t, f.KubeClient, f.Namespace, e2espec.NewBasicSecret(f.Namespace))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2eutil.NewCluster("test-couchbase-", secret.Name, 3))
+	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2espec.NewBasicCluster("test-couchbase-", secret.Name, 3))
 	if err != nil {
 		t.Fatal(err)
 	}
