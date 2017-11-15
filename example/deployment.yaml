@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: ritak8s18reg.azurecr.io/couchbase-operator:v1.0.2
+        image: couchbase/couchbase-operator:v1
         imagePullPolicy: Always
         env:
         - name: MY_POD_NAMESPACE
