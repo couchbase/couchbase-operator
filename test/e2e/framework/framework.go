@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -32,6 +33,7 @@ type Framework struct {
 	KubeClient kubernetes.Interface
 	CRClient   versioned.Interface
 	Namespace  string
+	config     *rest.Config
 	//S3Cli      *s3.S3
 	//S3Bucket   string
 }
@@ -57,6 +59,7 @@ func Setup() error {
 		CRClient:   client.MustNew(config),
 		Namespace:  *ns,
 		opImage:    *opImage,
+		config:     config,
 		//S3Bucket:   os.Getenv("TEST_S3_BUCKET"),
 	}
 	return Global.setup()
@@ -168,6 +171,10 @@ func (f *Framework) DeleteCouchbaseOperatorCompletely() error {
 
 func (f *Framework) deleteCouchbaseOperator() error {
 	return f.KubeClient.CoreV1().Pods(f.Namespace).Delete("couchbase-operator", metav1.NewDeleteOptions(1))
+}
+
+func (f *Framework) ApiServerHost() string {
+	return f.config.Host
 }
 
 /*

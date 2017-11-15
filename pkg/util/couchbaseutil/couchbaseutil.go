@@ -154,7 +154,7 @@ func Rebalance(ms MemberSet, username, password, clusterName string, nodesToRemo
 func CreateBucket(ms MemberSet, username, password string, config *cbapi.BucketConfig) error {
 	client := cbmgr.New(ms.ClientURLs(), username, password)
 
-	bucket, err := apiBucketToCbmgr(config)
+	bucket, err := ApiBucketToCbmgr(config)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func DeleteBucket(ms MemberSet, username, password, bucketName string) error {
 
 func EditBucket(ms MemberSet, username, password string, config *cbapi.BucketConfig) error {
 	client := cbmgr.New(ms.ClientURLs(), username, password)
-	bucket, err := apiBucketToCbmgr(config)
+	bucket, err := ApiBucketToCbmgr(config)
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func GetAutoFailoverSettings(ms MemberSet, username, password, clusterName strin
 		})
 }
 
-func apiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
+func ApiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
 
 	// convert bucket config to cbmgr bucket type
 	data, err := json.Marshal(config)

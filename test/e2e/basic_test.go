@@ -246,3 +246,91 @@ func TestInvalidBucketSpecUpdate(t *testing.T) {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 }
+
+// ensure updates to buckets made externally to cluster are reverted
+// when values do not match with spec
+func TestRevertExternalBucketUpdates(t *testing.T) {
+
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	secret, err := e2eutil.CreateSecret(t, f.KubeClient, f.Namespace, e2espec.NewBasicSecret(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCouchbase, err := e2eutil.CreateCluster(t, f.CRClient, f.Namespace, e2espec.NewSingleBucketCluster("test-couchbase-", secret.Name, "default", 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if err := e2eutil.DeleteCluster(t, f.CRClient, f.KubeClient, testCouchbase); err != nil {
+			t.Fatal(err)
+		}
+		if err := e2eutil.DeleteSecret(t, f.KubeClient, f.Namespace, secret.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	if _, err := e2eutil.WaitUntilSizeReached(t, f.CRClient, 1, 18, testCouchbase); err != nil {
+		t.Fatalf("failed to create to 1 member couchbase cluster: %v", err)
+	}
+
+	// bucket should exist with flush enabled
+	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			t.Logf("enabled bucket flush: %t", bucket.EnableFlush)
+			return bucket.EnableFlush
+		}
+		return false
+	}
+
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to create default bucket with flush enabled %v", err)
+	}
+
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	// make a bucket spec with flush disabled
+	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
+		b.EnableFlush = false
+	})
+	if err != nil {
+		t.Fatalf("error occurred converting bucket spec %v", err)
+	}
+
+	// edit bucket and verify change is reflected in cluster.
+	err = e2eutil.EditBucketAndVerify(t, client, bucket, 5, e2eutil.FlushDisabledVerifier)
+
+	if err != nil {
+		t.Fatalf("error occurred editing cluster bucket %v", err)
+	}
+
+	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+		t.Fatalf("failed to prevent changing bucket type: %v", err)
+	}
+
+	// verify that the operator has reverted the changed
+	// and re-enabled bucket flush
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to enable bucket flush %v", err)
+	}
+}
