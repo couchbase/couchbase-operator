@@ -12,6 +12,7 @@ spec:
       containers:
       - name: couchbase-operator
         image: couchbase/couchbase-operator:v1
+        imagePullPolicy: Always
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:
@@ -31,3 +32,5 @@ spec:
           initialDelaySeconds: 3
           periodSeconds: 3
           failureThreshold: 19
+      imagePullSecrets:
+      - name: registrykey

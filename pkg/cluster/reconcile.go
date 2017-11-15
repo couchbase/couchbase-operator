@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"time"
 
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
@@ -126,6 +127,14 @@ func (c *Cluster) addOneMember() error {
 	if err := c.addClusterNode(newMember); err != nil {
 		return err
 	}
+	
+	if err := c.setupServices(newMember.Name); err != nil {
+		return fmt.Errorf("cluster create: fail to create services: %v", err)
+	}
+
+	c.logger.Infof("sleeping now")
+	time.Sleep(120 * time.Second)
+	c.logger.Infof("waking up now")
 
 	// rebalance if this is last node to add to cluster
 	if len(c.members) == c.cluster.Spec.Size {

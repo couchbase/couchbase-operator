@@ -8,3 +8,5 @@
 /build/
 /vendor/
 /pkg/generated/
+
+example/registrykeysecret.yaml

@@ -1,11 +1,14 @@
+# Development
 
-###Developing:
+These are instructions to create the Docker image and build the operator.  As a user, you should not need to do this.
+
+## Install Dependencies
 
 To install dependencies run the following command:
 
 	glide install --strip-vendor
 
-###Running on MiniKube:
+## Running on MiniKube
 
 To run this operator on minikube you first need to build a docker image which
 can be deployed into the Kubernetes environment. Normally you would need to push
@@ -21,8 +24,7 @@ you can undo this change by running the command below.
 
 	eval $(minikube docker-env -u)
 
-
-###Configuring MiniKube:
+## Configuring MiniKube
 
 Note: If you are not using minikube you can skip this step.
 
@@ -45,8 +47,7 @@ Set the 'Folder Path' to '/opt' and check the 'Auto-Mount' box.
 Start minikube.
 	minikube start
 
-
-###Building the operator:
+##Building the Operator
 
 Run make command to build the docker image.
 
