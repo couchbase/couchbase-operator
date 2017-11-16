@@ -4,6 +4,7 @@
 
 *~
 *.deepcopy.go
+*.sw[a-z]
 
 /build/
 /vendor/
