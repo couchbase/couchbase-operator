@@ -257,7 +257,6 @@ func (c *Cluster) run() {
 				break
 			}
 
-			c.updateMemberStatus(c.members)
 			if err := c.updateCRStatus(); err != nil {
 				c.logger.Warningf("periodic update CR status failed: %v", err)
 			}

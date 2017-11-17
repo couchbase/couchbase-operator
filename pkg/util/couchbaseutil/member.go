@@ -48,6 +48,15 @@ func (ms MemberSet) Diff(other MemberSet) MemberSet {
 	return diff
 }
 
+func (ms MemberSet) Equal(other MemberSet) bool {
+	for n, _ := range ms {
+		if _, ok := other[n]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (ms MemberSet) IsEqual(other MemberSet) bool {
 	if ms.Size() != other.Size() {
 		return false
@@ -64,12 +73,22 @@ func (ms MemberSet) Size() int {
 	return len(ms)
 }
 
+func (ms MemberSet) Empty() bool {
+	return len(ms) == 0
+}
+
 func (ms MemberSet) Add(m *Member) {
 	ms[m.Name] = m
 }
 
 func (ms MemberSet) Remove(name string) {
 	delete(ms, name)
+}
+
+func (ms MemberSet) Append(other MemberSet) {
+	for _, m := range other {
+		ms.Add(m)
+	}
 }
 
 func (ms MemberSet) ClientURLs() []string {

@@ -17,55 +17,26 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}()
 
 	sp := c.cluster.Spec
-	running := podsToMemberSet(pods, c.isSecureClient())
-	running, err := c.removeUnknownMembers(running)
-	if err != nil {
-		return err
-	}
 
-	status, err := c.getClusterStatus()
+	cluster, err := c.getClusterStatus()
 	if err != nil {
-		return err
-	}
-
-	if status.IsRebalancing {
-		c.logger.Infoln("Skipping reconcile loop because the cluster is currently rebalancing")
-		// TODO - Should track the status of rebalance here
+		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %s", err.Error())
 		return nil
 	}
 
-	if status.NumUnhealthyNodes > status.AutoFailedNodes.Size() {
-		c.logger.Infoln("Skipping reconcile loop to allow autofilover to take place")
-		return nil
+	state := &ReconcileMachine{
+		runningPods: podsToMemberSet(pods, c.isSecureClient()),
+		knownNodes:  couchbaseutil.NewMemberSet(),
+		ejectNodes:  couchbaseutil.NewMemberSet(),
+		couchbase:   cluster,
+		state:       ReconcileInit,
 	}
 
-	if status.AutoFailedNodes.Size() > 0 {
-		c.logger.Infoln("An autofailover has taken place, rebalancing nodes")
-		for _, m := range status.AutoFailedNodes {
-			c.removeMember(m)
-			running.Remove(m.Name)
-		}
-	}
-
-	if status.NeedsRebalance {
-		c.logger.Infoln("The cluster is unbalanced, starting rebalance")
-		if err := c.rebalance([]string{}); err != nil {
-			return err
-		}
-	}
-
-	// TODO: We should update any cluster confiugration parameters here.
 	c.reconcileClusterSettings()
 
-	// Ensure that the actual cluster size matches the desired cluster size. Also
-	// clean up and failed pods.
+	c.reconcileMembers(state)
 
-	if !running.IsEqual(c.members) || c.members.Size() != sp.Size {
-		return c.reconcileMembers(running)
-	}
-
-	err = c.reconcileBuckets()
-	if err != nil {
+	if err := c.reconcileBuckets(); err != nil {
 		return err
 	}
 
@@ -81,58 +52,73 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 // - running pods on k8s and cluster membership
 // - cluster membership and expected size of couchbase cluster
 // Steps:
-// 1. Remove all pods from running set that does not belong to member set.
-// 2. L consist of remaining pods of runnings
-// 3. If L = members, the current state matches the membership state. END.
-// 4. Add one missing member. END.
-func (c *Cluster) reconcileMembers(running couchbaseutil.MemberSet) error {
-	c.logger.Infof("running members: %s", running)
-	c.logger.Infof("cluster membership: %s", c.members)
+// 1. Remove running pods that we didn't create explicitly (unknown members)
+// 2. If we are currently in a rebalance then we should finish it.
+// 3. If any nodes are down then wait for them to be failed over.
+// 4. Decide which nodes should be removed and whether we need to add nodes.
+//    - Nodes added to the cluster that are failed, but not rebalanced should
+//      be removed.
+//    - Nodes that have been failed over should be removed from the cluster
+//      and rebalanced out.
+//    - Nodes that are pending addition, healthy, but not yet rebalanced in
+//      should be fully added in.
+//    - Healthy active nodes should remain in the cluster.
+// 5. We will now know what the current cluster would look like if we handled
+//    any issues with the current nodes in the cluster. We now need to either
+//    remove healthy nodes if we're scaling down, or add noew nodes if we need
+//    to scale up.
+// 6. Run a rebalance if neccessary.
+// 7. Remove any nodes from the cached member set that are not part actually
+//    part of the cluster.
+func (c *Cluster) reconcileMembers(rm *ReconcileMachine) {
+	done := false
+	for !done {
+		switch rm.state {
+		case ReconcileInit:
+			rm.handleInit(c)
+		case ReconcileUnknownMembers:
+			rm.handleUnknownMembers(c)
+		case ReconcileRebalanceCheck:
+			rm.handleRebalanceCheck(c)
+		case ReconcileDownNodes:
+			rm.handleDownNodes(c)
+		case ReconcileFailedAddNodes:
+			rm.handleFailedAddNodes(c)
+		case ReconcileFailedNodes:
+			rm.handleFailedNodes(c)
+		case ReconcileRemoveNodes:
+			rm.handleRemoveNode(c)
+		case ReconcileAddNodes:
+			rm.handleAddNode(c)
+		case ReconcileRebalance:
+			rm.handleRebalance(c)
+		case ReconcileFinished:
+			rm.handleFinished(c)
+			done = true
+		default:
+			panic("Invalid state\n")
+		}
 
-	if running.Size() == c.members.Size() {
-		return c.resize()
+		if err := c.updateCRStatus(); err != nil {
+			c.logger.Warnf("update CR status failed: %v", err)
+		}
 	}
-
-	c.logger.Infof("removing one dead member")
-	// remove dead members that doesn't have any running pods before doing resizing.
-	return c.removeDeadMember(c.members.Diff(running).PickOne())
 }
 
-func (c *Cluster) resize() error {
-	if c.members.Size() == c.cluster.Spec.Size {
-		return nil
-	}
-
-	if c.members.Size() < c.cluster.Spec.Size {
-		return c.addOneMember()
-	}
-
-	return c.removeOneMember()
-}
-
-func (c *Cluster) addOneMember() error {
-	c.status.SetScalingUpCondition(c.members.Size(), c.cluster.Spec.Size)
-
+func (c *Cluster) addOneMember() (*couchbaseutil.Member, error) {
 	newMember := c.newMember(c.memberCounter)
 	c.members.Add(newMember)
 
 	if err := c.createPod(c.members, newMember); err != nil {
-		return fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
+		c.members.Remove(newMember.Name)
+		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
 	c.memberCounter++
 	c.logger.Infof("added member (%s)", newMember.Name)
 
-	// add node to cluster
-	if err := c.addClusterNode(newMember); err != nil {
-		return err
-	}
-
-	// rebalance if this is last node to add to cluster
-	if len(c.members) == c.cluster.Spec.Size {
-		return c.rebalance([]string{})
-	}
-
-	return nil
+	services := c.cluster.Spec.ClusterSettings.ServicesArr()
+	return newMember, couchbaseutil.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
+		c.cluster.Name, newMember.ClientURL(), c.username, c.password, services)
 }
 
 func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
@@ -142,13 +128,6 @@ func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
 // Rebalance nodes in the cluster
 func (c *Cluster) rebalance(nodesToRemove []string) error {
 	return couchbaseutil.Rebalance(c.members, c.username, c.password, c.cluster.Name, nodesToRemove, true)
-}
-
-// adds a node to the cluster
-func (c *Cluster) addClusterNode(m *couchbaseutil.Member) error {
-	services := c.cluster.Spec.ClusterSettings.ServicesArr()
-	return couchbaseutil.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(m)),
-		c.cluster.Name, m.ClientURL(), c.username, c.password, services)
 }
 
 // reconcile buckets by adding or removing
@@ -266,19 +245,8 @@ func (c *Cluster) initMember(m *couchbaseutil.Member) error {
 		c.cluster.Name, true, settings.AutoFailoverTimeout)
 }
 
-func (c *Cluster) removeOneMember() error {
-	c.status.SetScalingDownCondition(c.members.Size(), c.cluster.Spec.Size)
-
-	return c.removeMember(c.members.PickOne())
-}
-
 func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
 	c.logger.Infof("removing dead member %q", toRemove.Name)
-
-	return c.removeMember(toRemove)
-}
-
-func (c *Cluster) removeMember(toRemove *couchbaseutil.Member) error {
 	nodeName := toRemove.Name
 	err := c.rebalance([]string{toRemove.Addr() + ":8091"})
 	if err != nil {

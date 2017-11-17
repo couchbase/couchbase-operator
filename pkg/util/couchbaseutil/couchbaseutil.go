@@ -13,13 +13,14 @@ import (
 )
 
 type ClusterStatus struct {
-	TotalNodes        int
-	NumHealthyNodes   int
-	NumUnhealthyNodes int
-	NumWarmupNodes    int
-	AutoFailedNodes   MemberSet
-	IsRebalancing     bool
-	NeedsRebalance    bool
+	ActiveNodes     MemberSet // status=healthy,   clusterMembership=active
+	PendingAddNodes MemberSet // status=healthy,   clusterMembership=inactiveAdded
+	FailedAddNodes  MemberSet // status=unhealthy, clusterMembership=inactiveAdded
+	DownNodes       MemberSet // status=unhealthy, clusterMembership=active
+	FailedNodes     MemberSet // status=unhealthy, clusterMembership=inactiveFailed
+	UnknownNodes    MemberSet // not part of the cluster
+	IsRebalancing   bool
+	NeedsRebalance  bool
 }
 
 // check the health of a particular Couchbase node.
@@ -38,6 +39,14 @@ func AddNode(ms MemberSet, clusterName, hostname, username, password string, ser
 	return retryutil.RetryOnErr(5*time.Second, 36, "add node", clusterName,
 		func() error {
 			return client.AddNode(hostname, username, password, svcs)
+		})
+}
+
+func CancelAddNode(ms MemberSet, clusterName, hostname, username, password string) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	return retryutil.RetryOnErr(5*time.Second, 36, "add node", clusterName,
+		func() error {
+			return client.CancelAddNode(hostname)
 		})
 }
 
@@ -65,30 +74,39 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 			return err
 		}
 
-		status.TotalNodes = 0
-		status.NumHealthyNodes = 0
-		status.NumUnhealthyNodes = 0
-		status.NumWarmupNodes = 0
-		status.AutoFailedNodes = NewMemberSet()
+		status.ActiveNodes = NewMemberSet()
+		status.PendingAddNodes = NewMemberSet()
+		status.FailedAddNodes = NewMemberSet()
+		status.DownNodes = NewMemberSet()
+		status.FailedNodes = NewMemberSet()
 		status.IsRebalancing = (info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
 		status.NeedsRebalance = !info.Balanced
 
+		all := NewMemberSet()
 		for _, node := range info.Nodes {
-			status.TotalNodes++
-			if node.Status == "healthy" {
-				status.NumHealthyNodes++
-			} else if node.Status == "warmup" {
-				status.NumWarmupNodes++
+			member := ms[strings.Split(node.HostName, ".")[0]]
+			if member == nil {
+				continue
+			}
+			all.Add(member)
+			if node.Status == "healthy" || node.Status == "warmup" {
+				if node.Membership == "active" {
+					status.ActiveNodes.Add(member)
+				} else if node.Membership == "inactiveAdded" {
+					status.PendingAddNodes.Add(member)
+				}
 			} else if node.Status == "unhealthy" {
-				status.NumUnhealthyNodes++
-				if node.Membership == "inactiveFailed" {
-					host := strings.Split(node.HostName, ".")[0]
-					m := ms[host]
-					status.AutoFailedNodes.Add(m)
+				if node.Membership == "active" {
+					status.DownNodes.Add(member)
+				} else if node.Membership == "inactiveAdded" {
+					status.FailedAddNodes.Add(member)
+				} else if node.Membership == "inactiveFailed" {
+					status.FailedNodes.Add(member)
 				}
 			}
 		}
 
+		status.UnknownNodes = ms.Diff(all)
 		return nil
 	})
 
