@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -161,13 +160,6 @@ func (c *Controller) syncCouchbaseClus(clus *cbapi.CouchbaseCluster) {
 
 func (c *Controller) handleClusterEvent(event *Event) error {
 	clus := event.Object
-
-	data, err := json.Marshal(clus)
-	if err == nil {
-		c.logger.Info(string(data))
-	} else {
-		c.logger.Info(err.Error())
-	}
 
 	if clus.Status.IsFailed() {
 		if event.Type == kwatch.Deleted {

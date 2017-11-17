@@ -2,9 +2,11 @@ package cluster
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
+	"strings"
 	"time"
 
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
@@ -204,14 +206,7 @@ func (c *Cluster) run() {
 		case event := <-c.eventCh:
 			switch event.typ {
 			case eventModifyCluster:
-				/*if isSpecEqual(event.cluster.Spec, c.cluster.Spec) {
-					break
-				}
-				// TODO: we can't handle another upgrade while an upgrade is in progress
-				c.logSpecUpdate(event.cluster.Spec)
-
-				*/
-				c.cluster = event.cluster
+				c.handleUpdateEvent(event)
 			case eventDeleteCluster:
 				c.logger.Infof("cluster is deleted by the user")
 				return
@@ -268,6 +263,36 @@ func (c *Cluster) run() {
 
 func (c *Cluster) delete() {
 	c.gc.CollectCluster(c.cluster.Name, garbagecollection.NullUID)
+}
+
+func (c *Cluster) handleUpdateEvent(event *clusterEvent) {
+	oldSpec := c.cluster.Spec.DeepCopy()
+	c.cluster = event.cluster
+
+	if !reflect.DeepEqual(event.cluster.Spec, *oldSpec) {
+		c.logSpecUpdate(*oldSpec, event.cluster.Spec)
+	}
+}
+
+func (c *Cluster) logSpecUpdate(oldSpec, newSpec api.ClusterSpec) {
+	oldSpecBytes, err := json.MarshalIndent(oldSpec, "", "    ")
+	if err != nil {
+		c.logger.Errorf("failed to marshal cluster spec: %v", err)
+	}
+	newSpecBytes, err := json.MarshalIndent(newSpec, "", "    ")
+	if err != nil {
+		c.logger.Errorf("failed to marshal cluster spec: %v", err)
+	}
+
+	c.logger.Infof("spec update: Old Spec:")
+	for _, m := range strings.Split(string(oldSpecBytes), "\n") {
+		c.logger.Info(m)
+	}
+
+	c.logger.Infof("New Spec:")
+	for _, m := range strings.Split(string(newSpecBytes), "\n") {
+		c.logger.Info(m)
+	}
 }
 
 func (c *Cluster) updateCRStatus() error {
