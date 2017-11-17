@@ -14,7 +14,7 @@ var (
 // cluster settings
 var (
 	basicClusterSettings = &api.ClusterConfig{
-		Services:              "kv,n1ql,index",
+		Services:              []string{"kv", "n1ql", "index"},
 		DataServiceMemQuota:   256,
 		IndexServiceMemQuota:  256,
 		SearchServiceMemQuota: 256,
