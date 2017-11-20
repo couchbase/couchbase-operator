@@ -8,6 +8,7 @@ import (
 type Member struct {
 	Name         string
 	Namespace    string
+	ServerConfig string
 	SecureClient bool
 }
 
@@ -97,6 +98,17 @@ func (ms MemberSet) ClientURLs() []string {
 		endpoints = append(endpoints, m.ClientURL())
 	}
 	return endpoints
+}
+
+func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
+	rv := NewMemberSet()
+	for _, m := range ms {
+		if m.ServerConfig == config {
+			rv.Add(m)
+		}
+	}
+
+	return rv
 }
 
 func (ms MemberSet) PickOne() *Member {

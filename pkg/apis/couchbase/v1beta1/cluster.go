@@ -71,7 +71,7 @@ type ClusterSpec struct {
 	BucketSettings []BucketConfig `json:"buckets"`
 
 	// A specificaion for the way nodes should be configured in the cluster
-	ServerSettings ServerConfig `json:"servers,omitempty"`
+	ServerSettings []ServerConfig `json:"servers,omitempty"`
 
 	// AuthSecret is the name of a kube secret to use for authentication
 	AuthSecret string `json:"authSecret"`
@@ -129,6 +129,9 @@ type ServerConfig struct {
 	// cluster equal to the expected size. The vaild range of the size is
 	// from 1 to 50.
 	Size int `json:"size"`
+
+	// A name for the server configuration. It must be unique.
+	Name string `json:"name"`
 
 	// The services to run on nodes created with this spec
 	Services []string `json:"services"`
@@ -191,7 +194,11 @@ func (c *ClusterSpec) Cleanup() {
 }
 
 func (c *ClusterSpec) TotalSize() int {
-	return c.ServerSettings.Size
+	size := 0
+	for _, server := range c.ServerSettings {
+		size += server.Size
+	}
+	return size
 }
 
 // list of bucket names from config

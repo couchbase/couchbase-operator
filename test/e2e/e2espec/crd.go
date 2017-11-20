@@ -37,12 +37,15 @@ var (
 	}
 )
 
-func defaultServerSettings(size int) api.ServerConfig {
-	return api.ServerConfig{
-		Size:      size,
-		Services:  []string{"data", "n1ql", "index"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+func defaultServerSettings(size int) []api.ServerConfig {
+	return []api.ServerConfig{
+		api.ServerConfig{
+			Size:      size,
+			Name:      "test_config_1",
+			Services:  []string{"data", "n1ql", "index"},
+			DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+			IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		},
 	}
 }
 

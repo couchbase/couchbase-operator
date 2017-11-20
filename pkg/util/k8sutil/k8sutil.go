@@ -111,9 +111,10 @@ func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.Cl
 
 func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
 	labels := map[string]string{
-		"app":               "couchbase",
-		"couchbase_node":    memberName,
-		"couchbase_cluster": clusterName,
+		"app":                 "couchbase",
+		"couchbase_node":      memberName,
+		"couchbase_node_conf": ns.Name,
+		"couchbase_cluster":   clusterName,
 	}
 
 	for _, s := range ns.Services {

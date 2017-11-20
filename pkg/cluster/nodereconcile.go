@@ -14,9 +14,10 @@ const (
 	ReconcileDownNodes                     = 0x04
 	ReconcileFailedAddNodes                = 0x05
 	ReconcileFailedNodes                   = 0x06
-	ReconcileRemoveNodes                   = 0x07
-	ReconcileAddNodes                      = 0x08
-	ReconcileRebalance                     = 0x09
+	ReconcileServerConfigs                 = 0x07
+	ReconcileRemoveNodes                   = 0x08
+	ReconcileAddNodes                      = 0x09
+	ReconcileRebalance                     = 0x0a
 	ReconcileFinished                      = 0xff
 )
 
@@ -29,11 +30,44 @@ type ReconcileMachine struct {
 }
 
 func (r *ReconcileMachine) handleInit(c *Cluster) {
-	if r.couchbase.PendingAddNodes.Empty() && r.couchbase.FailedNodes.Empty() &&
-		r.couchbase.DownNodes.Empty() && r.couchbase.FailedAddNodes.Empty() &&
-		r.couchbase.ActiveNodes.Size() == c.cluster.Spec.TotalSize() &&
-		r.couchbase.UnknownNodes.Empty() && r.runningPods.Equal(c.members) &&
-		!r.couchbase.IsRebalancing && !r.couchbase.NeedsRebalance {
+	needsReconcile := false
+
+	// If we have any cluster related issues like failed nodes or if the cluster
+	// is not balanced or is currently rebalancing then we need to run reconcile.
+	if !r.couchbase.PendingAddNodes.Empty() || !r.couchbase.FailedNodes.Empty() ||
+		!r.couchbase.DownNodes.Empty() || !r.couchbase.FailedAddNodes.Empty() &&
+		!r.couchbase.UnknownNodes.Empty() || !r.runningPods.Equal(c.members) ||
+		r.couchbase.IsRebalancing || r.couchbase.NeedsRebalance {
+		needsReconcile = true
+	}
+
+	// If we have any server specs that are not properly sized then we need to
+	// reconcile the nodes.
+	serverSpecs := c.cluster.Spec.ServerSettings
+	for _, serverSpec := range serverSpecs {
+		nodes := r.couchbase.ActiveNodes.GroupByServerConfig(serverSpec.Name)
+		if nodes.Size() != serverSpec.Size {
+			needsReconcile = true
+			c.logger.Infof("server config %s: %s", serverSpec.Name, nodes)
+		}
+	}
+
+	// If we have any running pods that are not part of one of the current
+	// server configs then we need to reconcile so they can be removed.
+	for _, m := range r.runningPods {
+		found := false
+		for _, serverSpec := range serverSpecs {
+			if m.ServerConfig == serverSpec.Name {
+				found = true
+			}
+		}
+
+		if !found {
+			needsReconcile = true
+		}
+	}
+
+	if !needsReconcile {
 		r.transitionState(ReconcileFinished)
 		return
 	}
@@ -124,40 +158,75 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
 		r.ejectNodes.Add(m)
 	}
 
+	r.transitionState(ReconcileServerConfigs)
+}
+
+func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) {
+	// If a server configuration was deleted in a spec update then we will clean
+	// up all of the nodes from that server config here.
+	for _, m := range r.runningPods {
+		found := false
+		for _, serverSpec := range c.cluster.Spec.ServerSettings {
+			if m.ServerConfig == serverSpec.Name {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			c.logger.Infof("Member %s is no longer part of any server config, removing", m.Name)
+			r.couchbase.NeedsRebalance = true
+			r.knownNodes.Remove(m.Name)
+			r.ejectNodes.Add(m)
+		}
+	}
+
 	r.transitionState(ReconcileRemoveNodes)
 }
 
 func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
-	if r.knownNodes.Size() > c.cluster.Spec.TotalSize() {
-		originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
-		c.status.SetScalingDownCondition(originalSize, c.cluster.Spec.TotalSize())
+	serverSpecs := c.cluster.Spec.ServerSettings
+	for _, serverSpec := range serverSpecs {
+		removeCount := 0
+		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
+		for (nodes.Size() - removeCount) > serverSpec.Size {
+			originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
+			c.status.SetScalingDownCondition(originalSize, c.cluster.Spec.TotalSize())
 
-		r.couchbase.NeedsRebalance = true
-		toRemove := r.knownNodes.PickOne()
-		r.knownNodes.Remove(toRemove.Name)
-		r.ejectNodes.Add(toRemove)
-	} else {
-		r.transitionState(ReconcileAddNodes)
+			r.couchbase.NeedsRebalance = true
+			toRemove := nodes.PickOne()
+			r.knownNodes.Remove(toRemove.Name)
+			r.ejectNodes.Add(toRemove)
+			removeCount++
+		}
 	}
+
+	r.transitionState(ReconcileAddNodes)
 }
 
 func (r *ReconcileMachine) handleAddNode(c *Cluster) {
-	if r.knownNodes.Size() < c.cluster.Spec.TotalSize() {
-		originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
-		c.status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
+	serverSpecs := c.cluster.Spec.ServerSettings
+	for _, serverSpec := range serverSpecs {
+		addCount := 0
+		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
+		for nodes.Size()+addCount < serverSpec.Size {
+			originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
+			c.status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
 
-		r.couchbase.NeedsRebalance = true
-		m, err := c.addOneMember()
-		if err != nil {
-			c.logger.Warnf("Failed to add new node to cluster: %v", err)
-			r.transitionState(ReconcileFinished)
-			return
+			r.couchbase.NeedsRebalance = true
+			m, err := c.addOneMember(serverSpec)
+			if err != nil {
+				c.logger.Warnf("Failed to add new node to cluster: %v", err)
+				r.transitionState(ReconcileFinished)
+				return
+			}
+			r.knownNodes.Add(m)
+			r.runningPods.Add(m)
+			addCount++
 		}
-		r.knownNodes.Add(m)
-		r.runningPods.Add(m)
-	} else {
-		r.transitionState(ReconcileRebalance)
 	}
+
+	r.transitionState(ReconcileRebalance)
 }
 
 func (r *ReconcileMachine) handleRebalance(c *Cluster) {

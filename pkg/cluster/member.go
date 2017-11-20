@@ -14,11 +14,12 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	return nil
 }
 
-func (c *Cluster) newMember(id int) *couchbaseutil.Member {
+func (c *Cluster) newMember(id int, serverSpecName string) *couchbaseutil.Member {
 	name := couchbaseutil.CreateMemberName(c.cluster.Name, id)
 	return &couchbaseutil.Member{
 		Name:         name,
 		Namespace:    c.cluster.Namespace,
+		ServerConfig: serverSpecName,
 		SecureClient: c.isSecureClient(),
 	}
 }
@@ -26,7 +27,18 @@ func (c *Cluster) newMember(id int) *couchbaseutil.Member {
 func podsToMemberSet(pods []*v1.Pod, sc bool) couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
 	for _, pod := range pods {
-		m := &couchbaseutil.Member{Name: pod.Name, Namespace: pod.Namespace, SecureClient: sc}
+		config := ""
+		labels := pod.GetLabels()
+		if val, ok := labels["couchbase_node_conf"]; ok {
+			config = val
+		}
+
+		m := &couchbaseutil.Member{
+			Name:         pod.Name,
+			Namespace:    pod.Namespace,
+			ServerConfig: config,
+			SecureClient: sc,
+		}
 		members.Add(m)
 	}
 	return members

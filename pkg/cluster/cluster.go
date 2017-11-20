@@ -150,13 +150,24 @@ func (c *Cluster) create() error {
 			api.ClusterPhaseCreating, err)
 	}
 
+	if len(c.cluster.Spec.ServerSettings) == 0 {
+		return fmt.Errorf("cluster create: no server specification defined")
+	}
+
+	idx := c.indexOfServerConfigWithService("data")
+	if idx == -1 {
+		return fmt.Errorf("cluster create: at least one server specification must contain the `data` service")
+	}
+
 	m := &couchbaseutil.Member{
 		Name:         couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter),
 		Namespace:    c.cluster.Namespace,
+		ServerConfig: c.cluster.Spec.ServerSettings[idx].Name,
 		SecureClient: false,
 	}
 	ms := couchbaseutil.NewMemberSet(m)
-	if err := c.createPod(ms, m); err != nil {
+
+	if err := c.createPod(ms, m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
 	}
 
@@ -170,7 +181,7 @@ func (c *Cluster) create() error {
 		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}
 
-	if err := c.initMember(m); err != nil {
+	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
 	}
 
@@ -317,10 +328,11 @@ func (c *Cluster) isSecureClient() bool {
 	return c.cluster.Spec.TLS.IsSecureClient()
 }
 
-func (c *Cluster) createPod(members couchbaseutil.MemberSet, m *couchbaseutil.Member) error {
+func (c *Cluster) createPod(members couchbaseutil.MemberSet, m *couchbaseutil.Member,
+	serverSpec api.ServerConfig) error {
 
 	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec,
-		c.cluster.Spec.ServerSettings, c.cluster.AsOwner())
+		serverSpec, c.cluster.AsOwner())
 	_, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
 	return err
 }
@@ -479,4 +491,16 @@ func (c *Cluster) setupAuth(authSecret string) error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) indexOfServerConfigWithService(svc string) int {
+	for idx, serverSpec := range c.cluster.Spec.ServerSettings {
+		for _, service := range serverSpec.Services {
+			if service == svc {
+				return idx
+			}
+		}
+	}
+
+	return -1
 }

@@ -86,6 +86,8 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) {
 			rm.handleFailedAddNodes(c)
 		case ReconcileFailedNodes:
 			rm.handleFailedNodes(c)
+		case ReconcileServerConfigs:
+			rm.handleUnknownServerConfigs(c)
 		case ReconcileRemoveNodes:
 			rm.handleRemoveNode(c)
 		case ReconcileAddNodes:
@@ -105,11 +107,11 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) {
 	}
 }
 
-func (c *Cluster) addOneMember() (*couchbaseutil.Member, error) {
-	newMember := c.newMember(c.memberCounter)
+func (c *Cluster) addOneMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
+	newMember := c.newMember(c.memberCounter, serverSpec.Name)
 	c.members.Add(newMember)
 
-	if err := c.createPod(c.members, newMember); err != nil {
+	if err := c.createPod(c.members, newMember, serverSpec); err != nil {
 		c.members.Remove(newMember.Name)
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
@@ -117,8 +119,7 @@ func (c *Cluster) addOneMember() (*couchbaseutil.Member, error) {
 	c.logger.Infof("added member (%s)", newMember.Name)
 
 	return newMember, couchbaseutil.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
-		c.cluster.Name, newMember.ClientURL(), c.username, c.password,
-		c.cluster.Spec.ServerSettings.Services)
+		c.cluster.Name, newMember.ClientURL(), c.username, c.password, serverSpec.Services)
 }
 
 func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
@@ -231,12 +232,11 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 }
 
 // initializes member with cluster settings
-func (c *Cluster) initMember(m *couchbaseutil.Member) error {
+func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 	settings := c.cluster.Spec.ClusterSettings
-	nodeSpec := c.cluster.Spec.ServerSettings
 	err := couchbaseutil.InitializeCluster(m, c.username, c.password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
-		nodeSpec.Services, nodeSpec.DataPath, nodeSpec.IndexPath, settings.IndexStorageSetting)
+		serverSpec.Services, serverSpec.DataPath, serverSpec.IndexPath, settings.IndexStorageSetting)
 	if err != nil {
 		return err
 	}
