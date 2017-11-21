@@ -3,6 +3,7 @@ package cluster
 import (
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
 )
 
 type ReconcileState int
@@ -146,6 +147,12 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 			r.transitionState(ReconcileFinished)
 			return
 		}
+
+		_, err = c.eventsCli.Create(k8sutil.FailedAddNodeEvent(m.Name, c.cluster))
+		if err != nil {
+			c.logger.Errorf("failed to create failed add node event: %v", err)
+		}
+
 		r.runningPods.Remove(m.Name)
 	}
 
@@ -223,6 +230,11 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 			r.knownNodes.Add(m)
 			r.runningPods.Add(m)
 			addCount++
+
+			_, err = c.eventsCli.Create(k8sutil.MemberAddEvent(m.Name, c.cluster))
+			if err != nil {
+				c.logger.Errorf("failed to create new member add event: %v", err)
+			}
 		}
 	}
 
@@ -237,6 +249,19 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 			r.transitionState(ReconcileFinished)
 			return
 		}
+
+		for _, toRemove := range r.ejectNodes {
+			_, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(toRemove.Name, c.cluster))
+			if err != nil {
+				c.logger.Errorf("failed to create member remove event: %v", err)
+			}
+		}
+
+		_, err := c.eventsCli.Create(k8sutil.RebalanceEvent(c.cluster))
+		if err != nil {
+			c.logger.Errorf("failed to create rebalance event: %v", err)
+		}
+
 		r.runningPods = r.runningPods.Diff(r.ejectNodes)
 	}
 

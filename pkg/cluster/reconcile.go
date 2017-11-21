@@ -5,6 +5,7 @@ import (
 
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
 	"k8s.io/api/core/v1"
 )
 
@@ -180,6 +181,11 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 	err := couchbaseutil.CreateBucket(c.members, c.username, c.password, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
+
+		_, err = c.eventsCli.Create(k8sutil.BucketCreateEvent(bucketName, c.cluster))
+		if err != nil {
+			c.logger.Errorf("failed to create new bucket event: %v", err)
+		}
 	}
 	return err
 }
@@ -188,6 +194,11 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 	err := couchbaseutil.DeleteBucket(c.members, c.username, c.password, bucketName)
 	if err == nil {
 		c.status.RemoveBucket(bucketName)
+
+		_, err = c.eventsCli.Create(k8sutil.BucketDeleteEvent(bucketName, c.cluster))
+		if err != nil {
+			c.logger.Errorf("failed to create delete bucket event: %v", err)
+		}
 	}
 	return err
 }
@@ -202,6 +213,11 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 	err := couchbaseutil.EditBucket(c.members, c.username, c.password, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
+
+		//_, err = c.eventsCli.Create(k8sutil.BucketEditEvent(bucketName, c.cluster))
+		//if err != nil {
+		//	c.logger.Errorf("failed to create edit bucket event: %v", err)
+		//}
 	}
 	return err
 }

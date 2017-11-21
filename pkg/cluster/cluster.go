@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 var (
@@ -59,6 +60,7 @@ type Cluster struct {
 	members       couchbaseutil.MemberSet
 	tlsConfig     *tls.Config
 	gc            *garbagecollection.GC
+	eventsCli     corev1.EventInterface
 	username      string
 	password      string
 }
@@ -69,12 +71,13 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 			"module":       "cluster",
 			"cluster-name": cl.Name,
 		}),
-		config:  config,
-		status:  *(cl.Status.DeepCopy()),
-		cluster: cl,
-		eventCh: make(chan *clusterEvent, 100),
-		stopCh:  make(chan struct{}),
-		gc:      garbagecollection.New(config.KubeCli, cl.Namespace),
+		config:    config,
+		status:    *(cl.Status.DeepCopy()),
+		cluster:   cl,
+		eventCh:   make(chan *clusterEvent, 100),
+		stopCh:    make(chan struct{}),
+		gc:        garbagecollection.New(config.KubeCli, cl.Namespace),
+		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
 	}
 	c.logger.Info("Watching new cluster")
 
@@ -188,6 +191,11 @@ func (c *Cluster) create() error {
 	uuid, err := couchbaseutil.ClusterUUID(m, c.username, c.password, c.cluster.Name)
 	if err != nil {
 		return err
+	}
+
+	_, err = c.eventsCli.Create(k8sutil.MemberAddEvent(m.Name, c.cluster))
+	if err != nil {
+		c.logger.Errorf("failed to create new member add event: %v", err)
 	}
 
 	c.status.SetClusterID(uuid)

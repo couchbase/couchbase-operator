@@ -1,0 +1,94 @@
+package k8sutil
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbaselabs/couchbase-operator/pkg/util/constants"
+
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func MemberAddEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "NewMemberAdded"
+	event.Message = fmt.Sprintf("New member %s added to cluster", memberName)
+	return event
+}
+
+func MemberRemoveEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "MemberRemoved"
+	event.Message = fmt.Sprintf("Existing member %s removed from the cluster", memberName)
+	return event
+}
+
+func RebalanceEvent(cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "RebalanceStarted"
+	event.Message = fmt.Sprintf("A rebalance has been started to balance data across the cluster")
+	return event
+}
+
+func FailedAddNodeEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "FailedAddNode"
+	event.Message = fmt.Sprintf("Removed existing member %s because it failed before it could be added to the cluster", memberName)
+	return event
+}
+
+func BucketCreateEvent(bucketName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "BucketCreated"
+	event.Message = fmt.Sprintf("A new bucket `%s` was created", bucketName)
+	return event
+}
+
+func BucketDeleteEvent(bucketName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "BucketDeleted"
+	event.Message = fmt.Sprintf("Bucket `%s` was deleted", bucketName)
+	return event
+}
+
+func BucketEditEvent(bucketName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "BucketEdited"
+	event.Message = fmt.Sprintf("Bucket `%s` was edited", bucketName)
+	return event
+}
+
+func newClusterEvent(cl *api.CouchbaseCluster) *v1.Event {
+	t := time.Now()
+	return &v1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: cl.Name + "-",
+			Namespace:    cl.Namespace,
+		},
+		InvolvedObject: v1.ObjectReference{
+			APIVersion:      api.SchemeGroupVersion.String(),
+			Kind:            api.CRDResourceKind,
+			Name:            cl.Name,
+			Namespace:       cl.Namespace,
+			UID:             cl.UID,
+			ResourceVersion: cl.ResourceVersion,
+		},
+		Source: v1.EventSource{
+			Component: os.Getenv(constants.EnvOperatorPodName),
+		},
+		// Each cluster event is unique so it should not be collapsed with other events
+		FirstTimestamp: metav1.Time{Time: t},
+		LastTimestamp:  metav1.Time{Time: t},
+		Count:          int32(1),
+	}
+}
