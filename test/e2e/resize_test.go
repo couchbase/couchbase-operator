@@ -1,9 +1,9 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"testing"
-	"fmt"
 
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2espec"

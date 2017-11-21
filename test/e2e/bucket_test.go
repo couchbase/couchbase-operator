@@ -1,13 +1,13 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"testing"
-	"fmt"
 
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbaselabs/couchbase-operator/test/e2e/framework"
 )
 
@@ -44,14 +44,14 @@ func TestBucketAdd(t *testing.T) {
 	updateFunc := func(cl *api.CouchbaseCluster) {
 		cl.Spec.BucketSettings = []api.BucketConfig{
 			api.BucketConfig{
-				BucketName: "default",
-				BucketType: "couchbase",
-				BucketMemoryQuota: 128,
-				BucketReplicas: 1,
-				IoPriority: "high",
-				EvictionPolicy: "fullEviction",
+				BucketName:         "default",
+				BucketType:         "couchbase",
+				BucketMemoryQuota:  128,
+				BucketReplicas:     1,
+				IoPriority:         "high",
+				EvictionPolicy:     "fullEviction",
 				ConflictResolution: "sequence",
-				EnableFlush: true,
+				EnableFlush:        true,
 				EnableIndexReplica: false,
 			},
 		}
@@ -83,4 +83,3 @@ func TestBucketConfig(t *testing.T) {
 func TestBucketConfigNegative(t *testing.T) {
 
 }
-
