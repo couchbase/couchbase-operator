@@ -214,7 +214,12 @@ func GetBucketsToEdit(ms MemberSet, username, password string, spec *cbapi.Clust
 	for _, b := range buckets {
 		config := spec.GetBucketByName(b.BucketName)
 		if config != nil {
-			if !bucketStatusEqualsConfig(b, config) {
+
+			cbConfigBucket, err := ApiBucketToCbmgr(config)
+			if err != nil {
+				return bucketNames, err
+			}
+			if !bucketStatusEqualsConfig(b, cbConfigBucket) {
 				bucketNames = append(bucketNames, config.BucketName)
 			}
 		}
@@ -259,14 +264,12 @@ func ApiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
 }
 
 // transforms bucket status into bucketConfig type and compares the two
-func bucketStatusEqualsConfig(statusConfig *cbmgr.Bucket, specConfig *cbapi.BucketConfig) bool {
+func bucketStatusEqualsConfig(statusConfig *cbmgr.Bucket, specConfig *cbmgr.Bucket) bool {
 
 	// consider type couchbase = membase
 	if specConfig.BucketType == "couchbase" && statusConfig.BucketType == "membase" {
 		statusConfig.BucketType = "couchbase"
 	}
-	// TODO: status doesn't seem to return conflict resolution
-	//statusConfig.ConflictResolution = specConfig.ConflictResolution
 
 	return reflect.DeepEqual(statusConfig, specConfig)
 }
