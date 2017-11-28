@@ -72,7 +72,7 @@ type ClusterSpec struct {
 	ClusterSettings ClusterConfig `json:"cluster"`
 
 	// Bucket specific settings
-	BucketSettings []BucketConfig `json:"buckets"`
+	BucketSettings []BucketConfig `json:"buckets,omitempty"`
 
 	// A specificaion for the way nodes should be configured in the cluster
 	ServerSettings []ServerConfig `json:"servers,omitempty"`
