@@ -16,7 +16,13 @@ import (
 // updating a Cluster CR.
 type CouchbaseClusterCRUpdateFunc func(*api.CouchbaseCluster)
 
-func CreateCRD(clientset apiextensionsclient.Interface) error {
+func CreateCRD(clientset apiextensionsclient.Interface, enableValidation bool) error {
+	crd := createCRD(enableValidation)
+	_, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	return err
+}
+
+func createCRD(enableValidation bool) *apiextensionsv1beta1.CustomResourceDefinition {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: api.CRDName,
@@ -32,8 +38,12 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 			},
 		},
 	}
-	_, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-	return err
+
+	if enableValidation {
+		crd.Spec.Validation = getCustomResourceValidation()
+	}
+
+	return crd
 }
 
 func WaitCRDReady(clientset apiextensionsclient.Interface) error {

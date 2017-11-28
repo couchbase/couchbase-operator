@@ -43,12 +43,13 @@ type Controller struct {
 }
 
 type Config struct {
-	MasterHost     string
-	Namespace      string
-	ServiceAccount string
-	KubeCli        kubernetes.Interface
-	KubeExtCli     apiextensionsclient.Interface
-	CouchbaseCRCli versioned.Interface
+	EnableValidation bool
+	MasterHost       string
+	Namespace        string
+	ServiceAccount   string
+	KubeCli          kubernetes.Interface
+	KubeExtCli       apiextensionsclient.Interface
+	CouchbaseCRCli   versioned.Interface
 }
 
 func (c *Config) Validate() error {
@@ -100,7 +101,7 @@ func (c *Controller) run() {
 }
 
 func (c *Controller) initResource() error {
-	err := k8sutil.CreateCRD(c.KubeExtCli)
+	err := k8sutil.CreateCRD(c.KubeExtCli, c.Config.EnableValidation)
 	if err != nil && !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 		return fmt.Errorf("fail to create CRD: %v", err)
 	}
