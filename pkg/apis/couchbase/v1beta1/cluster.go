@@ -69,7 +69,7 @@ type ClusterSpec struct {
 	TLS *TLSPolicy `json:"tls,omitempty"`
 
 	// Cluster specific settings
-	ClusterSettings *ClusterConfig `json:"cluster"`
+	ClusterSettings ClusterConfig `json:"cluster"`
 
 	// Bucket specific settings
 	BucketSettings []BucketConfig `json:"buckets"`

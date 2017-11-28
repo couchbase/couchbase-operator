@@ -13,7 +13,7 @@ var (
 
 // cluster settings
 var (
-	basicClusterSettings = &api.ClusterConfig{
+	basicClusterSettings = api.ClusterConfig{
 		DataServiceMemQuota:   256,
 		IndexServiceMemQuota:  256,
 		SearchServiceMemQuota: 256,
