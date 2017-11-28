@@ -66,7 +66,7 @@ type ClusterSpec struct {
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// couchbase cluster TLS configuration
-	TLS *TLSPolicy `json:"TLS,omitempty"`
+	TLS *TLSPolicy `json:"tls,omitempty"`
 
 	// Cluster specific settings
 	ClusterSettings *ClusterConfig `json:"cluster"`
