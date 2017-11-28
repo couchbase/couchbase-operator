@@ -4,15 +4,22 @@ metadata:
   name: cb-example
   namespace: default
 spec:
-  image: couchbase/server
+  baseImage: couchbase/server
   version: "enterprise-4.5.1"
   paused: false
   antiAffinity: true
+  authSecret: my-secret
+  tls:
+    static:
+      member:
+        serverSecret: my-server-secret
+      operatorSecret: my-operator-secret
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
     indexStorageSetting: default
+    autoFailoverTimeout: 30
   buckets:
     - name: default
       type: couchbase
@@ -23,8 +30,9 @@ spec:
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
-  nodeSpecifications:
+  servers:
   - size: 1
+    name: all_services
     services:
       - kv
       - index
@@ -32,9 +40,9 @@ spec:
       - search
     dataPath: /opt/couchbase/var/lib/couchbase/data
     indexPath: /opt/couchbase/var/lib/couchbase/data
-    podPolicy:
+    pod:
       persistentVolumes:
-        volumeSize: 40960
+        volumeSizeInMB: 40960
         storageClass: standard
       couchabseEnv:
         ENV1: value
@@ -56,3 +64,4 @@ spec:
         operator: Equal
         value: cbapp
         effect: NoSchedule
+      automountServiceAccountToken: false
