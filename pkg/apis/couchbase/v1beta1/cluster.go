@@ -61,6 +61,10 @@ type ClusterSpec struct {
 	// Paused is to pause the control of the operator for the couchbase cluster.
 	Paused bool `json:"paused,omitempty"`
 
+	// AntiAffinity determines if the couchbase-operator tries to avoid putting
+	// the couchbase members in the same cluster onto the same node.
+	AntiAffinity bool `json:"antiAffinity,omitempty"`
+
 	// couchbase cluster TLS configuration
 	TLS *TLSPolicy `json:"TLS,omitempty"`
 
@@ -160,10 +164,6 @@ type PodPolicy struct {
 	// to run on a node, the node must have each of the indicated key-value pairs as
 	// labels.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// AntiAffinity determines if the couchbase-operator tries to avoid putting
-	// the couchbase members in the same cluster onto the same node.
-	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// Resources is the resource requirements for the couchbase container.
 	// This field cannot be updated once the cluster is created.

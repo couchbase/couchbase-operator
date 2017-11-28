@@ -101,6 +101,10 @@ func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.Cl
 		},
 	}
 
+	if cs.AntiAffinity {
+		pod = PodWithAntiAffinity(pod, clusterName)
+	}
+
 	applyPodPolicy(clusterName, pod, ns.Pod)
 
 	SetCouchbaseVersion(pod, cs.Version)

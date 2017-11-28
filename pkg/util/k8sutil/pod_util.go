@@ -130,10 +130,6 @@ func applyPodPolicy(clusterName string, pod *v1.Pod, policy *cbapi.PodPolicy) {
 		return
 	}
 
-	if policy.AntiAffinity {
-		pod = PodWithAntiAffinity(pod, clusterName)
-	}
-
 	if len(policy.NodeSelector) != 0 {
 		pod = PodWithNodeSelector(pod, policy.NodeSelector)
 	}
