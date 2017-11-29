@@ -29,6 +29,7 @@ type ReconcileMachine struct {
 	ejectNodes  couchbaseutil.MemberSet
 	couchbase   *couchbaseutil.ClusterStatus
 	state       ReconcileState
+	errored     bool
 }
 
 func (r *ReconcileMachine) handleInit(c *Cluster) {
@@ -112,6 +113,7 @@ func (r *ReconcileMachine) handleUnknownMembers(c *Cluster) {
 	r.runningPods, err = c.removeUnknownMembers(r.runningPods)
 	if err != nil {
 		c.logger.Errorf("Removal of unknown members failed: %s", err.Error())
+		r.errored = true
 		r.transitionState(ReconcileFinished)
 	} else {
 		r.transitionState(ReconcileRebalanceCheck)
@@ -121,6 +123,7 @@ func (r *ReconcileMachine) handleUnknownMembers(c *Cluster) {
 func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) {
 	if r.couchbase.IsRebalancing {
 		c.logger.Infoln("Skipping reconcile loop because the cluster is currently rebalancing")
+		r.errored = true
 		r.transitionState(ReconcileFinished)
 	} else {
 		r.transitionState(ReconcileDownNodes)
@@ -131,6 +134,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
 	if r.couchbase.DownNodes.Size() > 0 {
 		c.status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
 		c.logger.Warnln("Unable to reconcile nodes, waiting for auto-failover to take place")
+		r.errored = true
 		r.transitionState(ReconcileFinished)
 	} else {
 		c.status.SetReadyCondition()
@@ -145,6 +149,7 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 		err := couchbaseutil.CancelAddNode(r.knownNodes, c.cluster.Name, m.Addr(), c.username, c.password)
 		if err != nil {
 			c.logger.Errorf("Unable to removed a failed pending add node: %s", err.Error())
+			r.errored = true
 			r.transitionState(ReconcileFinished)
 			return
 		}
@@ -225,6 +230,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 			m, err := c.addOneMember(serverSpec)
 			if err != nil {
 				c.logger.Warnf("Failed to add new node to cluster: %v", err)
+				r.errored = true
 				r.transitionState(ReconcileFinished)
 				return
 			}
@@ -247,6 +253,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 		c.status.SetUnbalancedCondition()
 		if err := c.rebalance(r.ejectNodes.ClientURLs()); err != nil {
 			c.logger.Warnf("Failed to start rebalance: %s", err.Error())
+			r.errored = true
 			r.transitionState(ReconcileFinished)
 			return
 		}
@@ -289,6 +296,7 @@ func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
 		err := c.removeDeadMember(c.members.Diff(r.runningPods).PickOne())
 		if err != nil {
 			c.logger.Errorf("Failed to remove dead members: %s", err.Error())
+			r.errored = true
 		}
 	}
 

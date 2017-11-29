@@ -35,7 +35,9 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	c.reconcileClusterSettings()
 
-	c.reconcileMembers(state)
+	if !c.reconcileMembers(state) {
+		return nil
+	}
 
 	if err := c.reconcileBuckets(); err != nil {
 		return err
@@ -71,7 +73,8 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 // 6. Run a rebalance if neccessary.
 // 7. Remove any nodes from the cached member set that are not part actually
 //    part of the cluster.
-func (c *Cluster) reconcileMembers(rm *ReconcileMachine) {
+// Returns true if reconciliation completed properly
+func (c *Cluster) reconcileMembers(rm *ReconcileMachine) bool {
 	done := false
 	for !done {
 		switch rm.state {
@@ -108,6 +111,8 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) {
 			c.logger.Warnf("update CR status failed: %v", err)
 		}
 	}
+
+	return !rm.errored
 }
 
 func (c *Cluster) addOneMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
