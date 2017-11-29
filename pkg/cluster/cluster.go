@@ -198,6 +198,9 @@ func (c *Cluster) create() error {
 		c.logger.Errorf("failed to create new member add event: %v", err)
 	}
 
+	c.status.Size = c.members.Size()
+	c.updateMemberStatus(c.members)
+	c.status.SetVersion(c.cluster.Spec.Version)
 	c.status.SetClusterID(uuid)
 	return c.updateCRStatus()
 }
