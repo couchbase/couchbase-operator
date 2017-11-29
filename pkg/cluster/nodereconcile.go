@@ -19,6 +19,7 @@ const (
 	ReconcileRemoveNodes                   = 0x08
 	ReconcileAddNodes                      = 0x09
 	ReconcileRebalance                     = 0x0a
+	ReconcileDeadMembers                   = 0x0b
 	ReconcileFinished                      = 0xff
 )
 
@@ -275,10 +276,10 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 		c.status.SetBalancedCondition()
 	}
 
-	r.transitionState(ReconcileFinished)
+	r.transitionState(ReconcileDeadMembers)
 }
 
-func (r *ReconcileMachine) handleFinished(c *Cluster) {
+func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
 	c.updateMemberStatus(c.members)
 
 	dead := c.members.Diff(r.runningPods)
@@ -290,6 +291,12 @@ func (r *ReconcileMachine) handleFinished(c *Cluster) {
 			c.logger.Errorf("Failed to remove dead members: %s", err.Error())
 		}
 	}
+
+	r.transitionState(ReconcileFinished)
+}
+
+func (r *ReconcileMachine) handleFinished(c *Cluster) {
+	c.updateMemberStatus(c.members)
 }
 
 func (r *ReconcileMachine) transitionState(to ReconcileState) {

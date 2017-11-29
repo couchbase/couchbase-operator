@@ -95,6 +95,8 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) {
 			rm.handleAddNode(c)
 		case ReconcileRebalance:
 			rm.handleRebalance(c)
+		case ReconcileDeadMembers:
+			rm.handleDeadMembers(c)
 		case ReconcileFinished:
 			rm.handleFinished(c)
 			done = true
