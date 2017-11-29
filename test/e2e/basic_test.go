@@ -39,6 +39,20 @@ func TestCreateCluster(t *testing.T) {
 	if _, err := e2eutil.WaitUntilSizeReached(t, f.CRClient, 3, 18, testCouchbase); err != nil {
 		t.Fatalf("failed to create 3 members couchbase cluster: %v", err)
 	}
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
 }
 
 // TestPauseControl tests the user can pause the operator from controlling
