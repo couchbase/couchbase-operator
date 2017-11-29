@@ -60,8 +60,9 @@ spec:
       nodeSelector:
         instanceType: large
       tolerations:
-        key: app
-        operator: Equal
-        value: cbapp
-        effect: NoSchedule
+        - key: app
+          operator: Equal
+          value: cbapp
+          effect: NoSchedule
+          tolerationSeconds: 5
       automountServiceAccountToken: false
