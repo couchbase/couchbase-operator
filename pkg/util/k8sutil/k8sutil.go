@@ -210,6 +210,14 @@ func adminServicePorts() []v1.ServicePort {
 	}}
 }
 
+func NodeListOpt(clusterName, memberName string) metav1.ListOptions {
+	l := LabelsForCluster(clusterName)
+	l["couchbase_node"] = memberName
+	return metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(l).String(),
+	}
+}
+
 func IsKubernetesResourceAlreadyExistError(err error) bool {
 	return apierrors.IsAlreadyExists(err)
 }
