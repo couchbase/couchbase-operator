@@ -9,6 +9,9 @@ spec:
   paused: false
   antiAffinity: true
   authSecret: my-secret
+  exposeAdminConsole: true
+  adminConsoleServices:
+    - data
   tls:
     static:
       member:

@@ -6,6 +6,7 @@ spec:
   baseImage: couchbase/server
   version: enterprise-5.0.0
   authSecret: cb-example-auth
+  exposeAdminConsole: true
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256

@@ -206,7 +206,14 @@ func (c *Cluster) create() error {
 }
 
 func (c *Cluster) setupServices() error {
-	return k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
+	err := k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
+	if err != nil {
+		return err
+	}
+	if c.cluster.Spec.ExposeAdminConsole {
+		return k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.Spec.AdminConsoleServices, c.cluster.AsOwner())
+	}
+	return nil
 }
 
 func (c *Cluster) run() {

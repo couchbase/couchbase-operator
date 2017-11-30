@@ -1,7 +1,6 @@
 package k8sutil
 
 import (
-	//"fmt"
 	"net"
 	"os"
 
@@ -129,11 +128,8 @@ func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerCon
 	return labels
 }
 
-func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, ports []v1.ServicePort) *v1.Service {
-	labels := map[string]string{
-		"app":               "couchbase",
-		"couchbase_cluster": clusterName,
-	}
+func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v1.ServicePort, selector, labels map[string]string) *v1.Service {
+
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   svcName,
@@ -143,11 +139,12 @@ func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, port
 			},
 		},
 		Spec: v1.ServiceSpec{
-			Ports:     ports,
-			Selector:  labels,
-			ClusterIP: clusterIP,
+			Type:     serviceType,
+			Ports:    ports,
+			Selector: selector,
 		},
 	}
+
 	return svc
 }
 
@@ -156,17 +153,22 @@ func createCouchbaseServiceManifest(svcName, clusterName, clusterIP string, port
 // (sans load balancing middleware) which allows the operator to resolve
 // addresses of individual pods instead of a proxy
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
-	ports := []v1.ServicePort{{
-		Name:       "cb-admin",
-		Port:       8091,
-		TargetPort: intstr.FromInt(8091),
-		Protocol:   v1.ProtocolTCP,
-	}}
-	return createService(kubecli, clusterName, clusterName, ns, v1.ClusterIPNone, ports, owner)
+	labels := LabelsForCluster(clusterName)
+	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, adminServicePorts(), labels, labels)
+	svc.Spec.ClusterIP = v1.ClusterIPNone
+	return createService(kubecli, svc, ns, owner)
 }
 
-func createService(kubecli kubernetes.Interface, svcName, clusterName, ns, clusterIP string, ports []v1.ServicePort, owner metav1.OwnerReference) error {
-	svc := createCouchbaseServiceManifest(svcName, clusterName, clusterIP, ports)
+// creates a service of Type NodePort which allows external clients to
+// access the web ui
+func CreateUIService(kubecli kubernetes.Interface, clusterName, ns string, services []string, owner metav1.OwnerReference) error {
+	selectors := LabelsForAdminConsole(clusterName, services)
+	svc := createServiceManifest(clusterName+"-ui", v1.ServiceTypeNodePort, adminServicePorts(), selectors, LabelsForCluster(clusterName))
+	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+	return createService(kubecli, svc, ns, owner)
+}
+
+func createService(kubecli kubernetes.Interface, svc *v1.Service, ns string, owner metav1.OwnerReference) error {
 	addOwnerRefToObject(svc.GetObjectMeta(), owner)
 	_, err := kubecli.CoreV1().Services(ns).Create(svc)
 	return err
@@ -178,11 +180,34 @@ func ClusterListOpt(clusterName string) metav1.ListOptions {
 	}
 }
 
+func LabelsForAdminConsole(clusterName string, services []string) map[string]string {
+	labels := LabelsForCluster(clusterName)
+	for _, s := range services {
+		k := "couchbase_service_" + s
+		labels[k] = "enabled"
+	}
+	return labels
+}
+
 func LabelsForCluster(clusterName string) map[string]string {
 	return map[string]string{
 		"couchbase_cluster": clusterName,
 		"app":               "couchbase",
 	}
+}
+
+func adminServicePorts() []v1.ServicePort {
+	return []v1.ServicePort{{
+		Name:       "cb-admin",
+		Port:       8091,
+		TargetPort: intstr.FromInt(8091),
+		Protocol:   v1.ProtocolTCP,
+	}, {
+		Name:       "cb-admin-ssl",
+		Port:       18091,
+		TargetPort: intstr.FromInt(18091),
+		Protocol:   v1.ProtocolTCP,
+	}}
 }
 
 func IsKubernetesResourceAlreadyExistError(err error) bool {

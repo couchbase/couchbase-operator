@@ -79,6 +79,12 @@ type ClusterSpec struct {
 
 	// AuthSecret is the name of a kube secret to use for authentication
 	AuthSecret string `json:"authSecret"`
+
+	// Option to expose admin console
+	ExposeAdminConsole bool `json:"exposeAdminConsole"`
+
+	// Specific services to use when exposing ui
+	AdminConsoleServices []string `json:"adminConsoleServices"`
 }
 
 type ClusterConfig struct {
