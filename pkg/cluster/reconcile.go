@@ -39,8 +39,8 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return nil
 	}
 
-	if err := c.reconcileBuckets(); err != nil {
-		return err
+	if !c.reconcileBuckets() {
+		return nil
 	}
 
 	// TODO: We should upgrade any nodes in the cluster here.
@@ -142,10 +142,11 @@ func (c *Cluster) rebalance(nodesToRemove []string) error {
 // reconcile buckets by adding or removing
 // buckets one at a time based on comparison
 // of existing buckets to cluster spec
-func (c *Cluster) reconcileBuckets() error {
+func (c *Cluster) reconcileBuckets() bool {
 	existingBuckets, err := couchbaseutil.GetBucketNames(c.members, c.username, c.password)
 	if err != nil {
-		return err
+		c.logger.Warnf("Unable to get buckets from cluster: %s", err.Error())
+		return false
 	}
 
 	// when reconciling buckets, any buckets in cluster
@@ -156,30 +157,34 @@ func (c *Cluster) reconcileBuckets() error {
 	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
 	bucketsToEdit, err := couchbaseutil.GetBucketsToEdit(c.members, c.username, c.password, &spec)
 	if err != nil {
-		return err
+		c.logger.Warnf("Unable to get list of buckets to edit: %s", err.Error())
+		return false
 	}
 
 	if len(bucketsToRemove) > 0 {
 		bucketName := bucketsToRemove[0]
 		err := c.deleteClusterBucket(bucketName)
 		if err != nil {
-			return err
+			c.logger.Warnf("Unable to delete bucket named - %s: %s", bucketName, err.Error())
+			return false
 		}
 	} else if len(bucketsToEdit) > 0 {
 		bucketName := bucketsToEdit[0]
 		err := c.editClusterBucket(bucketName)
 		if err != nil {
-			return err
+			c.logger.Warnf("Unable to edit bucket named - %s: %s", bucketName, err.Error())
+			return false
 		}
 	} else if len(bucketsToAdd) > 0 {
 		bucketName := bucketsToAdd[0]
 		err := c.createClusterBucket(bucketName)
 		if err != nil {
-			return err
+			c.logger.Warnf("Unable to edit create named - %s: %s", bucketName, err.Error())
+			return false
 		}
 	}
 
-	return nil
+	return true
 }
 
 // create bucket on cluster
