@@ -180,3 +180,31 @@ func ResizeCluster(t *testing.T, clusterSize int, crClient versioned.Interface, 
 	t.Logf("Resize Success: %v...\n", names)
 	return nil
 }
+
+func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
+	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
+	if err != nil {
+		t.Fatalf("Error getting pods in cluster: %v", err)
+	}
+
+	if numToKill > len(pods.Items) {
+		t.Fatalf("Trying to kill %d pods, but only %d exist")
+	}
+
+	killPods := []string{}
+	for i := 0; i < numToKill; i++ {
+		killPods = append(killPods, pods.Items[i].Name)
+	}
+	t.Logf("Killing pods: %v", killPods)
+
+	KillMembers(kubeCli, cl.Namespace, killPods...)
+
+	for _, pod := range killPods {
+		WaitPodDeleted(t, kubeCli, pod, cl)
+	}
+
+	_, err = WaitUntilPodSizeReached(t, kubeCli, len(pods.Items), 20, cl)
+	if err != nil {
+		t.Fatalf("Failed to recover all nodes: %v", err)
+	}
+}

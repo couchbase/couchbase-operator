@@ -140,6 +140,48 @@ func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, bucke
 
 }
 
+func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, namespace string, expectedNodes, retries int) error {
+	err := retryutil.Retry(retryInterval, retries, func() (done bool, err error) {
+		cl, err := GetCouchbaseCluster(crClient, name, namespace)
+		if err != nil {
+			return false, err
+		}
+
+		if cl.Status.Size != expectedNodes {
+			t.Logf("Cluster nodes (%d) does not match expected nodes (%d)", cl.Status.Size, expectedNodes)
+			return false, nil
+		}
+
+		availableConditionFound := false
+		balancedConditionFound := false
+		for _, cond := range cl.Status.Conditions {
+			if cond.Type == api.ClusterConditionAvailable {
+				availableConditionFound = true
+				if cond.Status != v1.ConditionTrue {
+					t.Logf("Cluster is not available")
+					return false, nil
+				}
+			}
+
+			if cond.Type == api.ClusterConditionBalanced {
+				balancedConditionFound = true
+				if cond.Status != v1.ConditionTrue {
+					t.Logf("Cluster is not balanced")
+					return false, nil
+				}
+			}
+		}
+
+		return availableConditionFound && balancedConditionFound, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("fail to wait for cluster status to be healthy: %v", err)
+	}
+
+	return nil
+}
+
 func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, retries int) error {
 	undeletedPods, err := WaitPodsDeleted(kubeClient, cl.Namespace, retries, k8sutil.ClusterListOpt(cl.Name))
 	if err != nil {
