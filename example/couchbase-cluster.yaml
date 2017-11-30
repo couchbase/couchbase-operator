@@ -7,11 +7,6 @@ spec:
   version: enterprise-5.0.0
   authSecret: cb-example-auth
   cluster:
-    services:
-      - data
-      - index
-      - query
-      - fts
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
