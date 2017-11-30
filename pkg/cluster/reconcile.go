@@ -44,6 +44,8 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return nil
 	}
 
+	c.reconcileAdminService()
+
 	// TODO: We should upgrade any nodes in the cluster here.
 
 	c.status.SetVersion(sp.Version)
@@ -182,6 +184,49 @@ func (c *Cluster) reconcileBuckets() bool {
 	}
 
 	return true
+}
+
+// reconcile changes to selected pod labels for
+// the nodePort service exposing admin console
+func (c *Cluster) reconcileAdminService() {
+
+	svcName := k8sutil.AdminServiceName(c.cluster.Name)
+	svc, err := k8sutil.GetService(c.config.KubeCli, svcName, c.cluster.Namespace, nil)
+
+	if (err == nil) && !c.cluster.Spec.ExposeAdminConsole {
+		// deleting admin service
+		err = k8sutil.DeleteService(c.config.KubeCli, svcName, c.cluster.Namespace, nil)
+		if err != nil {
+			c.logger.Warnf("Error occured deleting admin service: %s", err.Error())
+		}
+		return
+	}
+
+	// create service if it doesn't exist and new expose requested
+	desiredServices := c.cluster.Spec.AdminConsoleServices
+	if k8sutil.IsKubernetesResourceNotFoundError(err) {
+		if c.cluster.Spec.ExposeAdminConsole {
+			err = k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, desiredServices, c.cluster.AsOwner())
+			if err != nil {
+				c.logger.Warnf("Error occured creating admin service: %s", err.Error())
+			}
+		}
+		return
+	} else if err != nil {
+		c.logger.Warnf("Unable to get admin service: %s", err.Error())
+		return
+	}
+
+	desiredSelector := k8sutil.LabelsForAdminConsole(c.cluster.Name, desiredServices)
+	if !reflect.DeepEqual(svc.Spec.Selector, desiredSelector) {
+		// update admin service
+		svc.Spec.Selector = desiredSelector
+		err = k8sutil.UpdateService(c.config.KubeCli, c.cluster.Namespace, svc)
+		if err != nil {
+			c.logger.Warnf("Error occured updating admin service: %s", err.Error())
+		}
+	}
+
 }
 
 // create bucket on cluster

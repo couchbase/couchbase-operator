@@ -174,6 +174,22 @@ func createService(kubecli kubernetes.Interface, svc *v1.Service, ns string, own
 	return err
 }
 
+func GetService(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Service, error) {
+	if opts == nil {
+		opts = &metav1.GetOptions{}
+	}
+	return kubecli.CoreV1().Services(ns).Get(name, *opts)
+}
+
+func DeleteService(kubecli kubernetes.Interface, name, ns string, opts *metav1.DeleteOptions) error {
+	return kubecli.CoreV1().Services(ns).Delete(name, opts)
+}
+
+func UpdateService(kubecli kubernetes.Interface, ns string, svc *v1.Service) error {
+	_, err := kubecli.CoreV1().Services(ns).Update(svc)
+	return err
+}
+
 func ClusterListOpt(clusterName string) metav1.ListOptions {
 	return metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(LabelsForCluster(clusterName)).String(),
@@ -194,6 +210,10 @@ func LabelsForCluster(clusterName string) map[string]string {
 		"couchbase_cluster": clusterName,
 		"app":               "couchbase",
 	}
+}
+
+func AdminServiceName(clusterName string) string {
+	return clusterName + "-ui"
 }
 
 func adminServicePorts() []v1.ServicePort {
