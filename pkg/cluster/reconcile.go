@@ -302,11 +302,14 @@ func (c *Cluster) removeUnknownMembers(running couchbaseutil.MemberSet) (couchba
 
 func (c *Cluster) reconcileClusterSettings() bool {
 
-	ok := c.reconcileAutoFailoverSettings()
+	if ok := c.reconcileAutoFailoverSettings(); !ok {
+		return false
+	}
+	if ok := c.reconcileMemoryQuotaSettings(); !ok {
+		return false
+	}
 
-	//TODO: reconcile other cluster settings
-
-	return ok
+	return true
 }
 
 // ensure autofailover timeout matches spec setting
@@ -326,6 +329,31 @@ func (c *Cluster) reconcileAutoFailoverSettings() bool {
 			c.cluster.Name, true, clusterSettings.AutoFailoverTimeout)
 		if err != nil {
 			message := fmt.Sprintf("Unable to set autofailover timeout to %d: %s", clusterSettings.AutoFailoverTimeout, err.Error())
+			c.status.SetConfigRejectedCondition(message)
+			c.logger.Warnf(message)
+			return false
+		}
+	}
+
+	c.status.ClearCondition(api.ClusterConditionManageConfig)
+	return true
+}
+
+// ensure memory quota's matche spec setting
+func (c *Cluster) reconcileMemoryQuotaSettings() bool {
+	info, err := couchbaseutil.GetClusterInfo(c.members, c.username, c.password)
+	if err != nil {
+		c.logger.Warnf("Unable to get cluster info: %s", err.Error())
+		return false
+	}
+
+	config := c.cluster.Spec.ClusterSettings
+	if config.DataServiceMemQuota != info.DataMemoryQuotaMB ||
+		config.IndexServiceMemQuota != info.IndexMemoryQuotaMB ||
+		config.SearchServiceMemQuota != info.SearchMemoryQuotaMB {
+		err = couchbaseutil.SetPoolsDefault(c.members, c.username, c.password, c.cluster.Name, config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota)
+		if err != nil {
+			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: %s", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.status.SetConfigRejectedCondition(message)
 			c.logger.Warnf(message)
 			return false

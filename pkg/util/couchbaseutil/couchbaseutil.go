@@ -247,6 +247,31 @@ func GetAutoFailoverSettings(ms MemberSet, username, password, clusterName strin
 		})
 }
 
+func GetClusterInfo(ms MemberSet, username, password string) (*cbmgr.ClusterInfo, error) {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	return client.ClusterInfo()
+}
+
+func SetPoolsDefault(ms MemberSet, username, password, clusterName string, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota int) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	return client.SetPoolsDefault(clusterName, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota)
+}
+
+func SetDataMemoryQuota(ms MemberSet, username, password string, quota int) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	return client.SetDataMemoryQuota(quota)
+}
+
+func SetIndexMemoryQuota(ms MemberSet, username, password string, quota int) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	return client.SetIndexMemoryQuota(quota)
+}
+
+func SetSearchMemoryQuota(ms MemberSet, username, password string, quota int) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	return client.SetSearchMemoryQuota(quota)
+}
+
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
 
 	// convert bucket config to cbmgr bucket type
