@@ -230,7 +230,7 @@ func GetBucketsToEdit(ms MemberSet, username, password string, spec *cbapi.Clust
 
 func SetAutoFailoverTimeout(ms MemberSet, username, password, clusterName string, enabled bool, timeout uint64) error {
 	client := cbmgr.New(ms.ClientURLs(), username, password)
-	return retryutil.RetryOnErr(5*time.Second, 36, "set autofailover timeout", clusterName,
+	return retryutil.RetryOnErr(5*time.Second, 5, "set autofailover timeout", clusterName,
 		func() error {
 			return client.SetAutoFailoverTimeout(enabled, timeout)
 		})

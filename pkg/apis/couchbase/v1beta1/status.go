@@ -165,6 +165,11 @@ func (cs *ClusterStatus) SetReadyCondition() {
 	cs.setClusterCondition(*c)
 }
 
+func (cs *ClusterStatus) SetConfigRejectedCondition(message string) {
+	c := newClusterCondition(ClusterConditionManageConfig, v1.ConditionFalse, "Cluster config is rejected", message)
+	cs.setClusterCondition(*c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	pos, _ := cs.getClusterCondition(t)
 	if pos == -1 {

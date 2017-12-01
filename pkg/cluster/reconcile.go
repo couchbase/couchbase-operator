@@ -300,20 +300,21 @@ func (c *Cluster) removeUnknownMembers(running couchbaseutil.MemberSet) (couchba
 	return running.Diff(unknownMembers), nil
 }
 
-func (c *Cluster) reconcileClusterSettings() error {
+func (c *Cluster) reconcileClusterSettings() bool {
 
-	err := c.reconcileAutoFailoverSettings()
+	ok := c.reconcileAutoFailoverSettings()
 
 	//TODO: reconcile other cluster settings
 
-	return err
+	return ok
 }
 
 // ensure autofailover timeout matches spec setting
-func (c *Cluster) reconcileAutoFailoverSettings() error {
+func (c *Cluster) reconcileAutoFailoverSettings() bool {
 	failoverSettings, err := couchbaseutil.GetAutoFailoverSettings(c.members, c.username, c.password, c.cluster.Name)
 	if err != nil {
-		return err
+		c.logger.Warnf("Unable to get auto failover settings: %s", err.Error())
+		return false
 	}
 
 	clusterSettings := c.cluster.Spec.ClusterSettings
@@ -321,9 +322,16 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 		(failoverSettings.Enabled != true) {
 
 		// reset autofailover timeout
-		return couchbaseutil.SetAutoFailoverTimeout(c.members, c.username, c.password,
+		err = couchbaseutil.SetAutoFailoverTimeout(c.members, c.username, c.password,
 			c.cluster.Name, true, clusterSettings.AutoFailoverTimeout)
+		if err != nil {
+			message := fmt.Sprintf("Unable to set autofailover timeout to %d: %s", clusterSettings.AutoFailoverTimeout, err.Error())
+			c.status.SetConfigRejectedCondition(message)
+			c.logger.Warnf(message)
+			return false
+		}
 	}
 
-	return nil
+	c.status.ClearCondition(api.ClusterConditionManageConfig)
+	return true
 }
