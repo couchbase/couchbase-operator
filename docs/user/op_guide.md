@@ -9,6 +9,12 @@ which will allow for the creation of a 'couchbasecluster' type within the kubern
 $ kubectl create -f example/deployment.yaml
 ```
 
+Create the 'cb-example-auth' secret
+
+```bash
+$ kubectl apply -f example/secret.yaml
+```
+
 
 Now objects with "kind: CouchbaseCluster" can be created.  Create a cluster:
 
