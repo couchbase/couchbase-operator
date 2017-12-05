@@ -34,6 +34,10 @@ type ErrInvalidBucketParamChange struct {
 	To     interface{}
 }
 
+type ErrPodUnschedulable struct {
+	Reason string
+}
+
 func (e ErrSecretMissingUsername) Error() string {
 	return fmt.Sprintf("secret is missing username key: %s", e.Reason)
 }
@@ -62,6 +66,10 @@ func (e ErrInvalidBucketParamChange) Error() string {
 
 	return fmt.Sprintf("cannot change (%s) bucket param='%s' from '%s' to '%s'",
 		e.Bucket, e.Param, fromStr, toStr)
+}
+
+func (e ErrPodUnschedulable) Error() string {
+	return fmt.Sprintf("unable to schedule pod pod: %s", e.Reason)
 }
 
 func hasValue(v interface{}) bool {

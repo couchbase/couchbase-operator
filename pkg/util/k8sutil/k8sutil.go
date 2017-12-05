@@ -313,6 +313,13 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 			case v1.PodRunning:
 				return nil
 			case v1.PodPending:
+				for _, cond := range status.Conditions {
+					if cond.Type == v1.PodScheduled {
+						if cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
+							return cberrors.ErrPodUnschedulable{cond.Message}
+						}
+					}
+				}
 			default:
 				return cberrors.ErrRunningPod{status.Reason}
 			}

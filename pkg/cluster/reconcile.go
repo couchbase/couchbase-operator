@@ -127,6 +127,14 @@ func (c *Cluster) addOneMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 		c.members.Remove(newMember.Name)
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
+	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, newMember.Name); err != nil {
+		if _, failed := err.(cberrors.ErrPodUnschedulable); failed {
+			// remove pod and member
+			c.members.Remove(newMember.Name)
+			c.removePod(newMember.Name)
+		}
+		return nil, err
+	}
 	c.memberCounter++
 	c.logger.Infof("added member (%s)", newMember.Name)
 
