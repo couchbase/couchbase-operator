@@ -3,6 +3,7 @@ package cluster
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 var (
@@ -29,8 +30,8 @@ type ErrRunningPod struct {
 type ErrInvalidBucketParamChange struct {
 	bucket string
 	param  string
-	from   string
-	to     string
+	from   interface{}
+	to     interface{}
 }
 
 func (e ErrSecretMissingUsername) Error() string {
@@ -50,6 +51,19 @@ func (e ErrRunningPod) Error() string {
 }
 
 func (e ErrInvalidBucketParamChange) Error() string {
+	fromStr := "unset"
+	toStr := "unset"
+	if hasValue(e.from) {
+		fromStr = reflect.Indirect(reflect.ValueOf(e.from)).String()
+	}
+	if hasValue(e.to) {
+		toStr = reflect.Indirect(reflect.ValueOf(e.to)).String()
+	}
+
 	return fmt.Sprintf("cannot change (%s) bucket param='%s' from '%s' to '%s'",
-		e.bucket, e.param, e.from, e.to)
+		e.bucket, e.param, fromStr, toStr)
+}
+
+func hasValue(v interface{}) bool {
+	return reflect.ValueOf(v) != reflect.Zero(reflect.TypeOf(v))
 }

@@ -115,16 +115,16 @@ type BucketConfig struct {
 	IoPriority string `json:"ioPriority"`
 
 	// The bucket eviction policy which determines behavior during expire and high mem usage
-	EvictionPolicy string `json:"evictionPolicy"`
+	EvictionPolicy *string `json:"evictionPolicy,omitempty"`
 
 	// The bucket's conflict resolution mechanism; which is to be used if a conflict occurs during Cross Data-Center Replication (XDCR). Sequence-based and timestamp-based mechanisms are supported.
-	ConflictResolution string `json:"conflictResolution"`
+	ConflictResolution *string `json:"conflictResolution,omitempty"`
 
 	// The enable flush option denotes wether the data in the bucket can be flushed
-	EnableFlush bool `json:"enableFlush"`
+	EnableFlush *bool `json:"enableFlush,omitempty"`
 
 	// Enable Index replica specifies whether or not to enable view index replicas for this bucket. This parameter defaults to false if it is not specified. This parameter only affects Couchbase buckets.
-	EnableIndexReplica bool `json:"enableIndexReplica"`
+	EnableIndexReplica *bool `json:"enableIndexReplica,omitempty"`
 }
 
 type ServerConfig struct {

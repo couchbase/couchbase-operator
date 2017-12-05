@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
 
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
@@ -240,7 +241,7 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 
 	bucketName := config.BucketName
 	if statusBucket, ok := c.status.Buckets[bucketName]; ok {
-		if config.ConflictResolution != statusBucket.ConflictResolution {
+		if !reflect.DeepEqual(config.ConflictResolution, statusBucket.ConflictResolution) {
 			return ErrInvalidBucketParamChange{
 				bucketName,
 				"conflictResolution",
