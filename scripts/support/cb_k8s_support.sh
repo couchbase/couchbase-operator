@@ -17,6 +17,7 @@ kubectl describe --show-events --all-namespaces po > $OUTPUT_DIR/describe_pods.l
 kubectl describe --show-events --all-namespaces deployment > $OUTPUT_DIR/describe_deployment.logs
 kubectl describe --show-events --all-namespaces rs > $OUTPUT_DIR/describe_rs.logs
 kubectl describe --show-events --all-namespaces statefulset > $OUTPUT_DIR/describe_statefulsets.logs
+kubectl describe --show-events --all-namespaces couchbasecluster > $OUTPUT_DIR/describe_couchbase.logs
 
 # container logs
 echo "collecting container logs"
