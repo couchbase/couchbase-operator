@@ -382,9 +382,9 @@ func (c *Cluster) waitForPod(podName string) error {
 
 		// check if any error occurred creating pod
 		case watch.Error:
-			return ErrCreatingPod(status.Reason)
+			return ErrCreatingPod{status.Reason}
 		case watch.Deleted:
-			return ErrCreatingPod(status.Reason)
+			return ErrCreatingPod{status.Reason}
 		case watch.Added, watch.Modified:
 
 			// make sure created pod is now running
@@ -393,7 +393,7 @@ func (c *Cluster) waitForPod(podName string) error {
 				return nil
 			case v1.PodPending:
 			default:
-				return ErrRunningPod(status.Reason)
+				return ErrRunningPod{status.Reason}
 			}
 		}
 	}
@@ -493,12 +493,12 @@ func (c *Cluster) setupAuth(authSecret string) error {
 	if username, ok := data[constants.AuthSecretUsernameKey]; ok {
 		c.username = string(username[:])
 	} else {
-		return ErrSecretMissingUsername(authSecret)
+		return ErrSecretMissingUsername{authSecret}
 	}
 	if password, ok := data[constants.AuthSecretPasswordKey]; ok {
 		c.password = string(password[:])
 	} else {
-		return ErrSecretMissingPassword(authSecret)
+		return ErrSecretMissingPassword{authSecret}
 	}
 
 	return nil
