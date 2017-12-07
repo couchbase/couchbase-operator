@@ -7,8 +7,12 @@ import (
 )
 
 var (
-	baseImage = "couchbase/server"
-	version   = "enterprise-5.0.0"
+	baseImage               = "couchbase/server"
+	version                 = "enterprise-5.0.0"
+	fullEvictionPolicy      = "fullEviction"
+	seqnoConflictResolution = "seqno"
+	enabled                 = true
+	disabled                = false
 )
 
 // cluster settings
@@ -24,16 +28,16 @@ var (
 
 // bucket settings
 var (
-	defaultBucketSettings = api.BucketConfig{
+	DefaultBucketSettings = api.BucketConfig{
 		BucketName:         "default",
 		BucketType:         "couchbase",
 		BucketMemoryQuota:  256,
 		BucketReplicas:     1,
 		IoPriority:         "high",
-		EvictionPolicy:     "fullEviction",
-		ConflictResolution: "seqno",
-		EnableFlush:        true,
-		EnableIndexReplica: false,
+		EvictionPolicy:     &fullEvictionPolicy,
+		ConflictResolution: &seqnoConflictResolution,
+		EnableFlush:        &enabled,
+		EnableIndexReplica: &disabled,
 	}
 )
 
@@ -62,7 +66,7 @@ func NewBasicCluster(genName, secretName string, size int) *api.CouchbaseCluster
 }
 
 func NewSingleBucketCluster(genName, secretName, bucketName string, size int) *api.CouchbaseCluster {
-	bucketSettings := api.BucketConfig(defaultBucketSettings)
+	bucketSettings := api.BucketConfig(DefaultBucketSettings)
 	bucketSettings.BucketName = bucketName
 
 	spec := api.ClusterSpec{

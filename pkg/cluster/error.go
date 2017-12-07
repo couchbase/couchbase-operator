@@ -12,19 +12,19 @@ var (
 )
 
 type ErrSecretMissingUsername struct {
-	reason string
+	Reason string
 }
 
 type ErrSecretMissingPassword struct {
-	reason string
+	Reason string
 }
 
 type ErrCreatingPod struct {
-	reason string
+	Reason string
 }
 
 type ErrRunningPod struct {
-	reason string
+	Reason string
 }
 
 type ErrInvalidBucketParamChange struct {
@@ -35,19 +35,19 @@ type ErrInvalidBucketParamChange struct {
 }
 
 func (e ErrSecretMissingUsername) Error() string {
-	return fmt.Sprintf("secret is missing username key: %s", e.reason)
+	return fmt.Sprintf("secret is missing username key: %s", e.Reason)
 }
 
 func (e ErrSecretMissingPassword) Error() string {
-	return fmt.Sprintf("secret is missing password key: %s", e.reason)
+	return fmt.Sprintf("secret is missing password key: %s", e.Reason)
 }
 
 func (e ErrCreatingPod) Error() string {
-	return fmt.Sprintf("failed to create pod: %s", e.reason)
+	return fmt.Sprintf("failed to create pod: %s", e.Reason)
 }
 
 func (e ErrRunningPod) Error() string {
-	return fmt.Sprintf("failed to run pod: %s", e.reason)
+	return fmt.Sprintf("failed to run pod: %s", e.Reason)
 }
 
 func (e ErrInvalidBucketParamChange) Error() string {

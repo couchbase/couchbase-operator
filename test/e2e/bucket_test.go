@@ -42,19 +42,7 @@ func TestBucketAdd(t *testing.T) {
 	fmt.Println("initialized 3 members in the cluster")
 
 	updateFunc := func(cl *api.CouchbaseCluster) {
-		cl.Spec.BucketSettings = []api.BucketConfig{
-			api.BucketConfig{
-				BucketName:         "default",
-				BucketType:         "couchbase",
-				BucketMemoryQuota:  128,
-				BucketReplicas:     1,
-				IoPriority:         "high",
-				EvictionPolicy:     "fullEviction",
-				ConflictResolution: "sequence",
-				EnableFlush:        true,
-				EnableIndexReplica: false,
-			},
-		}
+		cl.Spec.BucketSettings = []api.BucketConfig{e2espec.DefaultBucketSettings}
 	}
 
 	if testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 10, updateFunc); err != nil {

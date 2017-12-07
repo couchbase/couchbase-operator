@@ -303,8 +303,10 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// bucket should exist with flush enabled
 	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			t.Logf("enabled bucket flush: %t", bucket.EnableFlush)
-			return bucket.EnableFlush
+			if bucket.EnableFlush != nil {
+				t.Logf("enabled bucket flush: %t", *bucket.EnableFlush)
+				return *bucket.EnableFlush
+			}
 		}
 		return false
 	}
@@ -325,7 +327,8 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// make a bucket spec with flush disabled
 	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.EnableFlush = false
+		disabled := false
+		b.EnableFlush = &disabled
 	})
 	if err != nil {
 		t.Fatalf("error occurred converting bucket spec %v", err)

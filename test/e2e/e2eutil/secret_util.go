@@ -47,12 +47,12 @@ func GetClusterAuth(t *testing.T, kubeClient kubernetes.Interface, namespace str
 	if val, ok := data[constants.AuthSecretUsernameKey]; ok {
 		username = string(val[:])
 	} else {
-		return cluster.ErrSecretMissingUsername(secretName), username, password
+		return cluster.ErrSecretMissingUsername{secretName}, username, password
 	}
 	if val, ok := data[constants.AuthSecretPasswordKey]; ok {
 		password = string(val[:])
 	} else {
-		return cluster.ErrSecretMissingPassword(secretName), username, password
+		return cluster.ErrSecretMissingPassword{secretName}, username, password
 	}
 
 	return nil, username, password
