@@ -24,7 +24,10 @@ echo "collecting container logs"
 for ns in $( kubectl get namespaces -o name | sed 's/.*\///' ); do
   for pod in $( kubectl get -n $ns po -o name | sed 's/.*\///' ); do
       echo "----------$ns/$pod----------"  >> $OUTPUT_DIR/containers.logs
+      # print logs of active container within pod
       kubectl describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' kubectl -n $ns logs $pod  -c '{}' >>  $OUTPUT_DIR/containers.logs
+      # print logs of pervious container within pod
+      kubectl describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' kubectl -n $ns logs $pod  -p -c '{}' >>  $OUTPUT_DIR/containers_previous.logs  2>&1
   done
 done
 
