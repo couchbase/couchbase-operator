@@ -15,12 +15,12 @@ func TestResizeCluster(t *testing.T) {
 	f := framework.Global
 	expectedEvents := e2eutil.EventList{}
 	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase, secret, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, 1, false)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase, secret)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	clusterSizes := []int{2, 3, 2, 1}
 	prevClusterSize := 1
 	for _, clusterSize := range clusterSizes {
@@ -56,14 +56,13 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	f := framework.Global
 	expectedEvents := e2eutil.EventList{}
 	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase, secret, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, 1, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase, secret)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	clusterSizes := []int{2, 3, 2, 1}
 	prevClusterSize := 1
 	for _, clusterSize := range clusterSizes {

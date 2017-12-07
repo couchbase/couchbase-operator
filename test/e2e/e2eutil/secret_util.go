@@ -11,25 +11,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func CreateSecret(t *testing.T, kubeClient kubernetes.Interface, namespace string, secretSpec *v1.Secret) (*v1.Secret, error) {
-	secret, err := kubeClient.CoreV1().Secrets(namespace).Create(secretSpec)
-	if err != nil {
-		return nil, err
-	}
-	t.Logf("created secret: %s", secret.Name)
-
-	return secret, nil
+func CreateSecret(kubeClient kubernetes.Interface, namespace string, secretSpec *v1.Secret) (*v1.Secret, error) {
+	return kubeClient.CoreV1().Secrets(namespace).Create(secretSpec)
 }
 
-func DeleteSecret(t *testing.T, kubeClient kubernetes.Interface, namespace string, secretName string, options *metav1.DeleteOptions) error {
-	t.Logf("deleting secret: %s", secretName)
+func DeleteSecret(kubeClient kubernetes.Interface, namespace string, secretName string, options *metav1.DeleteOptions) error {
 	return kubeClient.CoreV1().Secrets(namespace).Delete(secretName, options)
 }
 
-func GetSecret(t *testing.T, kubeClient kubernetes.Interface, namespace string, secretName string) (*v1.Secret, error) {
-	t.Logf("get secret: %s", secretName)
-	opts := metav1.GetOptions{}
-	return kubeClient.CoreV1().Secrets(namespace).Get(secretName, opts)
+func GetSecret(kubeClient kubernetes.Interface, namespace string, secretName string) (*v1.Secret, error) {
+	return kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 }
 
 // Use username and password from secret store
@@ -38,7 +29,7 @@ func GetClusterAuth(t *testing.T, kubeClient kubernetes.Interface, namespace str
 	var username string
 	var password string
 
-	secret, err := GetSecret(t, kubeClient, namespace, secretName)
+	secret, err := GetSecret(kubeClient, namespace, secretName)
 	if err != nil {
 		return err, username, password
 	}

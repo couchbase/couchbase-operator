@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	"github.com/sirupsen/logrus"
@@ -34,6 +35,7 @@ type Framework struct {
 	KubeClient kubernetes.Interface
 	CRClient   versioned.Interface
 	Namespace  string
+	DefaultSecret *v1.Secret
 	config     *rest.Config
 	LogDir     string
 	//S3Cli      *s3.S3
@@ -76,6 +78,12 @@ func Teardown() error {
 	if err := Global.deleteCouchbaseOperator(); err != nil {
 		return err
 	}
+
+	err := e2eutil.DeleteSecret(Global.KubeClient, Global.Namespace, Global.DefaultSecret.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("Unable to delete the default secret: %v", err)
+	}
+
 	// TODO: check all deleted and wait
 	Global = nil
 	logrus.Info("e2e teardown successfully")
@@ -86,6 +94,13 @@ func (f *Framework) setup() error {
 	if err := f.SetupCouchbaseOperator(); err != nil {
 		return fmt.Errorf("failed to setup couchbase operator: %v", err)
 	}
+
+	secret, err := e2eutil.CreateSecret(f.KubeClient, f.Namespace, e2espec.NewDefaultSecret(f.Namespace))
+	if err != nil {
+		return fmt.Errorf("failed to create default couchbase secret: %v", err)
+	}
+	f.DefaultSecret = secret
+
 	logrus.Info("couchbase operator created successfully")
 	if os.Getenv("AWS_TEST_ENABLED") == "true" {
 		/*if err := f.setupAWS(); err != nil {

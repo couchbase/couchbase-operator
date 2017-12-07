@@ -20,51 +20,43 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, size int, withBucket bool) (*api.CouchbaseCluster, *v1.Secret, error) {
-	secret, err := CreateSecret(t, kubeClient, namespace, e2espec.NewBasicSecret(namespace))
+func NewClusterBasic(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool) (*api.CouchbaseCluster, error) {
+	testCouchbase, err := CreateCluster(t, crClient, namespace, e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket))
 	if err != nil {
-		return nil, nil, err
-	}
-	testCouchbase, err := CreateCluster(t, crClient, namespace, e2espec.NewBasicCluster("test-couchbase-", secret.Name, size, withBucket))
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	_, err = WaitUntilSizeReached(t, crClient, size, 18, testCouchbase)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if withBucket == true {
 		err = WaitUntilBucketsExists(t, crClient, []string{"default"}, 18, testCouchbase)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
-	return testCouchbase, secret, nil
+	return testCouchbase, nil
 }
 
-func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string,
-	config map[string]map[string]string) (*api.CouchbaseCluster, *v1.Secret, error) {
-	secret, err := CreateSecret(t, kubeClient, namespace, e2espec.NewBasicSecret(namespace))
-	if err != nil {
-		return nil, nil, err
-	}
-	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secret.Name, config)
+func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
+	config map[string]map[string]string) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config)
 	testCouchbase, err := CreateCluster(t, crClient, namespace, clusterSpec)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	_, err = WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	buckets := testCouchbase.Spec.BucketNames()
 	if len(buckets) > 0 {
 		err = WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
-	return testCouchbase, secret, nil
+	return testCouchbase, nil
 }
 
 func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
@@ -122,29 +114,22 @@ func UpdateBucketSpec(bucketName string, field string, value string, crClient ve
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 }
 
-func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster, secret *v1.Secret) {
+func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster) {
 	err1 := DeleteCluster(t, crClient, kubeClient, cluster, 10)
 	if err1 != nil {
 		t.Fatal(err1)
 	}
-	err2 := DeleteSecret(t, kubeClient, namespace, secret.Name, nil)
-	if err2 != nil {
-		t.Fatal(err2)
-	}
 }
 
-func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string, cluster *api.CouchbaseCluster, secret *v1.Secret) {
+func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string, cluster *api.CouchbaseCluster) {
 	err := WriteLogs(t, kubeClient, namespace, logDir)
 	if err != nil {
 		t.Logf("Error: %v", err)
 	}
+
 	err1 := DeleteCluster(t, crClient, kubeClient, cluster, 10)
 	if err1 != nil {
 		t.Logf("Error: %v", err1)
-	}
-	err2 := DeleteSecret(t, kubeClient, namespace, secret.Name, nil)
-	if err2 != nil {
-		t.Logf("Error: %v", err2)
 	}
 }
 

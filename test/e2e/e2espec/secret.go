@@ -12,7 +12,7 @@ var (
 	}
 )
 
-func NewBasicSecret(namespace string) *v1.Secret {
+func NewDefaultSecret(namespace string) *v1.Secret {
 	return NewSecret(namespace, "basic-test-secret", basicSecretData)
 }
 

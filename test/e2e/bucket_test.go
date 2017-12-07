@@ -22,11 +22,11 @@ func TestBucketAddRemove(t *testing.T) {
 	for _, bucketSetting := range bucketSettingsList {
 		expectedEvents := e2eutil.EventList{}
 		t.Logf("Creating New Couchbase Cluster...\n")
-		testCouchbase, secret, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, 3, false)
+		testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 3, false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase, secret)
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 		expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 		expectedEvents.AddMemberAddEvent(testCouchbase, 1)
@@ -75,7 +75,7 @@ func TestBucketAddRemove(t *testing.T) {
 
 		// delete cluster
 		t.Logf("Deleting Cluster \n")
-		e2eutil.DestroyCluster(t, f.KubeClient, f.CRClient, f.Namespace, testCouchbase, secret)
+		e2eutil.DestroyCluster(t, f.KubeClient, f.CRClient, f.Namespace, testCouchbase)
 	}
 
 }
@@ -99,11 +99,12 @@ func TestEditBucketMemoryQuota(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, secret, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, 1, true)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase, secret)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -146,11 +147,11 @@ func TestInvalidBucketSpecUpdate(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, secret, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, 1, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase, secret)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -193,11 +194,11 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, secret, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, 1, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase, secret)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
