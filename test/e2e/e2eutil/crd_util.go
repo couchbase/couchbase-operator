@@ -51,13 +51,13 @@ func AtomicUpdateClusterCR(crClient versioned.Interface, name, namespace string,
 	return result, err
 }
 
-func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) error {
+func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, retries int) error {
 	t.Logf("deleting couchbase cluster: %v", cl.Name)
 	err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Delete(cl.Name, nil)
 	if err != nil {
 		return err
 	}
-	return waitResourcesDeleted(t, kubeClient, cl)
+	return waitResourcesDeleted(t, kubeClient, cl, retries)
 }
 
 // NameLabelSelector returns a label selector of the form name=<name>
