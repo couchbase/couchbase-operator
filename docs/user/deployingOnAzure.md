@@ -25,7 +25,7 @@ To setup kubectl run:
 
 With this done, you can follow the instructions in [operationsGuide.md](operationsGuide.md).
 
-## Azure Container Instances (ACI)
+## Azure Container Instances (ACI) - Not currently used
 
 [Azure Container Instances (ACI)](https://azure.microsoft.com/en-us/blog/announcing-azure-container-instances/) are serverless Docker containers on Azure.  The [ACI connector](https://github.com/Azure/aci-connector-k8s) enables Kubernetes clusters to make use of ACI.
 
@@ -34,8 +34,8 @@ To setup ACI run:
     cd aci-connector-k8s
     kubectl create -f examples/example-aci-connector.yaml
 
-It's unclear to me how to point the operator at ACI.
-
 The connector doesn't currently support secrets, so using ACI is not possible at this time.  
+
+It's also unclear how to point the operator at ACI.
 
 There's an additional issue that ACI only supports the loopback and a NAT based IP address.  Couchbase can't bind to the NAT address.  Since there's no physical address that's routable across the cluster, we can't deploy Couchbase in ACI.  This is another example of how we need a network enhancement in the product.
