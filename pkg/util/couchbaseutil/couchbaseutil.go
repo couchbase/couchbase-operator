@@ -151,7 +151,7 @@ func Rebalance(ms MemberSet, username, password, clusterName string, nodesToRemo
 		})
 }
 
-func CreateBucket(ms MemberSet, username, password string, config *cbapi.BucketConfig) error {
+func CreateBucket(ms MemberSet, clusterName, username, password string, config *cbapi.BucketConfig) error {
 	client := cbmgr.New(ms.ClientURLs(), username, password)
 
 	bucket, err := ApiBucketToCbmgr(config)
@@ -164,9 +164,10 @@ func CreateBucket(ms MemberSet, username, password string, config *cbapi.BucketC
 	}
 
 	// make sure bucket exists
-	return retryutil.Retry(5*time.Second, 60,
-		func() (bool, error) {
-			return client.BucketReady(bucket.BucketName)
+	return retryutil.RetryOnErr(5*time.Second, 60, "create bucket", clusterName,
+		func() error {
+			_, err := client.BucketReady(bucket.BucketName)
+			return err
 		})
 }
 

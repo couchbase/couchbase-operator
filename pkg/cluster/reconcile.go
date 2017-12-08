@@ -176,7 +176,7 @@ func (c *Cluster) reconcileBuckets() bool {
 		bucketName := bucketsToAdd[0]
 		err := c.createClusterBucket(bucketName)
 		if err != nil {
-			c.logger.Warnf("Unable to edit create named - %s: %s", bucketName, err.Error())
+			c.logger.Warnf("Unable to create bucket named - %s: %s", bucketName, err.Error())
 			return false
 		}
 	}
@@ -187,7 +187,7 @@ func (c *Cluster) reconcileBuckets() bool {
 // create bucket on cluster
 func (c *Cluster) createClusterBucket(bucketName string) error {
 	config := c.cluster.Spec.GetBucketByName(bucketName)
-	err := couchbaseutil.CreateBucket(c.members, c.username, c.password, config)
+	err := couchbaseutil.CreateBucket(c.members, c.cluster.Name, c.username, c.password, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 
