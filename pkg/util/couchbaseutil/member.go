@@ -142,6 +142,17 @@ func (ms MemberSet) First(clusterName string, max int) *Member {
 	panic("empty")
 }
 
+func (ms MemberSet) Highest() *Member {
+	rv := ms.PickOne()
+	for _, m := range ms {
+		if strings.Compare(m.Name, rv.Name) > 0 {
+			rv = m
+		}
+	}
+
+	return rv
+}
+
 func CreateMemberName(clusterName string, member int) string {
 	return fmt.Sprintf("%s-%04d", clusterName, member)
 }

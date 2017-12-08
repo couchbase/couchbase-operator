@@ -207,7 +207,7 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
 			c.status.SetScalingDownCondition(originalSize, c.cluster.Spec.TotalSize())
 
 			r.couchbase.NeedsRebalance = true
-			toRemove := nodes.PickOne()
+			toRemove := nodes.Highest()
 			r.knownNodes.Remove(toRemove.Name)
 			r.ejectNodes.Add(toRemove)
 			removeCount++
