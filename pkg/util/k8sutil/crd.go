@@ -34,7 +34,7 @@ func createCRD(enableValidation bool) *apiextensionsv1beta1.CustomResourceDefini
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:     api.CRDResourcePlural,
 				Kind:       api.CRDResourceKind,
-				ShortNames: []string{"couchbase"},
+				ShortNames: []string{"couchbase", "cbc"},
 			},
 		},
 	}
