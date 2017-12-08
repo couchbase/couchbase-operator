@@ -278,10 +278,6 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
 	c.logger.Infof("removing dead member %q", toRemove.Name)
 	nodeName := toRemove.Name
-	err := c.rebalance([]string{toRemove.Addr() + ":8091"})
-	if err != nil {
-		return err
-	}
 
 	// remove member from operator
 	c.members.Remove(nodeName)
