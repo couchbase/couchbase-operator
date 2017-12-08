@@ -2,7 +2,7 @@
 
 ## Install the Couchbase Operator
 
-OPTIONAL: If you are using a private registry, make sure to deploy the registrykey secret first.  Create the 'registrykey' secret:
+OPTIONAL: If you are using a private registry (as is likely the case for the current pre release state of this), make sure to deploy the registry key secret first.  Create the 'registrykey' secret:
 
 ```bash
 $ kubectl apply -f example/registrykeysecret.yaml
