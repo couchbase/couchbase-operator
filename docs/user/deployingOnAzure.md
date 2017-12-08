@@ -19,7 +19,7 @@ With that complete you can run an AKS command with the Azure CLI 2.0 to create s
 
 To setup kubectl run:
 
-    az aks get-credentials -n MyCluster -g aks
+    az aks get-credentials -n MyCluster -g MyResourceGroup
 
 ## Deploying the Operator
 
