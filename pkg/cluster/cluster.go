@@ -211,7 +211,16 @@ func (c *Cluster) setupServices() error {
 		return err
 	}
 	if c.cluster.Spec.ExposeAdminConsole {
-		return c.createUIService(c.cluster.Spec.AdminConsoleServices)
+
+		svc, err := c.createUIService(c.cluster.Spec.AdminConsoleServices)
+		if err != nil {
+			return err
+		}
+		_, err = c.eventsCli.Create(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
+		if err != nil {
+			c.logger.Errorf("failed to create new service event: %v", err)
+			return err
+		}
 	}
 	return nil
 }
@@ -511,12 +520,12 @@ func (c *Cluster) setupAuth(authSecret string) error {
 	return nil
 }
 
-func (c *Cluster) createUIService(services []string) error {
+func (c *Cluster) createUIService(services []string) (*v1.Service, error) {
 	svc, err := k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, services, c.cluster.AsOwner())
 	if err == nil {
 		c.status.AdminConsolePort, c.status.AdminConsolePortSSL = k8sutil.GetAdminConsolePorts(svc)
 	}
-	return err
+	return svc, err
 }
 
 func (c *Cluster) deleteUIService(svcName string) error {

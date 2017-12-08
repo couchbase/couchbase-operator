@@ -198,6 +198,11 @@ func (c *Cluster) reconcileAdminService() {
 		err = c.deleteUIService(svcName)
 		if err != nil {
 			c.logger.Warnf("Error occured deleting admin service: %s", err.Error())
+		} else {
+			_, err = c.eventsCli.Create(k8sutil.AdminConsoleSvcDeleteEvent(svc.Name, c.cluster))
+			if err != nil {
+				c.logger.Errorf("failed to create new service event: %v", err)
+			}
 		}
 		return
 	}
@@ -206,9 +211,14 @@ func (c *Cluster) reconcileAdminService() {
 	desiredServices := c.cluster.Spec.AdminConsoleServices
 	if k8sutil.IsKubernetesResourceNotFoundError(err) {
 		if c.cluster.Spec.ExposeAdminConsole {
-			err = c.createUIService(desiredServices)
+			svc, err = c.createUIService(desiredServices)
 			if err != nil {
 				c.logger.Warnf("Error occured creating admin service: %s", err.Error())
+			} else {
+				_, err = c.eventsCli.Create(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
+				if err != nil {
+					c.logger.Errorf("failed to create new service event: %v", err)
+				}
 			}
 		}
 		return

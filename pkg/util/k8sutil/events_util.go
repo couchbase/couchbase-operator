@@ -68,6 +68,22 @@ func BucketEditEvent(bucketName string, cl *api.CouchbaseCluster) *v1.Event {
 	return event
 }
 
+func AdminConsoleSvcCreateEvent(svcName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "ServiceCreated"
+	event.Message = fmt.Sprintf("Service for admin console `%s` was created", svcName)
+	return event
+}
+
+func AdminConsoleSvcDeleteEvent(svcName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "ServiceDeleted"
+	event.Message = fmt.Sprintf("Service for admin console `%s` was deleted", svcName)
+	return event
+}
+
 func newClusterEvent(cl *api.CouchbaseCluster) *v1.Event {
 	t := time.Now()
 	return &v1.Event{
