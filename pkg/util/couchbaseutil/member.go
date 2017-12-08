@@ -31,6 +31,10 @@ func (m *Member) ClientURL() string {
 	return fmt.Sprintf("%s://%s:8091", m.clientScheme(), m.Addr())
 }
 
+func (m *Member) HostURL() string {
+	return fmt.Sprintf("%s:8091", m.Addr())
+}
+
 func (m *Member) clientScheme() string {
 	if m.SecureClient {
 		return "https"
@@ -96,6 +100,14 @@ func (ms MemberSet) ClientURLs() []string {
 	endpoints := make([]string, 0, len(ms))
 	for _, m := range ms {
 		endpoints = append(endpoints, m.ClientURL())
+	}
+	return endpoints
+}
+
+func (ms MemberSet) HostURLs() []string {
+	endpoints := make([]string, 0, len(ms))
+	for _, m := range ms {
+		endpoints = append(endpoints, m.HostURL())
 	}
 	return endpoints
 }

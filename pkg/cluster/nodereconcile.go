@@ -251,7 +251,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	if r.couchbase.NeedsRebalance {
 		c.status.SetUnbalancedCondition()
-		if err := c.rebalance(r.ejectNodes.ClientURLs()); err != nil {
+		if err := c.rebalance(r.ejectNodes.HostURLs()); err != nil {
 			c.logger.Warnf("Failed to start rebalance: %s", err.Error())
 			r.errored = true
 			r.transitionState(ReconcileFinished)
