@@ -19,12 +19,8 @@ Now objects with "kind: CouchbaseCluster" can be created.  Create a cluster:
 
     kubectl apply -f example/couchbase-cluster.yaml
 
-couchbase operator will automatically create a Kubernetes Custom Resource Definition (CRD):
+Couchbase operator will automatically create a Kubernetes Custom Resource Definition (CRD).  You can check that with the command:
 
-```bash
-$ kubectl get couchbasecluster
-NAME         KIND
-cb-example   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
-```
+    kubectl get couchbasecluster
 
 With these steps complete, you can follow the steps in the [Administration Guide](administrationGuide.md) to connect to the cluster.
