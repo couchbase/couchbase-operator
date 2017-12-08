@@ -65,15 +65,6 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	return testCouchbase, secret, nil
 }
 
-func BucketsFromSpec(clusterSpec *api.CouchbaseCluster) []string {
-	bucketNames := []string{}
-	bucketSettings := clusterSpec.Spec.BucketSettings
-	for _, setting := range bucketSettings {
-		bucketNames = append(bucketNames, setting.BucketName)
-	}
-	return bucketNames
-}
-
 func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
 
 	updateFunc := func(cl *api.CouchbaseCluster) {}
@@ -87,33 +78,43 @@ func UpdateClusterSpec(field string, value string, crClient versioned.Interface,
 
 }
 
-func UpdateBucketSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
-
+func UpdateBucketSpec(bucketName string, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
+	bucketIndex := 0
+	for i, bucket := range cl.Spec.BucketSettings {
+		if bucketName == bucket.BucketName {
+			bucketIndex = i
+			break
+		}
+	}
 	updateFunc := func(cl *api.CouchbaseCluster) {}
 	switch {
 	case field == "BucketName":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[0].BucketName = value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].BucketName = value }
 	case field == "BucketType":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[0].BucketType = value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].BucketType = value }
 	case field == "BucketMemoryQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[0].BucketMemoryQuota, _ = strconv.Atoi(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) {
+			cl.Spec.BucketSettings[bucketIndex].BucketMemoryQuota, _ = strconv.Atoi(value)
+		}
 	case field == "BucketReplicas":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[0].BucketReplicas, _ = strconv.Atoi(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) {
+			cl.Spec.BucketSettings[bucketIndex].BucketReplicas, _ = strconv.Atoi(value)
+		}
 	case field == "IoPriority":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[0].IoPriority = value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].IoPriority = value }
 	case field == "EvictionPolicy":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[0].EvictionPolicy = &value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].EvictionPolicy = &value }
 	case field == "ConflictResolution":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[0].ConflictResolution = &value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].ConflictResolution = &value }
 	case field == "EnableFlush":
 		updateFunc = func(cl *api.CouchbaseCluster) {
 			flush, _ := strconv.ParseBool(value)
-			cl.Spec.BucketSettings[0].EnableFlush = &flush
+			cl.Spec.BucketSettings[bucketIndex].EnableFlush = &flush
 		}
 	case field == "EnableIndexReplica":
 		updateFunc = func(cl *api.CouchbaseCluster) {
 			enableReplicas, _ := strconv.ParseBool(value)
-			cl.Spec.BucketSettings[0].EnableIndexReplica = &enableReplicas
+			cl.Spec.BucketSettings[bucketIndex].EnableIndexReplica = &enableReplicas
 		}
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)

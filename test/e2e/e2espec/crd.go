@@ -54,6 +54,50 @@ var (
 	}
 )
 
+func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
+	generatedSettings := []api.BucketConfig{}
+	bucketNames := []string{"default"}
+	bucketMemoryQuotas := []int{256}
+	bucketReplicas := []int{1}                   // 0, 1, 2, 3
+	ioPriorities := []string{"high"}             // high, low
+	evictionPolicies := []string{"fullEviction"} // fullEviction value-eviction
+	conflictResolutions := []string{"seqno"}     // sequence, timestamp
+	enableFlushes := []bool{true}                // true, false
+	enableIndexReplicas := []bool{true}          // true, false
+	for _, bucketName := range bucketNames {
+		for _, bucketType := range bucketTypes {
+			for _, bucketMemoryQuota := range bucketMemoryQuotas {
+				for _, bucketReplica := range bucketReplicas {
+					for _, ioPriority := range ioPriorities {
+						for _, evictionPolicy := range evictionPolicies {
+							for _, conflictResolution := range conflictResolutions {
+								for _, enableFlush := range enableFlushes {
+									for _, enableIndexReplica := range enableIndexReplicas {
+
+										bucketSetting := api.BucketConfig{
+											BucketName:         bucketName,
+											BucketType:         bucketType,
+											BucketMemoryQuota:  bucketMemoryQuota,
+											BucketReplicas:     bucketReplica,
+											IoPriority:         ioPriority,
+											EvictionPolicy:     &evictionPolicy,
+											ConflictResolution: &conflictResolution,
+											EnableFlush:        &enableFlush,
+											EnableIndexReplica: &enableIndexReplica,
+										}
+										generatedSettings = append(generatedSettings, bucketSetting)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return generatedSettings
+}
+
 // basic 3 node cluster
 func NewBasicCluster(genName, secretName string, size int, withBucket bool) *api.CouchbaseCluster {
 
