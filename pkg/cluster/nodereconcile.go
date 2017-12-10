@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"time"
+
 	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
@@ -264,6 +266,13 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 		}
 
 		for _, toRemove := range r.ejectNodes {
+			// This ensures events don't happen at roughly the same time. It looks
+			// like Kubernetes tracks events at second resolution and this causes
+			// our test verification to fail. Sleeping here isn't a big deal, but
+			// we should find a more permanent solution that doesn't sleep in the
+			// future.
+			time.Sleep(1*time.Second)
+
 			_, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(toRemove.Name, c.cluster))
 			if err != nil {
 				c.logger.Errorf("failed to create member remove event: %v", err)
