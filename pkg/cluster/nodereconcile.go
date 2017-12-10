@@ -258,16 +258,16 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 			return
 		}
 
+		_, err := c.eventsCli.Create(k8sutil.RebalanceEvent(c.cluster))
+		if err != nil {
+			c.logger.Errorf("failed to create rebalance event: %v", err)
+		}
+
 		for _, toRemove := range r.ejectNodes {
 			_, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(toRemove.Name, c.cluster))
 			if err != nil {
 				c.logger.Errorf("failed to create member remove event: %v", err)
 			}
-		}
-
-		_, err := c.eventsCli.Create(k8sutil.RebalanceEvent(c.cluster))
-		if err != nil {
-			c.logger.Errorf("failed to create rebalance event: %v", err)
 		}
 
 		r.runningPods = r.runningPods.Diff(r.ejectNodes)
