@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SUPPORT_PKG=cb-k8s-support
+SUPPORT_PKG=cb-k8s-support-`date +%F_%T`
 OUTPUT_DIR=/tmp/$SUPPORT_PKG
 mkdir -p $OUTPUT_DIR
 
