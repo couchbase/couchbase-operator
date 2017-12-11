@@ -285,7 +285,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	c.status.SetReadyCondition()
 	c.status.ClearCondition(api.ClusterConditionScaling)
 
-	newState, err := c.getClusterStatus()
+	newState, err := couchbaseutil.GetClusterStatus(r.knownNodes, c.username, c.password, c.cluster.Name)
 	if err != nil {
 		c.status.SetUnknownBalancedCondition()
 	} else if !newState.NeedsRebalance {

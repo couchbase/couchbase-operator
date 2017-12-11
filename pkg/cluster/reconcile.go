@@ -20,7 +20,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	sp := c.cluster.Spec
 
-	cluster, err := c.getClusterStatus()
+	cluster, err := couchbaseutil.GetClusterStatus(c.members, c.username, c.password, c.cluster.Name)
 	if err != nil {
 		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %s", err.Error())
 		return nil
@@ -129,10 +129,6 @@ func (c *Cluster) addOneMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 
 	return newMember, couchbaseutil.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
 		c.cluster.Name, newMember.ClientURL(), c.username, c.password, serverSpec.Services)
-}
-
-func (c *Cluster) getClusterStatus() (*couchbaseutil.ClusterStatus, error) {
-	return couchbaseutil.GetClusterStatus(c.members, c.username, c.password, c.cluster.Name)
 }
 
 // Rebalance nodes in the cluster
