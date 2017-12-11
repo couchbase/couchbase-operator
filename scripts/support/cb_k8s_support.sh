@@ -19,15 +19,18 @@ kubectl describe --show-events --all-namespaces rs > $OUTPUT_DIR/describe_rs.log
 kubectl describe --show-events --all-namespaces statefulset > $OUTPUT_DIR/describe_statefulsets.logs
 kubectl describe --show-events --all-namespaces couchbasecluster > $OUTPUT_DIR/describe_couchbase.logs
 
-# container logs
+# all container logs
+CONTAINER_LOG_DIR=$OUTPUT_DIR/containers
+mkdir $CONTAINER_LOG_DIR
 echo "collecting container logs"
 for ns in $( kubectl get namespaces -o name | sed 's/.*\///' ); do
   for pod in $( kubectl get -n $ns po -o name | sed 's/.*\///' ); do
-      echo "----------$ns/$pod----------"  >> $OUTPUT_DIR/containers.logs
+      pod_log_path=$CONTAINER_LOG_DIR/$ns/$pod
+      mkdir -p $pod_log_path
       # print logs of active container within pod
-      kubectl describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' kubectl -n $ns logs $pod  -c '{}' >>  $OUTPUT_DIR/containers.logs
+      kubectl describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' kubectl -n $ns logs $pod --timestamps=true  -c '{}' >>  $pod_log_path/output.log
       # print logs of pervious container within pod
-      kubectl describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' kubectl -n $ns logs $pod  -p -c '{}' >>  $OUTPUT_DIR/containers_previous.logs  2>&1
+      kubectl describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' kubectl -n $ns logs $pod --timestamps=true  -p -c '{}' >>  $pod_log_path/previous.logs  2>&1
   done
 done
 
