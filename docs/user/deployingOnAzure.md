@@ -11,9 +11,16 @@ In short, you need to run the Azure Power Shell commands:
     Select-AzureRMSubscription -SubscriptionId <some subscription id>
     Register-AzurermresourceProvider --ProviderNamespace Microsoft.ContainerService
 
-With that complete you can run an AKS command with the Azure CLI 2.0 to create set your subscription, create a resource group and then a cluster:
+For the next steps, you'll probably want the Azure CLI 2.0 installed locally on your machine.  Instructions on how to do that are [here](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?).  Once the CLI is installed, you can login with the command:
+
+    az login
+
+If you have multiple subscriptions, you'll need to set a particular subscription:
 
     az account set --subscription <some subscription id>
+
+With that complete you can run an AKS command with the Azure CLI 2.0 to create set your subscription, create a resource group and then a cluster:
+
     az group create --name MyResourceGroup --location centralus
     az aks create -n MyCluster -g MyResourceGroup
 
