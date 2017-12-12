@@ -3,6 +3,8 @@ package e2eutil
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -131,7 +133,11 @@ func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	}
 }
 
-func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster, secret *v1.Secret) {
+func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string, cluster *api.CouchbaseCluster, secret *v1.Secret) {
+	err := WriteLogs(t, kubeClient, namespace, logDir)
+	if err != nil {
+		t.Logf("Error: %v", err)
+	}
 	err1 := DeleteCluster(t, crClient, kubeClient, cluster, 10)
 	if err1 != nil {
 		t.Logf("Error: %v", err1)
@@ -150,6 +156,17 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string
 		}
 	}
 	return nil
+}
+
+func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {
+	opts := &v1.PodLogOptions{}
+	req := kubeClient.CoreV1().Pods(namespace).GetLogs("couchbase-operator", opts)
+	data, err := req.DoRaw()
+	if err != nil {
+		return err
+	}
+	logFile := filepath.Join(logDir, fmt.Sprintf("%s.log", t.Name()))
+	return ioutil.WriteFile(logFile, data, 0644)
 }
 
 func LogfWithTimestamp(t *testing.T, format string, args ...interface{}) {

@@ -26,8 +26,7 @@ func TestSingleNodeFailureNoBuckets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, testCouchbase, secret)
-
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase, secret)
 	e2eutil.KillPodsAndWaitForRecovery(t, f.KubeClient, testCouchbase, 1)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, testCouchbase.Namespace, clusterSize, 36)

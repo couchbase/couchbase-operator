@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/client"
@@ -34,6 +35,7 @@ type Framework struct {
 	CRClient   versioned.Interface
 	Namespace  string
 	config     *rest.Config
+	LogDir     string
 	//S3Cli      *s3.S3
 	//S3Bucket   string
 }
@@ -54,6 +56,10 @@ func Setup() error {
 		return err
 	}
 
+	logDir, err := makeLogDir()
+	if err != nil {
+		return err
+	}
 	Global = &Framework{
 		KubeClient: cli,
 		CRClient:   client.MustNew(config),
@@ -61,6 +67,7 @@ func Setup() error {
 		opImage:    *opImage,
 		config:     config,
 		//S3Bucket:   os.Getenv("TEST_S3_BUCKET"),
+		LogDir: logDir,
 	}
 	return Global.setup()
 }
@@ -175,6 +182,24 @@ func (f *Framework) deleteCouchbaseOperator() error {
 
 func (f *Framework) ApiServerHost() string {
 	return f.config.Host
+}
+
+func makeLogDir() (string, error) {
+	dir, err := GenerateLogDir()
+	if err != nil {
+		return "", err
+	}
+	return dir, os.MkdirAll(dir, os.ModePerm)
+}
+
+func GenerateLogDir() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	t := time.Now()
+	ts := t.Format(time.RFC3339)
+	return filepath.Join(cwd, "logs", ts), nil
 }
 
 /*
