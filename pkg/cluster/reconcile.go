@@ -195,7 +195,7 @@ func (c *Cluster) reconcileAdminService() {
 
 	if (err == nil) && !c.cluster.Spec.ExposeAdminConsole {
 		// deleting admin service
-		err = k8sutil.DeleteService(c.config.KubeCli, svcName, c.cluster.Namespace, nil)
+		err = c.deleteUIService(svcName)
 		if err != nil {
 			c.logger.Warnf("Error occured deleting admin service: %s", err.Error())
 		}
@@ -206,7 +206,7 @@ func (c *Cluster) reconcileAdminService() {
 	desiredServices := c.cluster.Spec.AdminConsoleServices
 	if k8sutil.IsKubernetesResourceNotFoundError(err) {
 		if c.cluster.Spec.ExposeAdminConsole {
-			err = k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, desiredServices, c.cluster.AsOwner())
+			err = c.createUIService(desiredServices)
 			if err != nil {
 				c.logger.Warnf("Error occured creating admin service: %s", err.Error())
 			}

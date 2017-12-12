@@ -3,6 +3,7 @@ package k8sutil
 import (
 	"net"
 	"os"
+	"strconv"
 
 	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
@@ -20,6 +21,8 @@ const (
 	couchbaseVersionAnnotationKey = "couchbase.version"
 	couchbaseVolumeName           = "couchbase-data"
 	couchbaseVolumeMountDir       = "/opt/couchbase/var/lib/data"
+	consoleAdminPortName          = "cb-admin"
+	consoleAdminPortNameSSL       = "cb-admin-ssl"
 )
 
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
@@ -156,22 +159,35 @@ func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, own
 	labels := LabelsForCluster(clusterName)
 	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, adminServicePorts(), labels, labels)
 	svc.Spec.ClusterIP = v1.ClusterIPNone
-	return createService(kubecli, svc, ns, owner)
+	_, err := createService(kubecli, svc, ns, owner)
+	return err
 }
 
 // creates a service of Type NodePort which allows external clients to
 // access the web ui
-func CreateUIService(kubecli kubernetes.Interface, clusterName, ns string, services []string, owner metav1.OwnerReference) error {
+func CreateUIService(kubecli kubernetes.Interface, clusterName, ns string, services []string, owner metav1.OwnerReference) (*v1.Service, error) {
 	selectors := LabelsForAdminConsole(clusterName, services)
 	svc := createServiceManifest(clusterName+"-ui", v1.ServiceTypeNodePort, adminServicePorts(), selectors, LabelsForCluster(clusterName))
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	return createService(kubecli, svc, ns, owner)
 }
 
-func createService(kubecli kubernetes.Interface, svc *v1.Service, ns string, owner metav1.OwnerReference) error {
+func createService(kubecli kubernetes.Interface, svc *v1.Service, ns string, owner metav1.OwnerReference) (*v1.Service, error) {
 	addOwnerRefToObject(svc.GetObjectMeta(), owner)
-	_, err := kubecli.CoreV1().Services(ns).Create(svc)
-	return err
+	return kubecli.CoreV1().Services(ns).Create(svc)
+}
+
+func GetAdminConsolePorts(svc *v1.Service) (string, string) {
+	return getAdminConsolePort(svc, consoleAdminPortName), getAdminConsolePort(svc, consoleAdminPortNameSSL)
+}
+
+func getAdminConsolePort(svc *v1.Service, portName string) string {
+	for _, port := range svc.Spec.Ports {
+		if port.Name == portName {
+			return strconv.Itoa(int(port.NodePort))
+		}
+	}
+	return ""
 }
 
 func GetService(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Service, error) {
@@ -218,12 +234,12 @@ func AdminServiceName(clusterName string) string {
 
 func adminServicePorts() []v1.ServicePort {
 	return []v1.ServicePort{{
-		Name:       "cb-admin",
+		Name:       consoleAdminPortName,
 		Port:       8091,
 		TargetPort: intstr.FromInt(8091),
 		Protocol:   v1.ProtocolTCP,
 	}, {
-		Name:       "cb-admin-ssl",
+		Name:       consoleAdminPortNameSSL,
 		Port:       18091,
 		TargetPort: intstr.FromInt(18091),
 		Protocol:   v1.ProtocolTCP,

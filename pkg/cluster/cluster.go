@@ -211,7 +211,7 @@ func (c *Cluster) setupServices() error {
 		return err
 	}
 	if c.cluster.Spec.ExposeAdminConsole {
-		return k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.Spec.AdminConsoleServices, c.cluster.AsOwner())
+		return c.createUIService(c.cluster.Spec.AdminConsoleServices)
 	}
 	return nil
 }
@@ -509,6 +509,22 @@ func (c *Cluster) setupAuth(authSecret string) error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) createUIService(services []string) error {
+	svc, err := k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, services, c.cluster.AsOwner())
+	if err == nil {
+		c.status.AdminConsolePort, c.status.AdminConsolePortSSL = k8sutil.GetAdminConsolePorts(svc)
+	}
+	return err
+}
+
+func (c *Cluster) deleteUIService(svcName string) error {
+	err := k8sutil.DeleteService(c.config.KubeCli, svcName, c.cluster.Namespace, nil)
+	if err == nil {
+		c.status.AdminConsolePort, c.status.AdminConsolePortSSL = "", ""
+	}
+	return err
 }
 
 func (c *Cluster) indexOfServerConfigWithService(svc string) int {

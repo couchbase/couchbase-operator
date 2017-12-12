@@ -67,6 +67,10 @@ type ClusterStatus struct {
 
 	// Name of buckets active within cluster
 	Buckets map[string]*BucketConfig `json:"buckets"`
+
+	// port exposing couchbase cluster
+	AdminConsolePort    string `json:"adminConsolePort,omitempty"`
+	AdminConsolePortSSL string `json:"adminConsolePortSSL,omitempty"`
 }
 
 type MembersStatus struct {
