@@ -370,6 +370,7 @@ func (c *Cluster) reconcileClusterSettings() bool {
 		return false
 	}
 
+	c.status.ClearCondition(api.ClusterConditionManageConfig)
 	return true
 }
 
@@ -396,7 +397,6 @@ func (c *Cluster) reconcileAutoFailoverSettings() bool {
 		}
 	}
 
-	c.status.ClearCondition(api.ClusterConditionManageConfig)
 	return true
 }
 
@@ -421,6 +421,5 @@ func (c *Cluster) reconcileMemoryQuotaSettings() bool {
 		}
 	}
 
-	c.status.ClearCondition(api.ClusterConditionManageConfig)
 	return true
 }
