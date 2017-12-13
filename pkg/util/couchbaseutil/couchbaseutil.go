@@ -80,7 +80,6 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 		status.DownNodes = NewMemberSet()
 		status.FailedNodes = NewMemberSet()
 		status.IsRebalancing = (info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
-		status.NeedsRebalance = !info.Balanced
 
 		all := NewMemberSet()
 		for _, node := range info.Nodes {
@@ -106,6 +105,7 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 			}
 		}
 
+		status.NeedsRebalance = !info.Balanced && all.Size() > 1
 		status.UnknownNodes = ms.Diff(all)
 		return nil
 	})

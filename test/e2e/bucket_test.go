@@ -37,7 +37,6 @@ func TestEditBucketMemoryQuota(t *testing.T) {
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	fullEvictionPolicy := "fullEviction"
@@ -104,7 +103,6 @@ func TestInvalidBucketSpecUpdate(t *testing.T) {
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	updateFunc := func(cl *api.CouchbaseCluster) {
@@ -152,7 +150,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))

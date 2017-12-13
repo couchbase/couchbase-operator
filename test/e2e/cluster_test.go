@@ -62,7 +62,6 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-	expectedEvents.AddRebalanceEvent(testCouchbase)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, testCouchbase, secret)
 	clusterSizes := []int{2, 3, 2, 1}
 	prevClusterSize := 1
