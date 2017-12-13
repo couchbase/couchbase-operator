@@ -286,10 +286,10 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 
-		//_, err = c.eventsCli.Create(k8sutil.BucketEditEvent(bucketName, c.cluster))
-		//if err != nil {
-		//	c.logger.Errorf("failed to create edit bucket event: %v", err)
-		//}
+		_, err = c.eventsCli.Create(k8sutil.BucketEditEvent(bucketName, c.cluster))
+		if err != nil {
+			c.logger.Errorf("failed to create bucket edit event: %v", err)
+		}
 	}
 	return err
 }

@@ -38,6 +38,7 @@ func TestEditBucketMemoryQuota(t *testing.T) {
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	fullEvictionPolicy := "fullEviction"
 	seqnoConflictResolution := "seqno"
