@@ -164,6 +164,8 @@ func (c *Cluster) reconcileBuckets() bool {
 		bucketName := bucketsToRemove[0]
 		err := c.deleteClusterBucket(bucketName)
 		if err != nil {
+			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
+			c.status.SetBucketManagementFailedCondition("Bucket delete failed", msg)
 			c.logger.Warnf("Unable to delete bucket named - %s: %s", bucketName, err.Error())
 			return false
 		}
@@ -171,6 +173,8 @@ func (c *Cluster) reconcileBuckets() bool {
 		bucketName := bucketsToEdit[0]
 		err := c.editClusterBucket(bucketName)
 		if err != nil {
+			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
+			c.status.SetBucketManagementFailedCondition("Bucket edit failed", msg)
 			c.logger.Warnf("Unable to edit bucket named - %s: %s", bucketName, err.Error())
 			return false
 		}
@@ -178,10 +182,14 @@ func (c *Cluster) reconcileBuckets() bool {
 		bucketName := bucketsToAdd[0]
 		err := c.createClusterBucket(bucketName)
 		if err != nil {
+			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
+			c.status.SetBucketManagementFailedCondition("Bucket add failed", msg)
 			c.logger.Warnf("Unable to create bucket named - %s: %s", bucketName, err.Error())
 			return false
 		}
 	}
+
+	c.status.ClearCondition(api.ClusterConditionManageBuckets)
 
 	return true
 }
