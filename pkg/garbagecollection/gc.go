@@ -1,7 +1,7 @@
 package garbagecollection
 
 import (
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"

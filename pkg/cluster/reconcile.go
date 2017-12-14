@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"reflect"
 
-	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"k8s.io/api/core/v1"
 )
 

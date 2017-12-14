@@ -1,7 +1,7 @@
 package e2espec
 
 import (
-	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 	s "strings"

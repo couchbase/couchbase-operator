@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbaselabs/gocbmgr"
 
 	"k8s.io/client-go/kubernetes"

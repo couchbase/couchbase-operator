@@ -17,11 +17,11 @@ container: build
 	docker build -t couchbase/couchbase-operator:v1 .
 
 test:
-	go test github.com/couchbaselabs/couchbase-operator/test/e2e -v -timeout 30m \
+	go test github.com/couchbase/couchbase-operator/test/e2e -v -timeout 30m \
 		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
 		--namespace $(namespace)
 
 test-indv:
-	go test github.com/couchbaselabs/couchbase-operator/test/e2e -run $(testname) \
+	go test github.com/couchbase/couchbase-operator/test/e2e -run $(testname) \
 		-v -timeout 30m --race --kubeconfig $(kubeconfig) --operator-image \
 		$(operatorImage) --namespace $(namespace)

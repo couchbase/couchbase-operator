@@ -8,13 +8,13 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/couchbaselabs/couchbase-operator/pkg/client"
-	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/constants"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/probe"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/probe"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	"github.com/sirupsen/logrus"
 

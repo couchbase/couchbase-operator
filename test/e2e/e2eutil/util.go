@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 
-	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

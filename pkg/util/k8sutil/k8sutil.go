@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

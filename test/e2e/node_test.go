@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
 // Tests one node failing in a cluster with 0 buckets

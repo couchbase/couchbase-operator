@@ -1,8 +1,8 @@
 package e2e
 
 import (
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"testing"
 )

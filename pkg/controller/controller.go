@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/cluster"
-	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/probe"
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 
 	"github.com/sirupsen/logrus"
 

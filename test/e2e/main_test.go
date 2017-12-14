@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	"github.com/sirupsen/logrus"
 )

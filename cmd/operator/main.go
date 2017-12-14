@@ -8,12 +8,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/couchbaselabs/couchbase-operator/pkg/chaos"
-	"github.com/couchbaselabs/couchbase-operator/pkg/client"
-	"github.com/couchbaselabs/couchbase-operator/pkg/controller"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/probe"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/pkg/chaos"
+	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/controller"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/probe"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	"github.com/sirupsen/logrus"
 

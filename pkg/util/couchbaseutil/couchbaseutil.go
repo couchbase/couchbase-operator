@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/retryutil"
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbaselabs/gocbmgr"
 )
 

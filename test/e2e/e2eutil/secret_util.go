@@ -3,8 +3,8 @@ package e2eutil
 import (
 	"testing"
 
-	"github.com/couchbaselabs/couchbase-operator/pkg/cluster"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

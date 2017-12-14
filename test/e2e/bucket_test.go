@@ -1,11 +1,11 @@
 package e2e
 
 import (
-	api "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbaselabs/couchbase-operator/pkg/cluster"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2espec"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbaselabs/couchbase-operator/test/e2e/framework"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"testing"
 )

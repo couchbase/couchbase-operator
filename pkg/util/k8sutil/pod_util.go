@@ -3,7 +3,7 @@ package k8sutil
 import (
 	"fmt"
 
-	cbapi "github.com/couchbaselabs/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

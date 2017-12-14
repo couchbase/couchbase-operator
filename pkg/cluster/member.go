@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
 )

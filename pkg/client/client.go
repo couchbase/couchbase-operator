@@ -1,8 +1,8 @@
 package client
 
 import (
-	"github.com/couchbaselabs/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbaselabs/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"k8s.io/client-go/rest"
 )
