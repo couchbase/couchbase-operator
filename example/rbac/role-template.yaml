@@ -18,6 +18,7 @@ rules:
   - endpoints
   - persistentvolumeclaims
   - events
+  - secrets
   verbs:
   - "*"
 - apiGroups:

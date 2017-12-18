@@ -10,3 +10,4 @@
 /build/
 /vendor/
 /pkg/generated/
+/test/e2e/logs/
