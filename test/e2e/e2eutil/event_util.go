@@ -19,12 +19,16 @@ func (e EventList) Compare(other EventList) bool {
 	}
 
 	for i, c := range e {
-		if c.Type != other[i].Type || c.Reason != other[i].Reason || c.Message != other[i].Message {
+		if !EqualEvent(&c, &other[i]) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func EqualEvent(e1, e2 *v1.Event) bool {
+	return (e1.Type == e2.Type && e1.Reason == e2.Reason && e1.Message == e2.Message)
 }
 
 func (e *EventList) AddEvent(add v1.Event) {
@@ -39,8 +43,7 @@ func (e *EventList) AddEvent(add v1.Event) {
 }
 
 func (e *EventList) AddMemberAddEvent(cl *api.CouchbaseCluster, memberId int) {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
-	event := k8sutil.MemberAddEvent(name, cl)
+	event := NewMemberAddEvent(cl, memberId)
 	*e = append(*e, *event)
 }
 
@@ -83,4 +86,9 @@ func (e EventList) String() string {
 
 func EventListCompareFailedString(expected, actual EventList) string {
 	return fmt.Sprintf("Expected events to be:\n%s\nbut got:\n%s", expected, actual)
+}
+
+func NewMemberAddEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	return k8sutil.MemberAddEvent(name, cl)
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 
@@ -135,10 +136,17 @@ func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string) error {
 	for _, name := range names {
-		err := kubecli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
-		if err != nil && !k8sutil.IsKubernetesResourceNotFoundError(err) {
+		if err := KillMember(kubecli, namespace, name); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func KillMember(kubecli kubernetes.Interface, namespace string, name string) error {
+	err := kubecli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
+	if err != nil && !k8sutil.IsKubernetesResourceNotFoundError(err) {
+		return err
 	}
 	return nil
 }
@@ -205,9 +213,13 @@ func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *
 	for _, pod := range killPods {
 		WaitPodDeleted(t, kubeCli, pod, cl)
 	}
-
 	_, err = WaitUntilPodSizeReached(t, kubeCli, len(pods.Items), 20, cl)
 	if err != nil {
 		t.Fatalf("Failed to recover all nodes: %v", err)
 	}
+}
+
+func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) error {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	return KillMember(kubeCli, cl.Namespace, name)
 }

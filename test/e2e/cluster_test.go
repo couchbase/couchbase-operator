@@ -110,6 +110,51 @@ func TestResizeClusterWithBucket(t *testing.T) {
 
 }
 
+// Tests scenerio where a third node is being added to a cluster, and a separate
+// node goes down immediately after the add & before the rebalance.
+//
+// Expects: autofailover of down node occurs and a replacement node is added
+// in order to reach desired cluster size
+func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
+
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 2 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	// async scale up to 3 node cluster
+	echan := make(chan error)
+	go func() {
+		echan <- e2eutil.ResizeCluster(t, 3, f.CRClient, testCouchbase)
+	}()
+
+	// wait for add member event
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// kill pod 1
+	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check response from resize request
+	err = <-echan
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestNegResizeCluster(t *testing.T) {
 
 }

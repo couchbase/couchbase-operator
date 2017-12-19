@@ -325,3 +325,30 @@ func CreateAndWaitPod(kubecli kubernetes.Interface, ns string, pod *v1.Pod, time
 
 	return retPod, nil
 }
+
+// waits until the provided condition type occurrs with associated status
+func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, seconds int) error {
+	opts := metav1.ListOptions{
+		TypeMeta: metav1.TypeMeta{Kind: api.CRDResourceKind},
+	}
+	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(opts)
+	if err != nil {
+		return err
+	}
+	defer watch.Stop()
+
+	resultChan := watch.ResultChan()
+	duration := time.Duration(seconds) * time.Second
+	for {
+		select {
+		case <-time.After(duration):
+			return fmt.Errorf("Time out waiting for cluster event %s, %s:", event.Reason, event.Message)
+
+		case watchEvent := <-resultChan:
+			crdEvent := watchEvent.Object.(*v1.Event)
+			if EqualEvent(event, crdEvent) {
+				return nil
+			}
+		}
+	}
+}
