@@ -352,3 +352,46 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 		}
 	}
 }
+
+// waits until the cluter's balanced condition is set
+func WaitForClusterBalancedCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
+	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, v1.ConditionTrue, cl, time.Now(), wait)
+}
+
+// waits until the provided condition type with associated status after specified timestamp
+func WaitForClusterCondition(crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) error {
+
+	cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// check conditions every second, or until duration reached
+	tick := time.Tick(1 * time.Second)
+	duration := time.Duration(wait) * time.Second
+	for {
+		select {
+		case <-time.After(duration):
+			return fmt.Errorf("timed out waiting for condition %s with status: %s", conditionType, status)
+
+		case <-tick:
+			// compare cluster conditions to desired condition
+			for _, condition := range cluster.Status.Conditions {
+				if condition.Type == conditionType && condition.Status == status {
+					conditionTime, err := time.Parse(time.RFC3339, condition.LastUpdateTime)
+					if err != nil {
+						return err
+					}
+					if conditionTime.After(after) {
+						return nil
+					}
+				}
+			}
+			// update cluster
+			cluster, err = GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
