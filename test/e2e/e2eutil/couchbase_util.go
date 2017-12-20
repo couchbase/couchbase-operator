@@ -91,6 +91,18 @@ func SpecToApiBucket(bucketName string, cl *api.CouchbaseCluster, modifiers ...b
 func FlushDisabledVerifier(t *testing.T, b *cbmgr.Bucket) bool {
 	// flush can be 'nil' as rest api doesn't specify flush info when disabled
 	flushDisabled := b.EnableFlush == nil || *b.EnableFlush == false
-	t.Logf("disabled bucket flush: %t", flushDisabled)
+	t.Logf("disabled bucket flush: %v", flushDisabled)
 	return flushDisabled
+}
+
+func ThreeReplicaVerifier(t *testing.T, b *cbmgr.Bucket) bool {
+	threeReplicas := b.BucketReplicas == 3
+	t.Logf("bucket replicas: %v", b.BucketReplicas)
+	return threeReplicas
+}
+
+func DefaultIoPriorityVerifier(t *testing.T, b *cbmgr.Bucket) bool {
+	defaultIoPriority := b.IoPriority == "low"
+	t.Logf("io priority: %v", b.IoPriority)
+	return defaultIoPriority
 }

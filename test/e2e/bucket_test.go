@@ -408,7 +408,9 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
+
 	// make a bucket spec with flush disabled
+	t.Logf("externally changing bucket flush to: false")
 	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
 		disabled := false
 		b.EnableFlush = &disabled
@@ -428,11 +430,84 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 
-	// verify that the operator has reverted the changed
+	// verify that the operator has reverted the change
 	// and re-enabled bucket flush
 	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to enable bucket flush %v", err)
 	}
+
+	// make a bucket spec with bucket replicas = 3
+	t.Logf("externally changing bucket replicas to: 3")
+	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
+		b.BucketReplicas = 3
+	})
+	if err != nil {
+		t.Fatalf("error occurred converting bucket spec %v", err)
+	}
+
+	// edit bucket and verify change is reflected in cluster.
+	err = e2eutil.EditBucketAndVerify(t, client, bucket, 5, e2eutil.ThreeReplicaVerifier)
+
+	if err != nil {
+		t.Fatalf("error occurred editing cluster bucket %v", err)
+	}
+
+	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+		t.Fatalf("failed to prevent changing bucket type: %v", err)
+	}
+
+	// verify that the operator has reverted the change
+	// and reverted bucket replicas to 1
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			t.Logf("bucket replicas: %v", bucket.BucketReplicas)
+			if bucket.BucketReplicas == 1 {
+				return true
+			}
+		}
+		return false
+	}
+
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to revert bucket replicas to 1 %v", err)
+	}
+
+	// make a bucket spec with io priority = "default"
+	t.Logf("externally changing bucket io priority to: default")
+	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
+		b.IoPriority = "low"
+	})
+	if err != nil {
+		t.Fatalf("error occurred converting bucket spec %v", err)
+	}
+
+	// edit bucket and verify change is reflected in cluster.
+	err = e2eutil.EditBucketAndVerify(t, client, bucket, 5, e2eutil.DefaultIoPriorityVerifier)
+
+	if err != nil {
+		t.Fatalf("error occurred editing cluster bucket %v", err)
+	}
+
+	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+		t.Fatalf("failed to prevent changing bucket type: %v", err)
+	}
+
+	// verify that the operator has reverted the change
+	// and reverted io priority to "high"
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			t.Logf("io priority: %v", bucket.IoPriority)
+			if bucket.IoPriority == "high" {
+				return true
+			}
+		}
+		return false
+	}
+
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to revert bucket io prioritys to high %v", err)
+	}
+
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
@@ -440,9 +515,5 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	if !expectedEvents.Compare(events) {
 		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
-
-}
-
-func TestBucketConfigNegative(t *testing.T) {
 
 }
