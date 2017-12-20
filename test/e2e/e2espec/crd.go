@@ -10,7 +10,7 @@ import (
 // other settings
 var (
 	baseImage               = "couchbase/server"
-	version                 = "enterprise-5.0.0"
+	version                 = "enterprise-5.0.1"
 	fullEvictionPolicy      = "fullEviction"
 	seqnoConflictResolution = "seqno"
 	enabled                 = true
