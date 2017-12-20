@@ -81,20 +81,55 @@ func TestBucketAddRemove(t *testing.T) {
 }
 
 func TestNegBucketAdd(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
+	fullEvictionPolicy      := "fullEviction"
+	seqnoConflictResolution := "seqno"
+	enabled                 := true
+	disabled                := false
+	bucketSettings := api.BucketConfig{
+		BucketName:         "default",
+		BucketType:         "ephemeral",
+		BucketMemoryQuota:  256,
+		BucketReplicas:     1,
+		IoPriority:         "high",
+		EvictionPolicy:     &fullEvictionPolicy,
+		ConflictResolution: &seqnoConflictResolution,
+		EnableFlush:        &enabled,
+		EnableIndexReplica: &disabled,
+	}
+	bucketConfig := []api.BucketConfig{bucketSettings}
+
+	// add bucket
+	t.Logf("Desired Bucket Properties: %v\n", bucketConfig)
+	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = bucketConfig }
+	t.Logf("Adding Bucket To Cluster \n")
+	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 20, updateFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Waiting For Bucket To Be Created \n")
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{bucketSettings.BucketName}, 30, testCouchbase)
+	if err == nil {
+		t.Fatalf("failed to NOT create bucket %v", err)
+	}
 }
 
-func TestBucketDelete(t *testing.T) {
-
-}
-
-func TestNegBucketDelete(t *testing.T) {
-
-}
-
-// edits memory quota of default bucket
-
-func TestEditBucketMemoryQuota(t *testing.T) {
+// edit bucket memory quota from 256 to 128
+// revert change
+// edit bucket replica count from 1 to 2
+// revert change
+// edit bucket flush policy from true to false
+// revert change
+func TestEditBucket(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
@@ -109,13 +144,13 @@ func TestEditBucketMemoryQuota(t *testing.T) {
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// change memory quota
 	_, err = e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", "128", f.CRClient, testCouchbase, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
 	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
@@ -127,6 +162,99 @@ func TestEditBucketMemoryQuota(t *testing.T) {
 	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to change default bucket ram quota %v", err)
 	}
+
+	// change memory quota back
+	_, err = e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", "256", f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	// verify
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.BucketMemoryQuota == 256
+		}
+		return false
+	}
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to change default bucket ram quota back %v", err)
+	}
+
+	// change replica count
+	_, err = e2eutil.UpdateBucketSpec("default", "BucketReplicas", "2", f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	// verify
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.BucketReplicas == 2
+		}
+		return false
+	}
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to change default bucket replica count %v", err)
+	}
+
+	// change replica count back
+	_, err = e2eutil.UpdateBucketSpec("default", "BucketReplicas", "1", f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	// verify
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.BucketReplicas == 1
+		}
+		return false
+	}
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to change default bucket replcia count back %v", err)
+	}
+
+	// change eviction policy
+	_, err = e2eutil.UpdateBucketSpec("default", "EnableFlush", "false", f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	// verify
+	disabled := false
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.EnableFlush == &disabled
+		}
+		return false
+	}
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to change default bucket flush policy %v", err)
+	}
+
+	// change eviction policy back
+	_, err = e2eutil.UpdateBucketSpec("default", "EnableFlush", "true", f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	// verify
+	enabled := true
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.EnableFlush == &enabled
+		}
+		return false
+	}
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+		t.Fatalf("failed to change default bucket flush policy back %v", err)
+	}
+
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
@@ -134,15 +262,10 @@ func TestEditBucketMemoryQuota(t *testing.T) {
 	if !expectedEvents.Compare(events) {
 		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
-
-}
-
-func TestBucketConfig(t *testing.T) {
-
 }
 
 // attempt to change bucket type to ephemeral
-func TestInvalidBucketSpecUpdate(t *testing.T) {
+func TestNegBucketEdit(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
@@ -157,6 +280,7 @@ func TestInvalidBucketSpecUpdate(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
+	// edit bucket type
 	updateFunc := func(cl *api.CouchbaseCluster) {
 		cl.Spec.BucketSettings[0].BucketType = "ephemeral"
 	}
@@ -176,6 +300,51 @@ func TestInvalidBucketSpecUpdate(t *testing.T) {
 	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
+
+	// edit memory quota
+	updateFunc = func(cl *api.CouchbaseCluster) {
+		cl.Spec.BucketSettings[0].BucketMemoryQuota = 9999
+	}
+
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, 3, updateFunc); err != nil {
+		t.Fatalf("failed to post updated cluster spec: %v", err)
+	}
+
+	// verify type did not change
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.BucketMemoryQuota == 256
+		}
+		return false
+	}
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
+	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+		t.Fatalf("failed to prevent changing bucket type: %v", err)
+	}
+
+	// edit conflict resolution
+	timestamp := "timestamp"
+	updateFunc = func(cl *api.CouchbaseCluster) {
+		cl.Spec.BucketSettings[0].ConflictResolution = &timestamp
+	}
+
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, 3, updateFunc); err != nil {
+		t.Fatalf("failed to post updated cluster spec: %v", err)
+	}
+
+	// verify type did not change
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.ConflictResolution == &timestamp
+		}
+		return false
+	}
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
+	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+		t.Fatalf("failed to prevent changing bucket type: %v", err)
+	}
+
+
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
