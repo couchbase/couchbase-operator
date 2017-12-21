@@ -1,14 +1,14 @@
-package cluster
+package errors
 
 import (
-	"errors"
+	E "errors"
 	"fmt"
 	"reflect"
 )
 
 var (
-	errCreatedCluster  = errors.New("cluster failed to be created")
-	errUnkownCreatePod = errors.New("unkown error occurred creating pod")
+	ErrCreatedCluster  = E.New("cluster failed to be created")
+	ErrUnkownCreatePod = E.New("unkown error occurred creating pod")
 )
 
 type ErrSecretMissingUsername struct {
@@ -28,10 +28,10 @@ type ErrRunningPod struct {
 }
 
 type ErrInvalidBucketParamChange struct {
-	bucket string
-	param  string
-	from   interface{}
-	to     interface{}
+	Bucket string
+	Param  string
+	From   interface{}
+	To     interface{}
 }
 
 func (e ErrSecretMissingUsername) Error() string {
@@ -53,15 +53,15 @@ func (e ErrRunningPod) Error() string {
 func (e ErrInvalidBucketParamChange) Error() string {
 	fromStr := "unset"
 	toStr := "unset"
-	if hasValue(e.from) {
-		fromStr = reflect.Indirect(reflect.ValueOf(e.from)).String()
+	if hasValue(e.From) {
+		fromStr = reflect.Indirect(reflect.ValueOf(e.From)).String()
 	}
-	if hasValue(e.to) {
-		toStr = reflect.Indirect(reflect.ValueOf(e.to)).String()
+	if hasValue(e.To) {
+		toStr = reflect.Indirect(reflect.ValueOf(e.To)).String()
 	}
 
 	return fmt.Sprintf("cannot change (%s) bucket param='%s' from '%s' to '%s'",
-		e.bucket, e.param, fromStr, toStr)
+		e.Bucket, e.Param, fromStr, toStr)
 }
 
 func hasValue(v interface{}) bool {

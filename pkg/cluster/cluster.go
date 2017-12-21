@@ -10,6 +10,7 @@ import (
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/garbagecollection"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -128,7 +129,7 @@ func (c *Cluster) setup() error {
 	case api.ClusterPhaseNone:
 		shouldCreateCluster = true
 	case api.ClusterPhaseCreating:
-		return errCreatedCluster
+		return cberrors.ErrCreatedCluster
 	case api.ClusterPhaseRunning:
 		shouldCreateCluster = false
 	default:
@@ -397,9 +398,9 @@ func (c *Cluster) waitForPod(podName string) error {
 
 		// check if any error occurred creating pod
 		case watch.Error:
-			return ErrCreatingPod{status.Reason}
+			return cberrors.ErrCreatingPod{status.Reason}
 		case watch.Deleted:
-			return ErrCreatingPod{status.Reason}
+			return cberrors.ErrCreatingPod{status.Reason}
 		case watch.Added, watch.Modified:
 
 			// make sure created pod is now running
@@ -408,12 +409,12 @@ func (c *Cluster) waitForPod(podName string) error {
 				return nil
 			case v1.PodPending:
 			default:
-				return ErrRunningPod{status.Reason}
+				return cberrors.ErrRunningPod{status.Reason}
 			}
 		}
 	}
 
-	return errUnkownCreatePod
+	return cberrors.ErrUnkownCreatePod
 }
 
 func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
@@ -512,12 +513,12 @@ func (c *Cluster) setupAuth(authSecret string) error {
 	if username, ok := data[constants.AuthSecretUsernameKey]; ok {
 		c.username = string(username[:])
 	} else {
-		return ErrSecretMissingUsername{authSecret}
+		return cberrors.ErrSecretMissingUsername{authSecret}
 	}
 	if password, ok := data[constants.AuthSecretPasswordKey]; ok {
 		c.password = string(password[:])
 	} else {
-		return ErrSecretMissingPassword{authSecret}
+		return cberrors.ErrSecretMissingPassword{authSecret}
 	}
 
 	return nil

@@ -3,7 +3,7 @@ package e2eutil
 import (
 	"testing"
 
-	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	"k8s.io/api/core/v1"
@@ -38,12 +38,12 @@ func GetClusterAuth(t *testing.T, kubeClient kubernetes.Interface, namespace str
 	if val, ok := data[constants.AuthSecretUsernameKey]; ok {
 		username = string(val[:])
 	} else {
-		return cluster.ErrSecretMissingUsername{secretName}, username, password
+		return cberrors.ErrSecretMissingUsername{secretName}, username, password
 	}
 	if val, ok := data[constants.AuthSecretPasswordKey]; ok {
 		password = string(val[:])
 	} else {
-		return cluster.ErrSecretMissingPassword{secretName}, username, password
+		return cberrors.ErrSecretMissingPassword{secretName}, username, password
 	}
 
 	return nil, username, password

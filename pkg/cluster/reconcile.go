@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"k8s.io/api/core/v1"
@@ -301,14 +302,14 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 	bucketName := config.BucketName
 	if statusBucket, ok := c.status.Buckets[bucketName]; ok {
 		if !reflect.DeepEqual(config.ConflictResolution, statusBucket.ConflictResolution) {
-			return ErrInvalidBucketParamChange{
+			return cberrors.ErrInvalidBucketParamChange{
 				bucketName,
 				"conflictResolution",
 				statusBucket.ConflictResolution,
 				config.ConflictResolution}
 		}
 		if config.BucketType != statusBucket.BucketType {
-			return ErrInvalidBucketParamChange{
+			return cberrors.ErrInvalidBucketParamChange{
 				bucketName,
 				"type",
 				statusBucket.BucketType,

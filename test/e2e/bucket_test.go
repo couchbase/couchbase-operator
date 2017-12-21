@@ -2,7 +2,7 @@ package e2e
 
 import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -91,10 +91,10 @@ func TestNegBucketAdd(t *testing.T) {
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
-	fullEvictionPolicy      := "fullEviction"
+	fullEvictionPolicy := "fullEviction"
 	seqnoConflictResolution := "seqno"
-	enabled                 := true
-	disabled                := false
+	enabled := true
+	disabled := false
 	bucketSettings := api.BucketConfig{
 		BucketName:         "default",
 		BucketType:         "ephemeral",
@@ -297,7 +297,7 @@ func TestNegBucketEdit(t *testing.T) {
 		return false
 	}
 	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
-	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 
@@ -318,7 +318,7 @@ func TestNegBucketEdit(t *testing.T) {
 		return false
 	}
 	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
-	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 
@@ -340,10 +340,9 @@ func TestNegBucketEdit(t *testing.T) {
 		return false
 	}
 	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
-	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
-
 
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
@@ -408,7 +407,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-
 	// make a bucket spec with flush disabled
 	t.Logf("externally changing bucket flush to: false")
 	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
@@ -426,7 +424,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
 
-	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 
@@ -452,7 +450,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
 
-	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 
@@ -488,7 +486,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
 
-	if _, allowed := err.(cluster.ErrInvalidBucketParamChange); allowed {
+	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 
