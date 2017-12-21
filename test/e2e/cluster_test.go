@@ -153,6 +153,12 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// cluster should also be balanced
+	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Tests scenerio where the node being added to is killed before it can be
