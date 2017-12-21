@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -202,6 +203,84 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 
 	// check response from resize request
 	err = <-echan
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// cluster should also be balanced
+	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// 1. Create 1 node cluster
+// 2. Scale cluster to 3 members
+// 3. When rebalance starts kill 3rd member
+// 4. Wait for autofailover to add a 4th member
+// 5. Kill 4th member when added to cluster
+// 6. Wait for resize to reach 3 nodes
+// 7. Make sure cluster is healthy
+func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
+
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 1 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	// async kill a pod while cluster is scaling to 3rd member
+	doneCh := make(chan bool)
+	go func() {
+
+		// detect 3rd member add event
+		event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
+		err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// wait rebalance event
+		event = k8sutil.RebalanceEvent(testCouchbase)
+		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// kill 3rd member being rebalanced in
+		err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		doneCh <- true
+	}()
+
+	// async watch for 4th member event
+	go func() {
+
+		// waiting for 3rd membr to be killed
+		<-doneCh
+
+		event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
+		err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 3)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// resize to 3 member cluster
+	err = e2eutil.ResizeCluster(t, 3, f.CRClient, testCouchbase)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -358,6 +358,11 @@ func WaitForClusterBalancedCondition(crClient versioned.Interface, cl *api.Couch
 	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, v1.ConditionTrue, cl, time.Now(), wait)
 }
 
+// waits until the cluter's balanced condition is false
+func WaitForClusterUnBalancedCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
+	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, v1.ConditionFalse, cl, time.Now(), wait)
+}
+
 // waits until the provided condition type with associated status after specified timestamp
 func WaitForClusterCondition(crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) error {
 
