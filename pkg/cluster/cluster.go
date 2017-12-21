@@ -170,7 +170,7 @@ func (c *Cluster) create() error {
 	}
 	ms := couchbaseutil.NewMemberSet(m)
 
-	if err := c.createPod(ms, m, c.cluster.Spec.ServerSettings[idx]); err != nil {
+	if err := c.createPod(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
 	}
 
@@ -355,8 +355,7 @@ func (c *Cluster) isSecureClient() bool {
 	return c.cluster.Spec.TLS.IsSecureClient()
 }
 
-func (c *Cluster) createPod(members couchbaseutil.MemberSet, m *couchbaseutil.Member,
-	serverSpec api.ServerConfig) error {
+func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 
 	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec,
 		serverSpec, c.cluster.AsOwner())
