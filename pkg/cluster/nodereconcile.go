@@ -271,7 +271,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 			// our test verification to fail. Sleeping here isn't a big deal, but
 			// we should find a more permanent solution that doesn't sleep in the
 			// future.
-			time.Sleep(1*time.Second)
+			time.Sleep(1 * time.Second)
 
 			_, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(toRemove.Name, c.cluster))
 			if err != nil {
