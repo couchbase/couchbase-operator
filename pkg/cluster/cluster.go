@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -175,7 +174,7 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	if err := c.waitForPod(m.Name); err != nil {
+	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, m.Name); err != nil {
 		return err
 	}
 
@@ -377,44 +376,6 @@ func (c *Cluster) removePod(name string) error {
 
 	c.logger.Infof("deleted pod (%s)", name)
 	return nil
-}
-
-func (c *Cluster) waitForPod(podName string) error {
-
-	opts := metav1.ListOptions{
-		LabelSelector: "couchbase_node=" + podName,
-	}
-
-	watcher, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).Watch(opts)
-	if err != nil {
-		return err
-	}
-	events := watcher.ResultChan()
-	for ev := range events {
-		obj := ev.Object.(*v1.Pod)
-		status := obj.Status
-
-		switch ev.Type {
-
-		// check if any error occurred creating pod
-		case watch.Error:
-			return cberrors.ErrCreatingPod{status.Reason}
-		case watch.Deleted:
-			return cberrors.ErrCreatingPod{status.Reason}
-		case watch.Added, watch.Modified:
-
-			// make sure created pod is now running
-			switch status.Phase {
-			case v1.PodRunning:
-				return nil
-			case v1.PodPending:
-			default:
-				return cberrors.ErrRunningPod{status.Reason}
-			}
-		}
-	}
-
-	return cberrors.ErrUnkownCreatePod
 }
 
 func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {

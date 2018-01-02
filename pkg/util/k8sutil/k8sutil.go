@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
@@ -13,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -280,4 +282,42 @@ func mergeLabels(l1, l2 map[string]string) {
 		}
 		l1[k] = v
 	}
+}
+
+func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
+
+	opts := metav1.ListOptions{
+		LabelSelector: "couchbase_node=" + podName,
+	}
+
+	watcher, err := kubeCli.CoreV1().Pods(namespace).Watch(opts)
+	if err != nil {
+		return err
+	}
+	events := watcher.ResultChan()
+	for ev := range events {
+		obj := ev.Object.(*v1.Pod)
+		status := obj.Status
+
+		switch ev.Type {
+
+		// check if any error occurred creating pod
+		case watch.Error:
+			return cberrors.ErrCreatingPod{status.Reason}
+		case watch.Deleted:
+			return cberrors.ErrCreatingPod{status.Reason}
+		case watch.Added, watch.Modified:
+
+			// make sure created pod is now running
+			switch status.Phase {
+			case v1.PodRunning:
+				return nil
+			case v1.PodPending:
+			default:
+				return cberrors.ErrRunningPod{status.Reason}
+			}
+		}
+	}
+
+	return cberrors.ErrUnkownCreatePod
 }
