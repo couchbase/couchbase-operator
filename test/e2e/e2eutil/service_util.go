@@ -37,3 +37,14 @@ func NodePortServiceClient(host string, service *v1.Service) (string, error) {
 	client := fmt.Sprintf("http://%s:%s", ip, port)
 	return client, nil
 }
+
+// Derives admin console url from exposed port and api server
+func AdminConsoleURL(apiServerHost, port string) (string, error) {
+	apiUrl, err := url.Parse(apiServerHost)
+	if err != nil {
+		return "", err
+	}
+	ip := strings.Split(apiUrl.Host, ":")[0]
+	consoleURL := fmt.Sprintf("http://%s:%s", ip, port)
+	return consoleURL, nil
+}

@@ -14,6 +14,24 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+func CreateClusterWithCRD(t *testing.T, crClient versioned.Interface, crd *api.CouchbaseCluster, namespace, secretName string, size int, withBucket bool) (*api.CouchbaseCluster, error) {
+	testCouchbase, err := CreateCluster(t, crClient, namespace, crd)
+	if err != nil {
+		return nil, err
+	}
+	_, err = WaitUntilSizeReached(t, crClient, size, 18, testCouchbase)
+	if err != nil {
+		return nil, err
+	}
+	if withBucket == true {
+		err = WaitUntilBucketsExists(t, crClient, crd.Spec.BucketNames(), 18, testCouchbase)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return testCouchbase, nil
+}
+
 func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	cl.Namespace = namespace
 	res, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Create(cl)
@@ -58,6 +76,10 @@ func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubern
 		return err
 	}
 	return waitResourcesDeleted(t, kubeClient, cl, retries)
+}
+
+func GetClusterCRD(crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+	return crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 }
 
 // NameLabelSelector returns a label selector of the form name=<name>

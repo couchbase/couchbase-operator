@@ -22,21 +22,13 @@ import (
 )
 
 func NewClusterBasic(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool) (*api.CouchbaseCluster, error) {
-	testCouchbase, err := CreateCluster(t, crClient, namespace, e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket))
-	if err != nil {
-		return nil, err
-	}
-	_, err = WaitUntilSizeReached(t, crClient, size, 18, testCouchbase)
-	if err != nil {
-		return nil, err
-	}
-	if withBucket == true {
-		err = WaitUntilBucketsExists(t, crClient, []string{"default"}, 18, testCouchbase)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return testCouchbase, nil
+	crd := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket)
+	return CreateClusterWithCRD(t, crClient, crd, namespace, secretName, size, withBucket)
+}
+
+func NewClusterExposed(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool) (*api.CouchbaseCluster, error) {
+	crd := e2espec.NewClusterExposedSpec("test-couchbase-", secretName, size, withBucket)
+	return CreateClusterWithCRD(t, crClient, crd, namespace, secretName, size, withBucket)
 }
 
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
@@ -67,8 +59,9 @@ func UpdateClusterSpec(field string, value string, crClient versioned.Interface,
 	switch {
 	case field == "Size":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[0].Size, _ = strconv.Atoi(value) }
+	case field == "ExposeAdminConsole":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ExposeAdminConsole, _ = strconv.ParseBool(value) }
 	}
-
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 
 }
@@ -222,4 +215,24 @@ func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *
 func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) error {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return KillMember(kubeCli, cl.Namespace, name)
+}
+
+func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *api.CouchbaseCluster, clusterName, namespace string) (*v1.Pod, error) {
+
+	for _, config := range cl.Spec.ServerSettings {
+		if config.Name == m.ServerConfig {
+			pod := k8sutil.CreateCouchbasePod(m, clusterName, cl.Spec, config, cl.AsOwner())
+			pod, err := kubeCli.Core().Pods(namespace).Create(pod)
+			if err != nil {
+				return nil, err
+			}
+			err = k8sutil.WaitForPod(kubeCli, namespace, pod.Name)
+			if err != nil {
+				return nil, err
+			}
+			return kubeCli.Core().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+		}
+	}
+
+	return nil, NewErrServerConfigNotFound(m.ServerConfig)
 }

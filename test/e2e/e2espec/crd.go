@@ -124,6 +124,13 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool) *api
 	return NewClusterCRD(genName, spec)
 }
 
+// basic cluster with AdminConsole enabled
+func NewClusterExposedSpec(genName, secretName string, size int, withBucket bool) *api.CouchbaseCluster {
+	crd := NewBasicCluster(genName, secretName, size, withBucket)
+	crd.Spec.ExposeAdminConsole = true
+	return crd
+}
+
 // new custom cluster
 func NewMultiCluster(genName, secretName string, config map[string]map[string]string) *api.CouchbaseCluster {
 

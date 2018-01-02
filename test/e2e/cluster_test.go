@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -290,6 +291,92 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Test that a foreign node is removed from cluster
+//
+// Expects: only nodes added by operator to be in cluster
+// 1. Create 1 node cluster
+// 2. Manually add 1 external member to cluster
+// 3. Request cluster resize to 2 members
+// 4. Verify that actuall cluster size is 2 nodes
+// 5. Verify that external member was removed
+// 6. Verify that the 2 cluster nodes are healthy
+func TestRemoveForeignNode(t *testing.T) {
+
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 1 node cluster with admin console
+	testCouchbase, err := e2eutil.NewClusterExposed(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	// create a client to admin console
+	testCouchbase, err = e2eutil.GetClusterCRD(f.CRClient, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+	err, username, password := e2eutil.GetClusterAuth(t, f.KubeClient, f.Namespace, f.DefaultSecret.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create a foreign member to be added to the cluster
+	serverConfig := testCouchbase.Spec.ServerSettings[0]
+	m := &couchbaseutil.Member{
+		Name:         "test-member",
+		Namespace:    f.Namespace,
+		ServerConfig: serverConfig.Name,
+		SecureClient: false,
+	}
+	pod, err := e2eutil.CreateMemberPod(f.KubeClient, m, testCouchbase, "unknown-cluster", f.Namespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.KillMember(f.KubeClient, f.Namespace, "test-member")
+
+	externalPodIP := pod.Status.PodIP + ":8091"
+	err = e2eutil.AddNode(t, client, serverConfig.Services, username, password, externalPodIP)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// resize to 2 member cluster
+	err = e2eutil.ResizeCluster(t, 2, f.CRClient, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that actual cluster size is only 2 nodes
+	info, err := client.ClusterInfo()
+	numNodes := len(info.Nodes)
+	if numNodes != 2 {
+		t.Fatalf("expected 2 nodes, found: %d", numNodes)
+	}
+
+	// None of the nodes should be the foreign member and
+	// all should be healthy
+	for _, node := range info.Nodes {
+		if node.HostName == externalPodIP {
+			t.Fatalf("node %s should not be in cluster", node.HostName)
+		}
+		if node.Status != "healthy" {
+			t.Fatalf("node %s is not healthy, status: %s", node.HostName, node.Status)
+		}
+	}
+
 }
 
 func TestNegResizeCluster(t *testing.T) {

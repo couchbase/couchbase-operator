@@ -16,3 +16,7 @@ func NewErrGetClusterBucket(bucket string) error {
 func NewErrGetBucketSpec(bucket string) error {
 	return fmt.Errorf("failed to get spec for bucket %s", bucket)
 }
+
+func NewErrServerConfigNotFound(configName string) error {
+	return fmt.Errorf("failed to find server config in spec %s", configName)
+}

@@ -67,6 +67,21 @@ func GetBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 	return nil, NewErrGetClusterBucket(bucketName)
 }
 
+// Add a node to the cluster
+func AddNode(t *testing.T, client *cbmgr.Couchbase, services []string, username, password, hostname string) error {
+	t.Logf("adding node: %s", hostname)
+
+	svcs, err := cbmgr.ServiceListFromStringArray(services)
+	if err != nil {
+		return err
+	}
+	err = client.AddNode(hostname, username, password, svcs)
+	return retryutil.RetryOnErr(5*time.Second, 36, "add node", hostname,
+		func() error {
+			return client.AddNode(hostname, username, password, svcs)
+		})
+}
+
 // Converts cluster spec bucket to cbmgr api type with
 // the option of modifying the spec prior to translation
 func SpecToApiBucket(bucketName string, cl *api.CouchbaseCluster, modifiers ...bucketModifier) (*cbmgr.Bucket, error) {
