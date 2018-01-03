@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SUPPORT_PKG=cb-k8s-support-`date +%F_%T`
+SUPPORT_PKG=cb-k8s-support-`date +%m%d%Y-%T | sed  "s/:/_/g"`
 KUBECTL="kubectl $@"
 OUTPUT_DIR=/tmp/$SUPPORT_PKG
 mkdir -p $OUTPUT_DIR
