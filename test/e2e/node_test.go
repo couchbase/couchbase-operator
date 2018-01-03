@@ -56,11 +56,15 @@ func TestSingleNodeFailureNoBuckets(t *testing.T) {
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 5, 18)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
-
 
 	if !expectedEvents.Compare(events) {
 		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
