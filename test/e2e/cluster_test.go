@@ -7,7 +7,11 @@ import (
 	"testing"
 )
 
-// This test will create single node basic cluster and attempt to scale it one node at a time up then down
+// Test scaling a cluster with no buckets up and down
+// 1. Create a one node cluster with no buckets
+// 2. Resize the cluster  1 -> 2 -> 3 -> 2 -> 1
+// 3. After each resize make sure the cluster is balanced and available
+// 4. Check the events to make sure the operator took the correct actions
 func TestResizeCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -28,6 +32,12 @@ func TestResizeCluster(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 18)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
 		switch {
 		case clusterSize-prevClusterSize > 0:
 			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
@@ -48,7 +58,11 @@ func TestResizeCluster(t *testing.T) {
 
 }
 
-// This test will create single node basic cluster with a bucket and attempt to scale it one node at a time up then down
+// Test scaling a cluster with no buckets up and down
+// 1. Create a one node cluster with one bucket
+// 2. Resize the cluster  1 -> 2 -> 3 -> 2 -> 1
+// 3. After each resize make sure the cluster is balanced and available
+// 4. Check the events to make sure the operator took the correct actions
 func TestResizeClusterWithBucket(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -70,6 +84,12 @@ func TestResizeClusterWithBucket(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 18)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
 		switch {
 		case clusterSize-prevClusterSize > 0:
 			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
