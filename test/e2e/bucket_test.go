@@ -117,7 +117,7 @@ func TestNegBucketAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("Waiting For Bucket To Be Created \n")
-	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{bucketSettings.BucketName}, 30, testCouchbase)
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{bucketSettings.BucketName}, 9, testCouchbase)
 	if err == nil {
 		t.Fatalf("failed to NOT create bucket %v", err)
 	}
