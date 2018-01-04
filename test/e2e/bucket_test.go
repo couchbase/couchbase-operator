@@ -80,6 +80,13 @@ func TestBucketAddRemove(t *testing.T) {
 
 }
 
+// Creates a cluster and adds a bucket with an invalid configuration
+// 1. Create a single node cluster with no buckets
+// 2. Creates an ephemeral bucket with replicaIndexes enabled (replicaIndexes
+//    are not supported on ephemeral buckets so creation should fail)
+// 3. Wait for 90 seconds to ensure that the bucket is not created
+// 4. (TODO) Check to make sure that an error is reported in the conditions section
+// 5. (TODO) Check the events to make sure the operator took the correct actions
 func TestNegBucketAdd(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
