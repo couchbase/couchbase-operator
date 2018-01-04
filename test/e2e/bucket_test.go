@@ -361,8 +361,16 @@ func TestNegBucketEdit(t *testing.T) {
 
 }
 
-// ensure updates to buckets made externally to cluster are reverted
-// when values do not match with spec
+// Tests that the operator reverts bucket edits not made by the operator
+// 1. Create a one node cluster with one bucket
+// 2. Create a node port service so we can access the cluster externally
+// 3. Use an external client to update the bucket flush enabled parameter to false
+// 4. Verify that the operator reverts the change
+// 5. Use an external client to update the bucket replicas parameter to 3
+// 6. Verify that the operator reverts the change
+// 7. Use an external client to update the bucket IO priority parameter to default
+// 8. Verify that the operator reverts the change
+// 9. Check the events to make sure the operator took the correct actions
 func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
