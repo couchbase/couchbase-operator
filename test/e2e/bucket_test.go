@@ -130,12 +130,18 @@ func TestNegBucketAdd(t *testing.T) {
 	}
 }
 
-// edit bucket memory quota from 256 to 128
-// revert change
-// edit bucket replica count from 1 to 2
-// revert change
-// edit bucket flush policy from true to false
-// revert change
+// Tests editing a bucket by changing various bucket parameters
+// 1. Create a one node cluster with one bucket
+// 2. Change the bucket memory quota to 128MB
+// 3. Verify that the memory quota was in the describe output and (TODO) in the actual cluster
+// 4. Change the bucket memory quota back to 256MB
+// 5. Change the bucket replicas to 2
+// 6. Verify that the bucket replicas was in the describe output and (TODO) in the actual cluster
+// 7. Change the bucket replicas back to 1
+// 8. Change enable flush to true
+// 9. Verify that the memory quota was in the describe output and (TODO) in the actual cluster
+// 10. Change enable flush back to false
+// 11. (TODO) Check the events to make sure the operator took the correct actions
 func TestEditBucket(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
