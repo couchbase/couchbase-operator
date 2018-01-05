@@ -20,24 +20,26 @@ func TestSingleNodeFailureNoBuckets(t *testing.T) {
 	}
 	f := framework.Global
 	clusterConfig := map[string]string{
-		"dataServiceMemQuota": "256",
-		"indexServiceMemQuota": "256",
+		"dataServiceMemQuota":   "256",
+		"indexServiceMemQuota":  "256",
 		"searchServiceMemQuota": "256",
-		"indexStorageSetting": "memory_optimized",
-		"autoFailoverTimeout": "30"}
+		"indexStorageSetting":   "memory_optimized",
+		"autoFailoverTimeout":   "30"}
 	serviceConfig1 := map[string]string{
-		"size": "5",
-		"name": "test_config_1",
-		"services": "data,n1ql,index",
-		"dataPath": "/opt/couchbase/var/lib/couchbase/data",
+		"size":      "5",
+		"name":      "test_config_1",
+		"services":  "data,n1ql,index",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
 		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
 	configMap := map[string]map[string]string{
-		"cluster": clusterConfig,
+		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
