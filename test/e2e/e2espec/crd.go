@@ -1,10 +1,15 @@
 package e2espec
 
 import (
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"fmt"
 	"strconv"
 	s "strings"
+
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // other settings
@@ -236,4 +241,25 @@ func NewClusterCRD(genName string, spec api.ClusterSpec) *api.CouchbaseCluster {
 		},
 		Spec: spec,
 	}
+}
+
+// Create Pod Policy with memory limit and requests in MB
+func CreateMemoryPodPolicy(request, limit int) *api.PodPolicy {
+	return CreatePodPolicy(v1.ResourceMemory, request, limit, "Mi")
+}
+
+// Create limit and request pod policy according to scale... ie 'Mi, Gi' where applicable
+func CreatePodPolicy(resourceName v1.ResourceName, request, limit int, scale string) *api.PodPolicy {
+
+	podPolicy := &api.PodPolicy{}
+	podPolicy.Resources = v1.ResourceRequirements{
+		Limits:   make(v1.ResourceList),
+		Requests: make(v1.ResourceList),
+	}
+
+	resourceValue := fmt.Sprintf("%d%s", limit, scale)
+	podPolicy.Resources.Limits[resourceName] = resource.MustParse(resourceValue)
+	resourceValue = fmt.Sprintf("%d%s", request, scale)
+	podPolicy.Resources.Requests[resourceName] = resource.MustParse(resourceValue)
+	return podPolicy
 }

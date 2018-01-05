@@ -353,6 +353,10 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
+func WaitForManagedConfigCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, status v1.ConditionStatus, wait int) error {
+	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, status, cl, time.Now(), wait)
+}
+
 // waits until the cluter's balanced condition is set
 func WaitForClusterBalancedCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
 	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, v1.ConditionTrue, cl, time.Now(), wait)
@@ -390,6 +394,7 @@ func WaitForClusterCondition(crClient versioned.Interface, conditionType api.Clu
 					if conditionTime.After(after) {
 						return nil
 					}
+
 				}
 			}
 			// update cluster

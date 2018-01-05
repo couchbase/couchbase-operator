@@ -4,8 +4,10 @@ import (
 	"os"
 	"testing"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -375,6 +377,73 @@ func TestRemoveForeignNode(t *testing.T) {
 		if node.Status != "healthy" {
 			t.Fatalf("node %s is not healthy, status: %s", node.HostName, node.Status)
 		}
+	}
+
+}
+
+// 1. create 1 node cluster
+// 2. get max allocatable memory of a k8s node
+// 3. update resource limits to 70% allocatable memory
+// 4. attempt to scale up as 3 node cluster
+// 5. wait for unbalanced condition
+// 6. remove resource limits
+// 7. expect scale up to complete
+func TestNodeUnschedulable(t *testing.T) {
+
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 1 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	// request 70% of allocatable memory
+	allocatableMemory, err := e2eutil.GetK8SAllocatableMemory(f.KubeClient, f.Namespace, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
+		cl.Spec.ServerSettings[0].Pod = e2espec.CreateMemoryPodPolicy(allocatableMemory*7/10, allocatableMemory)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// async start resize cluster
+	echan := make(chan error)
+	go func() {
+		echan <- e2eutil.ResizeCluster(t, 3, f.CRClient, testCouchbase)
+	}()
+
+	// expect unbalanced condition
+	err = e2eutil.WaitForClusterUnBalancedCondition(f.CRClient, testCouchbase, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// drop limits so that pod can be scheduled
+	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
+		cl.Spec.ServerSettings[0].Pod = nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify result from cluster resize ok
+	err = <-echan
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// cluster should be healthy with 3 nodes
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 3, 18)
+	if err != nil {
+		t.Fatal(err.Error())
 	}
 
 }

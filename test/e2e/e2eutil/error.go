@@ -20,3 +20,7 @@ func NewErrGetBucketSpec(bucket string) error {
 func NewErrServerConfigNotFound(configName string) error {
 	return fmt.Errorf("failed to find server config in spec %s", configName)
 }
+
+func NewErrEmptyNodeList() error {
+	return fmt.Errorf("node list is empty")
+}
