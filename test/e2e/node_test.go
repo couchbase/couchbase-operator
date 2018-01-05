@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -71,6 +73,85 @@ func TestSingleNodeFailureNoBuckets(t *testing.T) {
 	if !expectedEvents.Compare(events) {
 		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
+}
+
+// 1. Create 2 node cluster
+// 2. Manually failover 1 member
+// 3. Wait for operator to rebalance out failed node
+// 4. Expect operator to replace failed node with new node
+func TestNodeManualFailover(t *testing.T) {
+
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 2 node cluster with admin console
+	testCouchbase, err := e2eutil.NewClusterExposed(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 2, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	// create a client to admin console
+	testCouchbase, err = e2eutil.GetClusterCRD(f.CRClient, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	// failover member
+	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	m := &couchbaseutil.Member{
+		Name:         memberName,
+		Namespace:    f.Namespace,
+		ServerConfig: testCouchbase.Spec.ServerSettings[0].Name,
+		SecureClient: false,
+	}
+	err = client.Failover(m.HostURL())
+	if err != nil {
+		t.Fatalf("failed to failover host %s: %v", m.HostURL(), err)
+	}
+
+	// expect rebalance event to start
+	event := k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// cluster should also be balanced
+	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect member add for node being replaced
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect operator to rebalance in the node
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// healthy 2 node cluster
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 2, 18)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
 }
 
 func TestNodeConfig(t *testing.T) {
