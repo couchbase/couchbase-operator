@@ -52,18 +52,32 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	return testCouchbase, nil
 }
 
-func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
+func UpdateClusterSpec(field string, value interface{}, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
 
 	updateFunc := func(cl *api.CouchbaseCluster) {}
 
 	switch {
 	case field == "Size":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[0].Size, _ = strconv.Atoi(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[0].Size = ConvertToInt(value) }
 	case field == "ExposeAdminConsole":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ExposeAdminConsole, _ = strconv.ParseBool(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ExposeAdminConsole, _ = strconv.ParseBool(value.(string)) }
+	case field == "DataServiceMemQuota":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.DataServiceMemQuota = ConvertToInt(value) }
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 
+}
+
+// convert interfaced value to int, note this can downcast i64
+func ConvertToInt(value interface{}) int {
+	switch value.(type) {
+	case int, int64:
+		return value.(int)
+	case string:
+		strInt, _ := strconv.Atoi(value.(string))
+		return strInt
+	}
+	return 0
 }
 
 func UpdateBucketSpec(bucketName string, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
