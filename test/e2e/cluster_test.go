@@ -508,6 +508,92 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	}
 }
 
+// Test that a node is added back when operator is resumed
+//
+// 1. Create 2 node cluster
+// 2. Pause operator
+// 3. Externally remove a node
+// 4. Resume operator
+// 5. Expect operator to add another node
+// 6. Verify cluster is balanced with 2 nodes
+func TestReplaceManuallyRemovedNode(t *testing.T) {
+
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 2 node cluster with admin console
+	testCouchbase, err := e2eutil.NewClusterExposed(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 2, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	// pause operator
+	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
+		cl.Spec.Paused = true
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create node port service for node 0
+	clusterNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	nodePortService := e2espec.NewNodePortService(f.Namespace)
+	nodePortService.Spec.Selector["couchbase_node"] = clusterNodeName
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, nodePortService)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil)
+
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	// remove node
+	err = e2eutil.RebalanceOutMember(t, client, testCouchbase.Name, testCouchbase.Namespace, 1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// resume operator
+	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
+		cl.Spec.Paused = false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect an add member event to occur
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// cluster should also be balanced
+	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that actual cluster size is only 2 nodes
+	info, err := client.ClusterInfo()
+	numNodes := len(info.Nodes)
+	if numNodes != 2 {
+		t.Fatalf("expected 2 nodes, found: %d", numNodes)
+	}
+
+}
+
 func TestNegResizeCluster(t *testing.T) {
 
 }

@@ -28,7 +28,12 @@ func NewClusterBasic(t *testing.T, crClient versioned.Interface, namespace, secr
 
 func NewClusterExposed(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool) (*api.CouchbaseCluster, error) {
 	crd := e2espec.NewClusterExposedSpec("test-couchbase-", secretName, size, withBucket)
-	return CreateClusterWithCRD(t, crClient, crd, namespace, secretName, size, withBucket)
+	cl, err := CreateClusterWithCRD(t, crClient, crd, namespace, secretName, size, withBucket)
+	if err != nil {
+		return nil, err
+	}
+	// return with updated status so that admin console port is set
+	return GetClusterCRD(crClient, cl)
 }
 
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,

@@ -24,3 +24,7 @@ func NewErrServerConfigNotFound(configName string) error {
 func NewErrEmptyNodeList() error {
 	return fmt.Errorf("node list is empty")
 }
+
+func NewErrConsoleNotExposed() error {
+	return fmt.Errorf("admin console is not exposed")
+}

@@ -24,6 +24,19 @@ func NewClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseC
 	return cbmgr.New(urls, username, password), nil
 }
 
+// Creates client for interacting with admin console of crd
+// TODO: testing arg is not needed and will be removed, but has depends here
+func CreateAdminConsoleClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, apiServerHost string) (*cbmgr.Couchbase, error) {
+	if cl.Spec.ExposeAdminConsole == false {
+		return nil, NewErrConsoleNotExposed()
+	}
+	consoleURL, err := AdminConsoleURL(apiServerHost, cl.Status.AdminConsolePort)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(t, kubeClient, cl, []string{consoleURL})
+}
+
 func EditBucket(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket) error {
 	t.Logf("editing bucket: %s", bucket.BucketName)
 	return client.EditBucket(bucket)
@@ -80,6 +93,31 @@ func AddNode(t *testing.T, client *cbmgr.Couchbase, services []string, username,
 		func() error {
 			return client.AddNode(hostname, username, password, svcs)
 		})
+}
+
+// Rebalance out creates memberset with member at specified index and performs rebalance
+func RebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, namespace string, memberIndex int, wait bool) error {
+	outMember := MemberFromSpecProps(clusterName, namespace, "", memberIndex)
+	nodesToRemove := []string{outMember.HostURL()}
+	t.Logf("rebalance out: %s", outMember.Name)
+
+	return retryutil.RetryOnErr(5*time.Second, 36, "rebalance", clusterName,
+		func() error {
+			status, err := client.Rebalance(nodesToRemove)
+			if wait && status != nil {
+				return status.Wait()
+			}
+			return err
+		})
+}
+
+func MemberFromSpecProps(name, namespace, serverConfig string, memberIndex int) *couchbaseutil.Member {
+	return &couchbaseutil.Member{
+		Name:         couchbaseutil.CreateMemberName(name, memberIndex),
+		Namespace:    namespace,
+		ServerConfig: serverConfig,
+		SecureClient: false,
+	}
 }
 
 // Converts cluster spec bucket to cbmgr api type with
