@@ -9,23 +9,23 @@ mkdir -p $OUTPUT_DIR
 CLUSTER_LOG_DIR=$OUTPUT_DIR/cluster
 mkdir $CLUSTER_LOG_DIR
 echo "collecting cluster info"
-$KUBECTL cluster-info dump > $CLUSTER_LOG_DIR/cluster_info.logs
-$KUBECTL describe nodes > $CLUSTER_LOG_DIR/describe_nodes.logs
-$KUBECTL top node > $CLUSTER_LOG_DIR/top_nodes.logs   2>&1
-$KUBECTL top pod > $CLUSTER_LOG_DIR/top_pods.logs   2>&1
+$KUBECTL cluster-info dump > $CLUSTER_LOG_DIR/cluster_info.log
+$KUBECTL describe nodes > $CLUSTER_LOG_DIR/describe_nodes.log
+$KUBECTL top node > $CLUSTER_LOG_DIR/top_nodes.log   2>&1
+$KUBECTL top pod > $CLUSTER_LOG_DIR/top_pods.log   2>&1
 
 # info about pods, deployments, replicasets, and statefulsets
 RESOURCE_LOG_DIR=$OUTPUT_DIR/resources
 mkdir $RESOURCE_LOG_DIR
 echo "collecting info about cluster objects"
-$KUBECTL describe --show-events --all-namespaces po > $RESOURCE_LOG_DIR/pods.logs
-$KUBECTL describe --show-events --all-namespaces deployment > $RESOURCE_LOG_DIR/deployment.logs
-$KUBECTL describe --show-events --all-namespaces rs > $RESOURCE_LOG_DIR/repliaset.logs
-$KUBECTL describe --show-events --all-namespaces statefulset > $RESOURCE_LOG_DIR/statefulsets.logs
-$KUBECTL describe --show-events --all-namespaces couchbasecluster > $RESOURCE_LOG_DIR/couchbase.logs
+$KUBECTL describe --show-events --all-namespaces po > $RESOURCE_LOG_DIR/pods.log
+$KUBECTL describe --show-events --all-namespaces deployment > $RESOURCE_LOG_DIR/deployment.log
+$KUBECTL describe --show-events --all-namespaces rs > $RESOURCE_LOG_DIR/repliaset.log
+$KUBECTL describe --show-events --all-namespaces statefulset > $RESOURCE_LOG_DIR/statefulsets.log
+$KUBECTL describe --show-events --all-namespaces couchbasecluster > $RESOURCE_LOG_DIR/couchbase.log
 
 # list of all running resources, 'roles','limits'...
-$KUBECTL get --all-namespaces all -o yaml > $RESOURCE_LOG_DIR/all_resources.logs
+$KUBECTL get --all-namespaces all -o yaml > $RESOURCE_LOG_DIR/all_resources.log
 
 # all container logs
 CONTAINER_LOG_DIR=$OUTPUT_DIR/containers
@@ -38,7 +38,7 @@ for ns in $( $KUBECTL get namespaces -o name | sed 's/.*\///' ); do
       # print logs of active container within pod
       $KUBECTL describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' $KUBECTL -n $ns logs $pod --timestamps=true  -c '{}' >>  $pod_log_path/output.log
       # print logs of pervious container within pod
-      $KUBECTL describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' $KUBECTL -n $ns logs $pod --timestamps=true  -p -c '{}' >>  $pod_log_path/previous.logs  2>&1
+      $KUBECTL describe -n $ns po/$pod  | grep -B1 "Container ID" | grep ":$" | sed 's/://' | xargs -I '{}' $KUBECTL -n $ns logs $pod --timestamps=true  -p -c '{}' >>  $pod_log_path/previous.log  2>&1
   done
 done
 
