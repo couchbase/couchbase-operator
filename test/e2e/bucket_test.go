@@ -241,7 +241,9 @@ func TestEditBucket(t *testing.T) {
 	disabled := false
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.EnableFlush == &disabled
+			if bucket.EnableFlush != nil {
+				return *bucket.EnableFlush == disabled
+			}
 		}
 		return false
 	}
@@ -260,7 +262,9 @@ func TestEditBucket(t *testing.T) {
 	enabled := true
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.EnableFlush == &enabled
+			if bucket.EnableFlush != nil {
+				return *bucket.EnableFlush == enabled
+			}
 		}
 		return false
 	}
