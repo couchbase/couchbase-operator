@@ -143,7 +143,7 @@ func Rebalance(ms MemberSet, username, password, clusterName string, nodesToRemo
 	return retryutil.RetryOnErr(5*time.Second, 36, "rebalance", clusterName,
 		func() error {
 			status, err := client.Rebalance(nodesToRemove)
-			if wait {
+			if wait && status != nil {
 				status.SetLogger(retryutil.Log(clusterName))
 				return status.Wait()
 			}
