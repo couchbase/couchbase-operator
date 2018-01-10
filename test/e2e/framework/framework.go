@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -31,13 +32,13 @@ import (
 var Global *Framework
 
 type Framework struct {
-	opImage    string
-	KubeClient kubernetes.Interface
-	CRClient   versioned.Interface
-	Namespace  string
+	opImage       string
+	KubeClient    kubernetes.Interface
+	CRClient      versioned.Interface
+	Namespace     string
 	DefaultSecret *v1.Secret
-	config     *rest.Config
-	LogDir     string
+	config        *rest.Config
+	LogDir        string
 	//S3Cli      *s3.S3
 	//S3Bucket   string
 }
@@ -197,6 +198,10 @@ func (f *Framework) deleteCouchbaseOperator() error {
 
 func (f *Framework) ApiServerHost() string {
 	return f.config.Host
+}
+
+func (f *Framework) PodClient() typedv1.PodInterface {
+	return f.KubeClient.CoreV1().Pods(f.Namespace)
 }
 
 func makeLogDir() (string, error) {

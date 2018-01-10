@@ -1,5 +1,5 @@
-hash: 5507c29a22d575c7bcbe235d418f5a03b2afee72e18ad0c35bc442069d01aaa4
-updated: 2017-11-01T23:12:29.057997092-07:00
+hash: 336de9e5b6468d8c055b1367cd4587f7ba2a239948f6df828f6dddce8c784581
+updated: 2018-01-11T14:05:10.451738599-08:00
 imports:
 - name: github.com/couchbaselabs/gocbmgr
   version: ffac9afddc0b01343b9370d335ecdf45a6e17664
@@ -7,6 +7,10 @@ imports:
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:
   - spew
+- name: github.com/docker/spdystream
+  version: 449fdfce4d962303d702fec724ef0ad181c92528
+  subpackages:
+  - spdy
 - name: github.com/emicklei/go-restful
   version: ff4f55a206334ef123e4f79bbf348980da81ca46
   subpackages:
@@ -190,10 +194,13 @@ imports:
   - pkg/util/diff
   - pkg/util/errors
   - pkg/util/framer
+  - pkg/util/httpstream
+  - pkg/util/httpstream/spdy
   - pkg/util/intstr
   - pkg/util/json
   - pkg/util/mergepatch
   - pkg/util/net
+  - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
   - pkg/util/strategicpatch
@@ -204,6 +211,7 @@ imports:
   - pkg/version
   - pkg/watch
   - third_party/forked/golang/json
+  - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
   version: 82aa063804cf055e16e8911250f888bc216e8b61
@@ -252,8 +260,11 @@ imports:
   - tools/pager
   - tools/record
   - tools/reference
+  - tools/remotecommand
   - transport
+  - transport/spdy
   - util/cert
+  - util/exec
   - util/flowcontrol
   - util/homedir
   - util/integer
