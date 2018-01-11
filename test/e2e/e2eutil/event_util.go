@@ -48,8 +48,7 @@ func (e *EventList) AddMemberAddEvent(cl *api.CouchbaseCluster, memberId int) {
 }
 
 func (e *EventList) AddMemberRemoveEvent(cl *api.CouchbaseCluster, memberId int) {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
-	event := k8sutil.MemberRemoveEvent(name, cl)
+	event := NewMemberRemoveEvent(cl, memberId)
 	*e = append(*e, *event)
 }
 
@@ -91,4 +90,9 @@ func EventListCompareFailedString(expected, actual EventList) string {
 func NewMemberAddEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberAddEvent(name, cl)
+}
+
+func NewMemberRemoveEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	return k8sutil.MemberRemoveEvent(name, cl)
 }

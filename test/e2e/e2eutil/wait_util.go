@@ -357,6 +357,11 @@ func WaitForManagedConfigCondition(crClient versioned.Interface, cl *api.Couchba
 	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, status, cl, time.Now(), wait)
 }
 
+// waits until the cluter's scaling condition
+func WaitForClusterScalingCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
+	return WaitForClusterCondition(crClient, api.ClusterConditionScaling, v1.ConditionTrue, cl, time.Now(), wait)
+}
+
 // waits until the cluter's balanced condition is set
 func WaitForClusterBalancedCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
 	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, v1.ConditionTrue, cl, time.Now(), wait)
