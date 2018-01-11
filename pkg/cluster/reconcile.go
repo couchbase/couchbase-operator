@@ -98,6 +98,8 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) bool {
 			rm.handleUnknownServerConfigs(c)
 		case ReconcileRemoveNodes:
 			rm.handleRemoveNode(c)
+		case ReconcileRemoveUnmanaged:
+			rm.handleUnmanagedNodes(c)
 		case ReconcileAddNodes:
 			rm.handleAddNode(c)
 		case ReconcileRebalance:

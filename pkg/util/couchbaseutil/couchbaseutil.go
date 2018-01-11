@@ -18,7 +18,7 @@ type ClusterStatus struct {
 	FailedAddNodes  MemberSet // status=unhealthy, clusterMembership=inactiveAdded
 	DownNodes       MemberSet // status=unhealthy, clusterMembership=active
 	FailedNodes     MemberSet // status=unhealthy, clusterMembership=inactiveFailed
-	UnknownNodes    MemberSet // not part of the cluster
+	UnmanagedNodes  []string // not part of the cluster
 	IsRebalancing   bool
 	NeedsRebalance  bool
 }
@@ -67,24 +67,25 @@ func ClusterUUID(m *Member, username, password, clusterName string) (string, err
 func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*ClusterStatus, error) {
 	client := cbmgr.New(ms.ClientURLs(), username, password)
 
-	status := &ClusterStatus{}
+	status := &ClusterStatus{
+		ActiveNodes:     NewMemberSet(),
+		PendingAddNodes: NewMemberSet(),
+		FailedAddNodes:  NewMemberSet(),
+		DownNodes:       NewMemberSet(),
+		FailedNodes:     NewMemberSet(),
+		UnmanagedNodes:  make([]string, 0),
+	}
 	err := retryutil.RetryOnErr(5*time.Second, 36, "cluster status", clusterName, func() error {
 		info, err := client.ClusterInfo()
 		if err != nil {
 			return err
 		}
 
-		status.ActiveNodes = NewMemberSet()
-		status.PendingAddNodes = NewMemberSet()
-		status.FailedAddNodes = NewMemberSet()
-		status.DownNodes = NewMemberSet()
-		status.FailedNodes = NewMemberSet()
-		status.IsRebalancing = (info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
-
 		all := NewMemberSet()
 		for _, node := range info.Nodes {
 			member := ms[strings.Split(node.HostName, ".")[0]]
 			if member == nil {
+				status.UnmanagedNodes = append(status.UnmanagedNodes, node.HostName)
 				continue
 			}
 			all.Add(member)
@@ -105,8 +106,8 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 			}
 		}
 
+		status.IsRebalancing = (info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
 		status.NeedsRebalance = !info.Balanced && all.Size() > 1
-		status.UnknownNodes = ms.Diff(all)
 		return nil
 	})
 

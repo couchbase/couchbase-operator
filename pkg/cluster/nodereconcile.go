@@ -19,9 +19,10 @@ const (
 	ReconcileFailedNodes                   = 0x06
 	ReconcileServerConfigs                 = 0x07
 	ReconcileRemoveNodes                   = 0x08
-	ReconcileAddNodes                      = 0x09
-	ReconcileRebalance                     = 0x0a
-	ReconcileDeadMembers                   = 0x0b
+	ReconcileRemoveUnmanaged               = 0x09
+	ReconcileAddNodes                      = 0x0a
+	ReconcileRebalance                     = 0x0b
+	ReconcileDeadMembers                   = 0x0c
 	ReconcileFinished                      = 0xff
 )
 
@@ -40,8 +41,8 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 	// If we have any cluster related issues like failed nodes or if the cluster
 	// is not balanced or is currently rebalancing then we need to run reconcile.
 	if !r.couchbase.PendingAddNodes.Empty() || !r.couchbase.FailedNodes.Empty() ||
-		!r.couchbase.DownNodes.Empty() || !r.couchbase.FailedAddNodes.Empty() &&
-		!r.couchbase.UnknownNodes.Empty() || !r.runningPods.Equal(c.members) ||
+		!r.couchbase.DownNodes.Empty() || !r.couchbase.FailedAddNodes.Empty() ||
+		len(r.couchbase.UnmanagedNodes) > 0 || !r.runningPods.Equal(c.members) ||
 		r.couchbase.IsRebalancing || r.couchbase.NeedsRebalance {
 		needsReconcile = true
 	}
@@ -97,8 +98,8 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 		c.logger.Infof("failed nodes: %s", r.couchbase.FailedNodes)
 	}
 
-	if !r.couchbase.UnknownNodes.Empty() {
-		c.logger.Infof("unknown nodes: %s", r.couchbase.UnknownNodes)
+	if len(r.couchbase.UnmanagedNodes) > 0 {
+		c.logger.Infof("unmanaged nodes: %s", r.couchbase.UnmanagedNodes)
 	}
 
 	if r.couchbase.NeedsRebalance {
@@ -110,6 +111,8 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 	r.transitionState(ReconcileUnknownMembers)
 }
 
+// Unknown members are members who are currently running, but not part
+// of the set of nodes the operator is tracking.
 func (r *ReconcileMachine) handleUnknownMembers(c *Cluster) {
 	var err error
 	r.runningPods, err = c.removeUnknownMembers(r.runningPods)
@@ -216,6 +219,14 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
 		}
 	}
 
+	r.transitionState(ReconcileRemoveUnmanaged)
+}
+
+func (r *ReconcileMachine) handleUnmanagedNodes(c *Cluster) {
+	if len(r.couchbase.UnmanagedNodes) > 0 {
+		r.couchbase.NeedsRebalance = true
+	}
+
 	r.transitionState(ReconcileAddNodes)
 }
 
@@ -253,7 +264,8 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	if r.couchbase.NeedsRebalance {
 		c.status.SetUnbalancedCondition()
-		if err := c.rebalance(r.ejectNodes.HostURLs()); err != nil {
+		removeNodes := append(r.ejectNodes.HostURLs(), r.couchbase.UnmanagedNodes...)
+		if err := c.rebalance(removeNodes); err != nil {
 			c.logger.Warnf("Failed to start rebalance: %s", err.Error())
 			r.errored = true
 			r.transitionState(ReconcileFinished)
@@ -295,12 +307,13 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	r.transitionState(ReconcileDeadMembers)
 }
 
+// Dead members are members that the operator is tracking, but do not have a
+// corresponding running pod.
 func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
 	c.updateMemberStatus(c.members)
 
 	dead := c.members.Diff(r.runningPods)
 	if !dead.Empty() {
-		// remove dead members that don't have any running pods.
 		c.logger.Infof("removing one dead member")
 		err := c.removeDeadMember(c.members.Diff(r.runningPods).PickOne())
 		if err != nil {
