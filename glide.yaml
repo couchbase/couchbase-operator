@@ -1,4 +1,4 @@
-package: github.com/couchbaselabs/couchbase-operator
+package: github.com/couchbase/couchbase-operator
 import:
 - package: k8s.io/client-go
   version: 82aa063804cf055e16e8911250f888bc216e8b61
@@ -9,4 +9,4 @@ import:
 - package: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - package: github.com/couchbaselabs/gocbmgr
-  version: ffac9afddc0b01343b9370d335ecdf45a6e17664
+  version: 06c31c4d4f7613573e2b3331e9b03e75cbe32ff5

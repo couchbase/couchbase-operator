@@ -15,14 +15,15 @@ const (
 	ReconcileUnknownMembers                = 0x02
 	ReconcileRebalanceCheck                = 0x03
 	ReconcileDownNodes                     = 0x04
-	ReconcileFailedAddNodes                = 0x05
-	ReconcileFailedNodes                   = 0x06
-	ReconcileServerConfigs                 = 0x07
-	ReconcileRemoveNodes                   = 0x08
-	ReconcileRemoveUnmanaged               = 0x09
-	ReconcileAddNodes                      = 0x0a
-	ReconcileRebalance                     = 0x0b
-	ReconcileDeadMembers                   = 0x0c
+	ReconcileUnclusteredNodes              = 0x05
+	ReconcileFailedAddNodes                = 0x06
+	ReconcileFailedNodes                   = 0x07
+	ReconcileServerConfigs                 = 0x08
+	ReconcileRemoveNodes                   = 0x09
+	ReconcileRemoveUnmanaged               = 0x0a
+	ReconcileAddNodes                      = 0x0b
+	ReconcileRebalance                     = 0x0c
+	ReconcileDeadMembers                   = 0x0d
 	ReconcileFinished                      = 0xff
 )
 
@@ -43,7 +44,8 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 	if !r.couchbase.PendingAddNodes.Empty() || !r.couchbase.FailedNodes.Empty() ||
 		!r.couchbase.DownNodes.Empty() || !r.couchbase.FailedAddNodes.Empty() ||
 		len(r.couchbase.UnmanagedNodes) > 0 || !r.runningPods.Equal(c.members) ||
-		r.couchbase.IsRebalancing || r.couchbase.NeedsRebalance {
+		!r.couchbase.UnclusteredNodes.Empty() || r.couchbase.IsRebalancing ||
+		r.couchbase.NeedsRebalance {
 		needsReconcile = true
 	}
 
@@ -98,6 +100,10 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 		c.logger.Infof("failed nodes: %s", r.couchbase.FailedNodes)
 	}
 
+	if len(r.couchbase.UnclusteredNodes) > 0 {
+		c.logger.Infof("unclustered nodes: %s", r.couchbase.UnclusteredNodes)
+	}
+
 	if len(r.couchbase.UnmanagedNodes) > 0 {
 		c.logger.Infof("unmanaged nodes: %s", r.couchbase.UnmanagedNodes)
 	}
@@ -143,8 +149,22 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
 		r.transitionState(ReconcileFinished)
 	} else {
 		c.status.SetReadyCondition()
-		r.transitionState(ReconcileFailedAddNodes)
+		r.transitionState(ReconcileUnclusteredNodes)
 	}
+}
+
+func (r *ReconcileMachine) handleUnclusteredNodes(c *Cluster) {
+	for _, m := range r.couchbase.UnclusteredNodes {
+		if err := c.removePod(m.Name); err != nil {
+			c.logger.Errorf("Unable to remove unclustered node: %s", err.Error())
+		} else {
+			c.logger.Errorf("Removed unclustered node: %s", m.Name)
+			r.runningPods.Remove(m.Name)
+			c.members.Remove(m.Name)
+		}
+	}
+
+	r.transitionState(ReconcileFailedAddNodes)
 }
 
 func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
