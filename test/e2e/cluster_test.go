@@ -24,16 +24,26 @@ func TestResizeCluster(t *testing.T) {
 	f := framework.Global
 	expectedEvents := e2eutil.EventList{}
 	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, false)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
 	clusterSizes := []int{2, 3, 2, 1}
+
 	prevClusterSize := 1
+
 	for _, clusterSize := range clusterSizes {
-		err = e2eutil.ResizeCluster(t, clusterSize, f.CRClient, testCouchbase)
+		service := 0
+		err = e2eutil.ResizeCluster(t, service, clusterSize, f.CRClient, testCouchbase)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -45,22 +55,43 @@ func TestResizeCluster(t *testing.T) {
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
+			event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+
+			event = k8sutil.RebalanceEvent(testCouchbase)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddRebalanceEvent(testCouchbase)
+
 		case clusterSize-prevClusterSize < 0:
+			event = k8sutil.RebalanceEvent(testCouchbase)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddRebalanceEvent(testCouchbase)
+
+			event = e2eutil.NewMemberRemoveEvent(testCouchbase, clusterSize)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
 		}
 		prevClusterSize = clusterSize
 	}
-	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
 
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
 }
 
 // Test scaling a cluster with no buckets up and down
@@ -75,17 +106,31 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	f := framework.Global
 	expectedEvents := e2eutil.EventList{}
 	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	event = k8sutil.BucketCreateEvent("default", testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
 	clusterSizes := []int{2, 3, 2, 1}
 	prevClusterSize := 1
 	for _, clusterSize := range clusterSizes {
-		err = e2eutil.ResizeCluster(t, clusterSize, f.CRClient, testCouchbase)
+		service := 0
+		err = e2eutil.ResizeCluster(t, service, clusterSize, f.CRClient, testCouchbase)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,288 +142,366 @@ func TestResizeClusterWithBucket(t *testing.T) {
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
+			event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+
+			event = k8sutil.RebalanceEvent(testCouchbase)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddRebalanceEvent(testCouchbase)
 		case clusterSize-prevClusterSize < 0:
+			event = k8sutil.RebalanceEvent(testCouchbase)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddRebalanceEvent(testCouchbase)
+
+			event = e2eutil.NewMemberRemoveEvent(testCouchbase, clusterSize)
+			err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+			if err != nil {
+				t.Fatal(err)
+			}
 			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
 		}
 		prevClusterSize = clusterSize
 	}
-	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
 
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
 }
 
-// Tests scenerio where a third node is being added to a cluster, and a separate
-// node goes down immediately after the add & before the rebalance.
-//
-// Expects: autofailover of down node occurs and a replacement node is added
-// in order to reach desired cluster size
-func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
-
+// Tests editing of cluster settings
+// 1. Create a 1 node cluster
+// 2. Change data service memory quota from 256 to 257 (verify via rest call to cluster)
+// 3. Change index service memory quota from 256 to 257 (verify via rest call to cluster)
+// 4. Change search service memory quota from 256 to 257 ( verify via rest call to cluster)
+// 5. Change autofailover timeout from 30 to 31 ( verify via rest call to cluster)
+func TestEditClusterSettings(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1}
 
-	// create 2 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
-	// async scale up to 3 node cluster
-	echan := make(chan error)
-	go func() {
-		echan <- e2eutil.ResizeCluster(t, 3, f.CRClient, testCouchbase)
-	}()
+	expectedEvents := e2eutil.EventList{}
 
-	// wait for add member event
-	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
 
-	// kill pod 1
-	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// check response from resize request
-	err = <-echan
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Tests scenerio where the node being added to is killed before it can be
-// rebalanced in.
-//
-// Expects: autofailover of down node occurs and a replacement node is added
-// in order to reach desired cluster size
-func TestNodeRecoveryKilledNewMember(t *testing.T) {
-
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-
-	// create 2 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
-
-	// async scale up to 3 node cluster
-	echan := make(chan error)
-	go func() {
-		echan <- e2eutil.ResizeCluster(t, 3, f.CRClient, testCouchbase)
-	}()
-
-	// wait for add member event
-	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	// kill pod that was just added
-	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 2)
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// check response from resize request
-	err = <-echan
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-// 1. Create 1 node cluster
-// 2. Scale cluster to 3 members
-// 3. When rebalance starts kill 3rd member
-// 4. Wait for autofailover to add a 4th member
-// 5. Kill 4th member when added to cluster
-// 6. Wait for resize to reach 3 nodes
-// 7. Make sure cluster is healthy
-func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
-
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-
-	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
-
-	// async kill a pod while cluster is scaling to 3rd member
-	doneCh := make(chan bool)
-	go func() {
-
-		// detect 3rd member add event
-		event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
-		err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// wait rebalance event
-		event = k8sutil.RebalanceEvent(testCouchbase)
-		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// kill 3rd member being rebalanced in
-		err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 2)
-		if err != nil {
-			t.Fatal(err)
-		}
-		doneCh <- true
-	}()
-
-	// async watch for 4th member event
-	go func() {
-
-		// waiting for 3rd membr to be killed
-		<-doneCh
-
-		event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
-		err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 3)
-		if err != nil {
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
 			t.Fatal(err)
 		}
 	}()
-
-	// resize to 3 member cluster
-	err = e2eutil.ResizeCluster(t, 3, f.CRClient, testCouchbase)
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to get cluster url %v", err)
 	}
-
-	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Test that a foreign node is removed from cluster
-//
-// Expects: only nodes added by operator to be in cluster
-// 1. Create 1 node cluster
-// 2. Manually add 1 external member to cluster
-// 3. Request cluster resize to 2 members
-// 4. Verify that actuall cluster size is 2 nodes
-// 5. Verify that external member was removed
-// 6. Verify that the 2 cluster nodes are healthy
-func TestRemoveForeignNode(t *testing.T) {
-
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-
-	// create 1 node cluster with admin console
-	testCouchbase, err := e2eutil.NewClusterExposed(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
-
-	// create a client to admin console
-	testCouchbase, err = e2eutil.GetClusterCRD(f.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
-	err, username, password := e2eutil.GetClusterAuth(t, f.KubeClient, f.Namespace, f.DefaultSecret.Name)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %+v", clusterInfo)
+
+	// edit cluster dataServiceMemQuota
+	newDataServiceMemQuota := "257"
+	t.Log("Changing cluster data service mem quota")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyClusterInfo(t, client, 6, "257", e2eutil.DataServiceMemQuotaVerifier)
+	if err != nil {
+		t.Fatalf("failed to change cluster data service mem quota: %v", err)
+	}
+
+	// edit cluster indexServiceMemQuota
+	newIndexServiceMemQuota := "257"
+	t.Log("Changing cluster index service mem quota")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyClusterInfo(t, client, 6, "257", e2eutil.IndexServiceMemQuotaVerifier)
+	if err != nil {
+		t.Fatalf("failed to change cluster index service mem quota: %v", err)
+	}
+
+	// edit cluster searchServiceMemQuota
+	newSearchServiceMemQuota := "257"
+	t.Log("Changing cluster search service mem quota")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyClusterInfo(t, client, 6, "257", e2eutil.SearchServiceMemQuotaVerifier)
+	if err != nil {
+		t.Fatalf("failed to change cluster search service mem quota: %v", err)
+	}
+
+	// edit cluster autoFailoverTimeout
+	newAutoFailoverTimeout := "31"
+	t.Log("Changing cluster autofailover timeout")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyAutoFailoverInfo(t, client, 6, "31", e2eutil.AutoFailoverTimeoutVerifier)
+	if err != nil {
+		t.Fatalf("failed to change cluster autofailover timeout: %v", err)
+	}
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+// Tests invalid editing of cluster settings (setting changes should not take hold)
+// 1. Create a 1 node cluster
+// 2. Change data service memory quota from 256 to 0 (verify via rest call to cluster)
+// 3. Change index service memory quota from 256 to 0 (verify via rest call to cluster)
+// 4. Change search service memory quota from 256 to 0 ( verify via rest call to cluster)
+// 5. Change indexer storage mode from gsi to moi (verify via rest call to cluster)
+// 6. Change autofailover timeout from 30 to 0 ( verify via rest call to cluster)
+func TestNegEditClusterSettings(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// create a foreign member to be added to the cluster
-	serverConfig := testCouchbase.Spec.ServerSettings[0]
-	m := &couchbaseutil.Member{
-		Name:         "test-member",
-		Namespace:    f.Namespace,
-		ServerConfig: serverConfig.Name,
-		SecureClient: false,
-	}
-	pod, err := e2eutil.CreateMemberPod(f.KubeClient, m, testCouchbase, "unknown-cluster", f.Namespace)
+	expectedEvents := e2eutil.EventList{}
+
+	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.KillMember(f.KubeClient, f.Namespace, "test-member")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
 
-	externalPodIP := pod.Status.PodIP + ":8091"
-	err = e2eutil.AddNode(t, client, serverConfig.Services, username, password, externalPodIP)
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	// resize to 2 member cluster
-	err = e2eutil.ResizeCluster(t, 2, f.CRClient, testCouchbase)
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// check that actual cluster size is only 2 nodes
-	info, err := client.ClusterInfo()
-	numNodes := len(info.Nodes)
-	if numNodes != 2 {
-		t.Fatalf("expected 2 nodes, found: %d", numNodes)
-	}
-
-	// None of the nodes should be the foreign member and
-	// all should be healthy
-	for _, node := range info.Nodes {
-		if node.HostName == externalPodIP {
-			t.Fatalf("node %s should not be in cluster", node.HostName)
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
 		}
-		if node.Status != "healthy" {
-			t.Fatalf("node %s is not healthy, status: %s", node.HostName, node.Status)
-		}
+	}()
+
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %+v", clusterInfo)
+
+	// edit cluster dataServiceMemQuota
+	newDataServiceMemQuota := "0"
+	t.Log("Changing cluster data service mem quota")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyClusterInfo(t, client, 6, "0", e2eutil.DataServiceMemQuotaVerifier)
+	if err == nil {
+		t.Fatalf("failed to reject change for cluster data service mem quota: %v", err)
 	}
 
+	// edit cluster indexServiceMemQuota
+	newIndexServiceMemQuota := "0"
+	t.Log("Changing cluster index service mem quota")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyClusterInfo(t, client, 6, "0", e2eutil.IndexServiceMemQuotaVerifier)
+	if err == nil {
+		t.Fatalf("failed to reject change for cluster index service mem quota: %v", err)
+	}
+
+	// edit cluster searchServiceMemQuota
+	newSearchServiceMemQuota := "0"
+	t.Log("Changing cluster search service mem quota")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyClusterInfo(t, client, 6, "0", e2eutil.SearchServiceMemQuotaVerifier)
+	if err == nil {
+		t.Fatalf("failed to reject change cluster for search service mem quota: %v", err)
+	}
+
+	// edit cluster indexStorageSetting
+	newIndexStorageSetting := "plasma"
+	t.Log("Changing cluster index storage setting")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyIndexSettingInfo(t, client, 6, "0", e2eutil.IndexSettingVerifier)
+	if err == nil {
+		t.Fatalf("failed to reject change for cluster indexer storage setting: %v", err)
+	}
+
+	// edit cluster autoFailoverTimeout
+	newAutoFailoverTimeout := "0"
+	t.Log("Changing cluster autofailover timeout")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, f.CRClient, testCouchbase, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyAutoFailoverInfo(t, client, 6, "0", e2eutil.AutoFailoverTimeoutVerifier)
+	if err == nil {
+		t.Fatalf("failed to reject change for cluster autofailover timeout: %v", err)
+	}
+
+	//verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+// Tests if specs with invalid auth secrets will create a cluster (they should not)
+// 1. Attempt to create a cluster with invalid auth secret
+// 2. Wait until cluster creation fails
+func TestInvalidAuthSecret(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+	}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "invalid-test-secret", configMap, false)
+	if err == nil {
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+		t.Fatalf("failed to reject cluster creation: %v", err)
+	}
+}
+
+// Tests if specs with invalid base image will create a cluster (they should not)
+// 1. Attempt to create a cluster with invalid base image
+// 2. Wait until cluster creation fails
+func TestInvalidBaseImage(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	otherConfig1 := map[string]string{
+		"baseImageName": "basecouch/123",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"other1":   otherConfig1,
+	}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err == nil {
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+		t.Fatalf("failed to reject cluster creation: %v", err)
+	}
+}
+
+// Tests if specs with invalid verison will create a cluster (they should not)
+// 1. Attempt to create a cluster with invalid version
+// 2. Wait until cluster creation fails
+func TestInvalidVersion(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	otherConfig1 := map[string]string{
+		"versionNum": "enterprise-1.9.1",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"other1":   otherConfig1,
+	}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err == nil {
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+		t.Fatalf("failed to reject cluster creation: %v", err)
+	}
 }
 
 // 1. create 1 node cluster
@@ -389,14 +512,12 @@ func TestRemoveForeignNode(t *testing.T) {
 // 6. remove resource limits
 // 7. expect scale up to complete
 func TestNodeUnschedulable(t *testing.T) {
-
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
-
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,14 +531,10 @@ func TestNodeUnschedulable(t *testing.T) {
 	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
 		cl.Spec.ServerSettings[0].Pod = e2espec.CreateMemoryPodPolicy(allocatableMemory*7/10, allocatableMemory)
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// async start resize cluster
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 3, f.CRClient, testCouchbase)
+		echan <- e2eutil.ResizeCluster(t, 0, 3, f.CRClient, testCouchbase)
 	}()
 
 	// expect unbalanced condition
@@ -449,7 +566,6 @@ func TestNodeUnschedulable(t *testing.T) {
 }
 
 // Node service goes down while scaling down cluster
-//
 // 1. Create 5 node cluster
 // 2. Scale down to 4 nodes
 // 3. When rebalance starts, stop couchbase on node-0000
@@ -458,14 +574,13 @@ func TestNodeUnschedulable(t *testing.T) {
 //      a. either by not continuing to scale down since down node was removed
 //      b. continuing to scale down and replacing down node
 func TestNodeServiceDownDuringRebalance(t *testing.T) {
-
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
 
 	// create 5 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 5, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 5, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +589,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	// scale down to 4 node cluster
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 4, f.CRClient, testCouchbase)
+		echan <- e2eutil.ResizeCluster(t, 0, 4, f.CRClient, testCouchbase)
 	}()
 
 	// when cluster starts scaling kill couchbase service on pod 0
@@ -517,14 +632,13 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 // 5. Expect operator to add another node
 // 6. Verify cluster is balanced with 2 nodes
 func TestReplaceManuallyRemovedNode(t *testing.T) {
-
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
 
 	// create 2 node cluster with admin console
-	testCouchbase, err := e2eutil.NewClusterExposed(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 2, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 2, true, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -594,6 +708,882 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 
 }
 
-func TestNegResizeCluster(t *testing.T) {
+// Tests basic MDS Scaling
+// 1. Create 1 node cluster with data service only
+// 2. Add n1ql service to cluster (verify via rest call to cluster)
+// 3. Add index service to cluster (verify via rest call to cluster)
+// 4. Add search service to cluster (verify via rest call to cluster)
+// 5. Remove search service from cluster (verify via rest call to cluster)
+// 6. Remove index service from cluster (verify via rest call to cluster)
+// 7. Remove n1ql service from cluster (verify via rest call to cluster)
+func TestBasicMDSScaling(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1}
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %+v", clusterInfo)
+
+	// adding n1ql service
+	t.Log("adding n1ql service")
+	newService := api.ServerConfig{
+		Size:      1,
+		Name:      "test_config_2",
+		Services:  []string{"n1ql"},
+		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+	}
+	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, 10)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	serviceMap := map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 0,
+		"FTS":   0,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to add n1ql service: %v", err)
+	}
+
+	// adding index service
+	t.Log("adding index service")
+	newService = api.ServerConfig{
+		Size:      1,
+		Name:      "test_config_3",
+		Services:  []string{"index"},
+		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+	}
+	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, 10)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   0,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to add index service: %v", err)
+	}
+
+	// adding search service
+	t.Log("adding fts service")
+	newService = api.ServerConfig{
+		Size:      1,
+		Name:      "test_config_4",
+		Services:  []string{"fts"},
+		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+	}
+	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, 10)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   1,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to add fts service: %v", err)
+	}
+
+	// removing search service
+	t.Log("removing fts service")
+	removeServiceName := "test_config_4"
+	testCouchbase, err = e2eutil.RemoveServices(f.CRClient, testCouchbase, removeServiceName, 10)
+	if err != nil {
+		t.Fatalf("remove service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 3)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   0,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to remove fts service: %v", err)
+	}
+
+	// removing index service
+	t.Log("removing index service")
+	removeServiceName = "test_config_3"
+	testCouchbase, err = e2eutil.RemoveServices(f.CRClient, testCouchbase, removeServiceName, 10)
+	if err != nil {
+		t.Fatalf("remove service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 0,
+		"FTS":   0,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to remove index service: %v", err)
+	}
+
+	// removing n1ql service
+	t.Log("removing n1ql service")
+	removeServiceName = "test_config_2"
+	testCouchbase, err = e2eutil.RemoveServices(f.CRClient, testCouchbase, removeServiceName, 10)
+	if err != nil {
+		t.Fatalf("remove service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  0,
+		"Index": 0,
+		"FTS":   0,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to remove n1ql service: %v", err)
+	}
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+// Tests swapping nodes between services
+// 1. Create 1 node cluster with data service only
+// 2. Add n1ql service to cluster, 1 node (verify via rest call to cluster)
+// 3. Add index service to cluster, 1 node (verify via rest call to cluster)
+// 4. Add search service to cluster, 2 nodes (verify via rest call to cluster)
+// 5. Swap node from search service to index service (verify via rest call to cluster)
+// 6. Swap node from index service to n1ql service (verify via rest call to cluster)
+// 7. Swap node from n1ql service to data service (verify via rest call to cluster)
+func TestSwapNodesBetweenServices(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataNode
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, true)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %+v", clusterInfo)
+
+	// adding n1ql service
+	t.Log("adding n1ql service")
+	newService := api.ServerConfig{
+		Size:      1,
+		Name:      "test_config_2",
+		Services:  []string{"n1ql"},
+		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+	}
+	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, 10)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	serviceMap := map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 0,
+		"FTS":   0,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to add n1ql service: %v", err)
+	}
+
+	// adding index service
+	t.Log("adding index service")
+	newService = api.ServerConfig{
+		Size:      1,
+		Name:      "test_config_3",
+		Services:  []string{"index"},
+		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+	}
+	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, 10)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   0,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to add index service: %v", err)
+	}
+
+	// adding search services
+	t.Log("adding fts service")
+	newService = api.ServerConfig{
+		Size:      2,
+		Name:      "test_config_4",
+		Services:  []string{"fts"},
+		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
+		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+	}
+	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, 10)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   2,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to add fts service: %v", err)
+	}
+
+	// swapping nodes search - 1 and index + 1
+	t.Log("swaping nodes: test_config_4--, test_config_3++")
+	swapMap := map[string]int{
+		"test_config_4": 1,
+		"test_config_3": 2,
+	}
+	testCouchbase, err = e2eutil.ScaleServices(f.CRClient, testCouchbase, 10, swapMap)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, 4)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 4)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 2,
+		"FTS":   1,
+	}
+	err = e2eutil.VerifyServices(t, client, 18, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to scale test_config_4--, test_config_3++: %v", err)
+	}
+
+	// swapping nodes index - 1 and n1ql + 1
+	t.Log("swaping nodes: test_config_3--, test_config_2++")
+	swapMap = map[string]int{
+		"test_config_3": 1,
+		"test_config_2": 2,
+	}
+	testCouchbase, err = e2eutil.ScaleServices(f.CRClient, testCouchbase, 10, swapMap)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 6)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, 5)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 5)
+
+	serviceMap = map[string]int{
+		"Data":  1,
+		"N1QL":  2,
+		"Index": 1,
+		"FTS":   1,
+	}
+	err = e2eutil.VerifyServices(t, client, 18, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to scale test_config_3--, test_config_2++: %v", err)
+	}
+
+	// swapping nodes n1ql - 1 and data + 1
+	t.Log("swaping nodes: test_config_2--, test_config_1++")
+	swapMap = map[string]int{
+		"test_config_2": 1,
+		"test_config_1": 2,
+	}
+	testCouchbase, err = e2eutil.ScaleServices(f.CRClient, testCouchbase, 10, swapMap)
+	if err != nil {
+		t.Fatalf("add service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 7)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 7)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, 6)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 6)
+
+	serviceMap = map[string]int{
+		"Data":  2,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   1,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
+	}
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+// Tests creating a cluster without data service
+// 1. Attempt to create cluster without data service
+// 2. Verify that the cluster could not be created
+func TestCreateClusterWithoutDataService(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceThreeDataN1qlIndex
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1}
+
+	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, false)
+	if err == nil {
+		t.Fatal("failed to not create cluster")
+	}
+}
+
+// Tests creating a cluster where the data service is the second service listed in the spec
+// 1. Attempt to create a 2 node cluster with cluster spec order {[n1ql,fts,search], [data]}
+// 2. Verify cluster was created via rest call
+func TestCreateClusterDataServiceNotFirst(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneN1qlIndexSearch
+	serviceConfig2 := e2eutil.BasicSecondaryServiceOneData
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"service2": serviceConfig2}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, true)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	if err != nil {
+		t.Fatal("failed to create cluster: %v", err)
+	}
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %+v", clusterInfo)
+
+	serviceMap := map[string]int{
+		"Data":  1,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   1,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
+	}
+
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+func TestRemoveLastDataService(t *testing.T) {
+	t.Skip("test not ready")
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneN1qlIndexSearch
+	serviceConfig2 := e2eutil.BasicSecondaryServiceOneData
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"service2": serviceConfig2}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, true)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	if err != nil {
+		t.Fatal("failed to create cluster: %v", err)
+	}
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %+v", clusterInfo)
+
+	t.Log("removing last data service")
+	removeServiceName := "test_config_2"
+	testCouchbase, err = e2eutil.RemoveServices(f.CRClient, testCouchbase, removeServiceName, 10)
+	if err != nil {
+		t.Fatalf("remove service failed: %v", err)
+	}
+	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster resize failed: %v", err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
+	serviceMap := map[string]int{
+		"Data":  0,
+		"N1QL":  1,
+		"Index": 1,
+		"FTS":   1,
+	}
+	err = e2eutil.VerifyServices(t, client, 6, serviceMap, e2eutil.NodeServicesVerifier)
+	if err != nil {
+		t.Fatalf("failed to remove data service: %v", err)
+	}
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
 
 }

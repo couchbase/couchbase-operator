@@ -18,7 +18,7 @@ container: build
 	docker build -t couchbase/couchbase-operator:v1 .
 
 test:
-	go test github.com/couchbase/couchbase-operator/test/e2e -v -timeout 30m \
+	go test github.com/couchbase/couchbase-operator/test/e2e -v -timeout 120m \
 		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
 		--namespace $(namespace) --deployment-spec $(deploymentSpec)
 

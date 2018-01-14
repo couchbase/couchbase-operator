@@ -9,6 +9,22 @@ func NewErrVerifyEditBucket(bucket string) error {
 	return fmt.Errorf("failed during edit bucket verification: %s", bucket)
 }
 
+func NewErrVerifyClusterInfo() error {
+	return fmt.Errorf("failed to verify cluster info")
+}
+
+func NewErrAutoFailoverInfo() error {
+	return fmt.Errorf("failed to verify autofailover info")
+}
+
+func NewErrVerifyServices() error {
+	return fmt.Errorf("failed to verify services info")
+}
+
+func NewErrIndexSettingInfo() error {
+	return fmt.Errorf("failed to verify index setting info")
+}
+
 func NewErrGetClusterBucket(bucket string) error {
 	return fmt.Errorf("failed to get bucket from cluster %s", bucket)
 }

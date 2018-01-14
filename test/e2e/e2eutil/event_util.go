@@ -74,6 +74,10 @@ func (e *EventList) AddBucketEditEvent(cl *api.CouchbaseCluster, name string) {
 	*e = append(*e, *k8sutil.BucketEditEvent(name, cl))
 }
 
+func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *api.CouchbaseCluster, name string) {
+	*e = append(*e, *k8sutil.AdminConsoleSvcCreateEvent(name, cl))
+}
+
 func (e EventList) String() string {
 	s := ""
 	for _, c := range e {

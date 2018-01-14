@@ -2,6 +2,7 @@ package e2eutil
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -274,7 +275,7 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string
 	lo := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(NameLabelSelector(name)).String(),
 	}
-	err := retryutil.Retry(10*time.Second, 6, func() (bool, error) {
+	err := retryutil.Retry(10*time.Second, 18, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
@@ -289,6 +290,26 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string
 	})
 	if err != nil {
 		return fmt.Errorf("failed to wait for pod (%v) to become ready: %v", podName, err)
+	}
+	return nil
+}
+
+func WaitUntilOperatorDeleted(kubecli kubernetes.Interface, namespace, name string) error {
+	lo := metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(NameLabelSelector(name)).String(),
+	}
+	err := retryutil.Retry(10*time.Second, 6, func() (bool, error) {
+		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
+		if err != nil {
+			return false, err
+		}
+		if len(podList.Items) == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to wait for pods with label=(%v) to be deleted: %v", name, err)
 	}
 	return nil
 }
@@ -326,7 +347,7 @@ func CreateAndWaitPod(kubecli kubernetes.Interface, ns string, pod *v1.Pod, time
 	return retPod, nil
 }
 
-// waits until the provided condition type occurrs with associated status
+// waits until the provided condition type occurs with associated status
 func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, seconds int) error {
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: api.CRDResourceKind},
@@ -374,7 +395,6 @@ func WaitForClusterUnBalancedCondition(crClient versioned.Interface, cl *api.Cou
 
 // waits until the provided condition type with associated status after specified timestamp
 func WaitForClusterCondition(crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) error {
-
 	cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
 	if err != nil {
 		return err
@@ -409,4 +429,43 @@ func WaitForClusterCondition(crClient versioned.Interface, conditionType api.Clu
 			}
 		}
 	}
+}
+
+func WaitUntilAccepts(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
+	interval := 5 * time.Second
+	err := retryutil.Retry(interval, retries, func() (done bool, err error) {
+		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, accept := range accepts {
+			if !accept(currCluster) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func WaitUntilEventsCompare(t *testing.T, kubecli kubernetes.Interface, retries int, cl *api.CouchbaseCluster, compareEvents EventList, namespace string) error {
+	interval := 5 * time.Second
+	err := retryutil.Retry(interval, retries, func() (done bool, err error) {
+		events, err := GetCouchbaseEvents(kubecli, cl.Name, namespace)
+		if err != nil {
+			return false, fmt.Errorf("failed to get coucbase cluster events: %v", err)
+		}
+		if !compareEvents.Compare(events) {
+			return false, errors.New(EventListCompareFailedString(compareEvents, events))
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

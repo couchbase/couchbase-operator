@@ -1,21 +1,443 @@
 package e2e
 
 import (
+	"os"
 	"testing"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
-func TestPodConfig(t *testing.T) {
+//Assume each node has 7.6GB of memory
+func TestPodResourcesBasic(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := map[string]string{
+		"size":               "1",
+		"name":               "test_config_1",
+		"services":           "data",
+		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
+		"resourceMemRequest": "400",
+		"resourceMemLimit":   "500",
+	}
 
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+	}
+	t.Logf("Pod Policy Resource Memory Request=0.4GB... \n Pod Policy Resource Memory Limit=0.5GB... \n attempting to create 2 node cluster")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err != nil {
+		t.Fatalf("failed to place first pod: %v", err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
 }
 
-func TestPodConfigNegative(t *testing.T) {
+func TestNegPodResourcesBasic(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := map[string]string{
+		"size":               "1",
+		"name":               "test_config_1",
+		"services":           "data",
+		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
+		"resourceMemRequest": "500",
+		"resourceMemLimit":   "400",
+	}
 
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+	}
+	t.Logf("Pod Policy Resource Memory Request=0.5GB... \n Pod Policy Resource Memory Limit=0.4GB... \n attempting to create 1 node cluster")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err == nil {
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+		t.Fatalf("pod placed with invalid resource list, fail: ", err)
+	}
+	t.Logf("Pod not placed")
 }
 
-func TestPodPlacement(t *testing.T) {
-
+func TestPodResourcesHigh(t *testing.T) {
+	t.Skip("test not fully implemented...")
 }
 
-func TestPodPlacementNegative(t *testing.T) {
+func TestPodResourcesLow(t *testing.T) {
+	t.Skip("test not fully implemented...")
+}
 
+//Assume each node has 7.6GB of memory
+func TestPodResourcesCannotBePlaced(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := map[string]string{
+		"size":               "1",
+		"name":               "test_config_1",
+		"services":           "data",
+		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
+		"resourceMemRequest": "1000",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+	}
+	t.Logf("Pod Policy Resource Memory Request=1GB... \n scaling until pods cannot be placed")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err != nil {
+		t.Fatalf("failed to place first pod: %v", err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	clusterSize := 1
+	for err == nil {
+		clusterSize = clusterSize + 1
+		err = e2eutil.ResizeCluster(t, 0, clusterSize, f.CRClient, testCouchbase)
+		if err != nil {
+			t.Logf("failed to place pod: %v", clusterSize)
+			break
+		}
+
+		event = e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1)
+		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+
+		event = k8sutil.RebalanceEvent(testCouchbase)
+		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddRebalanceEvent(testCouchbase)
+
+		t.Logf("Pods placed: %v", clusterSize)
+	}
+	actualSize := clusterSize - 1
+
+	t.Logf("Cluster size: %v", actualSize)
+
+	// TODO calculate cluster memory total and use to assert correct cluster size
+	if actualSize != 1 && actualSize != 20 {
+		t.Fatalf("failed to saturate cluster memory: %v", err)
+	}
+
+	t.Logf("Cluster memory saturated with cluster size: %v", actualSize)
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+//Assume each node has 7.6GB of memory
+func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := map[string]string{
+		"size":               "1",
+		"name":               "test_config_1",
+		"services":           "data",
+		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
+		"resourceMemRequest": "16000",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+	}
+	t.Logf("Pod Policy Resource Memory Request=16GB... \n attempting to create 1 pod cluster with 3 nodes of 8GB")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err == nil {
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+		t.Fatalf("16GB request placed on node with 8GB, fail: ", err)
+	}
+	t.Logf("Pod not placed")
+}
+
+//this test will assume a 3 node kubernetes cluster
+func TestAntiAffinityOn(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceThreeDataNode
+	otherConfig1 := map[string]string{
+		"antiAffinity": "on",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"other1":   otherConfig1,
+	}
+	t.Logf("AntiAffinity=on... \n attempting to create 3 pod cluster with 3 nodes")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err != nil {
+		t.Fatalf("cluster creation failed: %v", err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	t.Logf("cluster created")
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+//this test will assume a 3 node kubernetes cluster
+func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceFourDataNode
+	otherConfig1 := map[string]string{
+		"antiAffinity": "on",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"other1":   otherConfig1,
+	}
+	t.Logf("AntiAffinity=on... \n attempting to create 4 pod cluster with 3 nodes")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err == nil {
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+		t.Fatalf("cluster created despite anti affinity status... fail: %v", err)
+	}
+	t.Logf("Cluster creation failed, anti affinty works")
+}
+
+//this test will assume a 3 node kubernetes cluster
+func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceThreeDataNode
+	otherConfig1 := map[string]string{
+		"antiAffinity": "on",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"other1":   otherConfig1,
+	}
+	t.Logf("AntiAffinity=on... \n attempting to create 3 pod cluster with 3 nodes")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err != nil {
+		t.Fatalf("cluster creation failed: %v", err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	t.Logf("Cluster created")
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	t.Logf("Attempting to add a node")
+	err = e2eutil.ResizeCluster(t, 0, 4, f.CRClient, testCouchbase)
+	if err == nil {
+		t.Fatalf("cluster scaled to 4 pods on 3 nodes, fail: %v", err)
+	}
+	t.Logf("Node not added")
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
+}
+
+//this test will assume a 3 node kubernetes cluster
+func TestAntiAffinityOff(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceFourDataNode
+	otherConfig1 := map[string]string{
+		"antiAffinity": "off",
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"other1":   otherConfig1,
+	}
+	t.Logf("AntiAffinity=off... \n attempting to create 4 pod cluster with 3 nodes")
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	if err != nil {
+		t.Fatalf("cluster creation failed: %v", err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	t.Logf("cluster created")
+
+	expectedEvents := e2eutil.EventList{}
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	t.Logf("Attempting to add a node")
+	err = e2eutil.ResizeCluster(t, 0, 5, f.CRClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster failed to scale to 5 nodes: %v", err)
+	}
+	t.Logf("Node added")
+
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
+
+	event = k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	// verify events
+	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	if err != nil {
+		t.Fatalf("compare events failed: %v", err)
+	}
 }

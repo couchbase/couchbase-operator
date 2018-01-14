@@ -2,10 +2,12 @@ package e2eutil
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,16 +20,99 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
-func NewClusterBasic(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool) (*api.CouchbaseCluster, error) {
-	crd := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket)
-	return CreateClusterWithCRD(t, crClient, crd, namespace, secretName, size, withBucket)
-}
+var (
+	BasicClusterConfig = map[string]string{
+		"dataServiceMemQuota":   "256",
+		"indexServiceMemQuota":  "256",
+		"searchServiceMemQuota": "256",
+		"indexStorageSetting":   "memory_optimized",
+		"autoFailoverTimeout":   "10"}
 
-func NewClusterExposed(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool) (*api.CouchbaseCluster, error) {
-	crd := e2espec.NewClusterExposedSpec("test-couchbase-", secretName, size, withBucket)
+	BasicServiceOneDataNode = map[string]string{
+		"size":      "1",
+		"name":      "test_config_1",
+		"services":  "data",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicServiceOneDataN1qlIndex = map[string]string{
+		"size":      "1",
+		"name":      "test_config_1",
+		"services":  "data,n1ql,index",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicServiceOneN1qlIndexSearch = map[string]string{
+		"size":      "1",
+		"name":      "test_config_1",
+		"services":  "n1ql,index,fts",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicSecondaryServiceOneData = map[string]string{
+		"size":      "1",
+		"name":      "test_config_2",
+		"services":  "data",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicServiceThreeDataN1qlIndex = map[string]string{
+		"size":      "3",
+		"name":      "test_config_1",
+		"services":  "data,n1ql,index",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicServiceThreeDataNode = map[string]string{
+		"size":      "3",
+		"name":      "test_config_1",
+		"services":  "data",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicServiceFourDataNode = map[string]string{
+		"size":      "4",
+		"name":      "test_config_1",
+		"services":  "data",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicServiceFiveDataN1qlIndex = map[string]string{
+		"size":      "5",
+		"name":      "test_config_1",
+		"services":  "data,n1ql,index",
+		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
+		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+
+	BasicOneReplicaBucket = map[string]string{
+		"bucketName":         "default",
+		"bucketType":         "couchbase",
+		"bucketMemoryQuota":  "100",
+		"bucketReplicas":     "1",
+		"ioPriority":         "high",
+		"evictionPolicy":     "fullEviction",
+		"conflictResolution": "seqno",
+		"enableFlush":        "true",
+		"enableIndexReplica": "false"}
+
+	BasicTwoReplicaBucket = map[string]string{
+		"bucketName":         "default",
+		"bucketType":         "couchbase",
+		"bucketMemoryQuota":  "100",
+		"bucketReplicas":     "2",
+		"ioPriority":         "high",
+		"evictionPolicy":     "fullEviction",
+		"conflictResolution": "seqno",
+		"enableFlush":        "true",
+		"enableIndexReplica": "false"}
+)
+
+func NewClusterBasic(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	crd := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
 	cl, err := CreateClusterWithCRD(t, crClient, crd, namespace, secretName, size, withBucket)
 	if err != nil {
 		return nil, err
@@ -37,8 +122,8 @@ func NewClusterExposed(t *testing.T, crClient versioned.Interface, namespace, se
 }
 
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
-	config map[string]map[string]string) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config)
+	config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
 	testCouchbase, err := CreateCluster(t, crClient, namespace, clusterSpec)
 	if err != nil {
 		return nil, err
@@ -54,20 +139,63 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 			return nil, err
 		}
 	}
-	return testCouchbase, nil
+	return GetClusterCRD(crClient, testCouchbase)
 }
 
-func UpdateClusterSpec(field string, value interface{}, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
+func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
+
+	updateFunc := func(cl *api.CouchbaseCluster) {}
+
+	switch {
+	case field == "Paused":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.Paused, _ = strconv.ParseBool(value) }
+	case field == "ExposeAdminConsole":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ExposeAdminConsole, _ = strconv.ParseBool(value) }
+	}
+
+	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+
+}
+
+func UpdateClusterSettings(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
+
+	updateFunc := func(cl *api.CouchbaseCluster) {}
+
+	switch {
+	case field == "DataServiceMemQuota":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.DataServiceMemQuota, _ = strconv.Atoi(value) }
+	case field == "IndexServiceMemQuota":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.IndexServiceMemQuota, _ = strconv.Atoi(value) }
+	case field == "SearchServiceMemQuota":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.SearchServiceMemQuota, _ = strconv.Atoi(value) }
+	case field == "IndexStorageSetting":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.IndexStorageSetting = value }
+	case field == "AutoFailoverTimeout":
+		updateFunc = func(cl *api.CouchbaseCluster) {
+			newTimeout, _ := strconv.Atoi(value)
+			cl.Spec.ClusterSettings.AutoFailoverTimeout = uint64(newTimeout)
+		}
+	}
+
+	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+
+}
+
+func UpdateServiceSpec(service int, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
 
 	updateFunc := func(cl *api.CouchbaseCluster) {}
 
 	switch {
 	case field == "Size":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[0].Size = ConvertToInt(value) }
-	case field == "ExposeAdminConsole":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ExposeAdminConsole, _ = strconv.ParseBool(value.(string)) }
-	case field == "DataServiceMemQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.DataServiceMemQuota = ConvertToInt(value) }
+	case field == "Name":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Name = value }
+	case field == "Services":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Services = strings.Split(value, ",") }
+	case field == "DataPath":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].DataPath = value }
+	case field == "IndexPath":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].IndexPath = value }
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 
@@ -83,6 +211,35 @@ func ConvertToInt(value interface{}) int {
 		return strInt
 	}
 	return 0
+}
+func AddServices(crClient versioned.Interface, cl *api.CouchbaseCluster, newService api.ServerConfig, maxRetries int) (*api.CouchbaseCluster, error) {
+	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = append(cl.Spec.ServerSettings, newService) }
+	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+}
+
+func RemoveServices(crClient versioned.Interface, cl *api.CouchbaseCluster, removeServiceName string, maxRetries int) (*api.CouchbaseCluster, error) {
+	newServiceConfig := []api.ServerConfig{}
+	for _, service := range cl.Spec.ServerSettings {
+		if service.Name != removeServiceName {
+			newServiceConfig = append(newServiceConfig, service)
+		}
+	}
+	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = newServiceConfig }
+	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+}
+
+func ScaleServices(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int, servicesMap map[string]int) (*api.CouchbaseCluster, error) {
+	newServiceConfig := []api.ServerConfig{}
+	for _, service := range cl.Spec.ServerSettings {
+		for serviceName, size := range servicesMap {
+			if serviceName == service.Name {
+				service.Size = size
+			}
+		}
+		newServiceConfig = append(newServiceConfig, service)
+	}
+	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = newServiceConfig }
+	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 }
 
 func UpdateBucketSpec(bucketName string, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
@@ -203,9 +360,9 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 	}
 }
 
-func ResizeCluster(t *testing.T, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
+func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	_, err := UpdateClusterSpec("Size", strconv.Itoa(clusterSize), crClient, cl, 10)
+	_, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), crClient, cl, 10)
 	if err != nil {
 		return err
 	}
@@ -218,7 +375,7 @@ func ResizeCluster(t *testing.T, clusterSize int, crClient versioned.Interface, 
 	return nil
 }
 
-func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
+func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
 	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 	if err != nil {
 		t.Fatalf("Error getting pods in cluster: %v", err)
@@ -239,6 +396,11 @@ func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *
 	for _, pod := range killPods {
 		WaitPodDeleted(t, kubeCli, pod, cl)
 	}
+}
+
+func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
+	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
+	KillPods(t, kubeCli, cl, numToKill)
 	_, err = WaitUntilPodSizeReached(t, kubeCli, len(pods.Items), 20, cl)
 	if err != nil {
 		t.Fatalf("Failed to recover all nodes: %v", err)
@@ -268,4 +430,44 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 	}
 
 	return nil, NewErrServerConfigNotFound(m.ServerConfig)
+}
+
+func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) error {
+	name, err := GetOperatorName(kubeCli, namespace)
+	if err != nil {
+		return err
+	}
+	return kubeCli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
+}
+
+func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, error) {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": "couchbase-operator"}))
+	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return "couchbase-operator", err
+	}
+	operatorPods := []string{}
+	for i := 0; i < len(pods.Items); i++ {
+		operatorPods = append(operatorPods, pods.Items[i].Name)
+	}
+	if len(operatorPods) > 1 {
+		return "couchbase-operator", errors.New("too many couchbase operators")
+	}
+	return operatorPods[0], nil
+}
+
+func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error) {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": "couchbase-operator"}))
+	pods, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return "couchbase-operator", err
+	}
+	operatorPods := []string{}
+	for i := 0; i < len(pods.Items); i++ {
+		operatorPods = append(operatorPods, pods.Items[i].Name)
+	}
+	if len(operatorPods) > 1 {
+		return "couchbase-operator", errors.New("too many couchbase operators")
+	}
+	return operatorPods[0], nil
 }

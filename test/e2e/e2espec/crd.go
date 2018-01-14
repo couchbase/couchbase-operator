@@ -2,11 +2,11 @@ package e2espec
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
-	s "strings"
+	"strings"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,12 +63,12 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 	generatedSettings := []api.BucketConfig{}
 	bucketNames := []string{"default"}
 	bucketMemoryQuotas := []int{256}
-	bucketReplicas := []int{1}                   // 0, 1, 2, 3
-	ioPriorities := []string{"high"}             // high, low
-	evictionPolicies := []string{"fullEviction"} // fullEviction value-eviction
-	conflictResolutions := []string{"seqno"}     // sequence, timestamp
-	enableFlushes := []bool{true}                // true, false
-	enableIndexReplicas := []bool{true}          // true, false
+	bucketReplicas := []int{1}                            // 0, 1, 2, 3
+	ioPriorities := []string{"high"}                      // high, low
+	evictionPolicies := []string{"fullEviction"}          // fullEviction value-eviction
+	conflictResolutions := []string{"seqno", "timestamp"} // sequence, timestamp
+	enableFlushes := []bool{true, false}                  // true, false
+	enableIndexReplicas := []bool{true, false}            // true, false
 	for _, bucketName := range bucketNames {
 		for _, bucketType := range bucketTypes {
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
@@ -104,7 +104,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 }
 
 // basic 3 node cluster
-func NewBasicCluster(genName, secretName string, size int, withBucket bool) *api.CouchbaseCluster {
+func NewBasicCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 
 	bucketConfig := []api.BucketConfig{}
 	if withBucket == true {
@@ -126,25 +126,29 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool) *api
 			IndexPath: "/opt/couchbase/var/lib/couchbase/data",
 		}},
 	}
-	return NewClusterCRD(genName, spec)
-}
-
-// basic cluster with AdminConsole enabled
-func NewClusterExposedSpec(genName, secretName string, size int, withBucket bool) *api.CouchbaseCluster {
-	crd := NewBasicCluster(genName, secretName, size, withBucket)
-	crd.Spec.ExposeAdminConsole = true
+	crd := NewClusterCRD(genName, spec)
+	if exposed {
+		crd.Spec.ExposeAdminConsole = true
+	}
 	return crd
 }
 
 // new custom cluster
-func NewMultiCluster(genName, secretName string, config map[string]map[string]string) *api.CouchbaseCluster {
-
+func NewMultiCluster(genName, secretName string, config map[string]map[string]string, exposed bool) *api.CouchbaseCluster {
 	clusterSettings := api.ClusterConfig(defaultClusterSettings)
 	bucketConfig := []api.BucketConfig{}
 	serverConfig := []api.ServerConfig{}
+	baseImageName := baseImage
+	versionNum := version
+	antiAffinity := ""
+	keys := []string{}
 	for key := range config {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
 		switch {
-		case s.Contains(key, "cluster"):
+		case strings.Contains(key, "cluster"):
 			for setting := range config[key] {
 				switch {
 				case setting == "dataServiceMemQuota":
@@ -163,7 +167,7 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 					clusterSettings.AutoFailoverTimeout = autoFailoverTimeout
 				}
 			}
-		case s.Contains(key, "bucket"):
+		case strings.Contains(key, "bucket"):
 			bucketSettings := api.BucketConfig(DefaultBucketSettings)
 			for setting := range config[key] {
 				switch {
@@ -194,8 +198,14 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 				}
 			}
 			bucketConfig = append(bucketConfig, bucketSettings)
-		case s.Contains(key, "service"):
+		case strings.Contains(key, "service"):
 			serverSettings := api.ServerConfig(defaultServerSettings)
+			podPolicy := &api.PodPolicy{}
+			podPolicy.Resources = v1.ResourceRequirements{
+				Limits:   make(v1.ResourceList),
+				Requests: make(v1.ResourceList),
+			}
+			serverSettings.Pod = podPolicy
 			for setting := range config[key] {
 				switch {
 				case setting == "name":
@@ -205,7 +215,7 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 					serverSettings.Size = size
 				case setting == "services":
 					services := []string{}
-					parsedServices := s.Split(config[key][setting], ",")
+					parsedServices := strings.Split(config[key][setting], ",")
 					for _, service := range parsedServices {
 						services = append(services, service)
 					}
@@ -214,20 +224,66 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 					serverSettings.DataPath = config[key][setting]
 				case setting == "indexPath":
 					serverSettings.IndexPath = config[key][setting]
+				case setting == "resourceMemLimit":
+					limit, _ := strconv.Atoi(config[key][setting])
+					serverSettings.Pod.Resources.Limits[v1.ResourceMemory] = resource.MustParse(fmt.Sprintf("%d%s", limit, "Mi"))
+				case setting == "resourceMemRequest":
+					request, _ := strconv.Atoi(config[key][setting])
+					serverSettings.Pod.Resources.Requests[v1.ResourceMemory] = resource.MustParse(fmt.Sprintf("%d%s", request, "Mi"))
 				}
 			}
 			serverConfig = append(serverConfig, serverSettings)
+		case strings.Contains(key, "other"):
+			for setting := range config[key] {
+				switch {
+				case setting == "antiAffinity":
+					antiAffinity = config[key][setting]
+				case setting == "baseImageName":
+					baseImageName = config[key][setting]
+				case setting == "versionNum":
+					versionNum = config[key][setting]
+				}
+			}
 		}
 	}
-	spec := api.ClusterSpec{
-		BaseImage:       baseImage,
-		Version:         version,
-		AuthSecret:      secretName,
-		ClusterSettings: clusterSettings,
-		BucketSettings:  bucketConfig,
-		ServerSettings:  serverConfig,
+	spec := api.ClusterSpec{}
+	switch {
+	case antiAffinity == "on":
+		spec = api.ClusterSpec{
+			BaseImage:       baseImageName,
+			Version:         versionNum,
+			AuthSecret:      secretName,
+			AntiAffinity:    true,
+			ClusterSettings: clusterSettings,
+			BucketSettings:  bucketConfig,
+			ServerSettings:  serverConfig,
+		}
+
+	case antiAffinity == "off":
+		spec = api.ClusterSpec{
+			BaseImage:       baseImageName,
+			Version:         versionNum,
+			AuthSecret:      secretName,
+			AntiAffinity:    false,
+			ClusterSettings: clusterSettings,
+			BucketSettings:  bucketConfig,
+			ServerSettings:  serverConfig,
+		}
+	case antiAffinity == "":
+		spec = api.ClusterSpec{
+			BaseImage:       baseImageName,
+			Version:         versionNum,
+			AuthSecret:      secretName,
+			ClusterSettings: clusterSettings,
+			BucketSettings:  bucketConfig,
+			ServerSettings:  serverConfig,
+		}
 	}
-	return NewClusterCRD(genName, spec)
+	crd := NewClusterCRD(genName, spec)
+	if exposed {
+		crd.Spec.ExposeAdminConsole = true
+	}
+	return crd
 }
 
 func NewClusterCRD(genName string, spec api.ClusterSpec) *api.CouchbaseCluster {
@@ -250,13 +306,11 @@ func CreateMemoryPodPolicy(request, limit int) *api.PodPolicy {
 
 // Create limit and request pod policy according to scale... ie 'Mi, Gi' where applicable
 func CreatePodPolicy(resourceName v1.ResourceName, request, limit int, scale string) *api.PodPolicy {
-
 	podPolicy := &api.PodPolicy{}
 	podPolicy.Resources = v1.ResourceRequirements{
 		Limits:   make(v1.ResourceList),
 		Requests: make(v1.ResourceList),
 	}
-
 	resourceValue := fmt.Sprintf("%d%s", limit, scale)
 	podPolicy.Resources.Limits[resourceName] = resource.MustParse(resourceValue)
 	resourceValue = fmt.Sprintf("%d%s", request, scale)
