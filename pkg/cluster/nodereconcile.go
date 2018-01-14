@@ -11,20 +11,20 @@ import (
 type ReconcileState int
 
 const (
-	ReconcileInit           ReconcileState = 0x01
-	ReconcileUnknownMembers                = 0x02
-	ReconcileRebalanceCheck                = 0x03
-	ReconcileDownNodes                     = 0x04
-	ReconcileUnclusteredNodes              = 0x05
-	ReconcileFailedAddNodes                = 0x06
-	ReconcileFailedNodes                   = 0x07
-	ReconcileServerConfigs                 = 0x08
-	ReconcileRemoveNodes                   = 0x09
-	ReconcileRemoveUnmanaged               = 0x0a
-	ReconcileAddNodes                      = 0x0b
-	ReconcileRebalance                     = 0x0c
-	ReconcileDeadMembers                   = 0x0d
-	ReconcileFinished                      = 0xff
+	ReconcileInit             ReconcileState = 0x01
+	ReconcileUnknownMembers                  = 0x02
+	ReconcileRebalanceCheck                  = 0x03
+	ReconcileDownNodes                       = 0x04
+	ReconcileUnclusteredNodes                = 0x05
+	ReconcileFailedAddNodes                  = 0x06
+	ReconcileFailedNodes                     = 0x07
+	ReconcileServerConfigs                   = 0x08
+	ReconcileRemoveNodes                     = 0x09
+	ReconcileRemoveUnmanaged                 = 0x0a
+	ReconcileAddNodes                        = 0x0b
+	ReconcileRebalance                       = 0x0c
+	ReconcileDeadMembers                     = 0x0d
+	ReconcileFinished                        = 0xff
 )
 
 type ReconcileMachine struct {
