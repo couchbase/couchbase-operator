@@ -1,19 +1,16 @@
 package framework
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -21,9 +18,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -35,6 +33,7 @@ type Framework struct {
 	opImage       string
 	KubeClient    kubernetes.Interface
 	CRClient      versioned.Interface
+	Deployment    *v1beta1.Deployment
 	Namespace     string
 	DefaultSecret *v1.Secret
 	config        *rest.Config
@@ -47,6 +46,7 @@ type Framework struct {
 func Setup() error {
 	kubeconfig := flag.String("kubeconfig", "", "kube config path, e.g. $HOME/.kube/config")
 	opImage := flag.String("operator-image", "", "operator image, e.g. couchbase/couchbase-operator")
+	deploymentSpec := flag.String("deployment-spec", "", "deployment spec, eg. $PWD/example/deployment.yaml")
 	ns := flag.String("namespace", "default", "e2e test namespace")
 	flag.Parse()
 
@@ -59,13 +59,31 @@ func Setup() error {
 		return err
 	}
 
+	raw, err := ioutil.ReadFile(*deploymentSpec)
+	if err != nil {
+		return err
+	}
+
+	deserializer := scheme.Codecs.UniversalDeserializer()
+	obj, _, err := deserializer.Decode([]byte(raw), nil, nil)
+	if err != nil {
+		return err
+	}
+
+	deployment, ok := obj.(*v1beta1.Deployment)
+	if !ok {
+		return fmt.Errorf("File %s does not define a deployment", *deploymentSpec)
+	}
+
 	logDir, err := makeLogDir()
 	if err != nil {
 		return err
 	}
+
 	Global = &Framework{
 		KubeClient: cli,
 		CRClient:   client.MustNew(config),
+		Deployment: deployment,
 		Namespace:  *ns,
 		opImage:    *opImage,
 		config:     config,
@@ -76,7 +94,7 @@ func Setup() error {
 }
 
 func Teardown() error {
-	if err := Global.deleteCouchbaseOperator(); err != nil {
+	if err := Global.DeleteCouchbaseOperatorCompletely(); err != nil {
 		return err
 	}
 
@@ -113,58 +131,10 @@ func (f *Framework) setup() error {
 }
 
 func (f *Framework) SetupCouchbaseOperator() error {
-	// TODO: unify this and the yaml file in example/
-	cmd := []string{"/usr/local/bin/couchbase-operator"}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "couchbase-operator",
-			Labels: map[string]string{"name": "couchbase-operator"},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "couchbase-operator",
-					Image:           f.opImage,
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         cmd,
-					Env: []v1.EnvVar{
-						{
-							Name:      constants.EnvOperatorPodNamespace,
-							ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.namespace"}},
-						},
-						{
-							Name:      constants.EnvOperatorPodName,
-							ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.name"}},
-						},
-					},
-					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
-							HTTPGet: &v1.HTTPGetAction{
-								Path: probe.HTTPReadyzEndpoint,
-								Port: intstr.IntOrString{Type: intstr.Int, IntVal: 8080},
-							},
-						},
-						InitialDelaySeconds: 3,
-						PeriodSeconds:       3,
-						FailureThreshold:    3,
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-
-	p, err := e2eutil.CreateAndWaitPod(f.KubeClient, f.Namespace, pod, 60*time.Second)
+	_, err := f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(f.Deployment)
 	if err != nil {
-		// assuming `kubectl` installed on $PATH
-		cmd := exec.Command("kubectl", "-n", f.Namespace, "describe", "pod", "couchbase-operator")
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		cmd.Run() // Just ignore the error...
-		logrus.Info("describing couchbase-operator pod:", out.String())
 		return err
 	}
-	logrus.Infof("couchbase operator pod is running on node (%s)", p.Spec.NodeName)
 
 	return e2eutil.WaitUntilOperatorReady(f.KubeClient, f.Namespace, "couchbase-operator")
 }
@@ -176,8 +146,8 @@ func (f *Framework) DeleteCouchbaseOperatorCompletely() error {
 	}
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
-	err = retryutil.Retry(5*time.Second, 6, func() (bool, error) {
-		_, err := f.KubeClient.CoreV1().Pods(f.Namespace).Get("couchbase-operator", metav1.GetOptions{})
+	err = retryutil.Retry(5*time.Second, 24, func() (bool, error) {
+		_, err := f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Get("couchbase-operator", metav1.GetOptions{})
 		if err == nil {
 			return false, nil
 		}
@@ -193,7 +163,10 @@ func (f *Framework) DeleteCouchbaseOperatorCompletely() error {
 }
 
 func (f *Framework) deleteCouchbaseOperator() error {
-	return f.KubeClient.CoreV1().Pods(f.Namespace).Delete("couchbase-operator", metav1.NewDeleteOptions(1))
+	deletePropagation := metav1.DeletePropagationForeground
+	deleteOpts := metav1.NewDeleteOptions(0)
+	deleteOpts.PropagationPolicy = &deletePropagation
+	return f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Delete(f.Deployment.GetName(), deleteOpts)
 }
 
 func (f *Framework) ApiServerHost() string {

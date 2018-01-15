@@ -3,6 +3,7 @@ PREFIX ?= $(shell pwd)
 kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
 namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
+deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
 testname = $(E2E_TEST)
 
 .PHONY: all build container test test-indv
@@ -19,9 +20,10 @@ container: build
 test:
 	go test github.com/couchbase/couchbase-operator/test/e2e -v -timeout 30m \
 		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace)
+		--namespace $(namespace) --deployment-spec $(deploymentSpec)
 
 test-indv:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run $(testname) \
-		-v -timeout 30m --race --kubeconfig $(kubeconfig) --operator-image \
-		$(operatorImage) --namespace $(namespace)
+		-v -timeout 60m --race --kubeconfig $(kubeconfig) --operator-image \
+		$(operatorImage) --namespace $(namespace) --deployment-spec \
+		$(deploymentSpec)

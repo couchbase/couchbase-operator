@@ -164,14 +164,28 @@ func KillMember(kubecli kubernetes.Interface, namespace string, name string) err
 }
 
 func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {
-	opts := &v1.PodLogOptions{}
-	req := kubeClient.CoreV1().Pods(namespace).GetLogs("couchbase-operator", opts)
-	data, err := req.DoRaw()
+	options := metav1.ListOptions{LabelSelector: "name=couchbase-operator"}
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(options)
 	if err != nil {
 		return err
 	}
-	logFile := filepath.Join(logDir, fmt.Sprintf("%s.log", t.Name()))
-	return ioutil.WriteFile(logFile, data, 0644)
+
+	for _, pod := range pods.Items {
+		logOpts := &v1.PodLogOptions{}
+		req := kubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, logOpts)
+		data, err := req.DoRaw()
+		if err != nil {
+			return err
+		}
+
+		logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", t.Name(), pod.Name))
+		err = ioutil.WriteFile(logFile, data, 0644)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func LogfWithTimestamp(t *testing.T, format string, args ...interface{}) {
