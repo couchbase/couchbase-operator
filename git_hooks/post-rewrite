@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Simple script that can be installed in the local git repository which
+# monitors when we've made local updates to package dependencies during
+# a rebase.  First git will checkout the new merge base, and update deps
+# via the post-checkout hook, we need to restore our local changes on
+# top of these once we've replayed all of our changes
+
+COMMAND=$1
+
+# Given 2 git SHA references return a string of differences
+function git_diff() {
+  echo $(git diff --raw $1 $2 | awk '{ print $6; }')
+}
+
+# Given 2 git SHA references has the list of dependencies changed?
+function deps_updated() {
+  if [[ $(git_diff $1 $2) == *"glide.yaml"* ]]; then
+    echo "true"
+  else
+    echo "false"
+  fi
+}
+
+# Get our branch point and our head
+BASE=$(git merge-base master HEAD)
+HEAD=$(git rev-parse HEAD)
+
+# If this is rebase operation and we've made dependency changes
+if [[ ${COMMAND} == "rebase" && $(deps_updated ${BASE} ${HEAD}) == "true" ]]; then
+    echo "Detected dependency update replaying from ${BASE} to ${HEAD} ..."
+    # Switch to the top-level directory and perform the update ...
+    pushd $(git rev-parse --show-toplevel)
+    # ... but only if there is something to update
+    if [[ -d vendor ]]; then
+      GOPATH=${PWD%/src/*} glide update --strip-vendor
+    fi
+    popd
+fi
+
+# vi: ts=2 et:

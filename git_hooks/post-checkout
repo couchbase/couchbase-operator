@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Simple script that can be installed in the local git repository which
+# monitors for the project dependencies changing across branches.  When we
+# checkout a new branch we check to see if the glide.yaml dependency file
+# has changed, if so we perform an update.
+
+PREV=$1
+CURR=$2
+BRANCH=$3
+
+# Given 2 git SHA references return a string of differences
+function git_diff() {
+  echo $(git diff --raw $1 $2 | awk '{ print $6; }')
+}
+
+# Given 2 git SHA references has the list of dependencies changed?
+function deps_updated() {
+  if [[ $(git_diff $1 $2) == *"glide.yaml"* ]]; then
+    echo "true"
+  else
+    echo "false"
+  fi
+}
+
+# Is this a branch checkout and have our dependencies updated?
+if [[ $BRANCH == "1" && $(deps_updated ${PREV} ${CURR}) == "true" ]]; then
+    echo "Detected dependency update switching from ${PREV} to ${CURR} ..."
+    # Switch to the top-level directory and perform the update ...
+    pushd $(git rev-parse --show-toplevel)
+    # ... but only if there is something to update
+    if [[ -d vendor ]]; then
+      GOPATH=${PWD%/src/*} glide update --strip-vendor
+    fi
+    popd
+fi
+
+# vi: ts=2 et:
