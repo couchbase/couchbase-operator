@@ -1,8 +1,8 @@
-hash: 73b459c5a8a259e8d2bb2d6bd71461b27f0d3f01acb5acae7f6d8ac63af2b78c
-updated: 2018-01-12T14:12:40.67542279-08:00
+hash: 91365f8a52485d87e83590e31415d81568c27d74b8b1d8376ff7e0ece2ac9f0c
+updated: 2018-01-16T17:18:16.333691-07:00
 imports:
 - name: github.com/couchbaselabs/gocbmgr
-  version: 06c31c4d4f7613573e2b3331e9b03e75cbe32ff5
+  version: 8a5cdfa1c889b9281065e82a67097059fe0eed45
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:
@@ -145,7 +145,6 @@ imports:
   - certificates/v1beta1
   - core/v1
   - extensions/v1beta1
-  - imagepolicy/v1alpha1
   - networking/v1
   - policy/v1beta1
   - rbac/v1
