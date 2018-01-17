@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -151,6 +152,32 @@ func (ms MemberSet) Highest() *Member {
 	}
 
 	return rv
+}
+
+func (ms MemberSet) GetHighestMemberCounter() int {
+	msCounter := 0
+	for _, m := range ms {
+		ct, err := GetCounterFromMemberName(m.Name)
+		if err != nil {
+			continue
+		}
+		if ct > msCounter {
+			msCounter = ct
+		}
+	}
+	return msCounter
+}
+
+func GetCounterFromMemberName(name string) (int, error) {
+	i := strings.LastIndex(name, "-")
+	if i == -1 || i+1 >= len(name) {
+		return 0, fmt.Errorf("name (%s) does not contain '-' or anything after '-'", name)
+	}
+	c, err := strconv.Atoi(name[i+1:])
+	if err != nil {
+		return 0, fmt.Errorf("could not atoi %s: %v", name[i+1:], err)
+	}
+	return c, nil
 }
 
 func CreateMemberName(clusterName string, member int) string {

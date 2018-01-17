@@ -2,15 +2,25 @@ package cluster
 
 import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-
 	"k8s.io/api/core/v1"
 )
 
 func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
-	// In the future we may need to keep some Couchbase specific information
-	// for each node cached in the operator. If so, then that should be done
-	// here.
-	c.members = known
+	status, err := couchbaseutil.GetClusterStatus(known, c.username, c.password, c.cluster.Name)
+	if err != nil {
+		return err
+	}
+	members := couchbaseutil.MemberSet{}
+	members.Append(status.ActiveNodes)
+	members.Append(status.PendingAddNodes)
+	members.Append(status.FailedAddNodes)
+	members.Append(status.DownNodes)
+
+	ct := members.GetHighestMemberCounter()
+	if ct+1 > c.memberCounter {
+		c.memberCounter = ct + 1
+	}
+	c.members = members
 	return nil
 }
 
