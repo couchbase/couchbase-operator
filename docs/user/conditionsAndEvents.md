@@ -9,13 +9,15 @@ Similarly the couchbase-operator exposes the Events and Conditions for each Couc
 ## Events
 The following types of Events and their specific instances are common in the lifecycle of an CouchbaseCluster:
 
-- A new node is added to the cluster
-- A node is removed from the cluster
+- A new Couchbase node was added to the cluster
+- A Couchbase node was removed from the cluster
+- A rebalance has started
+- Adding a node to the cluster failed
 - A bucket was created
 - A bucket was deleted
 - A bucket was modified
-- The cluster configuration changed
-- A rebalance has failed
+- The Administration Console service was created
+- The Administration Console service was deleted
 
 ## Conditions
 
@@ -26,7 +28,7 @@ The couchbase cluster Condition and its statuses are defined as:
   - False: One or more members are down and someVBuckets are unavailable
 - Balanced
   - True: VBuckets are evenly distributed across the cluster
-  - False: VBuckets are not evenly distibuted across the cluster
+  - False: VBuckets are not evenly distributed across the cluster
   - Unknown: The status is currently unknown
 - Scaling
   - True: Scaling from current members size X to spec.size Y
