@@ -7,32 +7,204 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
+	"strconv"
 	"testing"
 )
 
-func TestBucketAddRemove(t *testing.T) {
+func TestBucketAddRemoveBasic(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
-	//TODO add ephemeral bucket types
-	//TODO verify bucket exist from cluster side
-	bucketTypes := []string{"couchbase", "memcached"} // couchbase, memcached, ephemeral
-	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
-	for _, bucketSetting := range bucketSettingsList {
-		t.Logf("Creating New Couchbase Cluster...\n")
-		testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	fullEvictionPolicy := "fullEviction"
+	noEvictionPolicy := "noEviction"
+	nruEvictionPolicy := "nruEviction"
+	segnoConflictResolutions := "seqno"
+	timestampConflictResolution := "lww"
+	indexReplicaOn := true
+	//indexReplicaOff := false
+	enableFlush := true
+	disableFlush := false
+	bucket1 := api.BucketConfig{
+		BucketName:         "default1",
+		BucketType:         "couchbase",
+		BucketMemoryQuota:  101,
+		BucketReplicas:     1,
+		IoPriority:         "high",
+		EvictionPolicy:     &fullEvictionPolicy,
+		ConflictResolution: &segnoConflictResolutions,
+		EnableFlush:        &enableFlush,
+		EnableIndexReplica: &indexReplicaOn,
+	}
+	bucket2 := api.BucketConfig{
+		BucketName:        "default2",
+		BucketType:        "memcached",
+		BucketMemoryQuota: 101,
+		EnableFlush:       &disableFlush,
+	}
+	bucket3 := api.BucketConfig{
+		BucketName:         "default3",
+		BucketType:         "ephemeral",
+		BucketMemoryQuota:  101,
+		BucketReplicas:     1,
+		IoPriority:         "high",
+		EvictionPolicy:     &noEvictionPolicy,
+		ConflictResolution: &timestampConflictResolution,
+		EnableFlush:        &enableFlush,
+	}
+	bucket4 := api.BucketConfig{
+		BucketName:         "default4",
+		BucketType:         "ephemeral",
+		BucketMemoryQuota:  101,
+		BucketReplicas:     1,
+		IoPriority:         "high",
+		EvictionPolicy:     &nruEvictionPolicy,
+		ConflictResolution: &segnoConflictResolutions,
+		EnableFlush:        &enableFlush,
+	}
+	bucketSettingsList := []api.BucketConfig{bucket1, bucket2, bucket3, bucket4}
+
+	clusterConfig := e2eutil.BasicClusterConfig2
+	serviceConfig1 := e2eutil.BasicServiceThreeDataNode
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1}
+
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	// create connection to couchbase nodes
+	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %v", clusterInfo)
+
+	bucketConfigs := []api.BucketConfig{}
+	buckets := []string{}
+
+	for i, bucketSetting := range bucketSettingsList {
+		bucketConfigs = append(bucketConfigs, bucketSetting)
+
+		// add bucket
+		t.Logf("Desired Bucket Properties: %v\n", bucketSetting)
+		t.Logf("Spec Buckets: %v\n", bucketConfigs)
+		updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = bucketConfigs }
+		t.Logf("Adding Bucket To Cluster \n")
+		testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries10, updateFunc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
-		expectedEvents := e2eutil.EventList{}
-		expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-		expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-		expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-		expectedEvents.AddRebalanceEvent(testCouchbase)
+		buckets = append(buckets, bucketSetting.BucketName)
 
+		t.Logf("Waiting For Bucket To Be Created \n")
+		err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, buckets, e2eutil.Retries10, testCouchbase)
+		if err != nil {
+			t.Fatalf("failed to create bucket %v", err)
+		}
+
+		expectedEvents.AddBucketCreateEvent(testCouchbase, bucketSetting.BucketName)
+
+		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		currentBuckets, err := client.GetBuckets()
+		if err != nil && len(currentBuckets) != i+1 {
+			t.Fatalf("failed to see all buckets from client")
+		}
+	}
+	// delete all buckets
+	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = []api.BucketConfig{} }
+	t.Logf("Removing Bucket From Cluster \n")
+	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries10, updateFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.WaitUntilBucketsNotExists(t, f.CRClient, []string{"default1", "default2", "default3", "default4"}, e2eutil.Retries10, testCouchbase)
+	if err != nil {
+		t.Fatalf("failed to delete bucket %v", err)
+	}
+
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default1")
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default2")
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default3")
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default4")
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	currentBuckets, err := client.GetBuckets()
+	if err != nil && len(currentBuckets) != 0 {
+		t.Fatalf("failed to see no buckets from client")
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+func TestBucketAddRemoveExtended(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	t.Logf("Creating New Couchbase Cluster...\n")
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminExposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	// create connection to couchbase nodes
+	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %v", clusterInfo)
+
+	bucketTypes := []string{"couchbase", "memcached", "ephemeral"} // couchbase, memcached, ephemeral
+	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
+	for _, bucketSetting := range bucketSettingsList {
 		newConfig := []api.BucketConfig{bucketSetting}
 
 		// add bucket
@@ -51,6 +223,22 @@ func TestBucketAddRemove(t *testing.T) {
 		}
 
 		expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		currentBuckets, err := client.GetBuckets()
+		if err != nil && len(currentBuckets) != 1 {
+			t.Fatalf("failed to see all buckets from client")
+		}
+
+		ramQuota := strconv.Itoa(bucketSetting.BucketMemoryQuota)
+		err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, bucketSetting.BucketName, "BucketMemoryQuota", ramQuota, e2eutil.BucketInfoVerifier)
+		if err != nil {
+			t.Fatalf("failed to verify default bucket ram quota: %v", err)
+		}
 
 		// delete bucket
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = []api.BucketConfig{} }
@@ -71,17 +259,18 @@ func TestBucketAddRemove(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
-		if err != nil {
-			t.Fatalf("failed to get coucbase cluster events: %v", err)
+		currentBuckets, err = client.GetBuckets()
+		if err != nil && len(currentBuckets) != 0 {
+			t.Fatalf("failed to see no buckets from client")
 		}
-		if !expectedEvents.Compare(events) {
-			t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-		}
+	}
 
-		// delete cluster
-		t.Logf("Deleting Cluster \n")
-		e2eutil.DestroyCluster(t, f.KubeClient, f.CRClient, f.Namespace, testCouchbase)
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 

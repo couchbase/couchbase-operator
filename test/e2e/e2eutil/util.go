@@ -53,6 +53,13 @@ var (
 		"indexStorageSetting":   "memory_optimized",
 		"autoFailoverTimeout":   "10"}
 
+	BasicClusterConfig2 = map[string]string{
+		"dataServiceMemQuota":   "1024",
+		"indexServiceMemQuota":  "256",
+		"searchServiceMemQuota": "256",
+		"indexStorageSetting":   "memory_optimized",
+		"autoFailoverTimeout":   "10"}
+
 	BasicServiceOneDataNode = map[string]string{
 		"size":      "1",
 		"name":      "test_config_1",

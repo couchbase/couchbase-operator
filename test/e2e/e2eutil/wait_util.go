@@ -99,6 +99,7 @@ func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets 
 		LogfWithTimestamp(t, "waiting for buckets to be ready (%v)", buckets)
 		for _, b := range buckets {
 			if _, ok := currCluster.Status.Buckets[b]; !ok {
+				LogfWithTimestamp(t, "bucket (%v), not ready: (%v)", b, currCluster.Status.Buckets[b])
 				return false, nil
 			}
 		}

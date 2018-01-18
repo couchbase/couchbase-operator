@@ -61,16 +61,16 @@ var (
 
 func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 	generatedSettings := []api.BucketConfig{}
-	bucketNames := []string{"default"}
-	bucketMemoryQuotas := []int{256}
-	bucketReplicas := []int{1}                            // 0, 1, 2, 3
-	ioPriorities := []string{"high"}                      // high, low
-	evictionPolicies := []string{"fullEviction"}          // fullEviction value-eviction
-	conflictResolutions := []string{"seqno", "timestamp"} // sequence, timestamp
-	enableFlushes := []bool{true, false}                  // true, false
-	enableIndexReplicas := []bool{true, false}            // true, false
-	for _, bucketName := range bucketNames {
-		for _, bucketType := range bucketTypes {
+	for _, bucketType := range bucketTypes {
+		switch {
+		case bucketType == "couchbase":
+			bucketMemoryQuotas := []int{256}
+			bucketReplicas := []int{1}
+			ioPriorities := []string{"high"}
+			evictionPolicies := []string{"fullEviction"}
+			conflictResolutions := []string{"seqno", "lww"}
+			enableFlushes := []bool{true}
+			enableIndexReplicas := []bool{true}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, bucketReplica := range bucketReplicas {
 					for _, ioPriority := range ioPriorities {
@@ -78,9 +78,8 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 							for _, conflictResolution := range conflictResolutions {
 								for _, enableFlush := range enableFlushes {
 									for _, enableIndexReplica := range enableIndexReplicas {
-
 										bucketSetting := api.BucketConfig{
-											BucketName:         bucketName,
+											BucketName:         "default",
 											BucketType:         bucketType,
 											BucketMemoryQuota:  bucketMemoryQuota,
 											BucketReplicas:     bucketReplica,
@@ -98,8 +97,53 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 					}
 				}
 			}
+		case bucketType == "memcached":
+			bucketMemoryQuotas := []int{256}
+			enableFlushes := []bool{true, false}
+			for _, bucketMemoryQuota := range bucketMemoryQuotas {
+				for _, enableFlush := range enableFlushes {
+					bucketSetting := api.BucketConfig{
+						BucketName:        "default",
+						BucketType:        bucketType,
+						BucketMemoryQuota: bucketMemoryQuota,
+						EnableFlush:       &enableFlush,
+					}
+					generatedSettings = append(generatedSettings, bucketSetting)
+				}
+			}
+		case bucketType == "ephemeral":
+			bucketMemoryQuotas := []int{256}
+			bucketReplicas := []int{1}
+			ioPriorities := []string{"high"}
+			evictionPolicies := []string{"noEviction", "nruEviction"}
+			conflictResolutions := []string{"seqno", "timestamp"}
+			enableFlushes := []bool{true, false}
+			for _, bucketMemoryQuota := range bucketMemoryQuotas {
+				for _, bucketReplica := range bucketReplicas {
+					for _, ioPriority := range ioPriorities {
+						for _, evictionPolicy := range evictionPolicies {
+							for _, conflictResolution := range conflictResolutions {
+								for _, enableFlush := range enableFlushes {
+									bucketSetting := api.BucketConfig{
+										BucketName:         "default",
+										BucketType:         bucketType,
+										BucketMemoryQuota:  bucketMemoryQuota,
+										BucketReplicas:     bucketReplica,
+										IoPriority:         ioPriority,
+										EvictionPolicy:     &evictionPolicy,
+										ConflictResolution: &conflictResolution,
+										EnableFlush:        &enableFlush,
+									}
+									generatedSettings = append(generatedSettings, bucketSetting)
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
+
 	return generatedSettings
 }
 
