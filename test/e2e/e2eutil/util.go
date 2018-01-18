@@ -25,6 +25,27 @@ import (
 )
 
 var (
+	Size1 = 1
+	Size2 = 2
+	Size3 = 3
+	Size5 = 5
+)
+
+var (
+	WithBucket = true
+	WithoutBucket = false
+	AdminExposed = true
+	AdminHidden = false
+)
+
+var (
+	Retries5 = 5
+	Retries10 = 10
+	Retries20 = 20
+	Retries30 = 30
+)
+
+var (
 	BasicClusterConfig = map[string]string{
 		"dataServiceMemQuota":   "256",
 		"indexServiceMemQuota":  "256",

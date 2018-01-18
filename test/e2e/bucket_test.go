@@ -3,7 +3,6 @@ package e2e
 import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -17,43 +16,21 @@ func TestBucketAddRemove(t *testing.T) {
 	}
 	f := framework.Global
 	//TODO add ephemeral bucket types
+	//TODO verify bucket exist from cluster side
 	bucketTypes := []string{"couchbase", "memcached"} // couchbase, memcached, ephemeral
 	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucketSetting := range bucketSettingsList {
-		expectedEvents := e2eutil.EventList{}
 		t.Logf("Creating New Couchbase Cluster...\n")
-		testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 3, false, false)
+		testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
-		event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
-		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
+		expectedEvents := e2eutil.EventList{}
 		expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-		event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
 		expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-		event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
 		expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-		event = k8sutil.RebalanceEvent(testCouchbase)
-		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
 		expectedEvents.AddRebalanceEvent(testCouchbase)
 
 		newConfig := []api.BucketConfig{bucketSetting}
@@ -62,53 +39,50 @@ func TestBucketAddRemove(t *testing.T) {
 		t.Logf("Desired Bucket Properties: %v\n", newConfig)
 		updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = newConfig }
 		t.Logf("Adding Bucket To Cluster \n")
-		testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 20, updateFunc)
+		testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries10, updateFunc)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		t.Logf("Waiting For Bucket To Be Created \n")
-		err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{bucketSetting.BucketName}, 30, testCouchbase)
+		err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{bucketSetting.BucketName}, e2eutil.Retries10, testCouchbase)
 		if err != nil {
 			t.Fatalf("failed to create bucket %v", err)
 		}
 
-		event = k8sutil.BucketCreateEvent("default", testCouchbase)
-		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
 		expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 		// delete bucket
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = []api.BucketConfig{} }
 		t.Logf("Removing Bucket From Cluster \n")
-		testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 10, updateFunc)
+		testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries10, updateFunc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = e2eutil.WaitUntilBucketsNotExists(t, f.CRClient, []string{bucketSetting.BucketName}, 18, testCouchbase)
+		err = e2eutil.WaitUntilBucketsNotExists(t, f.CRClient, []string{bucketSetting.BucketName}, e2eutil.Retries10, testCouchbase)
 		if err != nil {
 			t.Fatalf("failed to delete bucket %v", err)
 		}
 
-		event = k8sutil.BucketDeleteEvent("default", testCouchbase)
-		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatal(err)
-		}
 		expectedEvents.AddBucketDeleteEvent(testCouchbase, "default")
 
-		err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 		if err != nil {
-			t.Fatalf("compare events failed: %v", err)
+			t.Fatal(err.Error())
+		}
+
+		events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+		if err != nil {
+			t.Fatalf("failed to get coucbase cluster events: %v", err)
+		}
+		if !expectedEvents.Compare(events) {
+			t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 		}
 
 		// delete cluster
 		t.Logf("Deleting Cluster \n")
 		e2eutil.DestroyCluster(t, f.KubeClient, f.CRClient, f.Namespace, testCouchbase)
 	}
-
 }
 
 // Creates a cluster and adds a bucket with an invalid configuration
@@ -123,19 +97,13 @@ func TestNegBucketAdd(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, false, false)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	fullEvictionPolicy := "fullEviction"
@@ -159,19 +127,22 @@ func TestNegBucketAdd(t *testing.T) {
 	t.Logf("Desired Bucket Properties: %v\n", bucketConfig)
 	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = bucketConfig }
 	t.Logf("Adding Bucket To Cluster \n")
-	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 20, updateFunc)
+	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries5, updateFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("Waiting For Bucket To Be Created \n")
-	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{bucketSettings.BucketName}, 9, testCouchbase)
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{bucketSettings.BucketName}, e2eutil.Retries10, testCouchbase)
 	if err == nil {
 		t.Fatalf("failed to NOT create bucket %v", err)
 	}
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -192,37 +163,19 @@ func TestEditBucket(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	t.Logf("Waiting For Bucket To Be Created \n")
-	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase)
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create bucket %v", err)
 	}
@@ -237,23 +190,18 @@ func TestEditBucket(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
 	// change memory quota
-	_, err = e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", "128", f.CRClient, testCouchbase, 5)
+	_, err = e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", "128", f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	event = k8sutil.BucketEditEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
@@ -263,26 +211,21 @@ func TestEditBucket(t *testing.T) {
 		}
 		return false
 	}
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to change default bucket ram quota %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "BucketMemoryQuota", "128", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketMemoryQuota", "128", e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
 
 	// change memory quota back
-	_, err = e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", "256", f.CRClient, testCouchbase, 5)
+	_, err = e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", "256", f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	event = k8sutil.BucketEditEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
@@ -292,26 +235,21 @@ func TestEditBucket(t *testing.T) {
 		}
 		return false
 	}
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to change default bucket ram quota back %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "BucketMemoryQuota", "256", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketMemoryQuota", "256", e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
 
 	// change replica count
-	_, err = e2eutil.UpdateBucketSpec("default", "BucketReplicas", "2", f.CRClient, testCouchbase, 5)
+	_, err = e2eutil.UpdateBucketSpec("default", "BucketReplicas", "2", f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	event = k8sutil.BucketEditEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
@@ -321,26 +259,21 @@ func TestEditBucket(t *testing.T) {
 		}
 		return false
 	}
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to change default bucket replica count %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "BucketReplicas", "2", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketReplicas", "2", e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify default bucket replica count: %v", err)
 	}
 
 	// change replica count back
-	_, err = e2eutil.UpdateBucketSpec("default", "BucketReplicas", "1", f.CRClient, testCouchbase, 5)
+	_, err = e2eutil.UpdateBucketSpec("default", "BucketReplicas", "1", f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	event = k8sutil.BucketEditEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
@@ -350,26 +283,21 @@ func TestEditBucket(t *testing.T) {
 		}
 		return false
 	}
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to change default bucket replcia count back %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "BucketReplicas", "1", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketReplicas", "1", e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify default bucket replcia count back: %v", err)
 	}
 
 	// change eviction policy
-	_, err = e2eutil.UpdateBucketSpec("default", "EnableFlush", "false", f.CRClient, testCouchbase, 5)
+	_, err = e2eutil.UpdateBucketSpec("default", "EnableFlush", "false", f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	event = k8sutil.BucketEditEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
@@ -382,26 +310,21 @@ func TestEditBucket(t *testing.T) {
 		}
 		return false
 	}
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to change default bucket flush policy %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "EnableFlush", "false", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "EnableFlush", "false", e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify default bucket flush policy: %v", err)
 	}
 
 	// change eviction policy back
-	_, err = e2eutil.UpdateBucketSpec("default", "EnableFlush", "true", f.CRClient, testCouchbase, 5)
+	_, err = e2eutil.UpdateBucketSpec("default", "EnableFlush", "true", f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	event = k8sutil.BucketEditEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
@@ -414,18 +337,26 @@ func TestEditBucket(t *testing.T) {
 		}
 		return false
 	}
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 18, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to change default bucket flush policy back %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "EnableFlush", "true", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "EnableFlush", "true", e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify default bucket flush policy back: %v", err)
 	}
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatal(err.Error())
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -435,33 +366,15 @@ func TestNegBucketEdit(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -474,7 +387,7 @@ func TestNegBucketEdit(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -485,7 +398,7 @@ func TestNegBucketEdit(t *testing.T) {
 		cl.Spec.BucketSettings[0].BucketType = "ephemeral"
 	}
 
-	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, 3, updateFunc); err != nil {
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
 		t.Fatalf("failed to post updated cluster spec: %v", err)
 	}
 
@@ -496,12 +409,12 @@ func TestNegBucketEdit(t *testing.T) {
 		}
 		return false
 	}
-	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
 	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket type: %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "BucketType", "ephemeral", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketType", "ephemeral", e2eutil.BucketInfoVerifier)
 	if err == nil {
 		t.Fatalf("failed to verify prevent changing bucket type: %v", err)
 	}
@@ -511,7 +424,7 @@ func TestNegBucketEdit(t *testing.T) {
 		cl.Spec.BucketSettings[0].BucketMemoryQuota = 9999
 	}
 
-	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, 3, updateFunc); err != nil {
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
 		t.Fatalf("failed to post updated cluster spec: %v", err)
 	}
 
@@ -522,12 +435,12 @@ func TestNegBucketEdit(t *testing.T) {
 		}
 		return false
 	}
-	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
 	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing bucket memory quota: %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "BucketMemoryQuota", "9999", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketMemoryQuota", "9999", e2eutil.BucketInfoVerifier)
 	if err == nil {
 		t.Fatalf("failed to verify prevent changing bucket memory quota: %v", err)
 	}
@@ -538,7 +451,7 @@ func TestNegBucketEdit(t *testing.T) {
 		cl.Spec.BucketSettings[0].ConflictResolution = &timestamp
 	}
 
-	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, 3, updateFunc); err != nil {
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
 		t.Fatalf("failed to post updated cluster spec: %v", err)
 	}
 
@@ -549,21 +462,28 @@ func TestNegBucketEdit(t *testing.T) {
 		}
 		return false
 	}
-	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 3, testCouchbase, acceptsBucketFunc)
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
 	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
 		t.Fatalf("failed to prevent changing conflict resolution: %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "ConflictResolution", "timestamp", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "ConflictResolution", "timestamp", e2eutil.BucketInfoVerifier)
 	if err == nil {
 		t.Fatalf("failed to verify prevent changing conflict resolution: %v", err)
 	}
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatal(err.Error())
 	}
 
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
 }
 
 // Tests that the operator reverts bucket edits not made by the operator
@@ -582,33 +502,15 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -620,7 +522,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -637,11 +539,11 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		return false
 	}
 
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to create default bucket with flush enabled %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, 6, "default", "EnableFlush", "true", e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "EnableFlush", "true", e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify create default bucket with flush enabled: %v", err)
 	}
@@ -657,7 +559,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	}
 
 	// edit bucket and verify change is reflected in cluster.
-	err = e2eutil.EditBucketAndVerify(t, client, bucket, 5, e2eutil.FlushDisabledVerifier)
+	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.FlushDisabledVerifier)
 
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
@@ -669,7 +571,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// verify that the operator has reverted the change
 	// and re-enabled bucket flush
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to enable bucket flush %v", err)
 	}
 
@@ -683,7 +585,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	}
 
 	// edit bucket and verify change is reflected in cluster.
-	err = e2eutil.EditBucketAndVerify(t, client, bucket, 5, e2eutil.ThreeReplicaVerifier)
+	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.ThreeReplicaVerifier)
 
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
@@ -705,7 +607,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		return false
 	}
 
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to revert bucket replicas to 1 %v", err)
 	}
 
@@ -719,7 +621,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	}
 
 	// edit bucket and verify change is reflected in cluster.
-	err = e2eutil.EditBucketAndVerify(t, client, bucket, 5, e2eutil.DefaultIoPriorityVerifier)
+	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.DefaultIoPriorityVerifier)
 
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
@@ -741,13 +643,20 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		return false
 	}
 
-	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, 10, testCouchbase, acceptsBucketFunc); err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to revert bucket io prioritys to high %v", err)
 	}
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatal(err.Error())
 	}
 
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
 }

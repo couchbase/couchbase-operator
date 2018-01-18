@@ -138,28 +138,31 @@ func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, bucke
 		return err
 	}
 	return nil
-
 }
 
 func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, namespace string, expectedNodes, retries int) error {
 	err := retryutil.Retry(retryInterval, retries, func() (done bool, err error) {
 		cl, err := GetCouchbaseCluster(crClient, name, namespace)
 		if err != nil {
+			LogfWithTimestamp(t, "could not get cluster: (%v) \n", err)
 			return false, err
 		}
 
 		if cl.Status.Size != expectedNodes {
-			t.Logf("Cluster nodes (%d) does not match expected nodes (%d)", cl.Status.Size, expectedNodes)
+			LogfWithTimestamp(t, "Cluster nodes (%d) does not match expected nodes (%d) \n", cl.Status.Size, expectedNodes)
 			return false, nil
 		}
 
 		availableConditionFound := false
 		balancedConditionFound := false
+
+		LogfWithTimestamp(t, "Cluster Status Conditions: (%v) \n", cl.Status.Conditions)
+
 		for _, cond := range cl.Status.Conditions {
 			if cond.Type == api.ClusterConditionAvailable {
 				availableConditionFound = true
 				if cond.Status != v1.ConditionTrue {
-					t.Logf("Cluster is not available")
+					LogfWithTimestamp(t, "Cluster not healthy (%v) \n", cond.Status)
 					return false, nil
 				}
 			}
@@ -167,17 +170,17 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 			if cond.Type == api.ClusterConditionBalanced {
 				balancedConditionFound = true
 				if cond.Status != v1.ConditionTrue {
-					t.Logf("Cluster is not balanced")
+					LogfWithTimestamp(t, "Cluster not balanced (%v) \n", cond.Status)
 					return false, nil
 				}
 			}
 		}
-
+		LogfWithTimestamp(t, "available (%v), balanced (%v) \n", availableConditionFound, balancedConditionFound)
 		return availableConditionFound && balancedConditionFound, nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("fail to wait for cluster status to be healthy: %v", err)
+		return fmt.Errorf("fail to wait for cluster status to be healthy: %v \n", err)
 	}
 
 	return nil

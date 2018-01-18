@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
 
 // Tests editing service spec
@@ -22,26 +22,14 @@ func TestEditServiceConfig(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceOneDataNode
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
@@ -54,7 +42,7 @@ func TestEditServiceConfig(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -65,34 +53,35 @@ func TestEditServiceConfig(t *testing.T) {
 	// edit service size
 	newSize := "2"
 	t.Log("Changing cluster size")
-	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, f.CRClient, testCouchbase, 5)
+	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = e2eutil.VerifyClusterInfo(t, client, 6, newSize, e2eutil.NumNodesVerifier)
+	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSize, e2eutil.NumNodesVerifier)
 	if err != nil {
 		t.Fatalf("failed to change service size: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	// verify events
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -110,26 +99,14 @@ func TestNegEditServiceConfig(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
@@ -142,7 +119,7 @@ func TestNegEditServiceConfig(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -154,23 +131,36 @@ func TestNegEditServiceConfig(t *testing.T) {
 	newSize := "-2"
 	oldSize := "1"
 	t.Log("Changing cluster size")
-	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, f.CRClient, testCouchbase, 5)
+	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = e2eutil.VerifyClusterInfo(t, client, 6, newSize, e2eutil.NumNodesVerifier)
+	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSize, e2eutil.NumNodesVerifier)
 	if err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, 6, oldSize, e2eutil.NumNodesVerifier)
+	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, oldSize, e2eutil.NumNodesVerifier)
 	if err != nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 6, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -522,61 +512,19 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
 	// create connection to couchbase nodes
@@ -589,7 +537,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -600,38 +548,26 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 		t.Fatalf("failed to kill pod and recover: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	// verify events
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -649,61 +585,19 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
 	// create connection to couchbase nodes
@@ -716,7 +610,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -729,19 +623,19 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	}
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 3: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 2)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 2)
 	if err != nil {
 		t.Fatalf("failed to wait for 2 unhealthy nodes: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -759,48 +653,38 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 
 	t.Logf("failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, 6, nodeName)
+		err = e2eutil.FailoverNode(t, client, e2eutil.Retries5, nodeName)
 		if err != nil {
 			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
 		}
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 6)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
+	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -822,68 +706,20 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -896,7 +732,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -909,19 +745,19 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 1)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
 	if err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -931,35 +767,31 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -982,68 +814,20 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1057,7 +841,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 20)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1070,19 +854,19 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 3: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 2)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 2)
 	if err != nil {
 		t.Fatalf("failed to wait for 2 unhealthy nodes: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1101,49 +885,38 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 
 	t.Logf("failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, 6, nodeName)
+		err = e2eutil.FailoverNode(t, client, e2eutil.Retries5, nodeName)
 		if err != nil {
 			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
 		}
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 3: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 6)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -1165,68 +938,20 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1239,7 +964,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1252,19 +977,19 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 1)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
 	if err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1274,35 +999,30 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -1325,7 +1045,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1333,60 +1053,13 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	expectedEvents := e2eutil.EventList{}
 
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1399,7 +1072,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1412,19 +1085,19 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 3: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 2)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 2)
 	if err != nil {
 		t.Fatalf("failed to wait for 2 unhealthy nodes: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1442,49 +1115,38 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	t.Logf("failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, 6, nodeName)
+		err = e2eutil.FailoverNode(t, client, e2eutil.Retries5, nodeName)
 		if err != nil {
 			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
 		}
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 6)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -1498,68 +1160,20 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1572,7 +1186,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1588,19 +1202,19 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	// ***
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 1)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
 	if err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1610,35 +1224,30 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -1657,68 +1266,20 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1731,7 +1292,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1747,19 +1308,19 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	// ***
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 1)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
 	if err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1769,35 +1330,30 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -1816,68 +1372,20 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, true)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
 	expectedEvents := e2eutil.EventList{}
-
-	event := k8sutil.AdminConsoleSvcCreateEvent(testCouchbase.Name+"-ui", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 4)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-
-	event = k8sutil.BucketCreateEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1890,7 +1398,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, 5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1915,19 +1423,19 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	// ***
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, 18, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, 6, 1)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
 	if err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, 6)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1937,34 +1445,29 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, 10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 5)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-
-	event = k8sutil.RebalanceEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
-	t.Logf("verifying cluster balanced and healthy")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, 20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	t.Logf("cluster balanced and healthy")
 
-	err = e2eutil.WaitUntilEventsCompare(t, f.KubeClient, 3, testCouchbase, expectedEvents, f.Namespace)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
-		t.Fatalf("compare events failed: %v", err)
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
