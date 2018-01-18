@@ -1,5 +1,7 @@
 PREFIX ?= $(shell pwd)
 GOPATH = $(shell echo $${PWD%/src/*})
+SOURCE = $(shell find . -name *.go -type f)
+BINARY = build/bin/couchbase-operator
 
 kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
@@ -16,7 +18,9 @@ dep: vendor
 vendor:
 	GOPATH=$(GOPATH) glide install --strip-vendor
 
-build: dep
+build: dep $(BINARY)
+
+$(BINARY): $(SOURCE)
 	./scripts/codegen/update-generated.sh
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
 
