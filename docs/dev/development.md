@@ -81,8 +81,48 @@ can be done by running the following.
 
     $ kubectl create -f example/deployment.yaml
 
+Before we create the Couchbase cluster we must install a secret into Kubernetes
+which will be used to create our Administrator user and password.
+
+    $ kubectl create -f example/secret.yaml
+
 Now you can create Couchbase clusters by specifying configurations for the
 CouchbaseCluster kind. We provide an example Couchbase cluster that you can
 load into Kubernetes by running the command below.
 
     $ kubectl create -f example/couchbase-cluster.yaml
+
+## Monitoring the Couchbase Cluster
+
+Most of this should be fairly trivial if you are familiar with Kubernetes.
+To view the pods that are on the system user the following:
+
+    $ kubectl get pods -o wide
+
+You should see the couchbase-operator pod and a number of Couchbase Server
+pods as defined in your cluster configuration.  To view the state of your
+cluser you can use the following:
+
+    $ kubectl get couchbasecluster -o json
+
+Finally if the previous command isn't sufficient to diagnose problems your
+next port of call should be the logs from the operator echoed to standard
+out.  With the full pod name you can interrogate the logs with something
+similar to the following, substituting in your operator pod name.
+
+    $ kubectl logs couchbase-operator-789c895556-87gq2
+
+## Configuring the Couchbase Cluster
+
+This section documents various tweaks to the example code which may be
+required to support a specific customer or to enable development of a
+specific feature.
+
+### Selecting Verions
+
+The containers used by couchbase-operator are hosted on Docker Hub.  You
+can modify the version to install by editing `example/couchbase-cluster.yaml`
+and altering the `spec['version']` value.  Valid container version tags are
+available at the following location:
+
+[Couchbase Server Docker Hub](https://hub.docker.com/r/couchbase/server/tags/)
