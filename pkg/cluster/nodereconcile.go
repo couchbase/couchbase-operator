@@ -76,6 +76,7 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 	}
 
 	if !needsReconcile {
+		c.status.SetBalancedCondition()
 		r.transitionState(ReconcileFinished)
 		return
 	}
