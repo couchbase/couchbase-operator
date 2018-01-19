@@ -32,14 +32,14 @@ var (
 )
 
 var (
-	WithBucket = true
+	WithBucket    = true
 	WithoutBucket = false
-	AdminExposed = true
-	AdminHidden = false
+	AdminExposed  = true
+	AdminHidden   = false
 )
 
 var (
-	Retries5 = 5
+	Retries5  = 5
 	Retries10 = 10
 	Retries20 = 20
 	Retries30 = 30

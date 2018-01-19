@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
 
 // Tests editing service spec

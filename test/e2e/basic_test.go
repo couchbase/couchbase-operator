@@ -2,9 +2,9 @@ package e2e
 
 import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"testing"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
 // Tests creation of a 3 node cluster with 0 buckets
