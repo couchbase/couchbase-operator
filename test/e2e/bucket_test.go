@@ -22,38 +22,38 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		BucketName:         "default1",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  101,
-		BucketReplicas:     1,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
 		ConflictResolution: &constants.BucketConflictResolutionSeqno,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucket2 := api.BucketConfig{
 		BucketName:        "default2",
 		BucketType:        constants.BucketTypeMemcached,
 		BucketMemoryQuota: 101,
-		EnableFlush:       &constants.BucketFlushDisabled,
+		EnableFlush:       constants.BucketFlushDisabled,
 	}
 	bucket3 := api.BucketConfig{
 		BucketName:         "default3",
 		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
-		BucketReplicas:     1,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyNoEviction,
 		ConflictResolution: &constants.BucketConflictResolutionTimestamp,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 	}
 	bucket4 := api.BucketConfig{
 		BucketName:         "default4",
 		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
-		BucketReplicas:     1,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyNRUEviction,
 		ConflictResolution: &constants.BucketConflictResolutionSeqno,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 	}
 	bucketSettingsList := []api.BucketConfig{bucket1, bucket2, bucket3, bucket4}
 
@@ -292,11 +292,11 @@ func TestNegBucketAdd(t *testing.T) {
 		BucketName:         "default",
 		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     1,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
 		ConflictResolution: &constants.BucketConflictResolutionSeqno,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 		EnableIndexReplica: &constants.BucketIndexReplicasDisabled,
 	}
 	bucketConfig := []api.BucketConfig{bucketSettings}
@@ -433,7 +433,7 @@ func TestEditBucket(t *testing.T) {
 	// verify
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketReplicas == 2
+			return *bucket.BucketReplicas == 2
 		}
 		return false
 	}
@@ -457,7 +457,7 @@ func TestEditBucket(t *testing.T) {
 	// verify
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketReplicas == 1
+			return *bucket.BucketReplicas == 1
 		}
 		return false
 	}
@@ -479,12 +479,9 @@ func TestEditBucket(t *testing.T) {
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
-	disabled := false
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			if bucket.EnableFlush != nil {
-				return *bucket.EnableFlush == disabled
-			}
+			return bucket.EnableFlush == constants.BucketFlushDisabled
 		}
 		return false
 	}
@@ -506,12 +503,9 @@ func TestEditBucket(t *testing.T) {
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	// verify
-	enabled := true
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			if bucket.EnableFlush != nil {
-				return *bucket.EnableFlush == enabled
-			}
+			return bucket.EnableFlush == constants.BucketFlushEnabled
 		}
 		return false
 	}
@@ -783,10 +777,8 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// bucket should exist with flush enabled
 	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			if bucket.EnableFlush != nil {
-				t.Logf("enabled bucket flush: %t", *bucket.EnableFlush)
-				return *bucket.EnableFlush
-			}
+			t.Logf("enabled bucket flush: %t", bucket.EnableFlush)
+			return bucket.EnableFlush == constants.BucketFlushEnabled
 		}
 		return false
 	}
@@ -803,8 +795,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// make a bucket spec with flush disabled
 	t.Logf("externally changing bucket flush to: false")
 	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		disabled := false
-		b.EnableFlush = &disabled
+		b.EnableFlush = false
 	})
 	if err != nil {
 		t.Fatalf("error occurred converting bucket spec %v", err)
@@ -830,7 +821,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// make a bucket spec with bucket replicas = 3
 	t.Logf("externally changing bucket replicas to: 3")
 	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.BucketReplicas = 3
+		b.BucketReplicas = &constants.BucketReplicasThree
 	})
 	if err != nil {
 		t.Fatalf("error occurred converting bucket spec %v", err)
@@ -852,7 +843,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
 			t.Logf("bucket replicas: %v", bucket.BucketReplicas)
-			if bucket.BucketReplicas == 1 {
+			if *bucket.BucketReplicas == 1 {
 				return true
 			}
 		}
@@ -866,7 +857,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// make a bucket spec with io priority = "default"
 	t.Logf("externally changing bucket io priority to: default")
 	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.IoPriority = "low"
+		b.IoPriority = &constants.BucketIoPriorityLow
 	})
 	if err != nil {
 		t.Fatalf("error occurred converting bucket spec %v", err)
@@ -888,7 +879,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
 			t.Logf("io priority: %v", bucket.IoPriority)
-			if bucket.IoPriority == "high" {
+			if *bucket.IoPriority == "high" {
 				return true
 			}
 		}

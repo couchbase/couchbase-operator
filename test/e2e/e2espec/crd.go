@@ -36,11 +36,11 @@ var (
 		BucketName:         "default",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     1,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
 		ConflictResolution: &constants.BucketConflictResolutionSeqno,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 		EnableIndexReplica: &constants.BucketIndexReplicasDisabled,
 	}
 )
@@ -79,11 +79,11 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 											BucketName:         "default",
 											BucketType:         bucketType,
 											BucketMemoryQuota:  bucketMemoryQuota,
-											BucketReplicas:     bucketReplica,
-											IoPriority:         ioPriority,
+											BucketReplicas:     &bucketReplica,
+											IoPriority:         &ioPriority,
 											EvictionPolicy:     &evictionPolicy,
 											ConflictResolution: &conflictResolution,
-											EnableFlush:        &enableFlush,
+											EnableFlush:        enableFlush,
 											EnableIndexReplica: &enableIndexReplica,
 										}
 										generatedSettings = append(generatedSettings, bucketSetting)
@@ -103,7 +103,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 						BucketName:        "default",
 						BucketType:        bucketType,
 						BucketMemoryQuota: bucketMemoryQuota,
-						EnableFlush:       &enableFlush,
+						EnableFlush:       enableFlush,
 					}
 					generatedSettings = append(generatedSettings, bucketSetting)
 				}
@@ -125,11 +125,11 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 										BucketName:         "default",
 										BucketType:         bucketType,
 										BucketMemoryQuota:  bucketMemoryQuota,
-										BucketReplicas:     bucketReplica,
-										IoPriority:         ioPriority,
+										BucketReplicas:     &bucketReplica,
+										IoPriority:         &ioPriority,
 										EvictionPolicy:     &evictionPolicy,
 										ConflictResolution: &conflictResolution,
-										EnableFlush:        &enableFlush,
+										EnableFlush:        enableFlush,
 									}
 									generatedSettings = append(generatedSettings, bucketSetting)
 								}
@@ -221,9 +221,10 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 					bucketSettings.BucketMemoryQuota = bucketMemoryQuota
 				case setting == "bucketReplicas":
 					bucketReplicas, _ := strconv.Atoi(config[key][setting])
-					bucketSettings.BucketReplicas = bucketReplicas
+					bucketSettings.BucketReplicas = &bucketReplicas
 				case setting == "ioPriority":
-					bucketSettings.IoPriority = config[key][setting]
+					ioPriority := config[key][setting]
+					bucketSettings.IoPriority = &ioPriority
 				case setting == "evictionPolicy":
 					policy := config[key][setting]
 					bucketSettings.EvictionPolicy = &policy
@@ -232,7 +233,7 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 					bucketSettings.ConflictResolution = &confResoultion
 				case setting == "enableFlush":
 					enableFlush, _ := strconv.ParseBool(config[key][setting])
-					bucketSettings.EnableFlush = &(enableFlush)
+					bucketSettings.EnableFlush = enableFlush
 				case setting == "enableIndexReplica":
 					enableIndexReplica, _ := strconv.ParseBool(config[key][setting])
 					bucketSettings.EnableIndexReplica = &(enableIndexReplica)

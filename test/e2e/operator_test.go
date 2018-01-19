@@ -2,6 +2,7 @@ package e2e
 
 import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -168,8 +169,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	// make a bucket spec with flush disabled
 	t.Logf("externally changing bucket flush to: false")
 	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		disabled := false
-		b.EnableFlush = &disabled
+		b.EnableFlush = constants.BucketFlushDisabled
 	})
 	if err != nil {
 		t.Fatalf("error occurred converting bucket spec %v", err)
@@ -177,10 +177,8 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 
 	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			if bucket.EnableFlush != nil {
-				t.Logf("enabled bucket flush: %t", *bucket.EnableFlush)
-				return *bucket.EnableFlush
-			}
+			t.Logf("enabled bucket flush: %t", bucket.EnableFlush)
+			return bucket.EnableFlush == constants.BucketFlushEnabled
 		}
 		return false
 	}

@@ -115,10 +115,10 @@ type BucketConfig struct {
 	BucketMemoryQuota int `json:"memoryQuota"`
 
 	// The number of bucket replicates
-	BucketReplicas int `json:"replicas"`
+	BucketReplicas *int `json:"replicas"`
 
 	// The priority when compared to other buckets
-	IoPriority string `json:"ioPriority"`
+	IoPriority *string `json:"ioPriority"`
 
 	// The bucket eviction policy which determines behavior during expire and high mem usage
 	EvictionPolicy *string `json:"evictionPolicy,omitempty"`
@@ -127,7 +127,7 @@ type BucketConfig struct {
 	ConflictResolution *string `json:"conflictResolution,omitempty"`
 
 	// The enable flush option denotes wether the data in the bucket can be flushed
-	EnableFlush *bool `json:"enableFlush,omitempty"`
+	EnableFlush bool `json:"enableFlush,omitempty"`
 
 	// Enable Index replica specifies whether or not to enable view index replicas for this bucket. This parameter defaults to false if it is not specified. This parameter only affects Couchbase buckets.
 	EnableIndexReplica *bool `json:"enableIndexReplica,omitempty"`

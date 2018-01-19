@@ -1385,11 +1385,11 @@ func TestManageMultipleClusters(t *testing.T) {
 		BucketName:         "default1",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     constants.BucketReplicasOne,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
 		ConflictResolution: &constants.BucketConflictResolutionSeqno,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig1 := []api.BucketConfig{bucketSetting1}
@@ -1419,11 +1419,11 @@ func TestManageMultipleClusters(t *testing.T) {
 		BucketName:         "default2",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     constants.BucketReplicasOne,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
 		ConflictResolution: &constants.BucketConflictResolutionSeqno,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig2 := []api.BucketConfig{bucketSetting2}
@@ -1453,11 +1453,11 @@ func TestManageMultipleClusters(t *testing.T) {
 		BucketName:         "default3",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     constants.BucketReplicasOne,
-		IoPriority:         constants.BucketIoPriorityHigh,
+		BucketReplicas:     &constants.BucketReplicasOne,
+		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
 		ConflictResolution: &constants.BucketConflictResolutionSeqno,
-		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableFlush:        constants.BucketFlushEnabled,
 		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig3 := []api.BucketConfig{bucketSetting3}
