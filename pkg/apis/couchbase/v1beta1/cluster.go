@@ -240,6 +240,14 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 	return bucketsToAdd, bucketsToRemove
 }
 
+func (c *BucketConfig) Equals(other *BucketConfig) bool {
+	return c.BucketName == other.BucketName && c.BucketType == other.BucketType &&
+		c.BucketMemoryQuota == other.BucketMemoryQuota && intPtrEquals(c.BucketReplicas, other.BucketReplicas) &&
+		stringPtrEquals(c.IoPriority, other.IoPriority) && stringPtrEquals(c.EvictionPolicy, other.EvictionPolicy) &&
+		stringPtrEquals(c.ConflictResolution, other.ConflictResolution) && c.EnableFlush == other.EnableFlush &&
+		boolPtrEquals(c.EnableIndexReplica, other.EnableIndexReplica)
+}
+
 // check wether item exists within array
 func HasItem(itm string, arr []string) (int, bool) {
 	for i, a := range arr {
@@ -261,4 +269,19 @@ func MissingItems(a1, a2 []string) []string {
 		}
 	}
 	return missingItems
+}
+
+// Returns true of the values of two pointers are equal
+func stringPtrEquals(p1, p2 *string) bool {
+	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
+}
+
+// Returns true of the values of two pointers are equal
+func intPtrEquals(p1, p2 *int) bool {
+	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
+}
+
+// Returns true of the values of two pointers are equal
+func boolPtrEquals(p1, p2 *bool) bool {
+	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
 }

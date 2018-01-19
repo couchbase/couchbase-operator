@@ -137,10 +137,7 @@ func SpecToApiBucket(bucketName string, cl *api.CouchbaseCluster, modifiers ...b
 	for _, f := range modifiers {
 		f(&bucket)
 	}
-	apiBucket, err := couchbaseutil.ApiBucketToCbmgr(&bucket)
-	if err != nil {
-		return nil, err
-	}
+	apiBucket := couchbaseutil.ApiBucketToCbmgr(&bucket)
 
 	return apiBucket, nil
 }

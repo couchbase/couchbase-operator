@@ -2,12 +2,12 @@ package couchbaseutil
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"reflect"
 	"strings"
 	"time"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbaselabs/gocbmgr"
 )
@@ -159,12 +159,8 @@ func Rebalance(ms MemberSet, username, password, clusterName string, nodesToRemo
 func CreateBucket(ms MemberSet, clusterName, username, password string, config *cbapi.BucketConfig) error {
 	client := cbmgr.New(ms.ClientURLs(), username, password)
 
-	bucket, err := ApiBucketToCbmgr(config)
-	if err != nil {
-		return err
-	}
-
-	if err = client.CreateBucket(bucket); err != nil {
+	bucket := ApiBucketToCbmgr(config)
+	if err := client.CreateBucket(bucket); err != nil {
 		return err
 	}
 
@@ -183,12 +179,24 @@ func DeleteBucket(ms MemberSet, username, password, bucketName string) error {
 
 func EditBucket(ms MemberSet, username, password string, config *cbapi.BucketConfig) error {
 	client := cbmgr.New(ms.ClientURLs(), username, password)
-	bucket, err := ApiBucketToCbmgr(config)
-	if err != nil {
-		return err
-	}
+	bucket := ApiBucketToCbmgr(config)
 
 	return client.EditBucket(bucket)
+}
+
+func GetBuckets(ms MemberSet, username, password string) ([]*cbapi.BucketConfig, error) {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	buckets, err := client.GetBuckets()
+	if err != nil {
+		return nil, err
+	}
+
+	rv := make([]*cbapi.BucketConfig, len(buckets))
+	for i, bucket := range buckets {
+		rv[i] = CbmgrBucketToApiBucket(bucket)
+	}
+
+	return rv, nil
 }
 
 func GetBucketNames(ms MemberSet, username, password string) ([]string, error) {
@@ -209,24 +217,17 @@ func GetBucketNames(ms MemberSet, username, password string) ([]string, error) {
 // compare spec buckets to couchbase buckets and add to list of buckets
 // that need editing
 func GetBucketsToEdit(ms MemberSet, username, password string, spec *cbapi.ClusterSpec) ([]string, error) {
-
 	bucketNames := []string{}
-	client := cbmgr.New(ms.ClientURLs(), username, password)
-
-	buckets, err := client.GetBuckets()
+	clusterBuckets, err := GetBuckets(ms, username, password)
 	if err != nil {
-		return bucketNames, err
+		return nil, err
 	}
-	for _, b := range buckets {
-		config := spec.GetBucketByName(b.BucketName)
-		if config != nil {
 
-			cbConfigBucket, err := ApiBucketToCbmgr(config)
-			if err != nil {
-				return bucketNames, err
-			}
-			if !bucketStatusEqualsConfig(b, cbConfigBucket) {
-				bucketNames = append(bucketNames, config.BucketName)
+	for _, clusterBucket := range clusterBuckets {
+		specBucket := spec.GetBucketByName(clusterBucket.BucketName)
+		if specBucket != nil {
+			if !specBucket.Equals(clusterBucket) {
+				bucketNames = append(bucketNames, specBucket.BucketName)
 			}
 		}
 	}
@@ -278,28 +279,74 @@ func SetSearchMemoryQuota(ms MemberSet, username, password string, quota int) er
 	return client.SetSearchMemoryQuota(quota)
 }
 
-func ApiBucketToCbmgr(config *cbapi.BucketConfig) (*cbmgr.Bucket, error) {
-
-	// convert bucket config to cbmgr bucket type
-	data, err := json.Marshal(config)
-	if err != nil {
-		return nil, err
+func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
+	rv := &cbmgr.Bucket{
+		BucketName:        config.BucketName,
+		BucketType:        config.BucketType,
+		BucketMemoryQuota: config.BucketMemoryQuota,
+		EnableFlush:       &config.EnableFlush,
 	}
 
-	bucket := cbmgr.Bucket{}
-	if err := json.Unmarshal(data, &bucket); err != nil {
-		return nil, err
+	if rv.BucketType == constants.BucketTypeMemcached {
+		return rv
 	}
 
-	return &bucket, nil
+	if config.BucketReplicas != nil {
+		rv.BucketReplicas = *config.BucketReplicas
+	}
+
+	if config.IoPriority != nil {
+		rv.IoPriority = cbmgr.IoPriorityType(*config.IoPriority)
+	}
+
+	rv.ConflictResolution = config.ConflictResolution
+	rv.EvictionPolicy = config.EvictionPolicy
+
+	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {
+		rv.BucketType = constants.BucketTypeCouchbase
+		rv.EnableIndexReplica = config.EnableIndexReplica
+	}
+
+	return rv
+}
+
+func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) (*cbapi.BucketConfig) {
+	rv := &cbapi.BucketConfig{
+		BucketName:         bucket.BucketName,
+		BucketType:         bucket.BucketType,
+		BucketMemoryQuota:  bucket.BucketMemoryQuota,
+	}
+
+	if bucket.EnableFlush == nil || *bucket.EnableFlush == false {
+		rv.EnableFlush = false
+	} else {
+		rv.EnableFlush = true
+	}
+
+	if rv.BucketType == constants.BucketTypeMemcached {
+		return rv
+	}
+
+	ioPriority := string(bucket.IoPriority)
+	rv.BucketReplicas = &bucket.BucketReplicas
+	rv.IoPriority = &ioPriority
+	rv.ConflictResolution = bucket.ConflictResolution
+	rv.EvictionPolicy = bucket.EvictionPolicy
+
+	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {
+		rv.BucketType = constants.BucketTypeCouchbase
+		rv.EnableIndexReplica = bucket.EnableIndexReplica
+	}
+
+	return rv
 }
 
 // transforms bucket status into bucketConfig type and compares the two
 func bucketStatusEqualsConfig(statusConfig *cbmgr.Bucket, specConfig *cbmgr.Bucket) bool {
 
 	// consider type couchbase = membase
-	if specConfig.BucketType == "couchbase" && statusConfig.BucketType == "membase" {
-		statusConfig.BucketType = "couchbase"
+	if specConfig.BucketType == constants.BucketTypeCouchbase && statusConfig.BucketType == constants.BucketTypeMembase {
+		statusConfig.BucketType = constants.BucketTypeCouchbase
 	}
 
 	return reflect.DeepEqual(statusConfig, specConfig)
