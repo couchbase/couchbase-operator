@@ -363,7 +363,12 @@ func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir 
 			return err
 		}
 
-		logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", t.Name(), pod.Name))
+		testName := t.Name()
+		if strings.Contains(testName, "/") {
+			testName = strings.Split(t.Name(), "/")[1]
+		}
+
+		logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", testName, pod.Name))
 		err = ioutil.WriteFile(logFile, data, 0644)
 		if err != nil {
 			return err
