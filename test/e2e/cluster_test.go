@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -1379,22 +1380,17 @@ func TestManageMultipleClusters(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo3)
 
-	fullEvictionPolicy := "fullEviction"
-	seqnoConflictResolutions := "seqno"
-	indexReplicaOn := true
-	enableFlush := true
-
 	// add bucket to cluster 1
 	bucketSetting1 := api.BucketConfig{
 		BucketName:         "default1",
-		BucketType:         "couchbase",
+		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &fullEvictionPolicy,
-		ConflictResolution: &seqnoConflictResolutions,
-		EnableFlush:        &enableFlush,
-		EnableIndexReplica: &indexReplicaOn,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig1 := []api.BucketConfig{bucketSetting1}
 	t.Logf("Desired Bucket Properties: %v\n", bucketConfig1)
@@ -1421,14 +1417,14 @@ func TestManageMultipleClusters(t *testing.T) {
 	// add bucket to cluster 2
 	bucketSetting2 := api.BucketConfig{
 		BucketName:         "default2",
-		BucketType:         "couchbase",
+		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &fullEvictionPolicy,
-		ConflictResolution: &seqnoConflictResolutions,
-		EnableFlush:        &enableFlush,
-		EnableIndexReplica: &indexReplicaOn,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig2 := []api.BucketConfig{bucketSetting2}
 	t.Logf("Desired Bucket Properties: %v\n", bucketConfig2)
@@ -1455,14 +1451,14 @@ func TestManageMultipleClusters(t *testing.T) {
 	// add bucket to cluster 3
 	bucketSetting3 := api.BucketConfig{
 		BucketName:         "default3",
-		BucketType:         "couchbase",
+		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &fullEvictionPolicy,
-		ConflictResolution: &seqnoConflictResolutions,
-		EnableFlush:        &enableFlush,
-		EnableIndexReplica: &indexReplicaOn,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig3 := []api.BucketConfig{bucketSetting3}
 	t.Logf("Desired Bucket Properties: %v\n", bucketConfig3)

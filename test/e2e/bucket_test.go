@@ -3,6 +3,7 @@ package e2e
 import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -17,51 +18,42 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	fullEvictionPolicy := "fullEviction"
-	noEvictionPolicy := "noEviction"
-	nruEvictionPolicy := "nruEviction"
-	segnoConflictResolutions := "seqno"
-	timestampConflictResolution := "lww"
-	indexReplicaOn := true
-	//indexReplicaOff := false
-	enableFlush := true
-	disableFlush := false
 	bucket1 := api.BucketConfig{
 		BucketName:         "default1",
-		BucketType:         "couchbase",
+		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  101,
 		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &fullEvictionPolicy,
-		ConflictResolution: &segnoConflictResolutions,
-		EnableFlush:        &enableFlush,
-		EnableIndexReplica: &indexReplicaOn,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
 	}
 	bucket2 := api.BucketConfig{
 		BucketName:        "default2",
-		BucketType:        "memcached",
+		BucketType:        constants.BucketTypeMemcached,
 		BucketMemoryQuota: 101,
-		EnableFlush:       &disableFlush,
+		EnableFlush:       &constants.BucketFlushDisabled,
 	}
 	bucket3 := api.BucketConfig{
 		BucketName:         "default3",
-		BucketType:         "ephemeral",
+		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
 		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &noEvictionPolicy,
-		ConflictResolution: &timestampConflictResolution,
-		EnableFlush:        &enableFlush,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyNoEviction,
+		ConflictResolution: &constants.BucketConflictResolutionTimestamp,
+		EnableFlush:        &constants.BucketFlushEnabled,
 	}
 	bucket4 := api.BucketConfig{
 		BucketName:         "default4",
-		BucketType:         "ephemeral",
+		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
 		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &nruEvictionPolicy,
-		ConflictResolution: &segnoConflictResolutions,
-		EnableFlush:        &enableFlush,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyNRUEviction,
+		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		EnableFlush:        &constants.BucketFlushEnabled,
 	}
 	bucketSettingsList := []api.BucketConfig{bucket1, bucket2, bucket3, bucket4}
 
@@ -296,20 +288,16 @@ func TestNegBucketAdd(t *testing.T) {
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	fullEvictionPolicy := "fullEviction"
-	seqnoConflictResolution := "seqno"
-	enabled := true
-	disabled := false
 	bucketSettings := api.BucketConfig{
 		BucketName:         "default",
-		BucketType:         "ephemeral",
+		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  256,
 		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &fullEvictionPolicy,
-		ConflictResolution: &seqnoConflictResolution,
-		EnableFlush:        &enabled,
-		EnableIndexReplica: &disabled,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableIndexReplica: &constants.BucketIndexReplicasDisabled,
 	}
 	bucketConfig := []api.BucketConfig{bucketSettings}
 

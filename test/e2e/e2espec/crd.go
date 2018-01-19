@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,12 +15,8 @@ import (
 
 // other settings
 var (
-	baseImage               = "couchbase/server"
-	version                 = "enterprise-5.0.1"
-	fullEvictionPolicy      = "fullEviction"
-	seqnoConflictResolution = "seqno"
-	enabled                 = true
-	disabled                = false
+	baseImage = "couchbase/server"
+	version   = "enterprise-5.0.1"
 )
 
 // cluster settings
@@ -28,7 +25,7 @@ var (
 		DataServiceMemQuota:   256,
 		IndexServiceMemQuota:  256,
 		SearchServiceMemQuota: 256,
-		IndexStorageSetting:   "memory_optimized",
+		IndexStorageSetting:   constants.IndexStorageModeMemoryOptimized,
 		AutoFailoverTimeout:   30,
 	}
 )
@@ -37,14 +34,14 @@ var (
 var (
 	DefaultBucketSettings = api.BucketConfig{
 		BucketName:         "default",
-		BucketType:         "couchbase",
+		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
 		BucketReplicas:     1,
-		IoPriority:         "high",
-		EvictionPolicy:     &fullEvictionPolicy,
-		ConflictResolution: &seqnoConflictResolution,
-		EnableFlush:        &enabled,
-		EnableIndexReplica: &disabled,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		EnableFlush:        &constants.BucketFlushEnabled,
+		EnableIndexReplica: &constants.BucketIndexReplicasDisabled,
 	}
 )
 
@@ -63,14 +60,14 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 	generatedSettings := []api.BucketConfig{}
 	for _, bucketType := range bucketTypes {
 		switch {
-		case bucketType == "couchbase":
+		case bucketType == constants.BucketTypeCouchbase:
 			bucketMemoryQuotas := []int{256}
 			bucketReplicas := []int{1}
-			ioPriorities := []string{"high"}
-			evictionPolicies := []string{"fullEviction"}
-			conflictResolutions := []string{"seqno", "lww"}
-			enableFlushes := []bool{true}
-			enableIndexReplicas := []bool{true}
+			ioPriorities := []string{constants.BucketIoPriorityHigh}
+			evictionPolicies := []string{constants.BucketEvictionPolicyFullEviction}
+			conflictResolutions := []string{constants.BucketConflictResolutionSeqno, constants.BucketConflictResolutionTimestamp}
+			enableFlushes := []bool{constants.BucketFlushEnabled}
+			enableIndexReplicas := []bool{constants.BucketIndexReplicasEnabled}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, bucketReplica := range bucketReplicas {
 					for _, ioPriority := range ioPriorities {
@@ -97,7 +94,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 					}
 				}
 			}
-		case bucketType == "memcached":
+		case bucketType == constants.BucketTypeMemcached:
 			bucketMemoryQuotas := []int{256}
 			enableFlushes := []bool{true, false}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
@@ -111,13 +108,13 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 					generatedSettings = append(generatedSettings, bucketSetting)
 				}
 			}
-		case bucketType == "ephemeral":
+		case bucketType == constants.BucketTypeEphemeral:
 			bucketMemoryQuotas := []int{256}
 			bucketReplicas := []int{1}
-			ioPriorities := []string{"high"}
-			evictionPolicies := []string{"noEviction", "nruEviction"}
-			conflictResolutions := []string{"seqno", "timestamp"}
-			enableFlushes := []bool{true, false}
+			ioPriorities := []string{constants.BucketIoPriorityHigh}
+			evictionPolicies := []string{constants.BucketEvictionPolicyNoEviction, constants.BucketEvictionPolicyNRUEviction}
+			conflictResolutions := []string{constants.BucketConflictResolutionSeqno, constants.BucketConflictResolutionTimestamp}
+			enableFlushes := []bool{constants.BucketFlushEnabled, constants.BucketFlushDisabled}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, bucketReplica := range bucketReplicas {
 					for _, ioPriority := range ioPriorities {
