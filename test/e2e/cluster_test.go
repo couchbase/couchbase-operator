@@ -649,7 +649,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	f := framework.Global
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	serviceConfig1 := e2eutil.BasicServiceOneDataNode
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
@@ -687,7 +687,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
 		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
 	}
-	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("add service failed: %v", err)
 	}
@@ -705,7 +705,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to add n1ql service: %v", err)
 	}
