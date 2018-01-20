@@ -1126,7 +1126,7 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 	}
 	f := framework.Global
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceThreeDataN1qlIndex
+	serviceConfig1 := e2eutil.BasicServiceOneN1qlIndexSearch
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
