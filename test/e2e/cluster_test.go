@@ -937,7 +937,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to add n1ql service: %v", err)
 	}
@@ -969,7 +969,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to add index service: %v", err)
 	}
@@ -1002,7 +1002,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   2,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to add fts service: %v", err)
 	}
@@ -1032,7 +1032,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 2,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to scale test_config_4--, test_config_3++: %v", err)
 	}
@@ -1062,7 +1062,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to scale test_config_3--, test_config_2++: %v", err)
 	}
@@ -1086,13 +1086,19 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 6)
 
+	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 6)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	serviceMap = map[string]int{
 		"Data":  2,
 		"N1QL":  1,
 		"Index": 1,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
 	}
