@@ -11,7 +11,7 @@
   * Ad-hoc scale-up and scale-down
   * Recover from node failure
 * Updating Couchbase Deployment
-* Deleting Couchbase Deployment
+* [Deleting Couchbase Deployment](deleteCouchbaseCluster.md)
 * Logging and Troubleshooting
   * Logs (Tommie)
   * [Conditions and Events](conditionsAndEvents.md)
