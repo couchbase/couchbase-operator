@@ -6,6 +6,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbaselabs/gocbmgr"
 	"os"
 	"strconv"
 	"testing"
@@ -660,6 +661,80 @@ func TestNegBucketEdit(t *testing.T) {
 	if err == nil {
 		t.Fatalf("failed to verify prevent changing conflict resolution: %v", err)
 	}
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+func TestRevertExternalBucketAdd(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminExposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	// create connection to couchbase nodes
+	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	if err != nil {
+		t.Fatalf("failed to get cluster info %v", err)
+	}
+	t.Logf("cluster info: %v", clusterInfo)
+
+	fullEvictionPolicy := "fullEviction"
+	timestampConflictResolution := "lww"
+	indexReplicaOff := false
+	disableFlush := false
+	newBucket := cbmgr.Bucket{
+		BucketName:         "default",
+		BucketType:         "couchbase",
+		BucketMemoryQuota:  101,
+		BucketReplicas:     0,
+		EvictionPolicy:     &fullEvictionPolicy,
+		ConflictResolution: &timestampConflictResolution,
+		EnableFlush:        &disableFlush,
+		EnableIndexReplica: &indexReplicaOff,
+	}
+
+	err = client.CreateBucket(&newBucket)
+	if err != nil {
+		t.Fatalf("failed to create bucket externally: %v", err)
+	}
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketMemoryQuota", "101", e2eutil.BucketInfoVerifier)
+	if err != nil {
+		t.Fatalf("failed to verify create default bucket: %v", err)
+	}
+	err = e2eutil.VerifyBucketDeleted(t, client, e2eutil.Retries10, "default")
+	if err != nil {
+		t.Fatalf("failed to delete bucket %v", err)
+	}
+
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default")
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {

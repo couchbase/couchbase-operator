@@ -261,6 +261,25 @@ func VerifyClusterInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value s
 		})
 }
 
+func VerifyBucketDeleted(t *testing.T, client *cbmgr.Couchbase, tries int, bucketName string) error {
+	return retryutil.RetryOnErr(5*time.Second, tries, "verify bucket deleted", "test-cluster",
+		func() error {
+
+			info, err := client.GetBuckets()
+			if err != nil {
+				return err
+			}
+
+			for _, bucket := range info {
+				if bucket.BucketName == bucketName {
+					return NewErrVerifyClusterInfo()
+				}
+			}
+
+			return nil
+		})
+}
+
 func VerifyBucketInfo(t *testing.T, client *cbmgr.Couchbase, tries int, bucketName string, bucketKey string, bucketValue string, verifiers ...bucketInfoVerifier) error {
 	return retryutil.RetryOnErr(5*time.Second, tries, "verify cluster info", "test-cluster",
 		func() error {
@@ -269,8 +288,10 @@ func VerifyBucketInfo(t *testing.T, client *cbmgr.Couchbase, tries int, bucketNa
 			if err != nil {
 				return err
 			}
+			bucketExists := false
 			for _, bucket := range info {
 				if bucket.BucketName == bucketName {
+					bucketExists = true
 					for _, verify := range verifiers {
 						if verify(t, bucket, bucketKey, bucketValue) == false {
 							return NewErrVerifyClusterInfo()
@@ -278,6 +299,9 @@ func VerifyBucketInfo(t *testing.T, client *cbmgr.Couchbase, tries int, bucketNa
 					}
 					break
 				}
+			}
+			if !bucketExists {
+				return NewErrVerifyClusterInfo()
 			}
 
 			return nil
