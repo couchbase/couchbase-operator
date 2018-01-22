@@ -4,14 +4,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-DOCKER_REPO_ROOT="/go/src/github.com/couchbase/couchbase-operator"
-IMAGE=${IMAGE:-"mikewied/k8s-code-gen"}
-
-docker run --rm \
-  -v "$PWD":"$DOCKER_REPO_ROOT" \
-  -w "$DOCKER_REPO_ROOT" \
-  "$IMAGE" \
-  "./scripts/codegen/codegen.sh" \
+# Following two commands should be very quick after the first time
+go get k8s.io/code-generator/...
+go install k8s.io/code-generator/cmd/...
+./scripts/codegen/codegen.sh \
   "all" \
   "github.com/couchbase/couchbase-operator/pkg/generated" \
   "github.com/couchbase/couchbase-operator/pkg/apis" \
