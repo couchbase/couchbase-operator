@@ -1,11 +1,11 @@
 package: github.com/couchbase/couchbase-operator
 import:
 - package: k8s.io/client-go
-  version: 82aa063804cf055e16e8911250f888bc216e8b61
+  version: kubernetes-1.8.7
 - package: k8s.io/apimachinery
-  version: 4fd33e5925599d66528ef4f1a5c80f4aa2e27c98
+  version: kubernetes-1.8.7
 - package: k8s.io/apiextensions-apiserver
-  version: e15e93d7733a51122160e13ddb510a23f72bbe09
+  version: kubernetes-1.8.7
 - package: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - package: github.com/couchbaselabs/gocbmgr

@@ -1,5 +1,5 @@
-hash: 91365f8a52485d87e83590e31415d81568c27d74b8b1d8376ff7e0ece2ac9f0c
-updated: 2018-01-16T17:18:16.333691-07:00
+hash: 8e77183ccac5f7b9a70897d17ac63d105ec457e3056bb67caa9ce88df577cc03
+updated: 2018-01-22T16:41:18.792072785-08:00
 imports:
 - name: github.com/couchbaselabs/gocbmgr
   version: 8a5cdfa1c889b9281065e82a67097059fe0eed45
@@ -128,7 +128,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/api
-  version: cadaf100c0a3dd6b254f320d6d651df079ec8e0a
+  version: 389dfa299845bcf399c16af89987e8775718ea48
   subpackages:
   - admissionregistration/v1alpha1
   - apps/v1beta1
@@ -155,7 +155,7 @@ imports:
   - storage/v1
   - storage/v1beta1
 - name: k8s.io/apiextensions-apiserver
-  version: e15e93d7733a51122160e13ddb510a23f72bbe09
+  version: d0becfa6529e20309bd6684f8486abc265cf0b59
   subpackages:
   - pkg/apis/apiextensions
   - pkg/apis/apiextensions/v1beta1
@@ -163,7 +163,7 @@ imports:
   - pkg/client/clientset/clientset/scheme
   - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 - name: k8s.io/apimachinery
-  version: 4fd33e5925599d66528ef4f1a5c80f4aa2e27c98
+  version: bc110fd540ab678abbf2bc71d9ce908eb9325ef6
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
@@ -213,7 +213,7 @@ imports:
   - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 82aa063804cf055e16e8911250f888bc216e8b61
+  version: 3a46b5de730a74e064197a157c96c2d29724a677
   subpackages:
   - discovery
   - discovery/fake
