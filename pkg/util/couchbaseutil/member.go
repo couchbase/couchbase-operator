@@ -144,6 +144,10 @@ func (ms MemberSet) First(clusterName string, max int) *Member {
 }
 
 func (ms MemberSet) Highest() *Member {
+	if ms.Empty() {
+		return nil
+	}
+
 	rv := ms.PickOne()
 	for _, m := range ms {
 		if strings.Compare(m.Name, rv.Name) > 0 {

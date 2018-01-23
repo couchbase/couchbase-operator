@@ -298,7 +298,12 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 			c.logger.Errorf("failed to create rebalance event: %v", err)
 		}
 
-		for _, toRemove := range r.ejectNodes {
+		for {
+			toRemove := r.ejectNodes.Highest()
+			if toRemove == nil {
+				break
+			}
+
 			// This ensures events don't happen at roughly the same time. It looks
 			// like Kubernetes tracks events at second resolution and this causes
 			// our test verification to fail. Sleeping here isn't a big deal, but
@@ -310,9 +315,9 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 			if err != nil {
 				c.logger.Errorf("failed to create member remove event: %v", err)
 			}
+			r.ejectNodes.Remove(toRemove.Name)
+			r.runningPods.Remove(toRemove.Name)
 		}
-
-		r.runningPods = r.runningPods.Diff(r.ejectNodes)
 	}
 
 	c.status.SetReadyCondition()
