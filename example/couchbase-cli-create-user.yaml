@@ -13,7 +13,7 @@ spec:
         image: sequoiatools/couchbase-cli
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c", "/couchbase-cli-secure user-manage
-										 -c data-service.default
+										 -c cb-example-0000.cb-example.default.svc
 										 -u {auth.admin.username}
 										 -p {auth.admin.password}
 										 --rbac-username {auth.users.default_user}

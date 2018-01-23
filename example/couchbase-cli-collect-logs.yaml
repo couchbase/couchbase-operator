@@ -13,7 +13,7 @@ spec:
         image: sequoiatools/couchbase-cli
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c", "/couchbase-cli-secure collect-logs-start
-                              -c data-service.default
+                              -c cb-example-0000.cb-example.default.svc
                               -u {auth.admin.username}
                               -p {auth.admin.password}
                               --all-nodes"]
