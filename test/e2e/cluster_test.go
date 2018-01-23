@@ -1501,7 +1501,6 @@ func TestManageMultipleClusters(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-
 	events1, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase1.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)

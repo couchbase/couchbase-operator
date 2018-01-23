@@ -5,8 +5,8 @@ import (
 )
 
 type testResult struct {
-	testName     string
-	testResult   bool
+	testName   string
+	testResult bool
 }
 
 func TestSanity(t *testing.T) {
@@ -168,7 +168,7 @@ func AnalyzeResults(t *testing.T, testResults []testResult) bool {
 	t.Logf("Suite Test Results: \n")
 
 	failures := []string{}
-	for i , result := range testResults {
+	for i, result := range testResults {
 		if result.testResult {
 			t.Logf("%d: %s...PASS", i+1, result.testName)
 		}
@@ -182,7 +182,7 @@ func AnalyzeResults(t *testing.T, testResults []testResult) bool {
 	pass := float64(len(testResults) - len(failures))
 	fail := float64(len(failures))
 	total := float64(len(testResults))
-	passRate := float64((pass/total) * 100.0)
+	passRate := float64((pass / total) * 100.0)
 
 	if fail > 0 {
 		t.Logf("Failures: ")
