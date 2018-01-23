@@ -3,11 +3,11 @@
 * [Overview](overview.md)
 * [Prerequisites and Setup](prerequisitesAndSetup.md)
 * [Deploying Couchbase Cluster](deployingCouchbase.md)
-  * CouchbaseCluster Configuration
+  * [CouchbaseCluster Configuration](couchbaseClusterConfig.md)
   * [Displaying Information about a Couchbase cluster](clusterStatusGuide.md)
-  * Listing and describing pods, services, and couchbaseclusters
+  * List the pods/services created by a Couchbase cluster
 * Accessing Couchbase
-  * Using Couchbase Web Console, CLI and REST API (Tommie)
+  * Using Couchbase Web Console, CLI and REST API
 * Running Couchbase on Kubernetes/OpenShift
   * Ad-hoc scale-up and scale-down
   * Recover from node failure
