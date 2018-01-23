@@ -7,7 +7,8 @@
   * [Displaying Information about a Couchbase cluster](clusterStatusGuide.md)
   * [List the pods/services created by a Couchbase cluster](listAndDescribe.md)
 * Accessing Couchbase
-  * Using Couchbase Web Console, CLI and REST API
+  * Using Couchbase Web Console
+  * [Using couchbase-cli and the Couchbase REST API](couchbaseCliGuide.md)
 * Running Couchbase on Kubernetes/OpenShift
   * Ad-hoc scale-up and scale-down
   * [Recover from node failure](nodeRecovery.md)
