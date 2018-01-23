@@ -10,7 +10,7 @@
   * Using Couchbase Web Console, CLI and REST API
 * Running Couchbase on Kubernetes/OpenShift
   * Ad-hoc scale-up and scale-down
-  * Recover from node failure
+  * [Recover from node failure](nodeRecovery.md)
 * Updating Couchbase Deployment
 * [Deleting Couchbase Deployment](deleteCouchbaseCluster.md)
 * Logging and Troubleshooting
