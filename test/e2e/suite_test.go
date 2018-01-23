@@ -46,7 +46,7 @@ func TestAll(t *testing.T) {
 	testResults = append(testResults, testResult{"TestInvalidAuthSecret", t.Run("TestInvalidAuthSecret", TestInvalidAuthSecret)})
 	testResults = append(testResults, testResult{"TestInvalidBaseImage", t.Run("TestInvalidBaseImage", TestInvalidBaseImage)})
 	testResults = append(testResults, testResult{"TestInvalidVersion", t.Run("TestInvalidVersion", TestInvalidVersion)})
-	testResults = append(testResults, testResult{"TestNodeUnschedulable", t.Run("TestNodeUnschedulable", TestNodeUnschedulable)})
+	//testResults = append(testResults, testResult{"TestNodeUnschedulable", t.Run("TestNodeUnschedulable", TestNodeUnschedulable)})
 	testResults = append(testResults, testResult{"TestNodeServiceDownDuringRebalance", t.Run("TestNodeServiceDownDuringRebalance", TestNodeServiceDownDuringRebalance)})
 	testResults = append(testResults, testResult{"TestReplaceManuallyRemovedNode", t.Run("TestReplaceManuallyRemovedNode", TestReplaceManuallyRemovedNode)})
 	testResults = append(testResults, testResult{"TestBasicMDSScaling", t.Run("TestBasicMDSScaling", TestBasicMDSScaling)})
