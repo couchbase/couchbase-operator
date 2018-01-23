@@ -4,6 +4,7 @@
 * [Prerequisites and Setup](prerequisitesAndSetup.md)
 * [Deploying Couchbase Cluster](deployingCouchbase.md)
   * CouchbaseCluster Configuration
+  * [Displaying Information about a Couchbase cluster](clusterStatusGuide.md)
   * Listing and describing pods, services, and couchbaseclusters
 * Accessing Couchbase
   * Using Couchbase Web Console, CLI and REST API (Tommie)
