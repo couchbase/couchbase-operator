@@ -92,6 +92,7 @@ func TestPodResourcesLow(t *testing.T) {
 }
 
 //Assume each node has 7.6GB of memory
+// TODO make work with minikube
 func TestPodResourcesCannotBePlaced(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -104,13 +105,13 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		"services":           "data",
 		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
 		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
-		"resourceMemRequest": "1000",
+		"resourceMemRequest": "7000",
 	}
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 	}
-	t.Logf("Pod Policy Resource Memory Request=1GB... \n scaling until pods cannot be placed")
+	t.Logf("Pod Policy Resource Memory Request=7GB... \n scaling until pods cannot be placed")
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err != nil {
 		t.Fatalf("failed to place first pod: %v", err)
@@ -139,7 +140,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	t.Logf("Cluster size: %v", actualSize)
 
 	// TODO calculate cluster memory total and use to assert correct cluster size
-	if actualSize != 1 && actualSize != 20 {
+	if actualSize != 3 {
 		t.Fatalf("failed to saturate cluster memory: %v", err)
 	}
 
@@ -147,7 +148,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, actualSize, e2eutil.Retries10)
 	if err != nil {
-		t.Fatal(err.Error())
+		t.Fatalf("failed to see healthy and balanced cluster: %v", err)
 	}
 
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)

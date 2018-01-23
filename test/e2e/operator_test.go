@@ -62,6 +62,14 @@ func TestPauseOperator(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+
+	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 	if err != nil {
