@@ -1,11 +1,8 @@
 package cluster
 
 import (
-	"time"
-
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
 
 type ReconcileState int
@@ -41,11 +38,7 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 
 	// If we have any cluster related issues like failed nodes or if the cluster
 	// is not balanced or is currently rebalancing then we need to run reconcile.
-	if !r.couchbase.PendingAddNodes.Empty() || !r.couchbase.FailedNodes.Empty() ||
-		!r.couchbase.DownNodes.Empty() || !r.couchbase.FailedAddNodes.Empty() ||
-		len(r.couchbase.UnmanagedNodes) > 0 || !r.runningPods.Equal(c.members) ||
-		!r.couchbase.UnclusteredNodes.Empty() || r.couchbase.IsRebalancing ||
-		r.couchbase.NeedsRebalance {
+	if !r.couchbase.ClusterHealthy() || !r.runningPods.Equal(c.members) {
 		needsReconcile = true
 	}
 
@@ -81,37 +74,22 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 		return
 	}
 
+	// Catch all "needs rebalance" check handles things like auto-failover
+	// which is outside of our control, or existing rebalance conditions
+	// after a restart
+	if r.couchbase.NeedsRebalance || r.couchbase.IsRebalancing {
+		c.status.SetUnbalancedCondition()
+		if err := c.updateCRStatus(); err != nil {
+			// TODO: we should handle errors properly
+			r.transitionState(ReconcileFinished)
+			return
+		}
+	}
+
 	c.logger.Infof("running members: %s", r.runningPods)
 	c.logger.Infof("cluster membership: %s", c.members)
-	c.logger.Infof("active nodes: %s", r.couchbase.ActiveNodes)
 
-	if !r.couchbase.PendingAddNodes.Empty() {
-		c.logger.Infof("pending add nodes: %s", r.couchbase.PendingAddNodes)
-	}
-
-	if !r.couchbase.FailedAddNodes.Empty() {
-		c.logger.Infof("failed add nodes: %s", r.couchbase.FailedAddNodes)
-	}
-
-	if !r.couchbase.DownNodes.Empty() {
-		c.logger.Infof("down nodes: %s", r.couchbase.DownNodes)
-	}
-
-	if !r.couchbase.FailedNodes.Empty() {
-		c.logger.Infof("failed nodes: %s", r.couchbase.FailedNodes)
-	}
-
-	if len(r.couchbase.UnclusteredNodes) > 0 {
-		c.logger.Infof("unclustered nodes: %s", r.couchbase.UnclusteredNodes)
-	}
-
-	if len(r.couchbase.UnmanagedNodes) > 0 {
-		c.logger.Infof("unmanaged nodes: %s", r.couchbase.UnmanagedNodes)
-	}
-
-	if r.couchbase.NeedsRebalance {
-		c.status.SetUnbalancedCondition()
-	}
+	r.couchbase.LogStatus(c.logger)
 
 	r.knownNodes.Append(r.couchbase.ActiveNodes)
 	r.knownNodes.Append(r.couchbase.PendingAddNodes)
@@ -172,17 +150,12 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 	// These nodes have been added, but the node failed before a rebalance could
 	// start. We will remove these nodes and re-add them in other pods later.
 	for _, m := range r.couchbase.FailedAddNodes {
-		err := c.client.CancelAddNode(r.knownNodes, m.HostURL())
+		err := c.cancelAddMember(r.knownNodes, m)
 		if err != nil {
 			c.logger.Errorf("Unable to removed a failed pending add node: %s", err.Error())
 			r.errored = true
 			r.transitionState(ReconcileFinished)
 			return
-		}
-
-		_, err = c.eventsCli.Create(k8sutil.FailedAddNodeEvent(m.Name, c.cluster))
-		if err != nil {
-			c.logger.Errorf("failed to create failed add node event: %v", err)
 		}
 
 		r.runningPods.Remove(m.Name)
@@ -261,7 +234,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 			c.status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
 
 			r.couchbase.NeedsRebalance = true
-			m, err := c.addOneMember(serverSpec)
+			m, err := c.addMember(serverSpec)
 			if err != nil {
 				c.logger.Warnf("Failed to add new node to cluster: %v", err)
 				r.errored = true
@@ -271,11 +244,6 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 			r.knownNodes.Add(m)
 			r.runningPods.Add(m)
 			addCount++
-
-			_, err = c.eventsCli.Create(k8sutil.MemberAddEvent(m.Name, c.cluster))
-			if err != nil {
-				c.logger.Errorf("failed to create new member add event: %v", err)
-			}
 		}
 	}
 
@@ -284,7 +252,6 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 
 func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	if r.couchbase.NeedsRebalance {
-		c.status.SetUnbalancedCondition()
 		removeNodes := append(r.ejectNodes.HostURLs(), r.couchbase.UnmanagedNodes...)
 		if err := c.rebalance(removeNodes); err != nil {
 			c.logger.Warnf("Failed to start rebalance: %s", err.Error())
@@ -293,28 +260,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 			return
 		}
 
-		_, err := c.eventsCli.Create(k8sutil.RebalanceEvent(c.cluster))
-		if err != nil {
-			c.logger.Errorf("failed to create rebalance event: %v", err)
-		}
-
-		for {
-			toRemove := r.ejectNodes.Highest()
-			if toRemove == nil {
-				break
-			}
-
-			// This ensures events don't happen at roughly the same time. It looks
-			// like Kubernetes tracks events at second resolution and this causes
-			// our test verification to fail. Sleeping here isn't a big deal, but
-			// we should find a more permanent solution that doesn't sleep in the
-			// future.
-			time.Sleep(1 * time.Second)
-
-			_, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(toRemove.Name, c.cluster))
-			if err != nil {
-				c.logger.Errorf("failed to create member remove event: %v", err)
-			}
+		for _, toRemove := range r.ejectNodes {
 			r.ejectNodes.Remove(toRemove.Name)
 			r.runningPods.Remove(toRemove.Name)
 		}
@@ -323,29 +269,18 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	c.status.SetReadyCondition()
 	c.status.ClearCondition(api.ClusterConditionScaling)
 
-	newState, err := c.client.GetClusterStatus(r.knownNodes)
-	if err != nil {
-		c.status.SetUnknownBalancedCondition()
-	} else if !newState.NeedsRebalance {
-		c.status.SetBalancedCondition()
-	}
-
 	r.transitionState(ReconcileDeadMembers)
 }
 
 // Dead members are members that the operator is tracking, but do not have a
 // corresponding running pod.
 func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
-	c.updateMemberStatus(c.members)
-
 	dead := c.members.Diff(r.runningPods)
 	for _, m := range dead {
 		err := c.removeDeadMember(m)
 		if err != nil {
 			c.logger.Errorf("Failed to remove dead members: %s", err.Error())
 			r.errored = true
-		} else {
-			c.members.Remove(m.Name)
 		}
 	}
 
@@ -353,7 +288,6 @@ func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
 }
 
 func (r *ReconcileMachine) handleFinished(c *Cluster) {
-	c.updateMemberStatus(c.members)
 }
 
 func (r *ReconcileMachine) transitionState(to ReconcileState) {

@@ -24,6 +24,11 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	return nil
 }
 
+// What would the next member name allocated by the cluster be?
+func (c *Cluster) nextMemberName() string {
+	return couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter)
+}
+
 func (c *Cluster) newMember(id int, serverSpecName string) *couchbaseutil.Member {
 	name := couchbaseutil.CreateMemberName(c.cluster.Name, id)
 	return &couchbaseutil.Member{

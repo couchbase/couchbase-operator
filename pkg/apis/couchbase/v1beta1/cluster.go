@@ -258,6 +258,16 @@ func HasItem(itm string, arr []string) (int, bool) {
 	return -1, false
 }
 
+// Get the server specification or nil if it doesn't exist
+func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
+	for _, spec := range cs.ServerSettings {
+		if spec.Name == name {
+			return &spec
+		}
+	}
+	return nil
+}
+
 // get list of items which are in first array but not in second
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}

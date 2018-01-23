@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+const (
+	adminPort    = 8091
+	adminPortTLS = 18091
+)
+
 type Member struct {
 	Name         string
 	Namespace    string
@@ -36,6 +41,20 @@ func (m *Member) HostURL() string {
 	return fmt.Sprintf("%s:%d", m.Addr(), m.clientPort())
 }
 
+// Be **very** careful using these functions.
+// NS server isn't able to handle /controller/addNode with a HTTPS/TLS node. As
+// an unfortunate result when adding or removing nodes from the cluster we must
+// force the use of HTTP.
+// Regular client operations should use the functions above which dynamically
+// adjust depending on the current node state.
+func (m *Member) ClientURLPlaintext() string {
+	return fmt.Sprintf("http://%s:%d", m.Addr(), adminPort)
+}
+
+func (m *Member) HostURLPlaintext() string {
+	return fmt.Sprintf("%s:%d", m.Addr(), adminPort)
+}
+
 func (m *Member) clientScheme() string {
 	if m.SecureClient {
 		return "https"
@@ -45,9 +64,17 @@ func (m *Member) clientScheme() string {
 
 func (m *Member) clientPort() int {
 	if m.SecureClient {
-		return 18091
+		return adminPortTLS
 	}
-	return 8091
+	return adminPort
+}
+
+func (ms MemberSet) Copy() MemberSet {
+	clone := MemberSet{}
+	for k, v := range ms {
+		clone[k] = v
+	}
+	return clone
 }
 
 // the set of all members of s1 that are not members of s2

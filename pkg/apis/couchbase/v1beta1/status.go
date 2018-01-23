@@ -42,6 +42,27 @@ const (
 	ClusterConditionScaling                            = "Scaling"
 )
 
+// If the status contains an UpgradeStatus object then an upgrade is in progress.
+//
+// Initially when we detect a modification to the cluster version the struct is
+// populated with the target version to upgrade to and the set of all member
+// nodes, less the first node to upgrade.  The first node to upgrade is recorded
+// along with the name of the new upgraded node to replace it with. Nodes are ordered
+// and processed in lexical order to allow determinism.  All this is atomically
+// added to the status.
+type UpgradeStatus struct {
+	// Version to upgrade to
+	TargetVersion string `json:"targetVersion"`
+	// Nodes ready to be upgraded
+	ReadyNodes []string `json:"readyNodes,omitempty"`
+	// Upgrading node
+	UpgradingNode string `json:"upgradingNode"`
+	// Upgraded node
+	UpgradedNode string `json:"upgradedNode"`
+	// Nodes who have been upgraded
+	DoneNodes []string `json:"doneNodes,omitempty"`
+}
+
 type ClusterStatus struct {
 	// Phase is the cluster running phase
 	Phase  ClusterPhase `json:"phase"`
@@ -61,9 +82,6 @@ type ClusterStatus struct {
 	Members MembersStatus `json:"members"`
 	// CurrentVersion is the current cluster version
 	CurrentVersion string `json:"currentVersion"`
-	// TargetVersion is the version the cluster upgrading to.
-	// If the cluster is not upgrading, TargetVersion is empty.
-	TargetVersion string `json:"targetVersion"`
 
 	// Name of buckets active within cluster
 	Buckets map[string]*BucketConfig `json:"buckets"`
@@ -71,6 +89,9 @@ type ClusterStatus struct {
 	// port exposing couchbase cluster
 	AdminConsolePort    string `json:"adminConsolePort,omitempty"`
 	AdminConsolePortSSL string `json:"adminConsolePortSSL,omitempty"`
+
+	// upgrade status
+	UpgradeStatus *UpgradeStatus `json:"upgrade,omitempty"`
 }
 
 type MembersStatus struct {
@@ -82,8 +103,41 @@ type MembersStatus struct {
 }
 
 func (cs *ClusterStatus) SetVersion(v string) {
-	cs.TargetVersion = ""
 	cs.CurrentVersion = v
+}
+
+// If the upgrade status is set then we are upgrading
+func (cs *ClusterStatus) Upgrading() bool {
+	return cs.UpgradeStatus != nil
+}
+
+// Flag upgrade start by setting the upgrade status, only if not set
+func (cs *ClusterStatus) StartUpgrade(status *UpgradeStatus) error {
+	if cs.Upgrading() {
+		return fmt.Errorf("unable to start upgrade upgrade state when upgrading")
+	}
+	cs.UpgradeStatus = status
+	return nil
+}
+
+// Update upgrade status if we are already in an upgrade
+func (cs *ClusterStatus) UpdateUpgrade(status *UpgradeStatus) error {
+	if !cs.Upgrading() {
+		return fmt.Errorf("unable to update upgrade status when not upgrading")
+	}
+	cs.UpgradeStatus = status
+	return nil
+}
+
+// Complete an upgrade by making the current version the target and unsetting
+// the upgrade status, but only if we are already upgrading
+func (cs *ClusterStatus) CompleteUpgrade() error {
+	if !cs.Upgrading() {
+		return fmt.Errorf("unable to complete upgrade when not upgrading")
+	}
+	cs.CurrentVersion = cs.UpgradeStatus.TargetVersion
+	cs.UpgradeStatus = nil
+	return nil
 }
 
 func (cs *ClusterStatus) UpdateBuckets(name string, config *BucketConfig) {

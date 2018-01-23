@@ -81,11 +81,11 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
 
-func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, ns cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
+func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, version string, ns cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
 
 	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
-	container := containerWithLivenessProbe(couchbaseContainer("", cs.BaseImage, cs.Version),
+	container := containerWithLivenessProbe(couchbaseContainer("", cs.BaseImage, version),
 		couchbaseLivenessProbe())
 
 	if ns.Pod != nil {
@@ -318,7 +318,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 
 	// Loop until success
 	done := false
-	for ; !done; {
+	for !done {
 		select {
 		// Handle timeout and cancellation events
 		case <-ctx.Done():

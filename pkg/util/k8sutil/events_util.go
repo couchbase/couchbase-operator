@@ -84,6 +84,22 @@ func AdminConsoleSvcDeleteEvent(svcName string, cl *api.CouchbaseCluster) *v1.Ev
 	return event
 }
 
+func UpgradeStartedEvent(sourceVersion, targetVersion string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "UpgradeStarted"
+	event.Message = fmt.Sprintf("Started upgrade from '%s' to '%s'", sourceVersion, targetVersion)
+	return event
+}
+
+func UpgradeFinishedEvent(sourceVersion, targetVersion string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "UpgradeFinished"
+	event.Message = fmt.Sprintf("Finished upgrade from '%s' to '%s'", sourceVersion, targetVersion)
+	return event
+}
+
 func newClusterEvent(cl *api.CouchbaseCluster) *v1.Event {
 	t := time.Now()
 	return &v1.Event{

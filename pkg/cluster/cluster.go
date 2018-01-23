@@ -158,6 +158,8 @@ func (c *Cluster) setup() error {
 
 func (c *Cluster) create() error {
 	c.status.SetPhase(api.ClusterPhaseCreating)
+	c.status.SetVersion(c.cluster.Spec.Version)
+
 	if err := c.updateCRStatus(); err != nil {
 		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
 			api.ClusterPhaseCreating, err)
@@ -172,36 +174,15 @@ func (c *Cluster) create() error {
 		return fmt.Errorf("cluster create: at least one server specification must contain the `data` service")
 	}
 
-	m := &couchbaseutil.Member{
-		Name:         couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter),
-		Namespace:    c.cluster.Namespace,
-		ServerConfig: c.cluster.Spec.ServerSettings[idx].Name,
-		SecureClient: false,
-	}
-	ms := couchbaseutil.NewMemberSet(m)
-
 	// Set up services e.g. DNS records before calling WaitForPod which will poll
 	// for the admin port via a DNS lookup
 	if err := c.setupServices(); err != nil {
 		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}
 
-	if err := c.createPod(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(c.ctx, 60*time.Second)
-	defer cancel()
-	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, m.Name, m.HostURL()); err != nil {
-		return err
-	}
-
-	c.memberCounter++
-	c.members = ms
-
-	// Initialise TLS if requested, after this point the member will switch to
-	// using encrpyted communication
-	if err := c.initMemberTLS(m, c.cluster.Spec); err != nil {
+	c.members = couchbaseutil.NewMemberSet()
+	m, err := c.createMember(c.cluster.Spec.ServerSettings[idx])
+	if err != nil {
 		return err
 	}
 
@@ -214,14 +195,6 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	_, err = c.eventsCli.Create(k8sutil.MemberAddEvent(m.Name, c.cluster))
-	if err != nil {
-		c.logger.Errorf("failed to create new member add event: %v", err)
-	}
-
-	c.status.Size = c.members.Size()
-	c.updateMemberStatus(c.members)
-	c.status.SetVersion(c.cluster.Spec.Version)
 	c.status.SetClusterID(uuid)
 	return c.updateCRStatus()
 }
@@ -345,20 +318,33 @@ func (c *Cluster) logSpecUpdate(oldSpec, newSpec api.ClusterSpec) {
 }
 
 func (c *Cluster) updateCRStatus() error {
+	// The cluster object can be updated asynchronously e.g. via a spec update,
+	// hence what's in etcd need not reflect what's locally cached and the k8s
+	// server will reject any updates that fail the CAS test.  We only pick up
+	// these updates between reconcile executions (see handleUpdateEvent).
+	cluster, err := c.config.CouchbaseCRCli.CouchbaseV1beta1().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if c.cluster.ResourceVersion != cluster.ResourceVersion {
+		c.logger.Infof("Resource version conflict, updating %s to %s", c.cluster.ResourceVersion, cluster.ResourceVersion)
+		c.cluster = cluster
+	}
+
+	// Ignore the case where nothing needs to be updated
 	if reflect.DeepEqual(c.cluster.Status, c.status) {
 		return nil
 	}
 
-	newCluster := c.cluster
-	newCluster.Status = c.status
+	// Copy the updated status to our cluster object and try update it
+	c.cluster.Status = c.status
 	newCluster, err := c.config.CouchbaseCRCli.CouchbaseV1beta1().CouchbaseClusters(c.cluster.Namespace).Update(c.cluster)
-
 	if err != nil {
-		return fmt.Errorf("failed to update CR status: %v", err)
+		return err
 	}
 
+	// Cache the new cluster object (with its new revision ID)
 	c.cluster = newCluster
-
 	return nil
 }
 
@@ -367,8 +353,16 @@ func (c *Cluster) isSecureClient() bool {
 }
 
 func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
+	// Always use the status version to create new pods, unless upgrading, and
+	// not that in the spec.  This avoids any potential race conditions where
+	// the upgrade code allows reconciliation, but picks up potentially illegal
+	// container versions from the spec.
+	version := c.status.CurrentVersion
+	if c.upgrading() {
+		version = c.status.UpgradeStatus.TargetVersion
+	}
 
-	pod, err := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec,
+	pod, err := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec, version,
 		serverSpec, c.cluster.AsOwner())
 	if err != nil {
 		return err
@@ -527,4 +521,18 @@ func (c *Cluster) indexOfServerConfigWithService(svc string) int {
 	}
 
 	return -1
+}
+
+// Adds a new member to our cluster object and updates the cluster status
+func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) {
+	c.members.Add(member)
+	c.status.Size = c.members.Size()
+	c.updateMemberStatus(c.members)
+}
+
+// Removes a member from our cluster object and updates the cluster status
+func (c *Cluster) clusterRemoveMember(name string) {
+	c.members.Remove(name)
+	c.status.Size = c.members.Size()
+	c.updateMemberStatus(c.members)
 }

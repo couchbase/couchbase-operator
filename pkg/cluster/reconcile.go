@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
@@ -18,15 +20,22 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	c.logger.Infoln("Start reconciling")
 	defer c.logger.Infoln("Finish reconciling")
 
-	defer func() {
-		c.status.Size = c.members.Size()
-	}()
-
-	sp := c.cluster.Spec
-
-	cluster, err := c.client.GetClusterStatus(c.members)
+	status, err := c.client.GetClusterStatus(c.members)
 	if err != nil {
 		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %s", err.Error())
+		return nil
+	}
+
+	// Upgrading must override reconciliation as during the process the
+	// cluster will be oversized and we don't want nodes to disappear ...
+	upgrading := c.upgrading()
+	if err := c.upgrade(status); err != nil {
+		return err
+	}
+	// ... addtionally if we were previously or currently are upgrading then
+	// state may have altered and reality may not match 'pods' without
+	// probing the API again
+	if upgrading || c.upgrading() {
 		return nil
 	}
 
@@ -34,7 +43,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		runningPods: podsToMemberSet(pods, c.isSecureClient()),
 		knownNodes:  couchbaseutil.NewMemberSet(),
 		ejectNodes:  couchbaseutil.NewMemberSet(),
-		couchbase:   cluster,
+		couchbase:   status,
 		state:       ReconcileInit,
 	}
 
@@ -50,9 +59,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	c.reconcileAdminService()
 
-	// TODO: We should upgrade any nodes in the cluster here.
-
-	c.status.SetVersion(sp.Version)
 	c.status.SetReadyCondition()
 
 	return nil
@@ -126,42 +132,134 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) bool {
 	return !rm.errored
 }
 
-func (c *Cluster) addOneMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
+// Create a new Couchbase cluster member
+func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
+	// Allocate and create a new member
 	newMember := c.newMember(c.memberCounter, serverSpec.Name)
-	c.members.Add(newMember)
-
 	if err := c.createPod(newMember, serverSpec); err != nil {
-		c.members.Remove(newMember.Name)
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
-	ctx, cancel := context.WithTimeout(c.ctx, 60*time.Second)
+
+	// Synchronize on pod creation and service availability
+	ctx, cancel := context.WithTimeout(c.ctx, 300*time.Second)
 	defer cancel()
 	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
 		if _, failed := err.(cberrors.ErrPodUnschedulable); failed {
-			// remove pod and member
-			c.members.Remove(newMember.Name)
+			// remove pod
 			c.removePod(newMember.Name)
 		}
 		return nil, err
 	}
+
+	// Increment the next member counter
 	c.memberCounter++
+
+	// Notify that we have created a new member
 	c.logger.Infof("added member (%s)", newMember.Name)
+	if _, err := c.eventsCli.Create(k8sutil.MemberAddEvent(newMember.Name, c.cluster)); err != nil {
+		c.logger.Errorf("failed to create new member add event: %v", err)
+	}
+	c.clusterAddMember(newMember)
+	if err := c.updateCRStatus(); err != nil {
+		return nil, err
+	}
 
-	// Grab the hostname now before we switch to https.  /controller/addNode
-	// will not work unless it's given a plaintext url
-	hostname := newMember.ClientURL()
-
+	// Enable TLS if requested
 	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
 		return nil, err
 	}
 
-	return newMember, c.client.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
-		hostname, serverSpec.Services)
+	return newMember, nil
+}
+
+// Creates and adds a new Couchbase cluster member
+func (c *Cluster) addMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
+	// Save the existing members now, these will be the set we use to add the new node via
+	ms := c.members.Copy()
+
+	// Create the new member
+	newMember, err := c.createMember(serverSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add to the cluster. Note we have to use the plain text url as
+	// /controller/addNode will not work with a https reference
+	return newMember, c.client.AddNode(ms, newMember.ClientURLPlaintext(), serverSpec.Services)
+}
+
+// Destroys a Couchbase cluster member
+func (c *Cluster) destroyMember(name string) error {
+	if err := c.removePod(name); err != nil {
+		return err
+	}
+
+	// Notify of deletion
+	c.clusterRemoveMember(name)
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Cancel a node addition
+func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseutil.Member) error {
+	if ms == nil {
+		m := couchbaseutil.NewMemberSet(member)
+		ms = c.members.Diff(m)
+	}
+	if err := c.client.CancelAddNode(ms, member.HostURLPlaintext()); err != nil {
+		return err
+	}
+	if _, err := c.eventsCli.Create(k8sutil.FailedAddNodeEvent(member.Name, c.cluster)); err != nil {
+		c.logger.Errorf("failed to create failed add node event: %v", err)
+	}
+	return nil
 }
 
 // Rebalance nodes in the cluster
 func (c *Cluster) rebalance(nodesToRemove []string) error {
-	return c.client.Rebalance(c.members, nodesToRemove, true)
+	// Notify that we are starting a rebalance, the actual client operation
+	// is blocking so we need to report now or kubernetes will be out of sync
+	if _, err := c.eventsCli.Create(k8sutil.RebalanceEvent(c.cluster)); err != nil {
+		c.logger.Errorf("failed to create rebalance event: %v", err)
+	}
+	c.status.SetUnbalancedCondition()
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
+	// Perform the operation
+	if err := c.client.Rebalance(c.members, nodesToRemove, true); err != nil {
+		return err
+	}
+
+	// Notify if we've removed some nodes (deterministically sorted)
+	sort.Strings(nodesToRemove)
+	for _, nodeToRemove := range nodesToRemove {
+		// TODO: this feels dirty, but as this is a mixed bag of members and
+		// un-managed nodes we have no other option for now
+		memberName := strings.Split(nodeToRemove, ".")[0]
+		if _, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(memberName, c.cluster)); err != nil {
+			c.logger.Errorf("failed to create member remove event: %v", err)
+		}
+
+		// This ensures events don't happen at roughly the same time. It looks
+		// like Kubernetes tracks events at second resolution and this causes
+		// our test verification to fail. Sleeping here isn't a big deal, but
+		// we should find a more permanent solution that doesn't sleep in the
+		// future.
+		time.Sleep(1 * time.Second)
+	}
+
+	// Report the cluster is balanced
+	// TODO: raise a rebalanced event
+	c.status.SetBalancedCondition()
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // reconcile buckets by adding or removing
@@ -417,10 +515,10 @@ func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
 	nodeName := toRemove.Name
 
 	// remove member from operator
-	c.members.Remove(nodeName)
 	if err := c.removePod(nodeName); err != nil {
 		return err
 	}
+	c.clusterRemoveMember(nodeName)
 	c.logger.Infof("removed member (%v)", nodeName)
 	return nil
 }

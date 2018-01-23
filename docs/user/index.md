@@ -14,6 +14,7 @@
   * [Ad-hoc scale-up and scale-down](scalingCouchbase.md)
   * [Recovering From Node Failure](nodeRecovery.md)
 * [Updating a Couchbase Deployment](updatingCouchbase.md)
+* [Upgrading Couchbase Deployment](upgradingCouchbase.md)
 * [Deleting a Couchbase Deployment](deleteCouchbaseCluster.md)
 * Troubleshooting
   * [Logs](logsTroubleshooting.md)

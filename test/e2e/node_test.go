@@ -544,6 +544,13 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
+	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
+	// wait for the cluster to be fully balanced and healthy before killing things
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
 	e2eutil.KillPodsAndWaitForRecovery(t, f.KubeClient, testCouchbase, 1)
 	if err != nil {
 		t.Fatalf("failed to kill pod and recover: %v", err)
@@ -617,6 +624,13 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
+	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
+	// wait for the cluster to be fully balanced and healthy before killing things
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
 	t.Logf("killing 2 pods...")
 	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 2)
 	if err != nil {
@@ -669,8 +683,8 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
 	if err != nil {
@@ -740,6 +754,13 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
 	t.Logf("cluster info: %v", clusterInfo)
+
+	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
+	// wait for the cluster to be fully balanced and healthy before killing things
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
 
 	t.Logf("killing 1 pod...")
 	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
@@ -858,6 +879,13 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
+	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
+	// wait for the cluster to be fully balanced and healthy before killing things
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
 	t.Logf("killing 2 pods...")
 	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 2)
 	if err != nil {
@@ -911,8 +939,8 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120)
 	if err != nil {
@@ -982,6 +1010,13 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
 	t.Logf("cluster info: %v", clusterInfo)
+
+	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
+	// wait for the cluster to be fully balanced and healthy before killing things
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
 
 	t.Logf("killing 1 pod...")
 	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
@@ -1113,6 +1148,13 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
+	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
+	// wait for the cluster to be fully balanced and healthy before killing things
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
 	t.Logf("killing 2 pods...")
 	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 2)
 	if err != nil {
@@ -1165,8 +1207,8 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120)
 	if err != nil {
