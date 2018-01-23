@@ -5,7 +5,7 @@
 * [Deploying Couchbase Cluster](deployingCouchbase.md)
   * [CouchbaseCluster Configuration](couchbaseClusterConfig.md)
   * [Displaying Information about a Couchbase cluster](clusterStatusGuide.md)
-  * List the pods/services created by a Couchbase cluster
+  * [List the pods/services created by a Couchbase cluster](listAndDescribe.md)
 * Accessing Couchbase
   * Using Couchbase Web Console, CLI and REST API
 * Running Couchbase on Kubernetes/OpenShift
@@ -14,5 +14,5 @@
 * Updating Couchbase Deployment
 * [Deleting Couchbase Deployment](deleteCouchbaseCluster.md)
 * Logging and Troubleshooting
-  * Logs (Tommie)
+  * Logs
   * [Conditions and Events](conditionsAndEvents.md)
