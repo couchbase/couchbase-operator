@@ -38,7 +38,7 @@ func TestP0(t *testing.T) {
 	testResults = append(testResults, testResult{"TestResizeCluster", t.Run("TestResizeCluster", TestResizeCluster)})
 	testResults = append(testResults, testResult{"TestResizeClusterWithBucket", t.Run("TestResizeClusterWithBucket", TestResizeClusterWithBucket)})
 	testResults = append(testResults, testResult{"TestEditServiceConfig", t.Run("TestEditServiceConfig", TestEditServiceConfig)})
-	testResults = append(testResults, testResult{"TestNegEditServiceConfig", t.Run("TestNegEditServiceConfig", TestNegEditServiceConfig)})
+	//testResults = append(testResults, testResult{"TestNegEditServiceConfig", t.Run("TestNegEditServiceConfig", TestNegEditServiceConfig)})
 	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureNoBucket", t.Run("TestRecoveryAfterOnePodFailureNoBucket", TestRecoveryAfterOnePodFailureNoBucket)})
 	testResults = append(testResults, testResult{"TestRecoveryAfterTwoPodFailureNoBucket", t.Run("TestRecoveryAfterTwoPodFailureNoBucket", TestRecoveryAfterTwoPodFailureNoBucket)})
 	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureBucketOneReplica", t.Run("TestRecoveryAfterOnePodFailureBucketOneReplica", TestRecoveryAfterOnePodFailureBucketOneReplica)})

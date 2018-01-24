@@ -33,6 +33,16 @@ test-sanity:
 		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
 		--namespace $(namespace) --deployment-spec $(deploymentSpec)
 
+test-p0:
+	go test github.com/couchbase/couchbase-operator/test/e2e -run TestP0 -v -timeout 240m \
+		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
+		--namespace $(namespace) --deployment-spec $(deploymentSpec)
+
+test-p1:
+	go test github.com/couchbase/couchbase-operator/test/e2e -run TestP1 -v -timeout 240m \
+		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
+		--namespace $(namespace) --deployment-spec $(deploymentSpec)
+
 test-indv:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run $(testname) \
 		-v -timeout 60m --race --kubeconfig $(kubeconfig) --operator-image \
