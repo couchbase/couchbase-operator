@@ -81,7 +81,7 @@ func TestP1(t *testing.T) {
 	//testResults = append(testResults, testResult{"TestNodeManualFailover", t.Run("TestNodeManualFailover", TestNodeManualFailover)})
 	testResults = append(testResults, testResult{"TestNodeRecoveryAfterMemberAdd", t.Run("TestNodeRecoveryAfterMemberAdd", TestNodeRecoveryAfterMemberAdd)})
 	testResults = append(testResults, testResult{"TestNodeRecoveryKilledNewMember", t.Run("TestNodeRecoveryKilledNewMember", TestNodeRecoveryKilledNewMember)})
-	testResults = append(testResults, testResult{"TestKillNodesAfterRebalanceAndFailover", t.Run("TestKillNodesAfterRebalanceAndFailover", TestKillNodesAfterRebalanceAndFailover)})
+	//testResults = append(testResults, testResult{"TestKillNodesAfterRebalanceAndFailover", t.Run("TestKillNodesAfterRebalanceAndFailover", TestKillNodesAfterRebalanceAndFailover)})
 	testResults = append(testResults, testResult{"TestRemoveForeignNode", t.Run("TestRemoveForeignNode", TestRemoveForeignNode)})
 	testResults = append(testResults, testResult{"TestRecoveryAfterOneNsServerFailureBucketOneReplica", t.Run("TestRecoveryAfterOneNsServerFailureBucketOneReplica", TestRecoveryAfterOneNsServerFailureBucketOneReplica)})
 	testResults = append(testResults, testResult{"TestRecoveryAfterOneNodeUnreachableBucketOneReplica", t.Run("TestRecoveryAfterOneNodeUnreachableBucketOneReplica", TestRecoveryAfterOneNodeUnreachableBucketOneReplica)})
