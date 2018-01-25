@@ -16,5 +16,5 @@
 * [Updating Couchbase Deployment](updatingCouchbase.md)
 * [Deleting Couchbase Deployment](deleteCouchbaseCluster.md)
 * Logging and Troubleshooting
-  * [Logs](logs.md)
+  * [Logs](logsTroubleshooting.md)
   * [Conditions and Events](conditionsAndEvents.md)

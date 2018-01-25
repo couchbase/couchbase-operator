@@ -9,7 +9,28 @@ The following references are also helpful when troubleshooting:
 * [Operator Configuration, fields and values](operatorConfig.md)
 
 
-## Operator Troubleshooting
+## Full Deployment Logs
+
+To get logs of the operator along with your entire kubernetes deployment (nodes, pods, services...), run the support script [cb_k8s_support.sh](https://github.com/couchbase/couchbase-operator/blob/master/scripts/support/cb_k8s_support.sh)
+
+    ./scripts/support/cb_k8s_support.sh
+
+This scripts gathers information about your kubernetes deployment and creates an archive within your current working directory:
+
+     <cwd>/cb-k8s-support-01182018-14_00_18.tgz
+
+
+Note this script attempts to run ```kubectl top pod``` to gather pod metrics such as cpu & memory.  By default these metrics are empty unless you have heapster deployed within your kubernetes cluster.  To deploy heapster for gathering pod metrics, run the following commands:
+```bash
+git clone https://github.com/kubernetes/heapster.git
+cd heapster
+kubectl create -f deploy/kube-config/influxdb/
+```
+
+Then run the support script again to generate logs which include pod metrics.
+
+
+## Operator Logs
 
 The couchbase operator generates logs that can be very helpful when troubleshooting your deployment.  Using kubectl, the operator logs can be printed to stdout:
 
@@ -32,22 +53,18 @@ The following messages indicate the operator is unable to reconcile your cluster
 * Logs with level=error
 * Operator is unable to get cluster state after N retries
 
-Logs for operator and all pods can be gathered using the support script.
-```console
-$ ./scripts/support/cb_k8s_support.sh
-```
+## Getting Server Logs
 
-This scripts gathers information about your kubernetes deployment and creates an archive within your current working directory:
-```
-$ tar -xf cb-k8s-support-01182018-14_00_18.tgz
-$ cd cb-k8s-support-01182018-14_00_18
-$ tail containers/default/couchbase-operator-1917615544-g765d/output.log
-2018-01-18T21:00:14.992396463Z time="2018-01-18T21:00:14Z" level=info msg="Finish reconciling" cluster-name=cb-example module=cluster
-2018-01-18T21:00:22.996438871Z time="2018-01-18T21:00:22Z" level=info msg="Start reconciling" cluster-name=cb-example module=cluster
-2018-01-18T21:00:23.033646507Z time="2018-01-18T21:00:23Z" level=info msg="Finish reconciling" cluster-name=cb-example module=cluster
-```
+The easiest way to get cbcollect logs is to access the administration console and click the "Collect Logs" button in the Logs tab. You can also deploy a job within kubernetes to trigger the log collection:
 
-## Couchbase Server Troubleshooting
+    kubectl create -f example/couchbase-cli-collect-logs.yaml
 
-When the couchbase operator is functioning properly, but the couchbase cluster needs some troubleshooting, then refer to the [getting server logs](https://github.com/couchbase/couchbase-operator/blob/master/docs/user/administrationGuide.md#getting-server-logs) section from the administration guide.  Also, refer to [couchbase server troubleshooting](https://developer.couchbase.com/documentation/server/current/troubleshooting/troubleshooting-intro.html) guide for additional information about reporting issues.
+Once log collection has completed, check the administraton console (Logs -> Collection Info) for the path to the corresponding zip file for each node in the cluster. You can then run a command like the one below against each node in the cluster to collect their logs.
 
+    kubectl cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
+
+An example of what this might look like is below.
+
+    kubectl cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
+
+Also, refer to [couchbase server troubleshooting](https://developer.couchbase.com/documentation/server/current/troubleshooting/troubleshooting-intro.html) guide for additional information about reporting issues.
