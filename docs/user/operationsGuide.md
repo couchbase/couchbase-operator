@@ -35,4 +35,4 @@ NAME         KIND
 cb-example   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
 ```
 
-With these steps complete, you can follow the steps in the [Administration Guide](administrationGuide.md) to connect to the cluster.
+With these steps complete, you can follow the steps in the [admin console access](adminConsoleAccess.md) to connect to the cluster.

@@ -5,7 +5,7 @@ The Couchbase command-line tool `couchbase-cli` can be used to interact with the
 **couchbase-cli to administration console**
 
 Requires:
-* See [administrationGuide](administrationGuide.md) for exposing the administration console.
+* See [admin console access](adminConsoleAccess.md) for exposing the administration console.
 * Download the couchbase-cli to your client machine:  https://github.com/couchbase/couchbase-cli
 
 Use describe command to get the administration console port:

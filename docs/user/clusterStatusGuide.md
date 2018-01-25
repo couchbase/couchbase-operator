@@ -60,7 +60,7 @@ Often when the status spec of the schema is updated, an associated event is gene
     Admin Console Port: 30239
     Admin Console Port SSL:	31628
 
-Ports used for exposing the couchbase cluster's administration console.  This section of the status is only visible when the ```exposeAdminConsole``` setting of the cluster spec is enabled.  See [administrationGuide.md](administrationGuide.md) for information about how to expose and access the the administration console.
+Ports used for exposing the couchbase cluster's administration console.  This section of the status is only visible when the ```exposeAdminConsole``` setting of the cluster spec is enabled.  See [admin console access guide](adminConsoleAccess.md) for information about how to expose and access the the administration console.
 
 Enabling and disabling the ```exposeAdminConsole``` setting produces the following events, respectively:
 
@@ -145,7 +145,7 @@ The current phase of the cluster.  Can either of the following:
 
     Size:			3
 
-The size of the couchbase cluster.  When this value is changed in the cluster spec, this value is also updated as members are added to the couchbase cluster.  If errors occur while the operator is attempting to conform the cluster to the desired size then the ```Conditions``` section should be checked for information about the current state of the cluster.  See the [administrationGuide](administrationGuide.md) for information about how to manually access the cluster and collect logs when additional troubleshooting is needed when scaling your cluster.
+The size of the couchbase cluster.  When this value is changed in the cluster spec, this value is also updated as members are added to the couchbase cluster.  If errors occur while the operator is attempting to conform the cluster to the desired size then the ```Conditions``` section should be checked for information about the current state of the cluster.  See the [admin console access](adminConsoleAccess.md) for information about how to manually access the cluster and collect logs when additional troubleshooting is needed when scaling your cluster.
 
 
 ### Conditions
