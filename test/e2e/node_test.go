@@ -145,12 +145,12 @@ func TestNegEditServiceConfig(t *testing.T) {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
@@ -887,7 +887,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 
 	t.Logf("failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, e2eutil.Retries5, nodeName)
+		err = e2eutil.FailoverNode(t, client, e2eutil.Retries10, nodeName)
 		if err != nil {
 			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
 		}
@@ -1120,7 +1120,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	t.Logf("failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, e2eutil.Retries5, nodeName)
+		err = e2eutil.FailoverNode(t, client, e2eutil.Retries10, nodeName)
 		if err != nil {
 			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
 		}

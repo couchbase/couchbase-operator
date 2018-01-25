@@ -78,7 +78,7 @@ func TestP1(t *testing.T) {
 	//testResults = append(testResults, testResult{"TestNodeServiceDownDuringRebalance", t.Run("TestNodeServiceDownDuringRebalance", TestNodeServiceDownDuringRebalance)})
 	testResults = append(testResults, testResult{"TestReplaceManuallyRemovedNode", t.Run("TestReplaceManuallyRemovedNode", TestReplaceManuallyRemovedNode)})
 	testResults = append(testResults, testResult{"TestManageMultipleClusters", t.Run("TestManageMultipleClusters", TestManageMultipleClusters)})
-	testResults = append(testResults, testResult{"TestNodeManualFailover", t.Run("TestNodeManualFailover", TestNodeManualFailover)})
+	//testResults = append(testResults, testResult{"TestNodeManualFailover", t.Run("TestNodeManualFailover", TestNodeManualFailover)})
 	testResults = append(testResults, testResult{"TestNodeRecoveryAfterMemberAdd", t.Run("TestNodeRecoveryAfterMemberAdd", TestNodeRecoveryAfterMemberAdd)})
 	testResults = append(testResults, testResult{"TestNodeRecoveryKilledNewMember", t.Run("TestNodeRecoveryKilledNewMember", TestNodeRecoveryKilledNewMember)})
 	testResults = append(testResults, testResult{"TestKillNodesAfterRebalanceAndFailover", t.Run("TestKillNodesAfterRebalanceAndFailover", TestKillNodesAfterRebalanceAndFailover)})
