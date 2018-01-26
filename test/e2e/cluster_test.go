@@ -492,38 +492,25 @@ func TestNodeUnschedulable(t *testing.T) {
 
 }
 
-// Node service goes down while scaling down cluster
-// 1. Create 5 node cluster
-// 2. Scale down to 4 nodes
-// 3. When rebalance starts, stop couchbase on node-0000
-// 4. Expect down node-0000 to be removed
-// 5. Cluster should eventually reconcile as 4 nodes:
-//      a. either by not continuing to scale down since down node was removed
-//      b. continuing to scale down and replacing down node
-func TestNodeServiceDownDuringRebalance(t *testing.T) {
+// Cluster recovers after node service goes down
+// 1. Create 3 node cluster
+// 2. stop couchbase on node-0000
+// 3. Expect down node-0000 to be removed
+// 4. Cluster should eventually reconcile as 5 nodes:
+func TestNodeServiceDownRecovery(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
 
-	// create 5 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 5, true, false)
+	// create 3 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 3, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
-	// scale down to 4 node cluster
-	echan := make(chan error)
-	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, 4, f.CRClient, testCouchbase)
-	}()
-
-	// when cluster starts scaling kill couchbase service on pod 0
-	err = e2eutil.WaitForClusterScalingCondition(f.CRClient, testCouchbase, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// kill couchbase service on pod 0
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	_, err = f.ExecShellInPod(memberName, "mv /etc/service/couchbase-server /tmp/")
 	if err != nil {
@@ -532,19 +519,13 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 
 	// expect down node to be removed from cluster
 	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// resize cluster should complete ok
-	err = <-echan
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// healthy 4 node cluster
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 4, 30)
+	// healthy 3 node cluster
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 3, 30)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
