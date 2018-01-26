@@ -296,6 +296,12 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	}
 	t.Logf("Node not added")
 
+	t.Logf("Reverting add")
+	err = e2eutil.ResizeCluster(t, 0, 3, f.CRClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("cluster failed to revert, fail: %v", err)
+	}
+
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
