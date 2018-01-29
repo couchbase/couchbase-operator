@@ -76,6 +76,7 @@ func TestP1(t *testing.T) {
 	testResults = append(testResults, testResult{"TestInvalidVersion", t.Run("TestInvalidVersion", TestInvalidVersion)})
 	//testResults = append(testResults, testResult{"TestNodeUnschedulable", t.Run("TestNodeUnschedulable", TestNodeUnschedulable)})
 	testResults = append(testResults, testResult{"TestNodeServiceDownRecovery", t.Run("TestNodeServiceDownRecovery", TestNodeServiceDownRecovery)})
+	// (TODO: fix K8S-113), testResults = append(testResults, testResult{"TestNodeServiceDownDuringRebalance", t.Run("TestNodeServiceDownDuringRebalance", TestNodeServiceDownDuringRebalance)})
 	testResults = append(testResults, testResult{"TestReplaceManuallyRemovedNode", t.Run("TestReplaceManuallyRemovedNode", TestReplaceManuallyRemovedNode)})
 	testResults = append(testResults, testResult{"TestManageMultipleClusters", t.Run("TestManageMultipleClusters", TestManageMultipleClusters)})
 	//testResults = append(testResults, testResult{"TestNodeManualFailover", t.Run("TestNodeManualFailover", TestNodeManualFailover)})
