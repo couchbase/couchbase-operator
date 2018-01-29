@@ -118,7 +118,7 @@ This section documents various tweaks to the example code which may be
 required to support a specific customer or to enable development of a
 specific feature.
 
-### Selecting Verions
+### Selecting Versions
 
 The containers used by couchbase-operator are hosted on Docker Hub.  You
 can modify the version to install by editing `example/couchbase-cluster.yaml`
