@@ -2,41 +2,43 @@
 
 Deploying a Couchbase cluster requires creating a configuration file that describes what the cluster should look like. Like all Kubernetes configurations Couchbase clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes. Below is the definition of a sample definition of a Couchbase cluster.
 
-    apiVersion: couchbase.database.couchbase.com/v1beta1
-    kind: CouchbaseCluster
-    metadata:
-      name: cb-example
-    spec:
-      baseImage: couchbase/server
-      version: enterprise-5.0.1
-      authSecret: cb-example-auth
-      exposeAdminConsole: true
-      cluster:
-        dataServiceMemoryQuota: 256
-        indexServiceMemoryQuota: 256
-        searchServiceMemoryQuota: 256
-        indexStorageSetting: memory_optimized
-        autoFailoverTimeout: 30
-      buckets:
-        - name: default
-          type: couchbase
-          memoryQuota: 128
-          replicas: 1
-          ioPriority: high
-          evictionPolicy: fullEviction
-          conflictResolution: seqno
-          enableFlush: true
-          enableIndexReplica: false
-      servers:
-        - size: 3
-          name: all_services
-          services:
-            - data
-            - index
-            - query
-            - search
-          dataPath: /opt/couchbase/var/lib/couchbase/data
-          indexPath: /opt/couchbase/var/lib/couchbase/data
+```yaml
+apiVersion: couchbase.database.couchbase.com/v1beta1
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  baseImage: couchbase/server
+  version: enterprise-5.0.1
+  authSecret: cb-example-auth
+  exposeAdminConsole: true
+  cluster:
+    dataServiceMemoryQuota: 256
+    indexServiceMemoryQuota: 256
+    searchServiceMemoryQuota: 256
+    indexStorageSetting: memory_optimized
+    autoFailoverTimeout: 30
+  buckets:
+    - name: default
+      type: couchbase
+      memoryQuota: 128
+      replicas: 1
+      ioPriority: high
+      evictionPolicy: fullEviction
+      conflictResolution: seqno
+      enableFlush: true
+      enableIndexReplica: false
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+      dataPath: /opt/couchbase/var/lib/couchbase/data
+      indexPath: /opt/couchbase/var/lib/couchbase/data
+```
 
 By looking at this configuration it should be easy to see that it defines a cluster with:
 
