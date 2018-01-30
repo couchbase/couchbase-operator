@@ -2,8 +2,8 @@
 
 * [Overview](overview.md)
 * [Prerequisites and Setup](prerequisiteAndSetup.md)
-* [Deploying Couchbase Cluster](deployingCouchbase.md)
   * [Operator Configuration](operatorConfig.md)
+* [Deploying Couchbase Cluster](deployingCouchbase.md)
   * [CouchbaseCluster Configuration](couchbaseClusterConfig.md)
   * [Displaying Information about a Couchbase cluster](clusterStatusGuide.md)
   * [List the pods/services created by a Couchbase cluster](listAndDescribe.md)
