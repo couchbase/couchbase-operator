@@ -157,7 +157,7 @@ The size of the couchbase cluster.  When this value is changed in the cluster sp
       Status:			True
       Type:			Balanced
 
-List of conditions reflecting the current state of the couchbase cluster.  Each Condition item is denoted by a ```Type``` along with an associated ```Status```.  The various types of conditions statuses are documented in [conditionsAndEvent](conditionsAndEvent.md).
+List of conditions reflecting the current state of the couchbase cluster.  Each Condition item is denoted by a ```Type``` along with an associated ```Status```.  The various types of conditions statuses are documented in [conditionsAndEvent](conditionsAndEvents.md).
 
 ### Events
 
@@ -166,4 +166,4 @@ List of conditions reflecting the current state of the couchbase cluster.  Each 
       29m		29m		1	couchbase-operator-1917615544-j1mg8			Normal		RebalanceStarted	A rebalance has been started to balance data across the cluster
       51m		51m		1	couchbase-operator-1917615544-j1mg8			Normal		BucketEdited		Bucket `default` was edited
 
-Events generated during cluster reconciliation.  The last 10 events are recorded and time stamped as the operator works to reconcile the cluster to its desired cluster state.  The types of events that can occur throughout the lifecycle of a couchbasecluster are documented in [conditionsAndEvent](conditionsAndEvent.md).
+Events generated during cluster reconciliation.  The last 10 events are recorded and time stamped as the operator works to reconcile the cluster to its desired cluster state.  The types of events that can occur throughout the lifecycle of a couchbasecluster are documented in [conditionsAndEvent](conditionsAndEvents.md).

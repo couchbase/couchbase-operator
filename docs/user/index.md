@@ -1,7 +1,7 @@
 # Couchbase Operator User Guide
 
 * [Overview](overview.md)
-* [Prerequisites and Setup](prerequisitesAndSetup.md)
+* [Prerequisites and Setup](prerequisiteAndSetup.md)
 * [Deploying Couchbase Cluster](deployingCouchbase.md)
   * [Operator Configuration](operatorConfig.md)
   * [CouchbaseCluster Configuration](couchbaseClusterConfig.md)
