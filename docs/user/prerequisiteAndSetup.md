@@ -18,7 +18,9 @@ Preparing the cluster to run the Couchbase operator may require setting up the p
 
 Before you can start deploying Couchbase clusters on either Kubernetes or OpenShift you must install the Couchbase Operator into your Kubernetes/Openshift deployment. This can be done by running the command below:
 
-    kubectl create -f https://github.com/couchbase/couchbase-operator/blob/master/example/deployment.yaml
+```bash
+$ kubectl create -f https://s3.amazonaws.com/packages.couchbase.com/kubernetes/beta/operator.yaml
+```
 
 Running this command will download the Couchbase Operator docker image and create a deployment which manages a single instance of the Couchbase Operator. We use a deployment becuase we want the Couchbase Operator to be restarted if the pod it's running in dies. When the Couchbase Operator pod is started for the first time it will register the CouchbaseCluster CRD with Kubernetes and register a controller which listens for updates to CouchbaseCluster configurations.
 
@@ -28,7 +30,9 @@ Running this command will download the Couchbase Operator docker image and creat
 
 To uninstall the Couchbase Operator run the following commands.
 
-    kubectl delete -f https://github.com/couchbase/couchbase-operator/blob/master/example/deployment.yaml
-    kubectl delete crd couchbaseclusters.couchbase.database.couchbase.com
+```bash
+$ kubectl delete -f https://s3.amazonaws.com/packages.couchbase.com/kubernetes/beta/operator.yaml
+$ kubectl delete crd couchbaseclusters.couchbase.database.couchbase.com
+```
 
 Uninstalling the Couchbase Operator will not remove or affect any Couchbase pods in your Kubernetes cluster.
