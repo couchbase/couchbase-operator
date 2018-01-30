@@ -339,12 +339,13 @@ func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
 	c.updateMemberStatus(c.members)
 
 	dead := c.members.Diff(r.runningPods)
-	if !dead.Empty() {
-		c.logger.Infof("removing one dead member")
-		err := c.removeDeadMember(c.members.Diff(r.runningPods).PickOne())
+	for _, m := range dead {
+		err := c.removeDeadMember(m)
 		if err != nil {
 			c.logger.Errorf("Failed to remove dead members: %s", err.Error())
 			r.errored = true
+		} else {
+			c.members.Remove(m.Name)
 		}
 	}
 
