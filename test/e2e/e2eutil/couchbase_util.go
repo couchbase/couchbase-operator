@@ -179,6 +179,7 @@ func FailoverNode(t *testing.T, client *cbmgr.Couchbase, tries int, nodeName str
 		func() error {
 			err := client.Failover(nodeName)
 			if err != nil {
+				t.Logf("Failover error: %v", err)
 				return err
 			}
 			return nil
@@ -314,7 +315,7 @@ func BucketInfoVerifier(t *testing.T, bucket *cbmgr.Bucket, bucketKey string, bu
 		verified = bucket.BucketType == bt
 	case bucketKey == "ConflictResolution":
 		cr := bucketValue
-		t.Logf("Want ConflictResolution: %v \n Have ConflictResolution: %v", cr, &bucket.ConflictResolution)
+		t.Logf("Want ConflictResolution: %v \n Have ConflictResolution: %v", cr, bucket.ConflictResolution)
 		verified = *bucket.ConflictResolution == cr
 	case bucketKey == "BucketMemoryQuota":
 		bmq, _ := strconv.Atoi(bucketValue)

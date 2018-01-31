@@ -592,6 +592,38 @@ func TestNegBucketEdit(t *testing.T) {
 		t.Fatalf("failed to verify prevent changing bucket type: %v", err)
 	}
 
+	message := "Bucket: default cannot change (default) bucket param='type' from 'couchbase' to 'ephemeral'"
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageBuckets, message)
+	if err != nil {
+		t.Fatalf("failed to verify condition: %v", err)
+	}
+
+	// revert edit bucket type
+	t.Logf("reverting bucket type edit")
+	updateFunc = func(cl *api.CouchbaseCluster) {
+		cl.Spec.BucketSettings[0].BucketType = "couchbase"
+	}
+
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
+		t.Fatalf("failed to post updated cluster spec: %v", err)
+	}
+
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.BucketType == "couchbase"
+		}
+		return false
+	}
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
+	if err != nil {
+		t.Fatalf("failed to revert failed bucket edit: %v", err)
+	}
+
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketType", "membase", e2eutil.BucketInfoVerifier)
+	if err != nil {
+		t.Fatalf("failed to verify bucket type: %v", err)
+	}
+
 	// edit memory quota
 	updateFunc = func(cl *api.CouchbaseCluster) {
 		cl.Spec.BucketSettings[0].BucketMemoryQuota = 9999
@@ -618,6 +650,38 @@ func TestNegBucketEdit(t *testing.T) {
 		t.Fatalf("failed to verify prevent changing bucket memory quota: %v", err)
 	}
 
+	message = "ramQuotaMB - RAM quota specified is too large to be provisioned into this cluster"
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 20, testCouchbase, api.ClusterConditionManageBuckets, message)
+	if err != nil {
+		t.Fatalf("failed to verify condition: %v", err)
+	}
+
+	// revert edit memory quota
+	t.Logf("reverting memory quota edit")
+	updateFunc = func(cl *api.CouchbaseCluster) {
+		cl.Spec.BucketSettings[0].BucketMemoryQuota = 256
+	}
+
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
+		t.Fatalf("failed to post updated cluster spec: %v", err)
+	}
+
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return bucket.BucketMemoryQuota == 256
+		}
+		return false
+	}
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
+	if err != nil {
+		t.Fatalf("failed to revert bucket edit: %c", err)
+	}
+
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "BucketMemoryQuota", "256", e2eutil.BucketInfoVerifier)
+	if err != nil {
+		t.Fatalf("failed to verify bucket: %v", err)
+	}
+
 	// edit conflict resolution
 	timestamp := "timestamp"
 	updateFunc = func(cl *api.CouchbaseCluster) {
@@ -628,10 +692,9 @@ func TestNegBucketEdit(t *testing.T) {
 		t.Fatalf("failed to post updated cluster spec: %v", err)
 	}
 
-	// verify type did not change
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.ConflictResolution == &timestamp
+			return *bucket.ConflictResolution == timestamp
 		}
 		return false
 	}
@@ -643,6 +706,39 @@ func TestNegBucketEdit(t *testing.T) {
 	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "ConflictResolution", "timestamp", e2eutil.BucketInfoVerifier)
 	if err == nil {
 		t.Fatalf("failed to verify prevent changing conflict resolution: %v", err)
+	}
+
+	message = "Bucket: default cannot change (default) bucket param='conflictResolution' from 'seqno' to 'timestamp'"
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageBuckets, message)
+	if err != nil {
+		t.Fatalf("failed to verify condition: %v", err)
+	}
+
+	// revert edit conflict resolution
+	t.Logf("reverting conflict resoltuion edit")
+	seqno := "seqno"
+	updateFunc = func(cl *api.CouchbaseCluster) {
+		cl.Spec.BucketSettings[0].ConflictResolution = &seqno
+	}
+
+	if _, err := e2eutil.UpdateCluster(f.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
+		t.Fatalf("failed to post updated cluster spec: %v", err)
+	}
+
+	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
+		if bucket, ok := c.Status.Buckets["default"]; ok {
+			return *bucket.ConflictResolution == seqno
+		}
+		return false
+	}
+	err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
+	if err != nil {
+		t.Fatalf("failed to revert bucket edit: %v", err)
+	}
+
+	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "ConflictResolution", "seqno", e2eutil.BucketInfoVerifier)
+	if err != nil {
+		t.Fatalf("failed to verify bucket: %v", err)
 	}
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
