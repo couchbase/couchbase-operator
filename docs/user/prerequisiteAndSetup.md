@@ -9,10 +9,8 @@ If you do not have access to a Kubenetes cluster and you plan on using the Couch
 
 Preparing the cluster to run the Couchbase operator may require setting up the proper RBAC settings in your Kubernetes cluster. Before moving forward we recommend reading deployment guides for our various deployment options.
 
-* [MiniKube]()
-* [MiniShift]()
-* [Kubernetes Cluster]()
-* [OpenShift Cluster]()
+* [Kubernetes](rbacKubernetes.md)
+* [OpenShift](rbacOpenshift.md)
 
 ## Setup
 
