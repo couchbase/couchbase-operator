@@ -8,6 +8,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 )
 
 // Tests editing service spec
@@ -832,13 +833,21 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
 	if err != nil {
 		t.Fatalf("failed to get cluster url %v", err)
 	}
-	t.Logf("url: %v", consoleURL)
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -905,7 +914,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
@@ -1067,6 +1076,26 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
+	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := e2eutil.DeleteService(t, f.KubeClient, f.Namespace, service.Name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	// create connection to couchbase nodes
+	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
+	if err != nil {
+		t.Fatalf("failed to get cluster url %v", err)
+	}
+	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	/*
 	// create connection to couchbase nodes
 	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
 	if err != nil {
@@ -1076,6 +1105,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
+	*/
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
@@ -1138,7 +1168,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}

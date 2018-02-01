@@ -43,6 +43,7 @@ var (
 	Retries10 = 10
 	Retries20 = 20
 	Retries30 = 30
+	Retries120 = 120
 )
 
 var (

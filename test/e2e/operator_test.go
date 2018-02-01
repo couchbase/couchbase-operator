@@ -6,6 +6,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"os"
 	"testing"
 	"time"
@@ -209,6 +210,12 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	t.Logf("Bucket settings reverted...")
 
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	event := k8sutil.BucketEditEvent("default", testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
