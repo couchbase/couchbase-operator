@@ -40,7 +40,16 @@ spec:
 
 ```
 
-The only fields that users may need to consider changing are below.
+Most fields in the operator configuration should never be changed and we recommend using the configuration as is. Some exceptions are below.
 
-* spec.spec.containers[0].image - To change the operator docker image.
-* metadata.namespace - To change the namespace that the operator is deployed in.
+**Changing The Namespace**
+
+The operator will manage clusters in the namespace that it is deployed in. If you want to deploy the operator in a namespace other than the default namespace then the metadata.namespace field can be changed.
+
+**Changing The Operation Container Image**
+
+Most users will not need to change the operator image unless they are pulling the image from somewhere other than the official couchbase docker repository. But if you are pulling the image from somewhere else the spec.spec.containers[0].image field can be changed.
+
+**Changing the Name**
+
+By default the name of the deployment created to maintain the Couchbase Operator is called couchbase-operator. We recommend keeping this name since it is used in all of our examples and tutorials. If you need to change it for some reason than you must make sure to change the metadata.name, spec.template.metadata.labels.name, and spec.spec.containers[0].name fields. These fields also must all have the same value.
