@@ -52,14 +52,18 @@ One thing that's important to note is the authSecret field. The Couchbase Operat
 
 ```bash
 $ kubectl create -f https://s3.amazonaws.com/packages.couchbase.com/kubernetes/beta/secret.yaml
+secret "cb-example-auth" created
 ```
 
 We can now push the Couchbase configuration to Kubernetes. Once we push it the Couchbase Operator will automatically begin creating the cluster. To push the Couchbase configuration run the command below.
 
 ```bash
 $ kubectl create -f https://s3.amazonaws.com/packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+couchbasecluster "cb-example" created
 ```
 
-That's it. You should now have a 3 node Kubernetes cluster with on bucket. For further details on what each field in the CouchbaseCluster configuration does as well as a list of all available fields see [CouchbaseCluster Configuration](couchbaseClusterConfig.md).
+After you run this command the Couchbase Operator will begin creating your cluster. Depending on what is defined in the configuration this can take some time. You can track the creation of the cluster using the ```kubectl describe``` command. We detail how to use this command and what the output means in the [Displaying Information about a Couchbase Cluster](clusterStatusGuide.md) section.
 
 Once the cluster has been provisioned you will notice that various pods, a service, and a couchbasecluster have been created. The configuration above was for a three node cluster so you should expect three pods to be created. The Couchbase operator also creates an internal headless service that can be used by applications deployed inside the same Kubernetes namespace to connect to the Couchbase cluster deployed. A couchbasecluster object is also created for the cluster and can be used to get health and status information about the cluster. For more details on how to inspect these objects see [Listing and describing pods, services, and couchbaseclusters](listAndDescribe.md)
+
+For further details on what each field in the CouchbaseCluster configuration does as well as a list of all available fields see [CouchbaseCluster Configuration](couchbaseClusterConfig.md).
