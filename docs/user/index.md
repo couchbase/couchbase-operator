@@ -18,3 +18,4 @@
 * Logging and Troubleshooting
   * [Logs](logsTroubleshooting.md)
   * [Conditions and Events](conditionsAndEvents.md)
+* [Tutorial](demo.md)
