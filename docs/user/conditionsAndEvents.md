@@ -1,6 +1,6 @@
 # Status Conditions and Events
 
-To make it easier for users to understand and debug the couchbase-operator, the actions of the operator and the state of the cluster are communicated to the user in the standard Kubernetes convention. 
+To make it easier for users to understand and debug the couchbase-operator, the actions of the operator and the state of the cluster are communicated to the user in the standard Kubernetes convention.
 
 In Kubernetes users will normally view more information about an object via `kubectl describe` which displays, among other things, the [Events](https://kubernetes.io/docs/api-reference/v1.8/#event-v1-core) and [Conditions](https://kubernetes.io/docs/api-reference/v1.8/#podcondition-v1-core) associated with the resource.
 
@@ -21,7 +21,7 @@ The following types of Events and their specific instances are common in the lif
 
 ## Conditions
 
-The couchbase cluster Condition and its statuses are defined as:
+The Couchbase cluster condition and its statuses are defined as:
 
 - Available
   - True: All members are up and all VBuckets are available

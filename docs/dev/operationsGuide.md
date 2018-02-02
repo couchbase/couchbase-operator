@@ -9,7 +9,7 @@ $ kubectl apply -f example/registrykeysecret.yaml
 ```
 
 Create deployment: In order to run a couchbase cluster you'll first need to deploy a custom resource definition
-which will allow for the creation of a 'couchbasecluster' type within the kubernetes cluster.
+which will allow for the creation of a 'couchbasecluster' type within the Kubernetes cluster.
 
 ```bash
 $ kubectl create -f example/deployment.yaml

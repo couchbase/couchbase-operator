@@ -69,7 +69,7 @@ Often when the status spec of the schema is updated, an associated event is gene
     Admin Console Port: 30239
     Admin Console Port SSL:	31628
 
-Ports used for exposing the couchbase cluster's administration console.  This section of the status is only visible when the ```exposeAdminConsole``` setting of the cluster spec is enabled.  See [admin console access guide](adminConsoleAccess.md) for information about how to expose and access the the administration console.
+Ports used for exposing the Couchbase cluster's administration console.  This section of the status is only visible when the ```exposeAdminConsole``` setting of the cluster spec is enabled.  See [admin console access guide](adminConsoleAccess.md) for information about how to expose and access the the administration console.
 
 Enabling and disabling the ```exposeAdminConsole``` setting produces the following events, respectively:
 
@@ -85,7 +85,7 @@ Enabling and disabling the ```exposeAdminConsole``` setting produces the followi
         Name:			default
         ...
 
-List of buckets currently active within the couchbase cluster.  The values of the bucket status are the same as the values provided in the bucket spec.  Refer to [couchbaseClusterConfig](couchbaseClusterConfig.md) for info about the bucket spec. When buckets from the spec are added, updated, or removed the following events are generated, respectively:
+List of buckets currently active within the Couchbase cluster.  The values of the bucket status are the same as the values provided in the bucket spec.  Refer to [couchbaseClusterConfig](couchbaseClusterConfig.md) for info about the bucket spec. When buckets from the spec are added, updated, or removed the following events are generated, respectively:
 
     Events:
       ... BucketCreated		A new bucket `default` was created
@@ -106,7 +106,7 @@ To resolve errors resulting from invalid updates, edit the cluster spec accordin
 
     Cluster Id:			9ae7fe4634e0360cf9c9245cb4ebb27b
 
-The cluster identifier as provided by the couchbase cluster.  This value is provided directly by the couchbase cluster and is therefore never updated by any changes to the cluster spec.
+The cluster identifier as provided by the Couchbase cluster.  This value is provided directly by the Couchbase cluster and is therefore never updated by any changes to the cluster spec.
 
 
 ### Members
@@ -118,7 +118,7 @@ The cluster identifier as provided by the couchbase cluster.  This value is prov
         cb-example-0002
 
 
-Members represent pods that are managed by the couchbase-operator.  All members in the Ready section represent pods that make up the couchbase cluster.  The status of cluster members is directly affected by the value of ```Size``` in the cluster spec.  When `Size` is increased a member add event is generated, followed by rebalance:
+Members represent pods that are managed by the couchbase-operator.  All members in the Ready section represent pods that make up the Couchbase cluster.  The status of cluster members is directly affected by the value of ```Size``` in the cluster spec.  When `Size` is increased a member add event is generated, followed by rebalance:
 
     Events:
       ... NewMemberAdded		New member cb-example-0003 added to cluster
@@ -154,7 +154,7 @@ The current phase of the cluster.  Can either of the following:
 
     Size:			3
 
-The size of the couchbase cluster.  When this value is changed in the cluster spec, this value is also updated as members are added to the couchbase cluster.  If errors occur while the operator is attempting to conform the cluster to the desired size then the ```Conditions``` section should be checked for information about the current state of the cluster.  See the [admin console access](adminConsoleAccess.md) for information about how to manually access the cluster and collect logs when additional troubleshooting is needed when scaling your cluster.
+The size of the Couchbase cluster.  When this value is changed in the cluster spec, this value is also updated as members are added to the Couchbase cluster.  If errors occur while the operator is attempting to conform the cluster to the desired size then the ```Conditions``` section should be checked for information about the current state of the cluster.  See the [admin console access](adminConsoleAccess.md) for information about how to manually access the cluster and collect logs when additional troubleshooting is needed when scaling your cluster.
 
 
 ### Conditions
@@ -166,7 +166,7 @@ The size of the couchbase cluster.  When this value is changed in the cluster sp
       Status:			True
       Type:			Balanced
 
-List of conditions reflecting the current state of the couchbase cluster.  Each Condition item is denoted by a ```Type``` along with an associated ```Status```.  The various types of conditions statuses are documented in [conditionsAndEvent](conditionsAndEvents.md).
+List of conditions reflecting the current state of the Couchbase cluster.  Each Condition item is denoted by a ```Type``` along with an associated ```Status```.  The various types of conditions statuses are documented in [conditionsAndEvent](conditionsAndEvents.md).
 
 ### Events
 

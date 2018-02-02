@@ -1,6 +1,6 @@
 # Couchbase Client
 
-The Couchbase command-line tool `couchbase-cli` can be used to interact with the cluster for performing one-off administration tasks such as creating rbac users and initiating cbcollect info tasks.  If your clusters administration console is exposed you can use the cli tool from any machine that can access the IP address of your kubernetes cluster.  Alternertavily couchbase-cli can be ran as a kubernetes job within the kubernetes cluster.
+The Couchbase command-line tool `couchbase-cli` can be used to interact with the cluster for performing one-off administration tasks such as creating rbac users and initiating cbcollect info tasks.  If your clusters administration console is exposed you can use the cli tool from any machine that can access the IP address of your Kubernetes cluster.  Alternatively couchbase-cli can be ran as a Kubernetes job within the Kubernetes cluster.
 
 **couchbase-cli to administration console**
 
@@ -23,9 +23,9 @@ SUCCESS: RBAC user set
 Note that the cluster is being managed by the couchbase-operator.  Therefore, certain administration tasks such as add/remove nodes and buckets will be reverted by the operator.
 
 
-**couchbase-cli as kubernetes job**
+**couchbase-cli as Kubernetes job**
 
-The most secure way to use the couchbase-cli with your kubernetes cluster is to run as batch jobs.  This option allows you to hide the username and password of your cluster by allowing the use of secrets.  For example, you can run a collect info job using the same secret provided in the cluster spec:
+The most secure way to use the couchbase-cli with your Kubernetes cluster is to run as batch jobs.  This option allows you to hide the username and password of your cluster by allowing the use of secrets.  For example, you can run a collect info job using the same secret provided in the cluster spec:
 
 ```console
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-collect-logs.yaml

@@ -1,5 +1,5 @@
 # Troubleshooting
-When troubleshooting the couchbase operator it's important to rule out kubernetes itself as the root cause of the problem you are experiencing.  See the kubernetes [troubleshooting guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/) for tips on debugging applications within a kubernetes cluster.
+When troubleshooting the couchbase operator it's important to rule out Kubernetes itself as the root cause of the problem you are experiencing.  See the Kubernetes [troubleshooting guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/) for tips on debugging applications within a Kubernetes cluster.
 
 The following references are also helpful when troubleshooting:
 * [Check cluster status and conditions for errors](clusterStatusGuide.md)
@@ -11,16 +11,16 @@ The following references are also helpful when troubleshooting:
 
 ## Full Deployment Logs
 
-To get logs of the operator along with your entire kubernetes deployment (nodes, pods, services...), run the support script [cb_k8s_support.sh](https://github.com/couchbase/couchbase-operator/blob/master/scripts/support/cb_k8s_support.sh)
+To get logs of the operator along with your entire Kubernetes deployment (nodes, pods, services...), run the support script [cb_k8s_support.sh](https://github.com/couchbase/couchbase-operator/blob/master/scripts/support/cb_k8s_support.sh)
 
     ./scripts/support/cb_k8s_support.sh
 
-This scripts gathers information about your kubernetes deployment and creates an archive within your current working directory:
+This scripts gathers information about your Kubernetes deployment and creates an archive within your current working directory:
 
      <cwd>/cb-k8s-support-01182018-14_00_18.tgz
 
 
-Note this script attempts to run ```kubectl top pod``` to gather pod metrics such as cpu & memory.  By default these metrics are empty unless you have heapster deployed within your kubernetes cluster.  To deploy heapster for gathering pod metrics, run the following commands:
+Note this script attempts to run ```kubectl top pod``` to gather pod metrics such as cpu & memory.  By default these metrics are empty unless you have heapster deployed within your Kubernetes cluster.  To deploy heapster for gathering pod metrics, run the following commands:
 ```bash
 git clone https://github.com/kubernetes/heapster.git
 cd heapster
@@ -55,7 +55,7 @@ The following messages indicate the operator is unable to reconcile your cluster
 
 ## Getting Server Logs
 
-The easiest way to get cbcollect logs is to access the administration console and click the "Collect Logs" button in the Logs tab. You can also deploy a job within kubernetes to trigger the log collection:
+The easiest way to get cbcollect logs is to access the administration console and click the "Collect Logs" button in the Logs tab. You can also deploy a job within Kubernetes to trigger the log collection:
 
     kubectl create -f example/couchbase-cli-collect-logs.yaml
 

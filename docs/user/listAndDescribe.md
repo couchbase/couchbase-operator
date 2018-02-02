@@ -1,6 +1,6 @@
 # Listing And Describing Resources
 
-When a couchbase cluster is deployed, additional kubernetes resources such as pods and services are created by the operator to facilitate its deployment.  All resources originating from the couchbase-operator are labeled in order to make it easy to list and describe resources belonging to a specific cluster.  The following is a description of all the resources created by the operator during cluster runtime.
+When a couchbase cluster is deployed, additional Kubernetes resources such as pods and services are created by the operator to facilitate its deployment.  All resources originating from the couchbase-operator are labeled in order to make it easy to list and describe resources belonging to a specific cluster.  The following is a description of all the resources created by the operator during cluster runtime.
 
 Note that each of the commands below use kubectl with default namespace ```kubectl -n default ...```.  If you've deployed your cluster using a different namespace then you will need to explicitly provide a different namespace.
 
@@ -68,7 +68,7 @@ cb-development-0000   1/1       Running   0          1h
 cb-development-0001   1/1       Running   0          1h
 ```
 
-After listing pods, additional information can be collecting using ```kubectl 
+After listing pods, additional information can be collecting using ```kubectl
 describe```:
 
 ```console

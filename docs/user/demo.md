@@ -1,8 +1,8 @@
-# Example Cluster Deployment
+# Cluster Deployment Tutorial
 
-The following steps demonstrate the deployment of a 3 node cluster with data loading.  See the [prerequisite and setup guide](prerequisiteAndSetup.md) for instructions to prepare your kubernetes cluster to run couchbase pods.
+The following steps demonstrate the deployment of a 3 node cluster with data loading.  See the [prerequisite and setup guide](prerequisiteAndSetup.md) for instructions to prepare your Kubernetes cluster to run Couchbase pods.
 
-**Create couchbase cluster**
+**Create Couchbase cluster**
 ```console
 $ kubectl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
@@ -10,7 +10,7 @@ couchbasecluster "cb-example" created
 
 **Create a Couchbase RBAC user**
 
-Since we're going to be loading data, a Couchbase RBAC user is required. As mentioned in the [couchbase-cli guide]( couchbaseCliGuide.md),  users can be created by directly using the cli tool or as a job within the kubernetes cluster.
+Since we're going to be loading data, a Couchbase RBAC user is required. As mentioned in the [couchbase-cli guide]( couchbaseCliGuide.md),  users can be created by directly using the cli tool or as a job within the Kubernetes cluster.
 
 **Option 1: Create deafult user with cli tool**
 
@@ -20,14 +20,14 @@ $ kubectl describe cbc cb-example |  grep "Admin Console Port:"
    Admin Console Port:		32486
 ```
 
-Create couchbase RBAC user:
+Create a Couchbase RBAC user:
 ```console
 $ ./couchbase-cli user-manage -c 192.168.99.100:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
 SUCCESS: RBAC user set
 ```
 (skip to loading data section)
 
-**Option 2: Create default user with kubernetes job**
+**Option 2: Create a default user with Kubernetes job**
 
 Just as the admin user has a secret, the RBAC user will also need it's own secret, so let's create one:
 
@@ -51,7 +51,7 @@ $ kubectl create -f  cb-user-auth-secret.yaml
 secret "cb-user-auth" created
 ```
 
-Now we can use the user secret to securely create a couchbase rbac user using a kubernetes job:
+Now we can use the user secret to securely create a Couchbase rbac user using a Kubernetes job:
 
 ```console
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
