@@ -4,7 +4,7 @@ The following steps demonstrate the deployment of a 3 node cluster with data loa
 
 **Create couchbase cluster**
 ```console
-$ kubectl apply -f  https://github.com/couchbase/couchbase-operator/blob/master/example/couchbase-cluster.yaml
+$ kubectl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 
@@ -54,7 +54,7 @@ secret "cb-user-auth" created
 Now we can use the user secret to securely create a couchbase rbac user using a kubernetes job:
 
 ```console
-$ kubectl create -f https://github.com/couchbase/couchbase-operator/blob/master/example/couchbase-cli-create-user.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ kubectl get job
@@ -63,8 +63,9 @@ create-user   1         1            4s
 ```
 
 Note that the name of the secret and it's keys are very important here since the example create-user spec volume mounts the secrets... ie:
+
 ```yaml
-# https://github.com/couchbase/couchbase-operator/blob/master/example/couchbase-cli-create-user.yaml
+# https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
 ---
 apiVersion: batch/v1
 kind: Job
@@ -107,7 +108,7 @@ spec:
 
 Deploy the pillowfight data loader:
 ```console
-$ kubectl create -f https://github.com/couchbase/couchbase-operator/blob/master/example/pillowfight-data-loader.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/beta/pillowfight-data-loader.yaml
 job "pillowfight" created
 ```
 

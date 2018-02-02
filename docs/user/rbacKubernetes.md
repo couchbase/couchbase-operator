@@ -2,7 +2,7 @@
 
 The Couchbase Operator needs some special permissions in order to interact with the Kubernetes master. These permissions need to be set for each namespace that the Couchbase Operator is used in. Note in the example below the namespace is "default".
 
-First download the RBAC role creation files [here](https://s3.amazonaws.com/packages.couchbase.com/kubernetes/beta/rbac.zip) and unzip them. Then run the command below.
+First download the RBAC role creation files [here](https://packages.couchbase.com/kubernetes/beta/rbac.zip) and unzip them. Then run the command below.
 
 ```bash
 $ ./create_roles.sh --namespace=default

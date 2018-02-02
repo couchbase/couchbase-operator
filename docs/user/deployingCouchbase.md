@@ -51,14 +51,14 @@ By looking at this configuration it should be easy to see that it defines a clus
 One thing that's important to note is the authSecret field. The Couchbase Operator makes use of Kubernetes Secrets in order to create and manage the Couchbase super-user credentials. As a result the authSecret must refer to secret that contains both a username and a password field. For convience we provide a sample secret that can be pushed into your Kubernetes cluster. The secret sets the username to "Administator" and the password to "password". To load this secret into your Kubernetes cluster run the command below.
 
 ```bash
-$ kubectl create -f https://s3.amazonaws.com/packages.couchbase.com/kubernetes/beta/secret.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/beta/secret.yaml
 secret "cb-example-auth" created
 ```
 
 We can now push the Couchbase configuration to Kubernetes. Once we push it the Couchbase Operator will automatically begin creating the cluster. To push the Couchbase configuration run the command below.
 
 ```bash
-$ kubectl create -f https://s3.amazonaws.com/packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 
