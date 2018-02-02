@@ -43,13 +43,12 @@ type Controller struct {
 }
 
 type Config struct {
-	EnableValidation bool
-	MasterHost       string
-	Namespace        string
-	ServiceAccount   string
-	KubeCli          kubernetes.Interface
-	KubeExtCli       apiextensionsclient.Interface
-	CouchbaseCRCli   versioned.Interface
+	MasterHost     string
+	Namespace      string
+	ServiceAccount string
+	KubeCli        kubernetes.Interface
+	KubeExtCli     apiextensionsclient.Interface
+	CouchbaseCRCli versioned.Interface
 }
 
 func (c *Config) Validate() error {
@@ -101,7 +100,12 @@ func (c *Controller) run() {
 }
 
 func (c *Controller) initResource() error {
-	err := k8sutil.CreateCRD(c.KubeExtCli, c.Config.EnableValidation)
+	version, err := k8sutil.GetKubernetesVersion(c.Config.KubeCli)
+	if err != nil {
+		c.logger.Logger.Warn("Unable to get server version due to %v, skipping validation registration", err)
+	}
+
+	err = k8sutil.CreateCRD(c.KubeExtCli, version)
 	if err != nil && !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 		return fmt.Errorf("fail to create CRD: %v", err)
 	}

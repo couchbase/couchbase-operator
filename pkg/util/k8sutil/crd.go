@@ -5,6 +5,7 @@ import (
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -16,13 +17,13 @@ import (
 // updating a Cluster CR.
 type CouchbaseClusterCRUpdateFunc func(*api.CouchbaseCluster)
 
-func CreateCRD(clientset apiextensionsclient.Interface, enableValidation bool) error {
-	crd := createCRD(enableValidation)
+func CreateCRD(clientset apiextensionsclient.Interface, version constants.KubernetesVersion) error {
+	crd := createCRD(version)
 	_, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	return err
 }
 
-func createCRD(enableValidation bool) *apiextensionsv1beta1.CustomResourceDefinition {
+func createCRD(version constants.KubernetesVersion) *apiextensionsv1beta1.CustomResourceDefinition {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: api.CRDName,
@@ -39,7 +40,7 @@ func createCRD(enableValidation bool) *apiextensionsv1beta1.CustomResourceDefini
 		},
 	}
 
-	if enableValidation {
+	if version > constants.KubernetesVersion1_8 {
 		crd.Spec.Validation = getCustomResourceValidation()
 	}
 

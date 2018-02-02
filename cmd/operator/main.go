@@ -33,11 +33,10 @@ import (
 const version = "0.8.0"
 
 var (
-	listenAddr    string
-	name          string
-	namespace     string
-	crdValidation bool
-	printVersion  bool
+	listenAddr   string
+	name         string
+	namespace    string
+	printVersion bool
 
 	chaosLevel int
 
@@ -48,7 +47,6 @@ var (
 func init() {
 	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
 	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
-	flag.BoolVar(&crdValidation, "enable-validation", false, "Enable CRD validation")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
@@ -135,12 +133,11 @@ func newControllerConfig() controller.Config {
 	}
 
 	cfg := controller.Config{
-		EnableValidation: crdValidation,
-		Namespace:        namespace,
-		ServiceAccount:   serviceAccount,
-		KubeCli:          kubecli,
-		KubeExtCli:       k8sutil.MustNewKubeExtClient(),
-		CouchbaseCRCli:   client.MustNewInCluster(),
+		Namespace:      namespace,
+		ServiceAccount: serviceAccount,
+		KubeCli:        kubecli,
+		KubeExtCli:     k8sutil.MustNewKubeExtClient(),
+		CouchbaseCRCli: client.MustNewInCluster(),
 	}
 
 	return cfg

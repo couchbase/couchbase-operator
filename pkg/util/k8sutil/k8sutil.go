@@ -1,12 +1,16 @@
 package k8sutil
 
 import (
+	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
@@ -327,4 +331,29 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 	}
 
 	return cberrors.ErrUnkownCreatePod
+}
+
+func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
+	version, err := kubeCli.Discovery().ServerVersion()
+	if err != nil {
+		return constants.KubernetesVersionUnknown, err
+	}
+
+	// Sometimes the Major and Minor values are not set so we need to parse them
+	// from the GitVersion field.
+	if version.Major == "" || version.Minor == "" {
+		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}$")
+		if !rx.MatchString(version.GitVersion) {
+			err := fmt.Errorf("Unable to get version from Kubernetes API response")
+			return constants.KubernetesVersionUnknown, err
+		}
+
+		parts := strings.Split(version.GitVersion[1:], ".")
+		version.Major = parts[0]
+		version.Minor = parts[1]
+	}
+
+	major, _ := strconv.Atoi(version.Major)
+	minor, _ := strconv.Atoi(version.Minor)
+	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
 }
