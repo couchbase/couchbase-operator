@@ -1,13 +1,22 @@
 # Cluster Status
 
-Once you've [deployed a couchbase cluster,](operationsGuide.md) a custom resource object is created with type ```couchbasecluster```.  As the couchbase-operator compares the values of your cluster spec to the actual state of the ```couchbasecluster```, the status of this resource is updated when necessary to reflect any changes required by the operator to reach its desired state.  This reconciliation is performed by the operators controller and is a common design pattern used to control other resources such as deployments and replicasets.
+Kubernetes users often need to check the status of various objects (eg. Pods, Deployments, and StatefulSets) that have been deployed inside their Kubernetes clusters. Status checking is done by "describing" one of the objects in the cluster using ```kubectl describe``` command. This command outputs the configuration for the specified object, a status section, and an event section. The status section varies depending on the object type and shows various health metrics related to the object described. The events sections is printed last and shows major events that have happened during the life of the object.
 
-You can use the kubectl cli to retrieve the status of ```couchbasecluster``` resource:
+Since the Couchbase Operator registers a "CouchbaseCluster" CRD with Kubernetes it allows Kuberentes to know about Couchbase Clusters natively. This means that the CouchbaseCluster becomes another object that can be described to get the configuration, status, and events specific to a particular Couchbase cluster.
+
+To describe a Couchbase cluster named "cb-example" run the following command.
+
 ```bash
-kubectl describe couchbasecluster   # or shorthand 'cbc'
+kubectl describe couchbasecluster cb-example
 ```
 
-The response details information about the current status of your deployment, along with insight into the condition of the cluster and reconciliation events that have occurred.  This is described in the **Status** and **Events** section of the response schema:
+In the command above note that the object name is "couchbasecluster". You can also use the shorthand name "cbc" as the object name to save some typing.
+
+```bash
+kubectl describe cbc cb-example
+```
+
+Below is an example of the output of the ```kubectl describe``` command. The various parts of the output and their significance will be discussed in more detail in the sections that follow.
 
 ```yaml
 Name:		cb-example
