@@ -1176,7 +1176,8 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
 
-	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	if err == nil {
 		t.Fatal("failed to not create cluster")
 	}
@@ -1203,7 +1204,6 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 		t.Fatal("failed to create cluster: %v", err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
-
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")

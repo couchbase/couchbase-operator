@@ -326,11 +326,24 @@ func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	if err != nil {
 		t.Logf("Error: %v", err)
 	}
+	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 
-	err1 := DeleteCluster(t, crClient, kubeClient, cluster, 10)
-	if err1 != nil {
-		t.Logf("Error: %v", err1)
+	clusterNameList := []string{}
+	for _, cluster := range clusters.Items {
+		clusterNameList = append(clusterNameList, cluster.Name)
 	}
+
+	t.Logf("Deleteing clusters: [%v]", clusterNameList)
+	for _, cluster := range clusters.Items {
+		t.Logf("Attempting to delete: [%v]", cluster.Name)
+		err1 := DeleteCluster(t, crClient, kubeClient, &cluster, 10)
+		if err1 != nil {
+			t.Logf("Error: %v", err1)
+		} else {
+			t.Logf("Successfully deleted: [%v]", cluster.Name)
+		}
+	}
+
 }
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string) error {
