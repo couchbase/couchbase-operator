@@ -2,7 +2,7 @@
 
 Kubernetes users often need to check the status of various objects (eg. Pods, Deployments, and StatefulSets) that have been deployed inside their Kubernetes clusters. Status checking is done by "describing" one of the objects in the cluster using ```kubectl describe``` command. This command outputs the configuration for the specified object, a status section, and an event section. The status section varies depending on the object type and shows various health metrics related to the object described. The events sections is printed last and shows major events that have happened during the life of the object.
 
-Since the Couchbase Operator registers a "CouchbaseCluster" CRD with Kubernetes it allows Kuberentes to know about Couchbase Clusters natively. This means that the CouchbaseCluster becomes another object that can be described to get the configuration, status, and events specific to a particular Couchbase cluster.
+Since the Couchbase Operator registers a "CouchbaseCluster" CRD with Kubernetes it allows Kuberentes to know about Couchbase clusters natively. This means that the CouchbaseCluster becomes another object that can be described to get the configuration, status, and events specific to a particular Couchbase cluster.
 
 To describe a Couchbase cluster named "cb-example" run the following command.
 
