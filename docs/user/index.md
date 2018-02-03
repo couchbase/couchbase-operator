@@ -19,3 +19,4 @@
   * [Logs](logsTroubleshooting.md)
   * [Conditions and Events](conditionsAndEvents.md)
 * [Tutorial](demo.md)
+* [Release Notes](releaseNotes.md)
