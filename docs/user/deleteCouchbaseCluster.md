@@ -1,9 +1,17 @@
-# Deleting a Couchbase Cluster
+# Deleting a CouchbaseCluster
 
-To delete a Couchbase Cluster you can either use the configuration file that you created the cluster with or you can delete the cluster directly. If your configuration file is named my-cluster.yaml then you can delete the cluster by running the following command.
+You can delete a cluster either by using the cluster configuration file that you created the cluster with, or by deleting the cluster directly.
 
-    kubectl delete -f my-cluster.yaml
+***Deleting a Cluster Using the Cluster Configuration File***
+To delete a cluster using the cluster configuration file, say ```my-cluster.yaml```, run the following command:
 
-If your cluster is named my-cluster then you can also delete the cluster by running the following command.
+```bash
+kubectl delete -f my-cluster.yaml
+```
 
-    kubectl delete couchbasecluster my-cluster
+***Deleting a Cluster Directly***
+To delete a cluster directly, say ```my-cluster```, run the following command:
+
+```bash
+kubectl delete couchbasecluster my-cluster
+```

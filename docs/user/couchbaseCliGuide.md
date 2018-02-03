@@ -1,4 +1,4 @@
-# The Couchbase Command-line Tool 'couchbase-cli'
+# Accessing the Couchbase CLI
 
 The Couchbase command-line tool `couchbase-cli` can be used to interact with the cluster for performing one off administration tasks such as creating RBAC users and initiating cbcollect info tasks. If your clusters Web Console is exposed, you can use the CLI tool from any machine that can access the IP address of your Kubernetes cluster. Alternatively, couchbase-cli can be run as a Kubernetes job within the Kubernetes cluster.
 

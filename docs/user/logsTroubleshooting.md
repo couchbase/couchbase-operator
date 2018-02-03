@@ -1,38 +1,40 @@
-# Troubleshooting
-When troubleshooting the couchbase operator it's important to rule out Kubernetes itself as the root cause of the problem you are experiencing.  See the Kubernetes [troubleshooting guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/) for tips on debugging applications within a Kubernetes cluster.
+# Logs and Troubleshooting
+
+This section provides information on how to diagnose and troubleshoot problems with the Couchbase Operator or your deployment.
+
+When troubleshooting the Couchbase Operator, it is important to rule out Kubernetes itself as the root cause of the problem you are experiencing.  See the Kubernetes [Troubleshooting Guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/) for tips on debugging applications within a Kubernetes cluster.
 
 The following references are also helpful when troubleshooting:
-* [Check cluster status and conditions for errors](clusterStatusGuide.md)
-  * [Understanding conditions and events](conditionsAndEvents.md)
+* [Cluster Status and Conditions](clusterStatusGuide.md)
+  * [Understanding Conditions and Events](conditionsAndEvents.md)
 * [Listing And Describing Resources](listAndDescribe.md)
-* [Dealing with node failures](nodeRecovery.md)
-* [Operator Configuration, fields and values](operatorConfig.md)
-
+* [Node Recovery](nodeRecovery.md)
+* [Operator Configuration](operatorConfig.md)
 
 ## Full Deployment Logs
 
-To get logs of the operator along with your entire Kubernetes deployment (nodes, pods, services...), run the support script [cb_k8s_support.sh](https://github.com/couchbase/couchbase-operator/blob/master/scripts/support/cb_k8s_support.sh)
-
-    ./scripts/support/cb_k8s_support.sh
+To get logs of the Operator along with your entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://github.com/couchbase/couchbase-operator/blob/master/scripts/support/cb_k8s_support.sh)
+```bash
+./scripts/support/cb_k8s_support.sh
+```
 
 This scripts gathers information about your Kubernetes deployment and creates an archive within your current working directory:
+```bash
+<cwd>/cb-k8s-support-01182018-14_00_18.tgz
+```
 
-     <cwd>/cb-k8s-support-01182018-14_00_18.tgz
-
-
-Note this script attempts to run ```kubectl top pod``` to gather pod metrics such as cpu & memory.  By default these metrics are empty unless you have heapster deployed within your Kubernetes cluster.  To deploy heapster for gathering pod metrics, run the following commands:
+This script runs ```kubectl top pod``` to gather pod metrics such as CPU and memory.  By default, these metrics are empty unless you have ```heapster``` deployed within your Kubernetes cluster.  To deploy ```heapster``` for gathering pod metrics, run the following commands:
 ```bash
 git clone https://github.com/kubernetes/heapster.git
 cd heapster
 kubectl create -f deploy/kube-config/influxdb/
 ```
 
-Then run the support script again to generate logs which include pod metrics.
-
+Then run the support script, ```cb_k8s_support.sh```, again to generate logs which include pod metrics.
 
 ## Operator Logs
 
-The couchbase operator generates logs that can be very helpful when troubleshooting your deployment.  Using kubectl, the operator logs can be printed to stdout:
+The Couchbase Operator generates logs that can help troubleshoot your deployment.  Using ```kubectl```, you can choose to print the Operator logs to stdout:
 
 ```console
 # Get name of operator pod
@@ -49,22 +51,29 @@ time="2018-01-23T22:56:51Z" level=info msg="I'm the leader, attempt to start the
 time="2018-01-23T22:56:51Z" level=info msg="Creating the couchbase-operator controller" module=main
 ```
 
-The following messages indicate the operator is unable to reconcile your cluster into a desired state:
+Watch for the following messages which indicate that the Operator is unable to reconcile your cluster into a desired state:
 * Logs with level=error
 * Operator is unable to get cluster state after N retries
 
-## Getting Server Logs
+## Getting Couchbase Server Logs
 
-The easiest way to get cbcollect logs is to access the administration console and click the "Collect Logs" button in the Logs tab. You can also deploy a job within Kubernetes to trigger the log collection:
+The easiest way to get ```cbcollect``` logs is to access the Couchbase Web Console and click the **Collect Logs** button in the Logs tab. You can also deploy a job within Kubernetes to trigger log collection:
 
-    kubectl create -f example/couchbase-cli-collect-logs.yaml
+```bash
+kubectl create -f example/couchbase-cli-collect-logs.yaml
+```
+Once log collection has completed, check the Couchbase Web Console > Logs tab > Collection Info for the path to the corresponding zip file for each node in the cluster. You can then run a command like the following for each node in the cluster to collect their logs.
 
-Once log collection has completed, check the administraton console (Logs -> Collection Info) for the path to the corresponding zip file for each node in the cluster. You can then run a command like the one below against each node in the cluster to collect their logs.
+```bash
+kubectl cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
+```
 
-    kubectl cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
+Here is an example command to collect the logs for node cb-example-0000:
 
-An example of what this might look like is below.
+```bash
+kubectl cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
+```
 
-    kubectl cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
+## See Also##
 
-Also, refer to [couchbase server troubleshooting](https://developer.couchbase.com/documentation/server/current/troubleshooting/troubleshooting-intro.html) guide for additional information about reporting issues.
+Refer to the [Couchbase Server Troubleshooting](https://developer.couchbase.com/documentation/server/current/troubleshooting/troubleshooting-intro.html) guide for additional information about reporting issues.

@@ -15,7 +15,7 @@
   * [Recovering From Node Failure](nodeRecovery.md)
 * [Updating a Couchbase Deployment](updatingCouchbase.md)
 * [Deleting a Couchbase Deployment](deleteCouchbaseCluster.md)
-* Logging and Troubleshooting
+* Troubleshooting
   * [Logs](logsTroubleshooting.md)
   * [Conditions and Events](conditionsAndEvents.md)
 * [Tutorial](demo.md)
