@@ -1,4 +1,4 @@
-## Accessing the Administration Console
+## Accessing the Couchbase Web Console
 
 The administration console can be accessed by enabling the ```exposeAdminConsole``` setting within the Couchbase clusters YAML spec, for example:
 ```yaml

@@ -20,7 +20,7 @@ Before you can start deploying Couchbase clusters on either Kubernetes or OpenSh
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/operator.yaml
 ```
 
-Running this command will download the Couchbase Operator docker image and create a deployment which manages a single instance of the Couchbase Operator. We use a deployment because we want the Couchbase Operator to be able to restart if the pod it's running in dies. When the Couchbase Operator pod is started for the first time, it registers the CouchbaseCluster CRD with Kubernetes and registers a controller which listens for updates to the CouchbaseCluster configurations.
+Running this command will download the Couchbase Operator docker image and create a deployment which manages a single instance of the Couchbase Operator. We use a deployment because we want the Couchbase Operator to be able to restart if the pod it's running in dies. When the Couchbase Operator pod is started for the first time, it registers the CouchbaseCluster Custom Resource Definition(CRD) with Kubernetes and registers a controller which listens for updates to the CouchbaseCluster configurations.
 
 >Note: This command creates the Couchbase Operator in the default namespace. To deploy the Operator in another namespace, download this file and modify the metadata.namespace field to reflect the namespace you want to install the Operator in.
 
