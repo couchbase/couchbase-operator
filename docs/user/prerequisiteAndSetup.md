@@ -15,7 +15,7 @@ Preparing the cluster to run the Couchbase Operator may require setting up prope
 
 ## Setup
 
-Before you can start deploying Couchbase clusters on either Kubernetes or OpenShift, you must install the Couchbase Operator into your Kubernetes/Openshift deployment. To do so, run the following command:
+Before you can start deploying Couchbase clusters on either Kubernetes or OpenShift, you must install the Couchbase Operator into your Kubernetes/OpenShift deployment. To do so, run the following command:
 
 ```bash
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/operator.yaml

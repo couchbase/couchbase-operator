@@ -1,31 +1,31 @@
-# Couchbase Client
+# The Couchbase Command-line Tool 'couchbase-cli'
 
-The Couchbase command-line tool `couchbase-cli` can be used to interact with the cluster for performing one-off administration tasks such as creating rbac users and initiating cbcollect info tasks.  If your clusters administration console is exposed you can use the cli tool from any machine that can access the IP address of your Kubernetes cluster.  Alternatively couchbase-cli can be ran as a Kubernetes job within the Kubernetes cluster.
+The Couchbase command-line tool `couchbase-cli` can be used to interact with the cluster for performing one off administration tasks such as creating RBAC users and initiating cbcollect info tasks. If your clusters Web Console is exposed, you can use the CLI tool from any machine that can access the IP address of your Kubernetes cluster. Alternatively, couchbase-cli can be run as a Kubernetes job within the Kubernetes cluster.
 
-**couchbase-cli to administration console**
+**couchbase-cli to Web Console**
 
 Requires:
-* See [admin console access](adminConsoleAccess.md) for exposing the administration console.
+* See [Accessing the Couchbase Web Console](adminConsoleAccess.md) for exposing the Web Console.
 * Download the couchbase-cli to your client machine:  https://github.com/couchbase/couchbase-cli
 
-Use describe command to get the administration console port:
+Use the describe command to get the Web Console port:
 
 ```console
 $ kubectl describe cbc cb-example |  grep "Admin Console Port:"
    Admin Console Port:		32486
 ```
 
-Now couchbase-cli can be used with to administer the cluster.  For example, adding an rbac user:
+Now you can use couchbase-cli to administer the cluster.  For example, adding an RBAC user:
 ```console
 $ ./couchbase-cli user-manage -c 192.168.99.100:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
 SUCCESS: RBAC user set
 ```
-Note that the cluster is being managed by the couchbase-operator.  Therefore, certain administration tasks such as add/remove nodes and buckets will be reverted by the operator.
+Note that the cluster is being managed by the Couchbase Operator.  Therefore, certain administration tasks such as adding or removing nodes and buckets can be reverted by the Operator.
 
 
-**couchbase-cli as Kubernetes job**
+**couchbase-cli as Kubernetes Job**
 
-The most secure way to use the couchbase-cli with your Kubernetes cluster is to run as batch jobs.  This option allows you to hide the username and password of your cluster by allowing the use of secrets.  For example, you can run a collect info job using the same secret provided in the cluster spec:
+The most secure way to use the couchbase-cli with your Kubernetes cluster is to run as batch jobs. This option allows you to hide the user name and password of your cluster by allowing the use of Secrets. For example, you can run a collect info job using the same secret provided in the cluster spec:
 
 ```console
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-collect-logs.yaml

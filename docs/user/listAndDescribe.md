@@ -1,12 +1,12 @@
 # Listing And Describing Resources
 
-When a couchbase cluster is deployed, additional Kubernetes resources such as pods and services are created by the operator to facilitate its deployment.  All resources originating from the couchbase-operator are labeled in order to make it easy to list and describe resources belonging to a specific cluster.  The following is a description of all the resources created by the operator during cluster runtime.
+When a Couchbase cluster is deployed, additional Kubernetes resources such as pods and services are created by the operator to facilitate its deployment.  All resources originating from the Couchbase Operator are labeled in order to make it easy to list and describe resources belonging to a specific cluster.  The following sections list and explain the resources created by the Operator when the cluster is running.
 
-Note that each of the commands below use kubectl with default namespace ```kubectl -n default ...```.  If you've deployed your cluster using a different namespace then you will need to explicitly provide a different namespace.
+Note that each of the commands below use kubectl with the default namespace ```kubectl -n default ...```. If you've deployed your cluster using a different namespace, you will need to explicitly provide the namespace where your cluster is deployed.
 
 ## Operator Deployment
 
-The operator is started as a deployment resource.  The name of the object will be the exact same as the name provided in your deployment spec (see [setup guide](prerequisiteAndSetup.md)).  The operator deployment can be listed and described as follows:
+The Operator is started as a deployment resource.  The name of the object will match the name provided in your deployment specification. (See [Prerequisites and Setup](prerequisiteAndSetup.md) for details.) The Operator deployment can be listed and described as follows:
 
 ```console
 $ kubectl get deployments couchbase-operator
@@ -26,9 +26,9 @@ Pod Template:
     Port:	8080/TCP
     ...
 ```
-Notice that the deployment resource manages a replicaset, which means it's important to check that the desired number of replicas match the total number of available replicas when describing the operator deployment.
+Notice that the deployment resource manages a ReplicaSet, which means it's important to check that the desired number of replicas match the total number of available replicas when describing the Operator deployment.
 
-Additional information about the replicasets and pods created by the operator deployment can be described using the deployment name as a label selector
+Additional information about the ReplicaSets and pods created by the operator deployment can be described using the deployment name as a label selector.
 
 ```console
 # replicasets created by couchbase-operator deployment
@@ -58,7 +58,7 @@ cb-production-0000    1/1       Running   0          1h
 cb-production-0001    1/1       Running   0          1h
 ```
 
-The pods are also labeled by cluster and according to couchbase service, which makes it possible to get only the pods providing the query service for a specific cluster:
+The pods are also labeled by cluster and according to Couchbase service, which makes it possible to get only the pods providing a specific service for a specific cluster. For example, the following command gets only the pods providing the query service on the cb-development cluster.
 
 ```console
 # query pods on dev deployment
@@ -68,8 +68,8 @@ cb-development-0000   1/1       Running   0          1h
 cb-development-0001   1/1       Running   0          1h
 ```
 
-After listing pods, additional information can be collecting using ```kubectl
-describe```:
+After listing the pods, additional information can be collecting using ```kubectl
+describe``` as follows:
 
 ```console
 $ kubectl describe po cb-development-0000
@@ -89,9 +89,9 @@ Containers:
 
 ## Services
 
-Services are created to facilitate both pod -> pod communication and connections from external clients -> internal cluster.  The former is established using a headless ClusterIP service, and the latter via NodePort service.  You can read more about [kubernetes services here](https://kubernetes.io/docs/concepts/services-networking/service/).  When listing the services the name of the ClusterIP service will be the exact same as the name provided in the CouchbaseCluster spec.  The NodePort service is also named after the CouchbaseCluster name, exept with a '-ui' suffix.
+Services are created to facilitate both pod to pod communication and connections from external clients to the internal cluster. The former is established using a headless ClusterIP service, and the latter via the NodePort service.  You can read more about the Kubernetes services [here](https://kubernetes.io/docs/concepts/services-networking/service/).  When listing the services, the name of the ClusterIP service will match the name provided in the CouchbaseCluster spec.  The NodePort service is also named after the CouchbaseCluster name, except with a '-ui' suffix.
 
-Services belonging to the operator can be listed as follows:
+Services belonging to the Operator can be listed as follows:
 
 ```console
 # all services managed by the operator
@@ -111,7 +111,7 @@ cb-production-ui   10.0.0.216   <nodes>       8091:30139/TCP,18091:30461/TCP   2
 
 ### Describing services
 
-After listing services, additional information about ports and endpoints can be gathering using ```kubectl describe```:
+After listing the services, additional information about ports and endpoints can be gathered using ```kubectl describe``` as follows:
 
 ```console
 $ kubectl describe service cb-production
@@ -137,7 +137,7 @@ Events:			<none>
 
 ## Listing Custom Resources
 
-Custom resources are extensions of the Kubernetes API.  The couchbase-operator creates custom resources of type ```CouchbaseCluster``` for each cluster being deployed.  Custom resources can be listed and described using kubectl just as other built-in resources:
+Custom resources are extensions of the Kubernetes API. The Couchbase Operator creates custom resources of type ```CouchbaseCluster``` for each cluster being deployed. Custom resources can be listed and described using kubectl just as other built-in resources:
 
 ```console
 $ kubectl get couchbasecluster
@@ -154,4 +154,4 @@ API Version:	couchbase.database.couchbase.com/v1beta1
 Kind:		CouchbaseCluster
 ...
 ```
-Describing the cluster resource returns the deployed spec and it's active status.  For more information about the response returned from the describe command can be found in the [Cluster Status Guide](clusterStatusGuide.md).
+Describing the cluster resource returns the deployed specification and its active status. For more information about the response returned from the describe command, see [Cluster Status Guide](clusterStatusGuide.md).
