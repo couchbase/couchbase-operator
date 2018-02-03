@@ -13,7 +13,7 @@ Preparing the cluster to run the Couchbase Operator may require setting up prope
 * [Kubernetes RBAC](rbacKubernetes.md)
 * [OpenShift RBAC](rbacOpenshift.md)
 
-## Setup
+## Setting up Couchbase Operator
 
 Before you can start deploying Couchbase clusters on either Kubernetes or OpenShift, you must install the Couchbase Operator into your Kubernetes/OpenShift deployment. To do so, run the following command:
 
@@ -44,6 +44,30 @@ In this case, the deployment is called "couchbase-operator". The DESIRED field i
 NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator   1         1         1            1           47s
 ```
+You can also verify that the Couchbase Operator has come up successfully using the following command:
+
+```bash
+kubectl get pods
+```
+
+If the Couchbase Operator is up and running successfully, the command returns an output where the status is Running and Ready is 1/1, such as:
+```bash
+NAME                                  READY   STATUS   RESTARTS   AGE
+couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
+```
+
+```bash
+$ kubectl logs couchbase-operator-1917615544-t5mhp
+time="2018-02-03T02:16:24Z" level=info msg="Obtaining resource lock" module=main
+time="2018-02-03T02:16:24Z" level=info msg="Starting event recorder" module=main
+time="2018-02-03T02:16:24Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
+time="2018-02-03T02:16:24Z" level=info msg="I'm the leader, attempt to start the operator" module=main
+time="2018-02-03T02:16:24Z" level=info msg="Creating the couchbase-operator controller" module=main
+time="2018-02-03T02:16:24Z" level=info msg="Event(v1.ObjectReference{Kind:\"Endpoints\", Namespace:\"testproject\", Name:\"couchbase-operator\", UID:\"3b96e3fa-0888-11e8-a682-028b77caec66\", APIVersion:\"v1\", ResourceVersion:\"599428\", FieldPath:\"\"}): type: 'Normal' reason: 'LeaderElection' couchbase-operator-1917615544-pd4q6 became leader" module=event_recorder
+time="2018-02-03T02:16:24Z" level=info msg="CRD initialized, listening for events..." module=controller\
+ ```
+
+The message: "CRD initialized, listening for events... module=controller" indicates that the Couchbase Operator is up and running.
 
 ## Uninstall
 

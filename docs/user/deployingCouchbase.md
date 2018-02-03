@@ -1,5 +1,9 @@
 # Deploying a Couchbase Cluster
 
+**Prerequisites**
+Before proceeding to deploy a Couchbase cluster, ensure that the [prerequisites](prerequisiteAndSetup.md) are met and the Couchbase Operator is up and running.
+
+**Deploying a Cluster**
 Deploying a Couchbase cluster requires creating a configuration file that describes what the cluster should look like. Like all Kubernetes configurations, Couchbase clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes. Below is a sample configuration file for a Couchbase cluster.
 
 ```yaml
@@ -64,6 +68,17 @@ couchbasecluster "cb-example" created
 
 The Couchbase Operator automatically begins creating the cluster. Depending on the configuration, creating a cluster can take some time. You can track the progress of cluster creation using the ```kubectl describe``` command. For details on how to use this command and an explanation of the output, see [Displaying Information about a Couchbase Cluster](clusterStatusGuide.md).
 
-Once the cluster has been provisioned, you'll see that various pods, a service, and a Couchbase cluster have been created. Since the configuration above was for a 3-nodes cluster, you should see three pods created. The Couchbase Operator also creates an internal headless service that can be used by applications deployed inside the same Kubernetes namespace to connect to the Couchbase cluster. A couchbasecluster object is also created for the cluster and can be used to get health and status information about the cluster. For details on how to inspect these objects, see [Listing and Describing Pods, Services, and couchbaseclusters](listAndDescribe.md)
+Once the cluster has been provisioned, you'll see that various pods, a service, and a Couchbase cluster have been created. Since the configuration above was for a 3-nodes cluster, you should see three pods created. The Couchbase Operator also creates an internal headless service that can be used by applications deployed inside the same Kubernetes namespace to connect to the Couchbase cluster.
+Run the following command to see the newly created pods:
+
+```bash
+$ kubectl get pods
+NAME                                  READY     STATUS    RESTARTS   AGE
+cb-example-0000                       1/1       Running   0          1m
+cb-example-0001                       1/1       Running   0          1m
+cb-example-0002                       1/1       Running   0          1m
+couchbase-operator-1917615544-pd4q6   1/1       Running   0          8m
+```
+A couchbasecluster object is also created for the cluster and can be used to get health and status information about the cluster. For details on how to inspect these objects, see [Listing and Describing Pods, Services, and couchbaseclusters](listAndDescribe.md)
 
 For further details on what each field in the CouchbaseCluster configuration does, as well as a list of all available fields see [CouchbaseCluster Configuration](couchbaseClusterConfig.md).

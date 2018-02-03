@@ -12,4 +12,4 @@ You can also edit the Couchbase cluster configuration directly using the ```kube
 
 This will open a text editor with the current cb-example configuration. You can then make edits and save and close the text editor. Upon closing the text editor the edits will be pushed back to Kubernetes.
 
-It should also be noted that some fields in the Couchbase cluster configuration cannot be edited after the cluster is created. We have noted these fields in the [Couchbase Configuration](couchbaseClusterConfig.md) documentation. In the future Kubernetes will allow us to validate these fields and catch mistakes, but unfortuantley this validation feature is  still a Kubernetes alpha feature.
+It should also be noted that some fields in the Couchbase cluster configuration cannot be edited after the cluster is created. We have noted these fields in the [Couchbase Configuration](couchbaseClusterConfig.md) documentation. In the future Kubernetes will allow us to validate these fields and catch mistakes, but unfortunately this validation feature is  still a Kubernetes alpha feature.

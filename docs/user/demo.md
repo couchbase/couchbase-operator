@@ -12,7 +12,7 @@ couchbasecluster "cb-example" created
 
 Since we're going to be loading data, a Couchbase RBAC user is required. As mentioned in the [couchbase-cli guide]( couchbaseCliGuide.md),  users can be created by directly using the cli tool or as a job within the Kubernetes cluster.
 
-**Option 1: Create deafult user with cli tool**
+**Option 1: Create default user with cli tool**
 
 Use describe command to get the administration console port:
 ```console
@@ -112,4 +112,4 @@ $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/pillowfight-d
 job "pillowfight" created
 ```
 
-Done!  You should have 10k items loaded in your cluster.  See the [administration guide](administrationGuide.md) for information about how to access the administration console.
+Done!  You should have 10k items loaded in your cluster.  See the [Accessing the Couchbase Web Console](adminConsoleAccess.md) for information about how to access the administration console.
