@@ -13,9 +13,11 @@ The following references are also helpful when troubleshooting:
 
 ## Full Deployment Logs
 
-To get logs of the Operator along with your entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://github.com/couchbase/couchbase-operator/blob/master/scripts/support/cb_k8s_support.sh)
+To get logs of the Operator along with your entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://packages.couchbase.com/kubernetes/beta/couchbase-kubernetes-support.sh.sh)
 ```bash
-./scripts/support/cb_k8s_support.sh
+wget https://packages.couchbase.com/kubernetes/beta/couchbase-kubernetes-support.sh
+chmod +x couchbase-kubernetes-support.sh
+./couchbase-kubernetes-support.sh
 ```
 
 This scripts gathers information about your Kubernetes deployment and creates an archive within your current working directory:
@@ -60,7 +62,7 @@ Watch for the following messages which indicate that the Operator is unable to r
 The easiest way to get ```cbcollect``` logs is to access the Couchbase Web Console and click the **Collect Logs** button in the Logs tab. You can also deploy a job within Kubernetes to trigger log collection:
 
 ```bash
-kubectl create -f example/couchbase-cli-collect-logs.yaml
+kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-collect-logs.yaml
 ```
 Once log collection has completed, check the Couchbase Web Console > Logs tab > Collection Info for the path to the corresponding zip file for each node in the cluster. You can then run a command like the following for each node in the cluster to collect their logs.
 
