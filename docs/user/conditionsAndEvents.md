@@ -4,6 +4,7 @@ The actions of the Couchbase Operator and the state of the cluster are communica
 
 In Kubernetes, you can normally view more information about an object using the `kubectl describe` command which displays, among other things, the [Events](https://kubernetes.io/docs/api-reference/v1.8/#event-v1-core) and [Conditions](https://kubernetes.io/docs/api-reference/v1.8/#podcondition-v1-core) associated with the resource.
 Similarly, the Couchbase Operator exposes the events and conditions for each CouchbaseCluster custom resource.
+If you're using OpenShift, you should be able to do the same using the `oc describe` command.
 
 ## Events
 

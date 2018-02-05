@@ -36,8 +36,8 @@ Then run the support script, ```cb_k8s_support.sh```, again to generate logs whi
 
 ## Operator Logs
 
-The Couchbase Operator generates logs that can help troubleshoot your deployment.  Using ```kubectl```, you can choose to print the Operator logs to stdout:
-
+The Couchbase Operator generates logs that can help troubleshoot your deployment.  Using ```kubectl``` or ```oc```, you can choose to print the Operator logs to stdout.
+On Kubernetes:
 ```console
 # Get name of operator pod
 $ kubectl get po -lname=couchbase-operator
@@ -52,6 +52,11 @@ time="2018-01-23T22:56:34Z" level=info msg="Attempting to be elected the couchba
 time="2018-01-23T22:56:51Z" level=info msg="I'm the leader, attempt to start the operator" module=main
 time="2018-01-23T22:56:51Z" level=info msg="Creating the couchbase-operator controller" module=main
 ```
+On OpenShift:
+```console
+# Get name of operator pod
+$ oc get po -lname=couchbase-operator
+```
 
 Watch for the following messages which indicate that the Operator is unable to reconcile your cluster into a desired state:
 * Logs with level=error
@@ -60,22 +65,32 @@ Watch for the following messages which indicate that the Operator is unable to r
 ## Getting Couchbase Server Logs
 
 The easiest way to get ```cbcollect``` logs is to access the Couchbase Web Console and click the **Collect Logs** button in the Logs tab. You can also deploy a job within Kubernetes to trigger log collection:
-
+On Kubernetes:
 ```bash
 kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-collect-logs.yaml
 ```
+On OpenShift:
+```bash
+    oc create -f example/couchbase-cli-collect-logs.yaml
+```
 Once log collection has completed, check the Couchbase Web Console > Logs tab > Collection Info for the path to the corresponding zip file for each node in the cluster. You can then run a command like the following for each node in the cluster to collect their logs.
-
+On Kubernetes:
 ```bash
 kubectl cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
 ```
-
-Here is an example command to collect the logs for node cb-example-0000:
-
+On OpenShift:
+```bash
+    oc cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
+```
+Here is an example command to collect the logs for node `cb-example-0000`.
+On Kubernetes:
 ```bash
 kubectl cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
 ```
-
+On OpenShift:
+```bash
+    oc cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
+```
 ## See Also##
 
 Refer to the [Couchbase Server Troubleshooting](https://developer.couchbase.com/documentation/server/current/troubleshooting/troubleshooting-intro.html) guide for additional information about reporting issues.

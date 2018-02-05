@@ -9,8 +9,14 @@ The tutorial also requires the following artifacts that are bundled with the Cou
 - `pillowfight-data-loader.yaml` job to load data into your cluster.
 
 1. **Create a Couchbase cluster**
+On Kubernetes:
 ```console
 $ kubectl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+couchbasecluster "cb-example" created
+```
+On OpenShift:
+```console
+$ oc apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 
@@ -21,11 +27,16 @@ This tutorial will be loading data in Couchbase and hence requires a Couchbase R
  - **Option 1: Create a default user using the CLI**
 
 Use the `describe` command to get the Web Console port:
+On Kubernetes:
 ```console
 $ kubectl describe cbc cb-example |  grep "Admin Console Port:"
    Admin Console Port:		32486
 ```
-
+On OpenShift:
+```console
+$ oc describe cbc cb-example |  grep "Admin Console Port:"
+   Admin Console Port:		32486
+```
 Create a Couchbase RBAC user by running the following command:
 ```console
 $ ./couchbase-cli user-manage -c 192.168.99.100:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
@@ -57,13 +68,22 @@ $ kubectl create -f  cb-user-auth-secret.yaml
 secret "cb-user-auth" created
 ```
 
-Now, use the RBAC user's secret to securely create a Couchbase RBAC user using a Kubernetes job:
-
+Now, use the RBAC user's secret to securely create a Couchbase RBAC user using a Kubernetes/OpenShift job:
+On Kubernetes:
 ```console
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ kubectl get job
+NAME          DESIRED   SUCCESSFUL   AGE
+create-user   1         1            4s
+```
+On OpenShift:
+```console
+$ oc create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
+job "create-user" created
+
+$ oc get job
 NAME          DESIRED   SUCCESSFUL   AGE
 create-user   1         1            4s
 ```
@@ -113,11 +133,16 @@ spec:
 ```
 
 To deploy the `pillowfight` data loader, run the following command:
+On Kubernetes:
 ```console
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/pillowfight-data-loader.yaml
 job "pillowfight" created
 ```
-
+On OpenShift:
+```console
+$ oc create -f https://packages.couchbase.com/kubernetes/beta/pillowfight-data-loader.yaml
+job "pillowfight" created
+```
 Once it completes, you should have 10k items loaded in your cluster.
 
 See [Accessing the Couchbase Web Console](adminConsoleAccess.md) for information about how to access the Web Console.

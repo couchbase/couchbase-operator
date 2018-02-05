@@ -15,23 +15,32 @@ Preparing the cluster to run the Couchbase Operator may require setting up prope
 
 ## Setting up Couchbase Operator
 
-Before you can start deploying Couchbase clusters on either Kubernetes or OpenShift, you must install the Couchbase Operator into your Kubernetes/OpenShift deployment. To do so, run the following command:
-
+Before you can start deploying Couchbase clusters on either Kubernetes or OpenShift, you must install the Couchbase Operator into your Kubernetes or OpenShift deployment. To do so, run the following command:
+On Kubernetes:
 ```bash
 $ kubectl create -f https://packages.couchbase.com/kubernetes/beta/operator.yaml
 ```
+On OpenShift:
+```bash
+$ oc create -f https://packages.couchbase.com/kubernetes/beta/operator.yaml
+```
 
-Running this command will download the Couchbase Operator docker image and create a deployment which manages a single instance of the Couchbase Operator. We use a deployment because we want the Couchbase Operator to be able to restart if the pod it's running in dies. When the Couchbase Operator pod is started for the first time, it registers the CouchbaseCluster Custom Resource Definition(CRD) with Kubernetes and registers a controller which listens for updates to the CouchbaseCluster configurations.
+Running this command will download the Couchbase Operator Docker image and create a deployment which manages a single instance of the Couchbase Operator. We use a deployment because we want the Couchbase Operator to be able to restart if the pod it's running in dies. When the Couchbase Operator pod is started for the first time, it registers the CouchbaseCluster Custom Resource Definition(CRD) with Kubernetes and registers a controller which listens for updates to the CouchbaseCluster configurations.
 
 >Note: This command creates the Couchbase Operator in the default namespace. To deploy the Operator in another namespace, download this file and modify the metadata.namespace field to reflect the namespace you want to install the Operator in.
 
-After you run the ```kubectl create``` command, it generally takes less than 1 minute for Kubernetes to deploy the Operator and for the Operator to be ready to run. You can check the status of the Operator using ```kubectl``` to see the status of your deployment by running the following command:
+After you run the ```kubectl create``` or ```oc create``` command, it generally takes less than 1 minute for Kubernetes to deploy the Operator and for the Operator to be ready to run. Using one of the following commands, you can check the status of the Operator and see the status of your deployment.
 
+On Kubernetes:
 ```bash
 $ kubectl get deployments
 ```
+On OpenShift:
+```bash
+$ oc get deployments
+```
 
-If you run this command immediately after you run the ```kubectl create``` command, then the output will look something like this:
+If you run this command immediately after you run the ```kubectl create``` or ```oc create```command, the output will look something like this:
 
 ```bash
 NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
@@ -45,9 +54,13 @@ NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator   1         1         1            1           47s
 ```
 You can also verify that the Couchbase Operator has come up successfully using the following command:
-
+On Kubernetes:
 ```bash
 kubectl get pods
+```
+On OpenShift:
+```bash
+oc get pods
 ```
 
 If the Couchbase Operator is up and running successfully, the command returns an output where the status is Running and Ready is 1/1, such as:
@@ -56,6 +69,9 @@ NAME                                  READY   STATUS   RESTARTS   AGE
 couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
 ```
 
+If you examine the logs using the following command, the message: "CRD initialized, listening for events... module=controller" indicates that the Couchbase Operator is up and running.
+
+On Kubernetes:
 ```bash
 $ kubectl logs couchbase-operator-1917615544-t5mhp
 time="2018-02-03T02:16:24Z" level=info msg="Obtaining resource lock" module=main
@@ -66,16 +82,23 @@ time="2018-02-03T02:16:24Z" level=info msg="Creating the couchbase-operator cont
 time="2018-02-03T02:16:24Z" level=info msg="Event(v1.ObjectReference{Kind:\"Endpoints\", Namespace:\"testproject\", Name:\"couchbase-operator\", UID:\"3b96e3fa-0888-11e8-a682-028b77caec66\", APIVersion:\"v1\", ResourceVersion:\"599428\", FieldPath:\"\"}): type: 'Normal' reason: 'LeaderElection' couchbase-operator-1917615544-pd4q6 became leader" module=event_recorder
 time="2018-02-03T02:16:24Z" level=info msg="CRD initialized, listening for events..." module=controller\
  ```
-
-The message: "CRD initialized, listening for events... module=controller" indicates that the Couchbase Operator is up and running.
+On OpenShift:
+```bash
+$ oc logs couchbase-operator-1917615544-t5mhp
+```
 
 ## Uninstall
 
-To uninstall the Couchbase Operator run the following commands:
-
+To uninstall the Couchbase Operator, run the following commands:
+On Kubernetes:
 ```bash
 $ kubectl delete -f https://packages.couchbase.com/kubernetes/beta/operator.yaml
 $ kubectl delete crd couchbaseclusters.couchbase.database.couchbase.com
+```
+On OpenShift:
+```bash
+$ oc delete -f https://packages.couchbase.com/kubernetes/beta/operator.yaml
+$ oc delete crd couchbaseclusters.couchbase.database.couchbase.com
 ```
 
 Uninstalling the Couchbase Operator will not remove or affect any Couchbase pods in your Kubernetes cluster.

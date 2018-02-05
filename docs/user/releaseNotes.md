@@ -16,6 +16,7 @@ The Beta release has the following limitations:
 
 ## Known Issues
 
+--- | ---
 Issue | Description
 --- | ---
 K8S-172 | The index storage mode cannot be changed.

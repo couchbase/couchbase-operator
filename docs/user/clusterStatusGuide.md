@@ -5,17 +5,20 @@ Kubernetes users often need to check the status of various objects (for example,
 Since the Couchbase Operator registers a "CouchbaseCluster" Custom Resource Definition(CRD) with Kubernetes, it allows Kuberentes to know about Couchbase clusters natively. This means that the CouchbaseCluster becomes another object that can be described to get the configuration, status, and events specific to a particular Couchbase cluster.
 
 To describe a Couchbase cluster named "cb-example", run the following command:
-
+On Kubernetes:
 ```bash
 kubectl describe couchbasecluster cb-example
 ```
 
 Note that the object name in the above command is "couchbasecluster". You can also use the shorthand name "cbc" as the object name to save some typing.
-
+On Kubernetes:
 ```bash
 kubectl describe cbc cb-example
 ```
-
+On OpenShift:
+```bash
+oc describe cbc cb-example
+```
 Below is an example of the output of the ```kubectl describe``` command. The various parts of the output and their significance will be discussed in detail in the following sections.
 
 ```yaml
@@ -139,7 +142,7 @@ The ```Conditions``` section of the status is also updated as the operator works
  * Available: Denoting whether all members are up and all VBuckets are available.
  * Scaling: Denoting whether cluster is currently scaling.
 
-See [conditionsAndEvents](conditionsAndEvents.md) for more information about these conditions and their statuses.
+See [Conditions and Events](conditionsAndEvents.md) for more information about these conditions and their statuses.
 
 ### Phase
 
@@ -156,8 +159,7 @@ The current phase of the cluster displayed as one of the following phases:
 
     Size:			3
 
-The size of the Couchbase cluster. When you change this value in the cluster specification, this value is also updated as members are added to the Couchbase cluster.  If an error occurs while the Operator is attempting to conform the cluster to the desired size, check the ```Conditions``` section for information about the current state of the cluster.  See [Accessing Couchbase Web Console](adminConsoleAccess.md) for information on how to manually access the cluster and collect logs when additional troubleshooting is needed.
-
+The size of the Couchbase cluster. When you change this value in the cluster specification, this value is also updated as members are added to the Couchbase cluster.  If an error occurs while the Operator is attempting to conform the cluster to the desired size, check the ```Conditions``` section for information about the current state of the cluster.  See [Accessing the Couchbase Web Console](adminConsoleAccess.md) for information on how to manually access the cluster and collect logs when additional troubleshooting is needed.
 
 ### Conditions
 
@@ -168,7 +170,7 @@ The size of the Couchbase cluster. When you change this value in the cluster spe
       Status:			True
       Type:			Balanced
 
-A list of conditions reflecting the current state of the Couchbase cluster. Each Condition item is denoted by a ```Type``` along with an associated ```Status```. The various conditions and their statuses are documented in [conditionsAndEvent](conditionsAndEvents.md).
+A list of conditions reflecting the current state of the Couchbase cluster. Each Condition item is denoted by a ```Type``` along with an associated ```Status```. The various conditions and their statuses are documented in [Conditions and Events](conditionsAndEvents.md).
 
 ### Events
 
@@ -177,4 +179,4 @@ A list of conditions reflecting the current state of the Couchbase cluster. Each
       29m		29m		1	couchbase-operator-1917615544-j1mg8			Normal		RebalanceStarted	A rebalance has been started to balance data across the cluster
       51m		51m		1	couchbase-operator-1917615544-j1mg8			Normal		BucketEdited		Bucket `default` was edited
 
-Events generated during cluster reconciliation. The last 10 events are recorded and timestamped as the Operator works to reconcile the cluster to its desired cluster state. The types of events that can occur throughout the lifecycle of a CouchbaseCluster are documented in [conditionsAndEvent](conditionsAndEvents.md).
+Events generated during cluster reconciliation. The last 10 events are recorded and timestamped as the Operator works to reconcile the cluster to its desired cluster state. The types of events that can occur throughout the lifecycle of a CouchbaseCluster are documented in [Conditions and Events](conditionsAndEvents.md).
