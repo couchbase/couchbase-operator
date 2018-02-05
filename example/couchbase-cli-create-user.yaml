@@ -10,9 +10,9 @@ spec:
     spec:
       containers:
       - name: couchbase-cli
-        image: sequoiatools/couchbase-cli
+        image: sequoiatools/couchbase-cli:v5.0.1
         imagePullPolicy: IfNotPresent
-        command: ["/bin/sh", "-c", "/couchbase-cli-secure user-manage
+        command: ["/bin/sh", "-c", "couchbase-cli-secure user-manage
 										 -c cb-example-0000.cb-example.default.svc
 										 -u {auth.admin.username}
 										 -p {auth.admin.password}
