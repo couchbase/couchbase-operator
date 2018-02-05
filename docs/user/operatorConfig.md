@@ -1,6 +1,6 @@
-# Operator Configuration
+# Couchbase Operator Configuration
 
-The operator configuration is defined below. When loaded into Kubernetes it will download the Couchbase Operator docker image, create the CouchbaseCluster Custom Resource Definition(CRD), and start listening for CouchbaseCluster events. The Operator is defined as a Deployment to allow it to be restarted in the event of a pod or node failure.
+The Couchbase Operator configuration is defined below. When loaded into Kubernetes, it downloads the Couchbase Operator docker image, creates the CouchbaseCluster Custom Resource Definition(CRD), and starts listening for CouchbaseCluster events. The Operator is defined as a deployment to allow it to be restarted in the event of a pod or node failure.
 
 ```yaml
 apiVersion: extensions/v1beta1
@@ -40,11 +40,11 @@ spec:
 
 ```
 
-Most fields in the operator configuration should never be changed and we recommend using the configuration as is. Some exceptions are below.
+Most fields in the Operator configuration should never be changed and we recommend using the configuration as is. Some exceptions are below.
 
 **Changing The Namespace**
 
-The operator will manage clusters in the namespace that it is deployed in. If you want to deploy the operator in a namespace other than the default namespace then the metadata.namespace field can be changed.
+The Operator will manage clusters in the namespace that it is deployed in. If you want to deploy the Operator in a namespace other than the default namespace then the `metadata.namespace` field can be changed.
 
 **Changing The Operation Container Image**
 
