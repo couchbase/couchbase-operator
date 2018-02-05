@@ -140,35 +140,83 @@ var (
 		"enableIndexReplica": "false"}
 )
 
-func NewClusterBasic(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
-	crd := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
-	cl, err := CreateClusterWithCRD(t, crClient, crd, namespace, secretName, size, withBucket)
-	if err != nil {
-		return nil, err
+func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
+
+	for i := 0; i < 5; i++ {
+		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
+		if err1 != nil {
+			DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
+			if i == 4 {
+				return nil, err1
+			}
+		} else {
+			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+			if err2 != nil {
+				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
+				if i == 4 {
+					return nil, err2
+				}
+			} else {
+				buckets := testCouchbase.Spec.BucketNames()
+				if withBucket == true {
+					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
+					if err != nil {
+						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
+						if i == 4 {
+							return nil, err
+						}
+					} else {
+						return GetClusterCRD(crClient, testCouchbase)
+					}
+				} else {
+					return GetClusterCRD(crClient, testCouchbase)
+				}
+
+			}
+		}
 	}
-	// return with updated status so that admin console port is set
-	return GetClusterCRD(crClient, cl)
+	return nil, fmt.Errorf("failed to create cluster")
 }
 
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
 	config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
-	testCouchbase, err := CreateCluster(t, crClient, namespace, clusterSpec)
-	if err != nil {
-		return nil, err
-	}
-	_, err = WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
-	if err != nil {
-		return nil, err
-	}
-	buckets := testCouchbase.Spec.BucketNames()
-	if len(buckets) > 0 {
-		err = WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
-		if err != nil {
-			return nil, err
+
+	for i := 0; i < 5; i++ {
+		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
+		if err1 != nil {
+			DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
+			if i == 4 {
+				return nil, err1
+			}
+		} else {
+			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
+			if err2 != nil {
+				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
+				if i == 4 {
+					return nil, err2
+				}
+			} else {
+				buckets := testCouchbase.Spec.BucketNames()
+				if len(buckets) > 0 {
+					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
+					if err != nil {
+						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
+						if i == 4 {
+							return nil, err
+						}
+					} else {
+						return GetClusterCRD(crClient, testCouchbase)
+					}
+				} else {
+					return GetClusterCRD(crClient, testCouchbase)
+				}
+
+			}
 		}
 	}
-	return GetClusterCRD(crClient, testCouchbase)
+	return nil, fmt.Errorf("failed to create cluster")
 }
 
 func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {

@@ -24,7 +24,7 @@ func TestResizeCluster(t *testing.T) {
 	f := framework.Global
 
 	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	}
 	f := framework.Global
 	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,8 +373,8 @@ func TestInvalidAuthSecret(t *testing.T) {
 	}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "invalid-test-secret", configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	if err == nil {
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 }
@@ -399,8 +399,8 @@ func TestInvalidBaseImage(t *testing.T) {
 	}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	if err == nil {
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 }
@@ -425,8 +425,8 @@ func TestInvalidVersion(t *testing.T) {
 	}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	if err == nil {
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 }
@@ -444,7 +444,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	}
 	f := framework.Global
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, false)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -504,7 +504,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	f := framework.Global
 
 	// create 3 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 3, true, false)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 3, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -551,7 +551,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	f := framework.Global
 
 	// create 5 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 5, true, false)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 5, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,7 +609,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	f := framework.Global
 
 	// create 2 node cluster with admin console
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, 2, true, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 2, true, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1339,21 +1339,21 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("Creating 3 Couchbase Clusters...\n")
 
 	t.Logf("1: Creating New Couchbase Cluster...\n")
-	testCouchbase1, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
+	testCouchbase1, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase1)
 
 	t.Logf("2: Creating New Couchbase Cluster...\n")
-	testCouchbase2, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
+	testCouchbase2, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase2)
 
 	t.Logf("3: Creating New Couchbase Cluster...\n")
-	testCouchbase3, err := e2eutil.NewClusterBasic(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
+	testCouchbase3, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
