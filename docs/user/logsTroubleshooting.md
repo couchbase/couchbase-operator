@@ -30,6 +30,7 @@ This script runs ```kubectl top pod``` to gather pod metrics such as CPU and mem
 git clone https://github.com/kubernetes/heapster.git
 cd heapster
 kubectl create -f deploy/kube-config/influxdb/
+kubectl create -f deploy/kube-config/rbac/heapster-rbac.yaml
 ```
 
 Then run the support script, ```cb_k8s_support.sh```, again to generate logs which include pod metrics.
