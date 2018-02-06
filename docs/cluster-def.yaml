@@ -12,11 +12,6 @@ spec:
   exposeAdminConsole: true
   adminConsoleServices:
     - data
-  tls:
-    static:
-      member:
-        serverSecret: my-server-secret
-      operatorSecret: my-operator-secret
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
