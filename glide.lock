@@ -1,5 +1,5 @@
-hash: fcbaf09805655228cfb3422b44056632d0de8dd1c3b381f3c668e17a97bd8b66
-updated: 2018-01-29T16:16:54.918205-07:00
+hash: 69372aa32804049e497994a509533c3b769b26676f65070b81747cc0ee96dc22
+updated: 2018-02-06T18:04:37.36028513-08:00
 imports:
 - name: github.com/couchbaselabs/gocbmgr
   version: 357fd3f6e78ea231a2dddfd8d509fdae2a3af2cc
@@ -15,8 +15,6 @@ imports:
   version: ff4f55a206334ef123e4f79bbf348980da81ca46
   subpackages:
   - log
-- name: github.com/emicklei/go-restful-swagger12
-  version: dcef7f55730566d41eae5db10e7d6981829720f6
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-openapi/jsonpointer
@@ -24,9 +22,9 @@ imports:
 - name: github.com/go-openapi/jsonreference
   version: 13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272
 - name: github.com/go-openapi/spec
-  version: 6aced65f8501fe1217321abf0749d354824ba2ff
+  version: 7abd5745472fff5eb3685386d5fb8bf38683154d
 - name: github.com/go-openapi/swag
-  version: 1d0bd113de87027671077d3c71eb3ac5d7dbba72
+  version: f3f9494671f93fcff853e3c6e9e948b3eb71e590
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -39,7 +37,7 @@ imports:
   subpackages:
   - lru
 - name: github.com/golang/protobuf
-  version: 4bd1920723d7b7c925de087aa32e2187708897f7
+  version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
   subpackages:
   - proto
   - ptypes
@@ -73,7 +71,7 @@ imports:
 - name: github.com/juju/ratelimit
   version: 5b9ff866471762aa2ab2dced63c9fb6f53921342
 - name: github.com/mailru/easyjson
-  version: d5b7844b561a7bc640052f1b935f7b800330d7e0
+  version: 2f5df55504ebc322e4d52d34df6a1f5b503bf26d
   subpackages:
   - buffer
   - jlexer
@@ -89,19 +87,22 @@ imports:
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: golang.org/x/crypto
-  version: faadfbdc035307d901e69eea569f5dda451a3ee3
+  version: d9133f5469342136e669e85192a26056b587f503
   subpackages:
   - ssh/terminal
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
+  - html
+  - html/atom
   - http2
   - http2/hpack
   - idna
   - lex/httplex
+  - websocket
 - name: golang.org/x/sys
-  version: 7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce
+  version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:
   - unix
   - windows
@@ -128,9 +129,11 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/api
-  version: 389dfa299845bcf399c16af89987e8775718ea48
+  version: 006a217681ae70cbacdd66a5e2fca1a61a8ff28e
   subpackages:
   - admissionregistration/v1alpha1
+  - admissionregistration/v1beta1
+  - apps/v1
   - apps/v1beta1
   - apps/v1beta2
   - authentication/v1
@@ -144,6 +147,7 @@ imports:
   - batch/v2alpha1
   - certificates/v1beta1
   - core/v1
+  - events/v1beta1
   - extensions/v1beta1
   - networking/v1
   - policy/v1beta1
@@ -153,9 +157,10 @@ imports:
   - scheduling/v1alpha1
   - settings/v1alpha1
   - storage/v1
+  - storage/v1alpha1
   - storage/v1beta1
 - name: k8s.io/apiextensions-apiserver
-  version: d0becfa6529e20309bd6684f8486abc265cf0b59
+  version: 6f29dd12234812844d29f52bd520bb01374619ce
   subpackages:
   - pkg/apis/apiextensions
   - pkg/apis/apiextensions/v1beta1
@@ -163,9 +168,8 @@ imports:
   - pkg/client/clientset/clientset/scheme
   - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 - name: k8s.io/apimachinery
-  version: bc110fd540ab678abbf2bc71d9ce908eb9325ef6
+  version: 68f9c3a1feb3140df59c67ced62d3a5df8e6c9c2
   subpackages:
-  - pkg/api/equality
   - pkg/api/errors
   - pkg/api/meta
   - pkg/api/resource
@@ -175,7 +179,6 @@ imports:
   - pkg/apis/meta/v1alpha1
   - pkg/conversion
   - pkg/conversion/queryparams
-  - pkg/conversion/unstructured
   - pkg/fields
   - pkg/labels
   - pkg/runtime
@@ -213,13 +216,15 @@ imports:
   - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 3a46b5de730a74e064197a157c96c2d29724a677
+  version: 9389c055a838d4f208b699b3c7c51b70f2368861
   subpackages:
   - discovery
   - discovery/fake
   - kubernetes
   - kubernetes/scheme
   - kubernetes/typed/admissionregistration/v1alpha1
+  - kubernetes/typed/admissionregistration/v1beta1
+  - kubernetes/typed/apps/v1
   - kubernetes/typed/apps/v1beta1
   - kubernetes/typed/apps/v1beta2
   - kubernetes/typed/authentication/v1
@@ -233,6 +238,7 @@ imports:
   - kubernetes/typed/batch/v2alpha1
   - kubernetes/typed/certificates/v1beta1
   - kubernetes/typed/core/v1
+  - kubernetes/typed/events/v1beta1
   - kubernetes/typed/extensions/v1beta1
   - kubernetes/typed/networking/v1
   - kubernetes/typed/policy/v1beta1
@@ -242,6 +248,7 @@ imports:
   - kubernetes/typed/scheduling/v1alpha1
   - kubernetes/typed/settings/v1alpha1
   - kubernetes/typed/storage/v1
+  - kubernetes/typed/storage/v1alpha1
   - kubernetes/typed/storage/v1beta1
   - pkg/version
   - rest
@@ -262,13 +269,15 @@ imports:
   - tools/remotecommand
   - transport
   - transport/spdy
+  - util/buffer
   - util/cert
   - util/exec
   - util/flowcontrol
   - util/homedir
   - util/integer
 - name: k8s.io/kube-openapi
-  version: 868f2f29720b192240e18284659231b440f9cda5
+  version: 39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1
   subpackages:
   - pkg/common
+  - pkg/util/proto
 testImports: []
