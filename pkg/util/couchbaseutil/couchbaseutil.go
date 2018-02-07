@@ -310,11 +310,11 @@ func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	return rv
 }
 
-func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) (*cbapi.BucketConfig) {
+func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) *cbapi.BucketConfig {
 	rv := &cbapi.BucketConfig{
-		BucketName:         bucket.BucketName,
-		BucketType:         bucket.BucketType,
-		BucketMemoryQuota:  bucket.BucketMemoryQuota,
+		BucketName:        bucket.BucketName,
+		BucketType:        bucket.BucketType,
+		BucketMemoryQuota: bucket.BucketMemoryQuota,
 	}
 
 	if bucket.EnableFlush == nil || *bucket.EnableFlush == false {

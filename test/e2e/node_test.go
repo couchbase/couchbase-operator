@@ -6,9 +6,9 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 )
 
 // Tests editing service spec
@@ -1096,15 +1096,15 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	}
 
 	/*
-	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+		// create connection to couchbase nodes
+		consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
+		if err != nil {
+			t.Fatalf("failed to get cluster url %v", err)
+		}
+		client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+		if err != nil {
+			t.Fatalf("failed to create cluster client %v", err)
+		}
 	*/
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
