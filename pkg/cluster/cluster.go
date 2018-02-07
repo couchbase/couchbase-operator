@@ -164,19 +164,22 @@ func (c *Cluster) create() error {
 	}
 	ms := couchbaseutil.NewMemberSet(m)
 
+	// Set up services e.g. DNS records before calling WaitForPod which will poll
+	// for the admin port via a DNS lookup
+	if err := c.setupServices(); err != nil {
+		return fmt.Errorf("cluster create: fail to create services: %v", err)
+	}
+
 	if err := c.createPod(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
 	}
 
-	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, m.Name); err != nil {
+	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, m.Name, m.HostURL()); err != nil {
 		return err
 	}
 
 	c.memberCounter++
 	c.members = ms
-	if err := c.setupServices(); err != nil {
-		return fmt.Errorf("cluster create: fail to create services: %v", err)
-	}
 
 	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err

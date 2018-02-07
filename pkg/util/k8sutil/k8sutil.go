@@ -12,6 +12,7 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -288,7 +289,7 @@ func mergeLabels(l1, l2 map[string]string) {
 	}
 }
 
-func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
+func WaitForPod(kubeCli kubernetes.Interface, namespace, podName, hostURL string) error {
 
 	opts := metav1.ListOptions{
 		LabelSelector: "couchbase_node=" + podName,
@@ -302,6 +303,7 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 	for ev := range events {
 		obj := ev.Object.(*v1.Pod)
 		status := obj.Status
+		done := false
 
 		switch ev.Type {
 
@@ -315,7 +317,7 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 			// make sure created pod is now running
 			switch status.Phase {
 			case v1.PodRunning:
-				return nil
+				done = true
 			case v1.PodPending:
 				for _, cond := range status.Conditions {
 					if cond.Type == v1.PodScheduled {
@@ -328,9 +330,19 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 				return cberrors.ErrRunningPod{status.Reason}
 			}
 		}
+
+		if done {
+			break
+		}
 	}
 
-	return cberrors.ErrUnkownCreatePod
+	// Wait for the admin port to come up, avoids unnecessary spam while trying to
+	// run commands against it (e.g. initialisation and adding new nodes)
+	if err := netutil.WaitForHostPort(hostURL, 120); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
