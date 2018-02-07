@@ -2,11 +2,11 @@ package e2e
 
 import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"os"
 	"testing"
 	"time"

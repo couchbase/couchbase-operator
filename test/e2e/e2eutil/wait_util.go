@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
-	"strings"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
@@ -499,4 +499,3 @@ func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries
 	}
 	return nil
 }
-

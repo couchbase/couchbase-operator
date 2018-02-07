@@ -39,10 +39,10 @@ var (
 )
 
 var (
-	Retries5  = 5
-	Retries10 = 10
-	Retries20 = 20
-	Retries30 = 30
+	Retries5   = 5
+	Retries10  = 10
+	Retries20  = 20
+	Retries30  = 30
 	Retries120 = 120
 )
 
