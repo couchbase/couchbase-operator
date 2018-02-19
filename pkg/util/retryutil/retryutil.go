@@ -1,6 +1,7 @@
 package retryutil
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -25,7 +26,7 @@ type RetryFunc func() (bool, error)
 // The interval won't be affected by how long f takes.
 // For example, if interval is 3s, f takes 1s, another f will be called 2s later.
 // However, if f takes longer than interval, it will be delayed.
-func Retry(interval time.Duration, maxRetries int, f RetryFunc) error {
+func Retry(ctx context.Context, interval time.Duration, maxRetries int, f RetryFunc) error {
 	if maxRetries <= 0 {
 		return fmt.Errorf("maxRetries (%d) should be > 0", maxRetries)
 	}
@@ -43,15 +44,19 @@ func Retry(interval time.Duration, maxRetries int, f RetryFunc) error {
 		if i == maxRetries {
 			break
 		}
-		<-tick.C
+		select {
+		case <-tick.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return &RetryError{maxRetries}
 }
 
 // Retry function that can return an error and log instead as warning
 // until actual maxRetries occurs.
-func RetryOnErr(interval time.Duration, maxRetries int, task string, clusterName string, f ConditionFunc) error {
-	return Retry(interval, maxRetries, func() (bool, error) {
+func RetryOnErr(ctx context.Context, interval time.Duration, maxRetries int, task string, clusterName string, f ConditionFunc) error {
+	return Retry(ctx, interval, maxRetries, func() (bool, error) {
 
 		// run f() and check for err
 		if err := f(); err != nil {

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbaselabs/gocbmgr"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
@@ -30,8 +32,11 @@ var (
 type clusterEventType string
 
 const (
-	eventDeleteCluster clusterEventType = "Delete"
-	eventModifyCluster clusterEventType = "Modify"
+	eventDeleteCluster      clusterEventType = "Delete"
+	eventModifyCluster      clusterEventType = "Modify"
+	tlsOperatorSecretCACert string           = "ca.crt"
+	tlsOperatorSecretCert   string           = "couchbase-operator.crt"
+	tlsOperatorSecretKey    string           = "couchbase-operator.key"
 )
 
 type clusterEvent struct {
@@ -58,6 +63,9 @@ type Cluster struct {
 	eventsCli     corev1.EventInterface
 	username      string
 	password      string
+	client        *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
+	ctx           context.Context                // Context used to cancel long running operations
+	cancel        context.CancelFunc             // Closure on the context to indicate cancellation
 }
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
@@ -73,6 +81,8 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		stopCh:    make(chan struct{}),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
 	}
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+
 	c.logger.Info("Watching new cluster")
 
 	go func() {
@@ -102,6 +112,8 @@ func (c *Cluster) Update(cl *api.CouchbaseCluster) {
 }
 
 func (c *Cluster) Delete() {
+	// Notify client operations to stop what they are doing e.g. abort retry loops
+	c.cancel()
 	c.send(&clusterEvent{typ: eventDeleteCluster})
 }
 
@@ -130,6 +142,10 @@ func (c *Cluster) setup() error {
 	}
 
 	if err := c.setupAuth(c.cluster.Spec.AuthSecret); err != nil {
+		return err
+	}
+
+	if err := c.initCouchbaseClient(); err != nil {
 		return err
 	}
 
@@ -174,18 +190,26 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, m.Name, m.HostURL()); err != nil {
+	ctx, cancel := context.WithTimeout(c.ctx, 60*time.Second)
+	defer cancel()
+	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, m.Name, m.HostURL()); err != nil {
 		return err
 	}
 
 	c.memberCounter++
 	c.members = ms
 
+	// Initialise TLS if requested, after this point the member will switch to
+	// using encrpyted communication
+	if err := c.initMemberTLS(m, c.cluster.Spec); err != nil {
+		return err
+	}
+
 	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
 	}
 
-	uuid, err := couchbaseutil.ClusterUUID(m, c.username, c.password, c.cluster.Name)
+	uuid, err := c.client.ClusterUUID(m)
 	if err != nil {
 		return err
 	}
@@ -344,9 +368,12 @@ func (c *Cluster) isSecureClient() bool {
 
 func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 
-	pod := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec,
+	pod, err := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec,
 		serverSpec, c.cluster.AsOwner())
-	_, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
+	if err != nil {
+		return err
+	}
+	_, err = c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
 	return err
 }
 
@@ -433,6 +460,42 @@ func (c *Cluster) setupAuth(authSecret string) error {
 		c.password = string(password[:])
 	} else {
 		return cberrors.ErrSecretMissingPassword{authSecret}
+	}
+
+	return nil
+}
+
+func (c *Cluster) initCouchbaseClient() error {
+	c.client = couchbaseutil.NewCouchbaseClient(c.ctx, c.cluster.Name, c.username, c.password)
+
+	if c.isSecureClient() {
+		// Grab the operator secret
+		secretName := c.cluster.Spec.TLS.Static.OperatorSecret
+		secret, err := k8sutil.GetSecret(c.config.KubeCli, secretName, c.cluster.Namespace, nil)
+		if err != nil {
+			return err
+		}
+
+		// Extract the data
+		if _, ok := secret.Data[tlsOperatorSecretCACert]; !ok {
+			return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCACert)
+		}
+		if _, ok := secret.Data[tlsOperatorSecretCert]; !ok {
+			return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCert)
+		}
+		if _, ok := secret.Data[tlsOperatorSecretKey]; !ok {
+			return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretKey)
+		}
+
+		// Add the TLS context
+		tls := &cbmgr.TLSAuth{
+			CACert: secret.Data[tlsOperatorSecretCACert],
+			ClientAuth: &cbmgr.TLSClientAuth{
+				Cert: secret.Data[tlsOperatorSecretCert],
+				Key:  secret.Data[tlsOperatorSecretKey],
+			},
+		}
+		c.client.SetTLS(tls)
 	}
 
 	return nil

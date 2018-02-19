@@ -29,11 +29,11 @@ func (m *Member) Addr() string {
 
 // ClientURL is the client URL for this member
 func (m *Member) ClientURL() string {
-	return fmt.Sprintf("%s://%s:8091", m.clientScheme(), m.Addr())
+	return fmt.Sprintf("%s://%s:%d", m.clientScheme(), m.Addr(), m.clientPort())
 }
 
 func (m *Member) HostURL() string {
-	return fmt.Sprintf("%s:8091", m.Addr())
+	return fmt.Sprintf("%s:%d", m.Addr(), m.clientPort())
 }
 
 func (m *Member) clientScheme() string {
@@ -41,6 +41,13 @@ func (m *Member) clientScheme() string {
 		return "https"
 	}
 	return "http"
+}
+
+func (m *Member) clientPort() int {
+	if m.SecureClient {
+		return 18091
+	}
+	return 8091
 }
 
 // the set of all members of s1 that are not members of s2

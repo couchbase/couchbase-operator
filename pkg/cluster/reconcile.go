@@ -1,13 +1,16 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"k8s.io/api/core/v1"
 )
 
@@ -21,7 +24,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	sp := c.cluster.Spec
 
-	cluster, err := couchbaseutil.GetClusterStatus(c.members, c.username, c.password, c.cluster.Name)
+	cluster, err := c.client.GetClusterStatus(c.members)
 	if err != nil {
 		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %s", err.Error())
 		return nil
@@ -131,7 +134,9 @@ func (c *Cluster) addOneMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 		c.members.Remove(newMember.Name)
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
-	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
+	ctx, cancel := context.WithTimeout(c.ctx, 60*time.Second)
+	defer cancel()
+	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
 		if _, failed := err.(cberrors.ErrPodUnschedulable); failed {
 			// remove pod and member
 			c.members.Remove(newMember.Name)
@@ -142,20 +147,28 @@ func (c *Cluster) addOneMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	c.memberCounter++
 	c.logger.Infof("added member (%s)", newMember.Name)
 
-	return newMember, couchbaseutil.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
-		c.cluster.Name, newMember.ClientURL(), c.username, c.password, serverSpec.Services)
+	// Grab the hostname now before we switch to https.  /controller/addNode
+	// will not work unless it's given a plaintext url
+	hostname := newMember.ClientURL()
+
+	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
+		return nil, err
+	}
+
+	return newMember, c.client.AddNode(c.members.Diff(couchbaseutil.NewMemberSet(newMember)),
+		hostname, serverSpec.Services)
 }
 
 // Rebalance nodes in the cluster
 func (c *Cluster) rebalance(nodesToRemove []string) error {
-	return couchbaseutil.Rebalance(c.members, c.username, c.password, c.cluster.Name, nodesToRemove, true)
+	return c.client.Rebalance(c.members, nodesToRemove, true)
 }
 
 // reconcile buckets by adding or removing
 // buckets one at a time based on comparison
 // of existing buckets to cluster spec
 func (c *Cluster) reconcileBuckets() bool {
-	existingBuckets, err := couchbaseutil.GetBucketNames(c.members, c.username, c.password)
+	existingBuckets, err := c.client.GetBucketNames(c.members)
 	if err != nil {
 		c.logger.Warnf("Unable to get buckets from cluster: %s", err.Error())
 		return false
@@ -167,7 +180,7 @@ func (c *Cluster) reconcileBuckets() bool {
 	// if still present in active spec
 	spec := c.cluster.Spec
 	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
-	bucketsToEdit, err := couchbaseutil.GetBucketsToEdit(c.members, c.username, c.password, &spec)
+	bucketsToEdit, err := c.client.GetBucketsToEdit(c.members, &spec)
 	if err != nil {
 		c.logger.Warnf("Unable to get list of buckets to edit: %s", err.Error())
 		return false
@@ -266,7 +279,7 @@ func (c *Cluster) reconcileAdminService() {
 // create bucket on cluster
 func (c *Cluster) createClusterBucket(bucketName string) error {
 	config := c.cluster.Spec.GetBucketByName(bucketName)
-	err := couchbaseutil.CreateBucket(c.members, c.cluster.Name, c.username, c.password, config)
+	err := c.client.CreateBucket(c.members, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 
@@ -279,7 +292,7 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 }
 
 func (c *Cluster) deleteClusterBucket(bucketName string) error {
-	err := couchbaseutil.DeleteBucket(c.members, c.username, c.password, bucketName)
+	err := c.client.DeleteBucket(c.members, bucketName)
 	if err == nil {
 		c.status.RemoveBucket(bucketName)
 
@@ -298,7 +311,7 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 	if err := c.validateEditBucket(config); err != nil {
 		return err
 	}
-	err := couchbaseutil.EditBucket(c.members, c.username, c.password, config)
+	err := c.client.EditBucket(c.members, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 
@@ -338,16 +351,65 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 // initializes member with cluster settings
 func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 	settings := c.cluster.Spec.ClusterSettings
-	err := couchbaseutil.InitializeCluster(m, c.username, c.password, c.cluster.Name,
+	if err := c.client.InitializeCluster(m, c.username, c.password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
-		serverSpec.Services, serverSpec.DataPath, serverSpec.IndexPath, settings.IndexStorageSetting)
-	if err != nil {
+		serverSpec.Services, serverSpec.DataPath, serverSpec.IndexPath, settings.IndexStorageSetting); err != nil {
 		return err
 	}
 
 	// enables autofailover by default
-	return couchbaseutil.SetAutoFailoverTimeout(c.members, c.username, c.password,
-		c.cluster.Name, true, settings.AutoFailoverTimeout)
+	return c.client.SetAutoFailoverTimeout(c.members, true, settings.AutoFailoverTimeout)
+}
+
+// Initialize a member with TLS certificates
+func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) error {
+	if cs.TLS != nil {
+		// Static configuration:
+		// * Upload the cluster CA certifcate
+		// * Reload the server certifcate/key.  These were injected into
+		//   the pod's file system from a secret during creation
+		if cs.TLS.Static != nil {
+			// Grab the operator secret
+			secretName := cs.TLS.Static.OperatorSecret
+			secret, err := k8sutil.GetSecret(c.config.KubeCli, secretName, c.cluster.Namespace, nil)
+			if err != nil {
+				return err
+			}
+
+			// Extract the CA's PEM data
+			pem, ok := secret.Data[tlsOperatorSecretCACert]
+			if !ok {
+				return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCACert)
+			}
+
+			// Update Couchbase's TLS configuration
+			if err := c.client.UploadClusterCACert(m, pem); err != nil {
+				return err
+			}
+			if err := c.client.ReloadNodeCert(m); err != nil {
+				return err
+			}
+
+			// TODO: Not available until >=5.5.0, even then does authz which we don't want :(
+			//settings := &cbmgr.ClientCertAuth{
+			//	State: "mandatory",
+			//}
+			//if err := c.client.SetClientCertAuth(m, settings); err != nil {
+			//	return err
+			//}
+
+			// Indicate that comms with this member are now encrypted
+			m.SecureClient = true
+
+			// Wait for the port to come backup with the correct certificate chain
+			ctx, cancel := context.WithTimeout(c.ctx, 60*time.Second)
+			defer cancel()
+			if err := netutil.WaitForHostPortTLS(ctx, m.HostURL(), pem); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
@@ -392,7 +454,7 @@ func (c *Cluster) reconcileClusterSettings() bool {
 
 // ensure autofailover timeout matches spec setting
 func (c *Cluster) reconcileAutoFailoverSettings() bool {
-	failoverSettings, err := couchbaseutil.GetAutoFailoverSettings(c.members, c.username, c.password, c.cluster.Name)
+	failoverSettings, err := c.client.GetAutoFailoverSettings(c.members)
 	if err != nil {
 		c.logger.Warnf("Unable to get auto failover settings: %s", err.Error())
 		return false
@@ -403,8 +465,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() bool {
 		(failoverSettings.Enabled != true) {
 
 		// reset autofailover timeout
-		err = couchbaseutil.SetAutoFailoverTimeout(c.members, c.username, c.password,
-			c.cluster.Name, true, clusterSettings.AutoFailoverTimeout)
+		err = c.client.SetAutoFailoverTimeout(c.members, true, clusterSettings.AutoFailoverTimeout)
 		if err != nil {
 			message := fmt.Sprintf("Unable to set autofailover timeout to %d: %s", clusterSettings.AutoFailoverTimeout, err.Error())
 			c.status.SetConfigRejectedCondition(message)
@@ -418,7 +479,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() bool {
 
 // ensure memory quota's matche spec setting
 func (c *Cluster) reconcileMemoryQuotaSettings() bool {
-	info, err := couchbaseutil.GetClusterInfo(c.members, c.username, c.password)
+	info, err := c.client.GetClusterInfo(c.members)
 	if err != nil {
 		c.logger.Warnf("Unable to get cluster info: %s", err.Error())
 		return false
@@ -428,7 +489,7 @@ func (c *Cluster) reconcileMemoryQuotaSettings() bool {
 	if config.DataServiceMemQuota != info.DataMemoryQuotaMB ||
 		config.IndexServiceMemQuota != info.IndexMemoryQuotaMB ||
 		config.SearchServiceMemQuota != info.SearchMemoryQuotaMB {
-		err = couchbaseutil.SetPoolsDefault(c.members, c.username, c.password, c.cluster.Name, config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota)
+		err = c.client.SetPoolsDefault(c.members, config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota)
 		if err != nil {
 			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: %s", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.status.SetConfigRejectedCondition(message)

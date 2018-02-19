@@ -172,7 +172,7 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 	// These nodes have been added, but the node failed before a rebalance could
 	// start. We will remove these nodes and re-add them in other pods later.
 	for _, m := range r.couchbase.FailedAddNodes {
-		err := couchbaseutil.CancelAddNode(r.knownNodes, c.cluster.Name, m.HostURL(), c.username, c.password)
+		err := c.client.CancelAddNode(r.knownNodes, m.HostURL())
 		if err != nil {
 			c.logger.Errorf("Unable to removed a failed pending add node: %s", err.Error())
 			r.errored = true
@@ -323,7 +323,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	c.status.SetReadyCondition()
 	c.status.ClearCondition(api.ClusterConditionScaling)
 
-	newState, err := couchbaseutil.GetClusterStatus(r.knownNodes, c.username, c.password, c.cluster.Name)
+	newState, err := c.client.GetClusterStatus(r.knownNodes)
 	if err != nil {
 		c.status.SetUnknownBalancedCondition()
 	} else if !newState.NeedsRebalance {

@@ -1,8 +1,8 @@
-hash: 69372aa32804049e497994a509533c3b769b26676f65070b81747cc0ee96dc22
-updated: 2018-02-06T18:04:37.36028513-08:00
+hash: d91a07f9a43536f1b7e0f599b16ff53d72bb2dbdde741c88b03816cdf7fdad67
+updated: 2018-02-20T10:31:51.419790217Z
 imports:
 - name: github.com/couchbaselabs/gocbmgr
-  version: 357fd3f6e78ea231a2dddfd8d509fdae2a3af2cc
+  version: 0cd67970849d94e5938b964a7830ca39699d7c04
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:
@@ -94,13 +94,10 @@ imports:
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
-  - html
-  - html/atom
   - http2
   - http2/hpack
   - idna
   - lex/httplex
-  - websocket
 - name: golang.org/x/sys
   version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:

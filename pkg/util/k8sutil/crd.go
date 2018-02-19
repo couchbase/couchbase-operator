@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -48,7 +49,7 @@ func createCRD(version constants.KubernetesVersion) *apiextensionsv1beta1.Custom
 }
 
 func WaitCRDReady(clientset apiextensionsclient.Interface) error {
-	err := retryutil.Retry(5*time.Second, 20, func() (bool, error) {
+	err := retryutil.Retry(context.Background(), 5*time.Second, 20, func() (bool, error) {
 		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(api.CRDName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -80,7 +81,7 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
 
-func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, ns cbapi.ServerConfig, owner metav1.OwnerReference) *v1.Pod {
+func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, ns cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
 
 	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
@@ -116,10 +117,14 @@ func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.Cl
 
 	applyPodPolicy(clusterName, pod, ns.Pod)
 
+	if err := applyPodTlsConfiguration(cs, pod); err != nil {
+		return nil, err
+	}
+
 	SetCouchbaseVersion(pod, cs.Version)
 
 	addOwnerRefToObject(pod.GetObjectMeta(), owner)
-	return pod
+	return pod, nil
 }
 
 func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
@@ -213,6 +218,13 @@ func UpdateService(kubecli kubernetes.Interface, ns string, svc *v1.Service) err
 	return err
 }
 
+func GetSecret(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Secret, error) {
+	if opts == nil {
+		opts = &metav1.GetOptions{}
+	}
+	return kubecli.CoreV1().Secrets(ns).Get(name, *opts)
+}
+
 func ClusterListOpt(clusterName string) metav1.ListOptions {
 	return metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(LabelsForCluster(clusterName)).String(),
@@ -289,7 +301,10 @@ func mergeLabels(l1, l2 map[string]string) {
 	}
 }
 
-func WaitForPod(kubeCli kubernetes.Interface, namespace, podName, hostURL string) error {
+// Waits for a pod to be created and for it to respond to TCP connections on
+// the admin port.  Accepts a context, typically with a timeout, which can
+// abort the operation.  The any timeout duration covers the whole process.
+func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, podName, hostURL string) error {
 
 	opts := metav1.ListOptions{
 		LabelSelector: "couchbase_node=" + podName,
@@ -300,45 +315,50 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName, hostURL string
 		return err
 	}
 	events := watcher.ResultChan()
-	for ev := range events {
-		obj := ev.Object.(*v1.Pod)
-		status := obj.Status
-		done := false
 
-		switch ev.Type {
+	// Loop until success
+	done := false
+	for ; !done; {
+		select {
+		// Handle timeout and cancellation events
+		case <-ctx.Done():
+			return ctx.Err()
+		// Process K8S events for our chosen pod
+		case ev := <-events:
+			obj := ev.Object.(*v1.Pod)
+			status := obj.Status
 
-		// check if any error occurred creating pod
-		case watch.Error:
-			return cberrors.ErrCreatingPod{status.Reason}
-		case watch.Deleted:
-			return cberrors.ErrCreatingPod{status.Reason}
-		case watch.Added, watch.Modified:
+			switch ev.Type {
 
-			// make sure created pod is now running
-			switch status.Phase {
-			case v1.PodRunning:
-				done = true
-			case v1.PodPending:
-				for _, cond := range status.Conditions {
-					if cond.Type == v1.PodScheduled {
-						if cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
-							return cberrors.ErrPodUnschedulable{cond.Message}
+			// check if any error occurred creating pod
+			case watch.Error:
+				return cberrors.ErrCreatingPod{status.Reason}
+			case watch.Deleted:
+				return cberrors.ErrCreatingPod{status.Reason}
+			case watch.Added, watch.Modified:
+
+				// make sure created pod is now running
+				switch status.Phase {
+				case v1.PodRunning:
+					done = true
+				case v1.PodPending:
+					for _, cond := range status.Conditions {
+						if cond.Type == v1.PodScheduled {
+							if cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
+								return cberrors.ErrPodUnschedulable{cond.Message}
+							}
 						}
 					}
+				default:
+					return cberrors.ErrRunningPod{status.Reason}
 				}
-			default:
-				return cberrors.ErrRunningPod{status.Reason}
 			}
-		}
-
-		if done {
-			break
 		}
 	}
 
 	// Wait for the admin port to come up, avoids unnecessary spam while trying to
 	// run commands against it (e.g. initialisation and adding new nodes)
-	if err := netutil.WaitForHostPort(hostURL, 120); err != nil {
+	if err := netutil.WaitForHostPort(ctx, hostURL); err != nil {
 		return err
 	}
 

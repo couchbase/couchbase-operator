@@ -2,6 +2,7 @@ package e2eutil
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -512,12 +513,17 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 
 	for _, config := range cl.Spec.ServerSettings {
 		if config.Name == m.ServerConfig {
-			pod := k8sutil.CreateCouchbasePod(m, clusterName, cl.Spec, config, cl.AsOwner())
-			pod, err := kubeCli.Core().Pods(namespace).Create(pod)
+			pod, err := k8sutil.CreateCouchbasePod(m, clusterName, cl.Spec, config, cl.AsOwner())
 			if err != nil {
 				return nil, err
 			}
-			err = k8sutil.WaitForPod(kubeCli, namespace, pod.Name, m.HostURL())
+			pod, err = kubeCli.Core().Pods(namespace).Create(pod)
+			if err != nil {
+				return nil, err
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			err = k8sutil.WaitForPod(ctx, kubeCli, namespace, pod.Name, m.HostURL())
 			if err != nil {
 				return nil, err
 			}

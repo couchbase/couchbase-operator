@@ -1,0 +1,85 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            74:de:50:54:fe:78:e6:05:9a:2b:b6:31:9a:69:db:0e
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: CN=Couchbase Example CA
+        Validity
+            Not Before: Feb  1 10:21:36 2018 GMT
+            Not After : Jan 30 10:21:36 2028 GMT
+        Subject: CN=couchbase-operator
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:b8:3f:8a:c4:b2:27:4a:62:25:54:2d:85:8d:41:
+                    8b:73:38:a8:c2:f8:92:db:a7:44:3b:38:f0:48:06:
+                    1f:5e:ec:cb:7b:2c:d2:78:70:30:cc:f6:7d:d5:60:
+                    a7:cc:c4:7a:79:af:b3:f2:7a:06:9e:fb:6a:4c:f5:
+                    4d:19:28:63:46:95:b6:a7:d1:bf:4b:3e:78:15:43:
+                    ae:c3:ee:b7:cf:98:fe:6e:e3:59:ba:0d:90:73:1b:
+                    83:ae:92:04:ab:42:f3:62:9b:43:be:27:b9:6e:3a:
+                    7d:72:dc:8c:74:4b:02:54:38:73:f7:49:11:11:fb:
+                    7c:dd:28:e1:c2:c3:f1:1c:ed:9a:fe:cb:c5:cc:05:
+                    84:e8:a8:95:c6:56:bb:66:ca:1d:f8:36:6d:80:96:
+                    f0:e4:15:01:d0:07:d4:e6:6b:9b:74:0f:02:30:2d:
+                    66:3a:06:52:ea:88:3c:26:b7:44:7f:04:ec:12:1c:
+                    d2:9d:d6:c9:5f:eb:2a:73:99:12:f2:e1:3e:67:6c:
+                    6e:ca:27:80:29:dd:9f:83:26:99:a1:bd:82:af:cd:
+                    9b:52:7e:c5:fd:c5:f3:1c:ac:91:67:00:92:74:57:
+                    69:aa:d5:45:22:08:ed:8f:99:52:4b:d5:00:a1:35:
+                    c4:38:0e:92:48:14:d6:7d:71:67:a4:64:b2:88:d6:
+                    89:dd
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Subject Key Identifier: 
+                BE:4B:35:25:84:F4:57:2B:35:82:B6:7A:62:75:67:1B:AB:ED:E3:52
+            X509v3 Authority Key Identifier: 
+                keyid:B5:B6:13:54:C2:A6:3D:B9:7E:7E:E6:AE:2E:E3:1F:5D:D0:78:2D:E6
+                DirName:/CN=Couchbase Example CA
+                serial:C6:D7:FE:03:84:55:98:47
+
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication
+            X509v3 Key Usage: 
+                Digital Signature
+    Signature Algorithm: sha256WithRSAEncryption
+         3b:16:2b:d7:f0:5e:f7:75:76:b8:aa:ad:4b:62:f9:37:01:34:
+         17:37:95:29:62:9b:7f:09:c1:f6:2d:39:f9:de:f8:89:9f:cb:
+         47:18:16:66:99:12:c0:35:b9:ae:9f:b2:ab:33:03:e6:32:71:
+         53:2f:f4:7d:20:70:ec:1e:d4:b6:ee:c0:61:b7:89:90:8a:9c:
+         ab:54:b2:3a:e9:19:60:11:bd:40:a0:de:81:2f:f8:17:f2:56:
+         ae:80:af:58:2b:87:f1:a4:04:02:98:e1:ac:55:31:eb:c5:c6:
+         79:e4:72:2b:6c:dd:64:c1:53:2c:9a:63:5e:e0:b8:45:f4:25:
+         58:2e:3c:45:fb:26:41:4f:a3:25:e3:29:4a:cf:e4:1d:45:48:
+         7d:31:a6:46:77:ce:61:49:20:92:50:85:9b:6a:ee:fb:4b:93:
+         93:10:d5:dd:b5:e9:e9:07:30:c3:d0:10:52:b7:0f:13:ec:d6:
+         8f:0e:1e:2b:b6:f0:8a:93:d1:f4:f4:d0:9e:ca:8d:ba:76:59:
+         41:18:7d:27:5f:c1:29:61:2c:91:61:6c:d3:72:fd:d6:af:c5:
+         d1:5c:6b:ab:2e:e6:4e:ea:80:09:97:d9:cc:7c:23:bc:db:cc:
+         f5:7f:b3:9e:14:10:1a:ab:b1:1b:21:4d:62:a0:4b:40:58:5d:
+         b6:de:d2:37
+-----BEGIN CERTIFICATE-----
+MIIDZzCCAk+gAwIBAgIQdN5QVP545gWaK7YxmmnbDjANBgkqhkiG9w0BAQsFADAf
+MR0wGwYDVQQDDBRDb3VjaGJhc2UgRXhhbXBsZSBDQTAeFw0xODAyMDExMDIxMzZa
+Fw0yODAxMzAxMDIxMzZaMB0xGzAZBgNVBAMMEmNvdWNoYmFzZS1vcGVyYXRvcjCC
+ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALg/isSyJ0piJVQthY1Bi3M4
+qML4ktunRDs48EgGH17sy3ss0nhwMMz2fdVgp8zEenmvs/J6Bp77akz1TRkoY0aV
+tqfRv0s+eBVDrsPut8+Y/m7jWboNkHMbg66SBKtC82KbQ74nuW46fXLcjHRLAlQ4
+c/dJERH7fN0o4cLD8Rztmv7LxcwFhOiolcZWu2bKHfg2bYCW8OQVAdAH1OZrm3QP
+AjAtZjoGUuqIPCa3RH8E7BIc0p3WyV/rKnOZEvLhPmdsbsongCndn4MmmaG9gq/N
+m1J+xf3F8xyskWcAknRXaarVRSII7Y+ZUkvVAKE1xDgOkkgU1n1xZ6RksojWid0C
+AwEAAaOBoDCBnTAJBgNVHRMEAjAAMB0GA1UdDgQWBBS+SzUlhPRXKzWCtnpidWcb
+q+3jUjBPBgNVHSMESDBGgBS1thNUwqY9uX5+5q4u4x9d0Hgt5qEjpCEwHzEdMBsG
+A1UEAwwUQ291Y2hiYXNlIEV4YW1wbGUgQ0GCCQDG1/4DhFWYRzATBgNVHSUEDDAK
+BggrBgEFBQcDAjALBgNVHQ8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBADsWK9fw
+Xvd1driqrUti+TcBNBc3lSlim38JwfYtOfne+Imfy0cYFmaZEsA1ua6fsqszA+Yy
+cVMv9H0gcOwe1LbuwGG3iZCKnKtUsjrpGWARvUCg3oEv+BfyVq6Ar1grh/GkBAKY
+4axVMevFxnnkcits3WTBUyyaY17guEX0JVguPEX7JkFPoyXjKUrP5B1FSH0xpkZ3
+zmFJIJJQhZtq7vtLk5MQ1d216ekHMMPQEFK3DxPs1o8OHiu28IqT0fT00J7Kjbp2
+WUEYfSdfwSlhLJFhbNNy/davxdFca6su5k7qgAmX2cx8I7zbzPV/s54UEBqrsRsh
+TWKgS0BYXbbe0jc=
+-----END CERTIFICATE-----

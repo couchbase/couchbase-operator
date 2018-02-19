@@ -145,7 +145,7 @@ func newControllerConfig() controller.Config {
 
 func getMyPodServiceAccount(kubecli kubernetes.Interface) (string, error) {
 	var sa string
-	err := retryutil.Retry(5*time.Second, 100, func() (bool, error) {
+	err := retryutil.Retry(context.Background(), 5*time.Second, 100, func() (bool, error) {
 		pod, err := kubecli.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			mainLogger.Errorf("Fail to get operator pod (%s): %v", name, err)

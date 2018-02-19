@@ -1,6 +1,7 @@
 package e2eutil
 
 import (
+	"context"
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -26,7 +27,7 @@ func NewClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseC
 		return nil, err
 	}
 
-	return cbmgr.New(urls, username, password), nil
+	return cbmgr.New(urls, username, password, nil), nil
 }
 
 // Creates client for interacting with admin console of crd
@@ -51,7 +52,7 @@ func EditBucket(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket) err
 // This is done within a retry loop in case the operator reconciles bucket
 // changes before verifiers run
 func EditBucketAndVerify(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket, tries int, verifiers ...bucketVerifier) error {
-	return retryutil.RetryOnErr(5*time.Second, tries, "verify edit bucket", "test-cluster",
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "verify edit bucket", "test-cluster",
 		func() error {
 
 			err := EditBucket(t, client, bucket)
@@ -94,7 +95,7 @@ func AddNode(t *testing.T, client *cbmgr.Couchbase, services []string, username,
 		return err
 	}
 	err = client.AddNode(hostname, username, password, svcs)
-	return retryutil.RetryOnErr(5*time.Second, 36, "add node", hostname,
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, 36, "add node", hostname,
 		func() error {
 			return client.AddNode(hostname, username, password, svcs)
 		})
@@ -106,7 +107,7 @@ func RebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, name
 	nodesToRemove := []string{outMember.HostURL()}
 	t.Logf("rebalance out: %s", outMember.Name)
 
-	return retryutil.RetryOnErr(5*time.Second, 36, "rebalance", clusterName,
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, 36, "rebalance", clusterName,
 		func() error {
 			status, err := client.Rebalance(nodesToRemove)
 			if wait && status != nil {
@@ -143,7 +144,7 @@ func SpecToApiBucket(bucketName string, cl *api.CouchbaseCluster, modifiers ...b
 }
 
 func GetClusterInfo(t *testing.T, client *cbmgr.Couchbase, tries int) (*cbmgr.ClusterInfo, error) {
-	err := retryutil.RetryOnErr(5*time.Second, tries, "get cluster info", "test-cluster",
+	err := retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "get cluster info", "test-cluster",
 		func() error {
 			_, err := client.ClusterInfo()
 			if err != nil {
@@ -175,7 +176,7 @@ func GetNodesFromCluster(t *testing.T, client *cbmgr.Couchbase, tries int) ([]cb
 }
 
 func FailoverNode(t *testing.T, client *cbmgr.Couchbase, tries int, nodeName string) error {
-	err := retryutil.RetryOnErr(5*time.Second, tries, "failover nodes", "test-cluster",
+	err := retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "failover nodes", "test-cluster",
 		func() error {
 			err := client.Failover(nodeName)
 			if err != nil {
@@ -192,7 +193,7 @@ func FailoverNode(t *testing.T, client *cbmgr.Couchbase, tries int, nodeName str
 }
 
 func VerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, tries int) error {
-	err := retryutil.RetryOnErr(5*time.Second, tries, "failover nodes", "test-cluster",
+	err := retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "failover nodes", "test-cluster",
 		func() error {
 			clusterInfo, err := client.ClusterInfo()
 			if err != nil {
@@ -218,7 +219,7 @@ func VerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, trie
 }
 
 func WaitForUnhealthyNodes(t *testing.T, client *cbmgr.Couchbase, tries int, numUnhealthy int) error {
-	err := retryutil.RetryOnErr(5*time.Second, tries, "wait for unhealthy nodes", "test-cluster",
+	err := retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "wait for unhealthy nodes", "test-cluster",
 		func() error {
 			unhealthy := []string{}
 			clusterInfo, err := client.ClusterInfo()
@@ -243,7 +244,7 @@ func WaitForUnhealthyNodes(t *testing.T, client *cbmgr.Couchbase, tries int, num
 }
 
 func VerifyClusterInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value string, verifiers ...clusterVerifier) error {
-	return retryutil.RetryOnErr(5*time.Second, tries, "verify cluster info", "test-cluster",
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "verify cluster info", "test-cluster",
 		func() error {
 
 			info, err := client.ClusterInfo()
@@ -260,7 +261,7 @@ func VerifyClusterInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value s
 }
 
 func VerifyBucketDeleted(t *testing.T, client *cbmgr.Couchbase, tries int, bucketName string) error {
-	return retryutil.RetryOnErr(5*time.Second, tries, "verify bucket deleted", "test-cluster",
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "verify bucket deleted", "test-cluster",
 		func() error {
 
 			info, err := client.GetBuckets()
@@ -279,7 +280,7 @@ func VerifyBucketDeleted(t *testing.T, client *cbmgr.Couchbase, tries int, bucke
 }
 
 func VerifyBucketInfo(t *testing.T, client *cbmgr.Couchbase, tries int, bucketName string, bucketKey string, bucketValue string, verifiers ...bucketInfoVerifier) error {
-	return retryutil.RetryOnErr(5*time.Second, tries, "verify cluster info", "test-cluster",
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "verify cluster info", "test-cluster",
 		func() error {
 
 			info, err := client.GetBuckets()
@@ -346,7 +347,7 @@ func BucketInfoVerifier(t *testing.T, bucket *cbmgr.Bucket, bucketKey string, bu
 }
 
 func VerifyAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value string, verifiers ...autoFailoverVerifier) error {
-	return retryutil.RetryOnErr(5*time.Second, tries, "verify autofailover info", "test-cluster",
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "verify autofailover info", "test-cluster",
 		func() error {
 
 			info, err := client.GetAutoFailoverSettings()
@@ -363,7 +364,7 @@ func VerifyAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, tries int, va
 }
 
 func VerifyIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value string, verifiers ...indexSettingVerifier) error {
-	return retryutil.RetryOnErr(5*time.Second, tries, "verify autofailover info", "test-cluster",
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "verify autofailover info", "test-cluster",
 		func() error {
 
 			info, err := client.GetIndexSettings()
@@ -380,7 +381,7 @@ func VerifyIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, tries int, va
 }
 
 func VerifyServices(t *testing.T, client *cbmgr.Couchbase, tries int, value map[string]int, verifiers ...serviceVerifier) error {
-	return retryutil.RetryOnErr(5*time.Second, tries, "verify service info", "test-cluster",
+	return retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "verify service info", "test-cluster",
 		func() error {
 
 			info, err := client.ClusterInfo()

@@ -1,6 +1,7 @@
 package couchbaseutil
 
 import (
+	"context"
 	"crypto/tls"
 	"reflect"
 	"strings"
@@ -24,39 +25,65 @@ type ClusterStatus struct {
 	NeedsRebalance   bool
 }
 
+type CouchbaseClient struct {
+	ctx         context.Context
+	clusterName string
+	username    string
+	password    string
+	tls         *cbmgr.TLSAuth
+}
+
+func NewCouchbaseClient(ctx context.Context, clusterName, username, password string) *CouchbaseClient {
+	return &CouchbaseClient{
+		ctx:         ctx,
+		clusterName: clusterName,
+		username:    username,
+		password:    password,
+	}
+}
+
+func (c *CouchbaseClient) SetTLS(tls *cbmgr.TLSAuth) {
+	c.tls = tls
+}
+
 // check the health of a particular Couchbase node.
 func CheckHealth(url string, tc *tls.Config) (bool, error) {
 	// TODO: check the health of a particular Couchbase node.
 	return true, nil
 }
 
-func AddNode(ms MemberSet, clusterName, hostname, username, password string, services []string) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) getClient(ms MemberSet) *cbmgr.Couchbase {
+	return cbmgr.New(ms.ClientURLs(), c.username, c.password, c.tls)
+}
+
+func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services []string) error {
+	client := c.getClient(ms)
 	svcs, err := cbmgr.ServiceListFromStringArray(services)
 	if err != nil {
 		return err
 	}
 
-	return retryutil.RetryOnErr(5*time.Second, 36, "add node", clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "add node", c.clusterName,
 		func() error {
-			return client.AddNode(hostname, username, password, svcs)
+			return client.AddNode(hostname, c.username, c.password, svcs)
 		})
 }
 
-func CancelAddNode(ms MemberSet, clusterName, hostname, username, password string) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
-	return retryutil.RetryOnErr(5*time.Second, 36, "add node", clusterName,
+func (c *CouchbaseClient) CancelAddNode(ms MemberSet, hostname string) error {
+	client := c.getClient(ms)
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "add node", c.clusterName,
 		func() error {
 			return client.CancelAddNode(hostname)
 		})
 }
 
-func ClusterUUID(m *Member, username, password, clusterName string) (string, error) {
-	client := cbmgr.New([]string{m.ClientURL()}, username, password)
+func (c *CouchbaseClient) ClusterUUID(m *Member) (string, error) {
+	ms := NewMemberSet(m)
+	client := c.getClient(ms)
 
 	var err error
 	var uuid string
-	err = retryutil.RetryOnErr(5*time.Second, 36, "cluster uuid", clusterName,
+	err = retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "cluster uuid", c.clusterName,
 		func() error {
 			uuid, err = client.ClusterUUID()
 			return err
@@ -65,8 +92,8 @@ func ClusterUUID(m *Member, username, password, clusterName string) (string, err
 	return uuid, err
 }
 
-func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*ClusterStatus, error) {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) GetClusterStatus(ms MemberSet) (*ClusterStatus, error) {
+	client := c.getClient(ms)
 
 	status := &ClusterStatus{
 		ActiveNodes:      NewMemberSet(),
@@ -77,7 +104,7 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 		UnclusteredNodes: NewMemberSet(),
 		UnmanagedNodes:   make([]string, 0),
 	}
-	err := retryutil.RetryOnErr(5*time.Second, 36, "cluster status", clusterName, func() error {
+	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "cluster status", c.clusterName, func() error {
 		info, err := client.ClusterInfo()
 		if err != nil {
 			return err
@@ -118,11 +145,12 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 	return status, err
 }
 
-func InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
+func (c *CouchbaseClient) InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
 	searchMemQuota int, services []string, dataPath, indexPath, indexStorageMode string) error {
-	client := cbmgr.New([]string{m.ClientURL()}, "", "")
+	ms := NewMemberSet(m)
+	client := c.getClient(ms)
 
-	err := retryutil.RetryOnErr(5*time.Second, 36, "node init", name,
+	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "node init", name,
 		func() error {
 			return client.NodeInitialize(m.Addr(), dataPath, indexPath)
 		})
@@ -136,28 +164,28 @@ func InitializeCluster(m *Member, username, password, name string, dataMemQuota,
 		return err
 	}
 
-	return retryutil.RetryOnErr(5*time.Second, 36, "cluster init", name,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "cluster init", name,
 		func() error {
 			return client.ClusterInitialize(username, password, name, dataMemQuota,
 				indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
 		})
 }
 
-func Rebalance(ms MemberSet, username, password, clusterName string, nodesToRemove []string, wait bool) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
-	return retryutil.RetryOnErr(5*time.Second, 36, "rebalance", clusterName,
+func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait bool) error {
+	client := c.getClient(ms)
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "rebalance", c.clusterName,
 		func() error {
 			status, err := client.Rebalance(nodesToRemove)
 			if wait && status != nil {
-				status.SetLogger(retryutil.Log(clusterName))
+				status.SetLogger(retryutil.Log(c.clusterName))
 				return status.Wait()
 			}
 			return err
 		})
 }
 
-func CreateBucket(ms MemberSet, clusterName, username, password string, config *cbapi.BucketConfig) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *cbapi.BucketConfig) error {
+	client := c.getClient(ms)
 
 	bucket := ApiBucketToCbmgr(config)
 	if err := client.CreateBucket(bucket); err != nil {
@@ -165,27 +193,27 @@ func CreateBucket(ms MemberSet, clusterName, username, password string, config *
 	}
 
 	// make sure bucket exists
-	return retryutil.RetryOnErr(5*time.Second, 60, "create bucket", clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 60, "create bucket", c.clusterName,
 		func() error {
 			_, err := client.BucketReady(bucket.BucketName)
 			return err
 		})
 }
 
-func DeleteBucket(ms MemberSet, username, password, bucketName string) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucketName string) error {
+	client := c.getClient(ms)
 	return client.DeleteBucket(bucketName)
 }
 
-func EditBucket(ms MemberSet, username, password string, config *cbapi.BucketConfig) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) EditBucket(ms MemberSet, config *cbapi.BucketConfig) error {
+	client := c.getClient(ms)
 	bucket := ApiBucketToCbmgr(config)
 
 	return client.EditBucket(bucket)
 }
 
-func GetBuckets(ms MemberSet, username, password string) ([]*cbapi.BucketConfig, error) {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) GetBuckets(ms MemberSet) ([]*cbapi.BucketConfig, error) {
+	client := c.getClient(ms)
 	buckets, err := client.GetBuckets()
 	if err != nil {
 		return nil, err
@@ -199,11 +227,11 @@ func GetBuckets(ms MemberSet, username, password string) ([]*cbapi.BucketConfig,
 	return rv, nil
 }
 
-func GetBucketNames(ms MemberSet, username, password string) ([]string, error) {
+func (c *CouchbaseClient) GetBucketNames(ms MemberSet) ([]string, error) {
 
 	bucketNames := []string{}
 
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+	client := c.getClient(ms)
 	buckets, err := client.GetBuckets()
 	if err == nil {
 		for _, b := range buckets {
@@ -216,9 +244,9 @@ func GetBucketNames(ms MemberSet, username, password string) ([]string, error) {
 
 // compare spec buckets to couchbase buckets and add to list of buckets
 // that need editing
-func GetBucketsToEdit(ms MemberSet, username, password string, spec *cbapi.ClusterSpec) ([]string, error) {
+func (c *CouchbaseClient) GetBucketsToEdit(ms MemberSet, spec *cbapi.ClusterSpec) ([]string, error) {
 	bucketNames := []string{}
-	clusterBuckets, err := GetBuckets(ms, username, password)
+	clusterBuckets, err := c.GetBuckets(ms)
 	if err != nil {
 		return nil, err
 	}
@@ -235,48 +263,72 @@ func GetBucketsToEdit(ms MemberSet, username, password string, spec *cbapi.Clust
 	return bucketNames, nil
 }
 
-func SetAutoFailoverTimeout(ms MemberSet, username, password, clusterName string, enabled bool, timeout uint64) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
-	return retryutil.RetryOnErr(5*time.Second, 5, "set autofailover timeout", clusterName,
+func (c *CouchbaseClient) SetAutoFailoverTimeout(ms MemberSet, enabled bool, timeout uint64) error {
+	client := c.getClient(ms)
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 5, "set autofailover timeout", c.clusterName,
 		func() error {
 			return client.SetAutoFailoverTimeout(enabled, timeout)
 		})
 }
 
-func GetAutoFailoverSettings(ms MemberSet, username, password, clusterName string) (*cbmgr.AutoFailoverSettings, error) {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*cbmgr.AutoFailoverSettings, error) {
+	client := c.getClient(ms)
 	var settings *cbmgr.AutoFailoverSettings
 
-	return settings, retryutil.RetryOnErr(5*time.Second, 10, "get autofailover settings", clusterName,
+	return settings, retryutil.RetryOnErr(c.ctx, 5*time.Second, 10, "get autofailover settings", c.clusterName,
 		func() (e error) {
 			settings, e = client.GetAutoFailoverSettings()
 			return e
 		})
 }
 
-func GetClusterInfo(ms MemberSet, username, password string) (*cbmgr.ClusterInfo, error) {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) GetClusterInfo(ms MemberSet) (*cbmgr.ClusterInfo, error) {
+	client := c.getClient(ms)
 	return client.ClusterInfo()
 }
 
-func SetPoolsDefault(ms MemberSet, username, password, clusterName string, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota int) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
-	return client.SetPoolsDefault(clusterName, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota)
+func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota int) error {
+	client := c.getClient(ms)
+	return client.SetPoolsDefault(c.clusterName, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota)
 }
 
-func SetDataMemoryQuota(ms MemberSet, username, password string, quota int) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) SetDataMemoryQuota(ms MemberSet, quota int) error {
+	client := c.getClient(ms)
 	return client.SetDataMemoryQuota(quota)
 }
 
-func SetIndexMemoryQuota(ms MemberSet, username, password string, quota int) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) SetIndexMemoryQuota(ms MemberSet, quota int) error {
+	client := c.getClient(ms)
 	return client.SetIndexMemoryQuota(quota)
 }
 
-func SetSearchMemoryQuota(ms MemberSet, username, password string, quota int) error {
-	client := cbmgr.New(ms.ClientURLs(), username, password)
+func (c *CouchbaseClient) SetSearchMemoryQuota(ms MemberSet, quota int) error {
+	client := c.getClient(ms)
 	return client.SetSearchMemoryQuota(quota)
+}
+
+func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
+	ms := NewMemberSet(m)
+	client := c.getClient(ms)
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "upload CA cert", c.clusterName,
+		func() error {
+			return client.UploadClusterCACert(pem)
+		})
+}
+
+func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
+	ms := NewMemberSet(m)
+	client := c.getClient(ms)
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "reload server cert", c.clusterName,
+		func() error {
+			return client.ReloadNodeCert()
+		})
+}
+
+func (c *CouchbaseClient) SetClientCertAuth(m *Member, settings *cbmgr.ClientCertAuth) error {
+	ms := NewMemberSet(m)
+	client := c.getClient(ms)
+	return client.SetClientCertAuth(settings)
 }
 
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {

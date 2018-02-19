@@ -1,6 +1,7 @@
 package e2eutil
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -49,7 +50,7 @@ func UpdateCluster(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRe
 
 func AtomicUpdateClusterCR(crClient versioned.Interface, name, namespace string, maxRetries int, updateFunc k8sutil.CouchbaseClusterCRUpdateFunc) (*api.CouchbaseCluster, error) {
 	result := &api.CouchbaseCluster{}
-	err := retryutil.Retry(1*time.Second, maxRetries, func() (done bool, err error) {
+	err := retryutil.Retry(context.Background(), 1*time.Second, maxRetries, func() (done bool, err error) {
 		couchbaseCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

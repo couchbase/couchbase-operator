@@ -6,7 +6,7 @@ import (
 )
 
 func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
-	status, err := couchbaseutil.GetClusterStatus(known, c.username, c.password, c.cluster.Name)
+	status, err := c.client.GetClusterStatus(known)
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func (c *Cluster) newMember(id int, serverSpecName string) *couchbaseutil.Member
 		Name:         name,
 		Namespace:    c.cluster.Namespace,
 		ServerConfig: serverSpecName,
-		SecureClient: c.isSecureClient(),
+		SecureClient: false,
 	}
 }
 

@@ -9,6 +9,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	couchbaseContainerName     = "couchbase-server"
+	couchbaseTlsVolumeName     = "couchbase-server-tls"
+	couchbaseTlsVolumeMountDir = "/opt/couchbase/var/lib/couchbase/inbox"
+)
+
 func imageName(baseImage, version string) string {
 	return fmt.Sprintf("%s:%s", baseImage, version)
 }
@@ -21,7 +27,7 @@ func couchbaseVolumeMounts() []v1.VolumeMount {
 
 func couchbaseContainer(commands, baseImage, version string) v1.Container {
 	c := v1.Container{
-		Name:  "couchbase-server",
+		Name:  couchbaseContainerName,
 		Image: imageName(baseImage, version),
 		Ports: []v1.ContainerPort{
 			{
@@ -147,6 +153,56 @@ func applyPodPolicy(clusterName string, pod *v1.Pod, policy *cbapi.PodPolicy) {
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, policy.CouchbaseEnv...)
 		}
 	}
+}
+
+// Given a pod, return a pointer to the couchbase container
+func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
+	for index := range pod.Spec.Containers {
+		if pod.Spec.Containers[index].Name == couchbaseContainerName {
+			return &pod.Spec.Containers[index], nil
+		}
+	}
+	return nil, fmt.Errorf("unable to locate couchbase container")
+}
+
+// Adds any necessary pod prerequisites before enabling TLS
+func applyPodTlsConfiguration(cs cbapi.ClusterSpec, pod *v1.Pod) error {
+	if cs.TLS != nil {
+		// Static configuration:
+		// * Defines a volume which contains the secrets necessary
+		//   to explicitly define TLS certificates and keys
+		// * Mounts the volume in in the correct location so that API
+		//   calls to /node/controller/reloadCertificate succeed
+		if cs.TLS.Static != nil {
+			// Ensure the schema is correct
+			// TODO: does this make sense not to be a pointer?
+			if cs.TLS.Static.Member == nil {
+				return fmt.Errorf("static tls member secret required")
+			}
+
+			// Add the TLS secret volume to the pod
+			volume := v1.Volume{
+				Name: couchbaseTlsVolumeName,
+			}
+			volume.VolumeSource.Secret = &v1.SecretVolumeSource{
+				SecretName: cs.TLS.Static.Member.ServerSecret,
+			}
+			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+			// Mount the secret volume in Couchbase's inbox
+			volumeMount := v1.VolumeMount{
+				Name:      couchbaseTlsVolumeName,
+				ReadOnly:  true,
+				MountPath: couchbaseTlsVolumeMountDir,
+			}
+			container, err := getCouchbaseContainer(pod)
+			if err != nil {
+				return err
+			}
+			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+		}
+	}
+	return nil
 }
 
 func containerWithLivenessProbe(c v1.Container, lp *v1.Probe) v1.Container {
