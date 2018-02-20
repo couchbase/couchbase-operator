@@ -164,6 +164,12 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 		return nil, err
 	}
 
+	// The new node will not be part of the cluster yet  so the API calls will fail
+	// when checking the UUID, temporarily disable these checks while installing
+	// TLS configuration
+	c.client.SetUUID("")
+	defer c.client.SetUUID(c.status.ClusterID)
+
 	// Enable TLS if requested
 	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
 		return nil, err

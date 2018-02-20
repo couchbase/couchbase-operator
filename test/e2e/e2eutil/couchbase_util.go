@@ -27,7 +27,9 @@ func NewClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseC
 		return nil, err
 	}
 
-	return cbmgr.New(urls, username, password, nil), nil
+	client := cbmgr.New(username, password)
+	client.SetEndpoints(urls)
+	return client, nil
 }
 
 // Creates client for interacting with admin console of crd

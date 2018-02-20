@@ -150,8 +150,15 @@ func (c *Cluster) setup() error {
 	}
 
 	if shouldCreateCluster {
-		return c.create()
+		if err := c.create(); err != nil {
+			return err
+		}
 	}
+
+	// Once the cluster is guaranteed to exist, extract the UUID and inject
+	// it into the client.  Connections from now on will be aborted if the
+	// UUID reported on the persistent connection differs
+	c.client.SetUUID(c.status.ClusterID)
 
 	return nil
 }
