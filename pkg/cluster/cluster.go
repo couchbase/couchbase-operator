@@ -4,23 +4,19 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"math"
 	"reflect"
 	"strings"
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
-	"github.com/couchbase/couchbase-operator/pkg/garbagecollection"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -59,7 +55,6 @@ type Cluster struct {
 	stopCh        chan struct{}
 	members       couchbaseutil.MemberSet
 	tlsConfig     *tls.Config
-	gc            *garbagecollection.GC
 	eventsCli     corev1.EventInterface
 	username      string
 	password      string
@@ -76,7 +71,6 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		cluster:   cl,
 		eventCh:   make(chan *clusterEvent, 100),
 		stopCh:    make(chan struct{}),
-		gc:        garbagecollection.New(config.KubeCli, cl.Namespace),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
 	}
 	c.logger.Info("Watching new cluster")
@@ -170,19 +164,22 @@ func (c *Cluster) create() error {
 	}
 	ms := couchbaseutil.NewMemberSet(m)
 
+	// Set up services e.g. DNS records before calling WaitForPod which will poll
+	// for the admin port via a DNS lookup
+	if err := c.setupServices(); err != nil {
+		return fmt.Errorf("cluster create: fail to create services: %v", err)
+	}
+
 	if err := c.createPod(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
 	}
 
-	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, m.Name); err != nil {
+	if err := k8sutil.WaitForPod(c.config.KubeCli, c.cluster.Namespace, m.Name, m.HostURL()); err != nil {
 		return err
 	}
 
 	c.memberCounter++
 	c.members = ms
-	if err := c.setupServices(); err != nil {
-		return fmt.Errorf("cluster create: fail to create services: %v", err)
-	}
 
 	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
@@ -226,12 +223,6 @@ func (c *Cluster) setupServices() error {
 }
 
 func (c *Cluster) run() {
-	defer func() {
-		c.logger.Infof("deleting the failed cluster")
-		c.reportFailedStatus()
-		c.delete()
-	}()
-
 	c.status.SetPhase(api.ClusterPhaseRunning)
 	if err := c.updateCRStatus(); err != nil {
 		c.logger.Warningf("update initial CR status failed: %v", err)
@@ -297,10 +288,6 @@ func (c *Cluster) run() {
 		}
 
 	}
-}
-
-func (c *Cluster) delete() {
-	c.gc.CollectCluster(c.cluster.Name, garbagecollection.NullUID)
 }
 
 func (c *Cluster) handleUpdateEvent(event *clusterEvent) {
@@ -426,40 +413,6 @@ func (c *Cluster) updateMemberStatus(members couchbaseutil.MemberSet) {
 	}
 	c.status.Members.Ready = ready
 	c.status.Members.Unready = unready
-}
-
-func (c *Cluster) reportFailedStatus() {
-	retryInterval := 5 * time.Second
-
-	f := func() (bool, error) {
-		c.status.SetPhase(api.ClusterPhaseFailed)
-		err := c.updateCRStatus()
-		if err == nil || k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return true, nil
-		}
-
-		if !apierrors.IsConflict(err) {
-			c.logger.Warningf("retry report status in %v: fail to update: %v", retryInterval, err)
-			return false, nil
-		}
-
-		cl, err := c.config.CouchbaseCRCli.CouchbaseV1beta1().CouchbaseClusters(c.cluster.Namespace).
-			Get(c.cluster.Name, metav1.GetOptions{})
-		if err != nil {
-			// Update (PUT) will return conflict even if object is deleted since we have UID set in object.
-			// Because it will check UID first and return something like:
-			// "Precondition failed: UID in precondition: 0xc42712c0f0, UID in object meta: ".
-			if k8sutil.IsKubernetesResourceNotFoundError(err) {
-				return true, nil
-			}
-			c.logger.Warningf("retry report status in %v: fail to get latest version: %v", retryInterval, err)
-			return false, nil
-		}
-		c.cluster = cl
-		return false, nil
-
-	}
-	retryutil.Retry(retryInterval, math.MaxInt64, f)
 }
 
 // Use username and password from secret store

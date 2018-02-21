@@ -1,13 +1,18 @@
 package k8sutil
 
 import (
+	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -284,7 +289,7 @@ func mergeLabels(l1, l2 map[string]string) {
 	}
 }
 
-func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
+func WaitForPod(kubeCli kubernetes.Interface, namespace, podName, hostURL string) error {
 
 	opts := metav1.ListOptions{
 		LabelSelector: "couchbase_node=" + podName,
@@ -298,6 +303,7 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 	for ev := range events {
 		obj := ev.Object.(*v1.Pod)
 		status := obj.Status
+		done := false
 
 		switch ev.Type {
 
@@ -311,7 +317,7 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 			// make sure created pod is now running
 			switch status.Phase {
 			case v1.PodRunning:
-				return nil
+				done = true
 			case v1.PodPending:
 				for _, cond := range status.Conditions {
 					if cond.Type == v1.PodScheduled {
@@ -324,7 +330,42 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName string) error {
 				return cberrors.ErrRunningPod{status.Reason}
 			}
 		}
+
+		if done {
+			break
+		}
 	}
 
-	return cberrors.ErrUnkownCreatePod
+	// Wait for the admin port to come up, avoids unnecessary spam while trying to
+	// run commands against it (e.g. initialisation and adding new nodes)
+	if err := netutil.WaitForHostPort(hostURL, 120); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
+	version, err := kubeCli.Discovery().ServerVersion()
+	if err != nil {
+		return constants.KubernetesVersionUnknown, err
+	}
+
+	// Sometimes the Major and Minor values are not set so we need to parse them
+	// from the GitVersion field.
+	if version.Major == "" || version.Minor == "" {
+		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}$")
+		if !rx.MatchString(version.GitVersion) {
+			err := fmt.Errorf("Unable to get version from Kubernetes API response")
+			return constants.KubernetesVersionUnknown, err
+		}
+
+		parts := strings.Split(version.GitVersion[1:], ".")
+		version.Major = parts[0]
+		version.Minor = parts[1]
+	}
+
+	major, _ := strconv.Atoi(version.Major)
+	minor, _ := strconv.Atoi(version.Minor)
+	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
 }

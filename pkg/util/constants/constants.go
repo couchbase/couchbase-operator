@@ -38,3 +38,13 @@ var (
 	IndexStorageModeMemoryOptimized = "memory_optimized"
 	IndexStorageModePlasma          = "plasma"
 )
+
+type KubernetesVersion string
+
+const (
+	KubernetesVersionUnknown KubernetesVersion = "0000"
+	KubernetesVersion1_7     KubernetesVersion = "0107"
+	KubernetesVersion1_8     KubernetesVersion = "0108"
+	KubernetesVersion1_9     KubernetesVersion = "0109"
+	KubernetesVersion1_10    KubernetesVersion = "0110"
+)
