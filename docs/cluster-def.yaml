@@ -39,9 +39,6 @@ spec:
     dataPath: /opt/couchbase/var/lib/couchbase/data
     indexPath: /opt/couchbase/var/lib/couchbase/data
     pod:
-      persistentVolumes:
-        volumeSizeInMB: 40960
-        storageClass: standard
       couchabseEnv:
         ENV1: value
       resources:

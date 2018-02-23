@@ -8,9 +8,16 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+
+	openapispec "github.com/go-openapi/spec"
+	"github.com/go-openapi/strfmt"
+	"github.com/go-openapi/validate"
 )
 
 // CouchbaseClusterCRUpdateFunc is a function to be used when atomically
@@ -21,6 +28,10 @@ func CreateCRD(clientset apiextensionsclient.Interface, version constants.Kubern
 	crd := createCRD(version)
 	_, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	return err
+}
+
+func GetCRD() *apiextensionsv1beta1.CustomResourceDefinition {
+	return createCRD(constants.KubernetesVersionMax)
 }
 
 func createCRD(version constants.KubernetesVersion) *apiextensionsv1beta1.CustomResourceDefinition {
@@ -79,4 +90,28 @@ func MustNewKubeExtClient() apiextensionsclient.Interface {
 		panic(err)
 	}
 	return apiextensionsclient.NewForConfigOrDie(cfg)
+}
+
+func ValidateCRD(customResource *api.CouchbaseCluster) error {
+	crd := apiextensions.CustomResourceDefinition{}
+	err := scheme.Scheme.Convert(GetCRD(), &crd, nil)
+	if err != nil {
+		return fmt.Errorf("Error converting CRD: %v", err)
+	}
+
+	openapiSchema := &openapispec.Schema{}
+	if err := apiservervalidation.ConvertToOpenAPITypes(&crd, openapiSchema); err != nil {
+		return fmt.Errorf("Error converting validation to Open API Type: %v", err)
+	}
+
+	if err := openapispec.ExpandSchema(openapiSchema, nil, nil); err != nil {
+		return fmt.Errorf("Error expanding schema: %v", err)
+	}
+
+	validator := validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
+	if err = apiservervalidation.ValidateCustomResource(customResource, validator); err != nil {
+		return err
+	}
+
+	return nil
 }

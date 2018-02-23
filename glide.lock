@@ -1,6 +1,10 @@
-hash: 69372aa32804049e497994a509533c3b769b26676f65070b81747cc0ee96dc22
-updated: 2018-02-06T18:04:37.36028513-08:00
+hash: 0f2f768afcc3dd9f0e741b7bff8427942c6b5a95661ae446b3db18a6da6aeb92
+updated: 2018-03-06T11:57:37.400636545-08:00
 imports:
+- name: github.com/asaskevich/govalidator
+  version: 593d64559f7600f29581a3ee42177f5dbded27a9
+- name: github.com/couchbase/cbflag
+  version: dbeda68bf448ce8e85e52a3216f3b031ef18a4b7
 - name: github.com/couchbaselabs/gocbmgr
   version: 357fd3f6e78ea231a2dddfd8d509fdae2a3af2cc
 - name: github.com/davecgh/go-spew
@@ -17,14 +21,26 @@ imports:
   - log
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
+- name: github.com/go-openapi/analysis
+  version: b44dc874b601d9e4e2f6e19140e794ba24bead3b
+- name: github.com/go-openapi/errors
+  version: d24ebc2075bad502fac3a8ae27aa6dd58e1952dc
 - name: github.com/go-openapi/jsonpointer
   version: 46af16f9f7b149af66e5d1bd010e3574dc06de98
 - name: github.com/go-openapi/jsonreference
   version: 13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272
+- name: github.com/go-openapi/loads
+  version: a80dea3052f00e5f032e860dd7355cd0cc67e24d
+- name: github.com/go-openapi/runtime
+  version: 11e322eeecc1032d5a0a96c566ed53f2b5c26e22
 - name: github.com/go-openapi/spec
   version: 7abd5745472fff5eb3685386d5fb8bf38683154d
+- name: github.com/go-openapi/strfmt
+  version: d65c7fdb29eca313476e529628176fe17e58c488
 - name: github.com/go-openapi/swag
   version: f3f9494671f93fcff853e3c6e9e948b3eb71e590
+- name: github.com/go-openapi/validate
+  version: deaf2c9013bc1a7f4c774662259a506ba874d80f
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -94,13 +110,10 @@ imports:
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
-  - html
-  - html/atom
   - http2
   - http2/hpack
   - idna
   - lex/httplex
-  - websocket
 - name: golang.org/x/sys
   version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:
@@ -164,6 +177,7 @@ imports:
   subpackages:
   - pkg/apis/apiextensions
   - pkg/apis/apiextensions/v1beta1
+  - pkg/apiserver/validation
   - pkg/client/clientset/clientset
   - pkg/client/clientset/clientset/scheme
   - pkg/client/clientset/clientset/typed/apiextensions/v1beta1

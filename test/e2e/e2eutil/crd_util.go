@@ -34,7 +34,7 @@ func CreateClusterWithCRD(t *testing.T, crClient versioned.Interface, crd *api.C
 
 func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	cl.Namespace = namespace
-	res, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Create(cl)
+	res, err := k8sutil.CreateCouchbaseCluster(crClient, cl)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func AtomicUpdateClusterCR(crClient versioned.Interface, name, namespace string,
 
 func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, retries int) error {
 	t.Logf("deleting couchbase cluster: %v", cl.Name)
-	err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Delete(cl.Name, nil)
+	err := k8sutil.DeleteCouchbaseCluster(crClient, cl)
 	if err != nil {
 		return err
 	}

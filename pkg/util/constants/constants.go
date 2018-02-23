@@ -37,8 +37,14 @@ var (
 
 	IndexStorageModeMemoryOptimized = "memory_optimized"
 	IndexStorageModePlasma          = "plasma"
+
+	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase"
+	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase"
 )
 
+// Represents the Kubernetes version by its major and minor parts. The first
+// two digits represent the major version and the last two digits represent the
+// minor version. We do not track the maintainence version.
 type KubernetesVersion string
 
 const (
@@ -47,4 +53,5 @@ const (
 	KubernetesVersion1_8     KubernetesVersion = "0108"
 	KubernetesVersion1_9     KubernetesVersion = "0109"
 	KubernetesVersion1_10    KubernetesVersion = "0110"
+	KubernetesVersionMax     KubernetesVersion = "9999"
 )

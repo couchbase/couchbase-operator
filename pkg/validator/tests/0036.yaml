@@ -1,0 +1,21 @@
+# The minimum base configuration
+apiVersion: couchbase.database.couchbase.com/v1beta1
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  version: enterprise-5.0.1
+  authSecret: cb-example-auth
+  cluster:
+    indexStorageSetting: plasma
+  servers:
+    - size: 3
+      name: data_only
+      services:
+        - data
+    - size: 1
+      name: others
+      services:
+        - index
+        - query
+        - search

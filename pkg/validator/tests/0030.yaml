@@ -1,0 +1,29 @@
+# The basic couchbase bucket creation
+apiVersion: couchbase.database.couchbase.com/v1beta1
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  version: enterprise-5.0.1
+  authSecret: cb-example-auth
+  cluster:
+    indexStorageSetting: plasma
+  buckets:
+    - name: default
+      type: ephemeral
+      memoryQuota: 256
+      replicas: 3
+      ioPriority: low
+      evictionPolicy: valueOnly
+      conflictResolution: seqno
+      enableFlush: false
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+      dataPath: /opt/couchbase/var/lib/couchbase/data
+      indexPath: /opt/couchbase/var/lib/couchbase/data
