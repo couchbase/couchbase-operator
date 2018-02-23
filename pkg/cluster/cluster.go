@@ -411,8 +411,8 @@ func (c *Cluster) updateMemberStatus(members couchbaseutil.MemberSet) {
 			unready = append(unready, m.Name)
 		}
 	}
-	c.status.Members.Ready = ready
-	c.status.Members.Unready = unready
+	c.status.Members.SetReady(ready)
+	c.status.Members.SetUnready(unready)
 }
 
 // Use username and password from secret store
