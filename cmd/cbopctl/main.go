@@ -35,6 +35,7 @@ func (c *CbopctlContext) Run() {
 func main() {
 	cbopctlCtx := &CbopctlContext{}
 	createCtx := &CreateContext{}
+	deleteCtx := &DeleteContext{}
 
 	cmdline := &cbflag.CLI{
 		Name:    "cbopctl",
@@ -74,6 +75,39 @@ func main() {
 					),
 					cbflag.StringFlag(
 						/* Destination  */ &createCtx.kubeconfig,
+						/* Default      */ filepath.Join(os.Getenv("HOME"), ".kube", "config"),
+						/* Short Option */ "",
+						/* Long Option  */ "kubeconfig",
+						/* Env Variable */ "",
+						/* Usage        */ "The path to your kubernetes configuration",
+						/* Deprecated   */ []string{},
+						/* Validator    */ nil,
+						/* Required     */ false,
+						/* Hidden       */ false,
+					),
+				},
+			},
+			&cbflag.Command{
+				Name:     "delete",
+				Desc:     "Delete a new Couchbase Cluster",
+				ManPage:  "",
+				Run:      deleteCtx.Run,
+				Commands: []*cbflag.Command{},
+				Flags: []*cbflag.Flag{
+					cbflag.StringFlag(
+						/* Destination  */ &deleteCtx.filename,
+						/* Default      */ "",
+						/* Short Option */ "f",
+						/* Long Option  */ "filename",
+						/* Env Variable */ "",
+						/* Usage        */ "Filename or the resource to create",
+						/* Deprecated   */ []string{},
+						/* Validator    */ nil,
+						/* Required     */ true,
+						/* Hidden       */ false,
+					),
+					cbflag.StringFlag(
+						/* Destination  */ &deleteCtx.kubeconfig,
 						/* Default      */ filepath.Join(os.Getenv("HOME"), ".kube", "config"),
 						/* Short Option */ "",
 						/* Long Option  */ "kubeconfig",
