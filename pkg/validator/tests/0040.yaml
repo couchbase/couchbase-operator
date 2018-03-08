@@ -1,13 +1,13 @@
-# The minimum base configuration
+# Used to check an update to the authSecret doesn't work
 apiVersion: couchbase.database.couchbase.com/v1beta1
 kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
   version: enterprise-5.0.1
-  authSecret: cb-example-auth
+  authSecret: cb-example-auth-different
   cluster:
-    indexStorageSetting: invalid
+    indexStorageSetting: plasma
   servers:
     - size: 3
       name: all_services

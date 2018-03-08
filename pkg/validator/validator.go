@@ -17,10 +17,7 @@ const (
 	DefaultServiceMemQuota     = 256
 )
 
-type CRDValidator struct {
-}
-
-func (c *CRDValidator) Create(resource *api.CouchbaseCluster) error {
+func Create(resource *api.CouchbaseCluster) error {
 	applyDefaults(resource)
 
 	if err := k8sutil.ValidateCRD(resource); err != nil {
@@ -28,6 +25,24 @@ func (c *CRDValidator) Create(resource *api.CouchbaseCluster) error {
 	}
 
 	if err := checkConstraints(resource); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Update(current, updated *api.CouchbaseCluster) error {
+	applyDefaults(updated)
+
+	if err := checkImmutableFields(current, updated); err != nil {
+		return err
+	}
+
+	if err := k8sutil.ValidateCRD(updated); err != nil {
+		return err
+	}
+
+	if err := checkConstraints(updated); err != nil {
 		return err
 	}
 
@@ -209,4 +224,117 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	return nil
+}
+
+type UpdateError struct {
+	field string
+	in    string
+}
+
+func (e *UpdateError) Error() string {
+	return fmt.Sprintf("%s in %s cannot be updated", e.field, e.in)
+}
+
+func checkImmutableFields(current, updated *api.CouchbaseCluster) error {
+	errs := []error{}
+	if current.Spec.AuthSecret != updated.Spec.AuthSecret {
+		err := &UpdateError{"spec.authSecret", "body"}
+		errs = append(errs, err)
+	}
+
+	for _, cur := range current.Spec.BucketSettings {
+		for i, up := range updated.Spec.BucketSettings {
+			if cur.BucketName == up.BucketName {
+				if cur.BucketType != up.BucketType {
+					err := &UpdateError{fmt.Sprintf("spec.buckets[%d].type", i), "body"}
+					errs = append(errs, err)
+				}
+
+				if !stringPtrEquals(cur.ConflictResolution, up.ConflictResolution) {
+					err := &UpdateError{fmt.Sprintf("spec.buckets[%d].conflictResolution", i), "body"}
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	for _, cur := range current.Spec.ServerSettings {
+		for i, up := range updated.Spec.ServerSettings {
+			if cur.Name == up.Name {
+				if !stringArrayCompare(cur.Services, up.Services) {
+					err := &UpdateError{fmt.Sprintf("spec.servers[%d].services", i), "body"}
+					errs = append(errs, err)
+				}
+
+				if cur.DataPath != up.DataPath {
+					err := &UpdateError{fmt.Sprintf("spec.servers[%d].dataPath", i), "body"}
+					errs = append(errs, err)
+				}
+
+				if cur.IndexPath != up.IndexPath {
+					err := &UpdateError{fmt.Sprintf("spec.servers[%d].indexPath", i), "body"}
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	// Check to see if either the old or new specification have the the index
+	// service defined. If they do then we cannot change the indexStorageSetting.
+	hasIndexSvc := false
+	for _, cur := range current.Spec.ServerSettings {
+		for _, svc := range cur.Services {
+			if svc == constants.ServiceIndex {
+				hasIndexSvc = true
+			}
+		}
+	}
+
+	for _, up := range updated.Spec.ServerSettings {
+		for _, svc := range up.Services {
+			if svc == constants.ServiceIndex {
+				hasIndexSvc = true
+			}
+		}
+	}
+
+	if hasIndexSvc && updated.Spec.ClusterSettings.IndexStorageSetting != current.Spec.ClusterSettings.IndexStorageSetting {
+		err := &UpdateError{"spec.cluster.indexStorageSetting", "body"}
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func stringArrayCompare(a1, a2 []string) bool {
+	m := make(map[string]int)
+	for _, val := range a1 {
+		m[val]++
+	}
+
+	for _, val := range a2 {
+		if _, ok := m[val]; ok {
+			if m[val] > 0 {
+				m[val]--
+				continue
+			}
+		}
+		return false
+	}
+
+	for _, cnt := range m {
+		if cnt > 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+func stringPtrEquals(p1, p2 *string) bool {
+	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
 }

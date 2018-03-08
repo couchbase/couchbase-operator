@@ -34,6 +34,7 @@ func (c *CbopctlContext) Run() {
 
 func main() {
 	cbopctlCtx := &CbopctlContext{}
+	applyCtx := &ApplyContext{}
 	createCtx := &CreateContext{}
 	deleteCtx := &DeleteContext{}
 
@@ -44,6 +45,49 @@ func main() {
 		ManPage: "",
 		Run:     cbopctlCtx.Run,
 		Commands: []*cbflag.Command{
+			&cbflag.Command{
+				Name:     "apply",
+				Desc:     "Update a Couchbase Cluster",
+				ManPage:  "",
+				Run:      applyCtx.Run,
+				Commands: []*cbflag.Command{},
+				Flags: []*cbflag.Flag{
+					cbflag.StringFlag(
+						/* Destination  */ &applyCtx.filename,
+						/* Default      */ "",
+						/* Short Option */ "f",
+						/* Long Option  */ "filename",
+						/* Env Variable */ "",
+						/* Usage        */ "Filename or the resource to create",
+						/* Deprecated   */ []string{},
+						/* Validator    */ nil,
+						/* Required     */ true,
+						/* Hidden       */ false,
+					),
+					cbflag.BoolFlag(
+						/* Destination  */ &applyCtx.dryRun,
+						/* Default      */ false,
+						/* Short Option */ "",
+						/* Long Option  */ "dry-run",
+						/* Env Variable */ "",
+						/* Usage        */ "If true, only print the object that would be sent, without sending it",
+						/* Deprecated   */ []string{},
+						/* Hidden       */ false,
+					),
+					cbflag.StringFlag(
+						/* Destination  */ &applyCtx.kubeconfig,
+						/* Default      */ filepath.Join(os.Getenv("HOME"), ".kube", "config"),
+						/* Short Option */ "",
+						/* Long Option  */ "kubeconfig",
+						/* Env Variable */ "",
+						/* Usage        */ "The path to your kubernetes configuration",
+						/* Deprecated   */ []string{},
+						/* Validator    */ nil,
+						/* Required     */ false,
+						/* Hidden       */ false,
+					),
+				},
+			},
 			&cbflag.Command{
 				Name:     "create",
 				Desc:     "Create a new Couchbase Cluster",

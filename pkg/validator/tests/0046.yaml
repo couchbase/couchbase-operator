@@ -1,4 +1,4 @@
-# The minimum base configuration
+# Used to test updates to server data path fails
 apiVersion: couchbase.database.couchbase.com/v1beta1
 kind: CouchbaseCluster
 metadata:
@@ -7,7 +7,7 @@ spec:
   version: enterprise-5.0.1
   authSecret: cb-example-auth
   cluster:
-    indexStorageSetting: invalid
+    indexStorageSetting: plasma
   servers:
     - size: 3
       name: all_services
@@ -16,5 +16,5 @@ spec:
         - index
         - query
         - search
-      dataPath: /opt/couchbase/var/lib/couchbase/data
+      dataPath: /tmp
       indexPath: /opt/couchbase/var/lib/couchbase/data
