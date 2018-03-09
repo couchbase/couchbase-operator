@@ -316,22 +316,8 @@ func (c *Cluster) upgrade(status *couchbaseutil.ClusterStatus) error {
 		// rebalance and eject it
 		if !status.NodeInState(upgradingNodeName, couchbaseutil.NodeStateUnclustered) {
 			// Perform the swap rebalance
-			ejectedNodes := []string{upgradingNode.HostURLPlaintext()}
-			if err := c.rebalance(ejectedNodes); err != nil {
-				return err
-			}
-
-			// Cluster status changed, update it
-			if err := c.client.UpdateClusterStatus(c.members, status); err != nil {
-				return err
-			}
-
-			// Before continuing ensure the upgrading node is now unclustered,
-			// the upgraded node is active, and the rest of the cluster is
-			// still active.  Cancelling a rebalance will trigger this but it
-			// will be retried on the next attempt
-			if err := c.checkUpgradeState(status, couchbaseutil.NodeStateUnclustered, couchbaseutil.NodeStateActive); err != nil {
-				status.LogStatus(c.logger)
+			ejectedNodes := couchbaseutil.NewMemberSet(upgradingNode)
+			if err := c.rebalance(ejectedNodes, nil); err != nil {
 				return err
 			}
 		}

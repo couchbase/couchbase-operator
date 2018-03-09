@@ -147,6 +147,16 @@ func (ms MemberSet) HostURLs() []string {
 	return endpoints
 }
 
+// See the documentation for HostURLPlaintext as to the intended use of
+// this method.
+func (ms MemberSet) HostURLsPlaintext() []string {
+	endpoints := make([]string, 0, len(ms))
+	for _, m := range ms {
+		endpoints = append(endpoints, m.HostURLPlaintext())
+	}
+	return endpoints
+}
+
 func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 	rv := NewMemberSet()
 	for _, m := range ms {

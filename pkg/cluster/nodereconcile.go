@@ -252,9 +252,8 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 
 func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 	if r.couchbase.NeedsRebalance {
-		removeNodes := append(r.ejectNodes.HostURLs(), r.couchbase.UnmanagedNodes...)
-		if err := c.rebalance(removeNodes); err != nil {
-			c.logger.Warnf("Failed to start rebalance: %s", err.Error())
+		if err := c.rebalance(r.ejectNodes, r.couchbase.UnmanagedNodes); err != nil {
+			c.logger.Warnf("Failed to rebalance: %s", err.Error())
 			r.errored = true
 			r.transitionState(ReconcileFinished)
 			return

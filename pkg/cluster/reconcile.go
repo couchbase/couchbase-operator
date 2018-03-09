@@ -225,7 +225,7 @@ func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseu
 }
 
 // Rebalance nodes in the cluster
-func (c *Cluster) rebalance(nodesToRemove []string) error {
+func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string) error {
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
 	if _, err := c.eventsCli.Create(k8sutil.RebalanceEvent(c.cluster)); err != nil {
@@ -237,8 +237,24 @@ func (c *Cluster) rebalance(nodesToRemove []string) error {
 	}
 
 	// Perform the operation
+	nodesToRemove := append(managed.HostURLsPlaintext(), unmanaged...)
 	if err := c.client.Rebalance(c.members, nodesToRemove, true); err != nil {
 		return err
+	}
+
+	// Error checking...
+	status, err := c.client.GetClusterStatus(c.members)
+	if err != nil {
+		return err
+	}
+
+	// If something stopped a rebalance we must return an error condition to
+	// prevent the reconcile loop/upgrade from deleting any managed nodes or
+	// this will result in data loss or a terminal cluster condition
+	for name, _ := range managed {
+		if !status.NodeInState(name, couchbaseutil.NodeStateUnclustered) {
+			return fmt.Errorf("node %s is still in the cluster", name)
+		}
 	}
 
 	// Notify if we've removed some nodes (deterministically sorted)
