@@ -34,17 +34,6 @@ func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
-type PVSource struct {
-	// VolumeSizeInMB specifies the required volume size.
-	VolumeSizeInMB int `json:"volumeSizeInMB"`
-
-	// StorageClass indicates what Kubernetes storage class will be used.
-	// This enables the user to have fine-grained control over how persistent
-	// volumes are created since it uses the existing StorageClass mechanism in
-	// Kubernetes.
-	StorageClass string `json:"storageClass"`
-}
-
 type ClusterSpec struct {
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
@@ -88,6 +77,11 @@ type ClusterSpec struct {
 
 	// Enables software update notifications in the UI
 	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications"`
+	// VolumeClaimTemplates define the desired characteristics of a volume
+	// that can be requested/claimed by a pod.
+	// When specified, each claim should map to the name of a volumeMount
+	// defined in a PodPolicy
+	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates"`
 }
 
 type ClusterConfig struct {
@@ -188,14 +182,22 @@ type PodPolicy struct {
 	// flag). This field cannot be updated.
 	CouchbaseEnv []v1.EnvVar `json:"couchbaseEnv,omitempty"`
 
-	// PV represents a Persistent Volume resource.
-	// If defined new pods will use a persistent volume to store couchbase data.
-	// TODO(sgotti) unimplemented
-	PV *PVSource `json:"pv,omitempty"`
+	// Volume mounts represent persistent volumes to attach to pod.
+	// If defined new pods will use a persistent volume for the specified path.
+	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty"`
 
 	// By default, kubernetes will mount a service account token into the couchbase pods.
 	// AutomountServiceAccountToken indicates whether pods running with the service account should have an API token automatically mounted.
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
+}
+
+type VolumeMount struct {
+	// Name of the volumeClaimTemplate to use when creating volumes
+	// for the mount path
+	Name string `json:"name"`
+
+	// Path represents the location of a volume to mount
+	Path string `json:"path"`
 }
 
 func (c *ClusterSpec) Cleanup() {
@@ -228,6 +230,16 @@ func (cs *ClusterSpec) GetBucketByName(name string) *BucketConfig {
 			if b.BucketName == name {
 				return &b
 			}
+		}
+	}
+	return nil
+}
+
+// Get the volumeClaimTemplate with specified name
+func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeClaim {
+	for _, claim := range cs.VolumeClaimTemplates {
+		if name == claim.Name {
+			return &claim
 		}
 	}
 	return nil

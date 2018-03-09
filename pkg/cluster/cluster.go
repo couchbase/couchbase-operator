@@ -373,26 +373,17 @@ func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig
 		version = c.status.UpgradeStatus.TargetVersion
 	}
 
-	pod, err := k8sutil.CreateCouchbasePod(m, c.cluster.Name, c.cluster.Spec, version,
-		serverSpec, c.cluster.AsOwner())
-	if err != nil {
-		return err
-	}
-	_, err = c.config.KubeCli.Core().Pods(c.cluster.Namespace).Create(pod)
+	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, m, c.cluster.Spec, version, serverSpec, c.cluster.AsOwner())
 	return err
 }
 
 func (c *Cluster) removePod(name string) error {
-	ns := c.cluster.Namespace
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-	err := c.config.KubeCli.Core().Pods(ns).Delete(name, opts)
+	err := k8sutil.DeleteCouchbasePod(c.config.KubeCli, c.cluster.Namespace, name, opts)
 	if err != nil {
-		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return err
-		}
-		c.logger.Warnf("pod (%s) not found while trying to delete it", name)
+		c.logger.Errorf("error occurred during pod deletion (%s)", err)
+		return err
 	}
-
 	c.logger.Infof("deleted pod (%s)", name)
 	return nil
 }
@@ -571,4 +562,5 @@ func (c *Cluster) raiseEvent(event *v1.Event) {
 
 	// Update the last event timestamp
 	c.lastEvent = event.FirstTimestamp.Time
+
 }

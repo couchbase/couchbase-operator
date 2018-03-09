@@ -328,6 +328,33 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 	return crd
 }
 
+// Stateful 3 node cluster with a single volume.
+// Spec will request 1Gb of storage (minikube default is 5gb).
+// Also uses 'standard' storage class which is default in kubernetes
+func NewStatefulCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+
+	crd := NewBasicCluster(genName, secretName, size, withBucket, exposed)
+	volume := api.VolumeMount{Name: "couchbase", Path: "/opt/couchbase/var/lib/couchbase/"}
+	crd.Spec.ServerSettings[0].Pod = &api.PodPolicy{
+		VolumeMounts: []api.VolumeMount{volume},
+	}
+
+	standardStorageClass := "standard"
+	storagePolicy := CreatePodPolicy(v1.ResourceStorage, 1, 1, "Gi")
+	claim := v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "couchbase",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			StorageClassName: &standardStorageClass,
+			Resources:        storagePolicy.Resources,
+		},
+	}
+	crd.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{claim}
+	return crd
+}
+
 // Explicitly generated cluster name.  Used by TLS tests where we need to know
 // the cluster DNS names before creating the cluster to generate certificates.
 // This is non-reentrant so do not parallelize tests when in use.

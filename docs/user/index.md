@@ -7,6 +7,7 @@
   * [CouchbaseCluster Configuration](couchbaseClusterConfig.md)
   * [Displaying Information About a Couchbase Cluster](clusterStatusGuide.md)
   * [Viewing the Pods/Services Created by a Couchbase Cluster](listAndDescribe.md)
+  * [Using Persistent Volumes](persistedVolumesGuide.md)
 * [Accessing Couchbase](accessingCouchbase.md)
   * [Using the Couchbase Web Console](adminConsoleAccess.md)
   * [Using couchbase-cli](couchbaseCliGuide.md)

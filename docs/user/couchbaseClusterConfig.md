@@ -66,6 +66,17 @@ spec:
             value: cbapp
             effect: NoSchedule
         automountServiceAccountToken: false
+        volumeMounts:
+          - name: couchbase
+            path: /opt/couchbase/var/lib/couchbase/
+  volumeClaimTemplates:
+    - metadata:
+        name: couchbase
+      spec:
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 1Gi
 ```
 
 ## Top-Level Definitions
@@ -396,6 +407,9 @@ The Pod policy defines settings that apply to all Pods deployed with this node c
           operator: Equal
           value: cbapp
           effect: NoSchedule
+        volumeMounts:
+          - name: couchbase
+            path: /opt/couchbase/var/lib/couchbase/
 ```
 
 **couchbaseEnv**
@@ -461,3 +475,50 @@ This field specifies a key-value map of the constraints on node placement for po
 This field specifies conditions upon which a node should not be selected when deploying a pod. From the sample configuration file referenced in this topic, you can see that any node with a label app:cbapp should not be allowed to run the pod defined in this node specification. You might do this if you have nodes dedicated for running an application using Couchbase where you don’t want the database and application to be running on the same node. See the Kubernetes documentation on [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) for more information on setting tolerations. The tolerations section is optional.
 
 > *Field rules:* The value of this field cannot be changed after a server has been defined.
+
+
+#### VolumeMounts
+
+```yaml
+        volumeMounts:
+          - name: couchbase
+            path: /opt/couchbase/var/lib/couchbase/
+```
+
+VolumeMounts specify a path within the Pod that should be persisted.
+
+**name**
+
+Name of the volumeClaimTemplate used to created persisted volumes. The name must match the name of a volumeClaimTemplate within the spec.
+
+**path**
+
+Path within the pod to mount the persistent volume.gg
+
+## Spec: VolumeClaimTemplates
+
+```
+  volumeClaimTemplates:
+    - metadata:
+        name: couchbase
+      spec:
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 1Gi
+```
+
+Defines a template of a persistent volume claim.  At runtime, the operator will create a persistent volume from this template for each pod.  Claims can request volumes from various types of storage systems as indentified by the storage class name.
+
+**Metadata Name**
+
+The metadata name identifies the claim template.  This name is used by the volumeMounts to reference which template to fulfill the mount request.
+
+**StorageClassName**
+
+The StorageClass required by the claim. A StorageClass provides a way for administrators to describe the classes of storage they offer. If no StorageClass is specified, then the default StorageClass will be used.  See kubernetes documentation for more information about (Storage Classes.)[https://kubernetes.io/docs/concepts/storage/storage-classes/]
+
+
+**Resources**
+
+The minimum resources the volume should have.  Only the storage requests are valid in this context.

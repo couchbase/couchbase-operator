@@ -9,10 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 
 	"k8s.io/api/core/v1"
@@ -79,68 +77,6 @@ func GetPodNames(pods []*v1.Pod) []string {
 
 func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
-}
-
-func CreateCouchbasePod(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, version string, ns cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
-
-	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
-
-	container := containerWithLivenessProbe(couchbaseContainer("", cs.BaseImage, version),
-		couchbaseLivenessProbe())
-
-	if ns.Pod != nil {
-		container = containerWithRequirements(container, ns.Pod.Resources)
-	}
-
-	volumes := []v1.Volume{
-		{Name: "couchbase-data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
-	}
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        m.Name,
-			Labels:      labels,
-			Annotations: map[string]string{},
-		},
-		Spec: v1.PodSpec{
-			Containers:    []v1.Container{container},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes:       volumes,
-			Hostname:      m.Name,
-			Subdomain:     clusterName,
-		},
-	}
-
-	if cs.AntiAffinity {
-		pod = PodWithAntiAffinity(pod, clusterName)
-	}
-
-	applyPodPolicy(clusterName, pod, ns.Pod)
-
-	if err := applyPodTlsConfiguration(cs, pod); err != nil {
-		return nil, err
-	}
-
-	SetCouchbaseVersion(pod, cs.Version)
-
-	addOwnerRefToObject(pod.GetObjectMeta(), owner)
-	return pod, nil
-}
-
-func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
-	labels := map[string]string{
-		"app":                 "couchbase",
-		"couchbase_node":      memberName,
-		"couchbase_node_conf": ns.Name,
-		"couchbase_cluster":   clusterName,
-	}
-
-	for _, s := range ns.Services {
-		k := "couchbase_service_" + s
-		labels[k] = "enabled"
-	}
-
-	return labels
 }
 
 func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v1.ServicePort, selector, labels map[string]string) *v1.Service {
@@ -299,6 +235,20 @@ func mergeLabels(l1, l2 map[string]string) {
 		}
 		l1[k] = v
 	}
+}
+
+func DeletePod(kubeCli kubernetes.Interface, namespace, podName string, opts *metav1.DeleteOptions) error {
+	err := kubeCli.Core().Pods(namespace).Delete(podName, opts)
+	if err != nil {
+		if !IsKubernetesResourceNotFoundError(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func CreatePod(kubeCli kubernetes.Interface, namespace string, pod *v1.Pod) (*v1.Pod, error) {
+	return kubeCli.Core().Pods(namespace).Create(pod)
 }
 
 // Waits for a pod to be created and for it to respond to TCP connections on

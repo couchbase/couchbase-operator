@@ -186,6 +186,16 @@ func NewClusterMultiQuick(t *testing.T, kubeClient kubernetes.Interface, crClien
 
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
+
+	return newClusterFromSpec(t, kubeClient, crClient, clusterSpec, namespace, secretName, size, withBucket, exposed)
+}
+
+func NewStatefulCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewStatefulCluster("test-couchbase-", secretName, size, withBucket, exposed)
+	return newClusterFromSpec(t, kubeClient, crClient, clusterSpec, namespace, secretName, size, withBucket, exposed)
+}
+
+func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, clusterSpec *api.CouchbaseCluster, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	retries := 2
 	for i := 0; i < retries; i++ {
 		time.Sleep(10 * time.Second)
@@ -446,8 +456,8 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		} else {
 			t.Logf("Successfully deleted: [%v]", cluster.Name)
 		}
-	}
 
+	}
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	killPods := []string{}
 	for _, pod := range pods.Items {
@@ -472,12 +482,8 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string
 	return nil
 }
 
-func KillMember(kubecli kubernetes.Interface, namespace string, name string) error {
-	err := kubecli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
-	if err != nil && !k8sutil.IsKubernetesResourceNotFoundError(err) {
-		return err
-	}
-	return nil
+func KillMember(kubecli kubernetes.Interface, namespace, name string) error {
+	return k8sutil.DeleteCouchbasePod(kubecli, namespace, name, metav1.NewDeleteOptions(0))
 }
 
 func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {
@@ -591,7 +597,7 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 
 	for _, config := range cl.Spec.ServerSettings {
 		if config.Name == m.ServerConfig {
-			pod, err := k8sutil.CreateCouchbasePod(m, clusterName, cl.Spec, cl.Spec.Version, config, cl.AsOwner())
+			pod, err := k8sutil.CreateCouchbasePod(kubeCli, namespace, clusterName, m, cl.Spec, cl.Status.CurrentVersion, config, cl.AsOwner())
 			if err != nil {
 				return nil, err
 			}
@@ -766,4 +772,12 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 		return 0, fmt.Errorf("no nodes in the cluster")
 	}
 	return scaleNum, nil
+}
+
+// Construct expected name for the PersistentVolumeClaim which belongs to member
+// where 'index' specifies the Nth claim generated from the specs template.
+// Only specs with multiple VolumeMounts should return volumes with index > 0
+func GetMemberPVC(kubeCli kubernetes.Interface, namespace string, claimName string, memberName string, index int) (*v1.PersistentVolumeClaim, error) {
+	name := k8sutil.NameForPersistentVolumeClaim(claimName, memberName, index)
+	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }

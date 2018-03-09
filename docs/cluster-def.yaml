@@ -39,6 +39,9 @@ spec:
     dataPath: /opt/couchbase/var/lib/couchbase/data
     indexPath: /opt/couchbase/var/lib/couchbase/data
     pod:
+      volumeMounts:
+        - name: couchbase
+          path: /opt/couchbase/var/lib/couchbase/
       couchabseEnv:
         ENV1: value
       resources:
@@ -61,3 +64,11 @@ spec:
           effect: NoSchedule
           tolerationSeconds: 5
       automountServiceAccountToken: false
+  volumeClaimTemplates:
+    - metadata:
+        name: couchbase
+      spec:
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 1Gi
