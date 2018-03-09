@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Generate go code to report git information
+#
+# Useful when testers raise defects against unversioned snapshots.
+# We can recreate on the specific revision the defect was reported
+# against and easily check whether the defect has been fixed upstream
+
+mkdir -p pkg/revision
+cat > pkg/revision/revision.go <<EOF
+package revision
+
+const (
+	GitBranch   = "$(git symbolic-ref --short HEAD)"
+	GitRevision = "$(git rev-parse HEAD)"
+)
+EOF
+
+# vi: ts=8 noet:

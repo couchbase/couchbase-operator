@@ -10,4 +10,5 @@
 /build/
 /vendor/
 /pkg/generated/
+/pkg/revision/
 /test/e2e/logs/

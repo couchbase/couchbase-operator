@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/chaos"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/controller"
+	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -30,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-const version = "0.8.0"
+const version = "1.0.0"
 
 var (
 	listenAddr   string
@@ -68,6 +69,12 @@ func main() {
 		fmt.Println("couchbase-operator", version)
 		os.Exit(0)
 	}
+
+	// Log the version, branch and revision so we know
+	// * Version feature set
+	// * Whether this is an official or development branch
+	// * The exact commit defects are raised against
+	mainLogger.Infof("couchbase-operator v%s (%s %s)", version, revision.GitBranch, revision.GitRevision)
 
 	id, err := os.Hostname()
 	if err != nil {

@@ -21,6 +21,7 @@ vendor:
 build: dep $(BINARY)
 
 $(BINARY): $(SOURCE)
+	./scripts/codegen/revision
 	./scripts/codegen/update-generated.sh
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
 
