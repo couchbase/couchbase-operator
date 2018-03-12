@@ -2,10 +2,13 @@ package e2e
 
 import (
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //Assume each node has 7.6GB of memory
@@ -78,7 +81,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 	if err == nil {
 		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
-		t.Fatalf("pod placed with invalid resource list, fail: ", err)
+		t.Fatalf("pod placed with invalid resource list, fail: %v", err)
 	}
 	t.Logf("Pod not placed")
 }
@@ -91,13 +94,34 @@ func TestPodResourcesLow(t *testing.T) {
 	t.Skip("test not fully implemented...")
 }
 
-//Assume each node has 7.6GB of memory
-// TODO make work with minikube
 func TestPodResourcesCannotBePlaced(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
+
+	totalMemAvail := 0
+	nodeList, err := f.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err == nil {
+		if len(nodeList.Items) > 0 {
+			for _, value := range nodeList.Items {
+				node := &value
+				nodeMap := node.GetLabels()
+				if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+					continue
+				}
+				memQuantity := node.Status.Allocatable[v1.ResourceMemory]
+				totalMemAvail = totalMemAvail + int(memQuantity.Value()>>20)
+			}
+		} else {
+			t.Fatal("Unable to read node list")
+			return
+		}
+	} else {
+		t.Fatalf("Error while reading node list data: %v", err)
+	}
+	resMemReq := (totalMemAvail / 3)
+	resMemReq = resMemReq - (resMemReq % 1024)
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
 		"size":               "1",
@@ -105,13 +129,14 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		"services":           "data",
 		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
 		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
-		"resourceMemRequest": "7000",
+		"resourceMemRequest": strconv.Itoa(resMemReq),
 	}
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 	}
-	t.Logf("Pod Policy Resource Memory Request=7GB... \n scaling until pods cannot be placed")
+	t.Logf("Total cluster memory available: %dMB", totalMemAvail)
+	t.Logf("Pod Policy Resource Memory Request=%.2fGB... \n scaling until pods cannot be placed", float32(resMemReq)/1024)
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err != nil {
 		t.Fatalf("failed to place first pod: %v", err)
@@ -184,7 +209,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	if err == nil {
 		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
-		t.Fatalf("16GB request placed on node with 8GB, fail: ", err)
+		t.Fatalf("16GB request placed on node with 8GB, fail: %v", err)
 	}
 	t.Logf("Pod not placed")
 }
