@@ -1,181 +1,293 @@
 package e2e
 
 import (
+	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 )
 
-type testResult struct {
-	testName   string
-	testResult bool
+// TestFunc defines the test function type
+type TestFunc func(*testing.T)
+
+// TestSuite defines a suite of tests
+type TestSuite []TestFunc
+
+// TestDecorator decorates a test function.  This is used to augment an
+// existing test usually to perform setup and tear-down tasks e.g.
+// initializing and deleting a cluster or applying TLS configuration
+type TestDecorator func(TestFunc) TestFunc
+
+// TestResult simply maps a test name to a pass/fail flag
+type TestResult struct {
+	name   string
+	result bool
 }
 
+// Test suite definitions
+//
+// TODO: We should start thinking about a sane hierarchy here e.g. all devs want to
+// run a set of tests which will work on a single node minikube cluster.  For
+// example in TestSanity, TestAntiAffinityOn fails all the time. Something
+// like the following would be cool, then filter what we want to run based on path.
+//
+//     TestAll
+//       TestSingleNode
+//         TestBasic
+//         TestPod
+//         TestNode
+//         TestCluster
+//       TestMultiNode
+//         TestAntiAffinity
+//       TestAWS
+//         TestServerGroups
+//       TestGoogle
+//         TestServerGroups
+//
+var testSuiteSanity = TestSuite{
+	TestCreateCluster,
+	TestCreateBucketCluster,
+	TestBucketAddRemoveBasic,
+	TestEditBucket,
+	TestResizeCluster,
+	TestEditClusterSettings,
+	TestRecoveryAfterOnePodFailureNoBucket,
+	TestAntiAffinityOn,
+	TestPodResourcesBasic,
+}
+
+var testSuiteP0 = TestSuite{
+	TestCreateCluster,
+	TestCreateBucketCluster,
+	TestBucketAddRemoveBasic,
+	TestNegBucketAdd,
+	TestEditBucket,
+	TestNegBucketEdit,
+	TestResizeCluster,
+	TestResizeClusterWithBucket,
+	TestEditServiceConfig,
+	//TestNegEditServiceConfig,
+	TestRecoveryAfterOnePodFailureNoBucket,
+	TestRecoveryAfterTwoPodFailureNoBucket,
+	TestRecoveryAfterOnePodFailureBucketOneReplica,
+	TestRecoveryAfterTwoPodFailureBucketOneReplica,
+	TestRecoveryAfterOnePodFailureBucketTwoReplica,
+	TestRecoveryAfterTwoPodFailureBucketTwoReplica,
+	TestPodResourcesBasic,
+	TestPodResourcesCannotBePlaced,
+	TestFirstNodePodResourcesCannotBePlaced,
+	TestAntiAffinityOn,
+	TestAntiAffinityOnCannotBePlaced,
+	TestAntiAffinityOff,
+	TestEditClusterSettings,
+	TestNegEditClusterSettings,
+	TestBasicMDSScaling,
+	TestSwapNodesBetweenServices,
+	TestCreateClusterWithoutDataService,
+	TestCreateClusterDataServiceNotFirst,
+	TestRemoveLastDataService,
+	TestKillOperator,
+	TestKillOperatorAndUpdateClusterConfig,
+}
+
+var testSuiteP1 = TestSuite{
+	TestBucketAddRemoveExtended,
+	TestRevertExternalBucketUpdates,
+	TestInvalidAuthSecret,
+	TestInvalidBaseImage,
+	TestInvalidVersion,
+	//TestNodeUnschedulable,
+	TestNodeServiceDownRecovery,
+	//TestNodeServiceDownDuringRebalance,
+	TestReplaceManuallyRemovedNode,
+	TestManageMultipleClusters,
+	//TestNodeManualFailover,
+	TestNodeRecoveryAfterMemberAdd,
+	TestNodeRecoveryKilledNewMember,
+	//TestKillNodesAfterRebalanceAndFailover,
+	//TestRemoveForeignNode,
+	TestRecoveryAfterOneNsServerFailureBucketOneReplica,
+	TestRecoveryAfterOneNodeUnreachableBucketOneReplica,
+	TestRecoveryNodeTmpUnreachableBucketOneReplica,
+	TestPauseOperator,
+	TestNegPodResourcesBasic,
+	TestPodResourcesHigh,
+	TestPodResourcesLow,
+	TestAntiAffinityOnCannotBeScaled,
+}
+
+var testSuiteAll = TestSuite{
+	// basic tests
+	TestCreateCluster,
+	TestCreateBucketCluster,
+
+	// bucket tests
+	TestBucketAddRemoveBasic,
+	TestBucketAddRemoveExtended,
+	TestNegBucketAdd,
+	TestEditBucket,
+	TestNegBucketEdit,
+	TestRevertExternalBucketUpdates,
+
+	// cluster tests
+	TestResizeCluster,
+	TestResizeClusterWithBucket,
+	TestEditClusterSettings,
+	TestNegEditClusterSettings,
+	TestInvalidAuthSecret,
+	TestInvalidBaseImage,
+	TestInvalidVersion,
+	//TestNodeUnschedulable,
+	//TestNodeServiceDownDuringRebalance,
+	TestReplaceManuallyRemovedNode,
+	TestBasicMDSScaling,
+	TestSwapNodesBetweenServices,
+	TestCreateClusterWithoutDataService,
+	TestCreateClusterDataServiceNotFirst,
+	TestRemoveLastDataService,
+	TestManageMultipleClusters,
+
+	// node tests
+	TestEditServiceConfig,
+	TestNegEditServiceConfig,
+	TestNodeManualFailover,
+	TestNodeRecoveryAfterMemberAdd,
+	TestNodeRecoveryKilledNewMember,
+	TestKillNodesAfterRebalanceAndFailover,
+	TestRemoveForeignNode,
+	TestRecoveryAfterOnePodFailureNoBucket,
+	TestRecoveryAfterTwoPodFailureNoBucket,
+	TestRecoveryAfterOnePodFailureBucketOneReplica,
+	TestRecoveryAfterTwoPodFailureBucketOneReplica,
+	TestRecoveryAfterOnePodFailureBucketTwoReplica,
+	TestRecoveryAfterTwoPodFailureBucketTwoReplica,
+	TestRecoveryAfterOneNsServerFailureBucketOneReplica,
+	TestRecoveryAfterOneNodeUnreachableBucketOneReplica,
+	TestRecoveryNodeTmpUnreachableBucketOneReplica,
+	TestPauseOperator,
+	TestKillOperator,
+	TestKillOperatorAndUpdateClusterConfig,
+	// pod tests
+	TestPodResourcesBasic,
+	TestNegPodResourcesBasic,
+	TestPodResourcesHigh,
+	TestPodResourcesLow,
+	TestPodResourcesCannotBePlaced,
+	TestFirstNodePodResourcesCannotBePlaced,
+	TestAntiAffinityOn,
+	TestAntiAffinityOnCannotBePlaced,
+	TestAntiAffinityOnCannotBeScaled,
+	TestAntiAffinityOff,
+}
+
+var testSuiteTLS = TestSuite{
+	// Only TLS specific code is to do with node addition/removal
+	TestResizeCluster,
+}
+
+// TestFuncName return the name of a test function
+func getTestFuncName(f TestFunc) string {
+	// Use reflection and symbol lookups to determine the function name.
+	// This returns library_path.name, so extract the bit we are interested in
+	nameRaw := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
+	nameParts := strings.Split(nameRaw, ".")
+	return nameParts[len(nameParts)-1]
+}
+
+// runSuite takes a TestSuite and runs each test one at a time.  An optional list
+// of decorators may be applied to each test in the suite.  Decorators are
+// applied in order, so the first to be specified is the last to be run before
+// the test is run, and the first to be run after the test completes
+//
+// TODO: we may in future want to apply a decorator at a specific level in
+// the test hierarchy e.g. for a specific cloud provider we may need to
+// perform an admin option only once during a set of tests, others e.g.
+// static TLS, need to be performed on a per-test basis.  The distinction
+// is decorate immediately for a superset, or defer until we have an actual
+// set of tests
+func runSuite(t *testing.T, suite TestSuite, decorators ...TestDecorator) {
+	results := []TestResult{}
+	for _, test := range suite {
+		// Grab the test name before we possibly alter the test
+		// function pointer with decorators
+		name := getTestFuncName(test)
+
+		// Apply per-test decorations
+		for _, decorator := range decorators {
+			test = decorator(test)
+		}
+
+		// Run the test
+		res := t.Run(name, test)
+		results = append(results, TestResult{name, res})
+	}
+
+	if analyzeResults(t, results) {
+		t.Fatalf("suite contains failures")
+	}
+}
+
+// Top-level test sets
 func TestSanity(t *testing.T) {
-	testResults := []testResult{}
-	testResults = append(testResults, testResult{"TestCreateCluster", t.Run("TestCreateCluster", TestCreateCluster)})
-	testResults = append(testResults, testResult{"TestCreateBucketCluster", t.Run("TestCreateBucketCluster", TestCreateBucketCluster)})
-	testResults = append(testResults, testResult{"TestBucketAddRemoveBasic", t.Run("TestBucketAddRemoveBasic", TestBucketAddRemoveBasic)})
-	testResults = append(testResults, testResult{"TestEditBucket", t.Run("TestEditBucket", TestEditBucket)})
-	testResults = append(testResults, testResult{"TestResizeCluster", t.Run("TestResizeCluster", TestResizeCluster)})
-	testResults = append(testResults, testResult{"TestEditClusterSettings", t.Run("TestEditClusterSettings", TestEditClusterSettings)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureNoBucket", t.Run("TestRecoveryAfterOnePodFailureNoBucket", TestRecoveryAfterOnePodFailureNoBucket)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOn", t.Run("TestAntiAffinityOn", TestAntiAffinityOn)})
-	testResults = append(testResults, testResult{"TestPodResourcesBasic", t.Run("TestPodResourcesBasic", TestPodResourcesBasic)})
-
-	if AnalyzeResults(t, testResults) {
-		t.Fatalf("suite contains failures")
-	}
+	runSuite(t, testSuiteSanity)
 }
 
-// 30 tests
 func TestP0(t *testing.T) {
-	testResults := []testResult{}
-	testResults = append(testResults, testResult{"TestCreateCluster", t.Run("TestCreateCluster", TestCreateCluster)})
-	testResults = append(testResults, testResult{"TestCreateBucketCluster", t.Run("TestCreateBucketCluster", TestCreateBucketCluster)})
-	testResults = append(testResults, testResult{"TestBucketAddRemoveBasic", t.Run("TestBucketAddRemoveBasic", TestBucketAddRemoveBasic)})
-	testResults = append(testResults, testResult{"TestNegBucketAdd", t.Run("TestNegBucketAdd", TestNegBucketAdd)})
-	testResults = append(testResults, testResult{"TestEditBucket", t.Run("TestEditBucket", TestEditBucket)})
-	testResults = append(testResults, testResult{"TestNegBucketEdit", t.Run("TestNegBucketEdit", TestNegBucketEdit)})
-	testResults = append(testResults, testResult{"TestResizeCluster", t.Run("TestResizeCluster", TestResizeCluster)})
-	testResults = append(testResults, testResult{"TestResizeClusterWithBucket", t.Run("TestResizeClusterWithBucket", TestResizeClusterWithBucket)})
-	testResults = append(testResults, testResult{"TestEditServiceConfig", t.Run("TestEditServiceConfig", TestEditServiceConfig)})
-	//testResults = append(testResults, testResult{"TestNegEditServiceConfig", t.Run("TestNegEditServiceConfig", TestNegEditServiceConfig)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureNoBucket", t.Run("TestRecoveryAfterOnePodFailureNoBucket", TestRecoveryAfterOnePodFailureNoBucket)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterTwoPodFailureNoBucket", t.Run("TestRecoveryAfterTwoPodFailureNoBucket", TestRecoveryAfterTwoPodFailureNoBucket)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureBucketOneReplica", t.Run("TestRecoveryAfterOnePodFailureBucketOneReplica", TestRecoveryAfterOnePodFailureBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterTwoPodFailureBucketOneReplica", t.Run("TestRecoveryAfterTwoPodFailureBucketOneReplica", TestRecoveryAfterTwoPodFailureBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureBucketTwoReplica", t.Run("TestRecoveryAfterOnePodFailureBucketTwoReplica", TestRecoveryAfterOnePodFailureBucketTwoReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterTwoPodFailureBucketTwoReplica", t.Run("TestRecoveryAfterTwoPodFailureBucketTwoReplica", TestRecoveryAfterTwoPodFailureBucketTwoReplica)})
-	testResults = append(testResults, testResult{"TestPodResourcesBasic", t.Run("TestPodResourcesBasic", TestPodResourcesBasic)})
-	testResults = append(testResults, testResult{"TestPodResourcesCannotBePlaced", t.Run("TestPodResourcesCannotBePlaced", TestPodResourcesCannotBePlaced)})
-	testResults = append(testResults, testResult{"TestFirstNodePodResourcesCannotBePlaced", t.Run("TestFirstNodePodResourcesCannotBePlaced", TestFirstNodePodResourcesCannotBePlaced)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOn", t.Run("TestAntiAffinityOn", TestAntiAffinityOn)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOnCannotBePlaced", t.Run("TestAntiAffinityOnCannotBePlaced", TestAntiAffinityOnCannotBePlaced)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOff", t.Run("TestAntiAffinityOff", TestAntiAffinityOff)})
-	testResults = append(testResults, testResult{"TestEditClusterSettings", t.Run("TestEditClusterSettings", TestEditClusterSettings)})
-	testResults = append(testResults, testResult{"TestNegEditClusterSettings", t.Run("TestNegEditClusterSettings", TestNegEditClusterSettings)})
-	testResults = append(testResults, testResult{"TestBasicMDSScaling", t.Run("TestBasicMDSScaling", TestBasicMDSScaling)})
-	testResults = append(testResults, testResult{"TestSwapNodesBetweenServices", t.Run("TestSwapNodesBetweenServices", TestSwapNodesBetweenServices)})
-	testResults = append(testResults, testResult{"TestCreateClusterWithoutDataService", t.Run("TestCreateClusterWithoutDataService", TestCreateClusterWithoutDataService)})
-	testResults = append(testResults, testResult{"TestCreateClusterDataServiceNotFirst", t.Run("TestCreateClusterDataServiceNotFirst", TestCreateClusterDataServiceNotFirst)})
-	testResults = append(testResults, testResult{"TestRemoveLastDataService", t.Run("TestRemoveLastDataService", TestRemoveLastDataService)})
-	testResults = append(testResults, testResult{"TestKillOperator", t.Run("TestKillOperator", TestKillOperator)})
-	testResults = append(testResults, testResult{"TestKillOperatorAndUpdateClusterConfig", t.Run("TestKillOperatorAndUpdateClusterConfig", TestKillOperatorAndUpdateClusterConfig)})
-
-	if AnalyzeResults(t, testResults) {
-		t.Fatalf("suite contains failures")
-	}
+	runSuite(t, testSuiteP0)
 }
 
-// 21 tests
 func TestP1(t *testing.T) {
-	testResults := []testResult{}
-	testResults = append(testResults, testResult{"TestBucketAddRemoveExtended", t.Run("TestBucketAddRemoveExtended", TestBucketAddRemoveExtended)})
-	testResults = append(testResults, testResult{"TestRevertExternalBucketUpdates", t.Run("TestRevertExternalBucketUpdates", TestRevertExternalBucketUpdates)})
-	testResults = append(testResults, testResult{"TestInvalidAuthSecret", t.Run("TestInvalidAuthSecret", TestInvalidAuthSecret)})
-	testResults = append(testResults, testResult{"TestInvalidBaseImage", t.Run("TestInvalidBaseImage", TestInvalidBaseImage)})
-	testResults = append(testResults, testResult{"TestInvalidVersion", t.Run("TestInvalidVersion", TestInvalidVersion)})
-	//testResults = append(testResults, testResult{"TestNodeUnschedulable", t.Run("TestNodeUnschedulable", TestNodeUnschedulable)})
-	testResults = append(testResults, testResult{"TestNodeServiceDownRecovery", t.Run("TestNodeServiceDownRecovery", TestNodeServiceDownRecovery)})
-	// (TODO: fix K8S-113), testResults = append(testResults, testResult{"TestNodeServiceDownDuringRebalance", t.Run("TestNodeServiceDownDuringRebalance", TestNodeServiceDownDuringRebalance)})
-	testResults = append(testResults, testResult{"TestReplaceManuallyRemovedNode", t.Run("TestReplaceManuallyRemovedNode", TestReplaceManuallyRemovedNode)})
-	testResults = append(testResults, testResult{"TestManageMultipleClusters", t.Run("TestManageMultipleClusters", TestManageMultipleClusters)})
-	//testResults = append(testResults, testResult{"TestNodeManualFailover", t.Run("TestNodeManualFailover", TestNodeManualFailover)})
-	testResults = append(testResults, testResult{"TestNodeRecoveryAfterMemberAdd", t.Run("TestNodeRecoveryAfterMemberAdd", TestNodeRecoveryAfterMemberAdd)})
-	testResults = append(testResults, testResult{"TestNodeRecoveryKilledNewMember", t.Run("TestNodeRecoveryKilledNewMember", TestNodeRecoveryKilledNewMember)})
-	//testResults = append(testResults, testResult{"TestKillNodesAfterRebalanceAndFailover", t.Run("TestKillNodesAfterRebalanceAndFailover", TestKillNodesAfterRebalanceAndFailover)})
-	//testResults = append(testResults, testResult{"TestRemoveForeignNode", t.Run("TestRemoveForeignNode", TestRemoveForeignNode)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOneNsServerFailureBucketOneReplica", t.Run("TestRecoveryAfterOneNsServerFailureBucketOneReplica", TestRecoveryAfterOneNsServerFailureBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOneNodeUnreachableBucketOneReplica", t.Run("TestRecoveryAfterOneNodeUnreachableBucketOneReplica", TestRecoveryAfterOneNodeUnreachableBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryNodeTmpUnreachableBucketOneReplica", t.Run("TestRecoveryNodeTmpUnreachableBucketOneReplica", TestRecoveryNodeTmpUnreachableBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestPauseOperator", t.Run("TestPauseOperator", TestPauseOperator)})
-	testResults = append(testResults, testResult{"TestNegPodResourcesBasic", t.Run("TestNegPodResourcesBasic", TestNegPodResourcesBasic)})
-	testResults = append(testResults, testResult{"TestPodResourcesHigh", t.Run("TestPodResourcesHigh", TestPodResourcesHigh)})
-	testResults = append(testResults, testResult{"TestPodResourcesLow", t.Run("TestPodResourcesLow", TestPodResourcesLow)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOnCannotBeScaled", t.Run("TestAntiAffinityOnCannotBeScaled", TestAntiAffinityOnCannotBeScaled)})
-
-	if AnalyzeResults(t, testResults) {
-		t.Fatalf("suite contains failures")
-	}
+	runSuite(t, testSuiteP1)
 }
 
 func TestAll(t *testing.T) {
-	testResults := []testResult{}
-	// basic tests
-	testResults = append(testResults, testResult{"TestCreateCluster", t.Run("TestCreateCluster", TestCreateCluster)})
-	testResults = append(testResults, testResult{"TestCreateBucketCluster", t.Run("TestCreateBucketCluster", TestCreateBucketCluster)})
-	// bucket tests
-	testResults = append(testResults, testResult{"TestBucketAddRemoveBasic", t.Run("TestBucketAddRemoveBasic", TestBucketAddRemoveBasic)})
-	testResults = append(testResults, testResult{"TestBucketAddRemoveExtended", t.Run("TestBucketAddRemoveExtended", TestBucketAddRemoveExtended)})
-	testResults = append(testResults, testResult{"TestNegBucketAdd", t.Run("TestNegBucketAdd", TestNegBucketAdd)})
-	testResults = append(testResults, testResult{"TestEditBucket", t.Run("TestEditBucket", TestEditBucket)})
-	testResults = append(testResults, testResult{"TestNegBucketEdit", t.Run("TestNegBucketEdit", TestNegBucketEdit)})
-	testResults = append(testResults, testResult{"TestRevertExternalBucketUpdates", t.Run("TestRevertExternalBucketUpdates", TestRevertExternalBucketUpdates)})
-	// cluster tests
-	testResults = append(testResults, testResult{"TestResizeCluster", t.Run("TestResizeCluster", TestResizeCluster)})
-	testResults = append(testResults, testResult{"TestResizeClusterWithBucket", t.Run("TestResizeClusterWithBucket", TestResizeClusterWithBucket)})
-	testResults = append(testResults, testResult{"TestEditClusterSettings", t.Run("TestEditClusterSettings", TestEditClusterSettings)})
-	testResults = append(testResults, testResult{"TestNegEditClusterSettings", t.Run("TestNegEditClusterSettings", TestNegEditClusterSettings)})
-	testResults = append(testResults, testResult{"TestInvalidAuthSecret", t.Run("TestInvalidAuthSecret", TestInvalidAuthSecret)})
-	testResults = append(testResults, testResult{"TestInvalidBaseImage", t.Run("TestInvalidBaseImage", TestInvalidBaseImage)})
-	testResults = append(testResults, testResult{"TestInvalidVersion", t.Run("TestInvalidVersion", TestInvalidVersion)})
-	//testResults = append(testResults, testResult{"TestNodeUnschedulable", t.Run("TestNodeUnschedulable", TestNodeUnschedulable)})
-	//testResults = append(testResults, testResult{"TestNodeServiceDownDuringRebalance", t.Run("TestNodeServiceDownDuringRebalance", TestNodeServiceDownDuringRebalance)})
-	testResults = append(testResults, testResult{"TestReplaceManuallyRemovedNode", t.Run("TestReplaceManuallyRemovedNode", TestReplaceManuallyRemovedNode)})
-	testResults = append(testResults, testResult{"TestBasicMDSScaling", t.Run("TestBasicMDSScaling", TestBasicMDSScaling)})
-	testResults = append(testResults, testResult{"TestSwapNodesBetweenServices", t.Run("TestSwapNodesBetweenServices", TestSwapNodesBetweenServices)})
-	testResults = append(testResults, testResult{"TestCreateClusterWithoutDataService", t.Run("TestCreateClusterWithoutDataService", TestCreateClusterWithoutDataService)})
-	testResults = append(testResults, testResult{"TestCreateClusterDataServiceNotFirst", t.Run("TestCreateClusterDataServiceNotFirst", TestCreateClusterDataServiceNotFirst)})
-	testResults = append(testResults, testResult{"TestRemoveLastDataService", t.Run("TestRemoveLastDataService", TestRemoveLastDataService)})
-	testResults = append(testResults, testResult{"TestManageMultipleClusters", t.Run("TestManageMultipleClusters", TestManageMultipleClusters)})
-	// node tests
-	testResults = append(testResults, testResult{"TestEditServiceConfig", t.Run("TestEditServiceConfig", TestEditServiceConfig)})
-	testResults = append(testResults, testResult{"TestNegEditServiceConfig", t.Run("TestNegEditServiceConfig", TestNegEditServiceConfig)})
-	testResults = append(testResults, testResult{"TestNodeManualFailover", t.Run("TestNodeManualFailover", TestNodeManualFailover)})
-	testResults = append(testResults, testResult{"TestNodeRecoveryAfterMemberAdd", t.Run("TestNodeRecoveryAfterMemberAdd", TestNodeRecoveryAfterMemberAdd)})
-	testResults = append(testResults, testResult{"TestNodeRecoveryKilledNewMember", t.Run("TestNodeRecoveryKilledNewMember", TestNodeRecoveryKilledNewMember)})
-	testResults = append(testResults, testResult{"TestKillNodesAfterRebalanceAndFailover", t.Run("TestKillNodesAfterRebalanceAndFailover", TestKillNodesAfterRebalanceAndFailover)})
-	testResults = append(testResults, testResult{"TestRemoveForeignNode", t.Run("TestRemoveForeignNode", TestRemoveForeignNode)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureNoBucket", t.Run("TestRecoveryAfterOnePodFailureNoBucket", TestRecoveryAfterOnePodFailureNoBucket)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterTwoPodFailureNoBucket", t.Run("TestRecoveryAfterTwoPodFailureNoBucket", TestRecoveryAfterTwoPodFailureNoBucket)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureBucketOneReplica", t.Run("TestRecoveryAfterOnePodFailureBucketOneReplica", TestRecoveryAfterOnePodFailureBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterTwoPodFailureBucketOneReplica", t.Run("TestRecoveryAfterTwoPodFailureBucketOneReplica", TestRecoveryAfterTwoPodFailureBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOnePodFailureBucketTwoReplica", t.Run("TestRecoveryAfterOnePodFailureBucketTwoReplica", TestRecoveryAfterOnePodFailureBucketTwoReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterTwoPodFailureBucketTwoReplica", t.Run("TestRecoveryAfterTwoPodFailureBucketTwoReplica", TestRecoveryAfterTwoPodFailureBucketTwoReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOneNsServerFailureBucketOneReplica", t.Run("TestRecoveryAfterOneNsServerFailureBucketOneReplica", TestRecoveryAfterOneNsServerFailureBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryAfterOneNodeUnreachableBucketOneReplica", t.Run("TestRecoveryAfterOneNodeUnreachableBucketOneReplica", TestRecoveryAfterOneNodeUnreachableBucketOneReplica)})
-	testResults = append(testResults, testResult{"TestRecoveryNodeTmpUnreachableBucketOneReplica", t.Run("TestRecoveryNodeTmpUnreachableBucketOneReplica", TestRecoveryNodeTmpUnreachableBucketOneReplica)})
-	// operator tests
-	testResults = append(testResults, testResult{"TestPauseOperator", t.Run("TestPauseOperator", TestPauseOperator)})
-	testResults = append(testResults, testResult{"TestKillOperator", t.Run("TestKillOperator", TestKillOperator)})
-	testResults = append(testResults, testResult{"TestKillOperatorAndUpdateClusterConfig", t.Run("TestKillOperatorAndUpdateClusterConfig", TestKillOperatorAndUpdateClusterConfig)})
-	// pod tests
-	testResults = append(testResults, testResult{"TestPodResourcesBasic", t.Run("TestPodResourcesBasic", TestPodResourcesBasic)})
-	testResults = append(testResults, testResult{"TestNegPodResourcesBasic", t.Run("TestNegPodResourcesBasic", TestNegPodResourcesBasic)})
-	testResults = append(testResults, testResult{"TestPodResourcesHigh", t.Run("TestPodResourcesHigh", TestPodResourcesHigh)})
-	testResults = append(testResults, testResult{"TestPodResourcesLow", t.Run("TestPodResourcesLow", TestPodResourcesLow)})
-	testResults = append(testResults, testResult{"TestPodResourcesCannotBePlaced", t.Run("TestPodResourcesCannotBePlaced", TestPodResourcesCannotBePlaced)})
-	testResults = append(testResults, testResult{"TestFirstNodePodResourcesCannotBePlaced", t.Run("TestFirstNodePodResourcesCannotBePlaced", TestFirstNodePodResourcesCannotBePlaced)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOn", t.Run("TestAntiAffinityOn", TestAntiAffinityOn)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOnCannotBePlaced", t.Run("TestAntiAffinityOnCannotBePlaced", TestAntiAffinityOnCannotBePlaced)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOnCannotBeScaled", t.Run("TestAntiAffinityOnCannotBeScaled", TestAntiAffinityOnCannotBeScaled)})
-	testResults = append(testResults, testResult{"TestAntiAffinityOff", t.Run("TestAntiAffinityOff", TestAntiAffinityOff)})
-
-	if AnalyzeResults(t, testResults) {
-		t.Fatalf("suite contains failures")
-	}
+	runSuite(t, testSuiteAll)
 }
 
-func AnalyzeResults(t *testing.T, testResults []testResult) bool {
+func TestRSA(t *testing.T) {
+	runSuite(t, testSuiteTLS, rsaDecorator)
+}
+
+func TestEllipticP224(t *testing.T) {
+	runSuite(t, testSuiteTLS, ellipticP224Decorator)
+}
+
+func TestEllipticP256(t *testing.T) {
+	runSuite(t, testSuiteTLS, ellipticP256Decorator)
+}
+
+func TestEllipticP384(t *testing.T) {
+	runSuite(t, testSuiteTLS, ellipticP384Decorator)
+}
+
+func TestEllipticP521(t *testing.T) {
+	runSuite(t, testSuiteTLS, ellipticP521Decorator)
+}
+
+func TestTLS(t *testing.T) {
+	suite := TestSuite{
+		TestRSA,
+		// These don't work: see MB-28680
+		TestEllipticP224,
+		TestEllipticP256,
+		TestEllipticP384,
+		TestEllipticP521,
+	}
+	runSuite(t, suite)
+}
+
+// analyzeResults accepts a list of test results and displays success rates
+func analyzeResults(t *testing.T, testResults []TestResult) bool {
 	t.Logf("Suite Test Results: \n")
 
 	failures := []string{}
 	for i, result := range testResults {
-		if result.testResult {
-			t.Logf("%d: %s...PASS", i+1, result.testName)
+		if result.result {
+			t.Logf("%d: %s...PASS", i+1, result.name)
 		}
-		if !result.testResult {
-			t.Logf("%d: %s...FAIL", i+1, result.testName)
-			failures = append(failures, result.testName)
+		if !result.result {
+			t.Logf("%d: %s...FAIL", i+1, result.name)
+			failures = append(failures, result.name)
 
 		}
 	}
