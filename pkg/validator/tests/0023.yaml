@@ -1,28 +1,23 @@
+# The basic couchbase bucket creation
 apiVersion: couchbase.database.couchbase.com/v1beta1
 kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  baseImage: couchbase/server
   version: enterprise-5.0.1
   authSecret: cb-example-auth
-  exposeAdminConsole: true
   cluster:
-    dataServiceMemoryQuota: 256
-    indexServiceMemoryQuota: 256
-    searchServiceMemoryQuota: 256
-    indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 30
+    indexStorageSetting: plasma
   buckets:
     - name: default
-      type: couchbase
-      memoryQuota: 128
+      type: memcached
+      memoryQuota: 256
       replicas: 1
       ioPriority: high
-      evictionPolicy: fullEviction
+      evictionPolicy: valueOnly
       conflictResolution: seqno
-      enableFlush: true
-      enableIndexReplica: false
+      enableFlush: false
+      enableIndexReplica: true
   servers:
     - size: 3
       name: all_services

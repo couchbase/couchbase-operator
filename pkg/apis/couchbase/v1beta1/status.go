@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -100,6 +101,16 @@ type MembersStatus struct {
 	Ready []string `json:"ready,omitempty"`
 	// Unready are the couchbase members not ready to serve requests
 	Unready []string `json:"unready,omitempty"`
+}
+
+func (ms *MembersStatus) SetReady(ready []string) {
+	sort.Strings(ready)
+	ms.Ready = ready
+}
+
+func (ms *MembersStatus) SetUnready(unready []string) {
+	sort.Strings(unready)
+	ms.Unready = unready
 }
 
 func (cs *ClusterStatus) SetVersion(v string) {

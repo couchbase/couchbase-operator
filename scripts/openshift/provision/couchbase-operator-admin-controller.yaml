@@ -1,0 +1,20 @@
+# controller for watching creation of CRD's and assigning
+# cluster-admin permissions to default service account
+# withint the CRD project
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: couchbase-operator-admin-controller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: couchbase-operator-admin
+    spec:
+      serviceAccountName: couchbase-operator-admin
+      containers:
+      - name: couchbase-operator-admin
+        image: couchbaseutils/couchbase-operator-admin:beta
+        imagePullPolicy: IfNotPresent

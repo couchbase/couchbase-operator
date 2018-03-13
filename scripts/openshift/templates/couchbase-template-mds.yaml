@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: couchbase-server-mds
+  annotations:
+    openshift.io/display-name: "Couchbase"
+    description: "Couchbase Server deployment template for a cluster with multi-dimensional scaling"
+    iconClass: "fa fa-database"
+    tags: "couchbase,database"
+message: "Your cluster name is ${CLUSTER_NAME}.  The administrator console will be available here: http://${CLUSTER_NAME}-frontend.${HOST_NAME}"
+
+objects:
+
+ # Cluster Auth
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: "${CLUSTER_NAME}-example-auth"
+    type: Opaque
+    stringData:
+      username: "${ADMIN_USERNAME}"
+      password: "${ADMIN_PASSWORD}"
+
+
+  # Front Route Spec
+  - apiVersion: v1
+    kind: Route
+    metadata:
+      name: "${CLUSTER_NAME}-frontend"
+    spec:
+      host: "${CLUSTER_NAME}-frontend.${HOST_NAME}"
+      to:
+        kind: Service
+        name: "${CLUSTER_NAME}-ui"
+
+  # Cluster CRD Spec
+  - apiVersion: couchbase.database.couchbase.com/v1beta1
+    kind: CouchbaseCluster
+    metadata:
+      name: "${CLUSTER_NAME}"
+    spec:
+      baseImage: couchbase/server
+      version: "enterprise-${CLUSTER_VERSION}"
+      authSecret: "${CLUSTER_NAME}-example-auth"
+      exposeAdminConsole: "${{EXPOSE_UI}}"
+      cluster:
+        dataServiceMemoryQuota: "${{DATA_MEM_QUOTA_MB}}"
+        indexServiceMemoryQuota:  "${{INDEX_MEM_QUOTA_MB}}"
+        searchServiceMemoryQuota: "${{SEARCH_MEM_QUOTA_MB}}"
+        indexStorageSetting: "${{INDEX_STORAGE_SETTING}}"
+        autoFailoverTimeout: 30
+      buckets:
+        - name: "${BUCKET_NAME}"
+          type: "${BUCKET_TYPE}"
+          memoryQuota: "${{BUCKET_MEMORY_QUOTA}}"
+          replicas: 1
+          ioPriority: high
+          evictionPolicy: fullEviction
+          conflictResolution: seqno
+          enableIndexReplica: false
+          enableFlush: false
+      servers:
+        - size: "${{DATA_SIZE}}"
+          name: data_services
+          services:
+            - data
+          dataPath: /opt/couchbase/var/lib/couchbase/data
+        - size: "${{INDEX_SIZE}}"
+          name: index_services
+          services:
+            - index
+          indexPath: /opt/couchbase/var/lib/couchbase/data
+        - size: "${{QUERY_SIZE}}"
+          name: query_services
+          services:
+            - query
+        - size: "${{SEARCH_SIZE}}"
+          name: sg00
+          services:
+            - search
+parameters:
+
+# Cluster spec params
+- description: Administrator Username
+  name: ADMIN_USERNAME
+  required: true
+- description: Administrator Password
+  name: ADMIN_PASSWORD
+  required: true
+- description: Name of cluster
+  name:  CLUSTER_NAME
+  from: 'cb-[a-z]{6}'
+  generate: expression
+- description: Cluster Version  (5.0.1+)
+  name:  CLUSTER_VERSION
+  value: "5.0.1"
+- description: Expose the administration console
+  name:  EXPOSE_UI
+  value: "true"
+
+
+
+# Server spec params
+- description: Number of data servers
+  name: DATA_SIZE
+  value: "1"
+- description: Number of index servers
+  name: INDEX_SIZE
+  value: "1"
+- description: Number of query servers
+  name: QUERY_SIZE
+  value: "1"
+- description: Number of search servers
+  name: SEARCH_SIZE
+  value: "1"
+
+# Bucket spec params
+- description: The bucket name
+  name: BUCKET_NAME
+  value: "default"
+- description: The amount of memory that should be allocated to the data service
+  name: DATA_MEM_QUOTA_MB
+  value: "256"
+- description: The amount of memory that should be allocated to the index service
+  name: INDEX_MEM_QUOTA_MB
+  value: "256"
+- description: The amount of memory that should be allocated to the search service
+  name: SEARCH_MEM_QUOTA_MB
+  value: "256"
+- description: The index storage mode to use for secondary indexing (memory_optimized, plasma)
+  name: INDEX_STORAGE_SETTING
+  value: "memory_optimized"
+- description: The type of bucket to use (couchbase, ephemeral)
+  name: BUCKET_TYPE
+  value: "couchbase"
+- description: The amount of memory that should be allocated to the bucket
+  name: BUCKET_MEMORY_QUOTA
+  value: "128"
+
+# Router
+- description: Public hostname for the route. If not specified, a hostname is generated.
+  name: HOST_NAME
+  value: "127.0.0.1.nip.io"

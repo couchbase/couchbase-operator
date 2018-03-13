@@ -60,10 +60,10 @@ spec:
         nodeSelector:
           instanceType: large
         tolerations:
-          key: app
-          operator: Equal
-          value: cbapp
-          effect: NoSchedule
+          - key: app
+            operator: Equal
+            value: cbapp
+            effect: NoSchedule
         automountServiceAccountToken: false
 ```
 
@@ -323,10 +323,10 @@ You must specify at least one, but possibly multiple node specifications. A node
       nodeSelector:
         instanceType: large
       tolerations:
-        key: app
-        operator: Equal
-        value: cbapp
-        effect: NoSchedule
+        - key: app
+          operator: Equal
+          value: cbapp
+          effect: NoSchedule
 ```
 
 *Specification rules:* The ```servers``` portion of the specification is required and must always contain at least one server definition. There must also be at least one definition that contains the data service.
@@ -367,7 +367,7 @@ The Pod policy defines settings that apply to all Pods deployed with this node c
 
 ```yaml
 ...
-    podPolicy:
+    pod:
       couchabseEnv:
         CB_ENV_VAR: value
       resources:
@@ -384,10 +384,10 @@ The Pod policy defines settings that apply to all Pods deployed with this node c
       nodeSelector:
         instanceType: large
       tolerations:
-        key: app
-        operator: Equal
-        value: cbapp
-        effect: NoSchedule
+        - key: app
+          operator: Equal
+          value: cbapp
+          effect: NoSchedule
 ```
 
 **couchbaseEnv**

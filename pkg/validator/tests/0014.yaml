@@ -1,0 +1,22 @@
+# This configuration sets the adminConsoleServices to invalid
+apiVersion: couchbase.database.couchbase.com/v1beta1
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  version: enterprise-5.0.1
+  authSecret: cb-example-auth
+  adminConsoleServices:
+    - invalid
+  cluster:
+    indexStorageSetting: plasma
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+      dataPath: /opt/couchbase/var/lib/couchbase/data
+      indexPath: /opt/couchbase/var/lib/couchbase/data

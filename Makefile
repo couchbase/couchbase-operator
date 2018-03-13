@@ -24,6 +24,7 @@ $(BINARY): $(SOURCE)
 	./scripts/codegen/revision
 	./scripts/codegen/update-generated.sh
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopctl ./cmd/cbopctl/
 
 container: build
 	docker build -t couchbase/couchbase-operator:v1 .
@@ -53,3 +54,6 @@ test-indv:
 		-v -timeout 60m --race --kubeconfig $(kubeconfig) --operator-image \
 		$(operatorImage) --namespace $(namespace) --deployment-spec \
 		$(deploymentSpec)
+
+test-unit:
+	go test -v github.com/couchbase/couchbase-operator/pkg/validator
