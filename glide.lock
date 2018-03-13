@@ -1,10 +1,15 @@
-hash: 0f2f768afcc3dd9f0e741b7bff8427942c6b5a95661ae446b3db18a6da6aeb92
-updated: 2018-03-06T11:57:37.400636545-08:00
+hash: df28bf59ae4074fb1b66ab76574bae1e990beb9f9836e78889a6a5f793537fb4
+updated: 2018-03-14T13:01:35.333547137-07:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 593d64559f7600f29581a3ee42177f5dbded27a9
 - name: github.com/couchbase/cbflag
   version: dbeda68bf448ce8e85e52a3216f3b031ef18a4b7
+  subpackages:
+  - man
+  - pwd
+- name: github.com/couchbase/gocbmgr
+  version: 357fd3f6e78ea231a2dddfd8d509fdae2a3af2cc
 - name: github.com/couchbaselabs/gocbmgr
   version: 357fd3f6e78ea231a2dddfd8d509fdae2a3af2cc
 - name: github.com/davecgh/go-spew
@@ -55,10 +60,12 @@ imports:
 - name: github.com/golang/protobuf
   version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
   subpackages:
+  - jsonpb
   - proto
   - ptypes
   - ptypes/any
   - ptypes/duration
+  - ptypes/struct
   - ptypes/timestamp
 - name: github.com/google/btree
   version: 7d79101e329e5a3adf994758c578dab82b90c017
@@ -103,17 +110,22 @@ imports:
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: golang.org/x/crypto
-  version: d9133f5469342136e669e85192a26056b587f503
+  version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:
   - ssh/terminal
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
+  - html
+  - html/atom
   - http2
   - http2/hpack
   - idna
+  - internal/timeseries
   - lex/httplex
+  - trace
+  - websocket
 - name: golang.org/x/sys
   version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:
@@ -144,6 +156,7 @@ imports:
 - name: k8s.io/api
   version: 006a217681ae70cbacdd66a5e2fca1a61a8ff28e
   subpackages:
+  - admission/v1beta1
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
   - apps/v1
@@ -292,6 +305,9 @@ imports:
 - name: k8s.io/kube-openapi
   version: 39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1
   subpackages:
+  - pkg/builder
   - pkg/common
+  - pkg/handler
+  - pkg/util
   - pkg/util/proto
 testImports: []
