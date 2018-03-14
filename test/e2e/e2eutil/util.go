@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"math"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -186,7 +187,7 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	for i := 0; i < 5; i++ {
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
-			DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
+			//(TODO) attempt to clean up namespace
 			if i == 4 {
 				return nil, err1
 			}
@@ -566,4 +567,64 @@ func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error
 		return "couchbase-operator", errors.New("too many couchbase operators")
 	}
 	return operatorPods[0], nil
+}
+
+func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error){
+	minMem := math.Inf(+1)
+	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return 0.0, err
+	}
+	if len(nodeList.Items) > 0 {
+		for _, value := range nodeList.Items {
+			node := &value
+			nodeMap := node.GetLabels()
+			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+				continue
+			}
+			//kilobytes
+			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
+			//megabytes
+			newMem := float64(memQuantity.Value()>>20)
+			if newMem < minMem {
+				minMem = newMem
+			}
+		}
+		if minMem == math.Inf(+1) {
+			return 0.0, fmt.Errorf("no minimum found")
+		}
+
+	} else {
+		return 0.0, fmt.Errorf("no nodes in the cluster")
+	}
+	return minMem, nil
+}
+
+func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
+	scaleNum := 0
+	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return 0, err
+	}
+	if len(nodeList.Items) > 0 {
+		for _, value := range nodeList.Items {
+			node := &value
+			nodeMap := node.GetLabels()
+			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+				continue
+			}
+			//kilobytes
+			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
+			//megabytes
+			nodeMem := float64(memQuantity.Value()>>20)
+			scaleNum = scaleNum + int(math.Floor(nodeMem / minMem))
+		}
+		if minMem == math.Inf(+1) {
+			return 0, fmt.Errorf("unable to calculate scale number")
+		}
+
+	} else {
+		return 0, fmt.Errorf("no nodes in the cluster")
+	}
+	return scaleNum, nil
 }
