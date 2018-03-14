@@ -7,7 +7,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"github.com/couchbaselabs/gocbmgr"
+	"github.com/couchbase/gocbmgr"
 	"os"
 	"strconv"
 	"testing"
