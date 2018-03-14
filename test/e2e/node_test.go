@@ -131,21 +131,43 @@ func TestNegEditServiceConfig(t *testing.T) {
 	// edit service size
 	newSize := "-2"
 	oldSize := "1"
-	t.Log("Changing cluster size")
+	t.Log("Changing cluster size to -2")
 	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	t.Log("Verify resize did not happen")
 	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSize, e2eutil.NumNodesVerifier)
 	if err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
+
+	t.Log("Verify cluster size is 1")
 	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, oldSize, e2eutil.NumNodesVerifier)
 	if err != nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 
+	t.Log("Verify cluster balanced and healthy through rest api")
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	t.Log("Changing cluster size back to 1")
+	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", oldSize, f.CRClient, testCouchbase, e2eutil.Retries5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Verify cluster size is 1")
+	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, oldSize, e2eutil.NumNodesVerifier)
+	if err != nil {
+		t.Fatalf("failed to reject invalid service size: %v", err)
+	}
+
+	t.Log("Verify cluster balanced and healthy through rest api")
 	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
@@ -160,6 +182,7 @@ func TestNegEditServiceConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
+
 	if !expectedEvents.Compare(events) {
 		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
@@ -182,6 +205,13 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create a client to admin console
 	testCouchbase, err = e2eutil.GetClusterCRD(f.CRClient, testCouchbase)
@@ -215,8 +245,10 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
 	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,6 +260,8 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+
 	// expect operator to rebalance in the node
 	event = k8sutil.RebalanceEvent(testCouchbase)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
@@ -235,10 +269,30 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
 	// healthy 2 node cluster
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 2, 18)
 	if err != nil {
 		t.Fatal(err.Error())
+	}
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries30)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
+	if err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -286,7 +340,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	}
 
 	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +391,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	}
 
 	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +469,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	}
 
 	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +481,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 // 1. Create 1 node cluster
 // 2. Manually add 1 external member to cluster
 // 3. Request cluster resize to 2 members
-// 4. Verify that actuall cluster size is 2 nodes
+// 4. Verify that actual cluster size is 2 nodes
 // 5. Verify that external member was removed
 // 6. Verify that the 2 cluster nodes are healthy
 func TestRemoveForeignNode(t *testing.T) {

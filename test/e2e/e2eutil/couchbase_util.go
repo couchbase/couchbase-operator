@@ -5,7 +5,7 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbaselabs/gocbmgr"
+	"github.com/couchbase/gocbmgr"
 	"k8s.io/client-go/kubernetes"
 	"reflect"
 	"strconv"

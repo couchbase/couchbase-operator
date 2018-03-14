@@ -15,7 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbaselabs/gocbmgr"
+	"github.com/couchbase/gocbmgr"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"

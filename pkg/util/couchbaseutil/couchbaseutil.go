@@ -10,7 +10,7 @@ import (
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbaselabs/gocbmgr"
+	"github.com/couchbase/gocbmgr"
 	"github.com/sirupsen/logrus"
 )
 
