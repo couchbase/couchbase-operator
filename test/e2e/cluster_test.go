@@ -10,6 +10,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test scaling a cluster with no buckets up and down
@@ -450,22 +451,32 @@ func TestNodeUnschedulable(t *testing.T) {
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
 	// request 70% of allocatable memory
 	allocatableMemory, err := e2eutil.GetK8SAllocatableMemory(f.KubeClient, f.Namespace, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	
+	t.Logf("Allocatable Memory: %d", allocatableMemory)
 	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
 		cl.Spec.ServerSettings[0].Pod = e2espec.CreateMemoryPodPolicy(allocatableMemory*7/10, allocatableMemory)
 	})
 	// async start resize cluster
+	nodeList, err := f.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+
+	//first node wont change request and last node should be unschedulable and minus out the master node
+	newSize := len(nodeList.Items) + 1
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, 3, f.CRClient, testCouchbase)
+		echan <- e2eutil.ResizeCluster(t, 0, newSize, f.CRClient, testCouchbase)
 	}()
 
 	// expect unbalanced condition
-	err = e2eutil.WaitForClusterUnBalancedCondition(f.CRClient, testCouchbase, 300)
+	err = e2eutil.WaitForClusterUnBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,16 +489,28 @@ func TestNodeUnschedulable(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	for i := 1; i < newSize; i++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, i)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
 	// verify result from cluster resize ok
 	err = <-echan
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// cluster should be healthy with 3 nodes
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 3, 18)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, newSize, 18)
 	if err != nil {
 		t.Fatal(err.Error())
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 
 }
@@ -564,7 +587,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	}()
 
 	// when cluster starts scaling kill couchbase service on pod 0
-	err = e2eutil.WaitForClusterScalingCondition(f.CRClient, testCouchbase, 300)
+	err = e2eutil.WaitForClusterScalingCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -665,7 +688,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	}
 
 	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(f.CRClient, testCouchbase, 300)
+	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -379,42 +379,42 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
-func WaitForManagedConfigCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, status v1.ConditionStatus, wait int) error {
-	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, status, cl, time.Now(), wait)
+func WaitForManagedConfigCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, status v1.ConditionStatus, wait int) error {
+	return WaitForClusterCondition(t, crClient, api.ClusterConditionBalanced, status, cl, time.Now(), wait)
 }
 
 // waits until the cluter's scaling condition
-func WaitForClusterScalingCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
-	return WaitForClusterCondition(crClient, api.ClusterConditionScaling, v1.ConditionTrue, cl, time.Now(), wait)
+func WaitForClusterScalingCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
+	return WaitForClusterCondition(t, crClient, api.ClusterConditionScaling, v1.ConditionTrue, cl, time.Now(), wait)
 }
 
 // waits until the cluter's balanced condition is set
-func WaitForClusterBalancedCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
-	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, v1.ConditionTrue, cl, time.Now(), wait)
+func WaitForClusterBalancedCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
+	return WaitForClusterCondition(t, crClient, api.ClusterConditionBalanced, v1.ConditionTrue, cl, time.Now(), wait)
 }
 
 // waits until the cluter's balanced condition is false
-func WaitForClusterUnBalancedCondition(crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
-	return WaitForClusterCondition(crClient, api.ClusterConditionBalanced, v1.ConditionFalse, cl, time.Now(), wait)
+func WaitForClusterUnBalancedCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, wait int) error {
+	return WaitForClusterCondition(t, crClient, api.ClusterConditionBalanced, v1.ConditionFalse, cl, time.Now(), wait)
 }
 
 // waits until the provided condition type with associated status after specified timestamp
-func WaitForClusterCondition(crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) error {
+func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) error {
 	cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
 	if err != nil {
 		return err
 	}
 
-	// check conditions every second, or until duration reached
-	tick := time.Tick(1 * time.Second)
-	duration := time.Duration(wait) * time.Second
+	timeOutChan := time.NewTimer(time.Duration(wait) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
 	for {
 		select {
-		case <-time.After(duration):
+		case <-timeOutChan:
 			return fmt.Errorf("timed out waiting for condition %s with status: %s", conditionType, status)
 
-		case <-tick:
+		case <-tickChan:
 			// compare cluster conditions to desired condition
+			t.Logf("cluster status: %s", cluster.Status.Conditions)
 			for _, condition := range cluster.Status.Conditions {
 				if condition.Type == conditionType && condition.Status == status {
 					conditionTime, err := time.Parse(time.RFC3339, condition.LastUpdateTime)
