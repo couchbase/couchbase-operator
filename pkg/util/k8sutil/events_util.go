@@ -28,11 +28,27 @@ func MemberRemoveEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func RebalanceEvent(cl *api.CouchbaseCluster) *v1.Event {
+func RebalanceStartedEvent(cl *api.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = "RebalanceStarted"
 	event.Message = fmt.Sprintf("A rebalance has been started to balance data across the cluster")
+	return event
+}
+
+func RebalanceIncompleteEvent(cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "RebalanceIncomplete"
+	event.Message = fmt.Sprintf("A rebalance is incomplete")
+	return event
+}
+
+func RebalanceCompletedEvent(cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "RebalanceCompleted"
+	event.Message = fmt.Sprintf("A rebalance has completed")
 	return event
 }
 

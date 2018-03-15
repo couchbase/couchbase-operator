@@ -65,7 +65,8 @@ func TestEditServiceConfig(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10)
 	if err != nil {
@@ -210,7 +211,8 @@ func TestNodeManualFailover(t *testing.T) {
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create a client to admin console
@@ -239,14 +241,15 @@ func TestNodeManualFailover(t *testing.T) {
 	}
 
 	// expect rebalance event to start
-	event := k8sutil.RebalanceEvent(testCouchbase)
+	event := k8sutil.RebalanceStartedEvent(testCouchbase)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// cluster should also be balanced
 	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
@@ -264,13 +267,14 @@ func TestNodeManualFailover(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 
 	// expect operator to rebalance in the node
-	event = k8sutil.RebalanceEvent(testCouchbase)
+	event = k8sutil.RebalanceStartedEvent(testCouchbase)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// healthy 2 node cluster
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries30)
@@ -426,7 +430,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		}
 
 		// wait rebalance event
-		event = k8sutil.RebalanceEvent(testCouchbase)
+		event = k8sutil.RebalanceCompletedEvent(testCouchbase)
 		err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 		if err != nil {
 			t.Fatal(err)
@@ -534,7 +538,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	err = e2eutil.ResizeCluster(t, 0, 2, f.CRClient, testCouchbase)
 
 	// wait rebalance event
-	event := k8sutil.RebalanceEvent(testCouchbase)
+	event := k8sutil.RebalanceStartedEvent(testCouchbase)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
@@ -587,7 +591,8 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
 	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
@@ -618,8 +623,9 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
 	if err != nil {
@@ -667,7 +673,8 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
 	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
@@ -743,9 +750,10 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
 	if err != nil {
@@ -797,7 +805,8 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -858,8 +867,9 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
 	if err != nil {
@@ -912,7 +922,8 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
@@ -999,9 +1010,10 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120)
 	if err != nil {
@@ -1053,7 +1065,8 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1114,8 +1127,9 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
 	if err != nil {
@@ -1169,7 +1183,8 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	service, err := e2eutil.CreateService(t, f.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
@@ -1267,9 +1282,10 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120)
 	if err != nil {
@@ -1313,7 +1329,8 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1370,7 +1387,8 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
@@ -1419,7 +1437,8 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1476,7 +1495,8 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {
@@ -1525,7 +1545,8 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
@@ -1591,7 +1612,8 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
 	if err != nil {

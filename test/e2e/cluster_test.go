@@ -53,11 +53,13 @@ func TestResizeCluster(t *testing.T) {
 		switch {
 		case clusterSize-prevClusterSize > 0:
 			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
-			expectedEvents.AddRebalanceEvent(testCouchbase)
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 		case clusterSize-prevClusterSize < 0:
-			expectedEvents.AddRebalanceEvent(testCouchbase)
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
+			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 		}
 		prevClusterSize = clusterSize
 	}
@@ -115,10 +117,12 @@ func TestResizeClusterWithBucket(t *testing.T) {
 		switch {
 		case clusterSize-prevClusterSize > 0:
 			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
-			expectedEvents.AddRebalanceEvent(testCouchbase)
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 		case clusterSize-prevClusterSize < 0:
-			expectedEvents.AddRebalanceEvent(testCouchbase)
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
+			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 		}
 		prevClusterSize = clusterSize
 	}
@@ -492,7 +496,8 @@ func TestNodeUnschedulable(t *testing.T) {
 	for i := 1; i < newSize; i++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, i)
 	}
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// verify result from cluster resize ok
 	err = <-echan
@@ -765,7 +770,8 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -797,7 +803,8 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -829,7 +836,8 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -854,8 +862,9 @@ func TestBasicMDSScaling(t *testing.T) {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 3)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -880,8 +889,9 @@ func TestBasicMDSScaling(t *testing.T) {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -906,8 +916,9 @@ func TestBasicMDSScaling(t *testing.T) {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -997,7 +1008,8 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -1029,7 +1041,8 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -1062,7 +1075,8 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -1091,8 +1105,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 4)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -1121,8 +1136,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 5)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -1151,8 +1167,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 7)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 6)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 6)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
@@ -1232,7 +1249,8 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
 	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
@@ -1298,7 +1316,8 @@ func TestRemoveLastDataService(t *testing.T) {
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
 	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
@@ -1325,7 +1344,8 @@ func TestRemoveLastDataService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 
 	serviceMap := map[string]int{
@@ -1386,19 +1406,22 @@ func TestManageMultipleClusters(t *testing.T) {
 	expectedEvents1.AddAdminConsoleSvcCreateEvent(testCouchbase1, testCouchbase1.Name+"-ui")
 	expectedEvents1.AddMemberAddEvent(testCouchbase1, 0)
 	expectedEvents1.AddMemberAddEvent(testCouchbase1, 1)
-	expectedEvents1.AddRebalanceEvent(testCouchbase1)
+	expectedEvents1.AddRebalanceStartedEvent(testCouchbase1)
+	expectedEvents1.AddRebalanceCompletedEvent(testCouchbase1)
 
 	expectedEvents2 := e2eutil.EventList{}
 	expectedEvents2.AddAdminConsoleSvcCreateEvent(testCouchbase2, testCouchbase2.Name+"-ui")
 	expectedEvents2.AddMemberAddEvent(testCouchbase2, 0)
 	expectedEvents2.AddMemberAddEvent(testCouchbase2, 1)
-	expectedEvents2.AddRebalanceEvent(testCouchbase2)
+	expectedEvents2.AddRebalanceStartedEvent(testCouchbase2)
+	expectedEvents2.AddRebalanceCompletedEvent(testCouchbase2)
 
 	expectedEvents3 := e2eutil.EventList{}
 	expectedEvents3.AddAdminConsoleSvcCreateEvent(testCouchbase3, testCouchbase3.Name+"-ui")
 	expectedEvents3.AddMemberAddEvent(testCouchbase3, 0)
 	expectedEvents3.AddMemberAddEvent(testCouchbase3, 1)
-	expectedEvents3.AddRebalanceEvent(testCouchbase3)
+	expectedEvents3.AddRebalanceStartedEvent(testCouchbase3)
+	expectedEvents3.AddRebalanceCompletedEvent(testCouchbase3)
 
 	// create connection to couchbase nodes
 	consoleURL1, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase1.Status.AdminConsolePort)

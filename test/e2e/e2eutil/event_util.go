@@ -52,8 +52,16 @@ func (e *EventList) AddMemberRemoveEvent(cl *api.CouchbaseCluster, memberId int)
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddRebalanceEvent(cl *api.CouchbaseCluster) {
-	*e = append(*e, *k8sutil.RebalanceEvent(cl))
+func (e *EventList) AddRebalanceStartedEvent(cl *api.CouchbaseCluster) {
+	*e = append(*e, *k8sutil.RebalanceStartedEvent(cl))
+}
+
+func (e *EventList) AddRebalanceIncompleteEvent(cl *api.CouchbaseCluster) {
+	*e = append(*e, *k8sutil.RebalanceIncompleteEvent(cl))
+}
+
+func (e *EventList) AddRebalanceCompletedEvent(cl *api.CouchbaseCluster) {
+	*e = append(*e, *k8sutil.RebalanceCompletedEvent(cl))
 }
 
 func (e *EventList) AddFailedAddNodeEvent(cl *api.CouchbaseCluster, memberId int) {

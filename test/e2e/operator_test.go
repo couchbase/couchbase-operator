@@ -29,7 +29,8 @@ func TestPauseOperator(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase)
 	if err != nil {
@@ -65,8 +66,9 @@ func TestPauseOperator(t *testing.T) {
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
@@ -103,9 +105,10 @@ func TestKillOperator(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("failed to create 3 members couchbase cluster: %v", err)
 	}

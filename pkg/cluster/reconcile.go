@@ -228,8 +228,8 @@ func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseu
 func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string) error {
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
-	if _, err := c.eventsCli.Create(k8sutil.RebalanceEvent(c.cluster)); err != nil {
-		c.logger.Errorf("failed to create rebalance event: %v", err)
+	if _, err := c.eventsCli.Create(k8sutil.RebalanceStartedEvent(c.cluster)); err != nil {
+		c.logger.Errorf("failed to create rebalance started event: %v", err)
 	}
 	c.status.SetUnbalancedCondition()
 	if err := c.updateCRStatus(); err != nil {
@@ -253,6 +253,9 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 	// this will result in data loss or a terminal cluster condition
 	for name, _ := range managed {
 		if !status.NodeInState(name, couchbaseutil.NodeStateUnclustered) {
+			if _, err := c.eventsCli.Create(k8sutil.RebalanceIncompleteEvent(c.cluster)); err != nil {
+				c.logger.Errorf("failed to create rebalance incomplete event: %v", err)
+			}
 			return fmt.Errorf("node %s is still in the cluster", name)
 		}
 	}
@@ -276,7 +279,9 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 	}
 
 	// Report the cluster is balanced
-	// TODO: raise a rebalanced event
+	if _, err := c.eventsCli.Create(k8sutil.RebalanceCompletedEvent(c.cluster)); err != nil {
+		c.logger.Errorf("failed to create rebalance completed event: %v", err)
+	}
 	c.status.SetBalancedCondition()
 	if err := c.updateCRStatus(); err != nil {
 		return err

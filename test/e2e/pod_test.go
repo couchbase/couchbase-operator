@@ -159,7 +159,8 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		}
 
 		expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
-		expectedEvents.AddRebalanceEvent(testCouchbase)
+		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 		t.Logf("Pods placed: %v", clusterSize)
 	}
@@ -257,7 +258,8 @@ func TestAntiAffinityOn(t *testing.T) {
 	for i := 0; i < numNodes; i++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, i)
 	}
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("cluster created")
 
@@ -344,7 +346,8 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	for i := 0; i < numNodes; i++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, i)
 	}
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("Attempting to add a node")
 	err = e2eutil.ResizeCluster(t, 0, numNodes + 1, f.CRClient, testCouchbase)
@@ -411,7 +414,8 @@ func TestAntiAffinityOff(t *testing.T) {
 	for i := 0; i < scaleToNum; i++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, i)
 	}
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("Attempting to add a node")
 	err = e2eutil.ResizeCluster(t, 0, scaleToNum+1, f.CRClient, testCouchbase)
@@ -421,7 +425,8 @@ func TestAntiAffinityOff(t *testing.T) {
 	t.Logf("Node added")
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, scaleToNum)
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, scaleToNum + 1, e2eutil.Retries10)
 	if err != nil {
