@@ -199,6 +199,7 @@ func (c *Cluster) create() error {
 	c.updateMemberStatus(c.members)
 	c.status.SetVersion(c.cluster.Spec.Version)
 	c.status.SetClusterID(uuid)
+	c.status.SetBalancedCondition()
 	return c.updateCRStatus()
 }
 
