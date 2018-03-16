@@ -8,8 +8,10 @@ import (
 	"time"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/gocbmgr"
 	"github.com/sirupsen/logrus"
 )
@@ -70,6 +72,16 @@ func NewCouchbaseClient(ctx context.Context, clusterName, username, password str
 		password:    password,
 	}
 	c.client = cbmgr.New(username, password)
+
+	// Make the User-Agent string more verbose about exactly who/what we are
+	// to simplify support incidents
+	userAgent := &cbmgr.UserAgent{
+		Name:    version.Application,
+		Version: version.Version,
+		UUID:    revision.GitBranch + " " + revision.GitRevision,
+	}
+	c.client.SetUserAgent(userAgent)
+
 	return c
 }
 

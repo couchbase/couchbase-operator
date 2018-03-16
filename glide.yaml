@@ -9,6 +9,6 @@ import:
 - package: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - package: github.com/couchbase/gocbmgr
-  version: 15c67e896206cd024f117fe81f7a24fb165665e0
+  version: 3a50fd53ef73a1c12636e9246e8c21379d0a83b1
 - package: github.com/couchbase/cbflag
   version: dbeda68bf448ce8e85e52a3216f3b031ef18a4b7
