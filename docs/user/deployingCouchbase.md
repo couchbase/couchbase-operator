@@ -83,7 +83,6 @@ Run the following command to see the newly created pods:
 On Kubernetes:
 ```bash
 $ kubectl get pods
-```
 NAME                                  READY     STATUS    RESTARTS   AGE
 cb-example-0000                       1/1       Running   0          1m
 cb-example-0001                       1/1       Running   0          1m
