@@ -202,6 +202,18 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		}
 	}
 
+	// Check that the total memory quota is valid
+	totalBucketMemory := 0
+	for _, bucket := range customResource.Spec.BucketSettings {
+		totalBucketMemory += bucket.BucketMemoryQuota
+	}
+
+	maxBucketQuota := customResource.Spec.ClusterSettings.DataServiceMemQuota
+	if totalBucketMemory > maxBucketQuota {
+		err := errors.ExceedsMaximumInt("spec.buckets[*].memoryQuota", "body", int64(maxBucketQuota), false)
+		errs = append(errs, err)
+	}
+
 	// Check to make sure:
 	// 1. Server names are unique
 	// 2. The data service is specified on at least one node

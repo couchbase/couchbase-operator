@@ -421,6 +421,14 @@ var testDefs = []testDef{
 			&UpdateError{"spec.cluster.indexStorageSetting", "body"},
 		),
 	},
+	{
+		name:        "TestUpdateClusterSettingsInvalidNew",
+		path:        "tests/0049.yaml",
+		description: "Tests that the sum of all bucket quotas is less than the data service quota",
+		expectedErr: errors.CompositeValidationError(
+			errors.ExceedsMaximumInt("spec.buckets[*].memoryQuota", "body", int64(256), false),
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {
