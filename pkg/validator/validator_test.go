@@ -474,7 +474,7 @@ func TestValiation(t *testing.T) {
 				continue
 			}
 
-			err = Update(resource, updated)
+			err, _ = Update(resource, updated)
 			if !checkErrors(tc, err) {
 				t.Fail()
 			}

@@ -42,7 +42,14 @@ func (ctx *ApplyContext) Run() {
 		os.Exit(1)
 	}
 
-	if err := validator.Update(current, resource); err != nil {
+	errs, warnings := validator.Update(current, resource)
+	if warnings != nil {
+		for _, warning := range warnings {
+			fmt.Printf("%s\n", warning.String())
+		}
+	}
+
+	if errs != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}

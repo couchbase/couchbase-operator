@@ -17,6 +17,12 @@ const (
 	DefaultServiceMemQuota     = 256
 )
 
+type Warning string
+
+func (w Warning) String() string {
+	return fmt.Sprintf("Warning: %s", string(w))
+}
+
 func Create(resource *api.CouchbaseCluster) error {
 	applyDefaults(resource)
 
@@ -31,22 +37,23 @@ func Create(resource *api.CouchbaseCluster) error {
 	return nil
 }
 
-func Update(current, updated *api.CouchbaseCluster) error {
+func Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
 	applyDefaults(updated)
 
-	if err := checkImmutableFields(current, updated); err != nil {
-		return err
+	err, warn := checkImmutableFields(current, updated)
+	if err != nil {
+		return err, warn
 	}
 
 	if err := k8sutil.ValidateCRD(updated); err != nil {
-		return err
+		return err, warn
 	}
 
 	if err := checkConstraints(updated); err != nil {
-		return err
+		return err, warn
 	}
 
-	return nil
+	return nil, warn
 }
 
 func applyDefaults(customResource *api.CouchbaseCluster) {
@@ -235,7 +242,8 @@ func (e *UpdateError) Error() string {
 	return fmt.Sprintf("%s in %s cannot be updated", e.field, e.in)
 }
 
-func checkImmutableFields(current, updated *api.CouchbaseCluster) error {
+func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warning) {
+	warns := []Warning{}
 	errs := []error{}
 	if current.Spec.AuthSecret != updated.Spec.AuthSecret {
 		err := &UpdateError{"spec.authSecret", "body"}
@@ -253,6 +261,16 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) error {
 				if !stringPtrEquals(cur.ConflictResolution, up.ConflictResolution) {
 					err := &UpdateError{fmt.Sprintf("spec.buckets[%d].conflictResolution", i), "body"}
 					errs = append(errs, err)
+				}
+
+				if !stringPtrEquals(cur.IoPriority, up.IoPriority) {
+					warn := Warning(fmt.Sprintf("Changing the IO Priority will cause the bucket %s to be temporarily unavailable", cur.BucketName))
+					warns = append(warns, warn)
+				}
+
+				if !stringPtrEquals(cur.EvictionPolicy, up.EvictionPolicy) {
+					warn := Warning(fmt.Sprintf("Changing the Eviction Policy will cause the bucket %s to be temporarily unavailable", cur.BucketName))
+					warns = append(warns, warn)
 				}
 			}
 		}
@@ -303,11 +321,15 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) error {
 		errs = append(errs, err)
 	}
 
-	if len(errs) > 0 {
-		return errors.CompositeValidationError(errs...)
+	if len(warns) == 0 {
+		warns = nil
 	}
 
-	return nil
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...), warns
+	}
+
+	return nil, warns
 }
 
 func stringArrayCompare(a1, a2 []string) bool {
