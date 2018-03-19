@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -184,9 +186,31 @@ func main() {
 }
 
 func decodeCouchbaseCluster(path string) (*api.CouchbaseCluster, error) {
-	raw, err := ioutil.ReadFile(path)
+	parsed, err := url.Parse(path)
 	if err != nil {
 		return nil, err
+	}
+
+	var raw []byte
+	if parsed.Scheme == "http" || parsed.Scheme == "https" {
+		resp, err := http.Get(path)
+		if err != nil {
+			return nil, err
+		}
+
+		raw, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+	} else if parsed.Scheme == "" {
+		raw, err = ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("Invalid scheme: %s", parsed.Scheme)
 	}
 
 	err = v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
