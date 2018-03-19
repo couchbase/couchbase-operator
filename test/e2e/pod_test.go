@@ -1,11 +1,11 @@
 package e2e
 
 import (
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"strconv"
 	"testing"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
 //Assume each node has 7.6GB of memory

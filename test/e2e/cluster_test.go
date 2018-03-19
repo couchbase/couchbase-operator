@@ -460,7 +460,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	t.Logf("Allocatable Memory: %d", allocatableMemory)
 	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
 		cl.Spec.ServerSettings[0].Pod = e2espec.CreateMemoryPodPolicy(allocatableMemory*7/10, allocatableMemory)

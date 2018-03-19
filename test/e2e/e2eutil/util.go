@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-	"math"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -569,7 +569,7 @@ func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error
 	return operatorPods[0], nil
 }
 
-func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error){
+func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 	minMem := math.Inf(+1)
 	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
@@ -585,7 +585,7 @@ func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error){
 			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes
-			newMem := float64(memQuantity.Value()>>20)
+			newMem := float64(memQuantity.Value() >> 20)
 			if newMem < minMem {
 				minMem = newMem
 			}
@@ -616,8 +616,8 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes
-			nodeMem := float64(memQuantity.Value()>>20)
-			scaleNum = scaleNum + int(math.Floor(nodeMem / minMem))
+			nodeMem := float64(memQuantity.Value() >> 20)
+			scaleNum = scaleNum + int(math.Floor(nodeMem/minMem))
 		}
 		if minMem == math.Inf(+1) {
 			return 0, fmt.Errorf("unable to calculate scale number")
