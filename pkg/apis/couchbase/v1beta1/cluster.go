@@ -85,6 +85,9 @@ type ClusterSpec struct {
 
 	// Specific services to use when exposing ui
 	AdminConsoleServices []string `json:"adminConsoleServices"`
+
+	// Enables software update notifications in the UI
+	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications"`
 }
 
 type ClusterConfig struct {

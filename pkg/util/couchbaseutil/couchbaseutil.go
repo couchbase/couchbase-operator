@@ -516,6 +516,16 @@ func (c *CouchbaseClient) SetClientCertAuth(m *Member, settings *cbmgr.ClientCer
 	return c.client.SetClientCertAuth(settings)
 }
 
+func (c *CouchbaseClient) GetUpdatesEnabled(ms MemberSet) (bool, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetUpdatesEnabled()
+}
+
+func (c *CouchbaseClient) SetUpdatesEnabled(ms MemberSet, enabled bool) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.SetUpdatesEnabled(enabled)
+}
+
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	rv := &cbmgr.Bucket{
 		BucketName:        config.BucketName,

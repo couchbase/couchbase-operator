@@ -17,6 +17,7 @@ spec:
   exposeAdminConsole: true
   adminConsoleServices:
     - data
+  softwareUpdateNotifications: true
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
@@ -117,6 +118,7 @@ Defines top level parameters related to a Couchbase cluster deployment.
   exposeAdminConsole: true
   adminConsoleServices:
     - data
+  softwareUpdateNotifications: true
 ...
 ```
 
@@ -160,6 +162,12 @@ This field specifies whether or not the Couchbase Web Console should be exposed 
 When the Couchbase Web Console is exposed, the pod that it is connected to is chosen based on the client IP address. Since the Web Console may display slightly different features based on the services running on the particular pod it is connected to, we let you specify the services so that the exposed port will only connect to pods that contain the services specified for this parameter. A list of one or more services should be provided. If you do not specify any service, then the Web Console will be connected to all pods in the cluster.
 
 > *Field rules:* The ```adminConsoleServices``` list is not required and defaults to an empty list. An empty list means any node in the cluster may be chosen when connecting to the Web Console.
+
+**softwareUpdateNotifications**
+
+This field specifies whether or not software update notifications are displayed in the Couchbase UI.  This provides a visual indication as to whether a software update is available and should be applied in order to increase functionality or fix defects.
+
+> *Field rules:* The ```softwareUpdateNotifications``` field is optional and defaults to false if not specified.  This setting can be modified at any point in the cluster life-cycle.
 
 ## Spec: The Cluster Settings
 

@@ -567,6 +567,9 @@ func (c *Cluster) reconcileClusterSettings() bool {
 	if ok := c.reconcileMemoryQuotaSettings(); !ok {
 		return false
 	}
+	if ok := c.reconcileSoftwareUpdateNotificationSettings(); ok {
+		return false
+	}
 
 	c.status.ClearCondition(api.ClusterConditionManageConfig)
 	return true
@@ -614,6 +617,26 @@ func (c *Cluster) reconcileMemoryQuotaSettings() bool {
 			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: %s", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.status.SetConfigRejectedCondition(message)
 			c.logger.Warnf(message)
+			return false
+		}
+	}
+
+	return true
+}
+
+// reconcileSoftwareUpdateNotificationSettings looks to see if the UI displays software
+// update notifications, and updates if different from the cluster specification.
+func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() bool {
+	actual, err := c.client.GetUpdatesEnabled(c.members)
+	if err != nil {
+		c.logger.Warnf("Unable to get cluster software updates: %v", err)
+		return false
+	}
+
+	requested := c.cluster.Spec.SoftwareUpdateNotifications
+	if actual != requested {
+		if err := c.client.SetUpdatesEnabled(c.members, requested); err != nil {
+			c.logger.Warnf("Unable to set cluster software updates: %v", err)
 			return false
 		}
 	}
