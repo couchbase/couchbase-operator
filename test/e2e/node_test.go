@@ -536,14 +536,25 @@ func TestRemoveForeignNode(t *testing.T) {
 
 	// resize to 2 member cluster
 	err = e2eutil.ResizeCluster(t, 0, 2, f.CRClient, testCouchbase)
-	// check that actual cluster size is only 2 nodes
-	info, err := client.ClusterInfo()
-	numNodes := len(info.Nodes)
-	if numNodes != 2 {
-		t.Fatalf("expected 2 nodes, found: %d", numNodes)
+
+	// wait rebalance event
+	event := k8sutil.RebalanceEvent(testCouchbase)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	// check that actual cluster size is only 2 nodes
+	if err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries20); err != nil {
+		t.Fatalf("cluster failed to become healthy")
+	}
+
 	// None of the nodes should be the foreign member and
 	// all should be healthy
+	info, err := client.ClusterInfo()
+	if err != nil {
+		t.Fatalf("unable to poll cluster info")
+	}
 	for _, node := range info.Nodes {
 		if node.HostName == externalPodIP {
 			t.Fatalf("node %s should not be in cluster", node.HostName)
