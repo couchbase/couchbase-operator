@@ -3,6 +3,7 @@ package cluster
 import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
 
 type ReconcileState int
@@ -133,13 +134,23 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
 }
 
 func (r *ReconcileMachine) handleUnclusteredNodes(c *Cluster) {
-	for _, m := range r.couchbase.UnclusteredNodes {
-		if err := c.removePod(m.Name); err != nil {
+	for name, _ := range r.couchbase.UnclusteredNodes {
+		if err := c.destroyMember(name); err != nil {
 			c.logger.Errorf("Unable to remove unclustered node: %s", err.Error())
 		} else {
-			c.logger.Errorf("Removed unclustered node: %s", m.Name)
-			r.runningPods.Remove(m.Name)
-			c.members.Remove(m.Name)
+			c.logger.Infof("Removed unclustered node: %s", name)
+			r.runningPods.Remove(name)
+
+			// Nodes may be rebalanced out in a previous iteration (caused by
+			// node failover) and thus miss out the ejection events from rebalance().
+			//
+			// TODO: it makes sense to unify handling all unclustered nodes *after*
+			// reblancing has occurred, however tests will probably fail left right
+			// and center due to the events occurring after the cluster is in a healthy
+			// state.
+			if _, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(name, c.cluster)); err != nil {
+				c.logger.Errorf("failed to create member remove event: %v", err)
+			}
 		}
 	}
 
@@ -275,9 +286,8 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 // corresponding running pod.
 func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
 	dead := c.members.Diff(r.runningPods)
-	for _, m := range dead {
-		err := c.removeDeadMember(m)
-		if err != nil {
+	for name, _ := range dead {
+		if err := c.destroyMember(name); err != nil {
 			c.logger.Errorf("Failed to remove dead members: %s", err.Error())
 			r.errored = true
 		}

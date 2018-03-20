@@ -532,19 +532,6 @@ func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) err
 	return nil
 }
 
-func (c *Cluster) removeDeadMember(toRemove *couchbaseutil.Member) error {
-	c.logger.Infof("removing dead member %q", toRemove.Name)
-	nodeName := toRemove.Name
-
-	// remove member from operator
-	if err := c.removePod(nodeName); err != nil {
-		return err
-	}
-	c.clusterRemoveMember(nodeName)
-	c.logger.Infof("removed member (%v)", nodeName)
-	return nil
-}
-
 // Remove all pods from running set that does not belong to member set.
 func (c *Cluster) removeUnknownMembers(running couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
 	unknownMembers := running.Diff(c.members)

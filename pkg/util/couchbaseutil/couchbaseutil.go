@@ -3,6 +3,7 @@ package couchbaseutil
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -309,6 +310,10 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 					status.ActiveNodes.Add(member)
 				} else if node.Membership == "inactiveAdded" {
 					status.PendingAddNodes.Add(member)
+				} else if node.Membership == "inactiveFailed" {
+					status.FailedNodes.Add(member) // Caused by manual failover
+				} else {
+					return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
 				}
 			} else if node.Status == "unhealthy" {
 				if node.Membership == "active" {
@@ -317,7 +322,11 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 					status.FailedAddNodes.Add(member)
 				} else if node.Membership == "inactiveFailed" {
 					status.FailedNodes.Add(member)
+				} else {
+					return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
 				}
+			} else {
+				return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
 			}
 		}
 

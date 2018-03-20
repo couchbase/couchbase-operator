@@ -246,6 +246,7 @@ func TestNodeManualFailover(t *testing.T) {
 	}
 
 	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
 	// cluster should also be balanced
 	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
@@ -272,11 +273,6 @@ func TestNodeManualFailover(t *testing.T) {
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
 	// healthy 2 node cluster
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, 2, 18)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries30)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)

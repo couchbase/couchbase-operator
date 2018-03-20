@@ -147,7 +147,7 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (done bool, err error) {
 		cl, err := GetCouchbaseCluster(crClient, name, namespace)
 		if err != nil {
-			LogfWithTimestamp(t, "could not get cluster: (%v) \n", err)
+			LogfWithTimestamp(t, "could not get cluster: (%v)", err)
 			return false, err
 		}
 
@@ -156,30 +156,39 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 			return false, nil
 		}
 
-		availableConditionFound := false
-		balancedConditionFound := false
+		LogfWithTimestamp(t, "Cluster Status Conditions: (%v)", cl.Status.Conditions)
 
-		LogfWithTimestamp(t, "Cluster Status Conditions: (%v) \n", cl.Status.Conditions)
+		healthyConditions := map[api.ClusterConditionType]struct {
+			healthyCondition v1.ConditionStatus
+			message          string
+		}{
+			api.ClusterConditionAvailable: {
+				v1.ConditionTrue,
+				"Cluster not available ...",
+			},
+			api.ClusterConditionBalanced: {
+				v1.ConditionTrue,
+				"Cluster unbalanced ...",
+			},
+			api.ClusterConditionScaling: {
+				v1.ConditionFalse,
+				"Cluster scaling ...",
+			},
+		}
 
 		for _, cond := range cl.Status.Conditions {
-			if cond.Type == api.ClusterConditionAvailable {
-				availableConditionFound = true
-				if cond.Status != v1.ConditionTrue {
-					LogfWithTimestamp(t, "Cluster not healthy (%v) \n", cond.Status)
-					return false, nil
-				}
+			healthyCondition, ok := healthyConditions[cond.Type]
+			if !ok {
+				continue
 			}
 
-			if cond.Type == api.ClusterConditionBalanced {
-				balancedConditionFound = true
-				if cond.Status != v1.ConditionTrue {
-					LogfWithTimestamp(t, "Cluster not balanced (%v) \n", cond.Status)
-					return false, nil
-				}
+			if cond.Status != healthyCondition.healthyCondition {
+				LogfWithTimestamp(t, "%s", healthyCondition.message)
+				return false, nil
 			}
 		}
-		LogfWithTimestamp(t, "available (%v), balanced (%v) \n", availableConditionFound, balancedConditionFound)
-		return availableConditionFound && balancedConditionFound, nil
+		LogfWithTimestamp(t, "Cluster healthy")
+		return true, nil
 	})
 
 	if err != nil {
