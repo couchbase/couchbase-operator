@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/revision"
+	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
 
 	"github.com/couchbase/cbflag"
@@ -21,16 +23,13 @@ var (
 	path string
 )
 
-var versionId string = "0.8"
-var versionHash string = "unknown"
-
 type CbopctlContext struct {
 	version bool
 }
 
 func (c *CbopctlContext) Run() {
 	if c.version {
-		fmt.Printf("cbopctl version %s (%s)\n", versionId, versionHash)
+		fmt.Printf("cbopctl version %s (%s)\n", version.Version, revision.GitRevision)
 	}
 }
 
