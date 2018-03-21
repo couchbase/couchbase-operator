@@ -14,13 +14,16 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-var testDefs = []struct {
+type testDef struct {
 	name        string
 	path        string
+	updatePath  string
 	description string
 	typeFail    bool
 	expectedErr *errors.CompositeError
-}{
+}
+
+var testDefs = []testDef{
 	{
 		name:        "TestExampleConfig",
 		path:        "tests/0001.yaml",
@@ -316,6 +319,116 @@ var testDefs = []struct {
 			errors.DuplicateItems("spec.servers.name", "body"),
 		),
 	},
+	{
+		name:        "TestValidIndexStorageSetting",
+		path:        "tests/0038.yaml",
+		description: "Tests setting indexStorageSetting to plasma",
+		expectedErr: nil,
+	},
+	{
+		name:        "TestInvalidIndexStorageSetting",
+		path:        "tests/0039.yaml",
+		description: "Tests setting indexStorageSetting to an invalid value",
+		expectedErr: errors.CompositeValidationError(
+			errors.EnumFail("spec.cluster.indexStorageSetting", "body", nil, []interface{}{"plasma", "memory_optimized"}),
+		),
+	},
+	{
+		name:        "TestUpdateToAuthSecret",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0040.yaml",
+		description: "Tests updating the authSecret fails",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.authSecret", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateToBucketType",
+		path:        "tests/0030.yaml",
+		updatePath:  "tests/0041.yaml",
+		description: "Tests updating the bucket type fails",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.buckets[0].type", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateToBucketConflictResolution",
+		path:        "tests/0030.yaml",
+		updatePath:  "tests/0042.yaml",
+		description: "Tests updating the bucket conflict resolution fails",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.buckets[0].conflictResolution", "body"},
+		),
+	},
+	{
+		name:        "TestInvalidUpdateToServices",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0043.yaml",
+		description: "Tests updating the services (with different services) fails",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.servers[0].services", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateToServicesDifferentOrder",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0044.yaml",
+		description: "Tests updating the services in a different order passes",
+		expectedErr: nil,
+	},
+	{
+		name:        "TestUpdateIndexPath",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0045.yaml",
+		description: "Tests updating the indexPath fails",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.servers[0].indexPath", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateDataPath",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0046.yaml",
+		description: "Tests updating the dataPath fails",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.servers[0].dataPath", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateClusterSettings",
+		path:        "tests/0047.yaml",
+		updatePath:  "tests/0048.yaml",
+		description: "Tests updating the dataPath fails",
+		expectedErr: nil,
+	},
+	{
+		name:        "TestUpdateClusterSettingsInvalidOld",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0048.yaml",
+		description: "Tests updating cluster settings when the old config has an index service",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.servers[0].services", "body"},
+			&UpdateError{"spec.cluster.indexStorageSetting", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateClusterSettingsInvalidNew",
+		path:        "tests/0048.yaml",
+		updatePath:  "tests/0001.yaml",
+		description: "Tests updating cluster settings when the new config has an index service",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.servers[0].services", "body"},
+			&UpdateError{"spec.cluster.indexStorageSetting", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateClusterSettingsInvalidNew",
+		path:        "tests/0049.yaml",
+		description: "Tests that the sum of all bucket quotas is less than the data service quota",
+		expectedErr: errors.CompositeValidationError(
+			errors.ExceedsMaximumInt("spec.buckets[*].memoryQuota", "body", int64(256), false),
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {
@@ -350,20 +463,27 @@ func TestValiation(t *testing.T) {
 			continue
 		}
 
-		v := CRDValidator{}
-		err = v.Create(resource)
-
-		if actual, ok := err.(*errors.CompositeError); ok {
-			if !compositeErrorEqual(tc.expectedErr, actual) {
-				printError(tc.name, tc.path, tc.description, tc.expectedErr, actual)
+		if tc.updatePath == "" {
+			err = Create(resource)
+			if !checkErrors(tc, err) {
 				t.Fail()
 			}
-		} else if err != nil {
-			fmt.Printf("%s failed due to %v\n", tc.name, err)
-			t.Fail()
 		} else {
-			if tc.expectedErr != nil {
-				printError(tc.name, tc.path, tc.description, tc.expectedErr, actual)
+			raw, err = ioutil.ReadFile(tc.updatePath)
+			if err != nil {
+				t.Fatal("%s failed due to %v", tc.name, err)
+			}
+
+			updated, err := decoder.DecodeCouchbaseCluster(raw)
+			if err != nil {
+				if !tc.typeFail {
+					fmt.Printf("Failed: %s %T\n", tc.name, err)
+				}
+				continue
+			}
+
+			err, _ = Update(resource, updated)
+			if !checkErrors(tc, err) {
 				t.Fail()
 			}
 		}
@@ -376,6 +496,25 @@ func printError(name, file, description string, expected, actual *errors.Composi
 	fmt.Printf("Expected:\n%v\n", expected)
 	fmt.Printf("Actual:\n%v\n", actual)
 	fmt.Printf("----\n")
+}
+
+func checkErrors(tc testDef, err error) bool {
+	if actual, ok := err.(*errors.CompositeError); ok {
+		if !compositeErrorEqual(tc.expectedErr, actual) {
+			printError(tc.name, tc.path, tc.description, tc.expectedErr, actual)
+			return false
+		}
+	} else if err != nil {
+		fmt.Printf("%s failed due to %v\n", tc.name, err)
+		return false
+	} else {
+		if tc.expectedErr != nil {
+			printError(tc.name, tc.path, tc.description, tc.expectedErr, actual)
+			return false
+		}
+	}
+
+	return true
 }
 
 func compositeErrorEqual(e1, e2 *errors.CompositeError) bool {

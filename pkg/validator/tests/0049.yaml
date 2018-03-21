@@ -1,4 +1,4 @@
-# The minimum base configuration
+# A configuration to check the sum of all bucket quotas is less than the data service quota
 apiVersion: couchbase.database.couchbase.com/v1beta1
 kind: CouchbaseCluster
 metadata:
@@ -7,13 +7,22 @@ spec:
   version: enterprise-5.0.1
   authSecret: cb-example-auth
   cluster:
-    indexStorageSetting: invalid
+    dataServiceMemoryQuota: 256
+    indexStorageSetting: memory_optimized
+  buckets:
+    - name: default
+      type: couchbase
+      memoryQuota: 512
+      replicas: 3
+      ioPriority: low
+      evictionPolicy: valueOnly
+      conflictResolution: seqno
+      enableFlush: false
   servers:
     - size: 3
       name: all_services
       services:
         - data
-        - index
         - query
         - search
       dataPath: /opt/couchbase/var/lib/couchbase/data

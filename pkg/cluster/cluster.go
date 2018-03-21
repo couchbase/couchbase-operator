@@ -203,6 +203,7 @@ func (c *Cluster) create() error {
 	}
 
 	c.status.SetClusterID(uuid)
+	c.status.SetBalancedCondition()
 	return c.updateCRStatus()
 }
 

@@ -29,6 +29,11 @@ $(BINARY): $(SOURCE)
 container: build
 	docker build -t couchbase/couchbase-operator:v1 .
 
+prod: container
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopctl ./cmd/cbopctl/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopctl ./cmd/cbopctl/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopctl ./cmd/cbopctl/
+
 test:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run TestAll -v -timeout 360m \
 		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \

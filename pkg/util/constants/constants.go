@@ -40,6 +40,11 @@ var (
 
 	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase"
 	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase"
+
+	ServiceIndex  = "index"
+	ServiceData   = "data"
+	ServiceQuery  = "query"
+	ServiceSearch = "search"
 )
 
 // Represents the Kubernetes version by its major and minor parts. The first

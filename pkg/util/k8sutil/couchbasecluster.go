@@ -6,13 +6,13 @@ import (
 )
 
 func CreateCouchbaseCluster(crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
-	res, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Create(cl)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+	return crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Create(cl)
 }
 
 func DeleteCouchbaseCluster(crClient versioned.Interface, cl *api.CouchbaseCluster) error {
 	return crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Delete(cl.Name, nil)
+}
+
+func UpdateCouchbaseCluster(crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+	return crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Update(cl)
 }

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -34,6 +36,7 @@ func (c *CbopctlContext) Run() {
 
 func main() {
 	cbopctlCtx := &CbopctlContext{}
+	applyCtx := &ApplyContext{}
 	createCtx := &CreateContext{}
 	deleteCtx := &DeleteContext{}
 
@@ -44,6 +47,49 @@ func main() {
 		ManPage: "",
 		Run:     cbopctlCtx.Run,
 		Commands: []*cbflag.Command{
+			&cbflag.Command{
+				Name:     "apply",
+				Desc:     "Update a Couchbase Cluster",
+				ManPage:  "",
+				Run:      applyCtx.Run,
+				Commands: []*cbflag.Command{},
+				Flags: []*cbflag.Flag{
+					cbflag.StringFlag(
+						/* Destination  */ &applyCtx.filename,
+						/* Default      */ "",
+						/* Short Option */ "f",
+						/* Long Option  */ "filename",
+						/* Env Variable */ "",
+						/* Usage        */ "Filename or the resource to create",
+						/* Deprecated   */ []string{},
+						/* Validator    */ nil,
+						/* Required     */ true,
+						/* Hidden       */ false,
+					),
+					cbflag.BoolFlag(
+						/* Destination  */ &applyCtx.dryRun,
+						/* Default      */ false,
+						/* Short Option */ "",
+						/* Long Option  */ "dry-run",
+						/* Env Variable */ "",
+						/* Usage        */ "If true, only print the object that would be sent, without sending it",
+						/* Deprecated   */ []string{},
+						/* Hidden       */ false,
+					),
+					cbflag.StringFlag(
+						/* Destination  */ &applyCtx.kubeconfig,
+						/* Default      */ filepath.Join(os.Getenv("HOME"), ".kube", "config"),
+						/* Short Option */ "",
+						/* Long Option  */ "kubeconfig",
+						/* Env Variable */ "",
+						/* Usage        */ "The path to your kubernetes configuration",
+						/* Deprecated   */ []string{},
+						/* Validator    */ nil,
+						/* Required     */ false,
+						/* Hidden       */ false,
+					),
+				},
+			},
 			&cbflag.Command{
 				Name:     "create",
 				Desc:     "Create a new Couchbase Cluster",
@@ -140,9 +186,31 @@ func main() {
 }
 
 func decodeCouchbaseCluster(path string) (*api.CouchbaseCluster, error) {
-	raw, err := ioutil.ReadFile(path)
+	parsed, err := url.Parse(path)
 	if err != nil {
 		return nil, err
+	}
+
+	var raw []byte
+	if parsed.Scheme == "http" || parsed.Scheme == "https" {
+		resp, err := http.Get(path)
+		if err != nil {
+			return nil, err
+		}
+
+		raw, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+	} else if parsed.Scheme == "" {
+		raw, err = ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("Invalid scheme: %s", parsed.Scheme)
 	}
 
 	err = v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)

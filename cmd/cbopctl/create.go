@@ -24,7 +24,6 @@ func (ctx *CreateContext) Run() {
 		os.Exit(1)
 	}
 
-	validator := validator.CRDValidator{}
 	err = validator.Create(resource)
 	if err != nil {
 		fmt.Printf("%v\n", err)
