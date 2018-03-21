@@ -143,19 +143,18 @@ var (
 
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
-
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 3; i++ {
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
-			DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-			if i == 4 {
+			//(TODO) attempt to clean up namespace
+			if i == 2 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == 4 {
+				if i == 2 {
 					return nil, err2
 				}
 			} else {
@@ -164,7 +163,7 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == 4 {
+						if i == 2 {
 							return nil, err
 						}
 					} else {
@@ -183,19 +182,18 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
 	config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
-
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 3; i++ {
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
 			//(TODO) attempt to clean up namespace
-			if i == 4 {
+			if i == 2 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == 4 {
+				if i == 2 {
 					return nil, err2
 				}
 			} else {
@@ -204,7 +202,7 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == 4 {
+						if i == 2 {
 							return nil, err
 						}
 					} else {
@@ -569,6 +567,31 @@ func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error
 	return operatorPods[0], nil
 }
 
+func NumK8Nodes(kubeCli kubernetes.Interface) (int, error) {
+	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return -1, err
+	}
+	return len(nodeList.Items), nil
+}
+
+func NumK8Workers(kubeCli kubernetes.Interface) (int, error) {
+	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return -1, err
+	}
+	numWorkers := 0
+	for _, value := range nodeList.Items {
+		node := &value
+		nodeMap := node.GetLabels()
+		if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+			continue
+		}
+		numWorkers = numWorkers + 1
+	}
+	return numWorkers, nil
+}
+
 func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 	minMem := math.Inf(+1)
 	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -598,6 +621,37 @@ func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 		return 0.0, fmt.Errorf("no nodes in the cluster")
 	}
 	return minMem, nil
+}
+
+func GetMaxNodeMem(kubeCli kubernetes.Interface) (float64, error) {
+	maxMem := 0.0
+	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return 0.0, err
+	}
+	if len(nodeList.Items) > 0 {
+		for _, value := range nodeList.Items {
+			node := &value
+			nodeMap := node.GetLabels()
+			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+				continue
+			}
+			//kilobytes
+			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
+			//megabytes
+			newMem := float64(memQuantity.Value() >> 20)
+			if newMem > maxMem {
+				maxMem = newMem
+			}
+		}
+		if maxMem == 0.0 {
+			return 0.0, fmt.Errorf("no maximum found")
+		}
+
+	} else {
+		return 0.0, fmt.Errorf("no nodes in the cluster")
+	}
+	return maxMem, nil
 }
 
 func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
