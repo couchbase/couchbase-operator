@@ -336,10 +336,12 @@ func WaitForPod(kubeCli kubernetes.Interface, namespace, podName, hostURL string
 		}
 	}
 
-	// Wait for the admin port to come up, avoids unnecessary spam while trying to
-	// run commands against it (e.g. initialisation and adding new nodes)
-	if err := netutil.WaitForHostPort(hostURL, 120); err != nil {
-		return err
+	if hostURL != "" {
+		// Wait for the admin port to come up, avoids unnecessary spam while trying to
+		// run commands against it (e.g. initialisation and adding new nodes)
+		if err := netutil.WaitForHostPort(hostURL, 120); err != nil {
+			return err
+		}
 	}
 
 	return nil

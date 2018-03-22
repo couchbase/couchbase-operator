@@ -516,7 +516,7 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 			if err != nil {
 				return nil, err
 			}
-			err = k8sutil.WaitForPod(kubeCli, namespace, pod.Name, m.HostURL())
+			err = k8sutil.WaitForPod(kubeCli, namespace, pod.Name, "")
 			if err != nil {
 				return nil, err
 			}
