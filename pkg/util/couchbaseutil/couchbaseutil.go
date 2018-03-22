@@ -279,6 +279,17 @@ func SetSearchMemoryQuota(ms MemberSet, username, password string, quota int) er
 	return client.SetSearchMemoryQuota(quota)
 }
 
+func GetIndexSettings(ms MemberSet, username, password string) (*cbmgr.IndexSettings, error) {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	return client.GetIndexSettings()
+}
+
+func SetIndexSettings(ms MemberSet, username, password, storageMode string, settings *cbmgr.IndexSettings) error {
+	client := cbmgr.New(ms.ClientURLs(), username, password)
+	settings.StorageMode = cbmgr.IndexStorageMode(storageMode)
+	return client.SetIndexSettings(settings)
+}
+
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	rv := &cbmgr.Bucket{
 		BucketName:        config.BucketName,
