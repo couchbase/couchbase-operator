@@ -29,7 +29,7 @@ func TestResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -92,7 +92,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -158,7 +158,7 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -260,7 +260,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 		"service1": serviceConfig1}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,8 +373,8 @@ func TestInvalidAuthSecret(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "invalid-test-secret", configMap, e2eutil.AdminHidden)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "invalid-test-secret", configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
@@ -399,8 +399,8 @@ func TestInvalidBaseImage(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
@@ -425,8 +425,8 @@ func TestInvalidVersion(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
@@ -449,7 +449,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -531,7 +531,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// kill couchbase service on pod 0
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -558,7 +558,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 //
 // TODO: (See K8S-113)
 //     Test currently hangs since failure scenario leads to
-//     possible datalos which currently requires manual user intervention
+//     possible dataloss which currently requires manual user intervention
 //
 // 1. Create 5 node cluster
 // 2. Scale down to 4 nodes
@@ -578,7 +578,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// scale down to 4 node cluster
 	echan := make(chan error)
@@ -637,7 +637,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// pause operator
 	testCouchbase, err = e2eutil.UpdateCluster(f.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
@@ -725,7 +725,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -954,7 +954,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"service1": serviceConfig1}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1199,8 +1199,8 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatal("failed to not create cluster")
 	}
@@ -1226,7 +1226,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to create cluster: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -1289,7 +1289,7 @@ func TestRemoveLastDataService(t *testing.T) {
 		"service2": serviceConfig2}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err != nil {
 		t.Fatal("failed to create cluster: %v", err)
 	}
@@ -1366,21 +1366,21 @@ func TestManageMultipleClusters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase1)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	t.Logf("2: Creating New Couchbase Cluster...\n")
 	testCouchbase2, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase2)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	t.Logf("3: Creating New Couchbase Cluster...\n")
 	testCouchbase3, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithoutBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase3)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents1 := e2eutil.EventList{}
 	expectedEvents1.AddAdminConsoleSvcCreateEvent(testCouchbase1, testCouchbase1.Name+"-ui")

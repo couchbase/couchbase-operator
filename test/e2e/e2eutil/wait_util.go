@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"strconv"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
@@ -425,6 +426,37 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 						return nil
 					}
 
+				}
+			}
+			// update cluster
+			cluster, err = GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType string, statusValue string, cl *api.CouchbaseCluster, wait int) error {
+	cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
+	if err != nil {
+		return err
+	}
+
+	timeOutChan := time.NewTimer(time.Duration(wait) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return fmt.Errorf("timed out waiting for status %s with status: %s", statusType, statusValue)
+
+		case <-tickChan:
+			// compare cluster conditions to desired condition
+			if statusType == "paused" {
+				t.Logf("cluster paused: %b", cluster.Status.ControlPaused)
+				desiredStatusBool, _ := strconv.ParseBool(statusValue)
+				if desiredStatusBool == cluster.Status.ControlPaused {
+					return nil
 				}
 			}
 			// update cluster

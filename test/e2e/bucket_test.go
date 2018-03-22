@@ -64,7 +64,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		"service1": serviceConfig1}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -172,7 +172,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -285,7 +285,7 @@ func TestNegBucketAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -347,7 +347,7 @@ func TestEditBucket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -544,7 +544,7 @@ func TestNegBucketEdit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -765,7 +765,7 @@ func TestRevertExternalBucketAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -850,7 +850,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")

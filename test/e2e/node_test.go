@@ -27,7 +27,7 @@ func TestEditServiceConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -104,7 +104,7 @@ func TestNegEditServiceConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -204,7 +204,7 @@ func TestNodeManualFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -312,7 +312,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// async scale up to 3 node cluster
 	echan := make(chan error)
@@ -363,7 +363,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// async scale up to 3 node cluster
 	echan := make(chan error)
@@ -416,7 +416,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// async kill a pod while cluster is scaling to 3rd member
 	doneCh := make(chan bool)
@@ -496,7 +496,7 @@ func TestRemoveForeignNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// create a client to admin console
 	testCouchbase, err = e2eutil.GetClusterCRD(f.CRClient, testCouchbase)
@@ -582,7 +582,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -655,7 +655,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -778,7 +778,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -886,7 +886,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -1020,7 +1020,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -1128,7 +1128,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 
@@ -1266,7 +1266,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -1372,7 +1372,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -1478,7 +1478,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")

@@ -36,7 +36,7 @@ func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string,
 	cl.Namespace = namespace
 	res, err := k8sutil.CreateCouchbaseCluster(crClient, cl)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 	t.Logf("creating couchbase cluster: %s", res.Name)
 

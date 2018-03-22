@@ -143,18 +143,19 @@ var (
 
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
-	for i := 0; i < 3; i++ {
+	retries := 3
+	for i := 0; i < retries; i++ {
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
-			//(TODO) attempt to clean up namespace
-			if i == 2 {
+			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
+			if i == retries - 1 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == 2 {
+				if i == retries - 1 {
 					return nil, err2
 				}
 			} else {
@@ -163,7 +164,7 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == 2 {
+						if i == retries - 1 {
 							return nil, err
 						}
 					} else {
@@ -172,7 +173,6 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 				} else {
 					return GetClusterCRD(crClient, testCouchbase)
 				}
-
 			}
 		}
 	}
@@ -182,18 +182,19 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
 	config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
-	for i := 0; i < 3; i++ {
+	retries := 3
+	for i := 0; i < retries; i++ {
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
-			//(TODO) attempt to clean up namespace
-			if i == 2 {
+			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
+			if i == retries - 1 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == 2 {
+				if i == retries - 1 {
 					return nil, err2
 				}
 			} else {
@@ -202,7 +203,7 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == 2 {
+						if i == retries - 1 {
 							return nil, err
 						}
 					} else {
@@ -211,7 +212,6 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 				} else {
 					return GetClusterCRD(crClient, testCouchbase)
 				}
-
 			}
 		}
 	}
@@ -368,13 +368,20 @@ func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	}
 }
 
-func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string, cluster *api.CouchbaseCluster) {
+func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string) {
 	err := WriteLogs(t, kubeClient, namespace, logDir)
 	if err != nil {
 		t.Logf("Error: %v", err)
 	}
-	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	CleanK8Cluster(t, kubeClient, crClient, namespace)
 
+}
+
+func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string) {
+	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		t.Logf("Error: %v", err)
+	}
 	clusterNameList := []string{}
 	for _, cluster := range clusters.Items {
 		clusterNameList = append(clusterNameList, cluster.Name)

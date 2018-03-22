@@ -23,7 +23,7 @@ func TestPauseOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -36,15 +36,23 @@ func TestPauseOperator(t *testing.T) {
 		t.Fatalf("failed to create 3 members couchbase cluster: %v", err)
 	}
 
+	cluster, err := e2eutil.GetCouchbaseCluster(f.CRClient, testCouchbase.Name, testCouchbase.Namespace)
+	if err != nil {
+		t.Fatalf("failed to pause control: %v", err)
+	}
+
+	t.Logf("cluster: %+v", cluster)
+
 	t.Logf("Pausing operator...")
 	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "true", f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to pause control: %v", err)
 	}
-
-	// TODO: this is used to wait for the CR to be updated.
-	// TODO: make this wait for reliable
-	time.Sleep(5 * time.Second)
+	
+	err = e2eutil.WaitForClusterStatus(t, f.CRClient, "paused", "true", testCouchbase, 300)
+	if err != nil {
+		t.Fatalf("failed to pause control: %v", err)
+	}
 
 	t.Logf("Killing pod...")
 	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
@@ -97,7 +105,7 @@ func TestKillOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -145,7 +153,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
