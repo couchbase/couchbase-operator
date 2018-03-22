@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"testing"
-	"time"
 )
 
 // TestPauseControl tests the user can pause the operator from controlling
@@ -48,7 +47,7 @@ func TestPauseOperator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to pause control: %v", err)
 	}
-	
+
 	err = e2eutil.WaitForClusterStatus(t, f.CRClient, "paused", "true", testCouchbase, 300)
 	if err != nil {
 		t.Fatalf("failed to pause control: %v", err)

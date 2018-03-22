@@ -275,7 +275,6 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 //    are not supported on ephemeral buckets so creation should fail)
 // 3. Wait for 90 seconds to ensure that the bucket is not created
 // 4. (TODO) Check to make sure that an error is reported in the conditions section
-// 5. (TODO) Check the events to make sure the operator took the correct actions
 func TestNegBucketAdd(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -317,6 +316,12 @@ func TestNegBucketAdd(t *testing.T) {
 		t.Fatalf("failed to NOT create bucket %v", err)
 	}
 
+	message := "[evictionPolicy - Eviction policy must be either 'noEviction' or 'nruEviction' for ephemeral buckets replicaNumber - Warning: you do not have enough data servers to support this number of replicas."
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageBuckets, message)
+	if err != nil {
+		t.Fatalf("failed to verify condition: %v", err)
+	}
+
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
@@ -337,7 +342,6 @@ func TestNegBucketAdd(t *testing.T) {
 // 8. Change enable flush to true
 // 9. Verify that the memory quota was in the describe output and in the actual cluster
 // 10. Change enable flush back to false
-// 11. (TODO) Check the events to make sure the operator took the correct actions
 func TestEditBucket(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
