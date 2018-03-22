@@ -29,7 +29,7 @@ type CbopctlContext struct {
 
 func (c *CbopctlContext) Run() {
 	if c.version {
-		fmt.Printf("cbopctl version %s (%s)\n", version.Version, revision.GitRevision)
+		fmt.Printf("cbopctl version %s (%s)\n", version.Version, revision.Revision())
 	}
 }
 

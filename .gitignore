@@ -10,5 +10,5 @@
 /build/
 /vendor/
 /pkg/generated/
-/pkg/revision/
+/pkg/revision/revision.go
 /test/e2e/logs/

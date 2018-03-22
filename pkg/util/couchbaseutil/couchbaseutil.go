@@ -79,7 +79,7 @@ func NewCouchbaseClient(ctx context.Context, clusterName, username, password str
 	userAgent := &cbmgr.UserAgent{
 		Name:    version.Application,
 		Version: version.Version,
-		UUID:    revision.GitBranch + " " + revision.GitRevision,
+		UUID:    revision.Revision(),
 	}
 	c.client.SetUserAgent(userAgent)
 

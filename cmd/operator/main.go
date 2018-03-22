@@ -73,7 +73,7 @@ func main() {
 	// * Version feature set
 	// * Whether this is an official or development branch
 	// * The exact commit defects are raised against
-	mainLogger.Infof("%s v%s (%s %s)", version.Application, version.Version, revision.GitBranch, revision.GitRevision)
+	mainLogger.Infof("%s v%s (%s)", version.Application, version.Version, revision.Revision())
 
 	id, err := os.Hostname()
 	if err != nil {
