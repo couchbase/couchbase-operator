@@ -1,11 +1,12 @@
 package e2e
 
 import (
-	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"strconv"
 	"testing"
+
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
 func TestPodResourcesBasic(t *testing.T) {
@@ -124,7 +125,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	}
 
 	memReq := strconv.Itoa(int(reqMem))
-	t.Logf("Mem Request: %d MB", memReq)
+	t.Logf("Mem Request: %s MB", memReq)
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
 		"size":               "1",
@@ -139,7 +140,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 
-	t.Logf("Pod Policy Resource Memory Request=%d MB...\n Cluster Capacity=%d  \n scaling until pods cannot be placed", memReq, scaleNum)
+	t.Logf("Pod Policy Resource Memory Request=%s MB...\n Cluster Capacity=%d  \n scaling until pods cannot be placed", memReq, scaleNum)
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err != nil {
 		t.Fatalf("failed to place first pod: %v", err)
@@ -217,7 +218,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	_, err = e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err == nil {
 		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
-		t.Fatalf("%dMB request placed on node with max allocatable memory of %dMB, fail: %v", memReq, int(maxMem), err)
+		t.Fatalf("%sMB request placed on node with max allocatable memory of %dMB, fail: %v", memReq, int(maxMem), err)
 	}
 	t.Logf("Pod not placed")
 }
@@ -399,7 +400,7 @@ func TestAntiAffinityOff(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	t.Logf("AntiAffinity=off... \n attempting to create %s pod cluster with %s nodes", scaleToNum, numNodes)
+	t.Logf("AntiAffinity=off... \n attempting to create %d pod cluster with %d nodes", scaleToNum, numNodes)
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)

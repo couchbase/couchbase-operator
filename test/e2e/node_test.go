@@ -200,7 +200,7 @@ func TestNodeManualFailover(t *testing.T) {
 	f := framework.Global
 
 	// create 2 node cluster with admin console
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 2, true, true)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,18 +306,23 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
+	podToKillMemberId := 1
 
-	// create 2 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, false)
+	// create 1 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
 	// async scale up to 3 node cluster
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, 3, f.CRClient, testCouchbase)
+		echan <- e2eutil.ResizeCluster(t, 0, e2eutil.Size3, f.CRClient, testCouchbase)
 	}()
 
 	// wait for add member event
@@ -327,11 +332,17 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	for nodeIndex := 1; nodeIndex < e2eutil.Size3; nodeIndex++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
 	// kill pod 1
-	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 1)
+	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, podToKillMemberId)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
 
 	// check response from resize request
 	err = <-echan
@@ -339,10 +350,28 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// wait for add member event
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
 	// cluster should also be balanced
 	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -352,23 +381,27 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 // Expects: autofailover of down node occurs and a replacement node is added
 // in order to reach desired cluster size
 func TestNodeRecoveryKilledNewMember(t *testing.T) {
-
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
+	podToKillMemberId := 2
 
-	// create 2 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, false)
+	// create 1 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
 	// async scale up to 3 node cluster
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, 3, f.CRClient, testCouchbase)
+		echan <- e2eutil.ResizeCluster(t, 0, e2eutil.Size3, f.CRClient, testCouchbase)
 	}()
 
 	// wait for add member event
@@ -378,11 +411,17 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	for nodeIndex := 1; nodeIndex < e2eutil.Size3; nodeIndex++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
 	// kill pod that was just added
-	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, 2)
+	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, podToKillMemberId)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
 
 	// check response from resize request
 	err = <-echan
@@ -390,10 +429,22 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
 	// cluster should also be balanced
 	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
 	if err != nil {
 		t.Fatal(err)
+	}
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -412,16 +463,15 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	f := framework.Global
 
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, false)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	// async kill a pod while cluster is scaling to 3rd member
-	doneCh := make(chan bool)
+	thirdPodKilled := make(chan bool)
 	go func() {
-
 		// detect 3rd member add event
 		event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
 		err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
@@ -441,14 +491,13 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		doneCh <- true
+		thirdPodKilled <- true
 	}()
 
 	// async watch for 4th member event
 	go func() {
-
-		// waiting for 3rd membr to be killed
-		<-doneCh
+		// waiting for 3rd member to be killed
+		<-thirdPodKilled
 
 		event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
 		err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
@@ -463,7 +512,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	}()
 
 	// resize to 3 member cluster
-	err = e2eutil.ResizeCluster(t, 0, 3, f.CRClient, testCouchbase)
+	err = e2eutil.ResizeCluster(t, 0, e2eutil.Size3, f.CRClient, testCouchbase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,8 +539,8 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 	f := framework.Global
 
-	// create 1 node cluster with admin console
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, 1, true, true)
+	// 1. create 1 node cluster with admin console
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,19 +563,20 @@ func TestRemoveForeignNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create a foreign member to be added to the cluster
+	// 2. create a foreign member to be added to the cluster
+	foreignNodeName := testCouchbase.Name + "-foreignnode"
 	serverConfig := testCouchbase.Spec.ServerSettings[0]
 	m := &couchbaseutil.Member{
-		Name:         "test-member",
+		Name:         foreignNodeName,
 		Namespace:    f.Namespace,
 		ServerConfig: serverConfig.Name,
 		SecureClient: false,
 	}
-	pod, err := e2eutil.CreateMemberPod(f.KubeClient, m, testCouchbase, "unknown-cluster", f.Namespace)
+	pod, err := e2eutil.CreateMemberPod(f.KubeClient, m, testCouchbase, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.KillMember(f.KubeClient, f.Namespace, "test-member")
+	defer e2eutil.KillMember(f.KubeClient, f.Namespace, foreignNodeName)
 
 	externalPodIP := pod.Status.PodIP + ":8091"
 	err = e2eutil.AddNode(t, client, serverConfig.Services, username, password, externalPodIP)
