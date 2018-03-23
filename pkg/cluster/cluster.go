@@ -66,6 +66,7 @@ type Cluster struct {
 	client        *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
 	ctx           context.Context                // Context used to cancel long running operations
 	cancel        context.CancelFunc             // Closure on the context to indicate cancellation
+	lastEvent     time.Time                      // When we raised the last event (see raiseEvent)
 }
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
@@ -193,6 +194,9 @@ func (c *Cluster) create() error {
 		return err
 	}
 
+	c.logger.Infof("added member (%s)", m.Name)
+	c.raiseEvent(k8sutil.MemberAddEvent(m.Name, c.cluster))
+
 	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
 		return err
 	}
@@ -218,11 +222,7 @@ func (c *Cluster) setupServices() error {
 		if err != nil {
 			return err
 		}
-		_, err = c.eventsCli.Create(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
-		if err != nil {
-			c.logger.Errorf("failed to create new service event: %v", err)
-			return err
-		}
+		c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
 	}
 	return nil
 }
@@ -543,4 +543,29 @@ func (c *Cluster) clusterRemoveMember(name string) {
 	c.members.Remove(name)
 	c.status.Size = c.members.Size()
 	c.updateMemberStatus(c.members)
+}
+
+// Raises an event.  Unfortunately the event stream only appears to have a
+// 1s granularity, so insert a delay if necessary
+func (c *Cluster) raiseEvent(event *v1.Event) {
+	// Work out how long since we last raised an event
+	duration := event.FirstTimestamp.Time.Sub(c.lastEvent)
+
+	if duration < time.Second {
+		// Sleep until the next whole second
+		timestamp := event.FirstTimestamp.Time.Add(time.Second).Truncate(time.Second)
+		time.Sleep(time.Until(timestamp))
+
+		// Update the event metadata so the events don't time travel!
+		event.FirstTimestamp.Time = timestamp
+		event.LastTimestamp.Time = timestamp
+	}
+
+	// Post the event to kubernetes
+	if _, err := c.eventsCli.Create(event); err != nil {
+		c.logger.Errorf("failed to create new %s event: %v", event.Reason, err)
+	}
+
+	// Update the last event timestamp
+	c.lastEvent = event.FirstTimestamp.Time
 }

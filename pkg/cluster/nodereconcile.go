@@ -148,9 +148,7 @@ func (r *ReconcileMachine) handleUnclusteredNodes(c *Cluster) {
 			// reblancing has occurred, however tests will probably fail left right
 			// and center due to the events occurring after the cluster is in a healthy
 			// state.
-			if _, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(name, c.cluster)); err != nil {
-				c.logger.Errorf("failed to create member remove event: %v", err)
-			}
+			c.raiseEvent(k8sutil.MemberRemoveEvent(name, c.cluster))
 		}
 	}
 

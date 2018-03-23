@@ -155,10 +155,6 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	c.memberCounter++
 
 	// Notify that we have created a new member
-	c.logger.Infof("added member (%s)", newMember.Name)
-	if _, err := c.eventsCli.Create(k8sutil.MemberAddEvent(newMember.Name, c.cluster)); err != nil {
-		c.logger.Errorf("failed to create new member add event: %v", err)
-	}
 	c.clusterAddMember(newMember)
 	if err := c.updateCRStatus(); err != nil {
 		return nil, err
@@ -191,7 +187,14 @@ func (c *Cluster) addMember(serverSpec api.ServerConfig) (*couchbaseutil.Member,
 
 	// Add to the cluster. Note we have to use the plain text url as
 	// /controller/addNode will not work with a https reference
-	return newMember, c.client.AddNode(ms, newMember.ClientURLPlaintext(), serverSpec.Services)
+	if err := c.client.AddNode(ms, newMember.ClientURLPlaintext(), serverSpec.Services); err != nil {
+		return newMember, err
+	}
+
+	c.logger.Infof("added member (%s)", newMember.Name)
+	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name, c.cluster))
+
+	return newMember, nil
 }
 
 // Destroys a Couchbase cluster member
@@ -218,9 +221,7 @@ func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseu
 	if err := c.client.CancelAddNode(ms, member.HostURLPlaintext()); err != nil {
 		return err
 	}
-	if _, err := c.eventsCli.Create(k8sutil.FailedAddNodeEvent(member.Name, c.cluster)); err != nil {
-		c.logger.Errorf("failed to create failed add node event: %v", err)
-	}
+	c.raiseEvent(k8sutil.FailedAddNodeEvent(member.Name, c.cluster))
 	return nil
 }
 
@@ -228,9 +229,7 @@ func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseu
 func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string) error {
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
-	if _, err := c.eventsCli.Create(k8sutil.RebalanceStartedEvent(c.cluster)); err != nil {
-		c.logger.Errorf("failed to create rebalance started event: %v", err)
-	}
+	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
 	c.status.SetUnbalancedCondition()
 	if err := c.updateCRStatus(); err != nil {
 		return err
@@ -253,10 +252,17 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 	// this will result in data loss or a terminal cluster condition
 	for name, _ := range managed {
 		if !status.NodeInState(name, couchbaseutil.NodeStateUnclustered) {
-			if _, err := c.eventsCli.Create(k8sutil.RebalanceIncompleteEvent(c.cluster)); err != nil {
-				c.logger.Errorf("failed to create rebalance incomplete event: %v", err)
-			}
+			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 			return fmt.Errorf("node %s is still in the cluster", name)
+		}
+	}
+
+	// Conversely check that everything is in that should be.  This ensures we
+	// don't report a balanced state if a node died before it was balanced in
+	for name, _ := range c.members.Diff(managed) {
+		if !status.NodeInState(name, couchbaseutil.NodeStateActive) {
+			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
+			return fmt.Errorf("node %s is not in the cluster", name)
 		}
 	}
 
@@ -266,22 +272,11 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 		// TODO: this feels dirty, but as this is a mixed bag of members and
 		// un-managed nodes we have no other option for now
 		memberName := strings.Split(nodeToRemove, ".")[0]
-		if _, err := c.eventsCli.Create(k8sutil.MemberRemoveEvent(memberName, c.cluster)); err != nil {
-			c.logger.Errorf("failed to create member remove event: %v", err)
-		}
-
-		// This ensures events don't happen at roughly the same time. It looks
-		// like Kubernetes tracks events at second resolution and this causes
-		// our test verification to fail. Sleeping here isn't a big deal, but
-		// we should find a more permanent solution that doesn't sleep in the
-		// future.
-		time.Sleep(1 * time.Second)
+		c.raiseEvent(k8sutil.MemberRemoveEvent(memberName, c.cluster))
 	}
 
 	// Report the cluster is balanced
-	if _, err := c.eventsCli.Create(k8sutil.RebalanceCompletedEvent(c.cluster)); err != nil {
-		c.logger.Errorf("failed to create rebalance completed event: %v", err)
-	}
+	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.status.SetBalancedCondition()
 	if err := c.updateCRStatus(); err != nil {
 		return err
@@ -361,10 +356,7 @@ func (c *Cluster) reconcileAdminService() {
 		if err != nil {
 			c.logger.Warnf("Error occured deleting admin service: %s", err.Error())
 		} else {
-			_, err = c.eventsCli.Create(k8sutil.AdminConsoleSvcDeleteEvent(svc.Name, c.cluster))
-			if err != nil {
-				c.logger.Errorf("failed to create new service event: %v", err)
-			}
+			c.raiseEvent(k8sutil.AdminConsoleSvcDeleteEvent(svc.Name, c.cluster))
 		}
 		return
 	}
@@ -377,10 +369,7 @@ func (c *Cluster) reconcileAdminService() {
 			if err != nil {
 				c.logger.Warnf("Error occured creating admin service: %s", err.Error())
 			} else {
-				_, err = c.eventsCli.Create(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
-				if err != nil {
-					c.logger.Errorf("failed to create new service event: %v", err)
-				}
+				c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
 			}
 		}
 		return
@@ -407,11 +396,7 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 	err := c.client.CreateBucket(c.members, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
-
-		_, err = c.eventsCli.Create(k8sutil.BucketCreateEvent(bucketName, c.cluster))
-		if err != nil {
-			c.logger.Errorf("failed to create new bucket event: %v", err)
-		}
+		c.raiseEvent(k8sutil.BucketCreateEvent(bucketName, c.cluster))
 	}
 	return err
 }
@@ -420,11 +405,7 @@ func (c *Cluster) deleteClusterBucket(bucketName string) error {
 	err := c.client.DeleteBucket(c.members, bucketName)
 	if err == nil {
 		c.status.RemoveBucket(bucketName)
-
-		_, err = c.eventsCli.Create(k8sutil.BucketDeleteEvent(bucketName, c.cluster))
-		if err != nil {
-			c.logger.Errorf("failed to create delete bucket event: %v", err)
-		}
+		c.raiseEvent(k8sutil.BucketDeleteEvent(bucketName, c.cluster))
 	}
 	return err
 }
@@ -439,11 +420,7 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 	err := c.client.EditBucket(c.members, config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
-
-		_, err = c.eventsCli.Create(k8sutil.BucketEditEvent(bucketName, c.cluster))
-		if err != nil {
-			c.logger.Errorf("failed to create bucket edit event: %v", err)
-		}
+		c.raiseEvent(k8sutil.BucketEditEvent(bucketName, c.cluster))
 	}
 	return err
 }

@@ -60,9 +60,7 @@ func (c *Cluster) triggerUpgrade() (bool, error) {
 // Atomically flag the start of an upgrade
 func (c *Cluster) startUpgrade() error {
 	c.logger.Infof("starting upgrade from '%s' to '%s'", c.status.CurrentVersion, c.cluster.Spec.Version)
-	if _, err := c.eventsCli.Create(k8sutil.UpgradeStartedEvent(c.status.CurrentVersion, c.cluster.Spec.Version, c.cluster)); err != nil {
-		c.logger.Errorf("failed to create upgrade start event: %v", err)
-	}
+	c.raiseEvent(k8sutil.UpgradeStartedEvent(c.status.CurrentVersion, c.cluster.Spec.Version, c.cluster))
 
 	// Make the upgrade path deterministic
 	members := make([]string, len(c.status.Members.Ready))
@@ -95,9 +93,7 @@ func (c *Cluster) updateUpgrade() error {
 	// No nodes left to upgrade, atomically complete the operation
 	if len(c.status.UpgradeStatus.ReadyNodes) == 0 {
 		c.logger.Infof("completed upgrade from '%s' to '%s'", c.status.CurrentVersion, c.status.UpgradeStatus.TargetVersion)
-		if _, err := c.eventsCli.Create(k8sutil.UpgradeFinishedEvent(c.status.CurrentVersion, c.cluster.Spec.Version, c.cluster)); err != nil {
-			c.logger.Errorf("failed to create upgrade start event: %v", err)
-		}
+		c.raiseEvent(k8sutil.UpgradeFinishedEvent(c.status.CurrentVersion, c.cluster.Spec.Version, c.cluster))
 
 		return c.status.CompleteUpgrade()
 	}
