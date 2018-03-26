@@ -19,8 +19,6 @@ const (
 )
 
 type ClusterCondition struct {
-	// Type of cluster condition.
-	Type ClusterConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status"`
 	// The last time this condition was updated.
@@ -42,6 +40,8 @@ const (
 	ClusterConditionManageConfig                       = "ManageConfig"
 	ClusterConditionScaling                            = "Scaling"
 )
+
+type ClusterStatusMap map[ClusterConditionType]*ClusterCondition
 
 // If the status contains an UpgradeStatus object then an upgrade is in progress.
 //
@@ -73,7 +73,7 @@ type ClusterStatus struct {
 	ControlPaused bool `json:"controlPaused"`
 
 	// Condition keeps ten most recent cluster conditions
-	Conditions []ClusterCondition `json:"conditions"`
+	Conditions ClusterStatusMap `json:"conditions,omitempty"`
 
 	// A unique cluster identifier
 	ClusterID string `json:"clusterId"`
@@ -196,101 +196,81 @@ func (cs *ClusterStatus) SetReason(r string) {
 }
 
 func (cs *ClusterStatus) SetBucketManagementFailedCondition(reason, message string) {
-	c := newClusterCondition(ClusterConditionManageBuckets, v1.ConditionFalse, reason, message)
-	cs.setClusterCondition(*c)
+	c := newClusterCondition(v1.ConditionFalse, reason, message)
+	cs.setClusterCondition(ClusterConditionManageBuckets, c)
 }
 
 func (cs *ClusterStatus) SetScalingUpCondition(from, to int) {
-	c := newClusterCondition(ClusterConditionScaling, v1.ConditionTrue, "Scaling up", scalingMsg(from, to))
-	cs.setClusterCondition(*c)
+	c := newClusterCondition(v1.ConditionTrue, "Scaling up", scalingMsg(from, to))
+	cs.setClusterCondition(ClusterConditionScaling, c)
 }
 
 func (cs *ClusterStatus) SetScalingDownCondition(from, to int) {
-	c := newClusterCondition(ClusterConditionScaling, v1.ConditionTrue, "Scaling down", scalingMsg(from, to))
-	cs.setClusterCondition(*c)
+	c := newClusterCondition(v1.ConditionTrue, "Scaling down", scalingMsg(from, to))
+	cs.setClusterCondition(ClusterConditionScaling, c)
 }
 
 func (cs *ClusterStatus) SetBalancedCondition() {
-	c := newClusterCondition(ClusterConditionBalanced, v1.ConditionTrue, "Cluster is balanced",
+	c := newClusterCondition(v1.ConditionTrue, "Cluster is balanced",
 		"Data is equally distributed across all nodes in the cluster")
-	cs.setClusterCondition(*c)
+	cs.setClusterCondition(ClusterConditionBalanced, c)
 }
 
 func (cs *ClusterStatus) SetUnbalancedCondition() {
-	c := newClusterCondition(ClusterConditionBalanced, v1.ConditionFalse, "Cluster is unbalanced",
+	c := newClusterCondition(v1.ConditionFalse, "Cluster is unbalanced",
 		"The operator is attempting to rebalance the data to correct this issue")
-	cs.setClusterCondition(*c)
+	cs.setClusterCondition(ClusterConditionBalanced, c)
 }
 
 func (cs *ClusterStatus) SetUnknownBalancedCondition() {
-	c := newClusterCondition(ClusterConditionBalanced, v1.ConditionUnknown,
+	c := newClusterCondition(v1.ConditionUnknown,
 		"Unable to check balanced state", "Unable to determine if cluster is balanced")
-	cs.setClusterCondition(*c)
+	cs.setClusterCondition(ClusterConditionBalanced, c)
 }
 
 func (cs *ClusterStatus) SetUnavailableCondition(down []string) {
-	c := newClusterCondition(ClusterConditionAvailable, v1.ConditionFalse, "Cluster partially available",
+	c := newClusterCondition(v1.ConditionFalse, "Cluster partially available",
 		fmt.Sprintf("The following nodes are down and not serving requests: %s", strings.Join(down, ", ")))
-	cs.setClusterCondition(*c)
+	cs.setClusterCondition(ClusterConditionAvailable, c)
 }
 
 func (cs *ClusterStatus) SetReadyCondition() {
-	c := newClusterCondition(ClusterConditionAvailable, v1.ConditionTrue, "Cluster available", "")
-	cs.setClusterCondition(*c)
+	c := newClusterCondition(v1.ConditionTrue, "Cluster available", "")
+	cs.setClusterCondition(ClusterConditionAvailable, c)
 }
 
 func (cs *ClusterStatus) SetConfigRejectedCondition(message string) {
-	c := newClusterCondition(ClusterConditionManageConfig, v1.ConditionFalse, "Cluster config is rejected", message)
-	cs.setClusterCondition(*c)
+	c := newClusterCondition(v1.ConditionFalse, "Cluster config is rejected", message)
+	cs.setClusterCondition(ClusterConditionManageConfig, c)
 }
 
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
-	pos, _ := cs.getClusterCondition(t)
-	if pos == -1 {
-		return
+	if cs.Conditions == nil {
+		cs.Conditions = ClusterStatusMap{}
 	}
-	cs.Conditions = append(cs.Conditions[:pos], cs.Conditions[pos+1:]...)
+	delete(cs.Conditions, t)
 }
 
-func (cs *ClusterStatus) setClusterCondition(c ClusterCondition) {
-	pos, cp := cs.getClusterCondition(c.Type)
-	if cp != nil &&
-		cp.Status == c.Status && cp.Reason == c.Reason && cp.Message == c.Message {
-		return
+func (cs *ClusterStatus) setClusterCondition(t ClusterConditionType, c *ClusterCondition) {
+	if cs.Conditions == nil {
+		cs.Conditions = ClusterStatusMap{}
 	}
-
-	if cp != nil {
-		cs.Conditions[pos] = c
-	} else {
-		cs.Conditions = append(cs.Conditions, c)
-	}
-}
-
-func (cs *ClusterStatus) getClusterCondition(t ClusterConditionType) (int, *ClusterCondition) {
-	for i, c := range cs.Conditions {
-		if t == c.Type {
-			return i, &c
+	if cp, ok := cs.Conditions[t]; ok {
+		if cp.Status == c.Status && cp.Reason == c.Reason && cp.Message == c.Message {
+			return
 		}
 	}
-	return -1, nil
+	cs.Conditions[t] = c
 }
 
-func newClusterCondition(condType ClusterConditionType, status v1.ConditionStatus, reason, message string) *ClusterCondition {
+func newClusterCondition(status v1.ConditionStatus, reason, message string) *ClusterCondition {
 	now := time.Now().Format(time.RFC3339)
 	return &ClusterCondition{
-		Type:               condType,
 		Status:             status,
 		LastUpdateTime:     now,
 		LastTransitionTime: now,
 		Reason:             reason,
 		Message:            message,
-	}
-}
-
-func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
-	cs.Conditions = append(cs.Conditions, c)
-	if len(cs.Conditions) > 10 {
-		cs.Conditions = cs.Conditions[1:]
 	}
 }
 

@@ -41,11 +41,11 @@ Status:
       Type:			couchbase
   Cluster Id:			9ae7fe4634e0360cf9c9245cb4ebb27b
   Conditions:
+    Balanced:
+      Message:			Data is equally distributed across all nodes in the cluster
+      Reason:			Cluster is balanced
+      Status:			True
     ...
-    Message:			Data is equally distributed across all nodes in the cluster
-    Reason:			Cluster is balanced
-    Status:			True
-    Type:			Balanced
   Control Paused:		false
   Current Version:		enterprise-5.0.1
   Members:
@@ -100,10 +100,10 @@ A list of buckets currently active within the Couchbase cluster. The values of t
 The bucket section of the status only reflects valid changes that have been made to the cluster.  In the case of attempts to update bucket section with an invalid specification, the following message will be seen in the ```Conditions``` section of the Status:
 
     Conditions:
-      Message:	Bucket: default cannot change (default) bucket param='conflictResolution' from 'seqno' to 'timestamp'
-      Reason:		Bucket edit failed
-      Status:		False
-      Type:			ManageBuckets
+      ManageBuckets:
+        Message:	Bucket: default cannot change (default) bucket param='conflictResolution' from 'seqno' to 'timestamp'
+        Reason:		Bucket edit failed
+        Status:		False
 
 To resolve errors resulting from invalid updates, edit the cluster specification according to the message shown under Conditions and apply the updated specification.
 
@@ -164,11 +164,11 @@ The size of the Couchbase cluster. When you change this value in the cluster spe
 ### Conditions
 
     Conditions:
+      Balanced:
+        Message:			Data is equally distributed across all nodes in the cluster
+        Reason:			Cluster is balanced
+        Status:			True
       ...
-      Message:			Data is equally distributed across all nodes in the cluster
-      Reason:			Cluster is balanced
-      Status:			True
-      Type:			Balanced
 
 A list of conditions reflecting the current state of the Couchbase cluster. Each Condition item is denoted by a ```Type``` along with an associated ```Status```. The various conditions and their statuses are documented in [Conditions and Events](conditionsAndEvents.md).
 

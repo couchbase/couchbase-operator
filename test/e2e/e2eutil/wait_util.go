@@ -176,8 +176,8 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 			},
 		}
 
-		for _, cond := range cl.Status.Conditions {
-			healthyCondition, ok := healthyConditions[cond.Type]
+		for kind, cond := range cl.Status.Conditions {
+			healthyCondition, ok := healthyConditions[kind]
 			if !ok {
 				continue
 			}
@@ -425,8 +425,8 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 		case <-tickChan:
 			// compare cluster conditions to desired condition
 			t.Logf("cluster status: %s", cluster.Status.Conditions)
-			for _, condition := range cluster.Status.Conditions {
-				if condition.Type == conditionType && condition.Status == status {
+			if condition, ok := cluster.Status.Conditions[conditionType]; ok {
+				if condition.Status == status {
 					conditionTime, err := time.Parse(time.RFC3339, condition.LastUpdateTime)
 					if err != nil {
 						return err
@@ -434,7 +434,6 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 					if conditionTime.After(after) {
 						return nil
 					}
-
 				}
 			}
 			// update cluster
@@ -492,13 +491,11 @@ func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries
 		if err != nil {
 			return false, err
 		}
-		for _, condition := range cluster.Status.Conditions {
-			if condition.Type == conditionType && strings.Contains(condition.Message, message) {
+		for kind, condition := range cluster.Status.Conditions {
+			if kind == conditionType && strings.Contains(condition.Message, message) {
 				return true, nil
-			} else {
-				t.Logf("condition: %v, message: %v", condition.Type, condition.Message)
 			}
-
+			t.Logf("condition: %v, message: %v", conditionType, condition.Message)
 		}
 		t.Logf("conditions: %v", cluster.Status.Conditions)
 		return false, nil
