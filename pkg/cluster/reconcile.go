@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
+	"github.com/couchbase/gocbmgr"
 	"k8s.io/api/core/v1"
 )
 
@@ -58,6 +59,14 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	c.reconcileAdminService()
+
+	if err := c.reconcileExposedFeatures(); err != nil {
+		return err
+	}
+
+	if err := c.reconcileMemberAlternateAddresses(); err != nil {
+		return err
+	}
 
 	c.status.SetReadyCondition()
 
@@ -382,12 +391,27 @@ func (c *Cluster) reconcileAdminService() {
 	if !reflect.DeepEqual(svc.Spec.Selector, desiredSelector) {
 		// update admin service
 		svc.Spec.Selector = desiredSelector
-		err = k8sutil.UpdateService(c.config.KubeCli, c.cluster.Namespace, svc)
-		if err != nil {
+		if _, err = k8sutil.UpdateService(c.config.KubeCli, c.cluster.Namespace, svc); err != nil {
 			c.logger.Warnf("Error occured updating admin service: %s", err.Error())
 		}
 	}
+}
 
+// reconcileExposedFeatures looks at the requested exported feature set in the
+// specification and add/removes services as requested, raising events as
+// appropriate.
+func (c *Cluster) reconcileExposedFeatures() error {
+	status, err := k8sutil.UpdateExposedFeatures(c.config.KubeCli, c.cluster, &c.status)
+	if err != nil {
+		return err
+	}
+	for _, service := range status.Added {
+		c.raiseEvent(k8sutil.NodeServiceCreateEvent(service, c.cluster))
+	}
+	for _, service := range status.Removed {
+		c.raiseEvent(k8sutil.NodeServiceDeleteEvent(service, c.cluster))
+	}
+	return nil
 }
 
 // create bucket on cluster
@@ -509,6 +533,91 @@ func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) err
 			if err := netutil.WaitForHostPortTLS(ctx, m.HostURL(), pem); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+// initMemberAlternateAddresses injects the K8S node's L3 address and alternate
+// ports into the requested member.  Clients may use these addresses/ports to
+// connect to the cluster if there is no direct L3 connectivity into the pod
+// network.
+func (c *Cluster) reconcileMemberAlternateAddresses() error {
+	// Examine each member in turn as they will have different node
+	// addresses (i.e. you must be using anti affinity or kubernetes
+	// has no way of addressing individual cluster nodes).
+	for memberName, member := range c.members {
+		// Grab the current configuration
+		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
+		if err != nil {
+			return err
+		}
+
+		// Calculate what the current state of the node's alternate addresses
+		// should be.
+		//
+		// Unfortunately clients outside of the pod network are not able to access
+		// all services, so we need to moderate what we set as externally available.
+		//
+		// See the following for guidance:
+		// https://github.com/couchbase/ns_server/blob/6071474b0bd8d625955b60e0ee94802d66e47cfc/src/menelaus_web_node.erl#L281
+		hostname, err := k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
+		if err != nil {
+			return err
+		}
+
+		// Marshal status data into manager library format taking note if any
+		// ports are actually set
+		addresses := &cbmgr.AlternateAddressesExternal{}
+		anyPortSet := false
+		if ports, ok := c.status.ExposedPorts[memberName]; ok {
+			addresses = &cbmgr.AlternateAddressesExternal{
+				Hostname: hostname,
+				Ports: cbmgr.AlternateAddressesExternalPorts{
+					AdminServicePort:    ports.AdminServicePort,
+					AdminServicePortTLS: ports.AdminServicePortTLS,
+					ViewServicePort:     ports.ViewServicePort,
+					ViewServicePortTLS:  ports.ViewServicePortTLS,
+					//QueryServicePort:        ports.QueryServicePort,
+					//QueryServicePortTLS:     ports.QueryServicePortTLS,
+					//FtsServicePort:          ports.FtsServicePort,
+					//FtsServicePortTLS:       ports.FtsServicePortTLS,
+					//AnalyticsServicePort:    ports.AnalyticsServicePort,
+					//AnalyticsServicePortTLS: ports.AnalyticsServicePortTLS,
+					DataServicePort: ports.DataServicePort,
+					//DataServicePortTLS:      ports.DataServicePortTLS,
+				},
+			}
+			ports := reflect.ValueOf(addresses.Ports)
+			for i := 0; i < ports.NumField(); i++ {
+				value := ports.Field(i)
+				if value.Int() != 0 {
+					anyPortSet = true
+					break
+				}
+			}
+		}
+
+		// If no ports are set, but the server reports the hostname is set we have
+		// existing configuration which needs to be deleted.  If the hostname is
+		// not set then there is no configuration to worry about
+		if !anyPortSet {
+			if existingAddresses.Hostname != "" {
+				if err := c.client.DeleteAlternateAddressesExternal(member); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		// Check to see if we need to perform any updates, ignoring if not
+		if reflect.DeepEqual(addresses, existingAddresses) {
+			continue
+		}
+
+		// Perform the update
+		if err := c.client.SetAlternateAddressesExternal(member, addresses); err != nil {
+			return err
 		}
 	}
 	return nil

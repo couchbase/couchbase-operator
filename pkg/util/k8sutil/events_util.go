@@ -100,6 +100,22 @@ func AdminConsoleSvcDeleteEvent(svcName string, cl *api.CouchbaseCluster) *v1.Ev
 	return event
 }
 
+func NodeServiceCreateEvent(service string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "NodeServiceCreated"
+	event.Message = fmt.Sprintf("Node service for %s was created", service)
+	return event
+}
+
+func NodeServiceDeleteEvent(service string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "NodeServiceDeleted"
+	event.Message = fmt.Sprintf("Node service for %s was deleted", service)
+	return event
+}
+
 func UpgradeStartedEvent(sourceVersion, targetVersion string, cl *api.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal

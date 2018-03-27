@@ -546,6 +546,24 @@ func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, username, password, sto
 	return c.client.SetIndexSettings(settings)
 }
 
+func (c *CouchbaseClient) GetAlternateAddressesExternal(m *Member) (*cbmgr.AlternateAddressesExternal, error) {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetAlternateAddressesExternal()
+}
+
+func (c *CouchbaseClient) SetAlternateAddressesExternal(m *Member, addresses *cbmgr.AlternateAddressesExternal) error {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.SetAlternateAddressesExternal(addresses)
+}
+
+func (c *CouchbaseClient) DeleteAlternateAddressesExternal(m *Member) error {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.DeleteAlternateAddressesExternal()
+}
+
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	rv := &cbmgr.Bucket{
 		BucketName:        config.BucketName,

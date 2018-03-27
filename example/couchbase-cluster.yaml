@@ -4,9 +4,11 @@ metadata:
   name: cb-example
 spec:
   baseImage: couchbase/server
-  version: enterprise-5.0.1
+  version: 5.5.0-beta
   authSecret: cb-example-auth
   exposeAdminConsole: true
+  exposedFeatures:
+    - xdcr
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256

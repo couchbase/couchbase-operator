@@ -6,9 +6,11 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -17,7 +19,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -27,8 +29,60 @@ const (
 	couchbaseVersionAnnotationKey = "couchbase.version"
 	couchbaseVolumeName           = "couchbase-data"
 	couchbaseVolumeMountDir       = "/opt/couchbase/var/lib/data"
-	consoleAdminPortName          = "couchbase"
-	consoleAdminPortNameSSL       = "couchbases"
+
+	// Fixed port names (generate SRV records for the peer services)
+	couchbaseSRVName    = "couchbase"
+	couchbaseSRVNameTLS = "couchbases"
+
+	// tlsBasePort is the port number relative to which TLS ports are (usually) translated
+	tlsBasePort = 10000
+
+	// Admin service constants
+	AdminService            = "admin"
+	adminServicePortName    = "cb-admin"
+	adminServicePortNameTLS = "cb-admin-tls"
+	adminServicePort        = 8091
+	adminServicePortTLS     = tlsBasePort + adminServicePort
+
+	// View service constants
+	ViewService            = "view"
+	viewServicePortName    = "cb-view"
+	viewServicePortNameTLS = "cb-view-tls"
+	viewServicePort        = 8092
+	viewServicePortTLS     = tlsBasePort + viewServicePort
+
+	// Query service constants
+	QueryService            = "query"
+	queryServicePortName    = "cb-query"
+	queryServicePortNameTLS = "cb-query-tls"
+	queryServicePort        = 8093
+	queryServicePortTLS     = tlsBasePort + queryServicePort
+
+	// Full text search service constants
+	FtsService            = "fts"
+	ftsServicePortName    = "cb-fts"
+	ftsServicePortNameTLS = "cb-fts-tls"
+	ftsServicePort        = 8094
+	ftsServicePortTLS     = tlsBasePort + ftsServicePort
+
+	// Analytics service constants
+	AnalyticsService            = "analytics"
+	analyticsServicePortName    = "cb-analytics"
+	analyticsServicePortNameTLS = "cb-analytics-tls"
+	analyticsServicePort        = 8095
+	analyticsServicePortTLS     = tlsBasePort + analyticsServicePort
+
+	// Data service constants
+	DataService            = "data"
+	dataServicePortName    = "cb-data"
+	dataServicePortNameTLS = "cb-data-tls"
+	dataServicePort        = 11210
+	dataServicePortTLS     = 11207
+
+	// Labels
+	labelApp     = "app"
+	labelCluster = "couchbase_cluster"
+	labelNode    = "couchbase_node"
 )
 
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
@@ -79,8 +133,7 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
 
-func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v1.ServicePort, selector, labels map[string]string) *v1.Service {
-
+func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v1.ServicePort, labels, selector map[string]string) *v1.Service {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   svcName,
@@ -104,29 +157,31 @@ func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v
 // (sans load balancing middleware) which allows the operator to resolve
 // addresses of individual pods instead of a proxy
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
+	ports := peerServicePorts
 	labels := LabelsForCluster(clusterName)
-	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, adminServicePorts(), labels, labels)
+	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, ports, labels, labels)
 	svc.Spec.ClusterIP = v1.ClusterIPNone
-	_, err := createService(kubecli, svc, ns, owner)
+	_, err := createService(kubecli, ns, svc, owner)
 	return err
 }
 
 // creates a service of Type NodePort which allows external clients to
 // access the web ui
 func CreateUIService(kubecli kubernetes.Interface, clusterName, ns string, services []string, owner metav1.OwnerReference) (*v1.Service, error) {
+	ports := peerServicePorts
 	selectors := LabelsForAdminConsole(clusterName, services)
-	svc := createServiceManifest(AdminServiceName(clusterName), v1.ServiceTypeNodePort, adminServicePorts(), selectors, LabelsForCluster(clusterName))
+	svc := createServiceManifest(AdminServiceName(clusterName), v1.ServiceTypeNodePort, ports, selectors, LabelsForCluster(clusterName))
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
-	return createService(kubecli, svc, ns, owner)
+	return createService(kubecli, ns, svc, owner)
 }
 
-func createService(kubecli kubernetes.Interface, svc *v1.Service, ns string, owner metav1.OwnerReference) (*v1.Service, error) {
+func createService(kubecli kubernetes.Interface, ns string, svc *v1.Service, owner metav1.OwnerReference) (*v1.Service, error) {
 	addOwnerRefToObject(svc.GetObjectMeta(), owner)
 	return kubecli.CoreV1().Services(ns).Create(svc)
 }
 
 func GetAdminConsolePorts(svc *v1.Service) (string, string) {
-	return getAdminConsolePort(svc, consoleAdminPortName), getAdminConsolePort(svc, consoleAdminPortNameSSL)
+	return getAdminConsolePort(svc, couchbaseSRVName), getAdminConsolePort(svc, couchbaseSRVNameTLS)
 }
 
 func getAdminConsolePort(svc *v1.Service, portName string) string {
@@ -145,13 +200,314 @@ func GetService(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetO
 	return kubecli.CoreV1().Services(ns).Get(name, *opts)
 }
 
-func DeleteService(kubecli kubernetes.Interface, name, ns string, opts *metav1.DeleteOptions) error {
+func DeleteService(kubecli kubernetes.Interface, ns, name string, opts *metav1.DeleteOptions) error {
 	return kubecli.CoreV1().Services(ns).Delete(name, opts)
 }
 
-func UpdateService(kubecli kubernetes.Interface, ns string, svc *v1.Service) error {
-	_, err := kubecli.CoreV1().Services(ns).Update(svc)
-	return err
+func UpdateService(kubecli kubernetes.Interface, ns string, svc *v1.Service) (*v1.Service, error) {
+	return kubecli.CoreV1().Services(ns).Update(svc)
+}
+
+// updateExposedPorts accepts a new or existing service and adds the allocated
+// node ports to a port status structure.
+func updateExposedPorts(portStatusMap cbapi.PortStatusMap, nodeName string, service *v1.Service) error {
+	portStatus, ok := portStatusMap[nodeName]
+	if !ok {
+		portStatus = &cbapi.PortStatus{}
+		portStatusMap[nodeName] = portStatus
+	}
+	for _, servicePort := range service.Spec.Ports {
+		switch servicePort.Name {
+		case adminServicePortName:
+			portStatus.AdminServicePort = servicePort.NodePort
+		case adminServicePortNameTLS:
+			portStatus.AdminServicePortTLS = servicePort.NodePort
+		case viewServicePortName:
+			portStatus.ViewServicePort = servicePort.NodePort
+		case viewServicePortNameTLS:
+			portStatus.ViewServicePortTLS = servicePort.NodePort
+		case queryServicePortName:
+			portStatus.QueryServicePort = servicePort.NodePort
+		case queryServicePortNameTLS:
+			portStatus.QueryServicePortTLS = servicePort.NodePort
+		case ftsServicePortName:
+			portStatus.FtsServicePort = servicePort.NodePort
+		case ftsServicePortNameTLS:
+			portStatus.FtsServicePortTLS = servicePort.NodePort
+		case analyticsServicePortName:
+			portStatus.AnalyticsServicePort = servicePort.NodePort
+		case analyticsServicePortNameTLS:
+			portStatus.AnalyticsServicePortTLS = servicePort.NodePort
+		case dataServicePortName:
+			portStatus.DataServicePort = servicePort.NodePort
+		case dataServicePortNameTLS:
+			portStatus.DataServicePortTLS = servicePort.NodePort
+		default:
+			return fmt.Errorf("unhandled port name %s", servicePort.Name)
+		}
+	}
+	return nil
+}
+
+// ServiceList contains a set of services
+type ServiceList []string
+
+// Contains returns true if a sevice is part of a service list
+func (sl ServiceList) Contains(service string) bool {
+	for _, s := range sl {
+		if s == service {
+			return true
+		}
+	}
+	return false
+}
+
+// Sub removes members from 'other' from a ServiceList
+func (sl ServiceList) Sub(other ServiceList) ServiceList {
+	out := ServiceList{}
+	for _, service := range sl {
+		if other.Contains(service) {
+			continue
+		}
+		out = append(out, service)
+	}
+	return out
+}
+
+// GetExposedServiceName returns the service name generated for each service port group
+func GetExposedServiceName(nodeName string) string {
+	return nodeName + "-exposed-ports"
+}
+
+// exposedfeatureSets is a mapping from feature name to a list of host ports to expose
+var exposedfeatureSets = map[string][]string{
+	cbapi.FeatureAdmin: []string{
+		AdminService,
+	},
+	cbapi.FeatureXDCR: []string{
+		AdminService,
+		ViewService,
+		DataService,
+	},
+	cbapi.FeatureClient: []string{
+		ViewService,
+		QueryService,
+		FtsService,
+		AnalyticsService,
+		DataService,
+	},
+}
+
+// exposedFeatureSetToServiceList takes a requested feature set and returns
+// a list of unique service names
+func exposedFeatureSetToServiceList(featureSet cbapi.ExposedFeatureList) (ServiceList, error) {
+	// Nothing to do, exit
+	serviceList := ServiceList{}
+	serviceSet := map[string]interface{}{}
+	if featureSet == nil || len(featureSet) == 0 {
+		return serviceList, nil
+	}
+
+	// Accumulate services defined by features into a set
+	for _, featureSet := range featureSet {
+		featureSetPorts, ok := exposedfeatureSets[featureSet]
+		if !ok {
+			return nil, fmt.Errorf("feature set %s undefined", featureSet)
+		}
+		for _, featureSetPort := range featureSetPorts {
+			serviceSet[featureSetPort] = nil
+		}
+	}
+
+	// Map the set keys into a list
+	for service, _ := range serviceSet {
+		serviceList = append(serviceList, service)
+	}
+	return serviceList, nil
+}
+
+// serviceExists scans a list of services and returns true if the named
+// service exists
+func serviceExists(services *v1.ServiceList, name string) bool {
+	for _, service := range services.Items {
+		if service.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// portExists returns true if a named port exists
+func portExists(ports []v1.ServicePort, name string) bool {
+	for _, port := range ports {
+		if port.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// intersectPorts performs a boolean intersection of ports based on name.
+// It returns a subset of a
+func intersectPorts(a, b []v1.ServicePort) []v1.ServicePort {
+	d := []v1.ServicePort{}
+	for _, port := range a {
+		if portExists(b, port.Name) {
+			d = append(d, port)
+		}
+	}
+	return d
+}
+
+// subtractPorts performs a boolean subtraction of ports based on name.
+// It returns a subset of a
+func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
+	d := []v1.ServicePort{}
+	for _, port := range a {
+		if !portExists(b, port.Name) {
+			d = append(d, port)
+		}
+	}
+	return d
+}
+
+// UpdateExposedFeatureStatus is used to communicate to clients which services have been
+// added or created by UpdateExposedFeatureStatus
+type UpdateExposedFeatureStatus struct {
+	Added   ServiceList
+	Removed ServiceList
+}
+
+// UpdateExposedFeatures handles adding and removing per-pod node ports for all
+// services.  Rather than specify individual ports we instead allow addition/deletion
+// via feature sets.  There is some overlap between sets so we perform a boolean union
+// before processing.  The function returns lists of added and removed services so
+// client code can perform any notifications, these are lexically sorted for determinism.
+func UpdateExposedFeatures(kubecli kubernetes.Interface, cluster *cbapi.CouchbaseCluster, status *cbapi.ClusterStatus) (*UpdateExposedFeatureStatus, error) {
+	// For each feature set accumulate a unique set of services to expose
+	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.ExposedFeatures)
+	if err != nil {
+		return nil, err
+	}
+	servicesDefined := len(serviceNames) != 0
+
+	// Create the list of ports each node should have
+	ports := []v1.ServicePort{}
+	for _, serviceName := range serviceNames {
+		ports = append(ports, servicePorts[serviceName]...)
+	}
+
+	// Get a list of all cluster services that belong to a specific nodes
+	clusterRequirement, err := labels.NewRequirement(labelCluster, selection.Equals, []string{cluster.Name})
+	if err != nil {
+		return nil, err
+	}
+	nodeRequirement, err := labels.NewRequirement(labelNode, selection.Exists, []string{})
+	if err != nil {
+		return nil, err
+	}
+	selector := labels.NewSelector()
+	selector = selector.Add(*clusterRequirement, *nodeRequirement)
+	services, err := kubecli.CoreV1().Services(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, err
+	}
+
+	// Buffer the port status as we go through
+	portStatus := map[string]*cbapi.PortStatus{}
+
+	// Remove any node services that shouldn't be defined or perform any updates
+	for _, service := range services.Items {
+		// Extract metadata from the service
+		nodeName := service.Labels[labelNode]
+
+		// Node no longer exists or no ports are defined so delete the service
+		if !servicesDefined || !status.Members.Ready.Contains(nodeName) {
+			if err := DeleteService(kubecli, cluster.Namespace, service.Name, nil); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		// Get pre-existing requested ports (with associated node ports), and requested ports that
+		// aren't defined
+		existingPorts := intersectPorts(service.Spec.Ports, ports)
+		newPorts := subtractPorts(ports, existingPorts)
+
+		// Perform an update if ports have been deleted or added
+		updatedService := &service
+		if len(existingPorts) != len(service.Spec.Ports) || len(newPorts) != 0 {
+			service.Spec.Ports = append(existingPorts, newPorts...)
+			if updatedService, err = UpdateService(kubecli, cluster.Namespace, &service); err != nil {
+				return nil, err
+			}
+		}
+
+		// Update the port status with the new node ports
+		if err := updateExposedPorts(portStatus, nodeName, updatedService); err != nil {
+			return nil, err
+		}
+	}
+
+	// Add any services to nodes which aren't already defined
+	if servicesDefined {
+		for _, nodeName := range status.Members.Ready {
+			// Define the new service name
+			exposedServiceName := GetExposedServiceName(nodeName)
+
+			// Service already exists, ignore
+			if serviceExists(services, exposedServiceName) {
+				continue
+			}
+
+			// Add the new service
+			labels := labelsForNodeService(cluster.Name, nodeName)
+			selectors := getNodeServiceSelectors(cluster, nodeName)
+			service := createServiceManifest(exposedServiceName, v1.ServiceTypeNodePort, ports, labels, selectors)
+
+			// Enforce that traffic has to come directly to the k8s node avoiding the
+			// penalty of an extra hop and SNAT
+			service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+
+			if service, err = createService(kubecli, cluster.Namespace, service, cluster.AsOwner()); err != nil {
+				return nil, err
+			}
+
+			// Update the port status with the new node ports
+			if err := updateExposedPorts(portStatus, nodeName, service); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Calculate which services have been added or removed
+	prevServiceNames, err := exposedFeatureSetToServiceList(status.ExposedFeatures)
+	if err != nil {
+		return nil, err
+	}
+	ret := &UpdateExposedFeatureStatus{
+		Added:   serviceNames.Sub(prevServiceNames),
+		Removed: prevServiceNames.Sub(serviceNames),
+	}
+	sort.Strings(ret.Added)
+	sort.Strings(ret.Removed)
+
+	// Finally update the status
+	status.ExposedFeatures = cluster.Spec.ExposedFeatures
+	status.ExposedPorts = portStatus
+
+	return ret, nil
+}
+
+func GetHostIP(kubecli kubernetes.Interface, ns, name string) (string, error) {
+	pod, err := kubecli.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	if pod.Status.HostIP == "" {
+		return "", fmt.Errorf("host IP unset, pod not scheduled")
+	}
+	return pod.Status.HostIP, nil
 }
 
 func GetSecret(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Secret, error) {
@@ -167,6 +523,19 @@ func ClusterListOpt(clusterName string) metav1.ListOptions {
 	}
 }
 
+// getNodeServiceSelectors returns a key/value map to identify a specific node
+// in the cluster.
+// In general all services are applied to all nodes in the Couchbase cluster.
+// If it is the admin port however we may apply it to only nodes with the
+// specified list of services installed (thus limiting the kinds of operations
+// that can be performed via the UI).
+func getNodeServiceSelectors(cluster *cbapi.CouchbaseCluster, nodeName string) map[string]string {
+	// Apply to a specific couchbase pod within the named cluster
+	selectors := LabelsForCluster(cluster.Name)
+	selectors[labelNode] = nodeName
+	return selectors
+}
+
 func LabelsForAdminConsole(clusterName string, services []string) map[string]string {
 	labels := LabelsForCluster(clusterName)
 	for _, s := range services {
@@ -176,10 +545,12 @@ func LabelsForAdminConsole(clusterName string, services []string) map[string]str
 	return labels
 }
 
+// LabelsForCluster returns a basic set of labels which will identify a couchbase
+// pod within a specific cluster.
 func LabelsForCluster(clusterName string) map[string]string {
 	return map[string]string{
-		"couchbase_cluster": clusterName,
-		"app":               "couchbase",
+		labelCluster: clusterName,
+		labelApp:     "couchbase",
 	}
 }
 
@@ -187,23 +558,111 @@ func AdminServiceName(clusterName string) string {
 	return clusterName + "-ui"
 }
 
-func adminServicePorts() []v1.ServicePort {
-	return []v1.ServicePort{{
-		Name:       consoleAdminPortName,
-		Port:       8091,
-		TargetPort: intstr.FromInt(8091),
-		Protocol:   v1.ProtocolTCP,
-	}, {
-		Name:       consoleAdminPortNameSSL,
-		Port:       18091,
-		TargetPort: intstr.FromInt(18091),
-		Protocol:   v1.ProtocolTCP,
-	}}
+// labelsForNodeService returns a set of labels which identify a cluster service
+// for a specific node.
+func labelsForNodeService(clusterName, nodeName string) map[string]string {
+	labels := LabelsForCluster(clusterName)
+	labels[labelNode] = nodeName
+	return labels
+}
+
+// peerServicePorts is the list of ports to expose for the Couchbase cluster
+// headless service.  This generates DNS A records for all pods, and SRV records
+// pointing to all pods.
+var peerServicePorts = []v1.ServicePort{
+	{
+		Name:     couchbaseSRVName,
+		Port:     adminServicePort,
+		Protocol: v1.ProtocolTCP,
+	},
+	{
+		Name:     couchbaseSRVNameTLS,
+		Port:     adminServicePortTLS,
+		Protocol: v1.ProtocolTCP,
+	},
+}
+
+// servicePorts maps a service type to it's set of ports.  These are used in
+// the generation of node ports to allow cluster access from outside of the
+// pod (overlay) network.
+var servicePorts = map[string][]v1.ServicePort{
+	AdminService: []v1.ServicePort{
+		{
+			Name:     adminServicePortName,
+			Port:     adminServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     adminServicePortNameTLS,
+			Port:     adminServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	},
+	ViewService: []v1.ServicePort{
+		{
+			Name:     viewServicePortName,
+			Port:     viewServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     viewServicePortNameTLS,
+			Port:     viewServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	},
+	QueryService: []v1.ServicePort{
+		{
+			Name:     queryServicePortName,
+			Port:     queryServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     queryServicePortNameTLS,
+			Port:     queryServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	},
+	FtsService: []v1.ServicePort{
+		{
+			Name:     ftsServicePortName,
+			Port:     ftsServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     ftsServicePortNameTLS,
+			Port:     ftsServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	},
+	AnalyticsService: []v1.ServicePort{
+		{
+			Name:     analyticsServicePortName,
+			Port:     analyticsServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     analyticsServicePortNameTLS,
+			Port:     analyticsServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	},
+	DataService: []v1.ServicePort{
+		{
+			Name:     dataServicePortName,
+			Port:     dataServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     dataServicePortNameTLS,
+			Port:     dataServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	},
 }
 
 func NodeListOpt(clusterName, memberName string) metav1.ListOptions {
 	l := LabelsForCluster(clusterName)
-	l["couchbase_node"] = memberName
+	l[labelNode] = memberName
 	return metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(l).String(),
 	}

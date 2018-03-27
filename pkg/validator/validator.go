@@ -62,6 +62,10 @@ func applyDefaults(customResource *api.CouchbaseCluster) {
 		customResource.Spec.BaseImage = DefaultBaseImage
 	}
 
+	if customResource.Spec.ExposedFeatures == nil {
+		customResource.Spec.ExposedFeatures = []string{}
+	}
+
 	if customResource.Spec.AdminConsoleServices == nil {
 		customResource.Spec.AdminConsoleServices = []string{}
 	}
@@ -99,6 +103,31 @@ func applyDefaults(customResource *api.CouchbaseCluster) {
 
 func checkConstraints(customResource *api.CouchbaseCluster) error {
 	errs := []error{}
+
+	if customResource.Spec.ExposedFeatures != nil {
+		if len(customResource.Spec.ExposedFeatures) > len(api.SupportedFeatures) {
+			err := errors.TooManyItems("spec.exposedFeatures", "body", int64(len(api.SupportedFeatures)))
+			errs = append(errs, err)
+		}
+
+		for _, feature := range customResource.Spec.ExposedFeatures {
+			found := false
+			for _, f := range api.SupportedFeatures {
+				if feature == f {
+					found = true
+					break
+				}
+			}
+			if !found {
+				enums := make([]interface{}, len(api.SupportedFeatures))
+				for idx, enum := range api.SupportedFeatures {
+					enums[idx] = enum
+				}
+				err := errors.EnumFail("spec.exposedFeatures", "body", nil, enums)
+				errs = append(errs, err)
+			}
+		}
+	}
 
 	if customResource.Spec.AdminConsoleServices != nil {
 		if len(customResource.Spec.AdminConsoleServices) > 4 {

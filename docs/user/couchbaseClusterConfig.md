@@ -17,6 +17,8 @@ spec:
   exposeAdminConsole: true
   adminConsoleServices:
     - data
+  exposedFeatures:
+    - xdcr
   softwareUpdateNotifications: true
   cluster:
     dataServiceMemoryQuota: 256
@@ -129,6 +131,8 @@ Defines top level parameters related to a Couchbase cluster deployment.
   exposeAdminConsole: true
   adminConsoleServices:
     - data
+  exposedFeatures:
+    - xdcr
   softwareUpdateNotifications: true
 ...
 ```
@@ -173,6 +177,24 @@ This field specifies whether or not the Couchbase Web Console should be exposed 
 When the Couchbase Web Console is exposed, the pod that it is connected to is chosen based on the client IP address. Since the Web Console may display slightly different features based on the services running on the particular pod it is connected to, we let you specify the services so that the exposed port will only connect to pods that contain the services specified for this parameter. A list of one or more services should be provided. If you do not specify any service, then the Web Console will be connected to all pods in the cluster.
 
 > *Field rules:* The ```adminConsoleServices``` list is not required and defaults to an empty list. An empty list means any node in the cluster may be chosen when connecting to the Web Console.
+
+**exposedFeatures**
+
+This field specified a list of per-pod features to expose on the cluster network (as opposed to the pod network).  These define sets of ports which are required to support the specified features.  The supported values are as follows:
+
+***admin***
+
+Exposes the admin API and UI
+
+***xdcr***
+
+Exposes the ports necessary to support XDCR via L3 connectivity at the cluster network layer.
+
+***client***
+
+Exposes all client services.  These include data, views, query, full text search, analytics.
+
+> *Field rules:* The ```exposedFeatures``` list is optional, no feature sets are exposed to the cluster network if unset.
 
 **softwareUpdateNotifications**
 

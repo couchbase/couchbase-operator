@@ -16,7 +16,7 @@ import (
 // other settings
 var (
 	baseImage = "couchbase/server"
-	version   = "enterprise-5.0.1"
+	version   = "5.5.0-beta"
 )
 
 // cluster settings
@@ -166,6 +166,7 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 			DataPath:  "/opt/couchbase/var/lib/couchbase/data",
 			IndexPath: "/opt/couchbase/var/lib/couchbase/data",
 		}},
+		ExposedFeatures: []string{},
 	}
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
@@ -288,7 +289,9 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 			}
 		}
 	}
-	spec := api.ClusterSpec{}
+	spec := api.ClusterSpec{
+		ExposedFeatures: []string{},
+	}
 	switch {
 	case antiAffinity == "on":
 		spec = api.ClusterSpec{

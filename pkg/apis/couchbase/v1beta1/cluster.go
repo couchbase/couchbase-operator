@@ -34,6 +34,35 @@ func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
+// Supported features
+const (
+	// Exposes the admin port/UI
+	FeatureAdmin = "admin"
+	// Exposes ports necessary for XDCR
+	FeatureXDCR = "xdcr"
+	// Exposes all client ports for services
+	FeatureClient = "client"
+)
+
+var SupportedFeatures = []string{
+	FeatureAdmin,
+	FeatureXDCR,
+	FeatureClient,
+}
+
+// A list of exposed features e.g. admin,xdcr
+type ExposedFeatureList []string
+
+// Contains returns true if a requested feature is enabled
+func (efl ExposedFeatureList) Contains(feature string) bool {
+	for _, f := range efl {
+		if f == feature {
+			return true
+		}
+	}
+	return false
+}
+
 type ClusterSpec struct {
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
@@ -74,6 +103,11 @@ type ClusterSpec struct {
 
 	// Specific services to use when exposing ui
 	AdminConsoleServices []string `json:"adminConsoleServices"`
+
+	// ExposedFeatures is a list of features to expose on the K8S node
+	// network.  They represent a subset of ports e.g. admin=8091,
+	// xdcr=8091,8092,11210, and thus may overlap.
+	ExposedFeatures ExposedFeatureList `json:"exposedFeatures"`
 
 	// Enables software update notifications in the UI
 	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications"`

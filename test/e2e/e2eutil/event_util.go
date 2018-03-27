@@ -82,8 +82,8 @@ func (e *EventList) AddBucketEditEvent(cl *api.CouchbaseCluster, bucketName stri
 	*e = append(*e, *k8sutil.BucketEditEvent(bucketName, cl))
 }
 
-func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *api.CouchbaseCluster, svcName string) {
-	*e = append(*e, *k8sutil.AdminConsoleSvcCreateEvent(svcName, cl))
+func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *api.CouchbaseCluster) {
+	*e = append(*e, *k8sutil.AdminConsoleSvcCreateEvent(cl.Name+"-ui", cl))
 }
 
 func (e EventList) String() string {

@@ -34,7 +34,7 @@ func NewClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseC
 
 // Creates client for interacting with admin console of crd
 // TODO: testing arg is not needed and will be removed, but has depends here
-func CreateAdminConsoleClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, apiServerHost string) (*cbmgr.Couchbase, error) {
+func CreateAdminConsoleClient(t *testing.T, apiServerHost string, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) (*cbmgr.Couchbase, error) {
 	if cl.Spec.ExposeAdminConsole == false {
 		return nil, NewErrConsoleNotExposed()
 	}

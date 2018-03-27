@@ -506,7 +506,7 @@ func (c *Cluster) createUIService(services []string) (*v1.Service, error) {
 }
 
 func (c *Cluster) deleteUIService(svcName string) error {
-	err := k8sutil.DeleteService(c.config.KubeCli, svcName, c.cluster.Namespace, nil)
+	err := k8sutil.DeleteService(c.config.KubeCli, c.cluster.Namespace, svcName, nil)
 	if err == nil {
 		c.status.AdminConsolePort, c.status.AdminConsolePortSSL = "", ""
 	}

@@ -12,6 +12,8 @@ spec:
   exposeAdminConsole: true
   adminConsoleServices:
     - data
+  exposedFeatures:
+    - xdcr
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256

@@ -166,15 +166,11 @@ func TestEditClusterSettings(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -283,15 +279,11 @@ func TestNegEditClusterSettings(t *testing.T) {
 	}
 
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -480,7 +472,12 @@ func TestInvalidAuthSecret(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "invalid-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
+	retries := &e2eutil.ClusterReadyRetries{
+		Size:    e2eutil.Retries5,
+		Bucket:  e2eutil.Retries1,
+		Service: e2eutil.Retries1,
+	}
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.CRClient, f.Namespace, "invalid-test-secret", configMap, e2eutil.AdminHidden, retries)
 
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
@@ -527,7 +524,12 @@ func TestInvalidBaseImage(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
+	retries := &e2eutil.ClusterReadyRetries{
+		Size:    e2eutil.Retries5,
+		Bucket:  e2eutil.Retries1,
+		Service: e2eutil.Retries1,
+	}
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, retries)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
@@ -585,7 +587,12 @@ func TestInvalidVersion(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
+	retries := &e2eutil.ClusterReadyRetries{
+		Size:    e2eutil.Retries5,
+		Bucket:  e2eutil.Retries1,
+		Service: e2eutil.Retries1,
+	}
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, retries)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
@@ -870,7 +877,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	for nodeIndex := 0; nodeIndex < e2eutil.Size2; nodeIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 	}
@@ -978,15 +985,11 @@ func TestBasicMDSScaling(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1216,15 +1219,11 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1461,7 +1460,12 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
 
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden, 5, 1)
+	retries := &e2eutil.ClusterReadyRetries{
+		Size:    e2eutil.Retries5,
+		Bucket:  e2eutil.Retries1,
+		Service: e2eutil.Retries1,
+	}
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden, retries)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
@@ -1493,18 +1497,14 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1559,19 +1559,14 @@ func TestRemoveLastDataService(t *testing.T) {
 	}
 
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	consoleURL, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1653,32 +1648,28 @@ func TestManageMultipleClusters(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents1 := e2eutil.EventList{}
-	expectedEvents1.AddAdminConsoleSvcCreateEvent(testCouchbase1, testCouchbase1.Name+"-ui")
+	expectedEvents1.AddAdminConsoleSvcCreateEvent(testCouchbase1)
 	expectedEvents1.AddMemberAddEvent(testCouchbase1, 0)
 	expectedEvents1.AddMemberAddEvent(testCouchbase1, 1)
 	expectedEvents1.AddRebalanceStartedEvent(testCouchbase1)
 	expectedEvents1.AddRebalanceCompletedEvent(testCouchbase1)
 
 	expectedEvents2 := e2eutil.EventList{}
-	expectedEvents2.AddAdminConsoleSvcCreateEvent(testCouchbase2, testCouchbase2.Name+"-ui")
+	expectedEvents2.AddAdminConsoleSvcCreateEvent(testCouchbase2)
 	expectedEvents2.AddMemberAddEvent(testCouchbase2, 0)
 	expectedEvents2.AddMemberAddEvent(testCouchbase2, 1)
 	expectedEvents2.AddRebalanceStartedEvent(testCouchbase2)
 	expectedEvents2.AddRebalanceCompletedEvent(testCouchbase2)
 
 	expectedEvents3 := e2eutil.EventList{}
-	expectedEvents3.AddAdminConsoleSvcCreateEvent(testCouchbase3, testCouchbase3.Name+"-ui")
+	expectedEvents3.AddAdminConsoleSvcCreateEvent(testCouchbase3)
 	expectedEvents3.AddMemberAddEvent(testCouchbase3, 0)
 	expectedEvents3.AddMemberAddEvent(testCouchbase3, 1)
 	expectedEvents3.AddRebalanceStartedEvent(testCouchbase3)
 	expectedEvents3.AddRebalanceCompletedEvent(testCouchbase3)
 
 	// create connection to couchbase nodes
-	consoleURL1, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase1.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client1, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase1, []string{consoleURL1})
+	client1, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1690,11 +1681,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo1)
 
 	// create connection to couchbase nodes
-	consoleURL2, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase2.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client2, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase2, []string{consoleURL2})
+	client2, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1706,11 +1693,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo2)
 
 	// create connection to couchbase nodes
-	consoleURL3, err := e2eutil.AdminConsoleURL(f.ApiServerHost(), testCouchbase3.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client3, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase3, []string{consoleURL3})
+	client3, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase3)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}

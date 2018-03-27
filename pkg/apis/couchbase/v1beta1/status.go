@@ -64,6 +64,25 @@ type UpgradeStatus struct {
 	DoneNodes []string `json:"doneNodes,omitempty"`
 }
 
+// PortStatus contains the K8S port mappings for various services
+type PortStatus struct {
+	AdminServicePort        int32 `json:"adminServicePort,omitempty"`
+	AdminServicePortTLS     int32 `json:"adminServicePortTLS,omitempty"`
+	ViewServicePort         int32 `json:"viewServicePort,omitempty"`
+	ViewServicePortTLS      int32 `json:"viewServicePortTLS,omitempty"`
+	QueryServicePort        int32 `json:"queryServicePort,omitempty"`
+	QueryServicePortTLS     int32 `json:"queryServicePortTLS,omitempty"`
+	FtsServicePort          int32 `json:"ftsServicePort,omitempty"`
+	FtsServicePortTLS       int32 `json:"ftsServicePortTLS,omitempty"`
+	AnalyticsServicePort    int32 `json:"analyticsServicePort,omitempty"`
+	AnalyticsServicePortTLS int32 `json:"analyticsServicePortTLS,omitempty"`
+	DataServicePort         int32 `json:"dataServicePort,omitempty"`
+	DataServicePortTLS      int32 `json:"dataServicePortTLS,omitempty"`
+}
+
+// PortStatusMap maps a node name to port status information
+type PortStatusMap map[string]*PortStatus
+
 type ClusterStatus struct {
 	// Phase is the cluster running phase
 	Phase  ClusterPhase `json:"phase"`
@@ -91,16 +110,34 @@ type ClusterStatus struct {
 	AdminConsolePort    string `json:"adminConsolePort,omitempty"`
 	AdminConsolePortSSL string `json:"adminConsolePortSSL,omitempty"`
 
+	// ExposedFeatures keeps tabs on what features are currently
+	// exposed as node ports
+	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
+
+	// ports exposing couchbase cluster on the K8S node network
+	ExposedPorts PortStatusMap `json:"nodePorts,omitempty"`
+
 	// upgrade status
 	UpgradeStatus *UpgradeStatus `json:"upgrade,omitempty"`
+}
+
+type MemberStatusList []string
+
+func (l MemberStatusList) Contains(name string) bool {
+	for _, member := range l {
+		if member == name {
+			return true
+		}
+	}
+	return false
 }
 
 type MembersStatus struct {
 	// Ready are the couchbase members that are ready to serve requests
 	// The member names are the same as the couchbase pod names
-	Ready []string `json:"ready,omitempty"`
+	Ready MemberStatusList `json:"ready,omitempty"`
 	// Unready are the couchbase members not ready to serve requests
-	Unready []string `json:"unready,omitempty"`
+	Unready MemberStatusList `json:"unready,omitempty"`
 }
 
 func (ms *MembersStatus) SetReady(ready []string) {
