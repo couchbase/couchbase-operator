@@ -1,7 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 SUPPORT_PKG=cb-k8s-support-`date +%m%d%Y-%T | sed  "s/:/_/g"`
 KUBECTL="kubectl $@"
+OC="oc $@"
 OUTPUT_DIR=/tmp/$SUPPORT_PKG
 mkdir -p $OUTPUT_DIR
 
@@ -11,8 +12,6 @@ mkdir $CLUSTER_LOG_DIR
 echo "collecting cluster info"
 $KUBECTL cluster-info dump > $CLUSTER_LOG_DIR/cluster_info.log
 $KUBECTL describe nodes > $CLUSTER_LOG_DIR/describe_nodes.log
-$KUBECTL top node > $CLUSTER_LOG_DIR/top_nodes.log   2>&1
-$KUBECTL top pod > $CLUSTER_LOG_DIR/top_pods.log   2>&1
 
 # info about pods, deployments, replicasets, and statefulsets
 RESOURCE_LOG_DIR=$OUTPUT_DIR/resources
@@ -49,6 +48,15 @@ echo "collecting service logs"
 $KUBECTL describe --all-namespaces --show-events=true  endpoints > $SERVICE_LOG_DIR/endpoints.log
 $KUBECTL describe --all-namespaces --show-events=true  svc > $SERVICE_LOG_DIR/services.log
 $KUBECTL describe --all-namespaces --show-events=true  ing > $SERVICE_LOG_DIR/ingress.log
+
+# collect metrics
+if ! [ -x "$(command -v oc)" ]; then
+  $KUBECTL top node > $CLUSTER_LOG_DIR/top_nodes.log   2>&1
+  $KUBECTL top pod > $CLUSTER_LOG_DIR/top_pods.log   2>&1
+else
+  $OC adm top node > $CLUSTER_LOG_DIR/top_nodes.log
+  $OC adm top pod --all-namespaces > $CLUSTER_LOG_DIR/top_pods.log   2>&1
+fi
 
 
 tar -czf $SUPPORT_PKG.tgz -C /tmp $SUPPORT_PKG
