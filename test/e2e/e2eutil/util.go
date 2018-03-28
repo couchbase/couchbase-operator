@@ -149,14 +149,14 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
 			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
-			if i == retries - 1 {
+			if i == retries-1 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == retries - 1 {
+				if i == retries-1 {
 					return nil, err2
 				}
 			} else {
@@ -165,7 +165,7 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == retries - 1 {
+						if i == retries-1 {
 							return nil, err
 						}
 					} else {
@@ -188,14 +188,14 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
 			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
-			if i == retries - 1 {
+			if i == retries-1 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == retries - 1 {
+				if i == retries-1 {
 					return nil, err2
 				}
 			} else {
@@ -204,7 +204,7 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == retries - 1 {
+						if i == retries-1 {
 							return nil, err
 						}
 					} else {
