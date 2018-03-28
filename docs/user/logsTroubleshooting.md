@@ -25,13 +25,14 @@ This scripts gathers information about your Kubernetes deployment and creates an
 <cwd>/cb-k8s-support-01182018-14_00_18.tgz
 ```
 
-This script runs ```kubectl top pod``` to gather pod metrics such as CPU and memory.  By default, these metrics are empty unless you have ```heapster``` deployed within your Kubernetes cluster.  To deploy ```heapster``` for gathering pod metrics, run the following commands:
+This script runs ```kubectl top pod``` to gather pod metrics such as CPU and memory.  By default, these metrics are empty unless you have ```heapster``` deployed alongside your cluster.  Run the following commands to deploy ```heapster``` within kubernetes environment:
 ```bash
 git clone https://github.com/kubernetes/heapster.git
 cd heapster
 kubectl create -f deploy/kube-config/influxdb/
 kubectl create -f deploy/kube-config/rbac/heapster-rbac.yaml
 ```
+For openshift refer to install guide for [cluster metrics.](https://docs.openshift.org/latest/install_config/cluster_metrics.html).
 
 Then run the support script, ```cb_k8s_support.sh```, again to generate logs which include pod metrics.
 
