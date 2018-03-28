@@ -3,6 +3,7 @@ package e2e
 import (
 	"os"
 	"testing"
+	"strconv"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -1404,7 +1405,6 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
-	t.Skip("test not fully implemented...")
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
@@ -1412,7 +1412,8 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
-	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
+	bucketConfig1 := e2eutil.BasicOneReplicaBucket
+	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1":  bucketConfig1,}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
@@ -1445,17 +1446,17 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	// TODO kill pod via pkill beam.smp
-	// ***
-	t.Logf("killing 1 pod...")
-	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
+	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	_, err = f.ExecShellInPod(memberName, "mv /etc/service/couchbase-server /tmp/")
 	if err != nil {
-		t.Fatalf("failed to kill pods: %v", err)
+		t.Fatal(err)
 	}
-	// ***
+
+	autofailoverTimeout, err := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
+	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries30, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
@@ -1482,6 +1483,8 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
+	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
@@ -1523,7 +1526,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+	//defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -1551,18 +1554,16 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	// TODO bring up iptables to disable networking on the node
-	// ***
-	t.Logf("killing 1 pod...")
-	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
-	if err != nil {
-		t.Fatalf("failed to kill pods: %v", err)
-	}
-	// ***
+	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	f.ExecShellInPod(memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT; iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
+
+	autofailoverTimeout, err := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
+	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries30, testCouchbase)
 	if err != nil {
+		t.Logf("status: %v+", testCouchbase)
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
@@ -1616,7 +1617,13 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	clusterConfig := e2eutil.BasicClusterConfig
+	autofailoverTimeout := 30
+	clusterConfig := map[string]string{
+		"dataServiceMemQuota":   "256",
+		"indexServiceMemQuota":  "256",
+		"searchServiceMemQuota": "256",
+		"indexStorageSetting":   "memory_optimized",
+		"autoFailoverTimeout":   strconv.Itoa(autofailoverTimeout)}
 	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
@@ -1657,23 +1664,47 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	// TODO bring up iptables to disable networking on the node
-	// ***
-	t.Logf("killing 1 pod...")
-	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
-	if err != nil {
-		t.Fatalf("failed to kill pods: %v", err)
-	}
-	// ***
+	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	// TODO revert changes to iptables to reenable networking on the node
-	// ***
-	t.Logf("killing 1 pod...")
-	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
+	//block all incoming and outgoing traffic expect ssh on port 22
+	_, err = f.ExecShellInPod(memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT")
 	if err != nil {
-		t.Fatalf("failed to kill pods: %v", err)
+		t.Fatal(err)
 	}
-	// ***
+
+	_, err = f.ExecShellInPod(memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait half of autofailover timeout
+	time.Sleep(time.Duration(int64(autofailoverTimeout / 2)) * time.Second)
+
+	//revert iptable changes, allow all incoming and outgoing traffic
+	_, err = f.ExecShellInPod(memberName, "iptables -F")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = f.ExecShellInPod(memberName, "iptables -X")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = f.ExecShellInPod(memberName, "iptables -P INPUT DROP")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = f.ExecShellInPod(memberName, "iptables -P OUTPUT DROP")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = f.ExecShellInPod(memberName, "iptables -P FORWARD DROP")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Logf("waiting for pods to die...")
 	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)

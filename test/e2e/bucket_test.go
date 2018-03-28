@@ -21,7 +21,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	bucket1 := api.BucketConfig{
 		BucketName:         "default1",
 		BucketType:         constants.BucketTypeCouchbase,
-		BucketMemoryQuota:  101,
+		BucketMemoryQuota:  256,
 		BucketReplicas:     &constants.BucketReplicasOne,
 		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
@@ -32,7 +32,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	bucket2 := api.BucketConfig{
 		BucketName:        "default2",
 		BucketType:        constants.BucketTypeMemcached,
-		BucketMemoryQuota: 101,
+		BucketMemoryQuota: 256,
 		EnableFlush:       constants.BucketFlushDisabled,
 	}
 	bucket3 := api.BucketConfig{
@@ -108,8 +108,9 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		buckets = append(buckets, bucketSetting.BucketName)
 
 		t.Logf("Waiting For Bucket To Be Created \n")
-		err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, buckets, e2eutil.Retries10, testCouchbase)
+		err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, buckets, e2eutil.Retries20, testCouchbase)
 		if err != nil {
+			t.Logf("status: %v+", testCouchbase.Status)
 			t.Fatalf("failed to create bucket %v", err)
 		}
 
