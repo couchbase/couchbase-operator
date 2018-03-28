@@ -416,7 +416,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to reject change for cluster indexer storage setting: %v", err)
 	}
 
-	message = "placeholder"
+	message = "storageMode - Changing the optimization mode of global indexes is not supported when index service nodes are present in the cluster"
 	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageConfig, message)
 	if err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
@@ -463,11 +463,29 @@ func TestInvalidAuthSecret(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 
-	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "invalid-test-secret", configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "invalid-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
+
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
+
+	expectedEvents := e2eutil.EventList{}
+
+	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if len(pods.Items) != 0 {
+		t.Fatalf("more than zero pods: %+v", pods.Items)
+	}
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+
 }
 
 // Tests if specs with invalid base image will create a cluster (they should not)
@@ -489,14 +507,39 @@ func TestInvalidBaseImage(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
+
+	expectedEvents := e2eutil.EventList{}
+
+	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if len(pods.Items) != 1 {
+		t.Fatalf("more than one pod: %v", pods.Items)
+	}
+
+	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
+	if reason != "ErrImagePull" && reason != "ImagePullBackOff" {
+		t.Fatalf("container status error: %+v", reason)
+	}
+
+	message := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
+	if message != "Back-off pulling image \"basecouch/123:enterprise-5.0.1\""{
+		t.Fatalf("container status error: %+v", message)
+	}
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
 }
 
-// Tests if specs with invalid verison will create a cluster (they should not)
+// Tests if specs with invalid version will create a cluster (they should not)
 // 1. Attempt to create a cluster with invalid version
 // 2. Wait until cluster creation fails
 func TestInvalidVersion(t *testing.T) {
@@ -515,10 +558,36 @@ func TestInvalidVersion(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
+	}
+
+	expectedEvents := e2eutil.EventList{}
+
+	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if len(pods.Items) != 1 {
+		t.Fatalf("more than one pod: %v", pods.Items)
+	}
+
+	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
+	if reason != "ErrImagePull" && reason != "ImagePullBackOff" {
+		t.Fatalf("container status error: %+v", reason)
+	}
+
+	message := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
+	if message != "Back-off pulling image \"couchbase/server:enterprise-1.9.1\""{
+		t.Fatalf("container status error: %+v", message)
+	}
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -686,11 +755,13 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	f := framework.Global
 
 	// create 5 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size5, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size5, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
 
 	// scale down to 4 node cluster
 	echan := make(chan error)
@@ -710,9 +781,10 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	}
 
 	// expect down node to be removed from cluster
-	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
+	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 4)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 120)
 	if err != nil {
+		t.Logf("status: %+v", testCouchbase.Status)
 		t.Fatal(err)
 	}
 
@@ -723,9 +795,18 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	}
 
 	// healthy 4 node cluster
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size4, e2eutil.Retries30)
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size4, 50)
 	if err != nil {
-		t.Fatal(err.Error())
+		t.Logf("status: %+v", testCouchbase.Status)
+		t.Fatal(err)
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 

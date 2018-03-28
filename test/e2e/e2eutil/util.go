@@ -142,10 +142,52 @@ var (
 		"enableIndexReplica": "false"}
 )
 
+func NewClusterBasicQuick(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, sizeChecks int, bucketChecks int) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
+	testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
+	if err1 != nil {
+		return testCouchbase, err1
+	}
+	_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), sizeChecks, testCouchbase)
+	if err2 != nil {
+		return testCouchbase, err2
+	}
+	buckets := testCouchbase.Spec.BucketNames()
+	if withBucket == true {
+		err := WaitUntilBucketsExists(t, crClient, buckets, bucketChecks, testCouchbase)
+		if err != nil {
+			return testCouchbase, err
+		}
+	}
+	return GetClusterCRD(crClient, testCouchbase)
+}
+
+func NewClusterMultiQuick(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
+	config map[string]map[string]string, exposed bool, sizeChecks int, bucketChecks int) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
+	testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
+	if err1 != nil {
+		return testCouchbase, err1
+	}
+	_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), sizeChecks, testCouchbase)
+	if err2 != nil {
+		return testCouchbase, err2
+	}
+	buckets := testCouchbase.Spec.BucketNames()
+	if len(buckets) > 0 {
+		err := WaitUntilBucketsExists(t, crClient, buckets, bucketChecks, testCouchbase)
+		if err != nil {
+			return testCouchbase, err
+		}
+	}
+	return GetClusterCRD(crClient, testCouchbase)
+}
+
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
-	retries := 3
+	retries := 2
 	for i := 0; i < retries; i++ {
+		time.Sleep(10 * time.Second)
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
 			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
@@ -183,8 +225,9 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
 	config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
-	retries := 3
+	retries := 2
 	for i := 0; i < retries; i++ {
+		time.Sleep(10 * time.Second)
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
 			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
@@ -399,6 +442,19 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		}
 	}
 
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	killPods := []string{}
+	for _, pod := range pods.Items {
+		killPods = append(killPods, pod.Name)
+	}
+	t.Logf("Killing pods: %v", killPods)
+
+	KillMembers(kubeClient, namespace, killPods...)
+
+	for _, pod := range killPods {
+		t.Logf("Waiting for deletion of pod: %v", pod)
+		WaitUntilPodDeleted(t, kubeClient, namespace)
+	}
 }
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string) error {

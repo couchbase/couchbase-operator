@@ -245,6 +245,27 @@ func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName strin
 	return nil
 }
 
+func WaitUntilPodDeleted(t *testing.T, kubeClient kubernetes.Interface, namespace string) error {
+	undeletedPods, err := WaitPodsDeleted(kubeClient, namespace, 3, metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if err != nil {
+		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
+			p := undeletedPods[0]
+			LogfWithTimestamp(t, "waiting pod (%s) to be deleted.", p.Name)
+
+			buf := bytes.NewBuffer(nil)
+			buf.WriteString("init container status:\n")
+			printContainerStatus(buf, p.Status.InitContainerStatuses)
+			buf.WriteString("container status:\n")
+			printContainerStatus(buf, p.Status.ContainerStatuses)
+			t.Logf("pod (%s) status.phase is (%s): %v", p.Name, p.Status.Phase, buf.String())
+		}
+
+		return fmt.Errorf("fail to wait pods deleted: %v", err)
+	}
+
+	return nil
+}
+
 func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions) ([]*v1.Pod, error) {
 	f := func(p *v1.Pod) bool { return p.DeletionTimestamp != nil }
 	return waitPodsDeleted(kubecli, namespace, retries, lo, f)
