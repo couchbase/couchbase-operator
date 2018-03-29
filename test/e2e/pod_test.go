@@ -345,7 +345,11 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	for i := 0; i < numNodes; i++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, i)
 	}
-	expectedEvents.AddRebalanceEvent(testCouchbase)
+
+	// For single node cluster
+	if numNodes > 1 {
+		expectedEvents.AddRebalanceEvent(testCouchbase)
+	}
 
 	t.Logf("Attempting to add a node")
 	err = e2eutil.ResizeCluster(t, 0, numNodes+1, f.CRClient, testCouchbase)

@@ -2,8 +2,8 @@ package e2e
 
 import (
 	"os"
-	"testing"
 	"strconv"
+	"testing"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -290,6 +290,7 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
+	// Event checking
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)

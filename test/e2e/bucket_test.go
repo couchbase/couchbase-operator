@@ -1,6 +1,10 @@
 package e2e
 
 import (
+	"os"
+	"strconv"
+	"testing"
+
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -8,9 +12,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/gocbmgr"
-	"os"
-	"strconv"
-	"testing"
 )
 
 func TestBucketAddRemoveBasic(t *testing.T) {
@@ -198,7 +199,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	bucketTypes := []string{"couchbase", "memcached", "ephemeral"} // couchbase, memcached, ephemeral
+	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucketSetting := range bucketSettingsList {
 		newConfig := []api.BucketConfig{bucketSetting}

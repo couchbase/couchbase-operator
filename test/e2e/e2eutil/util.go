@@ -648,7 +648,9 @@ func NumK8Workers(kubeCli kubernetes.Interface) (int, error) {
 	for _, value := range nodeList.Items {
 		node := &value
 		nodeMap := node.GetLabels()
-		if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+		_, isK8SMaster := nodeMap["node-role.kubernetes.io/master"]
+		_, isOpenshiftMaster := nodeMap["openshift-infra"]
+		if isK8SMaster || isOpenshiftMaster {
 			continue
 		}
 		numWorkers = numWorkers + 1
