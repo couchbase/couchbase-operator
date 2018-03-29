@@ -1412,11 +1412,13 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
 
-	_, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminHidden, 5, 1)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	if err == nil {
-		t.Fatal("failed to not create cluster")
+		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
+
+	t.Logf("status: %+v",testCouchbase.Status.Conditions)
 }
 
 // Tests creating a cluster where the data service is the second service listed in the spec
@@ -1488,7 +1490,6 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 }
 
 func TestRemoveLastDataService(t *testing.T) {
-	//t.Skip("test not ready")
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
