@@ -247,6 +247,9 @@ func (c *Cluster) run() {
 		case <-time.After(reconcileInterval):
 			if c.cluster.Spec.Paused {
 				c.status.PauseControl()
+				if err := c.updateCRStatus(); err != nil {
+					c.logger.Warningf("periodic update CR status failed: %v", err)
+				}
 				c.logger.Infof("control is paused, skipping reconciliation")
 				continue
 			} else {
