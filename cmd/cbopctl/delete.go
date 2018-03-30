@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -37,4 +38,6 @@ func (ctx *DeleteContext) Run() {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("%s \"%s\" deleted\n", api.CRDResourcePlural, resource.Name)
 }

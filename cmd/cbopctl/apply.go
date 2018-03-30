@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
@@ -63,4 +64,6 @@ func (ctx *ApplyContext) Run() {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("%s \"%s\" applied\n", api.CRDResourcePlural, resource.Name)
 }
