@@ -526,7 +526,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	}
 
 	message := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	if message != "Back-off pulling image \"basecouch/123:enterprise-5.0.1\""{
+	if message != "Back-off pulling image \"basecouch/123:enterprise-5.0.1\"" {
 		t.Fatalf("container status error: %+v", message)
 	}
 	// Event checking
@@ -577,7 +577,7 @@ func TestInvalidVersion(t *testing.T) {
 	}
 
 	message := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	if message != "Back-off pulling image \"couchbase/server:enterprise-1.9.1\""{
+	if message != "Back-off pulling image \"couchbase/server:enterprise-1.9.1\"" {
 		t.Fatalf("container status error: %+v", message)
 	}
 
@@ -801,6 +801,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Event checking
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("Failed to get couchbase cluster events: %v", err)
@@ -1418,7 +1419,7 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 
-	t.Logf("status: %+v",testCouchbase.Status.Conditions)
+	t.Logf("status: %+v", testCouchbase.Status.Conditions)
 }
 
 // Tests creating a cluster where the data service is the second service listed in the spec
@@ -1495,7 +1496,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	}
 	f := framework.Global
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneN1qlIndexSearch
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
 	serviceConfig2 := e2eutil.BasicSecondaryServiceOneData
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -1519,10 +1520,12 @@ func TestRemoveLastDataService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get cluster url %v", err)
 	}
+
 	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{consoleURL})
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
+
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
@@ -1535,18 +1538,20 @@ func TestRemoveLastDataService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remove service failed: %v", err)
 	}
+
 	_, err = e2eutil.WaitUntilSizeReached(t, f.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
+
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 
 	serviceMap := map[string]int{
-		"Data":  0,
+		"Data":  1,
 		"N1QL":  1,
 		"Index": 1,
-		"FTS":   1,
+		"FTS":   0,
 	}
 	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {

@@ -247,7 +247,6 @@ func TestNodeManualFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
 	// cluster should also be balanced
@@ -262,7 +261,6 @@ func TestNodeManualFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 
 	// expect operator to rebalance in the node
@@ -271,7 +269,6 @@ func TestNodeManualFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 
 	// healthy 2 node cluster
@@ -1414,7 +1411,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
-	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1":  bucketConfig1,}
+	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1": bucketConfig1,}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)

@@ -524,6 +524,15 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 	}
 }
 
+func isMasterNode(nodeMap map[string]string) bool {
+	_, isK8SMaster := nodeMap["node-role.kubernetes.io/master"]
+	_, isOpenshiftMaster := nodeMap["openshift-infra"]
+	if isK8SMaster || isOpenshiftMaster {
+		return true
+	}
+	return false
+}
+
 func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
 	_, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), crClient, cl, 10)
@@ -653,9 +662,7 @@ func NumK8Workers(kubeCli kubernetes.Interface) (int, error) {
 	for _, value := range nodeList.Items {
 		node := &value
 		nodeMap := node.GetLabels()
-		_, isK8SMaster := nodeMap["node-role.kubernetes.io/master"]
-		_, isOpenshiftMaster := nodeMap["openshift-infra"]
-		if isK8SMaster || isOpenshiftMaster {
+		if isMasterNode(nodeMap) {
 			continue
 		}
 		numWorkers = numWorkers + 1
@@ -673,11 +680,9 @@ func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 		for _, value := range nodeList.Items {
 			node := &value
 			nodeMap := node.GetLabels()
-			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+			if isMasterNode(nodeMap) {
 				continue
 			}
-
-			
 			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes
@@ -706,7 +711,7 @@ func GetMaxNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 		for _, value := range nodeList.Items {
 			node := &value
 			nodeMap := node.GetLabels()
-			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+			if isMasterNode(nodeMap) {
 				continue
 			}
 			//kilobytes
@@ -737,7 +742,7 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 		for _, value := range nodeList.Items {
 			node := &value
 			nodeMap := node.GetLabels()
-			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+			if isMasterNode(nodeMap) {
 				continue
 			}
 			//kilobytes
