@@ -422,6 +422,11 @@ func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 }
 
 func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string) {
+	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	for _, service := range services.Items {
+		kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+	}
+
 	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Logf("Error: %v", err)
@@ -671,6 +676,8 @@ func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
 				continue
 			}
+
+			
 			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes
