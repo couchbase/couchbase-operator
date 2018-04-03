@@ -51,7 +51,7 @@ func (ctx *ApplyContext) Run() {
 	}
 
 	if errs != nil {
-		fmt.Printf("%v\n", err)
+		fmt.Printf("%v\n", errs)
 		os.Exit(1)
 	}
 
