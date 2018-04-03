@@ -53,6 +53,7 @@ func Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
 		return err, warn
 	}
 
+	updated.ResourceVersion = current.ResourceVersion
 	return nil, warn
 }
 
