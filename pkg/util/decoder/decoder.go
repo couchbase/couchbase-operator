@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
-
+	"github.com/ghodss/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -29,4 +29,12 @@ func DecodeCouchbaseCluster(raw []byte) (*api.CouchbaseCluster, error) {
 	}
 
 	return nil, fmt.Errorf("Could not convert object to CouchbaseCluster")
+}
+
+func EncodeCouchbaseCluster(resource *api.CouchbaseCluster) ([]byte, error) {
+	yaml, err := yaml.Marshal(resource)
+	if err != nil {
+		return nil, err
+	}
+	return yaml, nil
 }

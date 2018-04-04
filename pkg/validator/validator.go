@@ -116,7 +116,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		}
 	}
 
-	// Ensure unneccessary settings in memcached and ephemeral buckets are nil
+	// Ensure unnecessary settings in memcached and ephemeral buckets are nil
 	for i, _ := range customResource.Spec.BucketSettings {
 		if customResource.Spec.BucketSettings[i].BucketType == constants.BucketTypeCouchbase {
 			continue

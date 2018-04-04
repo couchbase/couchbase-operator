@@ -99,6 +99,30 @@ func TestP1(t *testing.T) {
 	}
 }
 
+func TestCRDValidation(t *testing.T) {
+	testResults := []testResult{}
+	// create
+	testResults = append(testResults, testResult{"TestValidationCreate", t.Run("TestValidationCreate", TestValidationCreate)})
+	testResults = append(testResults, testResult{"TestNegValidationCreate", t.Run("TestNegValidationCreate", TestNegValidationCreate)})
+	testResults = append(testResults, testResult{"TestValidationDefaultCreate", t.Run("TestValidationDefaultCreate", TestValidationDefaultCreate)})
+	testResults = append(testResults, testResult{"TestNegValidationDefaultCreate", t.Run("TestNegValidationDefaultCreate", TestNegValidationDefaultCreate)})
+	testResults = append(testResults, testResult{"TestNegValidationConstraintsCreate", t.Run("TestNegValidationConstraintsCreate", TestNegValidationConstraintsCreate)})
+	// apply
+	testResults = append(testResults, testResult{"TestValidationApply", t.Run("TestValidationApply", TestValidationApply)})
+	testResults = append(testResults, testResult{"TestNegValidationApply", t.Run("TestNegValidationApply", TestNegValidationApply)})
+	testResults = append(testResults, testResult{"TestValidationDefaultApply", t.Run("TestValidationDefaultApply", TestValidationDefaultApply)})
+	testResults = append(testResults, testResult{"TestNegValidationDefaultApply", t.Run("TestNegValidationDefaultApply", TestNegValidationDefaultApply)})
+	testResults = append(testResults, testResult{"TestNegValidationConstraintsApply", t.Run("TestNegValidationConstraintsApply", TestNegValidationConstraintsApply)})
+	testResults = append(testResults, testResult{"TestNegValidationImmutableApply", t.Run("TestNegValidationImmutableApply", TestNegValidationImmutableApply)})
+	// delete
+	testResults = append(testResults, testResult{"TestValidationDelete", t.Run("TestValidationDelete", TestValidationDelete)})
+	testResults = append(testResults, testResult{"TestNegValidationDelete", t.Run("TestNegValidationDelete", TestNegValidationDelete)})
+
+	if AnalyzeResults(t, testResults) {
+		t.Fatalf("suite contains failures")
+	}
+}
+
 func TestAll(t *testing.T) {
 	testResults := []testResult{}
 	// basic tests
