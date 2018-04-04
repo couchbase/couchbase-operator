@@ -439,9 +439,9 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	t.Logf("Deleteing clusters: [%v]", clusterNameList)
 	for _, cluster := range clusters.Items {
 		t.Logf("Attempting to delete: [%v]", cluster.Name)
-		err1 := DeleteCluster(t, crClient, kubeClient, &cluster, 10)
-		if err1 != nil {
-			t.Logf("Error: %v", err1)
+		err := k8sutil.DeleteCouchbaseCluster(crClient, &cluster)
+		if err != nil {
+			t.Logf("Error: %v", err)
 		} else {
 			t.Logf("Successfully deleted: [%v]", cluster.Name)
 		}
@@ -458,8 +458,8 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 
 	for _, pod := range killPods {
 		t.Logf("Waiting for deletion of pod: %v", pod)
-		WaitUntilPodDeleted(t, kubeClient, namespace)
 	}
+	WaitUntilPodDeleted(t, kubeClient, namespace)
 }
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string) error {

@@ -149,7 +149,7 @@ func TestEditClusterSettings(t *testing.T) {
 	}
 	f := framework.Global
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	serviceConfig1 := e2eutil.BasicServiceOneDataNode
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
@@ -225,6 +225,18 @@ func TestEditClusterSettings(t *testing.T) {
 	err = e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier)
 	if err != nil {
 		t.Fatalf("failed to change cluster autofailover timeout: %v", err)
+	}
+
+	// edit cluster indexStorageSetting
+	newIndexStorageSetting := "plasma"
+	t.Log("Changing cluster index storage setting")
+	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, f.CRClient, testCouchbase, e2eutil.Retries5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e2eutil.VerifyIndexSettingInfo(t, client, e2eutil.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier)
+	if err != nil {
+		t.Fatalf("failed to change cluster indexer storage setting: %v", err)
 	}
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
