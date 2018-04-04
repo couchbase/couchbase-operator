@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type DeleteContext struct {
@@ -23,11 +24,15 @@ func (ctx *DeleteContext) Run() {
 		os.Exit(1)
 	}
 
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: ctx.kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}})
+
 	if resource.Namespace == "" {
-		resource.Namespace = "default"
+		resource.Namespace, _, _ = clientConfig.Namespace()
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", ctx.kubeconfig)
+	config, err := clientConfig.ClientConfig()
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
