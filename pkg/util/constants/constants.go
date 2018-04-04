@@ -38,8 +38,8 @@ var (
 	IndexStorageModeMemoryOptimized = "memory_optimized"
 	IndexStorageModePlasma          = "plasma"
 
-	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase"
-	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase"
+	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase/data"
+	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase/data"
 
 	ServiceIndex  = "index"
 	ServiceData   = "data"
