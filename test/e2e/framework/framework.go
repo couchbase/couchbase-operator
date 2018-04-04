@@ -17,6 +17,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +26,6 @@ import (
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 )
 
 var Global *Framework

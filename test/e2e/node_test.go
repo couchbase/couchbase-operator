@@ -1411,7 +1411,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
-	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1": bucketConfig1,}
+	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1": bucketConfig1}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
@@ -1676,7 +1676,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	// wait half of autofailover timeout
-	time.Sleep(time.Duration(int64(autofailoverTimeout / 2)) * time.Second)
+	time.Sleep(time.Duration(int64(autofailoverTimeout/2)) * time.Second)
 
 	//revert iptable changes, allow all incoming and outgoing traffic
 	_, err = f.ExecShellInPod(memberName, "iptables -F")
