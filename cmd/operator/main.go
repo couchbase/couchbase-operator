@@ -110,17 +110,11 @@ func main() {
 func run(stop <-chan struct{}) {
 	mainLogger.Info("I'm the leader, attempt to start the operator")
 	cfg := newControllerConfig()
-	if err := cfg.Validate(); err != nil {
-		mainLogger.Fatalf("Invalid operator config: %v", err)
-	}
-
-	//go periodicFullGC(cfg.KubeCli, cfg.Namespace, gcInterval)
 
 	startChaos(context.Background(), cfg.KubeCli, cfg.Namespace, chaosLevel)
 
 	c := controller.New(cfg)
-	err := c.Start()
-	mainLogger.Fatalf("Controller Start() failed: %v", err)
+	c.Start()
 }
 
 func newControllerConfig() controller.Config {
@@ -136,7 +130,6 @@ func newControllerConfig() controller.Config {
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
 		KubeCli:        kubecli,
-		KubeExtCli:     k8sutil.MustNewKubeExtClient(),
 		CouchbaseCRCli: client.MustNewInCluster(),
 	}
 

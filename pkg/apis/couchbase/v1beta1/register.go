@@ -1,6 +1,8 @@
 package v1beta1
 
 import (
+	sdkK8sutil "github.com/coreos/operator-sdk/pkg/util/k8sutil"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -20,9 +22,8 @@ var (
 	CRDName            = CRDResourcePlural + "." + groupName
 )
 
-// Resource gets an CouchbaseCluster GroupResource for a specified resource
-func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
+func init() {
+	sdkK8sutil.AddToSDKScheme(AddToScheme)
 }
 
 // addKnownTypes adds the set of types defined in this package to the supplied scheme.

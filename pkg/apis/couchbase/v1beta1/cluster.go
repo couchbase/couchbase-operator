@@ -195,10 +195,6 @@ type PodPolicy struct {
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
 }
 
-func (c *ClusterSpec) Cleanup() {
-
-}
-
 func (c *ClusterSpec) TotalSize() int {
 	size := 0
 	for _, server := range c.ServerSettings {
