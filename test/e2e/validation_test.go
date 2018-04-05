@@ -258,7 +258,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 		}
 
 		for _, param := range test.paramsIn {
-			t.Logf("setting parameter: %+v", param)
+			t.Log("setting parameter: %+v", param)
 			err = SetClusterParameter(testCouchbase, param)
 			if err != nil {
 				t.Logf("error: %v", err)
@@ -304,7 +304,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			}
 		}
 		if test.shouldFail {
-			if command == "delete" {
+			if command == "delete" || command == "apply" {
 				if len(clusters.Items) != 1 {
 					failures = append(failures, failure{testName: test.name, testError: errors.New("cluster deletion should fail")})
 					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
@@ -341,7 +341,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 				}
 				testCouchbase = &clusters.Items[0]
 				for _, param := range test.paramsOut {
-					t.Logf("verifying parameter: %+v", param)
+					t.Log("verifying parameter: %+v", param)
 					err = VerifyClusterParameter(testCouchbase, param)
 					if err != nil {
 						failures = append(failures, failure{testName: test.name, testError: err})
@@ -446,6 +446,20 @@ func TestNegValidationCreate(t *testing.T) {
 			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets.type in body should be one of [couchbase ephemeral memcached]", "spec.buckets.name in body should match '^[a-zA-Z0-9._\\-%]*$'"},
+		},
+
+		{
+			name: "create invalid server name",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Name"},
+					fieldType:  "string",
+					fieldValue: "data_only",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers.name in body shouldn't contain duplicates"},
 		},
 	}
 	failures := runTest(t, f, testDefs, "create")
@@ -707,7 +721,7 @@ func TestNegValidationApply(t *testing.T) {
 	f := framework.Global
 	testDefs := []testDef{
 		{
-			name: "apply:neg:Spec.BucketSettings.BucketName",
+			name: "apply invalid changes to bucket name",
 			paramsIn: []parameter{
 				{
 					field:      []string{"Spec", "BucketSettings", "0", "BucketName"},
@@ -719,8 +733,9 @@ func TestNegValidationApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets.name in body should match '^[a-zA-Z0-9._\\-%]*$'"},
 		},
+
 		{
-			name: "apply:neg:Spec.BucketSettings.BucketType",
+			name: "apply invalid changes to bucket type",
 			paramsIn: []parameter{
 				{
 					field:      []string{"Spec", "BucketSettings", "0", "BucketType"},
@@ -731,6 +746,20 @@ func TestNegValidationApply(t *testing.T) {
 			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets[0].type in body cannot be updated"},
+		},
+
+		{
+			name: "apply invalid changes to server name",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Name"},
+					fieldType:  "string",
+					fieldValue: "data_only",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[0].services in body cannot be updated"},
 		},
 	}
 	failures := runTest(t, f, testDefs, "apply")
