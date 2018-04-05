@@ -267,7 +267,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -1002,6 +1002,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }

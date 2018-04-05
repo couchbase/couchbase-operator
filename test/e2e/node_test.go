@@ -293,7 +293,7 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -711,7 +711,7 @@ func TestRemoveForeignNode(t *testing.T) {
 		t.Fatalf("Failed to get couchbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
