@@ -12,9 +12,9 @@ This will get you the latest version of MiniShift. You will also need Virtual Ma
 
 Now that you hovae the software installed you can bring up Openshift by running the following command:
 
-    $ minishift start --vm-driver=virtualbox --openshift-version=v3.7.0
+    $ minishift start --vm-driver=virtualbox --openshift-version=v3.9.0
 
-Note that VirtualBox and OpenShift 3.7 are not the defaults (at least at the time of this writing) so you need to modify the default slightly. If there is a released version of Openshift after 3.7 the we recommend using the newer version.
+Note that VirtualBox and OpenShift 3.9 are not the defaults (at least at the time of this writing) so you need to modify the default slightly. If there is a released version of Openshift after 3.9 the we recommend using the newer version.
 
 Next we need to configure our machine so that we can use the 'oc' command and we also need to make sure we set our docker environment to the one that's running inside of MiniShift. Setting the docker environment is important for development because it allows us to push our development containers directly into MiniShift so that we can test them.
 

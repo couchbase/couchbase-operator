@@ -2,8 +2,8 @@
 
 In order to run the Couchbase Operator all you need is a running Kubernetes or OpenShift cluster. We support the following releases:
 
-* Kubernetes 1.7+
-* OpenShift 3.7+
+* Kubernetes 1.8+
+* OpenShift 3.9+
 
 If you do not have access to a Kubernetes cluster and plan on using the Couchbase Operator for development, we recommend using either MiniKube (single-node Kubernetes cluster) or MiniShift (single-node OpenShift cluster). Both these products are much easier to install and deploy when compared to setting up and running an actual Kubernetes or OpenShift cluster.
 For installation instructions, see [MiniKube](https://kubernetes.io/docs/tasks/tools/install-minikube/) or [MiniShift](https://docs.openshift.org/latest/minishift/getting-started/installing.html).

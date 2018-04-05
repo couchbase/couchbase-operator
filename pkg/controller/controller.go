@@ -8,6 +8,7 @@ import (
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 
@@ -103,6 +104,11 @@ func (c *Controller) initResource() error {
 	version, err := k8sutil.GetKubernetesVersion(c.Config.KubeCli)
 	if err != nil {
 		c.logger.Logger.Warn("Unable to get server version due to %v, skipping validation registration", err)
+	}
+
+	if version < constants.KubernetesVersion1_8 {
+		return fmt.Errorf("kubernetes version %s is too old, %s is minimum supported version ",
+			version, constants.KubernetesVersion1_8)
 	}
 
 	err = k8sutil.CreateCRD(c.KubeExtCli, version)
