@@ -3,6 +3,7 @@ package e2e
 import (
 	"os"
 	"testing"
+	"strings"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -508,61 +509,12 @@ func TestInvalidBaseImage(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
+	couchbaseBaseImage := "basecouch/123"
+	couchbaseVerString := "enterprise-5.0.1"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
 	otherConfig1 := map[string]string{
-		"baseImageName": "basecouch/123",
-	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"other1":   otherConfig1,
-	}
-
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
-	if err == nil {
-		t.Fatalf("failed to reject cluster creation: %v", err)
-	}
-
-	expectedEvents := e2eutil.EventList{}
-
-	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
-	if len(pods.Items) != 1 {
-		t.Fatalf("more than one pod: %v", pods.Items)
-	}
-
-	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
-	if reason != "ErrImagePull" && reason != "ImagePullBackOff" {
-		t.Fatalf("container status error: %+v", reason)
-	}
-
-	message := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	if message != "Back-off pulling image \"basecouch/123:enterprise-5.0.1\"" {
-		t.Fatalf("container status error: %+v", message)
-	}
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
-}
-
-// Tests if specs with invalid version will create a cluster (they should not)
-// 1. Attempt to create a cluster with invalid version
-// 2. Wait until cluster creation fails
-func TestInvalidVersion(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	couchbaseVerString := "enterprise-1.9.1"
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
-	otherConfig1 := map[string]string{
+		"baseImageName": couchbaseBaseImage,
 		"versionNum": couchbaseVerString,
 	}
 	configMap := map[string]map[string]string{
@@ -585,12 +537,70 @@ func TestInvalidVersion(t *testing.T) {
 	}
 
 	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
-	if reason != "ErrImagePull" && reason != "ImagePullBackOff" {
-		t.Fatalf("container status error: %+v", reason)
+	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found")  {
+		t.Fatalf("container status error: %s", reason)
 	}
 
-	k8sErrMsg := "Back-off pulling image \"couchbase/server:" + couchbaseVerString + "\""
-	ocErrMsg := "rpc error: code = 2 desc = Tag " + couchbaseVerString + " not found in repository docker.io/couchbase/server"
+	k8sErrMsg := "Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\""
+	ocErrMsg := "rpc error: code = 2 desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found"
+
+	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
+	if containerMsg != k8sErrMsg && containerMsg != ocErrMsg {
+		t.Fatalf("container status error: %+v", containerMsg)
+	}
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+// Tests if specs with invalid version will create a cluster (they should not)
+// 1. Attempt to create a cluster with invalid version
+// 2. Wait until cluster creation fails
+func TestInvalidVersion(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	couchbaseVerString := "enterprise-1.9.1"
+	couchbaseBaseImage := "couchbase/server"
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	otherConfig1 := map[string]string{
+		"versionNum": couchbaseVerString,
+		"baseImageName": couchbaseBaseImage,
+	}
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"other1":   otherConfig1,
+	}
+
+	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminHidden, 5, 1)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+	if err == nil {
+		t.Fatalf("failed to reject cluster creation: %v", err)
+	}
+
+	expectedEvents := e2eutil.EventList{}
+
+	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if len(pods.Items) != 1 {
+		t.Fatalf("more than one pod: %v", pods.Items)
+	}
+
+	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
+	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found")  {
+		t.Fatalf("container status error: %s", reason)
+	}
+
+	k8sErrMsg := "Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\""
+	ocErrMsg := "rpc error: code = 2 desc = Tag " + couchbaseVerString + " not found in repository docker.io/" + couchbaseBaseImage
 
 	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
 	if containerMsg != k8sErrMsg && containerMsg != ocErrMsg {
