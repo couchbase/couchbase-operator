@@ -13,12 +13,15 @@ spec:
         image: sequoiatools/couchbase-cli:v5.0.1
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c", "couchbase-cli-secure user-manage
-										 -c cb-example-0000.cb-example.default.svc
+										 -c ${CLUSTER_NAME}
 										 -u {auth.admin.username}
 										 -p {auth.admin.password}
 										 --rbac-username {auth.users.default_user}
                      --rbac-password {auth.users.default_password}
                      --roles admin --auth-domain local --set"]
+        env:
+          - name: CLUSTER_NAME
+            value: cb-example
         volumeMounts:
           - name: cb-admin
             mountPath: "/auth/admin"
