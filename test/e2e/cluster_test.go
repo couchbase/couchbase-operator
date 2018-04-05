@@ -559,10 +559,11 @@ func TestInvalidVersion(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
+	couchbaseVerString := "enterprise-1.9.1"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
 	otherConfig1 := map[string]string{
-		"versionNum": "enterprise-1.9.1",
+		"versionNum": couchbaseVerString,
 	}
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -588,9 +589,12 @@ func TestInvalidVersion(t *testing.T) {
 		t.Fatalf("container status error: %+v", reason)
 	}
 
-	message := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	if message != "Back-off pulling image \"couchbase/server:enterprise-1.9.1\"" {
-		t.Fatalf("container status error: %+v", message)
+	k8sErrMsg := "Back-off pulling image \"couchbase/server:" + couchbaseVerString + "\""
+	ocErrMsg := "rpc error: code = 2 desc = Tag " + couchbaseVerString + " not found in repository docker.io/couchbase/server"
+
+	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
+	if containerMsg != k8sErrMsg && containerMsg != ocErrMsg {
+		t.Fatalf("container status error: %+v", containerMsg)
 	}
 
 	// Event checking

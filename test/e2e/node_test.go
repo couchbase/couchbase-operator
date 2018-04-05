@@ -1040,11 +1040,9 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
+	for nodeIndex := 0; nodeIndex < e2eutil.Size5; nodeIndex++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
@@ -1057,6 +1055,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+
 	// create connection to couchbase nodes
 	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
 	if err != nil {
@@ -1080,7 +1079,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, e2eutil.Retries10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 3: %v", err)
 	}
@@ -1118,9 +1117,9 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
-		t.Fatalf("failed to reach cluster size of 3: %v", err)
+		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
@@ -1420,11 +1419,9 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
+	for nodeIndex := 0; nodeIndex < e2eutil.Size5; nodeIndex++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
@@ -1454,13 +1451,13 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries30, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size4, e2eutil.Retries30, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
+	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries10, 1)
 	if err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
@@ -1470,13 +1467,13 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
-	if len(clusterNodes) != 5 {
+	if len(clusterNodes) != e2eutil.Size5 {
 		t.Logf("clusterNodes: %v", clusterNodes)
 		t.Fatal("failed to see 5 nodes in the cluster")
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}

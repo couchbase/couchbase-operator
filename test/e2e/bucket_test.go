@@ -907,7 +907,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// edit bucket and verify change is reflected in cluster.
 	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.FlushDisabledVerifier)
-
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
@@ -933,7 +932,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// edit bucket and verify change is reflected in cluster.
 	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.ThreeReplicaVerifier)
-
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
@@ -969,7 +967,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// edit bucket and verify change is reflected in cluster.
 	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.DefaultIoPriorityVerifier)
-
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
@@ -999,6 +996,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
+	// Event checking
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
