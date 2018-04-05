@@ -434,18 +434,18 @@ var testDefs = []testDef{
 func TestValiation(t *testing.T) {
 	err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
-		t.Fatal("Failed to register CRD scheme due to %v", err)
+		t.Fatalf("Failed to register CRD scheme due to %v", err)
 	}
 
 	err = api.AddToScheme(scheme.Scheme)
 	if err != nil {
-		t.Fatal("Failed to register CouchbaseCluster scheme due to %v", err)
+		t.Fatalf("Failed to register CouchbaseCluster scheme due to %v", err)
 	}
 
 	for _, tc := range testDefs {
 		raw, err := ioutil.ReadFile(tc.path)
 		if err != nil {
-			t.Fatal("%s failed due to %v", tc.name, err)
+			t.Fatalf("%s failed due to %v", tc.name, err)
 		}
 
 		resource, err := decoder.DecodeCouchbaseCluster(raw)
@@ -471,7 +471,7 @@ func TestValiation(t *testing.T) {
 		} else {
 			raw, err = ioutil.ReadFile(tc.updatePath)
 			if err != nil {
-				t.Fatal("%s failed due to %v", tc.name, err)
+				t.Fatalf("%s failed due to %v", tc.name, err)
 			}
 
 			updated, err := decoder.DecodeCouchbaseCluster(raw)

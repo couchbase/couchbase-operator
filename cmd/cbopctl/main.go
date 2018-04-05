@@ -10,8 +10,8 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
-	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
+	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/couchbase/cbflag"
 

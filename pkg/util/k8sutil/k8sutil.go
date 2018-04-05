@@ -332,9 +332,9 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 
 			// check if any error occurred creating pod
 			case watch.Error:
-				return cberrors.ErrCreatingPod{status.Reason}
+				return cberrors.ErrCreatingPod{Reason: status.Reason}
 			case watch.Deleted:
-				return cberrors.ErrCreatingPod{status.Reason}
+				return cberrors.ErrCreatingPod{Reason: status.Reason}
 			case watch.Added, watch.Modified:
 
 				// make sure created pod is now running
@@ -345,12 +345,12 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 					for _, cond := range status.Conditions {
 						if cond.Type == v1.PodScheduled {
 							if cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
-								return cberrors.ErrPodUnschedulable{cond.Message}
+								return cberrors.ErrPodUnschedulable{Reason: cond.Message}
 							}
 						}
 					}
 				default:
-					return cberrors.ErrRunningPod{status.Reason}
+					return cberrors.ErrRunningPod{Reason: status.Reason}
 				}
 			}
 		}

@@ -456,12 +456,12 @@ func (c *Cluster) setupAuth(authSecret string) error {
 	if username, ok := data[constants.AuthSecretUsernameKey]; ok {
 		c.username = string(username[:])
 	} else {
-		return cberrors.ErrSecretMissingUsername{authSecret}
+		return cberrors.ErrSecretMissingUsername{Reason: authSecret}
 	}
 	if password, ok := data[constants.AuthSecretPasswordKey]; ok {
 		c.password = string(password[:])
 	} else {
-		return cberrors.ErrSecretMissingPassword{authSecret}
+		return cberrors.ErrSecretMissingPassword{Reason: authSecret}
 	}
 
 	return nil

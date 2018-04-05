@@ -433,17 +433,17 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 	if statusBucket, ok := c.status.Buckets[bucketName]; ok {
 		if !reflect.DeepEqual(config.ConflictResolution, statusBucket.ConflictResolution) {
 			return cberrors.ErrInvalidBucketParamChange{
-				bucketName,
-				"conflictResolution",
-				statusBucket.ConflictResolution,
-				config.ConflictResolution}
+				Bucket: bucketName,
+				Param:  "conflictResolution",
+				From:   statusBucket.ConflictResolution,
+				To:     config.ConflictResolution}
 		}
 		if config.BucketType != statusBucket.BucketType {
 			return cberrors.ErrInvalidBucketParamChange{
-				bucketName,
-				"type",
-				statusBucket.BucketType,
-				config.BucketType}
+				Bucket: bucketName,
+				Param:  "type",
+				From:   statusBucket.BucketType,
+				To:     config.BucketType}
 		}
 	}
 

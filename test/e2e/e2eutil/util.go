@@ -477,8 +477,9 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 		t.Fatalf("Error getting pods in cluster: %v", err)
 	}
 
-	if numToKill > len(pods.Items) {
-		t.Fatalf("Trying to kill %d pods, but only %d exist")
+	items := len(pods.Items)
+	if numToKill > items {
+		t.Fatalf("Trying to kill %d pods, but only %d exist", numToKill, items)
 	}
 
 	killPods := []string{}

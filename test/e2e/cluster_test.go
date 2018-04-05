@@ -1241,7 +1241,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
 	if err != nil {
-		t.Fatal("failed to create cluster: %v", err)
+		t.Fatalf("failed to create cluster: %v", err)
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 
@@ -1309,7 +1309,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
 	if err != nil {
-		t.Fatal("failed to create cluster: %v", err)
+		t.Fatalf("failed to create cluster: %v", err)
 	}
 
 	expectedEvents := e2eutil.EventList{}

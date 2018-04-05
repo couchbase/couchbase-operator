@@ -131,12 +131,12 @@ func ParseCertificate(data []byte) (*x509.Certificate, error) {
 // CertificateAuthority represents a certificate authority with public
 // and private key pair
 type CertificateAuthority struct {
-        // Private certificate used to sign CSRs
-        certificate *x509.Certificate
-        // Private key used to sign CSRs
-        key crypto.PrivateKey
-        // Public certificate
-        Certificate []byte
+	// Private certificate used to sign CSRs
+	certificate *x509.Certificate
+	// Private key used to sign CSRs
+	key crypto.PrivateKey
+	// Public certificate
+	Certificate []byte
 }
 
 // NewCertificateAuthority creates a new CA.  It automatically generates a new
