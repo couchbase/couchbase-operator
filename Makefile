@@ -53,6 +53,11 @@ test-p1:
 		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
 		--namespace $(namespace) --deployment-spec $(deploymentSpec)
 
+test-cbopctl:
+	go test github.com/couchbase/couchbase-operator/test/e2e -run TestCRDValidation -v -timeout 240m \
+		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
+		--namespace $(namespace) --deployment-spec $(deploymentSpec)
+
 test-indv:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run $(testname) \
 		-v -timeout 60m --race --kubeconfig $(kubeconfig) --operator-image \
