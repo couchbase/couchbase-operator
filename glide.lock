@@ -1,5 +1,5 @@
-hash: d7b74e881073ce627baf3674aaa73c68dcc2b2abb905bc6287aa2b836ead1945
-updated: 2018-03-21T09:23:53.502871427Z
+hash: d52d4f2d219a8c7c019f1b8f63ee292d10713f0f94db7b959edc0e5a3b26bc0c
+updated: 2018-04-06T17:04:23.345349907+01:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 593d64559f7600f29581a3ee42177f5dbded27a9
@@ -9,7 +9,9 @@ imports:
   - man
   - pwd
 - name: github.com/couchbase/gocbmgr
-  version: 3a50fd53ef73a1c12636e9246e8c21379d0a83b1
+  version: e0aeb284494703563de793b4ec7422beedf99771
+  subpackages:
+  - urlencoding
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:

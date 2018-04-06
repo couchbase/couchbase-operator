@@ -38,8 +38,8 @@ var (
 	IndexStorageModeMemoryOptimized = "memory_optimized"
 	IndexStorageModePlasma          = "plasma"
 
-	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase"
-	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase"
+	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase/data"
+	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase/data"
 
 	ServiceIndex  = "index"
 	ServiceData   = "data"
@@ -58,5 +58,25 @@ const (
 	KubernetesVersion1_8     KubernetesVersion = "0108"
 	KubernetesVersion1_9     KubernetesVersion = "0109"
 	KubernetesVersion1_10    KubernetesVersion = "0110"
+	KubernetesVersion1_11    KubernetesVersion = "0111"
 	KubernetesVersionMax     KubernetesVersion = "9999"
 )
+
+func (v KubernetesVersion) String() string {
+	if v == KubernetesVersionMax || v == KubernetesVersionUnknown {
+		return "unknown"
+	}
+
+	vstr := string(v)
+	major := string(vstr[0:2])
+	if v[0] == '0' {
+		major = string(vstr[1])
+	}
+
+	minor := vstr[2:4]
+	if v[2] == '0' {
+		minor = string(vstr[3])
+	}
+
+	return major + "." + minor
+}

@@ -66,7 +66,7 @@ var testSuiteP0 = TestSuite{
 	TestResizeCluster,
 	TestResizeClusterWithBucket,
 	TestEditServiceConfig,
-	//TestNegEditServiceConfig,
+	TestNegEditServiceConfig,
 	TestRecoveryAfterOnePodFailureNoBucket,
 	TestRecoveryAfterTwoPodFailureNoBucket,
 	TestRecoveryAfterOnePodFailureBucketOneReplica,
@@ -96,16 +96,16 @@ var testSuiteP1 = TestSuite{
 	TestInvalidAuthSecret,
 	TestInvalidBaseImage,
 	TestInvalidVersion,
-	//TestNodeUnschedulable,
+	TestNodeUnschedulable,
 	TestNodeServiceDownRecovery,
-	//TestNodeServiceDownDuringRebalance,
+	TestNodeServiceDownDuringRebalance,
 	TestReplaceManuallyRemovedNode,
 	TestManageMultipleClusters,
-	//TestNodeManualFailover,
+	TestNodeManualFailover,
 	TestNodeRecoveryAfterMemberAdd,
 	TestNodeRecoveryKilledNewMember,
 	//TestKillNodesAfterRebalanceAndFailover,
-	//TestRemoveForeignNode,
+	TestRemoveForeignNode,
 	TestRecoveryAfterOneNsServerFailureBucketOneReplica,
 	TestRecoveryAfterOneNodeUnreachableBucketOneReplica,
 	TestRecoveryNodeTmpUnreachableBucketOneReplica,
@@ -114,6 +114,22 @@ var testSuiteP1 = TestSuite{
 	TestPodResourcesHigh,
 	TestPodResourcesLow,
 	TestAntiAffinityOnCannotBeScaled,
+}
+
+var testCRDValidation = TestSuite{
+	TestValidationCreate,
+	TestNegValidationCreate,
+	TestValidationDefaultCreate,
+	TestNegValidationDefaultCreate,
+	TestNegValidationConstraintsCreate,
+	TestValidationApply,
+	TestNegValidationApply,
+	TestValidationDefaultApply,
+	TestNegValidationDefaultApply,
+	TestNegValidationConstraintsApply,
+	TestNegValidationImmutableApply,
+	TestValidationDelete,
+	TestNegValidationDelete,
 }
 
 var testSuiteAll = TestSuite{
@@ -137,8 +153,8 @@ var testSuiteAll = TestSuite{
 	TestInvalidAuthSecret,
 	TestInvalidBaseImage,
 	TestInvalidVersion,
-	//TestNodeUnschedulable,
-	//TestNodeServiceDownDuringRebalance,
+	TestNodeUnschedulable,
+	TestNodeServiceDownDuringRebalance,
 	TestReplaceManuallyRemovedNode,
 	TestBasicMDSScaling,
 	TestSwapNodesBetweenServices,
@@ -164,9 +180,12 @@ var testSuiteAll = TestSuite{
 	TestRecoveryAfterOneNsServerFailureBucketOneReplica,
 	TestRecoveryAfterOneNodeUnreachableBucketOneReplica,
 	TestRecoveryNodeTmpUnreachableBucketOneReplica,
+
+	// operator tests
 	TestPauseOperator,
 	TestKillOperator,
 	TestKillOperatorAndUpdateClusterConfig,
+
 	// pod tests
 	TestPodResourcesBasic,
 	TestNegPodResourcesBasic,
@@ -238,6 +257,10 @@ func TestP0(t *testing.T) {
 
 func TestP1(t *testing.T) {
 	runSuite(t, testSuiteP1)
+}
+
+func TestCRDValidation(t *testing.T) {
+	runSuite(t, testCRDValidation)
 }
 
 func TestAll(t *testing.T) {

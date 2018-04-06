@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -254,6 +255,27 @@ func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName strin
 	return nil
 }
 
+func WaitUntilPodDeleted(t *testing.T, kubeClient kubernetes.Interface, namespace string) error {
+	undeletedPods, err := WaitPodsDeleted(kubeClient, namespace, 3, metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if err != nil {
+		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
+			p := undeletedPods[0]
+			LogfWithTimestamp(t, "waiting pod (%s) to be deleted.", p.Name)
+
+			buf := bytes.NewBuffer(nil)
+			buf.WriteString("init container status:\n")
+			printContainerStatus(buf, p.Status.InitContainerStatuses)
+			buf.WriteString("container status:\n")
+			printContainerStatus(buf, p.Status.ContainerStatuses)
+			t.Logf("pod (%s) status.phase is (%s): %v", p.Name, p.Status.Phase, buf.String())
+		}
+
+		return fmt.Errorf("fail to wait pods deleted: %v", err)
+	}
+
+	return nil
+}
+
 func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions) ([]*v1.Pod, error) {
 	f := func(p *v1.Pod) bool { return p.DeletionTimestamp != nil }
 	return waitPodsDeleted(kubecli, namespace, retries, lo, f)
@@ -434,6 +456,37 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 					if conditionTime.After(after) {
 						return nil
 					}
+				}
+			}
+			// update cluster
+			cluster, err = GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType string, statusValue string, cl *api.CouchbaseCluster, wait int) error {
+	cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
+	if err != nil {
+		return err
+	}
+
+	timeOutChan := time.NewTimer(time.Duration(wait) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return fmt.Errorf("timed out waiting for status %s with status: %s", statusType, statusValue)
+
+		case <-tickChan:
+			// compare cluster conditions to desired condition
+			if statusType == "ControlPaused" {
+				t.Logf("cluster paused: %b", cluster.Status.ControlPaused)
+				desiredStatusBool, _ := strconv.ParseBool(statusValue)
+				if desiredStatusBool == cluster.Status.ControlPaused {
+					return nil
 				}
 			}
 			// update cluster

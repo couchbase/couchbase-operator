@@ -18,6 +18,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,16 @@ func Setup() error {
 		return err
 	}
 
+	err = v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return err
+	}
+
+	err = api.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return err
+	}
+
 	raw, err := ioutil.ReadFile(*deploymentSpec)
 	if err != nil {
 		return err
@@ -95,13 +106,30 @@ func Setup() error {
 }
 
 func Teardown() error {
-	if err := Global.DeleteCouchbaseOperatorCompletely(); err != nil {
+	if err := Global.DeleteCouchbaseOperatorCompletely(Global.Deployment.GetName()); err != nil {
 		return err
 	}
 
 	err := e2eutil.DeleteSecret(Global.KubeClient, Global.Namespace, Global.DefaultSecret.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("Unable to delete the default secret: %v", err)
+	}
+
+	clusters, err := Global.CRClient.CouchbaseV1beta1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
+	for _, cluster := range clusters.Items {
+		Global.CRClient.CouchbaseV1beta1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+	}
+
+	pods, err := Global.KubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	killPods := []string{}
+	for _, pod := range pods.Items {
+		killPods = append(killPods, pod.Name)
+	}
+	e2eutil.KillMembers(Global.KubeClient, Global.Namespace, killPods...)
+
+	services, err := Global.KubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	for _, service := range services.Items {
+		Global.KubeClient.CoreV1().Services(Global.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
 
 	// TODO: check all deleted and wait
@@ -111,6 +139,32 @@ func Teardown() error {
 }
 
 func (f *Framework) setup() error {
+	logrus.Info("cleaning up namespace before deployment")
+	deployments, err := f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
+	for _, deployment := range deployments.Items {
+		Global.DeleteCouchbaseOperatorCompletely(deployment.GetName())
+	}
+
+	clusters, err := f.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
+	for _, cluster := range clusters.Items {
+		f.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+	}
+
+	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	killPods := []string{}
+	for _, pod := range pods.Items {
+		killPods = append(killPods, pod.Name)
+	}
+	e2eutil.KillMembers(f.KubeClient, f.Namespace, killPods...)
+
+	services, err := f.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	for _, service := range services.Items {
+		f.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+	}
+
+	e2eutil.DeleteSecret(f.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
+
+	logrus.Info("deploying operator")
 	if err := f.SetupCouchbaseOperator(); err != nil {
 		return fmt.Errorf("failed to setup couchbase operator: %v", err)
 	}
@@ -140,8 +194,8 @@ func (f *Framework) SetupCouchbaseOperator() error {
 	return e2eutil.WaitUntilOperatorReady(f.KubeClient, f.Namespace, "couchbase-operator")
 }
 
-func (f *Framework) DeleteCouchbaseOperatorCompletely() error {
-	err := f.deleteCouchbaseOperator()
+func (f *Framework) DeleteCouchbaseOperatorCompletely(deploymentName string) error {
+	err := f.deleteCouchbaseOperator(deploymentName)
 	if err != nil {
 		return err
 	}
@@ -163,11 +217,11 @@ func (f *Framework) DeleteCouchbaseOperatorCompletely() error {
 	return nil
 }
 
-func (f *Framework) deleteCouchbaseOperator() error {
+func (f *Framework) deleteCouchbaseOperator(deploymentName string) error {
 	deletePropagation := metav1.DeletePropagationForeground
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
-	return f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Delete(f.Deployment.GetName(), deleteOpts)
+	return f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Delete(deploymentName, deleteOpts)
 }
 
 func (f *Framework) ApiServerHost() string {

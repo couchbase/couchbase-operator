@@ -1,6 +1,10 @@
 package e2e
 
 import (
+	"os"
+	"strconv"
+	"testing"
+
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -8,9 +12,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/gocbmgr"
-	"os"
-	"strconv"
-	"testing"
 )
 
 func TestBucketAddRemoveBasic(t *testing.T) {
@@ -21,7 +22,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	bucket1 := api.BucketConfig{
 		BucketName:         "default1",
 		BucketType:         constants.BucketTypeCouchbase,
-		BucketMemoryQuota:  101,
+		BucketMemoryQuota:  256,
 		BucketReplicas:     &constants.BucketReplicasOne,
 		IoPriority:         &constants.BucketIoPriorityHigh,
 		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
@@ -32,7 +33,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	bucket2 := api.BucketConfig{
 		BucketName:        "default2",
 		BucketType:        constants.BucketTypeMemcached,
-		BucketMemoryQuota: 101,
+		BucketMemoryQuota: 256,
 		EnableFlush:       constants.BucketFlushDisabled,
 	}
 	bucket3 := api.BucketConfig{
@@ -64,7 +65,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		"service1": serviceConfig1}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -109,8 +110,9 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		buckets = append(buckets, bucketSetting.BucketName)
 
 		t.Logf("Waiting For Bucket To Be Created \n")
-		err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, buckets, e2eutil.Retries10, testCouchbase)
+		err = e2eutil.WaitUntilBucketsExists(t, f.CRClient, buckets, e2eutil.Retries20, testCouchbase)
 		if err != nil {
+			t.Logf("status: %v+", testCouchbase.Status)
 			t.Fatalf("failed to create bucket %v", err)
 		}
 
@@ -173,7 +175,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -199,7 +201,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	bucketTypes := []string{"couchbase", "memcached", "ephemeral"} // couchbase, memcached, ephemeral
+	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucketSetting := range bucketSettingsList {
 		newConfig := []api.BucketConfig{bucketSetting}
@@ -267,7 +269,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 
@@ -277,7 +279,6 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 //    are not supported on ephemeral buckets so creation should fail)
 // 3. Wait for 90 seconds to ensure that the bucket is not created
 // 4. (TODO) Check to make sure that an error is reported in the conditions section
-// 5. (TODO) Check the events to make sure the operator took the correct actions
 func TestNegBucketAdd(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -287,7 +288,7 @@ func TestNegBucketAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -319,6 +320,12 @@ func TestNegBucketAdd(t *testing.T) {
 		t.Fatalf("failed to NOT create bucket %v", err)
 	}
 
+	message := "[evictionPolicy - Eviction policy must be either 'noEviction' or 'nruEviction' for ephemeral buckets replicaNumber - Warning: you do not have enough data servers to support this number of replicas."
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageBuckets, message)
+	if err != nil {
+		t.Fatalf("failed to verify condition: %v", err)
+	}
+
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
@@ -339,7 +346,6 @@ func TestNegBucketAdd(t *testing.T) {
 // 8. Change enable flush to true
 // 9. Verify that the memory quota was in the describe output and in the actual cluster
 // 10. Change enable flush back to false
-// 11. (TODO) Check the events to make sure the operator took the correct actions
 func TestEditBucket(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -349,7 +355,7 @@ func TestEditBucket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -546,7 +552,7 @@ func TestNegBucketEdit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -767,7 +773,7 @@ func TestRevertExternalBucketAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -852,7 +858,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")
@@ -903,7 +909,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// edit bucket and verify change is reflected in cluster.
 	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.FlushDisabledVerifier)
-
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
@@ -929,7 +934,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// edit bucket and verify change is reflected in cluster.
 	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.ThreeReplicaVerifier)
-
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
@@ -965,7 +969,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// edit bucket and verify change is reflected in cluster.
 	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.DefaultIoPriorityVerifier)
-
 	if err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
@@ -995,11 +998,12 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
+	// Event checking
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }

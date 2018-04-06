@@ -29,8 +29,8 @@ const (
 	couchbaseVersionAnnotationKey = "couchbase.version"
 	couchbaseVolumeName           = "couchbase-data"
 	couchbaseVolumeMountDir       = "/opt/couchbase/var/lib/data"
-	consoleAdminPortName          = "cb-admin"
-	consoleAdminPortNameSSL       = "cb-admin-ssl"
+	consoleAdminPortName          = "couchbase"
+	consoleAdminPortNameSSL       = "couchbases"
 )
 
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"

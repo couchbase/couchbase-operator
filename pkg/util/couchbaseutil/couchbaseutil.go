@@ -535,6 +535,17 @@ func (c *CouchbaseClient) SetUpdatesEnabled(ms MemberSet, enabled bool) error {
 	return c.client.SetUpdatesEnabled(enabled)
 }
 
+func (c *CouchbaseClient) GetIndexSettings(ms MemberSet, username, password string) (*cbmgr.IndexSettings, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetIndexSettings()
+}
+
+func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, username, password, storageMode string, settings *cbmgr.IndexSettings) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	settings.StorageMode = cbmgr.IndexStorageMode(storageMode)
+	return c.client.SetIndexSettings(settings)
+}
+
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	rv := &cbmgr.Bucket{
 		BucketName:        config.BucketName,

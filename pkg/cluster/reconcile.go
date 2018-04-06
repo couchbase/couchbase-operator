@@ -536,7 +536,10 @@ func (c *Cluster) reconcileClusterSettings() bool {
 	if ok := c.reconcileMemoryQuotaSettings(); !ok {
 		return false
 	}
-	if ok := c.reconcileSoftwareUpdateNotificationSettings(); ok {
+	if ok := c.reconcileSoftwareUpdateNotificationSettings(); !ok {
+		return false
+	}
+	if ok := c.reconcileIndexStorageSettings(); !ok {
 		return false
 	}
 
@@ -606,6 +609,27 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() bool {
 	if actual != requested {
 		if err := c.client.SetUpdatesEnabled(c.members, requested); err != nil {
 			c.logger.Warnf("Unable to set cluster software updates: %v", err)
+			return false
+		}
+	}
+
+	return true
+}
+
+// Compare cluster index settings with spec, reconcile if necessary
+func (c *Cluster) reconcileIndexStorageSettings() bool {
+	settings, err := c.client.GetIndexSettings(c.members, c.username, c.password)
+	if err != nil {
+		c.logger.Warnf("Unable to get index storage settings: %v", err)
+		return false
+	}
+
+	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
+	if specStorageMode != string(settings.StorageMode) {
+		if err := c.client.SetIndexSettings(c.members, c.username, c.password, specStorageMode, settings); err != nil {
+			emsg := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
+			c.status.SetConfigRejectedCondition(emsg)
+			c.logger.Warnf(emsg)
 			return false
 		}
 	}

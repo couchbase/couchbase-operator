@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type ApplyContext struct {
@@ -25,11 +27,15 @@ func (ctx *ApplyContext) Run() {
 		os.Exit(1)
 	}
 
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: ctx.kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}})
+
 	if resource.Namespace == "" {
-		resource.Namespace = "default"
+		resource.Namespace, _, _ = clientConfig.Namespace()
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", ctx.kubeconfig)
+	config, err := clientConfig.ClientConfig()
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
@@ -50,7 +56,7 @@ func (ctx *ApplyContext) Run() {
 	}
 
 	if errs != nil {
-		fmt.Printf("%v\n", err)
+		fmt.Printf("%v\n", errs)
 		os.Exit(1)
 	}
 
@@ -63,4 +69,6 @@ func (ctx *ApplyContext) Run() {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("%s \"%s\" applied\n", api.CRDResourcePlural, resource.Name)
 }

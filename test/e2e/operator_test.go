@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"testing"
-	"time"
 )
 
 // TestPauseControl tests the user can pause the operator from controlling
@@ -23,7 +22,7 @@ func TestPauseOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -43,25 +42,29 @@ func TestPauseOperator(t *testing.T) {
 		t.Fatalf("failed to pause control: %v", err)
 	}
 
-	// TODO: this is used to wait for the CR to be updated.
-	// TODO: make this wait for reliable
-	time.Sleep(5 * time.Second)
+	err = e2eutil.WaitForClusterStatus(t, f.CRClient, "ControlPaused", "true", testCouchbase, 300)
+	if err != nil {
+		t.Fatalf("failed to pause control: %v", err)
+	}
 
 	t.Logf("Killing pod...")
 	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
 	if _, err := e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size2, e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("failed to wait for killed member to die: %v", err)
 	}
+
 	if _, err := e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase); err == nil {
 		t.Fatalf("cluster should not be recovered: control is paused")
 	}
+
 	t.Logf("Resuming operator...")
 	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "false", f.CRClient, testCouchbase, e2eutil.Retries10)
 	if err != nil {
 		t.Fatalf("failed to resume control: %v", err)
 	}
+
 	t.Logf("Waiting for recovery...")
-	if _, err := e2eutil.WaitUntilSizeReached(t, f.CRClient, 3, e2eutil.Retries10, testCouchbase); err != nil {
+	if _, err := e2eutil.WaitUntilSizeReached(t, f.CRClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("failed to resize to 3 members couchbase cluster: %v", err)
 	}
 
@@ -75,6 +78,7 @@ func TestPauseOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 	if err != nil {
@@ -99,7 +103,7 @@ func TestKillOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -148,7 +152,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase, testCouchbase.Name+"-ui")

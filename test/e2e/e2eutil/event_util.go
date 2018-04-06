@@ -70,20 +70,20 @@ func (e *EventList) AddFailedAddNodeEvent(cl *api.CouchbaseCluster, memberId int
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddBucketCreateEvent(cl *api.CouchbaseCluster, name string) {
-	*e = append(*e, *k8sutil.BucketCreateEvent(name, cl))
+func (e *EventList) AddBucketCreateEvent(cl *api.CouchbaseCluster, bucketName string) {
+	*e = append(*e, *k8sutil.BucketCreateEvent(bucketName, cl))
 }
 
-func (e *EventList) AddBucketDeleteEvent(cl *api.CouchbaseCluster, name string) {
-	*e = append(*e, *k8sutil.BucketDeleteEvent(name, cl))
+func (e *EventList) AddBucketDeleteEvent(cl *api.CouchbaseCluster, bucketName string) {
+	*e = append(*e, *k8sutil.BucketDeleteEvent(bucketName, cl))
 }
 
-func (e *EventList) AddBucketEditEvent(cl *api.CouchbaseCluster, name string) {
-	*e = append(*e, *k8sutil.BucketEditEvent(name, cl))
+func (e *EventList) AddBucketEditEvent(cl *api.CouchbaseCluster, bucketName string) {
+	*e = append(*e, *k8sutil.BucketEditEvent(bucketName, cl))
 }
 
-func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *api.CouchbaseCluster, name string) {
-	*e = append(*e, *k8sutil.AdminConsoleSvcCreateEvent(name, cl))
+func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *api.CouchbaseCluster, svcName string) {
+	*e = append(*e, *k8sutil.AdminConsoleSvcCreateEvent(svcName, cl))
 }
 
 func (e EventList) String() string {

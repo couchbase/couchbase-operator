@@ -1,11 +1,12 @@
 package e2e
 
 import (
-	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"strconv"
 	"testing"
+
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
 func TestPodResourcesBasic(t *testing.T) {
@@ -41,7 +42,7 @@ func TestPodResourcesBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to place first pod: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -90,9 +91,9 @@ func TestNegPodResourcesBasic(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 	t.Logf("Pod Policy Resource Memory Request=%sMB... \n Pod Policy Resource Memory Limit=%sMB... \n attempting to create 1 node cluster", memReq, memLimit)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	_, err = e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err == nil {
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 		t.Fatalf("pod placed with invalid resource list, fail: %v", err)
 	}
@@ -144,7 +145,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to place first pod: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -215,9 +216,9 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 	t.Logf("Pod Policy Resource Memory Request=%sMB... \n attempting to create 1 pod cluster with max allocatable memory of %dMB", memReq, int(maxMem))
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	_, err = e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err == nil {
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 		t.Fatalf("%s MB request placed on node with max allocatable memory of %dMB, fail: %v", memReq, int(maxMem), err)
 	}
 	t.Logf("Pod not placed")
@@ -252,7 +253,7 @@ func TestAntiAffinityOn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for i := 0; i < numNodes; i++ {
@@ -302,9 +303,9 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 	t.Logf("AntiAffinity=on... \n attempting to create %d pod cluster with %d nodes", numNodes+1, numNodes)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	_, err = e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err == nil {
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 		t.Fatalf("cluster created despite anti affinity status... fail: %v", err)
 	}
 	t.Logf("Cluster creation failed, anti affinty works")
@@ -339,15 +340,19 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	t.Logf("Cluster created")
 
 	expectedEvents := e2eutil.EventList{}
 	for i := 0; i < numNodes; i++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, i)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	// For single node cluster
+	if numNodes > 1 {
+		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	}
 
 	t.Logf("Attempting to add a node")
 	err = e2eutil.ResizeCluster(t, 0, numNodes+1, f.CRClient, testCouchbase)
@@ -407,7 +412,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir, testCouchbase)
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 	t.Logf("cluster created")
 
 	expectedEvents := e2eutil.EventList{}

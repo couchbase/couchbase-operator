@@ -1,0 +1,77 @@
+apiVersion: couchbase.database.couchbase.com/v1beta1
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+  namespace: default
+spec:
+  baseImage: couchbase/server
+  version: enterprise-5.0.1
+  authSecret: basic-test-secret
+  exposeAdminConsole: false
+  adminConsoleServices:
+      - data
+      - index
+      - query
+      - search
+  paused: false
+  cluster:
+    dataServiceMemoryQuota: 600
+    indexServiceMemoryQuota: 256
+    searchServiceMemoryQuota: 256
+    indexStorageSetting: memory_optimized
+    autoFailoverTimeout: 10
+  buckets:
+    - name: default1
+      type: couchbase
+      memoryQuota: 100
+      replicas: 0
+      ioPriority: high
+      evictionPolicy: fullEviction
+      conflictResolution: seqno
+      enableFlush: true
+      enableIndexReplica: false
+    - name: default2
+      type: couchbase
+      memoryQuota: 100
+      replicas: 0
+      ioPriority: high
+      evictionPolicy: valueOnly
+      conflictResolution: seqno
+      enableFlush: true
+      enableIndexReplica: false
+    - name: default3
+      type: memcached
+      memoryQuota: 100
+      enableFlush: true
+    - name: default4
+      type: ephemeral
+      memoryQuota: 100
+      replicas: 3
+      ioPriority: low
+      evictionPolicy: noEviction
+      conflictResolution: lww
+      enableFlush: true
+    - name: default5
+      type: ephemeral
+      memoryQuota: 100
+      replicas: 3
+      ioPriority: low
+      evictionPolicy: nruEviction
+      conflictResolution: lww
+      enableFlush: true
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+      dataPath: /opt/couchbase/var/lib/couchbase/data
+      indexPath: /opt/couchbase/var/lib/couchbase/data
+    - size: 1
+      name: data_only
+      services:
+        - data
+      dataPath: /opt/couchbase/var/lib/couchbase/data
+      indexPath: /opt/couchbase/var/lib/couchbase/data

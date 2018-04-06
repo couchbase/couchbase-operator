@@ -30,6 +30,7 @@ var (
 	Size1 = 1
 	Size2 = 2
 	Size3 = 3
+	Size4 = 4
 	Size5 = 5
 )
 
@@ -142,20 +143,63 @@ var (
 		"enableIndexReplica": "false"}
 )
 
+func NewClusterBasicQuick(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, sizeChecks int, bucketChecks int) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
+	testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
+	if err1 != nil {
+		return testCouchbase, err1
+	}
+	_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), sizeChecks, testCouchbase)
+	if err2 != nil {
+		return testCouchbase, err2
+	}
+	buckets := testCouchbase.Spec.BucketNames()
+	if withBucket == true {
+		err := WaitUntilBucketsExists(t, crClient, buckets, bucketChecks, testCouchbase)
+		if err != nil {
+			return testCouchbase, err
+		}
+	}
+	return GetClusterCRD(crClient, testCouchbase)
+}
+
+func NewClusterMultiQuick(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
+	config map[string]map[string]string, exposed bool, sizeChecks int, bucketChecks int) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
+	testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
+	if err1 != nil {
+		return testCouchbase, err1
+	}
+	_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), sizeChecks, testCouchbase)
+	if err2 != nil {
+		return testCouchbase, err2
+	}
+	buckets := testCouchbase.Spec.BucketNames()
+	if len(buckets) > 0 {
+		err := WaitUntilBucketsExists(t, crClient, buckets, bucketChecks, testCouchbase)
+		if err != nil {
+			return testCouchbase, err
+		}
+	}
+	return GetClusterCRD(crClient, testCouchbase)
+}
+
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
-	for i := 0; i < 3; i++ {
+	retries := 2
+	for i := 0; i < retries; i++ {
+		time.Sleep(10 * time.Second)
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
-			//(TODO) attempt to clean up namespace
-			if i == 2 {
+			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
+			if i == retries-1 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == 2 {
+				if i == retries-1 {
 					return nil, err2
 				}
 			} else {
@@ -164,7 +208,7 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == 2 {
+						if i == retries-1 {
 							return nil, err
 						}
 					} else {
@@ -173,7 +217,6 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 				} else {
 					return GetClusterCRD(crClient, testCouchbase)
 				}
-
 			}
 		}
 	}
@@ -183,18 +226,20 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string,
 	config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
-	for i := 0; i < 3; i++ {
+	retries := 2
+	for i := 0; i < retries; i++ {
+		time.Sleep(10 * time.Second)
 		testCouchbase, err1 := CreateCluster(t, crClient, namespace, clusterSpec)
 		if err1 != nil {
-			//(TODO) attempt to clean up namespace
-			if i == 2 {
+			crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Delete(testCouchbase.Name, nil)
+			if i == retries-1 {
 				return nil, err1
 			}
 		} else {
 			_, err2 := WaitUntilSizeReached(t, crClient, testCouchbase.Spec.TotalSize(), 18, testCouchbase)
 			if err2 != nil {
 				DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-				if i == 2 {
+				if i == retries-1 {
 					return nil, err2
 				}
 			} else {
@@ -203,7 +248,7 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 					err := WaitUntilBucketsExists(t, crClient, buckets, 18, testCouchbase)
 					if err != nil {
 						DeleteCluster(t, crClient, kubeClient, testCouchbase, 5)
-						if i == 2 {
+						if i == retries-1 {
 							return nil, err
 						}
 					} else {
@@ -212,7 +257,6 @@ func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 				} else {
 					return GetClusterCRD(crClient, testCouchbase)
 				}
-
 			}
 		}
 	}
@@ -369,13 +413,25 @@ func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	}
 }
 
-func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string, cluster *api.CouchbaseCluster) {
+func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string) {
 	err := WriteLogs(t, kubeClient, namespace, logDir)
 	if err != nil {
 		t.Logf("Error: %v", err)
 	}
-	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	CleanK8Cluster(t, kubeClient, crClient, namespace)
 
+}
+
+func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string) {
+	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	for _, service := range services.Items {
+		kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+	}
+
+	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		t.Logf("Error: %v", err)
+	}
 	clusterNameList := []string{}
 	for _, cluster := range clusters.Items {
 		clusterNameList = append(clusterNameList, cluster.Name)
@@ -384,14 +440,27 @@ func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	t.Logf("Deleteing clusters: [%v]", clusterNameList)
 	for _, cluster := range clusters.Items {
 		t.Logf("Attempting to delete: [%v]", cluster.Name)
-		err1 := DeleteCluster(t, crClient, kubeClient, &cluster, 10)
-		if err1 != nil {
-			t.Logf("Error: %v", err1)
+		err := k8sutil.DeleteCouchbaseCluster(crClient, &cluster)
+		if err != nil {
+			t.Logf("Error: %v", err)
 		} else {
 			t.Logf("Successfully deleted: [%v]", cluster.Name)
 		}
 	}
 
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	killPods := []string{}
+	for _, pod := range pods.Items {
+		killPods = append(killPods, pod.Name)
+	}
+	t.Logf("Killing pods: %v", killPods)
+
+	KillMembers(kubeClient, namespace, killPods...)
+
+	for _, pod := range killPods {
+		t.Logf("Waiting for deletion of pod: %v", pod)
+	}
+	WaitUntilPodDeleted(t, kubeClient, namespace)
 }
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string) error {
@@ -454,6 +523,15 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 			buf.WriteString(fmt.Sprintf("%s: Terminated: message (%s) reason (%s)\n", s.Name, s.State.Terminated.Message, s.State.Terminated.Reason))
 		}
 	}
+}
+
+func isMasterNode(nodeMap map[string]string) bool {
+	_, isK8SMaster := nodeMap["node-role.kubernetes.io/master"]
+	_, isOpenshiftMaster := nodeMap["openshift-infra"]
+	if isK8SMaster || isOpenshiftMaster {
+		return true
+	}
+	return false
 }
 
 func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
@@ -591,7 +669,7 @@ func NumK8Workers(kubeCli kubernetes.Interface) (int, error) {
 	for _, value := range nodeList.Items {
 		node := &value
 		nodeMap := node.GetLabels()
-		if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+		if isMasterNode(nodeMap) {
 			continue
 		}
 		numWorkers = numWorkers + 1
@@ -609,7 +687,7 @@ func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 		for _, value := range nodeList.Items {
 			node := &value
 			nodeMap := node.GetLabels()
-			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+			if isMasterNode(nodeMap) {
 				continue
 			}
 			//kilobytes
@@ -640,7 +718,7 @@ func GetMaxNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 		for _, value := range nodeList.Items {
 			node := &value
 			nodeMap := node.GetLabels()
-			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+			if isMasterNode(nodeMap) {
 				continue
 			}
 			//kilobytes
@@ -671,7 +749,7 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 		for _, value := range nodeList.Items {
 			node := &value
 			nodeMap := node.GetLabels()
-			if _, ok := nodeMap["node-role.kubernetes.io/master"]; ok {
+			if isMasterNode(nodeMap) {
 				continue
 			}
 			//kilobytes
