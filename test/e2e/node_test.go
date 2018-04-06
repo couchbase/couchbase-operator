@@ -248,6 +248,7 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedEvents.AddRebalanceEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 
 	// cluster should also be balanced
 	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
@@ -282,7 +283,7 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries20)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
@@ -293,7 +294,7 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 

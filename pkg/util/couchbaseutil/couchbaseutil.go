@@ -15,6 +15,7 @@ import (
 type ClusterStatus struct {
 	ActiveNodes      MemberSet // status=healthy,   clusterMembership=active
 	PendingAddNodes  MemberSet // status=healthy,   clusterMembership=inactiveAdded
+	AddBackNodes     MemberSet // status=healthy, clusterMembership=inactiveFailed
 	FailedAddNodes   MemberSet // status=unhealthy, clusterMembership=inactiveAdded
 	DownNodes        MemberSet // status=unhealthy, clusterMembership=active
 	FailedNodes      MemberSet // status=unhealthy, clusterMembership=inactiveFailed
@@ -71,6 +72,7 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 	status := &ClusterStatus{
 		ActiveNodes:      NewMemberSet(),
 		PendingAddNodes:  NewMemberSet(),
+		AddBackNodes:     NewMemberSet(),
 		FailedAddNodes:   NewMemberSet(),
 		DownNodes:        NewMemberSet(),
 		FailedNodes:      NewMemberSet(),
@@ -97,6 +99,8 @@ func GetClusterStatus(ms MemberSet, username, password, clusterName string) (*Cl
 					status.ActiveNodes.Add(member)
 				} else if node.Membership == "inactiveAdded" {
 					status.PendingAddNodes.Add(member)
+				} else if node.Membership == "inactiveFailed" {
+					status.AddBackNodes.Add(member)
 				}
 			} else if node.Status == "unhealthy" {
 				if node.Membership == "active" {
