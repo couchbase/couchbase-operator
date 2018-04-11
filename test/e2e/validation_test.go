@@ -865,7 +865,7 @@ func TestValidationDefaultApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "0", "IndexPath"},
 					fieldType:  "string",
-					fieldValue: "/opt/couchbase/var/lib/couchbase",
+					fieldValue: "/opt/couchbase/var/lib/couchbase/data",
 				},
 			},
 			shouldFail:       false,
