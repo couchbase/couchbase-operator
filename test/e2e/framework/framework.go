@@ -86,6 +86,13 @@ func Setup() error {
 		return fmt.Errorf("File %s does not define a deployment", *deploymentSpec)
 	}
 
+	// set operator image from env var
+	oi := os.Getenv("OPERATOR_IMAGE")
+	if oi != "" {
+		fmt.Printf("setting operator image: %s \n", oi)
+		deployment.Spec.Template.Spec.Containers[0].Image = oi
+	}
+
 	logDir, err := makeLogDir()
 	if err != nil {
 		return err
