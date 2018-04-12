@@ -2,6 +2,7 @@ PREFIX ?= $(shell pwd)
 GOPATH = $(shell echo $${PWD%/src/*})
 SOURCE = $(shell find . -name *.go -type f)
 BINARY = build/bin/couchbase-operator
+ARTIFACTS = build/artifacts
 
 kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
@@ -32,6 +33,20 @@ prod: container
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopctl ./cmd/cbopctl/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopctl ./cmd/cbopctl/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopctl ./cmd/cbopctl/
+	mkdir -p $(ARTIFACTS)
+	cp -r build/darwin $(ARTIFACTS)
+	cp -r build/linux $(ARTIFACTS)
+	cp -r build/windows $(ARTIFACTS)
+	cp example/couchbase-cluster.yaml $(ARTIFACTS)/couchbase-cluster.yaml
+	cp example/deployment.yaml $(ARTIFACTS)/operator.yaml
+	cp example/couchbase-cli-collect-logs.yaml $(ARTIFACTS)/couchbase-cli-collect-logs.yaml
+	cp example/couchbase-cli-create-user.yaml $(ARTIFACTS)/couchbase-cli-create-user.yaml
+	cp example/pillowfight-data-loader.yaml $(ARTIFACTS)/pillowfight.yaml
+	cp example/pillowfight-data-loader-openshift.yaml $(ARTIFACTS)/pillowfight-openshift.yaml
+	tar -czf $(ARTIFACTS)/rbac.zip example/rbac
+	cp scripts/support/cb_k8s_support.sh $(ARTIFACTS)/cb_k8s_support.sh
+	cd build && tar -czf artifacts.zip artifacts && cd ..
+	rm -r $(ARTIFACTS)
 
 test:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run TestAll -v -timeout 360m \
