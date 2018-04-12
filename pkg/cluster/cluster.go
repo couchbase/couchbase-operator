@@ -388,6 +388,48 @@ func (c *Cluster) removePod(name string) error {
 	return nil
 }
 
+// Delete pod and create with same name.
+// Persisted members will reuse volume mounts
+func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
+	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+	if config == nil {
+		return fmt.Errorf("config for pod does not exist: %s", m.ServerConfig)
+	}
+	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
+	err := k8sutil.DeletePod(c.config.KubeCli, c.cluster.Namespace, m.Name, opts)
+	if err != nil {
+		return err
+	}
+	err = c.waitForDeletePod(m.Name, 120)
+	if err != nil {
+		return err
+	}
+	err = c.createPod(m, *config)
+	if err != nil {
+		return err
+	}
+	return c.waitForCreatePod(m, 120)
+}
+
+// wait with context
+func (c *Cluster) waitForCreatePod(member *couchbaseutil.Member, timeout int64) error {
+	ctx, cancel := context.WithTimeout(c.ctx, time.Duration(timeout)*time.Second)
+	defer cancel()
+	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
+	ctx, cancel := context.WithTimeout(c.ctx, time.Duration(timeout)*time.Second)
+	defer cancel()
+	if err := k8sutil.WaitForDeletePod(ctx, c.config.KubeCli, c.cluster.Namespace, podName); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 	podList, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Name))
 	if err != nil {

@@ -42,8 +42,10 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, namespace string, clusterN
 
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
+// Volumes that already exist are reused
 func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
 
+	var err error
 	volumes := []v1.Volume{}
 	mounts := []v1.VolumeMount{}
 	mountPaths := getPathsToPersist(config.Pod.VolumeMounts)
@@ -63,18 +65,26 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 			} else {
 				claimUsageCnt[claimName] = 0
 			}
-			claim.Name = NameForPersistentVolumeClaim(claimName, pod.Name, claimUsageCnt[claimName], mountName)
-			claim.Labels = map[string]string{
-				"app":               "couchbase",
-				"couchbase_node":    pod.Name,
-				"couchbase_cluster": clusterName,
-				"couchbase_volume":  claimName,
-			}
 
-			// Create PVC from the template
-			pvc, err := createPersistentVolumeClaim(kubeCli, claim, namespace, owner)
-			if err != nil {
-				return nil, err
+			// Find volumes that already exist for this mount path
+			// to allow pod recovery. Otherwise, create a new PVC
+			mountPath := pathForVolumeMountName(mountName, config)
+			pvc := findMemberPVC(kubeCli, pod.Name, clusterName, namespace, mountPath)
+			if pvc == nil {
+				// Label and Annotate so that volumes
+				// can be easily targeted when recovering pods
+				claim.Labels = map[string]string{
+					"app":               "couchbase",
+					"couchbase_node":    pod.Name,
+					"couchbase_cluster": clusterName,
+					"couchbase_volume":  claimName,
+				}
+				claim.SetAnnotations(map[string]string{"path": mountPath})
+				claim.Name = NameForPersistentVolumeClaim(claimName, pod.Name, claimUsageCnt[claimName], mountName)
+				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			// Volumes will be added to Pod spec
@@ -82,7 +92,6 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 			volumes = append(volumes, volume)
 
 			// Mount point for Pod Container spec to reference volume by name
-			mountPath := pathForVolumeMountName(mountName, config)
 			mounts = append(mounts, v1.VolumeMount{Name: volume.Name, MountPath: mountPath})
 		} else {
 			// It is invalid to have volumeMounts that do not
@@ -513,6 +522,25 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 	for i := range status.Conditions {
 		if status.Conditions[i].Type == v1.PodReady {
 			return &status.Conditions[i]
+		}
+	}
+	return nil
+}
+
+// Find the PVC belonging to a member that was mounted at the specified path.
+// It's not considered an error in the case that PVC cannot be found
+func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namespace, path string) *v1.PersistentVolumeClaim {
+	pvcList, err := listMemberPVCS(kubeCli, memberName, clusterName, namespace)
+	if err != nil {
+		return nil
+	}
+	for _, pvc := range pvcList.Items {
+		if pvcPath, ok := pvc.Annotations["path"]; ok {
+			if pvcPath == path {
+				if pvc.Status.Phase == v1.ClaimBound {
+					return &pvc
+				}
+			}
 		}
 	}
 	return nil

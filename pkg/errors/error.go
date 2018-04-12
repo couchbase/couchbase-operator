@@ -23,6 +23,10 @@ type ErrCreatingPod struct {
 	Reason string
 }
 
+type ErrDeletingPod struct {
+	Reason string
+}
+
 type ErrRunningPod struct {
 	Reason string
 }
@@ -48,6 +52,10 @@ func (e ErrSecretMissingPassword) Error() string {
 
 func (e ErrCreatingPod) Error() string {
 	return fmt.Sprintf("failed to create pod: %s", e.Reason)
+}
+
+func (e ErrDeletingPod) Error() string {
+	return fmt.Sprintf("failed to delete pod: %s", e.Reason)
 }
 
 func (e ErrRunningPod) Error() string {

@@ -795,6 +795,54 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 	return nil
 }
 
+func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespace, podName string) error {
+
+	_, err := kubeCli.Core().Pods(namespace).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		if IsKubernetesResourceNotFoundError(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	// watch for pod deletion event
+	opts := metav1.ListOptions{
+		LabelSelector: "couchbase_node=" + podName,
+	}
+
+	watcher, err := kubeCli.CoreV1().Pods(namespace).Watch(opts)
+	if err != nil {
+		return err
+	}
+	events := watcher.ResultChan()
+
+	done := false
+	for !done {
+		select {
+		// Handle timeout and cancellation events
+		case <-ctx.Done():
+			return ctx.Err()
+		// Process K8S events for our chosen pod
+		case ev := <-events:
+			obj := ev.Object.(*v1.Pod)
+			status := obj.Status
+
+			switch ev.Type {
+			// check if any error occurred creating pod
+			case watch.Error:
+				return cberrors.ErrDeletingPod{Reason: status.Reason}
+			case watch.Deleted:
+				return nil
+			default:
+				continue
+			}
+		}
+	}
+
+	return fmt.Errorf("failed to wait for pod to delete: %s", podName)
+}
+
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
 	version, err := kubeCli.Discovery().ServerVersion()
 	if err != nil {
