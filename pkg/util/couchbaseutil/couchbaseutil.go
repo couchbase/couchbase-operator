@@ -290,7 +290,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	status.UnclusteredNodes = NewMemberSet()
 	status.UnmanagedNodes = []string{}
 
-	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "cluster status", c.clusterName, func() error {
+	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, 5, "cluster status", c.clusterName, func() error {
 		info, err := c.client.ClusterInfo()
 		if err != nil {
 			return err
