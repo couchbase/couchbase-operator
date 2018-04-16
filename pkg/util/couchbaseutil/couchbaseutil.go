@@ -42,6 +42,11 @@ type ClusterStatus struct {
 	NeedsRebalance   bool
 }
 
+const (
+	RetryCount         = 5
+	ExtendedRetryCount = 36
+)
+
 type ClusterStateMap map[string]NodeState
 
 // CouchbaseClient encapsulates Couchbase API operations.
@@ -242,7 +247,7 @@ func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services []stri
 		return err
 	}
 
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "add node", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "add node", c.clusterName,
 		func() error {
 			return c.client.AddNode(hostname, c.username, c.password, svcs)
 		})
@@ -250,7 +255,7 @@ func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services []stri
 
 func (c *CouchbaseClient) CancelAddNode(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "add node", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "add node", c.clusterName,
 		func() error {
 			return c.client.CancelAddNode(hostname)
 		})
@@ -262,7 +267,7 @@ func (c *CouchbaseClient) ClusterUUID(m *Member) (string, error) {
 
 	var err error
 	var uuid string
-	err = retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "cluster uuid", c.clusterName,
+	err = retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster uuid", c.clusterName,
 		func() error {
 			uuid, err = c.client.ClusterUUID()
 			return err
@@ -290,7 +295,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	status.UnclusteredNodes = NewMemberSet()
 	status.UnmanagedNodes = []string{}
 
-	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, 5, "cluster status", c.clusterName, func() error {
+	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster status", c.clusterName, func() error {
 		info, err := c.client.ClusterInfo()
 		if err != nil {
 			return err
@@ -344,7 +349,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password, name 
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "node init", name,
+	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "node init", name,
 		func() error {
 			return c.client.NodeInitialize(m.Addr(), dataPath, indexPath)
 		})
@@ -358,7 +363,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password, name 
 		return err
 	}
 
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "cluster init", name,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster init", name,
 		func() error {
 			return c.client.ClusterInitialize(username, password, name, dataMemQuota,
 				indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
@@ -367,7 +372,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password, name 
 
 func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait bool) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "rebalance", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "rebalance", c.clusterName,
 		func() error {
 			status, err := c.client.Rebalance(nodesToRemove)
 			if wait && status != nil {
@@ -387,7 +392,7 @@ func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *cbapi.BucketConfig)
 	}
 
 	// make sure bucket exists
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 60, "create bucket", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "create bucket", c.clusterName,
 		func() error {
 			_, err := c.client.BucketReady(bucket.BucketName)
 			return err
@@ -459,7 +464,7 @@ func (c *CouchbaseClient) GetBucketsToEdit(ms MemberSet, spec *cbapi.ClusterSpec
 
 func (c *CouchbaseClient) SetAutoFailoverTimeout(ms MemberSet, enabled bool, timeout uint64) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 5, "set autofailover timeout", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "set autofailover timeout", c.clusterName,
 		func() error {
 			return c.client.SetAutoFailoverTimeout(enabled, timeout)
 		})
@@ -469,7 +474,7 @@ func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*cbmgr.AutoFail
 	c.client.SetEndpoints(ms.ClientURLs())
 	var settings *cbmgr.AutoFailoverSettings
 
-	return settings, retryutil.RetryOnErr(c.ctx, 5*time.Second, 10, "get autofailover settings", c.clusterName,
+	return settings, retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "get autofailover settings", c.clusterName,
 		func() (e error) {
 			settings, e = c.client.GetAutoFailoverSettings()
 			return e
@@ -504,7 +509,7 @@ func (c *CouchbaseClient) SetSearchMemoryQuota(ms MemberSet, quota int) error {
 func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "upload CA cert", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "upload CA cert", c.clusterName,
 		func() error {
 			return c.client.UploadClusterCACert(pem)
 		})
@@ -513,7 +518,7 @@ func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
 func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, 36, "reload server cert", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "reload server cert", c.clusterName,
 		func() error {
 			return c.client.ReloadNodeCert()
 		})
