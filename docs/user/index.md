@@ -10,6 +10,7 @@
 * [Accessing Couchbase](accessingCouchbase.md)
   * [Using the Couchbase Web Console](adminConsoleAccess.md)
   * [Using couchbase-cli](couchbaseCliGuide.md)
+  * [Using Couchbase clients](couchbaseClients.md)
 * [Running Couchbase on Kubernetes or OpenShift](runningCouchbase.md)
   * [Ad-hoc scale-up and scale-down](scalingCouchbase.md)
   * [Recovering From Node Failure](nodeRecovery.md)
