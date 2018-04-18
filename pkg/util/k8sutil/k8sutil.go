@@ -39,50 +39,58 @@ const (
 
 	// Admin service constants
 	AdminService            = "admin"
-	adminServicePortName    = "cb-admin"
-	adminServicePortNameTLS = "cb-admin-tls"
+	adminServicePortName    = "admin"
+	adminServicePortNameTLS = "admin-tls"
 	adminServicePort        = 8091
 	adminServicePortTLS     = tlsBasePort + adminServicePort
 
 	// View service constants
 	ViewService            = "view"
-	viewServicePortName    = "cb-view"
-	viewServicePortNameTLS = "cb-view-tls"
+	viewServicePortName    = "view"
+	viewServicePortNameTLS = "view-tls"
 	viewServicePort        = 8092
 	viewServicePortTLS     = tlsBasePort + viewServicePort
 
 	// Query service constants
 	QueryService            = "query"
-	queryServicePortName    = "cb-query"
-	queryServicePortNameTLS = "cb-query-tls"
+	queryServicePortName    = "query"
+	queryServicePortNameTLS = "query-tls"
 	queryServicePort        = 8093
 	queryServicePortTLS     = tlsBasePort + queryServicePort
 
 	// Full text search service constants
 	FtsService            = "fts"
-	ftsServicePortName    = "cb-fts"
-	ftsServicePortNameTLS = "cb-fts-tls"
+	ftsServicePortName    = "fts"
+	ftsServicePortNameTLS = "fts-tls"
 	ftsServicePort        = 8094
 	ftsServicePortTLS     = tlsBasePort + ftsServicePort
 
 	// Analytics service constants
 	AnalyticsService            = "analytics"
-	analyticsServicePortName    = "cb-analytics"
-	analyticsServicePortNameTLS = "cb-analytics-tls"
+	analyticsServicePortName    = "analytics"
+	analyticsServicePortNameTLS = "analytics-tls"
 	analyticsServicePort        = 8095
 	analyticsServicePortTLS     = tlsBasePort + analyticsServicePort
 
+	// Eventing service constants
+	EventingService            = "eventing"
+	eventingServicePortName    = "eventing"
+	eventingServicePortNameTLS = "eventing-tls"
+	eventingServicePort        = 8096
+	eventingServicePortTLS     = tlsBasePort + eventingServicePort
+
 	// Data service constants
 	DataService            = "data"
-	dataServicePortName    = "cb-data"
-	dataServicePortNameTLS = "cb-data-tls"
+	dataServicePortName    = "data"
+	dataServicePortNameTLS = "data-tls"
 	dataServicePort        = 11210
 	dataServicePortTLS     = 11207
 
 	// Labels
-	labelApp     = "app"
-	labelCluster = "couchbase_cluster"
-	labelNode    = "couchbase_node"
+	labelApp      = "app"
+	labelCluster  = "couchbase_cluster"
+	labelNode     = "couchbase_node"
+	labelNodeConf = "couchbase_node_conf"
 )
 
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
@@ -294,6 +302,7 @@ var exposedfeatureSets = map[string][]string{
 		QueryService,
 		FtsService,
 		AnalyticsService,
+		EventingService,
 		DataService,
 	},
 }
@@ -643,6 +652,18 @@ var servicePorts = map[string][]v1.ServicePort{
 		{
 			Name:     analyticsServicePortNameTLS,
 			Port:     analyticsServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	},
+	EventingService: []v1.ServicePort{
+		{
+			Name:     eventingServicePortName,
+			Port:     eventingServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     eventingServicePortNameTLS,
+			Port:     eventingServicePortTLS,
 			Protocol: v1.ProtocolTCP,
 		},
 	},

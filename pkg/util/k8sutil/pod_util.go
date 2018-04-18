@@ -207,10 +207,10 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 
 func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
 	labels := map[string]string{
-		"app":                 "couchbase",
-		"couchbase_node":      memberName,
-		"couchbase_node_conf": ns.Name,
-		"couchbase_cluster":   clusterName,
+		labelApp:      "couchbase",
+		labelNode:     memberName,
+		labelNodeConf: ns.Name,
+		labelCluster:  clusterName,
 	}
 
 	for _, s := range ns.Services {
@@ -236,23 +236,33 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 		Image: imageName(baseImage, version),
 		Ports: []v1.ContainerPort{
 			{
-				Name:          "cb-admin",
-				ContainerPort: int32(8091),
+				Name:          adminServicePortName,
+				ContainerPort: int32(adminServicePort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-views",
-				ContainerPort: int32(8092),
+				Name:          viewServicePortName,
+				ContainerPort: int32(viewServicePort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-query",
-				ContainerPort: int32(8093),
+				Name:          queryServicePortName,
+				ContainerPort: int32(queryServicePort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-search",
-				ContainerPort: int32(8094),
+				Name:          ftsServicePortName,
+				ContainerPort: int32(ftsServicePort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsServicePortName,
+				ContainerPort: int32(analyticsServicePort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          eventingServicePortName,
+				ContainerPort: int32(eventingServicePort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
@@ -261,13 +271,13 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-data-ssl",
-				ContainerPort: int32(11207),
+				Name:          dataServicePortNameTLS,
+				ContainerPort: int32(dataServicePortTLS),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-data",
-				ContainerPort: int32(11210),
+				Name:          dataServicePortName,
+				ContainerPort: int32(dataServicePort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
@@ -286,18 +296,33 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-admin-ssl",
-				ContainerPort: int32(18091),
+				Name:          adminServicePortNameTLS,
+				ContainerPort: int32(adminServicePortTLS),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-views-ssl",
-				ContainerPort: int32(18092),
+				Name:          viewServicePortNameTLS,
+				ContainerPort: int32(viewServicePortTLS),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-query-ssl",
-				ContainerPort: int32(18093),
+				Name:          queryServicePortNameTLS,
+				ContainerPort: int32(queryServicePortTLS),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          ftsServicePortNameTLS,
+				ContainerPort: int32(ftsServicePortTLS),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsServicePortNameTLS,
+				ContainerPort: int32(analyticsServicePortTLS),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          eventingServicePortNameTLS,
+				ContainerPort: int32(eventingServicePortTLS),
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
@@ -310,7 +335,7 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 func PodWithAntiAffinity(pod *v1.Pod, clusterName string) *v1.Pod {
 	// set pod anti-affinity with the pods that belongs to the same couchbase cluster
 	ls := &metav1.LabelSelector{MatchLabels: map[string]string{
-		"couchbase_cluster": clusterName,
+		labelCluster: clusterName,
 	}}
 	return podWithAntiAffinity(pod, ls)
 }
