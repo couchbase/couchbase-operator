@@ -25,6 +25,8 @@ $(BINARY): $(SOURCE)
 	./scripts/codegen/update-generated.sh
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopctl ./cmd/cbopctl/
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/crdgen ./cmd/crdgen/
+	build/bin/crdgen -outfile example/crd.yaml
 
 container: build
 	docker build -t couchbase/couchbase-operator:v1 .
@@ -37,6 +39,7 @@ prod: container
 	cp -r build/darwin $(ARTIFACTS)
 	cp -r build/linux $(ARTIFACTS)
 	cp -r build/windows $(ARTIFACTS)
+	cp example/crd.yaml $(ARTIFACTS)/crd.yaml
 	cp example/couchbase-cluster.yaml $(ARTIFACTS)/couchbase-cluster.yaml
 	cp example/deployment.yaml $(ARTIFACTS)/operator.yaml
 	cp example/couchbase-cli-collect-logs.yaml $(ARTIFACTS)/couchbase-cli-collect-logs.yaml

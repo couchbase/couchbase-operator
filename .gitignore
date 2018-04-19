@@ -11,3 +11,4 @@
 /vendor/
 /pkg/generated/
 /test/e2e/logs/
+example/crd.yaml
