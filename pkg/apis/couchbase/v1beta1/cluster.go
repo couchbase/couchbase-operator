@@ -111,11 +111,17 @@ type ClusterSpec struct {
 
 	// Enables software update notifications in the UI
 	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications"`
+
 	// VolumeClaimTemplates define the desired characteristics of a volume
 	// that can be requested/claimed by a pod.
 	// When specified, each claim should map to the name of a volumeMount
 	// defined in a PodPolicy
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates"`
+
+	// ServerGroups define the set of availability zones we want to distribute
+	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
+	// nodes, but use a specific subset for a particular Couchbase cluster.
+	ServerGroups []string `json:"serverGroups"`
 }
 
 type ClusterConfig struct {
@@ -320,6 +326,10 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 	bucketsToRemove := MissingItems(existingBuckets, specBuckets)
 
 	return bucketsToAdd, bucketsToRemove
+}
+
+func (cs *ClusterSpec) ServerGroupsEnabled() bool {
+	return cs.ServerGroups != nil && len(cs.ServerGroups) > 0
 }
 
 func (c *BucketConfig) Equals(other *BucketConfig) bool {

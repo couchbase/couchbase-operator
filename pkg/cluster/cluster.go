@@ -201,6 +201,10 @@ func (c *Cluster) create() error {
 		return err
 	}
 
+	if err := c.initMemberServerGroups(m); err != nil {
+		return err
+	}
+
 	uuid, err := c.client.ClusterUUID(m)
 	if err != nil {
 		return err
@@ -372,7 +376,7 @@ func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig
 		version = c.status.UpgradeStatus.TargetVersion
 	}
 
-	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, m, c.cluster.Spec, version, serverSpec, c.cluster.AsOwner())
+	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.cluster, m, version, serverSpec)
 	return err
 }
 

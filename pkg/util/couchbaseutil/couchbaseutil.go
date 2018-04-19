@@ -570,6 +570,21 @@ func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) er
 	return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
 }
 
+func (c *CouchbaseClient) GetServerGroups(ms MemberSet) (*cbmgr.ServerGroups, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetServerGroups()
+}
+
+func (c *CouchbaseClient) CreateServerGroup(ms MemberSet, name string) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.CreateServerGroup(name)
+}
+
+func (c *CouchbaseClient) UpdateServerGroups(ms MemberSet, revision string, groups *cbmgr.ServerGroupsUpdate) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.UpdateServerGroups(revision, groups)
+}
+
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	rv := &cbmgr.Bucket{
 		BucketName:        config.BucketName,

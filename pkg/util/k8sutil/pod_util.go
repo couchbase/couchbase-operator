@@ -2,6 +2,7 @@ package k8sutil
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
@@ -9,6 +10,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -20,24 +23,30 @@ const (
 	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
 	CouchbaseVolumeMountDataDir     = "/mnt/data"
 	CouchbaseVolumeMountIndexDir    = "/mnt/index"
+	serverGroupLabel                = "server-group.couchbase.com/zone"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(kubeCli kubernetes.Interface, namespace string, clusterName string, m *couchbaseutil.Member, cs cbapi.ClusterSpec, version string, config cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
+func CreateCouchbasePod(kubeCli kubernetes.Interface, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig) (*v1.Pod, error) {
 
-	pod, err := createCouchbasePodSpec(m, clusterName, cs, version, config, owner)
+	pod, err := createCouchbasePodSpec(m, cluster.Name, cluster.Spec, version, config, cluster.AsOwner())
 	if err != nil {
 		return nil, err
 	}
 
 	if config.GetDefaultVolumeClaim() != nil {
-		pod, err = addPodVolumes(kubeCli, pod, namespace, clusterName, cs, config, owner)
+		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, cluster.AsOwner())
 		if err != nil {
 			return nil, err
 		}
 	}
-	return CreatePod(kubeCli, namespace, pod)
+
+	if err := schedulePod(kubeCli, cluster, pod); err != nil {
+		return nil, err
+	}
+
+	return CreatePod(kubeCli, cluster.Namespace, pod)
 }
 
 // Add a persistent volume to the pod spec for each volumeMount.
@@ -210,6 +219,66 @@ func listMemberPVCS(kubeCli kubernetes.Interface, memberName, clusterName, names
 // ie...: pvc-data-cb-example-0000-00-default, pvc-data-cb-example-0000-01-index
 func NameForPersistentVolumeClaim(claimName string, memberName string, index int, mountName cbapi.VolumeMountName) string {
 	return fmt.Sprintf("pvc-%s-%s-%02d-%s", claimName, memberName, index, mountName)
+}
+
+// schedulePod applies the necessary node selectors if a user has set the
+// set of server groups
+func schedulePod(kubeCli kubernetes.Interface, cluster *cbapi.CouchbaseCluster, pod *v1.Pod) error {
+	// Nothing defined, let the chips land where they may
+	if !cluster.Spec.ServerGroupsEnabled() {
+		return nil
+	}
+
+	// List all pods in our cluster
+	clusterRequirement, err := labels.NewRequirement(labelCluster, selection.Equals, []string{cluster.Name})
+	if err != nil {
+		return err
+	}
+	selector := labels.NewSelector()
+	selector = selector.Add(*clusterRequirement)
+	existingPods, err := kubeCli.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return err
+	}
+
+	// Map from server group to pods
+	serverGroupPodMap := map[string][]*v1.Pod{}
+	for _, serverGroup := range cluster.Spec.ServerGroups {
+		serverGroupPodMap[serverGroup] = []*v1.Pod{}
+	}
+	for _, existingPod := range existingPods.Items {
+		serverGroup, ok := existingPod.Spec.NodeSelector[serverGroupLabel]
+		if !ok {
+			return fmt.Errorf("pod %s does not have server group selector", existingPod.Name)
+		}
+		if _, ok := serverGroupPodMap[serverGroup]; !ok {
+			return fmt.Errorf("pod %s has undefined server group selector", existingPod.Name)
+		}
+		serverGroupPodMap[serverGroup] = append(serverGroupPodMap[serverGroup], &existingPod)
+	}
+
+	// Select the server groups with the fewest pods
+	smallestSize := int(^uint(0) >> 1)
+	var smallestServerGroups []string
+	for serverGroup, pods := range serverGroupPodMap {
+		size := len(pods)
+		if size < smallestSize {
+			smallestSize = size
+			smallestServerGroups = []string{}
+		}
+		if size == smallestSize {
+			smallestServerGroups = append(smallestServerGroups, serverGroup)
+		}
+	}
+
+	// Deterministically select the server group to create the pod in
+	sort.Strings(smallestServerGroups)
+	if _, ok := pod.Spec.NodeSelector[serverGroupLabel]; !ok {
+		pod.Spec.NodeSelector = map[string]string{}
+	}
+	pod.Spec.NodeSelector[serverGroupLabel] = smallestServerGroups[0]
+
+	return nil
 }
 
 // Couchbase pod spec with default configuration

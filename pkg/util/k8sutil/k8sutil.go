@@ -564,8 +564,12 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, cluster *cbapi.Couchbas
 	return ret, nil
 }
 
+func GetPod(kubecli kubernetes.Interface, ns, name string) (*v1.Pod, error) {
+	return kubecli.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
+}
+
 func GetHostIP(kubecli kubernetes.Interface, ns, name string) (string, error) {
-	pod, err := kubecli.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
+	pod, err := GetPod(kubecli, ns, name)
 	if err != nil {
 		return "", err
 	}
@@ -573,6 +577,18 @@ func GetHostIP(kubecli kubernetes.Interface, ns, name string) (string, error) {
 		return "", fmt.Errorf("host IP unset, pod not scheduled")
 	}
 	return pod.Status.HostIP, nil
+}
+
+func GetServerGroup(kubecli kubernetes.Interface, ns, name string) string {
+	pod, err := GetPod(kubecli, ns, name)
+	if err != nil {
+		return ""
+	}
+	if pod.Spec.NodeSelector == nil {
+		return ""
+	}
+	serverGroup, _ := pod.Spec.NodeSelector[serverGroupLabel]
+	return serverGroup
 }
 
 func GetSecret(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Secret, error) {

@@ -14,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/gocbmgr"
 	"k8s.io/api/core/v1"
 )
@@ -207,6 +208,10 @@ func (c *Cluster) addMember(serverSpec api.ServerConfig) (*couchbaseutil.Member,
 
 	c.logger.Infof("added member (%s)", newMember.Name)
 	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name, c.cluster))
+
+	if err := c.initMemberServerGroups(newMember); err != nil {
+		return newMember, err
+	}
 
 	return newMember, nil
 }
@@ -567,6 +572,86 @@ func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) err
 		}
 	}
 	return nil
+}
+
+// initMemberServerGroups looks at the cluster specification, if we have enabled
+// server groups, lookup the availability zone the member is in, create the server
+// group if it doesn't exist and add the member to the group
+func (c *Cluster) initMemberServerGroups(member *couchbaseutil.Member) error {
+	// Cluster not server group aware
+	if !c.cluster.Spec.ServerGroupsEnabled() {
+		return nil
+	}
+
+	// Extract the scheduled server group
+	serverGroup := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, member.Name)
+	if serverGroup == "" {
+		return fmt.Errorf("server group unset for pod %s", member.Name)
+	}
+
+	// Get a list of existing server groups, adding a new one if required to
+	// allow the addition of the new member
+	groups, err := c.client.GetServerGroups(c.members)
+	if err != nil {
+		return err
+	}
+	if groups.GetServerGroup(serverGroup) == nil {
+		if err := c.client.CreateServerGroup(c.members, serverGroup); err != nil {
+			return err
+		}
+
+		// 409s have been seen due to this not being updated quick enough, ensure the
+		// new server group exists before continuing
+		err := retryutil.Retry(c.ctx, 5*time.Second, couchbaseutil.RetryCount, func() (bool, error) {
+			groups, err = c.client.GetServerGroups(c.members)
+			if err != nil {
+				return false, err
+			}
+			return groups.GetServerGroup(serverGroup) != nil, nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Pass 1: Take the existing configuration and copy over into an update
+	// request.  When we hit the member we are adding ignore it, the target
+	// server group may not have been processed yet.
+	var newNode *cbmgr.NodeInfo = nil
+	newGroups := cbmgr.ServerGroupsUpdate{
+		Groups: []cbmgr.ServerGroupUpdate{},
+	}
+	for _, group := range groups.Groups {
+		newGroup := cbmgr.ServerGroupUpdate{
+			Name:  group.Name,
+			URI:   group.URI,
+			Nodes: []cbmgr.ServerGroupUpdateOTPNode{},
+		}
+		for _, node := range group.Nodes {
+			if node.HostName == member.HostURLPlaintext() {
+				newNode = &node
+				continue
+			}
+			otpNode := cbmgr.ServerGroupUpdateOTPNode{
+				OTPNode: node.OTPNode,
+			}
+			newGroup.Nodes = append(newGroup.Nodes, otpNode)
+		}
+		newGroups.Groups = append(newGroups.Groups, newGroup)
+	}
+
+	// Pass 2: Find the target server group and add the new member to it
+	for index, group := range newGroups.Groups {
+		if group.Name == serverGroup {
+			otpNode := cbmgr.ServerGroupUpdateOTPNode{
+				OTPNode: newNode.OTPNode,
+			}
+			newGroups.Groups[index].Nodes = append(newGroups.Groups[index].Nodes, otpNode)
+			break
+		}
+	}
+
+	return c.client.UpdateServerGroups(c.members, groups.GetRevision(), &newGroups)
 }
 
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate

@@ -555,7 +555,7 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 
 	for _, config := range cl.Spec.ServerSettings {
 		if config.Name == m.ServerConfig {
-			pod, err := k8sutil.CreateCouchbasePod(kubeCli, namespace, clusterName, m, cl.Spec, cl.Status.CurrentVersion, config, cl.AsOwner())
+			pod, err := k8sutil.CreateCouchbasePod(kubeCli, cl, m, cl.Status.CurrentVersion, config)
 			if err != nil {
 				return nil, err
 			}
