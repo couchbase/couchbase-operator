@@ -62,10 +62,10 @@ On Kubernetes:
 [source,console]
 ----
 # replicasets created by couchbase-operator deployment
-$ kubectl describe rs -lname=couchbase-operator
+$ kubectl describe rs -lapp=couchbase-operator
 
 # pods created by the deployments replicaset
-$ kubectl describe pods -lname=couchbase-operator
+$ kubectl describe pods -lapp=couchbase-operator
 Name:		couchbase-operator-1917615544-8kgw9
 Status:		Running
 IP:		172.17.0.3
@@ -81,10 +81,10 @@ On OpenShift:
 [source,console]
 ----
 # replicasets created by couchbase-operator deployment
-$ oc describe rs -lname=couchbase-operator
+$ oc describe rs -lapp=couchbase-operator
 
 # pods created by the deployments replicaset
-$ oc describe pods -lname=couchbase-operator
+$ oc describe pods -lapp=couchbase-operator
 Name:		couchbase-operator-1917615544-8kgw9
 Status:		Running
 IP:		172.17.0.3

@@ -4,10 +4,13 @@ metadata:
   name: couchbase-operator
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: couchbase-operator
   template:
     metadata:
       labels:
-        name: couchbase-operator
+        app: couchbase-operator
     spec:
       containers:
       - name: couchbase-operator
