@@ -528,7 +528,7 @@ func WaitUntilEventsCompare(t *testing.T, kubecli kubernetes.Interface, retries 
 	return nil
 }
 
-func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, conditionType api.ClusterConditionType, message string) error {
+func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, conditionType api.ClusterConditionType, messageList ...string) error {
 	interval := 5 * time.Second
 	err := retryutil.Retry(interval, retries, func() (done bool, err error) {
 		cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
@@ -536,12 +536,13 @@ func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries
 			return false, err
 		}
 		for _, condition := range cluster.Status.Conditions {
-			if condition.Type == conditionType && strings.Contains(condition.Message, message) {
-				return true, nil
-			} else {
-				t.Logf("condition: %v, message: %v", condition.Type, condition.Message)
+			for _, message := range messageList {
+				if condition.Type == conditionType && strings.Contains(condition.Message, message) {
+					return true, nil
+				} else {
+					t.Logf("condition: %v, message: %v", condition.Type, condition.Message)
+				}
 			}
-
 		}
 		t.Logf("conditions: %v", cluster.Status.Conditions)
 		return false, nil

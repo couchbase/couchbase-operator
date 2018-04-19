@@ -258,7 +258,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 		}
 
 		for _, param := range test.paramsIn {
-			t.Log("setting parameter: %+v", param)
+			t.Logf("setting parameter: %+v", param)
 			err = SetClusterParameter(testCouchbase, param)
 			if err != nil {
 				t.Logf("error: %v", err)
@@ -326,7 +326,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
-				_, err = e2eutil.WaitPodsDeleted(f.KubeClient, ns, 10, metav1.ListOptions{LabelSelector: "app=couchbase"})
+				_, err = e2eutil.WaitPodsDeleted(f.KubeClient, ns, e2eutil.Retries10, metav1.ListOptions{LabelSelector: "app=couchbase"})
 				if err != nil {
 					failures = append(failures, failure{testName: test.name, testError: err})
 					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
@@ -341,7 +341,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 				}
 				testCouchbase = &clusters.Items[0]
 				for _, param := range test.paramsOut {
-					t.Log("verifying parameter: %+v", param)
+					t.Logf("verifying parameter: %+v", param)
 					err = VerifyClusterParameter(testCouchbase, param)
 					if err != nil {
 						failures = append(failures, failure{testName: test.name, testError: err})

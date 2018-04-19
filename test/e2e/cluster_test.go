@@ -309,8 +309,9 @@ func TestNegEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to reject change for cluster data service mem quota: %v", err)
 	}
 
-	message := "memoryQuota - The kv service quota (0MB) cannot be less than 256MB (current total buckets quota, or at least 256MB)"
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageConfig, message)
+	ver5_1_0_msg := "memoryQuota - The kv service quota (0MB) cannot be less than 256MB (current total buckets quota, or at least 256MB)"
+	ver5_5_0_msg := "memoryQuota - The data service quota (0MB) cannot be less than 256MB (current total buckets quota, or at least 256MB)."
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, ver5_1_0_msg, ver5_5_0_msg)
 	if err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
 	}
@@ -339,7 +340,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to reject change for cluster index service mem quota: %v", err)
 	}
 
-	message = "indexMemoryQuota - The index service quota (0MB) cannot be less than 256MB"
+	message := "indexMemoryQuota - The index service quota (0MB) cannot be less than 256MB"
 	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageConfig, message)
 	if err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
@@ -369,8 +370,9 @@ func TestNegEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to reject change cluster for search service mem quota: %v", err)
 	}
 
-	message = "The fts service quota (0MB) cannot be less than 256MB"
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageConfig, message)
+	ver5_1_0_msg = "The fts service quota (0MB) cannot be less than 256MB"
+	ver5_5_0_msg = "ftsMemoryQuota - The full text search service quota (0MB) cannot be less than 256MB."
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, ver5_1_0_msg, ver5_5_0_msg)
 	if err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
 	}
@@ -400,7 +402,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	}
 
 	message = "Unable to set autofailover timeout to 0"
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageConfig, message)
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, message)
 	if err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
 	}
@@ -430,7 +432,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	}
 
 	message = "storageMode - Changing the optimization mode of global indexes is not supported when index service nodes are present in the cluster"
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageConfig, message)
+	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, message)
 	if err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
 	}
@@ -537,7 +539,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	}
 
 	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
-	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found")  {
+	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found") {
 		t.Fatalf("container status error: %s", reason)
 	}
 
@@ -595,7 +597,7 @@ func TestInvalidVersion(t *testing.T) {
 	}
 
 	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
-	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found")  {
+	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found") {
 		t.Fatalf("container status error: %s", reason)
 	}
 
