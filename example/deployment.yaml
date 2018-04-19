@@ -12,6 +12,11 @@ spec:
       containers:
       - name: couchbase-operator
         image: couchbase/couchbase-operator:v1
+        command:
+        - couchbase-operator
+        # Remove the arguments section if you are installing the CRD manually
+        args:
+        - -create-crd
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:

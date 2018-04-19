@@ -48,6 +48,7 @@ type Config struct {
 	MasterHost     string
 	Namespace      string
 	ServiceAccount string
+	CreateCrd      bool
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
 }
@@ -62,17 +63,19 @@ func New(cfg Config) *Controller {
 
 func (c *Controller) Start() {
 
-	for {
-		err := c.initResource()
-		if err == nil {
-			break
+	if c.Config.CreateCrd {
+		for {
+			err := c.initResource()
+			if err == nil {
+				break
+			}
+			c.logger.Errorf("Initialization failed: %v", err)
+			c.logger.Infof("Retry initialization in %v...", initRetryWaitTime)
+			time.Sleep(initRetryWaitTime)
 		}
-		c.logger.Errorf("Initialization failed: %v", err)
-		c.logger.Infof("Retry initialization in %v...", initRetryWaitTime)
-		time.Sleep(initRetryWaitTime)
-	}
 
-	c.logger.Infof("CRD initialized, listening for events...")
+		c.logger.Infof("CRD initialized, listening for events...")
+	}
 	probe.SetReady()
 
 	sdk.Initialize()

@@ -36,6 +36,7 @@ var (
 	listenAddr   string
 	name         string
 	namespace    string
+	createCrd    bool
 	printVersion bool
 
 	chaosLevel int
@@ -47,6 +48,7 @@ var (
 func init() {
 	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
 	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
+	flag.BoolVar(&createCrd, "create-crd", false, "Create the crd if it does not exist")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
@@ -131,6 +133,7 @@ func newControllerConfig() controller.Config {
 		ServiceAccount: serviceAccount,
 		KubeCli:        kubecli,
 		CouchbaseCRCli: client.MustNewInCluster(),
+		CreateCrd:      createCrd,
 	}
 
 	return cfg
