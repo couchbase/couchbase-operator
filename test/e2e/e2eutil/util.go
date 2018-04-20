@@ -427,6 +427,11 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
 
+	jobs, err := kubeClient.BatchV1().Jobs(namespace).List(metav1.ListOptions{})
+	for _, job := range jobs.Items {
+		kubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+	}
+
 	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Logf("Error: %v", err)

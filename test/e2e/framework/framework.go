@@ -116,7 +116,12 @@ func Teardown() error {
 		return err
 	}
 
-	err := e2eutil.DeleteSecret(Global.KubeClient, Global.Namespace, Global.DefaultSecret.Name, &metav1.DeleteOptions{})
+	jobs, err := Global.KubeClient.BatchV1().Jobs(Global.Namespace).List(metav1.ListOptions{})
+	for _, job := range jobs.Items {
+		Global.KubeClient.BatchV1().Jobs(Global.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+	}
+
+	err = e2eutil.DeleteSecret(Global.KubeClient, Global.Namespace, Global.DefaultSecret.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("Unable to delete the default secret: %v", err)
 	}
@@ -146,6 +151,12 @@ func Teardown() error {
 
 func (f *Framework) setup() error {
 	logrus.Info("cleaning up namespace before deployment")
+
+	jobs, err := f.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
+	for _, job := range jobs.Items {
+		f.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+	}
+
 	deployments, err := f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
 	for _, deployment := range deployments.Items {
 		Global.DeleteCouchbaseOperatorCompletely(deployment.GetName())

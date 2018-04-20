@@ -123,6 +123,15 @@ func TestCRDValidation(t *testing.T) {
 	}
 }
 
+func TestSystem(t *testing.T) {
+	testResults := []testResult{}
+	// create
+	testResults = append(testResults, testResult{"TestFeaturesAll", t.Run("TestFeaturesAll", TestFeaturesAll)})
+	if AnalyzeResults(t, testResults) {
+		t.Fatalf("suite contains failures")
+	}
+}
+
 func TestAll(t *testing.T) {
 	testResults := []testResult{}
 	// basic tests
