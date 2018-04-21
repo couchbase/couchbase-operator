@@ -194,6 +194,20 @@ func CreateJob(t *testing.T, f *framework.Framework, jobSpec *batchv1.Job) (*bat
 	return job
 }
 
+func NewBucket(name string) (map[string]string){
+	return map[string]string{
+		"bucketName":         name,
+		"bucketType":         "couchbase",
+		"bucketMemoryQuota":  "100",
+		"bucketReplicas":     "1",
+		"ioPriority":         "high",
+		"evictionPolicy":     "fullEviction",
+		"conflictResolution": "seqno",
+		"enableFlush":        "true",
+		"enableIndexReplica": "false",
+	}
+}
+
 // runs a system test based on a sysTestDef
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
@@ -213,117 +227,16 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
 		"indexPath": "/opt/couchbase/var/lib/couchbase/data",
 	}
-	bucketConfig1 := map[string]string{
-		"bucketName":         "default",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-
-	bucketConfig2 := map[string]string{
-		"bucketName":         "CUSTOMER",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig3 := map[string]string{
-		"bucketName":         "DISTRICT",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig4 := map[string]string{
-		"bucketName":         "HISTORY",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig5 := map[string]string{
-		"bucketName":         "WAREHOUSE",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig6 := map[string]string{
-		"bucketName":         "ITEM",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig7 := map[string]string{
-		"bucketName":         "NEW_ORDER",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig8 := map[string]string{
-		"bucketName":         "ORDERS",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig9 := map[string]string{
-		"bucketName":         "ORDER_LINE",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-	bucketConfig10 := map[string]string{
-		"bucketName":         "STOCK",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
+	bucketConfig1 := NewBucket("default")
+	bucketConfig2 := NewBucket("CUSTOMER")
+	bucketConfig3 := NewBucket("DISTRICT")
+	bucketConfig4 := NewBucket("HISTORY")
+	bucketConfig5 := NewBucket("WAREHOUSE")
+	bucketConfig6 := NewBucket("ITEM")
+	bucketConfig7 := NewBucket("NEW_ORDER")
+	bucketConfig8 := NewBucket("ORDERS")
+	bucketConfig9 := NewBucket("ORDER_LINE")
+	bucketConfig10 := NewBucket("STOCK")
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
@@ -345,7 +258,9 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		t.Logf("cluster: %+v", testCouchbase)
 		t.Fatalf("failed to create cluster %+v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+	if !f.SkipTeardown {
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+	}
 
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
@@ -425,6 +340,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	jobStatus := <- singleResults
 	CheckJob(t, jobStatus)
 	DeleteJob(t, f, jobStatus)
+	time.Sleep(5 * time.Second)
 
 	rbacOp = operation{
 		name: "create-user",
@@ -463,12 +379,13 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 				t.Logf("got results from %v \n", result["jobName"])
 				CheckJob(t, result)
 				DeleteJob(t, f, result)
-				if len(jobList) == 0 && i == len(testDef.ops) {
-					break innerLoop
-				}
+				delete(jobList, result["jobName"])
 				time.Sleep(1 * time.Second)
 			//launch next job if any left
 			default:
+				if len(jobList) == 0 && i == len(testDef.ops) {
+					break innerLoop
+				}
 				if i < len(testDef.ops) {
 					op := testDef.ops[i]
 					jobSpec := CreateJobSpec(op)
@@ -487,9 +404,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 					}
 					i = i + 1
 				}
-				if len(jobList) == 0 && i == len(testDef.ops) {
-					break innerLoop
-				}
+
 				time.Sleep(1 * time.Second)
 			}
 		}

@@ -39,8 +39,9 @@ type Framework struct {
 	DefaultSecret *v1.Secret
 	config        *rest.Config
 	LogDir        string
-	//S3Cli      *s3.S3
-	//S3Bucket   string
+	SkipTeardown  bool
+	//S3Cli         *s3.S3
+	//S3Bucket      string
 }
 
 // Setup setups a test framework and points "Global" to it.
@@ -49,6 +50,7 @@ func Setup() error {
 	opImage := flag.String("operator-image", "", "operator image, e.g. couchbase/couchbase-operator")
 	deploymentSpec := flag.String("deployment-spec", "", "deployment spec, eg. $PWD/example/deployment.yaml")
 	ns := flag.String("namespace", "default", "e2e test namespace")
+	skipTearDown := flag.Bool("skip-teardown", false, "skip teardown after tests")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -107,11 +109,15 @@ func Setup() error {
 		config:     config,
 		//S3Bucket:   os.Getenv("TEST_S3_BUCKET"),
 		LogDir: logDir,
+		SkipTeardown: *skipTearDown,
 	}
 	return Global.setup()
 }
 
 func Teardown() error {
+	if Global.SkipTeardown {
+		return nil
+	}
 	if err := Global.DeleteCouchbaseOperatorCompletely(Global.Deployment.GetName()); err != nil {
 		return err
 	}

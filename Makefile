@@ -79,8 +79,7 @@ test-cbopctl:
 test-system:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run TestSystem -v -timeout 4320m \
 		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec)
-
+		--namespace $(namespace) --deployment-spec $(deploymentSpec) --skip-teardown
 
 test-indv:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run $(testname) \
