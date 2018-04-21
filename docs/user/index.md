@@ -2,6 +2,9 @@
 
 * [Overview](overview.md)
 * [Prerequisites and Setup](prerequisiteAndSetup.md)
+  * [Kubernetes Setup](installKubernetes.md)
+  * [Kubernetes Setup (RBAC Disabled)](installKubernetesNoRBAC.md)
+  * [OpenShift Setup](installOpenShift.md)
   * [Operator Configuration](operatorConfig.md)
 * [Deploying a Couchbase Cluster](deployingCouchbase.md)
   * [CouchbaseCluster Configuration](couchbaseClusterConfig.md)
