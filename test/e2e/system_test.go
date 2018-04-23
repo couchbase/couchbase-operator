@@ -167,7 +167,7 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 				results <- jobInfo
 				return
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(3 * time.Second)
 		}
 	}
 }
@@ -214,10 +214,10 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// cluster configuration, 10 buckets, 4 nodes, all services
 	clusterConfig := map[string]string{
-		"dataServiceMemQuota":   "2000",
+		"dataServiceMemQuota":   "3000",
 		"indexServiceMemQuota":  "1000",
-		"searchServiceMemQuota": "256",
-		"indexStorageSetting":   "memory_optimized",
+		"searchServiceMemQuota": "1000",
+		"indexStorageSetting":   "plasma",
 		"autoFailoverTimeout":   "120",
 	}
 	serviceConfig1 := map[string]string{
@@ -340,7 +340,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	jobStatus := <- singleResults
 	CheckJob(t, jobStatus)
 	DeleteJob(t, f, jobStatus)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	rbacOp = operation{
 		name: "create-user",
@@ -357,6 +357,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	jobStatus = <- singleResults
 	CheckJob(t, jobStatus)
 	DeleteJob(t, f, jobStatus)
+	time.Sleep(3 * time.Second)
 
 	// run the system test
 	to := time.After(time.Duration(testDef.days * 24 * 60 * 60) * time.Second)
@@ -380,7 +381,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 				CheckJob(t, result)
 				DeleteJob(t, f, result)
 				delete(jobList, result["jobName"])
-				time.Sleep(1 * time.Second)
+				time.Sleep(3 * time.Second)
 			//launch next job if any left
 			default:
 				if len(jobList) == 0 && i == len(testDef.ops) {
@@ -405,7 +406,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 					i = i + 1
 				}
 
-				time.Sleep(1 * time.Second)
+				time.Sleep(3 * time.Second)
 			}
 		}
 		// make sure cluster is healthy before running next cycle
