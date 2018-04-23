@@ -218,7 +218,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		"indexServiceMemQuota":  "1000",
 		"searchServiceMemQuota": "256",
 		"indexStorageSetting":   "memory_optimized",
-		"autoFailoverTimeout":   "10",
+		"autoFailoverTimeout":   "120",
 	}
 	serviceConfig1 := map[string]string{
 		"size":      "4",
