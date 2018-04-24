@@ -300,26 +300,22 @@ func TestNegEditClusterSettings(t *testing.T) {
 	// edit cluster dataServiceMemQuota
 	newDataServiceMemQuota := "0"
 	t.Log("Changing cluster data service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
-		t.Fatal(err)
+	_, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
+	if err == nil {
+		t.Fatalf("failed to reject invalid service size: %v", err)
+	}
+	if !strings.Contains(err.Error(), "spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256") {
+		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
 	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier)
 	if err == nil {
 		t.Fatalf("failed to reject change for cluster data service mem quota: %v", err)
 	}
 
-	ver5_1_0_msg := "memoryQuota - The kv service quota (0MB) cannot be less than 256MB (current total buckets quota, or at least 256MB)"
-	ver5_5_0_msg := "memoryQuota - The data service quota (0MB) cannot be less than 256MB (current total buckets quota, or at least 256MB)."
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, ver5_1_0_msg, ver5_5_0_msg)
-	if err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
-	}
-
 	// revert edit cluster dataServiceMemQuota
 	newDataServiceMemQuota = "256"
 	t.Log("Changing cluster data service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
+	_, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,19 +327,16 @@ func TestNegEditClusterSettings(t *testing.T) {
 	// edit cluster indexServiceMemQuota
 	newIndexServiceMemQuota := "0"
 	t.Log("Changing cluster index service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
-		t.Fatal(err)
+	_, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
+	if err == nil {
+		t.Fatalf("failed to reject invalid service size: %v", err)
+	}
+	if !strings.Contains(err.Error(), "spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256") {
+		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
 	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier)
 	if err == nil {
 		t.Fatalf("failed to reject change for cluster index service mem quota: %v", err)
-	}
-
-	message := "indexMemoryQuota - The index service quota (0MB) cannot be less than 256MB"
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, 10, testCouchbase, api.ClusterConditionManageConfig, message)
-	if err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
 	}
 
 	// revert edit cluster indexServiceMemQuota
@@ -361,26 +354,23 @@ func TestNegEditClusterSettings(t *testing.T) {
 	// edit cluster searchServiceMemQuota
 	newSearchServiceMemQuota := "0"
 	t.Log("Changing cluster search service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
-		t.Fatal(err)
+	_, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
+	if err == nil {
+		t.Fatalf("failed to reject invalid service size: %v", err)
+	}
+	if !strings.Contains(err.Error(), "spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256") {
+		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
 	err = e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier)
 	if err == nil {
 		t.Fatalf("failed to reject change cluster for search service mem quota: %v", err)
 	}
 
-	ver5_1_0_msg = "The fts service quota (0MB) cannot be less than 256MB"
-	ver5_5_0_msg = "ftsMemoryQuota - The full text search service quota (0MB) cannot be less than 256MB."
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, ver5_1_0_msg, ver5_5_0_msg)
-	if err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
-	}
 
 	// revert edit cluster searchServiceMemQuota
 	newSearchServiceMemQuota = "256"
 	t.Log("Changing cluster search service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
+	_, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,25 +382,22 @@ func TestNegEditClusterSettings(t *testing.T) {
 	// edit cluster autoFailoverTimeout
 	newAutoFailoverTimeout := "0"
 	t.Log("Changing cluster autofailover timeout")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, f.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
-		t.Fatal(err)
+	_, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, f.CRClient, testCouchbase, e2eutil.Retries5)
+	if err == nil {
+		t.Fatalf("failed to reject invalid service size: %v", err)
+	}
+	if !strings.Contains(err.Error(), "spec.cluster.autoFailoverTimeout in body should be greater than or equal to 1") {
+		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
 	err = e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier)
 	if err == nil {
 		t.Fatalf("failed to reject change for cluster autofailover timeout: %v", err)
 	}
 
-	message = "Unable to set autofailover timeout to 0"
-	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, message)
-	if err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
-	}
-
 	// revert edit cluster autoFailoverTimeout
 	newAutoFailoverTimeout = "10"
 	t.Log("Changing cluster autofailover timeout")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, f.CRClient, testCouchbase, e2eutil.Retries5)
+	_, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +409,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	// edit cluster indexStorageSetting
 	newIndexStorageSetting := "plasma"
 	t.Log("Changing cluster index storage setting")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, f.CRClient, testCouchbase, e2eutil.Retries5)
+	_, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +418,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to reject change for cluster indexer storage setting: %v", err)
 	}
 
-	message = "storageMode - Changing the optimization mode of global indexes is not supported when index service nodes are present in the cluster"
+	message := "storageMode - Changing the optimization mode of global indexes is not supported when index service nodes are present in the cluster"
 	err = e2eutil.WaitForConditionMessage(t, f.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, message)
 	if err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
@@ -440,7 +427,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	// revert edit cluster indexStorageSetting
 	newIndexStorageSetting = "memory_optimized"
 	t.Log("Changing cluster index storage setting")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, f.CRClient, testCouchbase, e2eutil.Retries5)
+	_, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, f.CRClient, testCouchbase, e2eutil.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
