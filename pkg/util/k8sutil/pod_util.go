@@ -25,6 +25,11 @@ const (
 	CouchbaseVolumeMountIndexDir    = "/mnt/index"
 )
 
+var (
+	defaultSecurityContextUid          int64 = 1000
+	defaultSecurityContextRunAsNonRoot bool  = true
+)
+
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
 func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig) (*v1.Pod, error) {
@@ -117,6 +122,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 	if err != nil {
 		return pod, err
 	}
+
 	container.VolumeMounts = mounts
 	return pod, nil
 }
@@ -251,6 +257,15 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 		container = containerWithRequirements(container, ns.Pod.Resources)
 	}
 
+	securityContext := cs.SecurityContext
+	if securityContext == nil {
+		securityContext = &v1.PodSecurityContext{
+			FSGroup:      &defaultSecurityContextUid,
+			RunAsUser:    &defaultSecurityContextUid,
+			RunAsNonRoot: &defaultSecurityContextRunAsNonRoot,
+		}
+	}
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        m.Name,
@@ -266,7 +281,8 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 				{Name: couchbaseVolumeName,
 					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 			},
-			NodeSelector: map[string]string{},
+			NodeSelector:    map[string]string{},
+			SecurityContext: securityContext,
 		},
 	}
 	if cs.AntiAffinity {

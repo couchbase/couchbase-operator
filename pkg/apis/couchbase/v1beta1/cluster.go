@@ -122,6 +122,9 @@ type ClusterSpec struct {
 	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
 	// nodes, but use a specific subset for a particular Couchbase cluster.
 	ServerGroups []string `json:"serverGroups,omitempty"`
+
+	// Security Context for all pods
+	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 type ClusterConfig struct {
