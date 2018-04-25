@@ -4,10 +4,12 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -895,9 +897,20 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// verify that the operator has reverted the change
 	// and re-enabled bucket flush
+	event := k8sutil.BucketEditEvent("default", testCouchbase)
+	if err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 30); err != nil {
+		t.Fatalf("cluster did not raise bucket edited event")
+	}
 	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to enable bucket flush %v", err)
 	}
+
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	// Bucket edits can be consumed by a prior reconcile interestingly due to
+	// a race somewhere in Couchbase server, so ensure we wait for things to
+	// settle
+	time.Sleep(5 * time.Second)
 
 	// make a bucket spec with bucket replicas = 3
 	t.Logf("externally changing bucket replicas to: 3")
@@ -930,12 +943,22 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		return false
 	}
 
+	if err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 30); err != nil {
+		t.Fatalf("cluster did not raise bucket edited event")
+	}
 	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to revert bucket replicas to 1 %v", err)
 	}
 
-	// make a bucket spec with io priority = "default"
-	t.Logf("externally changing bucket io priority to: default")
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+
+	// Bucket edits can be consumed by a prior reconcile interestingly due to
+	// a race somewhere in Couchbase server, so ensure we wait for things to
+	// settle
+	time.Sleep(5 * time.Second)
+
+	// make a bucket spec with io priority = "low"
+	t.Logf("externally changing bucket io priority to: low")
 	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
 		b.IoPriority = &constants.BucketIoPriorityLow
 	})
@@ -965,9 +988,14 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		return false
 	}
 
+	if err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 30); err != nil {
+		t.Fatalf("cluster did not raise bucket edited event")
+	}
 	if err := e2eutil.WaitUntilBucketsExists(t, f.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to revert bucket io prioritys to high %v", err)
 	}
+
+	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
@@ -980,6 +1008,6 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }

@@ -395,6 +395,8 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 	defer watch.Stop()
 
+	now := metav1.Now()
+
 	resultChan := watch.ResultChan()
 	duration := time.Duration(seconds) * time.Second
 	for {
@@ -404,6 +406,12 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 
 		case watchEvent := <-resultChan:
 			crdEvent := watchEvent.Object.(*v1.Event)
+			// Watch() returns every event since the dawn of time, so ensure we
+			// only return things after we started the wait.  This avoids matching
+			// events that may have already occurred
+			if crdEvent.FirstTimestamp.Before(&now) {
+				continue
+			}
 			if EqualEvent(event, crdEvent) {
 				return nil
 			}
