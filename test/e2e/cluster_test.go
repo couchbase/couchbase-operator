@@ -530,12 +530,23 @@ func TestInvalidBaseImage(t *testing.T) {
 		t.Fatalf("container status error: %s", reason)
 	}
 
-	k8sErrMsg := "Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\""
-	ocErrMsg := "rpc error: code = 2 desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found"
+	acceptableMessages := []string{
+		"Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\"",
+		"rpc error: code = 2 desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
+		"rpc error: code = Unknown desc = repository docker.io/" + couchbaseBaseImage + " not found: does not exist or no pull access",
+	}
 
 	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	if containerMsg != k8sErrMsg && containerMsg != ocErrMsg {
-		t.Fatalf("container status error: %+v", containerMsg)
+
+	correctMsg := false
+	for _, acceptableMsg := range acceptableMessages {
+		if containerMsg == acceptableMsg {
+			correctMsg = true
+		}
+	}
+
+	if !correctMsg {
+		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
 
 	// Event checking
@@ -588,12 +599,23 @@ func TestInvalidVersion(t *testing.T) {
 		t.Fatalf("container status error: %s", reason)
 	}
 
-	k8sErrMsg := "Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\""
-	ocErrMsg := "rpc error: code = 2 desc = Tag " + couchbaseVerString + " not found in repository docker.io/" + couchbaseBaseImage
+	acceptableMessages := []string{
+		"Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\"",
+		"rpc error: code = 2 desc = Tag " + couchbaseVerString + " not found in repository docker.io/",
+		"rpc error: code = Unknown desc = manifest for docker.io/" + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
+	}
 
 	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	if containerMsg != k8sErrMsg && containerMsg != ocErrMsg {
-		t.Fatalf("container status error: %+v", containerMsg)
+
+	correctMsg := false
+	for _, acceptableMsg := range acceptableMessages {
+		if containerMsg == acceptableMsg {
+			correctMsg = true
+		}
+	}
+
+	if !correctMsg {
+		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
 
 	// Event checking

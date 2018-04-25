@@ -658,23 +658,6 @@ func NumK8Nodes(kubeCli kubernetes.Interface) (int, error) {
 	return len(nodeList.Items), nil
 }
 
-func NumK8Workers(kubeCli kubernetes.Interface) (int, error) {
-	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return -1, err
-	}
-	numWorkers := 0
-	for _, value := range nodeList.Items {
-		node := &value
-		nodeMap := node.GetLabels()
-		if isMasterNode(nodeMap) {
-			continue
-		}
-		numWorkers = numWorkers + 1
-	}
-	return numWorkers, nil
-}
-
 func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 	minMem := math.Inf(+1)
 	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -684,10 +667,6 @@ func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 	if len(nodeList.Items) > 0 {
 		for _, value := range nodeList.Items {
 			node := &value
-			nodeMap := node.GetLabels()
-			if isMasterNode(nodeMap) {
-				continue
-			}
 			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes
@@ -715,11 +694,6 @@ func GetMaxNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 	if len(nodeList.Items) > 0 {
 		for _, value := range nodeList.Items {
 			node := &value
-			nodeMap := node.GetLabels()
-			if isMasterNode(nodeMap) {
-				continue
-			}
-			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes
 			newMem := float64(memQuantity.Value() >> 20)
@@ -746,10 +720,6 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 	if len(nodeList.Items) > 0 {
 		for _, value := range nodeList.Items {
 			node := &value
-			nodeMap := node.GetLabels()
-			if isMasterNode(nodeMap) {
-				continue
-			}
 			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes
