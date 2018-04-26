@@ -813,6 +813,13 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
+	for nodeIndex := 0; nodeIndex < e2eutil.Size5; nodeIndex++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	}
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// scale down to 4 node cluster
 	echan := make(chan error)
@@ -831,13 +838,20 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
+
 	// expect down node to be removed from cluster
-	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 4)
+	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 120)
 	if err != nil {
 		t.Logf("status: %+v", testCouchbase.Status)
 		t.Fatal(err)
 	}
+
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// resize cluster should complete ok
 	err = <-echan

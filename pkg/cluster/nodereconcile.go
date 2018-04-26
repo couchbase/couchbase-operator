@@ -189,6 +189,7 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
 	for _, m := range r.couchbase.FailedNodes {
 		c.logger.Infof("An auto-failover has taken place on %s, planning removal", m.ClientURL())
 		r.ejectNodes.Add(m)
+		r.runningPods.Remove(m.Name)
 	}
 
 	r.transitionState(ReconcileServerConfigs)
