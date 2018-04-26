@@ -33,3 +33,5 @@ spec:
         - index
         - query
         - search
+        - eventing
+        - analytics

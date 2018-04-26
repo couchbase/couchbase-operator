@@ -318,8 +318,98 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          "cb-index-admin",
-				ContainerPort: int32(9100),
+				Name:          indexerAdminPortName,
+				ContainerPort: int32(indexerAdminPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          indexerScanPortName,
+				ContainerPort: int32(indexerScanPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          indexerHTTPPortName,
+				ContainerPort: int32(indexerHTTPPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          indexerSTInitPortName,
+				ContainerPort: int32(indexerSTInitPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          indexerSTCatchupPortName,
+				ContainerPort: int32(indexerSTCatchupPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          indexerSTMainPortName,
+				ContainerPort: int32(indexerSTMainPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsAdminPortName,
+				ContainerPort: int32(analyticsAdminPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsCCHTTPPortName,
+				ContainerPort: int32(analyticsCCHTTPPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsCCClusterPortName,
+				ContainerPort: int32(analyticsCCClusterPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsCCClientPortName,
+				ContainerPort: int32(analyticsCCClientPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsConsolePortName,
+				ContainerPort: int32(analyticsConsolePort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsClusterPortName,
+				ContainerPort: int32(analyticsClusterPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsDataPortName,
+				ContainerPort: int32(analyticsDataPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsResultPortName,
+				ContainerPort: int32(analyticsResultPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsMessagingPortName,
+				ContainerPort: int32(analyticsMessagingPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsAuthPortName,
+				ContainerPort: int32(analyticsAuthPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsReplicationPortName,
+				ContainerPort: int32(analyticsReplicationPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsMetadataPortName,
+				ContainerPort: int32(analyticsMetadataPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          analyticsMetadataCallbackPortName,
+				ContainerPort: int32(analyticsMetadataCallbackPort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{

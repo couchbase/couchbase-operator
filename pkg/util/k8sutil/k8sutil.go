@@ -77,6 +77,48 @@ const (
 	eventingServicePort        = 8096
 	eventingServicePortTLS     = tlsBasePort + eventingServicePort
 
+	// Indexer service constants
+	indexerAdminPortName     = "index-admin"
+	indexerAdminPort         = 9100
+	indexerScanPortName      = "index-scan"
+	indexerScanPort          = 9101
+	indexerHTTPPortName      = "index-http"
+	indexerHTTPPort          = 9102
+	indexerSTInitPortName    = "index-stinit"
+	indexerSTInitPort        = 9103
+	indexerSTCatchupPortName = "index-stcatchup"
+	indexerSTCatchupPort     = 9104
+	indexerSTMainPortName    = "index-stmaint"
+	indexerSTMainPort        = 9105
+
+	// Analytics service constants
+	analyticsAdminPortName            = "cbas-admin"
+	analyticsAdminPort                = 9110
+	analyticsCCHTTPPortName           = "cbas-cc-http"
+	analyticsCCHTTPPort               = 9111
+	analyticsCCClusterPortName        = "cbas-cc-cluster"
+	analyticsCCClusterPort            = 9112
+	analyticsCCClientPortName         = "cbas-cc-client"
+	analyticsCCClientPort             = 9113
+	analyticsConsolePortName          = "cbas-client"
+	analyticsConsolePort              = 9114
+	analyticsClusterPortName          = "cbas-cluster"
+	analyticsClusterPort              = 9115
+	analyticsDataPortName             = "cbas-data"
+	analyticsDataPort                 = 9116
+	analyticsResultPortName           = "cbas-report"
+	analyticsResultPort               = 9117
+	analyticsMessagingPortName        = "cbas-messaging"
+	analyticsMessagingPort            = 9118
+	analyticsAuthPortName             = "cbas-auth"
+	analyticsAuthPort                 = 9119
+	analyticsReplicationPortName      = "cbas-repl"
+	analyticsReplicationPort          = 9120
+	analyticsMetadataPortName         = "cbas-meta"
+	analyticsMetadataPort             = 9121
+	analyticsMetadataCallbackPortName = "cbas-meta-cb"
+	analyticsMetadataCallbackPort     = 9122
+
 	// Data service constants
 	DataService            = "data"
 	dataServicePortName    = "data"

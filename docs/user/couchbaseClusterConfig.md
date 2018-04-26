@@ -44,6 +44,8 @@ spec:
         - index
         - query
         - search
+        - eventing
+        - analytics
       pod:
         couchabseEnv:
           ENV1: value
@@ -356,6 +358,8 @@ You must specify at least one, but possibly multiple node specifications. A node
       - index
       - query
       - search
+      - eventing
+      - analytics
     pod:
       couchabseEnv:
         CB_ENV_VAR: value
@@ -395,9 +399,9 @@ This field specifies a name for this group of servers.
 
 **services**
 
-This field specifies a list of services that should be run on nodes of this type. Users can specify data, index, query, and search in the list. At least one service must be specified and all clusters must contain at least one node specification that includes the data service.
+This field specifies a list of services that should be run on nodes of this type. Users can specify data, index, query, search, eventing and analytics in the list. At least one service must be specified and all clusters must contain at least one node specification that includes the data service.
 
-> *Field rules:* The ```services``` list is required and must contain at least one service. Valid values for services are "data", "index", "query", and "search". The values of this list cannot be changed after a server has been defined.
+> *Field rules:* The ```services``` list is required and must contain at least one service. Valid values for services are "data", "index", "query", "search", "eventing" and "analytics". The values of this list cannot be changed after a server has been defined.
 
 ### The Pod Policy
 
