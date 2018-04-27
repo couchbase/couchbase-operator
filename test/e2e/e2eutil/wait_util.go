@@ -491,7 +491,7 @@ func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType
 		case <-tickChan:
 			// compare cluster conditions to desired condition
 			if statusType == "ControlPaused" {
-				t.Logf("cluster paused: %b", cluster.Status.ControlPaused)
+				t.Logf("cluster paused: %t", cluster.Status.ControlPaused)
 				desiredStatusBool, _ := strconv.ParseBool(statusValue)
 				if desiredStatusBool == cluster.Status.ControlPaused {
 					return nil
