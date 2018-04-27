@@ -33,6 +33,7 @@ const (
 type ClusterStatus struct {
 	ActiveNodes      MemberSet // status=healthy,   clusterMembership=active
 	PendingAddNodes  MemberSet // status=healthy,   clusterMembership=inactiveAdded
+	AddBackNodes     MemberSet // status=healthy, clusterMembership=inactiveFailed
 	FailedAddNodes   MemberSet // status=unhealthy, clusterMembership=inactiveAdded
 	DownNodes        MemberSet // status=unhealthy, clusterMembership=active
 	FailedNodes      MemberSet // status=unhealthy, clusterMembership=inactiveFailed

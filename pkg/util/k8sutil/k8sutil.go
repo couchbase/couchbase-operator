@@ -806,7 +806,7 @@ func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVer
 	// Sometimes the Major and Minor values are not set so we need to parse them
 	// from the GitVersion field.
 	if version.Major == "" || version.Minor == "" {
-		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}$")
+		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}(\\+[0-9abcdef]*)?$")
 		if !rx.MatchString(version.GitVersion) {
 			err := fmt.Errorf("Unable to get version from Kubernetes API response")
 			return constants.KubernetesVersionUnknown, err

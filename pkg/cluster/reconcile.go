@@ -112,6 +112,8 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) bool {
 			rm.handleUnclusteredNodes(c)
 		case ReconcileFailedAddNodes:
 			rm.handleFailedAddNodes(c)
+		case ReconcileAddBackNodes:
+			rm.handleAddBackNodes(c)
 		case ReconcileFailedNodes:
 			rm.handleFailedNodes(c)
 		case ReconcileServerConfigs:

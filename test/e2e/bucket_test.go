@@ -67,6 +67,9 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		"service1": serviceConfig1}
 
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}

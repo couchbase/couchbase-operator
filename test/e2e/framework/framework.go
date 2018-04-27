@@ -40,8 +40,9 @@ type Framework struct {
 	DefaultSecret *v1.Secret
 	config        *rest.Config
 	LogDir        string
-	//S3Cli      *s3.S3
-	//S3Bucket   string
+	SkipTeardown  bool
+	//S3Cli         *s3.S3
+	//S3Bucket      string
 }
 
 // Setup setups a test framework and points "Global" to it.
@@ -50,6 +51,7 @@ func Setup() error {
 	opImage := flag.String("operator-image", "", "operator image, e.g. couchbase/couchbase-operator")
 	deploymentSpec := flag.String("deployment-spec", "", "deployment spec, eg. $PWD/example/deployment.yaml")
 	ns := flag.String("namespace", "default", "e2e test namespace")
+	skipTearDown := flag.Bool("skip-teardown", false, "skip teardown after tests")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -87,6 +89,13 @@ func Setup() error {
 		return fmt.Errorf("File %s does not define a deployment", *deploymentSpec)
 	}
 
+	// set operator image from env var
+	oi := os.Getenv("OPERATOR_IMAGE")
+	if oi != "" {
+		fmt.Printf("setting operator image: %s \n", oi)
+		deployment.Spec.Template.Spec.Containers[0].Image = oi
+	}
+
 	logDir, err := makeLogDir()
 	if err != nil {
 		return err
@@ -100,17 +109,26 @@ func Setup() error {
 		opImage:    *opImage,
 		config:     config,
 		//S3Bucket:   os.Getenv("TEST_S3_BUCKET"),
-		LogDir: logDir,
+		LogDir:       logDir,
+		SkipTeardown: *skipTearDown,
 	}
 	return Global.setup()
 }
 
 func Teardown() error {
+	if Global.SkipTeardown {
+		return nil
+	}
 	if err := Global.DeleteCouchbaseOperatorCompletely(Global.Deployment.GetName()); err != nil {
 		return err
 	}
 
-	err := e2eutil.DeleteSecret(Global.KubeClient, Global.Namespace, Global.DefaultSecret.Name, &metav1.DeleteOptions{})
+	jobs, err := Global.KubeClient.BatchV1().Jobs(Global.Namespace).List(metav1.ListOptions{})
+	for _, job := range jobs.Items {
+		Global.KubeClient.BatchV1().Jobs(Global.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+	}
+
+	err = e2eutil.DeleteSecret(Global.KubeClient, Global.Namespace, Global.DefaultSecret.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("Unable to delete the default secret: %v", err)
 	}
@@ -140,6 +158,12 @@ func Teardown() error {
 
 func (f *Framework) setup() error {
 	logrus.Info("cleaning up namespace before deployment")
+
+	jobs, err := f.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
+	for _, job := range jobs.Items {
+		f.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+	}
+
 	deployments, err := f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
 	for _, deployment := range deployments.Items {
 		Global.DeleteCouchbaseOperatorCompletely(deployment.GetName())

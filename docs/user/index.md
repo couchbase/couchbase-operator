@@ -2,6 +2,9 @@
 
 * [Overview](overview.md)
 * [Prerequisites and Setup](prerequisiteAndSetup.md)
+  * [Kubernetes Setup](installKubernetes.md)
+  * [Kubernetes Setup (RBAC Disabled)](installKubernetesNoRBAC.md)
+  * [OpenShift Setup](installOpenShift.md)
   * [Operator Configuration](operatorConfig.md)
 * [Deploying a Couchbase Cluster](deployingCouchbase.md)
   * [CouchbaseCluster Configuration](couchbaseClusterConfig.md)
@@ -11,6 +14,7 @@
 * [Accessing Couchbase](accessingCouchbase.md)
   * [Using the Couchbase Web Console](adminConsoleAccess.md)
   * [Using couchbase-cli](couchbaseCliGuide.md)
+  * [Using Couchbase clients](couchbaseClients.md)
 * [Running Couchbase on Kubernetes or OpenShift](runningCouchbase.md)
   * [Ad-hoc scale-up and scale-down](scalingCouchbase.md)
   * [Recovering From Node Failure](nodeRecovery.md)

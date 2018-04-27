@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -129,9 +130,12 @@ func TestNegEditServiceConfig(t *testing.T) {
 	newSize := "-2"
 	oldSize := "1"
 	t.Log("Changing cluster size to -2")
-	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, f.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
-		t.Fatal(err)
+	_, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, f.CRClient, testCouchbase, e2eutil.Retries5)
+	if err == nil {
+		t.Fatalf("failed to reject invalid service size: %v", err)
+	}
+	if !strings.Contains(err.Error(), "spec.servers.size in body should be greater than or equal to 1") {
+		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
 
 	t.Log("Verify resize did not happen")
@@ -276,7 +280,7 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
+	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries20)
 	if err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
@@ -287,7 +291,7 @@ func TestNodeManualFailover(t *testing.T) {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }
 

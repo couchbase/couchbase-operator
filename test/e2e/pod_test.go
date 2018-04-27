@@ -229,7 +229,7 @@ func TestAntiAffinityOn(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	numNodes, err := e2eutil.NumK8Workers(f.KubeClient)
+	numNodes, err := e2eutil.NumK8Nodes(f.KubeClient)
 	if err != nil {
 		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	numNodes, err := e2eutil.NumK8Workers(f.KubeClient)
+	numNodes, err := e2eutil.NumK8Nodes(f.KubeClient)
 	if err != nil {
 		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	numNodes, err := e2eutil.NumK8Workers(f.KubeClient)
+	numNodes, err := e2eutil.NumK8Nodes(f.KubeClient)
 	if err != nil {
 		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
 	}
@@ -386,7 +386,7 @@ func TestAntiAffinityOff(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	numNodes, err := e2eutil.NumK8Workers(f.KubeClient)
+	numNodes, err := e2eutil.NumK8Nodes(f.KubeClient)
 	if err != nil {
 		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
 	}

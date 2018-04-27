@@ -6,6 +6,9 @@ import:
   version: 68f9c3a1feb3140df59c67ced62d3a5df8e6c9c2 #v1.9.2
 - package: k8s.io/apiextensions-apiserver
   version: 6f29dd12234812844d29f52bd520bb01374619ce #v1.9.2
+- package: github.com/coreos/operator-sdk
+  version: eb7defde99b268e4f1b0c50e40b29b4703494526 #v0.0.4 (+1 Couchbase change)
+  repo:    git@github.com:couchbaselabs/operator-sdk.git
 - package: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - package: github.com/couchbase/gocbmgr

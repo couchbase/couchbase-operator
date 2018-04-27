@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	sdk "github.com/coreos/operator-sdk/pkg/sdk"
+	"github.com/coreos/operator-sdk/pkg/sdk/handler"
+	"github.com/coreos/operator-sdk/pkg/sdk/types"
+
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
@@ -14,11 +18,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/fields"
 	kwatch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -47,13 +48,9 @@ type Config struct {
 	MasterHost     string
 	Namespace      string
 	ServiceAccount string
+	CreateCrd      bool
 	KubeCli        kubernetes.Interface
-	KubeExtCli     apiextensionsclient.Interface
 	CouchbaseCRCli versioned.Interface
-}
-
-func (c *Config) Validate() error {
-	return nil
 }
 
 func New(cfg Config) *Controller {
@@ -64,40 +61,55 @@ func New(cfg Config) *Controller {
 	}
 }
 
-func (c *Controller) Start() error {
+func (c *Controller) Start() {
 
-	for {
-		err := c.initResource()
-		if err == nil {
-			break
+	if c.Config.CreateCrd {
+		for {
+			err := c.initResource()
+			if err == nil {
+				break
+			}
+			c.logger.Errorf("Initialization failed: %v", err)
+			c.logger.Infof("Retry initialization in %v...", initRetryWaitTime)
+			time.Sleep(initRetryWaitTime)
 		}
-		c.logger.Errorf("Initialization failed: %v", err)
-		c.logger.Infof("Retry initialization in %v...", initRetryWaitTime)
-		time.Sleep(initRetryWaitTime)
-	}
 
-	c.logger.Infof("CRD initialized, listening for events...")
+		c.logger.Infof("CRD initialized, listening for events...")
+	}
 	probe.SetReady()
-	c.run()
+
+	sdk.Initialize()
+	sdk.Watch(cbapi.SchemeGroupVersion.String(), cbapi.CRDResourceKind, c.Config.Namespace, 0)
+	sdk.Handle((handler.Handler)(c))
+	sdk.Run(context.TODO())
+
 	panic("unreachable")
 }
 
-func (c *Controller) run() {
-	source := cache.NewListWatchFromClient(
-		c.Config.CouchbaseCRCli.CouchbaseV1beta1().RESTClient(),
-		cbapi.CRDResourcePlural,
-		c.Config.Namespace,
-		fields.Everything())
+func (c *Controller) Handle(ctx types.Context, event types.Event) error {
+	if cluster, ok := event.Object.(*cbapi.CouchbaseCluster); ok {
+		ev := &Event{
+			Type:   kwatch.Added,
+			Object: cluster,
+		}
 
-	_, informer := cache.NewIndexerInformer(source, &cbapi.CouchbaseCluster{}, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.onAddCouchbaseCluster,
-		UpdateFunc: c.onUpdateCouchbaseCluster,
-		DeleteFunc: c.onDeleteCouchbaseCluster,
-	}, cache.Indexers{})
+		if event.Deleted {
+			ev.Type = kwatch.Deleted
+		} else {
+			if _, ok := c.clusters[ev.Object.Name]; ok { // re-watch or restart could give ADD event
+				ev.Type = kwatch.Modified
+			}
+		}
 
-	ctx := context.TODO()
-	// TODO: use workqueue to avoid blocking
-	informer.Run(ctx.Done())
+		pt.start()
+		err := c.handleClusterEvent(ev)
+		if err != nil {
+			logrus.Warningf("Fail to handle event: %v", err)
+		}
+		pt.stop()
+	}
+
+	return nil
 }
 
 func (c *Controller) initResource() error {
@@ -111,62 +123,13 @@ func (c *Controller) initResource() error {
 			version, constants.KubernetesVersion1_8)
 	}
 
-	err = k8sutil.CreateCRD(c.KubeExtCli, version)
+	kubeExtClient := k8sutil.MustNewKubeExtClient()
+	err = k8sutil.CreateCRD(kubeExtClient, version)
 	if err != nil && !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 		return fmt.Errorf("fail to create CRD: %v", err)
 	}
 
-	return k8sutil.WaitCRDReady(c.KubeExtCli)
-}
-
-func (c *Controller) onAddCouchbaseCluster(obj interface{}) {
-	c.syncCouchbaseClus(obj.(*cbapi.CouchbaseCluster))
-}
-
-func (c *Controller) onUpdateCouchbaseCluster(oldObj, newObj interface{}) {
-	c.syncCouchbaseClus(newObj.(*cbapi.CouchbaseCluster))
-}
-
-func (c *Controller) onDeleteCouchbaseCluster(obj interface{}) {
-	clus, ok := obj.(*cbapi.CouchbaseCluster)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			panic(fmt.Sprintf("unknown object from CouchbaseCluster delete event: %#v", obj))
-		}
-		clus, ok = tombstone.Obj.(*cbapi.CouchbaseCluster)
-		if !ok {
-			panic(fmt.Sprintf("Tombstone contained object that is not an CouchbaseCluster: %#v", obj))
-		}
-	}
-	ev := &Event{
-		Type:   kwatch.Deleted,
-		Object: clus,
-	}
-
-	pt.start()
-	err := c.handleClusterEvent(ev)
-	if err != nil {
-		logrus.Warningf("Fail to handle delete event: %v", err)
-	}
-	pt.stop()
-}
-
-func (c *Controller) syncCouchbaseClus(clus *cbapi.CouchbaseCluster) {
-	ev := &Event{
-		Type:   kwatch.Added,
-		Object: clus,
-	}
-	if _, ok := c.clusters[clus.Name]; ok { // re-watch or restart could give ADD event
-		ev.Type = kwatch.Modified
-	}
-
-	pt.start()
-	err := c.handleClusterEvent(ev)
-	if err != nil {
-		logrus.Warningf("Fail to handle add/update event: %v", err)
-	}
-	pt.stop()
+	return k8sutil.WaitCRDReady(kubeExtClient)
 }
 
 func (c *Controller) handleClusterEvent(event *Event) error {
@@ -180,18 +143,14 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 		return fmt.Errorf("ignore failed cluster (%s). Please delete its CR", clus.Name)
 	}
 
-	// TODO: add validation to spec update.
-	clus.Spec.Cleanup()
-
 	switch event.Type {
 	case kwatch.Added:
 		if _, ok := c.clusters[clus.Name]; ok {
 			return fmt.Errorf("unsafe state. cluster (%s) was created before but we received event (%s)", clus.Name, event.Type)
 		}
 
-		nc := cluster.New(c.makeClusterConfig(), clus)
+		c.clusters[clus.Name] = cluster.New(c.makeClusterConfig(), clus)
 
-		c.clusters[clus.Name] = nc
 	case kwatch.Modified:
 		if _, ok := c.clusters[clus.Name]; !ok {
 			return fmt.Errorf("unsafe state. cluster (%s) was never created but we received event (%s)", clus.Name, event.Type)

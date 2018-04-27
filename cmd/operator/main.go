@@ -36,6 +36,7 @@ var (
 	listenAddr   string
 	name         string
 	namespace    string
+	createCrd    bool
 	printVersion bool
 
 	chaosLevel int
@@ -47,6 +48,7 @@ var (
 func init() {
 	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
 	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
+	flag.BoolVar(&createCrd, "create-crd", false, "Create the crd if it does not exist")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
@@ -116,17 +118,11 @@ func main() {
 func run(stop <-chan struct{}) {
 	mainLogger.Info("I'm the leader, attempt to start the operator")
 	cfg := newControllerConfig()
-	if err := cfg.Validate(); err != nil {
-		mainLogger.Fatalf("Invalid operator config: %v", err)
-	}
-
-	//go periodicFullGC(cfg.KubeCli, cfg.Namespace, gcInterval)
 
 	startChaos(context.Background(), cfg.KubeCli, cfg.Namespace, chaosLevel)
 
 	c := controller.New(cfg)
-	err := c.Start()
-	mainLogger.Fatalf("Controller Start() failed: %v", err)
+	c.Start()
 }
 
 func newControllerConfig() controller.Config {
@@ -142,8 +138,8 @@ func newControllerConfig() controller.Config {
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
 		KubeCli:        kubecli,
-		KubeExtCli:     k8sutil.MustNewKubeExtClient(),
 		CouchbaseCRCli: client.MustNewInCluster(),
+		CreateCrd:      createCrd,
 	}
 
 	return cfg

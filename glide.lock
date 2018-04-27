@@ -3,6 +3,16 @@ updated: 2018-04-06T17:04:23.345349907+01:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 593d64559f7600f29581a3ee42177f5dbded27a9
+- name: github.com/coreos/operator-sdk
+  version: eb7defde99b268e4f1b0c50e40b29b4703494526
+  repo: git@github.com:couchbaselabs/operator-sdk.git
+  subpackages:
+  - pkg/k8sclient
+  - pkg/sdk
+  - pkg/sdk/handler
+  - pkg/sdk/informer
+  - pkg/sdk/types
+  - pkg/util/k8sutil
 - name: github.com/couchbase/cbflag
   version: dbeda68bf448ce8e85e52a3216f3b031ef18a4b7
   subpackages:
@@ -246,7 +256,9 @@ imports:
   version: 9389c055a838d4f208b699b3c7c51b70f2368861
   subpackages:
   - discovery
+  - discovery/cached
   - discovery/fake
+  - dynamic
   - kubernetes
   - kubernetes/scheme
   - kubernetes/typed/admissionregistration/v1alpha1
@@ -302,6 +314,7 @@ imports:
   - util/flowcontrol
   - util/homedir
   - util/integer
+  - util/workqueue
 - name: k8s.io/kube-openapi
   version: 39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1
   subpackages:

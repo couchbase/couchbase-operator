@@ -405,6 +405,11 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
 
+	jobs, err := kubeClient.BatchV1().Jobs(namespace).List(metav1.ListOptions{})
+	for _, job := range jobs.Items {
+		kubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+	}
+
 	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Logf("Error: %v", err)
@@ -633,23 +638,6 @@ func NumK8Nodes(kubeCli kubernetes.Interface) (int, error) {
 	return len(nodeList.Items), nil
 }
 
-func NumK8Workers(kubeCli kubernetes.Interface) (int, error) {
-	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return -1, err
-	}
-	numWorkers := 0
-	for _, value := range nodeList.Items {
-		node := &value
-		nodeMap := node.GetLabels()
-		if isMasterNode(nodeMap) {
-			continue
-		}
-		numWorkers = numWorkers + 1
-	}
-	return numWorkers, nil
-}
-
 func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
 	minMem := math.Inf(+1)
 	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -721,10 +709,6 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 	if len(nodeList.Items) > 0 {
 		for _, value := range nodeList.Items {
 			node := &value
-			nodeMap := node.GetLabels()
-			if isMasterNode(nodeMap) {
-				continue
-			}
 			//kilobytes
 			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
 			//megabytes

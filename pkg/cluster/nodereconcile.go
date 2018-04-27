@@ -15,13 +15,14 @@ const (
 	ReconcileDownNodes                       = 0x04
 	ReconcileUnclusteredNodes                = 0x05
 	ReconcileFailedAddNodes                  = 0x06
-	ReconcileFailedNodes                     = 0x07
-	ReconcileServerConfigs                   = 0x08
-	ReconcileRemoveNodes                     = 0x09
-	ReconcileRemoveUnmanaged                 = 0x0a
-	ReconcileAddNodes                        = 0x0b
-	ReconcileRebalance                       = 0x0c
-	ReconcileDeadMembers                     = 0x0d
+	ReconcileAddBackNodes                    = 0x07
+	ReconcileFailedNodes                     = 0x08
+	ReconcileServerConfigs                   = 0x09
+	ReconcileRemoveNodes                     = 0x0a
+	ReconcileRemoveUnmanaged                 = 0x0b
+	ReconcileAddNodes                        = 0x0c
+	ReconcileRebalance                       = 0x0d
+	ReconcileDeadMembers                     = 0x0e
 	ReconcileFinished                        = 0xff
 )
 
@@ -168,6 +169,17 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 		}
 
 		r.runningPods.Remove(m.Name)
+	}
+
+	r.transitionState(ReconcileAddBackNodes)
+}
+
+func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) {
+	// These nodes are failed over, but are responding and can be added back into the cluster,
+	// but for now we will just consider them failed and remove them.
+	for _, m := range r.couchbase.AddBackNodes {
+		c.logger.Infof("Removing healthy node %s because it is failed over", m.ClientURL())
+		r.ejectNodes.Add(m)
 	}
 
 	r.transitionState(ReconcileFailedNodes)

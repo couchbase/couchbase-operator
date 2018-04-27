@@ -13,3 +13,4 @@
 /pkg/revision/revision.go
 /test/e2e/logs/
 /test/e2e/resources/
+example/crd.yaml

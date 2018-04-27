@@ -17,7 +17,11 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: couchbase/couchbase-operator:v1
+        image: couchbase/k8s-operator:0.8.0
+        command:
+        - couchbase-operator
+        args:
+        - -create-crd
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:
@@ -37,7 +41,7 @@ spec:
           initialDelaySeconds: 3
           periodSeconds: 3
           failureThreshold: 19
-
+        serviceAccountName: couchbase-operator
 ```
 
 Most fields in the Operator configuration should never be changed and we recommend using the configuration as is. Some exceptions are below.
@@ -53,3 +57,7 @@ You should not need to change the Operator image unless you are pulling the imag
 **Changing the Name**
 
 By default the name of the deployment created to maintain the Couchbase Operator is called couchbase-operator. We recommend keeping this name since it is used in all of our examples and tutorials. If you need to change it for some reason, ensure that you change the `metadata.name`, `spec.template.metadata.labels.name`, and `spec.spec.containers[0].name` fields. These fields also must all have the same value.
+
+**Changing the Service Account**
+
+We recommend using a ServiceAccount named couchbase-operator, but depending on your environment you may want to use a service account with a different name. Note that this field only takes affect if your Kubernetes environment has RBAC enabled.
