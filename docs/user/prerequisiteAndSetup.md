@@ -13,6 +13,8 @@ Preparing the cluster to run the Couchbase Operator may require setting up prope
 * [Installing in Kubernetes](installKubernetes.md)
 * [Installing in Kubernetes (without RBAC)](installingKubernetesNoRBAC.md)
 * [Installing in OpenShift](installOpenShift.md)
+* [Bootstrapping OpenShift](bootstrapOpenShift.md)
+  * *Bootstrap automation should only be used in development clusters since it involves granting privileges to the operator that aren't ideal in a production OpenShift cluster.*
 
 For more information about how the Couchbase Operator Deployment is defined as well as documentation about the fields that you might want to customize see the link below.
 
