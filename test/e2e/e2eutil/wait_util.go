@@ -312,7 +312,7 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string
 	lo := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(NameLabelSelector(name)).String(),
 	}
-	err := retryutil.Retry(context.Background(), 10*time.Second, 18, func() (bool, error) {
+	err := retryutil.Retry(context.Background(), time.Second, 180, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
