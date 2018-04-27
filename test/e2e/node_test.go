@@ -3,9 +3,9 @@ package e2e
 import (
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
-	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -1115,7 +1115,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 
 	t.Logf("failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, e2eutil.Retries10, nodeName)
+		err = e2eutil.FailoverNode(t, client, e2eutil.Retries20, nodeName)
 		if err != nil {
 			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
 		}
@@ -1369,14 +1369,14 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	t.Logf("failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, e2eutil.Retries10, nodeName)
+		err = e2eutil.FailoverNode(t, client, e2eutil.Retries20, nodeName)
 		if err != nil {
 			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
 		}
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
+	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size5, e2eutil.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
