@@ -162,7 +162,7 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 				return
 			}
 
-			if checkJob.Status.Failed == 1 {
+			if checkJob.Status.Failed >= 3 {
 				jobInfo["status"] = "error: job failed: " + jobName
 				results <- jobInfo
 				return
