@@ -67,14 +67,17 @@ secret "cb-example-auth" created
 The Couchbase Operator configuration is now ready to be pushed to Kubernetes. To push the Couchbase Operator configuration, run the following command:
 On Kubernetes:
 ```bash
-$ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+$ cbopctl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 On OpenShift:
 ```bash
-$ oc create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+$ cbopctl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
+
+*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for more information about this tool.
+
 The Couchbase Operator automatically begins creating the cluster. Depending on the configuration, creating a cluster can take some time. You can track the progress of cluster creation using the ```kubectl describe``` command. For details on how to use this command and an explanation of the output, see [Displaying Information about a Couchbase Cluster](clusterStatusGuide.md).
 
 Once the cluster has been provisioned, you'll see that various pods, a service, and a Couchbase cluster have been created. Since the configuration above was for a 3-nodes cluster, you should see three pods created. The Couchbase Operator also creates an internal headless service that can be used by applications deployed inside the same Kubernetes namespace to connect to the Couchbase cluster.

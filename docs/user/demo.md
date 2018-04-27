@@ -11,14 +11,16 @@ The tutorial also requires the following artifacts that are bundled with the Cou
 1. **Create a Couchbase cluster**
 On Kubernetes:
 ```console
-$ kubectl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 On OpenShift:
 ```console
-$ oc apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
+
+*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for more information about this tool.
 
 2. **Create a Couchbase RBAC user**
 
