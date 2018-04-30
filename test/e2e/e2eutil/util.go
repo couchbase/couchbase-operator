@@ -66,60 +66,44 @@ var (
 		"autoFailoverTimeout":   "10"}
 
 	BasicServiceOneDataNode = map[string]string{
-		"size":      "1",
-		"name":      "test_config_1",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "1",
+		"name":     "test_config_1",
+		"services": "data"}
 
 	BasicServiceOneDataN1qlIndex = map[string]string{
-		"size":      "1",
-		"name":      "test_config_1",
-		"services":  "data,n1ql,index",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "1",
+		"name":     "test_config_1",
+		"services": "data,n1ql,index"}
 
 	BasicServiceOneN1qlIndexSearch = map[string]string{
-		"size":      "1",
-		"name":      "test_config_1",
-		"services":  "n1ql,index,fts",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "1",
+		"name":     "test_config_1",
+		"services": "n1ql,index,fts"}
 
 	BasicSecondaryServiceOneData = map[string]string{
-		"size":      "1",
-		"name":      "test_config_2",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "1",
+		"name":     "test_config_2",
+		"services": "data"}
 
 	BasicServiceThreeDataN1qlIndex = map[string]string{
-		"size":      "3",
-		"name":      "test_config_1",
-		"services":  "data,n1ql,index",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "3",
+		"name":     "test_config_1",
+		"services": "data,n1ql,index"}
 
 	BasicServiceThreeDataNode = map[string]string{
-		"size":      "3",
-		"name":      "test_config_1",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "3",
+		"name":     "test_config_1",
+		"services": "data"}
 
 	BasicServiceFourDataNode = map[string]string{
-		"size":      "4",
-		"name":      "test_config_1",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "4",
+		"name":     "test_config_1",
+		"services": "data"}
 
 	BasicServiceFiveDataN1qlIndex = map[string]string{
-		"size":      "5",
-		"name":      "test_config_1",
-		"services":  "data,n1ql,index",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     "5",
+		"name":     "test_config_1",
+		"services": "data,n1ql,index"}
 
 	BasicOneReplicaBucket = map[string]string{
 		"bucketName":         "default",
@@ -290,10 +274,6 @@ func UpdateServiceSpec(service int, field string, value string, crClient version
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Name = value }
 	case field == "Services":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Services = strings.Split(value, ",") }
-	case field == "DataPath":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].DataPath = value }
-	case field == "IndexPath":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].IndexPath = value }
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 
@@ -419,7 +399,7 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		clusterNameList = append(clusterNameList, cluster.Name)
 	}
 
-	t.Logf("Deleteing clusters: [%v]", clusterNameList)
+	t.Logf("Deleting clusters: [%v]", clusterNameList)
 	for _, cluster := range clusters.Items {
 		t.Logf("Attempting to delete: [%v]", cluster.Name)
 		err := k8sutil.DeleteCouchbaseCluster(crClient, &cluster)
@@ -428,34 +408,32 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		} else {
 			t.Logf("Successfully deleted: [%v]", cluster.Name)
 		}
+		pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
+		killPods := []string{}
+		for _, pod := range pods.Items {
+			killPods = append(killPods, pod.Name)
+		}
+		t.Logf("Killing pods: %v", killPods)
+		KillMembers(kubeClient, namespace, cluster.Name, killPods...)
 
-	}
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
-	killPods := []string{}
-	for _, pod := range pods.Items {
-		killPods = append(killPods, pod.Name)
-	}
-	t.Logf("Killing pods: %v", killPods)
-
-	KillMembers(kubeClient, namespace, killPods...)
-
-	for _, pod := range killPods {
-		t.Logf("Waiting for deletion of pod: %v", pod)
+		for _, pod := range killPods {
+			t.Logf("Waiting for deletion of pod: %v", pod)
+		}
 	}
 	WaitUntilPodDeleted(t, kubeClient, namespace)
 }
 
-func KillMembers(kubecli kubernetes.Interface, namespace string, names ...string) error {
+func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName string, names ...string) error {
 	for _, name := range names {
-		if err := KillMember(kubecli, namespace, name); err != nil {
+		if err := KillMember(kubecli, namespace, clusterName, name); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func KillMember(kubecli kubernetes.Interface, namespace, name string) error {
-	return k8sutil.DeleteCouchbasePod(kubecli, namespace, name, metav1.NewDeleteOptions(0))
+func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string) error {
+	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0))
 }
 
 func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {
@@ -544,7 +522,7 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 	}
 	t.Logf("Killing pods: %v", killPods)
 
-	KillMembers(kubeCli, cl.Namespace, killPods...)
+	KillMembers(kubeCli, cl.Namespace, cl.Name, killPods...)
 
 	for _, pod := range killPods {
 		WaitPodDeleted(t, kubeCli, pod, cl)
@@ -562,7 +540,7 @@ func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *
 
 func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) error {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
-	return KillMember(kubeCli, cl.Namespace, name)
+	return KillMember(kubeCli, cl.Namespace, cl.Name, name)
 }
 
 func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *api.CouchbaseCluster, clusterName, namespace string) (*v1.Pod, error) {
@@ -728,7 +706,7 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 // Construct expected name for the PersistentVolumeClaim which belongs to member
 // where 'index' specifies the Nth claim generated from the specs template.
 // Only specs with multiple VolumeMounts should return volumes with index > 0
-func GetMemberPVC(kubeCli kubernetes.Interface, namespace string, claimName string, memberName string, index int) (*v1.PersistentVolumeClaim, error) {
-	name := k8sutil.NameForPersistentVolumeClaim(claimName, memberName, index)
+func GetMemberPVC(kubeCli kubernetes.Interface, namespace string, claimName string, memberName string, index int, mountName api.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
+	name := k8sutil.NameForPersistentVolumeClaim(claimName, memberName, index, mountName)
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }

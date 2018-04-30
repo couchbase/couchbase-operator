@@ -139,14 +139,16 @@ func Teardown() error {
 	clusters, err := Global.CRClient.CouchbaseV1beta1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
 	for _, cluster := range clusters.Items {
 		Global.CRClient.CouchbaseV1beta1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+		pods, err := Global.KubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
+		if err != nil {
+			return fmt.Errorf("failed to list pods for cluster: %v", err)
+		}
+		killPods := []string{}
+		for _, pod := range pods.Items {
+			killPods = append(killPods, pod.Name)
+		}
+		e2eutil.KillMembers(Global.KubeClient, Global.Namespace, cluster.Name, killPods...)
 	}
-
-	pods, err := Global.KubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
-	killPods := []string{}
-	for _, pod := range pods.Items {
-		killPods = append(killPods, pod.Name)
-	}
-	e2eutil.KillMembers(Global.KubeClient, Global.Namespace, killPods...)
 
 	services, err := Global.KubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	for _, service := range services.Items {
@@ -173,16 +175,21 @@ func (f *Framework) setup() error {
 	}
 
 	clusters, err := f.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("Unable to get clusters: %v", err)
+	}
 	for _, cluster := range clusters.Items {
 		f.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+		pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
+		if err != nil {
+			return fmt.Errorf("failed to list pods for cluster: %v", err)
+		}
+		killPods := []string{}
+		for _, pod := range pods.Items {
+			killPods = append(killPods, pod.Name)
+		}
+		e2eutil.KillMembers(Global.KubeClient, Global.Namespace, cluster.Name, killPods...)
 	}
-
-	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
-	killPods := []string{}
-	for _, pod := range pods.Items {
-		killPods = append(killPods, pod.Name)
-	}
-	e2eutil.KillMembers(f.KubeClient, f.Namespace, killPods...)
 
 	services, err := f.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	for _, service := range services.Items {

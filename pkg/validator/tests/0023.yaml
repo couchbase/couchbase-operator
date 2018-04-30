@@ -26,5 +26,3 @@ spec:
         - index
         - query
         - search
-      dataPath: /opt/couchbase/var/lib/couchbase/data
-      indexPath: /opt/couchbase/var/lib/couchbase/data

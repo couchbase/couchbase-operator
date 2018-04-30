@@ -27,8 +27,6 @@ import (
 
 const (
 	couchbaseVersionAnnotationKey = "couchbase.version"
-	couchbaseVolumeName           = "couchbase-data"
-	couchbaseVolumeMountDir       = "/opt/couchbase/var/lib/data"
 
 	// Fixed port names (generate SRV records for the peer services)
 	couchbaseSRVName    = "couchbase"

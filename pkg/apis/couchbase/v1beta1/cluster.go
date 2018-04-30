@@ -177,12 +177,6 @@ type ServerConfig struct {
 	// The services to run on nodes created with this spec
 	Services []string `json:"services"`
 
-	// The path on each node to store key-value data
-	DataPath string `json:"dataPath"`
-
-	// The path on each node to store index data
-	IndexPath string `json:"indexPath"`
-
 	// Pod defines the policy to create pod for the couchbase pod.
 	//
 	// Updating Pod does not take effect on any existing couchbase pods.
@@ -216,22 +210,43 @@ type PodPolicy struct {
 	// flag). This field cannot be updated.
 	CouchbaseEnv []v1.EnvVar `json:"couchbaseEnv,omitempty"`
 
-	// Volume mounts represent persistent volumes to attach to pod.
-	// If defined new pods will use a persistent volume for the specified path.
-	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty"`
+	// Volume mounts represent persistent volume claims to attach to pod.
+	// If defined new pods will use persistent volumes.
+	VolumeMounts *VolumeMounts `json:"volumeMounts,omitempty"`
 
 	// By default, kubernetes will mount a service account token into the couchbase pods.
 	// AutomountServiceAccountToken indicates whether pods running with the service account should have an API token automatically mounted.
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
 }
 
-type VolumeMount struct {
-	// Name of the volumeClaimTemplate to use when creating volumes
-	// for the mount path
-	Name string `json:"name"`
+type VolumeMountName string
 
-	// Path represents the location of a volume to mount
-	Path string `json:"path"`
+const (
+	DefaultVolumeMount VolumeMountName = "default"
+	DataVolumeMount                    = "data"
+	IndexVolumeMount                   = "index"
+)
+
+type VolumeMounts struct {
+	// Name of claim to use for couchbases default install path
+	DefaultClaim *string `json:"default"`
+	// Name of claim to use for index path
+	IndexClaim *string `json:"index"`
+	// Name of claim to use for data path
+	DataClaim *string `json:"data"`
+}
+
+func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
+	if sc.Pod != nil {
+		return sc.Pod.VolumeMounts
+	}
+	return nil
+}
+func (sc *ServerConfig) GetDefaultVolumeClaim() *string {
+	if mounts := sc.GetVolumeMounts(); mounts != nil {
+		return mounts.DefaultClaim
+	}
+	return nil
 }
 
 func (c *ClusterSpec) Cleanup() {

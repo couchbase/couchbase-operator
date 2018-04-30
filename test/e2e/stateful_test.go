@@ -42,7 +42,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 	claimTemplate := testCouchbase.Spec.VolumeClaimTemplates[0].Name
 	for i := 0; i < clusterSize; i++ {
 		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, i)
-		_, err := e2eutil.GetMemberPVC(f.KubeClient, f.Namespace, claimTemplate, memberName, 0)
+		_, err := e2eutil.GetMemberPVC(f.KubeClient, f.Namespace, claimTemplate, memberName, 0, "default")
 		if err != nil {
 			t.Fatalf("could not find persistent volume for member: %s, %v", memberName, err)
 		}

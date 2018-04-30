@@ -44,8 +44,6 @@ spec:
         - index
         - query
         - search
-      dataPath: /opt/couchbase/var/lib/couchbase/data
-      indexPath: /opt/couchbase/var/lib/couchbase/data
       pod:
         couchabseEnv:
           ENV1: value
@@ -69,8 +67,9 @@ spec:
             effect: NoSchedule
         automountServiceAccountToken: false
         volumeMounts:
-          - name: couchbase
-            path: /opt/couchbase/var/lib/couchbase/
+          default: couchbase
+          data:  couchbase
+          index: couchbase
   volumeClaimTemplates:
     - metadata:
         name: couchbase
@@ -357,8 +356,6 @@ You must specify at least one, but possibly multiple node specifications. A node
       - index
       - query
       - search
-    dataPath: /opt/couchbase/var/lib/couchbase/data
-    indexPath: /opt/couchbase/var/lib/couchbase/data
     pod:
       couchabseEnv:
         CB_ENV_VAR: value
@@ -402,18 +399,6 @@ This field specifies a list of services that should be run on nodes of this type
 
 > *Field rules:* The ```services``` list is required and must contain at least one service. Valid values for services are "data", "index", "query", and "search". The values of this list cannot be changed after a server has been defined.
 
-**dataPath**
-
-This field specifies the path where data from the data service should be stored. This parameter is required.
-
-> *Field rules:* The ```dataPath``` is required and be set to a valid path. The value of this field cannot be changed after a server has been defined.
-
-**indexPath**
-
-This field specifies the path were data created by indexes should be stored. This parameter is required.
-
-> *Field rules:* The ```indexPath``` is required and be set to a valid path. The value of this field cannot be changed after a server has been defined.
-
 ### The Pod Policy
 
 The Pod policy defines settings that apply to all Pods deployed with this node configuration. A Pod always contains a single running instance of Couchbase Server.
@@ -442,8 +427,9 @@ The Pod policy defines settings that apply to all Pods deployed with this node c
           value: cbapp
           effect: NoSchedule
         volumeMounts:
-          - name: couchbase
-            path: /opt/couchbase/var/lib/couchbase/
+          default: couchbase
+          data:  couchbase
+          index: couchbase
 ```
 
 **couchbaseEnv**
@@ -514,20 +500,25 @@ This field specifies conditions upon which a node should not be selected when de
 #### VolumeMounts
 
 ```yaml
-        volumeMounts:
-          - name: couchbase
-            path: /opt/couchbase/var/lib/couchbase/
+      volumeMounts:
+          default: couchbase
+          data:  couchbase
+          index: couchbase
 ```
 
-VolumeMounts specify a path within the Pod that should be persisted.
+VolumeMounts specifies the claims to use for storage used by the couchbase cluster
 
-**name**
+**default**
 
-Name of the volumeClaimTemplate used to created persisted volumes. The name must match the name of a volumeClaimTemplate within the spec.
+This field is required when using persistent volumes.  The value specifies name of the volumeClaimTemplate used to create a persisted volume for the `default` path.  This is always `/opt/couchbase/var/lib/couchbase`. The claim must match the name of a volumeClaimTemplate within the spec.
 
-**path**
+**data**
 
-Path within the pod to mount the persistent volume.gg
+Name of the volumeClaimTemplate used to create a persisted volume for the `data` path.  When specified the data path will be `/mnt/data`. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
+
+**index**
+
+Name of the volumeClaimTemplate used to create a persisted volume for the `index` path. When specified the data path will be `/mnt/index`. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
 
 ## Spec: VolumeClaimTemplates
 

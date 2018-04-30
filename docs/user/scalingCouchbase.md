@@ -11,8 +11,6 @@ servers:
       - index
       - query
       - search
-    dataPath: /opt/couchbase/var/lib/couchbase/data
-    indexPath: /opt/couchbase/var/lib/couchbase/data
 ```
 
 This configuration specifies that the cluster should contain 3 nodes running the data, index, query, and search services and that the data and index path are each set to ```/opt/couchbase/var/lib/couchbase/data```. To scale these servers, you only need to change the ```size``` parameter and then push the new configuration into Kubernetes to increase or decrease the number of nodes in the cluster. To update the configuration in Kubernetes, run the following command:
@@ -46,20 +44,14 @@ servers:
     name: data_services
     services:
       - data
-    dataPath: /opt/couchbase/var/lib/couchbase/data
-    indexPath: /opt/couchbase/var/lib/couchbase/data
   - size: 1
     name: index_services
     services:
       - index
-    dataPath: /opt/couchbase/var/lib/couchbase/data
-    indexPath: /opt/couchbase/var/lib/couchbase/data
   - size: 1
     name: query_services
     services:
       - query
-    dataPath: /opt/couchbase/var/lib/couchbase/data
-    indexPath: /opt/couchbase/var/lib/couchbase/data
 ```
 
 This configuration creates a 5-node Couchbase cluster with different services running on each pod. If you see that your queries are taking longer than usual, you can scale up your query service independent of the other services by changing the size of the server specification that contains the query service. For example, if you update the size from 1 to 2 and push the new configuration into Kubernetes, the Couchbase Operator will automatically scale up the query service.

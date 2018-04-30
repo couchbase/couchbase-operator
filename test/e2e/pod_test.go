@@ -27,8 +27,6 @@ func TestPodResourcesBasic(t *testing.T) {
 		"size":               "1",
 		"name":               "test_config_1",
 		"services":           "data",
-		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
 		"resourceMemRequest": memReq,
 		"resourceMemLimit":   memLimit,
 	}
@@ -80,8 +78,6 @@ func TestNegPodResourcesBasic(t *testing.T) {
 		"size":               "1",
 		"name":               "test_config_1",
 		"services":           "data",
-		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
 		"resourceMemRequest": memReq,
 		"resourceMemLimit":   memLimit,
 	}
@@ -131,8 +127,6 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		"size":               "1",
 		"name":               "test_config_1",
 		"services":           "data",
-		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
 		"resourceMemRequest": memReq,
 	}
 	configMap := map[string]map[string]string{
@@ -207,8 +201,6 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 		"size":               "1",
 		"name":               "test_config_1",
 		"services":           "data",
-		"dataPath":           "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath":          "/opt/couchbase/var/lib/couchbase/data",
 		"resourceMemRequest": memReq,
 	}
 	configMap := map[string]map[string]string{
@@ -235,11 +227,9 @@ func TestAntiAffinityOn(t *testing.T) {
 	}
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
-		"size":      strconv.Itoa(numNodes),
-		"name":      "test_config_1",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     strconv.Itoa(numNodes),
+		"name":     "test_config_1",
+		"services": "data"}
 	otherConfig1 := map[string]string{
 		"antiAffinity": "on",
 	}
@@ -289,11 +279,9 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	}
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
-		"size":      strconv.Itoa(numNodes + 1),
-		"name":      "test_config_1",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     strconv.Itoa(numNodes + 1),
+		"name":     "test_config_1",
+		"services": "data"}
 	otherConfig1 := map[string]string{
 		"antiAffinity": "on",
 	}
@@ -322,11 +310,9 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	}
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
-		"size":      strconv.Itoa(numNodes),
-		"name":      "test_config_1",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     strconv.Itoa(numNodes),
+		"name":     "test_config_1",
+		"services": "data"}
 	otherConfig1 := map[string]string{
 		"antiAffinity": "on",
 	}
@@ -393,11 +379,9 @@ func TestAntiAffinityOff(t *testing.T) {
 	scaleToNum := numNodes + 1
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
-		"size":      strconv.Itoa(scaleToNum),
-		"name":      "test_config_1",
-		"services":  "data",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data"}
+		"size":     strconv.Itoa(scaleToNum),
+		"name":     "test_config_1",
+		"services": "data"}
 	otherConfig1 := map[string]string{
 		"antiAffinity": "off",
 	}

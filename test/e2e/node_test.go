@@ -648,7 +648,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.KillMember(f.KubeClient, f.Namespace, foreignNodeName)
+	defer e2eutil.KillMember(f.KubeClient, f.Namespace, testCouchbase.Name, foreignNodeName)
 
 	externalPodIP := pod.Status.PodIP + ":8091"
 	err = e2eutil.AddNode(t, client, serverConfig.Services, username, password, externalPodIP)

@@ -1083,22 +1083,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets[0].conflictResolution in body cannot be updated"},
 		},
-
-		{
-			name: "change data path",
-			paramsIn: []parameter{
-				{
-					field:          []string{"Spec", "ServerSettings", "0", "DataPath"},
-					fieldType:      "string",
-					fieldValue:     "/invalid/data/path",
-					fieldIsPointer: false,
-				},
-			},
-			paramsOut:        []parameter{},
-			shouldFail:       true,
-			expectedMessages: []string{"spec.servers[0].dataPath in body cannot be updated"},
-		},
-
 		{
 			name: "change index storage mode",
 			paramsIn: []parameter{

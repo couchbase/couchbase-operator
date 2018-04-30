@@ -38,12 +38,11 @@ spec:
       - index
       - query
       - search
-    dataPath: /opt/couchbase/var/lib/couchbase/data
-    indexPath: /opt/couchbase/var/lib/couchbase/data
     pod:
       volumeMounts:
-        - name: couchbase
-          path: /opt/couchbase/var/lib/couchbase/
+        default: couchbase
+        data:  couchbase
+        index: couchbase
       couchabseEnv:
         ENV1: value
       resources:

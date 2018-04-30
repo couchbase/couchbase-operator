@@ -377,28 +377,9 @@ var testDefs = []testDef{
 		expectedErr: nil,
 	},
 	{
-		name:        "TestUpdateIndexPath",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0045.yaml",
-		description: "Tests updating the indexPath fails",
-		expectedErr: errors.CompositeValidationError(
-			&UpdateError{"spec.servers[0].indexPath", "body"},
-		),
-	},
-	{
-		name:        "TestUpdateDataPath",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0046.yaml",
-		description: "Tests updating the dataPath fails",
-		expectedErr: errors.CompositeValidationError(
-			&UpdateError{"spec.servers[0].dataPath", "body"},
-		),
-	},
-	{
 		name:        "TestUpdateClusterSettings",
 		path:        "tests/0047.yaml",
 		updatePath:  "tests/0048.yaml",
-		description: "Tests updating the dataPath fails",
 		expectedErr: nil,
 	},
 	{

@@ -4,7 +4,7 @@ metadata:
   name: cb-example
 spec:
   baseImage: couchbase/server
-  version: enterprise-5.0.1
+  version: 5.5.0-beta
   authSecret: cb-example-auth
   exposeAdminConsole: true
   cluster:
@@ -31,12 +31,11 @@ spec:
         - index
         - query
         - search
-      dataPath: /opt/couchbase/var/lib/couchbase/data
-      indexPath: /opt/couchbase/var/lib/couchbase/index
       pod:
         volumeMounts:
-          - name: couchbase
-            path: /opt/couchbase/var/lib/couchbase/
+          default: couchbase
+          data:  couchbase
+          index: couchbase
   volumeClaimTemplates:
     - metadata:
         name: couchbase

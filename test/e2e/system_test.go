@@ -220,11 +220,9 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		"autoFailoverTimeout":   "120",
 	}
 	serviceConfig1 := map[string]string{
-		"size":      "4",
-		"name":      "test_config_1",
-		"services":  "data,n1ql,index,fts",
-		"dataPath":  "/opt/couchbase/var/lib/couchbase/data",
-		"indexPath": "/opt/couchbase/var/lib/couchbase/data",
+		"size":     "4",
+		"name":     "test_config_1",
+		"services": "data,n1ql,index,fts",
 	}
 	bucketConfig1 := NewBucket("default")
 	bucketConfig2 := NewBucket("CUSTOMER")

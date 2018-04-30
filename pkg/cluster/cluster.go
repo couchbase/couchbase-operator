@@ -379,7 +379,7 @@ func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig
 
 func (c *Cluster) removePod(name string) error {
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-	err := k8sutil.DeleteCouchbasePod(c.config.KubeCli, c.cluster.Namespace, name, opts)
+	err := k8sutil.DeleteCouchbasePod(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, name, opts)
 	if err != nil {
 		c.logger.Errorf("error occurred during pod deletion (%s)", err)
 		return err

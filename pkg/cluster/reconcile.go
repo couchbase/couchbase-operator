@@ -10,6 +10,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -479,9 +480,22 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 // initializes member with cluster settings
 func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 	settings := c.cluster.Spec.ClusterSettings
+
+	// set default volume paths and allow for override of via spec
+	dataPath := constants.DefaultDataPath
+	indexPath := constants.DefaultDataPath
+	if mounts := serverSpec.GetVolumeMounts(); mounts != nil {
+		if mounts.DataClaim != nil {
+			dataPath = k8sutil.CouchbaseVolumeMountDataDir
+		}
+		if mounts.IndexClaim != nil {
+			indexPath = k8sutil.CouchbaseVolumeMountIndexDir
+		}
+	}
+
 	if err := c.client.InitializeCluster(m, c.username, c.password, c.cluster.Name,
 		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
-		serverSpec.Services, serverSpec.DataPath, serverSpec.IndexPath, settings.IndexStorageSetting); err != nil {
+		serverSpec.Services, dataPath, indexPath, settings.IndexStorageSetting); err != nil {
 		return err
 	}
 

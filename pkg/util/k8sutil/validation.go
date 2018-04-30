@@ -142,8 +142,6 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 										"size",
 										"name",
 										"services",
-										"dataPath",
-										"indexPath",
 									},
 									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 										"size": apiextensionsv1beta1.JSONSchemaProps{
@@ -158,12 +156,6 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 										"services": apiextensionsv1beta1.JSONSchemaProps{
 											Type:      "array",
 											MinLength: &minimumServicesLength,
-										},
-										"dataPath": apiextensionsv1beta1.JSONSchemaProps{
-											Type: "string",
-										},
-										"indexPath": apiextensionsv1beta1.JSONSchemaProps{
-											Type: "string",
 										},
 										"pod": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "object",

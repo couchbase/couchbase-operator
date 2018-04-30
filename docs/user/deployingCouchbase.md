@@ -40,8 +40,6 @@ spec:
         - index
         - query
         - search
-      dataPath: /opt/couchbase/var/lib/couchbase/data
-      indexPath: /opt/couchbase/var/lib/couchbase/data
 ```
 
 By taking a quick look at this configuration file you can see that it defines a cluster by specifying the following:

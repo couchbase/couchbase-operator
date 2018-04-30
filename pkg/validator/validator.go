@@ -90,15 +90,6 @@ func applyDefaults(customResource *api.CouchbaseCluster) {
 		customResource.Spec.ClusterSettings.AutoFailoverTimeout = DefaultAutoFailoverTimeout
 	}
 
-	for i, _ := range customResource.Spec.ServerSettings {
-		if customResource.Spec.ServerSettings[i].DataPath == "" {
-			customResource.Spec.ServerSettings[i].DataPath = constants.DefaultDataPath
-		}
-
-		if customResource.Spec.ServerSettings[i].IndexPath == "" {
-			customResource.Spec.ServerSettings[i].IndexPath = constants.DefaultIndexPath
-		}
-	}
 }
 
 func checkConstraints(customResource *api.CouchbaseCluster) error {
@@ -323,16 +314,6 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 			if cur.Name == up.Name {
 				if !stringArrayCompare(cur.Services, up.Services) {
 					err := &UpdateError{fmt.Sprintf("spec.servers[%d].services", i), "body"}
-					errs = append(errs, err)
-				}
-
-				if cur.DataPath != up.DataPath {
-					err := &UpdateError{fmt.Sprintf("spec.servers[%d].dataPath", i), "body"}
-					errs = append(errs, err)
-				}
-
-				if cur.IndexPath != up.IndexPath {
-					err := &UpdateError{fmt.Sprintf("spec.servers[%d].indexPath", i), "body"}
 					errs = append(errs, err)
 				}
 			}

@@ -1026,11 +1026,9 @@ func TestBasicMDSScaling(t *testing.T) {
 	// adding n1ql service
 	t.Log("adding n1ql service")
 	newService := api.ServerConfig{
-		Size:      1,
-		Name:      "test_config_2",
-		Services:  []string{"n1ql"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		Size:     1,
+		Name:     "test_config_2",
+		Services: []string{"n1ql"},
 	}
 	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1059,11 +1057,9 @@ func TestBasicMDSScaling(t *testing.T) {
 	// adding index service
 	t.Log("adding index service")
 	newService = api.ServerConfig{
-		Size:      1,
-		Name:      "test_config_3",
-		Services:  []string{"index"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		Size:     1,
+		Name:     "test_config_3",
+		Services: []string{"index"},
 	}
 	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries5)
 	if err != nil {
@@ -1092,11 +1088,9 @@ func TestBasicMDSScaling(t *testing.T) {
 	// adding search service
 	t.Log("adding fts service")
 	newService = api.ServerConfig{
-		Size:      1,
-		Name:      "test_config_4",
-		Services:  []string{"fts"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		Size:     1,
+		Name:     "test_config_4",
+		Services: []string{"fts"},
 	}
 	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries5)
 	if err != nil {
@@ -1260,11 +1254,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	// adding n1ql service
 	t.Log("adding n1ql service")
 	newService := api.ServerConfig{
-		Size:      1,
-		Name:      "test_config_2",
-		Services:  []string{"n1ql"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		Size:     1,
+		Name:     "test_config_2",
+		Services: []string{"n1ql"},
 	}
 	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1293,11 +1285,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	// adding index service
 	t.Log("adding index service")
 	newService = api.ServerConfig{
-		Size:      1,
-		Name:      "test_config_3",
-		Services:  []string{"index"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		Size:     1,
+		Name:     "test_config_3",
+		Services: []string{"index"},
 	}
 	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1326,11 +1316,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	// adding search services
 	t.Log("adding fts service")
 	newService = api.ServerConfig{
-		Size:      2,
-		Name:      "test_config_4",
-		Services:  []string{"fts"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		Size:     2,
+		Name:     "test_config_4",
+		Services: []string{"fts"},
 	}
 	testCouchbase, err = e2eutil.AddServices(f.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {

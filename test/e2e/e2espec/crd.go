@@ -48,11 +48,9 @@ var (
 // server settings
 var (
 	defaultServerSettings = api.ServerConfig{
-		Size:      1,
-		Name:      "test_config_1",
-		Services:  []string{"data", "n1ql", "index"},
-		DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-		IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+		Size:     1,
+		Name:     "test_config_1",
+		Services: []string{"data", "n1ql", "index"},
 	}
 )
 
@@ -160,11 +158,9 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 		ClusterSettings: defaultClusterSettings,
 		BucketSettings:  bucketConfig,
 		ServerSettings: []api.ServerConfig{api.ServerConfig{
-			Size:      size,
-			Name:      "test_config_1",
-			Services:  []string{"data", "n1ql", "index"},
-			DataPath:  "/opt/couchbase/var/lib/couchbase/data",
-			IndexPath: "/opt/couchbase/var/lib/couchbase/data",
+			Size:     size,
+			Name:     "test_config_1",
+			Services: []string{"data", "n1ql", "index"},
 		}},
 		ExposedFeatures: []string{},
 	}
@@ -263,10 +259,6 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 						services = append(services, service)
 					}
 					serverSettings.Services = services
-				case setting == "dataPath":
-					serverSettings.DataPath = config[key][setting]
-				case setting == "indexPath":
-					serverSettings.IndexPath = config[key][setting]
 				case setting == "resourceMemLimit":
 					limit, _ := strconv.Atoi(config[key][setting])
 					serverSettings.Pod.Resources.Limits[v1.ResourceMemory] = resource.MustParse(fmt.Sprintf("%d%s", limit, "Mi"))
@@ -337,9 +329,9 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 func NewStatefulCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 
 	crd := NewBasicCluster(genName, secretName, size, withBucket, exposed)
-	volume := api.VolumeMount{Name: "couchbase", Path: "/opt/couchbase/var/lib/couchbase/"}
+	couchbase := "couchbase"
 	crd.Spec.ServerSettings[0].Pod = &api.PodPolicy{
-		VolumeMounts: []api.VolumeMount{volume},
+		VolumeMounts: &api.VolumeMounts{DefaultClaim: &couchbase},
 	}
 
 	standardStorageClass := "standard"
