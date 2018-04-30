@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrCreatedCluster  = E.New("cluster failed to be created")
+	ErrClusterCreating = E.New("existing cluster failed during prior initialization, state unknown")
 	ErrUnkownCreatePod = E.New("unkown error occurred creating pod")
 )
 

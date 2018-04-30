@@ -135,7 +135,7 @@ func (c *Cluster) setup() error {
 	case api.ClusterPhaseNone:
 		shouldCreateCluster = true
 	case api.ClusterPhaseCreating:
-		return cberrors.ErrCreatedCluster
+		return cberrors.ErrClusterCreating
 	case api.ClusterPhaseRunning:
 		shouldCreateCluster = false
 	default:
