@@ -426,7 +426,7 @@ func TestFeaturesAll(t *testing.T) {
 	f := framework.Global
 	testDef := sysTestDef{
 		name: "simple",
-		days: 2,
+		days: f.Duration,
 		ops: []operation{
 			// Load data
 			{
