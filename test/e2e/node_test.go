@@ -751,12 +751,6 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
@@ -764,11 +758,22 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	e2eutil.KillPodsAndWaitForRecovery(t, f.KubeClient, testCouchbase, 1)
+	t.Logf("killing 1 pod...")
+	e2eutil.KillPods(t, f.KubeClient, testCouchbase, 1)
 	if err != nil {
-		t.Fatalf("failed to kill pod and recover: %v", err)
+		t.Fatalf("failed to kill pods: %v", err)
 	}
 
+	// Wait for the nodes to be reported as down before failing over, so we deterministically
+	// see the down events
+	downEvent := e2eutil.NewMemberDownEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, downEvent, 300)
+	if err != nil {
+		t.Fatalf("failed to wait for down node: %v", err)
+	}
+
+	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
@@ -829,12 +834,6 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
@@ -848,49 +847,21 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, e2eutil.Retries10, testCouchbase)
+	// Wait for the nodes to be reported as down before failing over, so we deterministically
+	// see the down events
+	downEvent := e2eutil.NewMemberDownEvent(testCouchbase, 1)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, downEvent, 300)
 	if err != nil {
-		t.Fatalf("failed to reach cluster size of 3: %v", err)
+		t.Fatalf("failed to wait for down node: %v", err)
 	}
 
-	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 2)
-	if err != nil {
-		t.Fatalf("failed to wait for 2 unhealthy nodes: %v", err)
-	}
+	// Manually failover nodes
+	e2eutil.FailoverNodes(t, client, 5, 2)
 
-	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != 5 {
-		t.Logf("clusterNodes: %v", clusterNodes)
-		t.Fatal("failed to see 5 nodes in the cluster")
-	}
-	nodesToFailover := []string{}
-	for _, node := range clusterNodes {
-		t.Logf("node status: %v", node.Status)
-		if node.Status == "unhealthy" {
-			nodesToFailover = append(nodesToFailover, node.HostName)
-		}
-	}
-
-	t.Logf("failing over nodes: %v", nodesToFailover)
-	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, e2eutil.Retries5, nodeName)
-		if err != nil {
-			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
-		}
-	}
-
-	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to reach cluster size of 5: %v", err)
-	}
-
+	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
+	expectedEvents.AddMemberDownEvent(testCouchbase, 1)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 1)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -958,12 +929,6 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
@@ -977,34 +942,16 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
+	// Wait for the nodes to be reported as down before failing over, so we deterministically
+	// see the down events
+	downEvent := e2eutil.NewMemberDownEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, downEvent, 300)
 	if err != nil {
-		t.Fatalf("failed to reach cluster size of 4: %v", err)
+		t.Fatalf("failed to wait for down node: %v", err)
 	}
 
-	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
-	if err != nil {
-		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
-	}
-
-	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != 5 {
-		t.Logf("clusterNodes: %v", clusterNodes)
-		t.Fatal("failed to see 5 nodes in the cluster")
-	}
-
-	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to reach cluster size of 5: %v", err)
-	}
-
+	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
@@ -1074,20 +1021,10 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}()
 
 	// create connection to couchbase nodes
-	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
@@ -1102,50 +1039,21 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase)
+	// Wait for the nodes to be reported as down before failing over, so we deterministically
+	// see the down events
+	downEvent := e2eutil.NewMemberDownEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, downEvent, 300)
 	if err != nil {
-		t.Fatalf("failed to reach cluster size of 3: %v", err)
+		t.Fatalf("failed to wait for down node: %v", err)
 	}
 
-	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 2)
-	if err != nil {
-		t.Fatalf("failed to wait for 2 unhealthy nodes: %v", err)
-	}
+	// Manually failover nodes
+	e2eutil.FailoverNodes(t, client, 5, 2)
 
-	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != 5 {
-		t.Logf("clusterNodes: %v", clusterNodes)
-		t.Fatal("failed to see 3 nodes in the cluster")
-	}
-
-	nodesToFailover := []string{}
-	for _, node := range clusterNodes {
-		t.Logf("node status: %v", node.Status)
-		if node.Status == "unhealthy" {
-			nodesToFailover = append(nodesToFailover, node.HostName)
-		}
-	}
-
-	t.Logf("failing over nodes: %v", nodesToFailover)
-	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, e2eutil.Retries20, nodeName)
-		if err != nil {
-			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
-		}
-	}
-
-	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size5, e2eutil.Retries10, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to reach cluster size of 5: %v", err)
-	}
-
+	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
+	expectedEvents.AddMemberDownEvent(testCouchbase, 1)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 1)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -1213,12 +1121,6 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
@@ -1232,34 +1134,16 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 4, e2eutil.Retries10, testCouchbase)
+	// Wait for the nodes to be reported as down before failing over, so we deterministically
+	// see the down events
+	downEvent := e2eutil.NewMemberDownEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, downEvent, 300)
 	if err != nil {
-		t.Fatalf("failed to reach cluster size of 4: %v", err)
+		t.Fatalf("failed to wait for down node: %v", err)
 	}
 
-	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
-	if err != nil {
-		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
-	}
-
-	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != 5 {
-		t.Logf("clusterNodes: %v", clusterNodes)
-		t.Fatal("failed to see 5 nodes in the cluster")
-	}
-
-	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 5, e2eutil.Retries10, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to reach cluster size of 5: %v", err)
-	}
-
+	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
@@ -1330,29 +1214,12 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+
 	// create connection to couchbase nodes
-	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(), service)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, f.KubeClient, testCouchbase, []string{serviceUrl})
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
-
-	/*
-		// create connection to couchbase nodes
-		client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(), f.KubeClient, testCouchbase)
-		if err != nil {
-			t.Fatalf("failed to create cluster client %v", err)
-		}
-	*/
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
@@ -1367,49 +1234,21 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, 3, e2eutil.Retries10, testCouchbase)
+	// Wait for the nodes to be reported as down before failing over, so we deterministically
+	// see the down events
+	downEvent := e2eutil.NewMemberDownEvent(testCouchbase, 0)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, downEvent, 300)
 	if err != nil {
-		t.Fatalf("failed to reach cluster size of 3: %v", err)
+		t.Fatalf("failed to wait for down node: %v", err)
 	}
 
-	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 2)
-	if err != nil {
-		t.Fatalf("failed to wait for 2 unhealthy nodes: %v", err)
-	}
+	// Manually failover nodes
+	e2eutil.FailoverNodes(t, client, 5, 2)
 
-	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != 5 {
-		t.Logf("clusterNodes: %v", clusterNodes)
-		t.Fatal("failed to see 5 nodes in the cluster")
-	}
-	nodesToFailover := []string{}
-	for _, node := range clusterNodes {
-		t.Logf("node status: %v", node.Status)
-		if node.Status == "unhealthy" {
-			nodesToFailover = append(nodesToFailover, node.HostName)
-		}
-	}
-
-	t.Logf("failing over nodes: %v", nodesToFailover)
-	for _, nodeName := range nodesToFailover {
-		err = e2eutil.FailoverNode(t, client, e2eutil.Retries20, nodeName)
-		if err != nil {
-			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
-		}
-	}
-
-	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, f.KubeClient, e2eutil.Size5, e2eutil.Retries10, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to reach cluster size of 5: %v", err)
-	}
-
+	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
+	expectedEvents.AddMemberDownEvent(testCouchbase, 1)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 1)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)

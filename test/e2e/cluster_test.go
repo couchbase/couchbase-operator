@@ -726,7 +726,7 @@ func TestNodeUnschedulable(t *testing.T) {
 // 1. Create 3 node cluster
 // 2. stop couchbase on node-0000
 // 3. Expect down node-0000 to be removed
-// 4. Cluster should eventually reconcile as 5 nodes:
+// 4. Cluster should eventually reconcile as 3 nodes:
 func TestNodeServiceDownRecovery(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -748,8 +748,6 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// kill couchbase service on pod 0
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -758,7 +756,8 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
+	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 
 	// expect down node to be removed from cluster
 	event := e2eutil.NewMemberRemoveEvent(testCouchbase, removePodMemberId)
@@ -767,15 +766,16 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
 	// healthy 3 node cluster
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries30)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	// Event checking
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
@@ -787,10 +787,6 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 }
 
 // Node service goes down while scaling down cluster
-//
-// TODO: (See K8S-113)
-//     Test currently hangs since failure scenario leads to
-//     possible dataloss which currently requires manual user intervention
 //
 // 1. Create 5 node cluster
 // 2. Scale down to 4 nodes
@@ -849,6 +845,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)

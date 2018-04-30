@@ -52,6 +52,16 @@ func (e *EventList) AddMemberRemoveEvent(cl *api.CouchbaseCluster, memberId int)
 	*e = append(*e, *event)
 }
 
+func (e *EventList) AddMemberDownEvent(cl *api.CouchbaseCluster, memberId int) {
+	event := NewMemberDownEvent(cl, memberId)
+	*e = append(*e, *event)
+}
+
+func (e *EventList) AddMemberFailedOverEvent(cl *api.CouchbaseCluster, memberId int) {
+	event := NewMemberFailedOverEvent(cl, memberId)
+	*e = append(*e, *event)
+}
+
 func (e *EventList) AddRebalanceStartedEvent(cl *api.CouchbaseCluster) {
 	*e = append(*e, *k8sutil.RebalanceStartedEvent(cl))
 }
@@ -107,4 +117,14 @@ func NewMemberAddEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
 func NewMemberRemoveEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberRemoveEvent(name, cl)
+}
+
+func NewMemberDownEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	return k8sutil.MemberDownEvent(name, cl)
+}
+
+func NewMemberFailedOverEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	return k8sutil.MemberFailedOverEvent(name, cl)
 }

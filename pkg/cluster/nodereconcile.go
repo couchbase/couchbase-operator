@@ -121,9 +121,17 @@ func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) {
 
 func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
 	if r.couchbase.DownNodes.Size() > 0 {
+		// Ensure the cluster is visibly unhealthy before triggering any events
 		c.status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
+		c.updateCRStatus()
+
 		c.logger.Warnln("Unable to reconcile nodes, waiting for auto-failover to take place")
 		r.errored = true
+
+		for _, name := range r.couchbase.DownNodes.Names() {
+			c.raiseEventCached(k8sutil.MemberDownEvent(name, c.cluster))
+		}
+
 		r.transitionState(ReconcileFinished)
 	} else {
 		c.status.SetReadyCondition()
@@ -212,6 +220,10 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
 		c.logger.Infof("planning removal of %s", m.ClientURL())
 		r.ejectNodes.Add(m)
 		r.runningPods.Remove(m.Name)
+	}
+
+	for _, name := range r.couchbase.FailedNodes.Names() {
+		c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
 	}
 
 	r.transitionState(ReconcileServerConfigs)

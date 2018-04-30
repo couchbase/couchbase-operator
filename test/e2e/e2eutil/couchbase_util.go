@@ -194,6 +194,35 @@ func FailoverNode(t *testing.T, client *cbmgr.Couchbase, tries int, nodeName str
 	return nil
 }
 
+// FailoverNodes manually fails over nodes, raises an error if the cluster is the wrong size
+// or the number of down nodes is wrong
+func FailoverNodes(t *testing.T, client *cbmgr.Couchbase, expectedSize, expectedDown int) {
+	t.Logf("getting cluster nodes...")
+	clusterNodes, err := GetNodesFromCluster(t, client, Retries5)
+	if err != nil {
+		t.Fatalf("failed to get nodes from cluster: %v", err)
+	}
+	if len(clusterNodes) != expectedSize {
+		t.Fatalf("expected %d nodes, got %d", expectedSize, len(clusterNodes))
+	}
+
+	nodesToFailover := []string{}
+	for _, node := range clusterNodes {
+		t.Logf("node status: %v", node.Status)
+		if node.Status == "unhealthy" {
+			nodesToFailover = append(nodesToFailover, node.HostName)
+		}
+	}
+
+	t.Logf("failing over nodes: %v", nodesToFailover)
+	for _, nodeName := range nodesToFailover {
+		err = FailoverNode(t, client, Retries5, nodeName)
+		if err != nil {
+			t.Fatalf("failed to failover node: %v with error: %v", nodeName, err)
+		}
+	}
+}
+
 func VerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, tries int) error {
 	err := retryutil.RetryOnErr(context.Background(), 5*time.Second, tries, "failover nodes", "test-cluster",
 		func() error {

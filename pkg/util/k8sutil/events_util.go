@@ -28,6 +28,22 @@ func MemberRemoveEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
 	return event
 }
 
+func MemberDownEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = "MemberDown"
+	event.Message = fmt.Sprintf("Existing member %s down", memberName)
+	return event
+}
+
+func MemberFailedOverEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = "MemberFailedOver"
+	event.Message = fmt.Sprintf("Existing member %s failed over", memberName)
+	return event
+}
+
 func RebalanceStartedEvent(cl *api.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -21,7 +22,9 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 var (
@@ -67,6 +70,7 @@ type Cluster struct {
 	ctx           context.Context                // Context used to cancel long running operations
 	cancel        context.CancelFunc             // Closure on the context to indicate cancellation
 	lastEvent     time.Time                      // When we raised the last event (see raiseEvent)
+	recorder      record.EventRecorder           // Buffers and aggegates events
 }
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
@@ -83,6 +87,15 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
+
+	// Set up our event logger.  Note that this will cache and aggregate
+	// events over a 10 minute window.
+	if err := api.AddToScheme(scheme.Scheme); err != nil {
+		return nil
+	}
+	broadcaster := record.NewBroadcaster()
+	c.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: os.Getenv(constants.EnvOperatorPodName)})
+	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: config.KubeCli.Core().Events(c.cluster.Namespace)})
 
 	c.logger.Info("Watching new cluster")
 
@@ -332,6 +345,9 @@ func (c *Cluster) logSpecUpdate(oldSpec, newSpec api.ClusterSpec) {
 }
 
 func (c *Cluster) updateCRStatus() error {
+	kind := c.cluster.Kind
+	apiVersion := c.cluster.APIVersion
+
 	// The cluster object can be updated asynchronously e.g. via a spec update,
 	// hence what's in etcd need not reflect what's locally cached and the k8s
 	// server will reject any updates that fail the CAS test.  We only pick up
@@ -358,7 +374,14 @@ func (c *Cluster) updateCRStatus() error {
 	}
 
 	// Cache the new cluster object (with its new revision ID)
+	//
+	// Note: TypeMeta isn't populated after the Update() so manually restore.
+	//       May be related to https://github.com/kubernetes/apiextensions-apiserver/issues/29 for tracking
+	//       This must be populated for cached events to work properly as there is a bug in the fallback
+	//       code which parses the object link to extract the same information.
 	c.cluster = newCluster
+	c.cluster.Kind = kind
+	c.cluster.APIVersion = apiVersion
 	return nil
 }
 
@@ -620,5 +643,10 @@ func (c *Cluster) raiseEvent(event *v1.Event) {
 
 	// Update the last event timestamp
 	c.lastEvent = event.FirstTimestamp.Time
+}
 
+// raiseEventCached raises an event but first checks an LRU cache and optionally
+// aggregates events together
+func (c *Cluster) raiseEventCached(event *v1.Event) {
+	c.recorder.Event(c.cluster, event.Type, event.Reason, event.Message)
 }

@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -129,6 +130,16 @@ func (ms MemberSet) Append(other MemberSet) {
 	for _, m := range other {
 		ms.Add(m)
 	}
+}
+
+// Names returns a sorted list of member names
+func (ms MemberSet) Names() []string {
+	names := []string{}
+	for _, m := range ms {
+		names = append(names, m.Name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (ms MemberSet) ClientURLs() []string {
