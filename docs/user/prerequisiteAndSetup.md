@@ -11,7 +11,7 @@ For installation instructions, see [MiniKube](https://kubernetes.io/docs/tasks/t
 Preparing the cluster to run the Couchbase Operator may require setting up proper RBAC settings in your Kubernetes cluster. Before moving forward, you should read the deployment guides for for the various supported platforms.
 
 * [Installing in Kubernetes](installKubernetes.md)
-* [Installing in Kubernetes (without RBAC)](installingKubernetesNoRBAC.md)
+* [Installing in Kubernetes (without RBAC)](installKubernetesNoRBAC.md)
 * [Installing in OpenShift](installOpenShift.md)
 * [Bootstrapping OpenShift](bootstrapOpenShift.md)
   * *Bootstrap automation should only be used in development clusters since it involves granting privileges to the operator that aren't ideal in a production OpenShift cluster.*
