@@ -551,10 +551,7 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 			if err != nil {
 				return nil, err
 			}
-			pod, err = kubeCli.Core().Pods(namespace).Create(pod)
-			if err != nil {
-				return nil, err
-			}
+
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			err = k8sutil.WaitForPod(ctx, kubeCli, namespace, pod.Name, "")

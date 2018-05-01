@@ -644,14 +644,12 @@ func TestRemoveForeignNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pod, err := e2eutil.CreateMemberPod(f.KubeClient, m, testCouchbase, testCouchbase.Name, f.Namespace)
-	if err != nil {
+	if _, err := e2eutil.CreateMemberPod(f.KubeClient, m, testCouchbase, testCouchbase.Name, f.Namespace); err != nil {
 		t.Fatal(err)
 	}
 	defer e2eutil.KillMember(f.KubeClient, f.Namespace, testCouchbase.Name, foreignNodeName)
 
-	externalPodIP := pod.Status.PodIP + ":8091"
-	err = e2eutil.AddNode(t, client, serverConfig.Services, username, password, externalPodIP)
+	err = e2eutil.AddNode(t, client, serverConfig.Services, username, password, m.ClientURLPlaintext())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -693,6 +691,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddEvent(*k8sutil.MemberRemoveEvent(foreignNodeName, testCouchbase))
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// None of the nodes should be the foreign member and
@@ -702,9 +701,6 @@ func TestRemoveForeignNode(t *testing.T) {
 		t.Fatalf("unable to poll cluster info")
 	}
 	for _, node := range info.Nodes {
-		if node.HostName == externalPodIP {
-			t.Fatalf("node %s should not be in cluster", node.HostName)
-		}
 		if node.Status != "healthy" {
 			t.Fatalf("node %s is not healthy, status: %s", node.HostName, node.Status)
 		}

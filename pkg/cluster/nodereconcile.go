@@ -101,15 +101,12 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 // Unknown members are members who are currently running, but not part
 // of the set of nodes the operator is tracking.
 func (r *ReconcileMachine) handleUnknownMembers(c *Cluster) {
-	var err error
-	r.runningPods, err = c.removeUnknownMembers(r.runningPods)
-	if err != nil {
-		c.logger.Errorf("Removal of unknown members failed: %s", err.Error())
-		r.errored = true
-		r.transitionState(ReconcileFinished)
-	} else {
-		r.transitionState(ReconcileRebalanceCheck)
+	// Safely balance out these illegal members
+	unknownMembers := r.runningPods.Diff(c.members)
+	for name, _ := range unknownMembers {
+		r.runningPods.Remove(name)
 	}
+	r.transitionState(ReconcileRebalanceCheck)
 }
 
 func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) {

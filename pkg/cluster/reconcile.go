@@ -639,20 +639,6 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	return nil
 }
 
-// Remove all pods from running set that does not belong to member set.
-func (c *Cluster) removeUnknownMembers(running couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
-	unknownMembers := running.Diff(c.members)
-	if unknownMembers.Size() > 0 {
-		c.logger.Infof("removing unexpected pods: %v", unknownMembers)
-		for _, m := range unknownMembers {
-			if err := c.removePod(m.Name); err != nil {
-				return running, err
-			}
-		}
-	}
-	return running.Diff(unknownMembers), nil
-}
-
 func (c *Cluster) reconcileClusterSettings() bool {
 
 	if ok := c.reconcileAutoFailoverSettings(); !ok {
