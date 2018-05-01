@@ -13,9 +13,9 @@ The following topics are also helpful to understand when troubleshooting the Ope
 
 ## Full Deployment Logs
 
-To retrieve the logs for the Operator and the entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://packages.couchbase.com/kubernetes/beta/couchbase-kubernetes-support.sh.sh)
+To retrieve the logs for the Operator and the entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-kubernetes-support.sh)
 ```bash
-wget https://packages.couchbase.com/kubernetes/beta/couchbase-kubernetes-support.sh
+wget https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-kubernetes-support.sh
 chmod +x couchbase-kubernetes-support.sh
 ./couchbase-kubernetes-support.sh
 ```
@@ -71,11 +71,11 @@ The easiest way to get ```cbcollect``` logs is to use the standard logs collecti
 
 On Kubernetes:
 ```bash
-kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-collect-logs.yaml
+kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
 ```
 On OpenShift:
 ```bash
-oc create -f example/couchbase-cli-collect-logs.yaml
+oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
 ```
 Once the log collection is complete, you can view the log location for each node from the Couchbase Server Web Console by going to **Logs > Collect Information** and clicking **Show Current Collection**. You can then run a command like the following for each node in the cluster to collect their logs.
 

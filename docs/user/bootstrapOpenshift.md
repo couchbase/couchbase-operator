@@ -9,7 +9,9 @@ OpenShift offers an application catalog which provides templated deployment of a
 Since templates can be imported using the standard `oc` cli tool, we've created a bootstrap script to assist with importing couchbase templates into your OpenShift cluster.  Note that the bootstrap will also create a utility project named `admin-ct-ctl`.  This utility project consists of a controller that detects when a new couchbase cluster is being created from your template and ensures that there is an instance of the couchbase-operator within your clusters project.
 
 ```console
-$ wget https://packages.couchbase.com/kubernetes/0.8.0/k8s/openshift-bootsrap.sh
+$ wget https://packages.couchbase.com/kubernetes/0.8.0-beta2/openshift-bootstrap.zip
+$ tar xzf openshift-bootstrap.zip
+$ cd openshift-bootstrap
 $ chmod +x openshift-bootsrap.sh
 $ ./openshift-bootsrap.sh
 ```

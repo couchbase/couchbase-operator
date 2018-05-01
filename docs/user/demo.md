@@ -11,12 +11,12 @@ The tutorial also requires the following artifacts that are bundled with the Cou
 1. **Create a Couchbase cluster**
 On Kubernetes:
 ```console
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 On OpenShift:
 ```console
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/beta/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 
@@ -73,7 +73,7 @@ secret "cb-user-auth" created
 Now, use the RBAC user's secret to securely create a Couchbase RBAC user using a Kubernetes/OpenShift job:
 On Kubernetes:
 ```console
-$ kubectl create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ kubectl get job
@@ -82,7 +82,7 @@ create-user   1         1            4s
 ```
 On OpenShift:
 ```console
-$ oc create -f https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ oc get job
@@ -93,7 +93,7 @@ create-user   1         1            4s
 The name of the secret and its keys are very important as the sample `create-user` spec mounts the secrets into a volume.
 
 ```yaml
-# https://packages.couchbase.com/kubernetes/beta/couchbase-cli-create-user.yaml
+# https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-create-user.yaml
 ---
 apiVersion: batch/v1
 kind: Job
@@ -137,12 +137,12 @@ spec:
 To deploy the `pillowfight` data loader, run the following command:
 On Kubernetes:
 ```console
-$ kubectl create -f https://packages.couchbase.com/kubernetes/beta/pillowfight-data-loader.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/pillowfight-data-loader.yaml
 job "pillowfight" created
 ```
 On OpenShift:
 ```console
-$ oc create -f https://packages.couchbase.com/kubernetes/beta/pillowfight-data-loader.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/pillowfight-data-loader-openshift.yaml
 job "pillowfight" created
 ```
 Once it completes, you should have 10k items loaded in your cluster.

@@ -9,7 +9,7 @@ The first step for installing the Couchbase Operator is to create a *ClusterRole
 To create the ClusterRole for the Couchbase Operator, run the following command:
 
 ```bash
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0/k8s-rbac/cluster-role.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/k8s-rbac/cluster-role.yaml
 ```
 *Note*: This role only needs to be created once.
 
@@ -29,7 +29,7 @@ $ kubectl create clusterrolebinding couchbase-operator --clusterrole couchbase-o
 Now that the ServiceAccount is set up with the appropriate permissions, you can start the Couchbase Operator by running the following command:
 
 ```bash
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0/k8s-rbac/operator.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/k8s-rbac/operator.yaml
 ```
 
 Running this command downloads the Couchbase Operator Docker image that is specified in the ```operator.yaml``` file and creates a *deployment* which manages a single instance of the Couchbase Operator. The Couchbase Operator uses a deployment so that it can restart if the pod it's running in dies.
