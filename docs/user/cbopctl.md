@@ -3,7 +3,7 @@
 The `cbopctl` command implements a subset of the kubectl/oc commands and ensures that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes. Checking that a configuration is valid before uploading it is important because once a configuration is uploaded to Kubernetes the Couchbase Operator is unable to handle configuration errors. To better understand why this is the case see the diagram below which shows what happens when a CouchbaseCluster configuration is uploaded to Kubernetes.
 
 
-![Figure 1](../images/cbopctl_figure_1.jpg)
+![Figure 1](images/cbopctl_figure_1.jpg)
 
 
 1. A kubectl command is run and the CouchbaseCluster configuration is sent to the Kubernetes API Server.
