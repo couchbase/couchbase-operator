@@ -1,6 +1,6 @@
 # Cluster Deployment Tutorial
 
-This tutorial walks you through the steps to deploy a 3-nodes cluster and load data into the cluster.  
+This tutorial walks you through the steps to deploy a 3-nodes cluster and load data into the cluster.
 
 **Prerequisites**
 Before proceeding to perform the steps in this tutorial, ensure that you've prepared your Kubernetes cluster to run Couchbase pods. See [Prerequisites and Setup](prerequisiteAndSetup.md) for details.
@@ -9,6 +9,7 @@ The tutorial also requires the following artifacts that are bundled with the Cou
 - `pillowfight-data-loader.yaml` job to load data into your cluster.
 
 1. **Create a Couchbase cluster**
+
 On Kubernetes:
 ```console
 $ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cluster.yaml
@@ -29,6 +30,7 @@ This tutorial will be loading data in Couchbase and hence requires a Couchbase R
  - **Option 1: Create a default user using the CLI**
 
 Use the `describe` command to get the Web Console port:
+
 On Kubernetes:
 ```console
 $ kubectl describe cbc cb-example |  grep "Admin Console Port:"
@@ -71,6 +73,7 @@ secret "cb-user-auth" created
 ```
 
 Now, use the RBAC user's secret to securely create a Couchbase RBAC user using a Kubernetes/OpenShift job:
+
 On Kubernetes:
 ```console
 $ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-create-user.yaml
@@ -88,6 +91,19 @@ job "create-user" created
 $ oc get job
 NAME          DESIRED   SUCCESSFUL   AGE
 create-user   1         1            4s
+```
+
+*Note*: If you are not using the default namespace, you must download and update the ```couchbase-cli-create-user.yaml``` file to reflect your namespace.
+For example, if your namespace is myproject, edit the command field in the YAML file to replace ```cb-example-0000.cb-example.default.svc``` with ```cb-example-0000.cb-example.myproject.svc```. The updated field will now look like the following snippet:
+
+```yaml
+command: ["/bin/sh", "-c", "/couchbase-cli-secure user-manage
+                     -c cb-example-0000.cb-example.myproject.svc
+                     -u {auth.admin.username}
+                     -p {auth.admin.password}
+                     --rbac-username {auth.users.default_user}
+                     --rbac-password {auth.users.default_password}
+                     --roles admin --auth-domain local --set"]
 ```
 
 The name of the secret and its keys are very important as the sample `create-user` spec mounts the secrets into a volume.
@@ -135,6 +151,7 @@ spec:
 ```
 
 To deploy the `pillowfight` data loader, run the following command:
+
 On Kubernetes:
 ```console
 $ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/pillowfight-data-loader.yaml

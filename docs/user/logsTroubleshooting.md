@@ -77,6 +77,22 @@ On OpenShift:
 ```bash
 oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
 ```
+
+
+*Note*: If you are not using the default namespace, you must download and update the `couchbase-cli-collect-logs.yaml` file to reflect your namespace.
+For example, if your namespace is `myproject`, edit the `command` field in the YAML file to replace `cb-example-0000.cb-example.default.svc` with `cb-example-0000.cb-example.myproject.svc`.
+The updated field will now look like the following:
+
+```yaml
+---
+command: [""/bin/sh"", ""-c"", ""couchbase-cli-secure collect-logs-start
+                              -c cb-example-0000.cb-example.myproject.svc
+                              -u {auth.admin.username}
+                              -p {auth.admin.password}
+                              --all-nodes""]
+---
+```
+
 Once the log collection is complete, you can view the log location for each node from the Couchbase Server Web Console by going to **Logs > Collect Information** and clicking **Show Current Collection**. You can then run a command like the following for each node in the cluster to collect their logs.
 
 On Kubernetes:
