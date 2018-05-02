@@ -161,7 +161,7 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 				return
 			}
 
-			if checkJob.Status.Failed == 1 {
+			if checkJob.Status.Failed >= 3 {
 				jobInfo["status"] = "error: job failed: " + jobName
 				results <- jobInfo
 				return
@@ -425,7 +425,7 @@ func TestFeaturesAll(t *testing.T) {
 	f := framework.Global
 	testDef := sysTestDef{
 		name: "simple",
-		days: 2,
+		days: f.Duration,
 		ops: []operation{
 			// Load data
 			{

@@ -41,6 +41,7 @@ type Framework struct {
 	config        *rest.Config
 	LogDir        string
 	SkipTeardown  bool
+	Duration      int
 	//S3Cli         *s3.S3
 	//S3Bucket      string
 }
@@ -52,6 +53,7 @@ func Setup() error {
 	deploymentSpec := flag.String("deployment-spec", "", "deployment spec, eg. $PWD/example/deployment.yaml")
 	ns := flag.String("namespace", "default", "e2e test namespace")
 	skipTearDown := flag.Bool("skip-teardown", false, "skip teardown after tests")
+	duration := flag.Int("duration", 7, "days to run test")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -111,6 +113,7 @@ func Setup() error {
 		//S3Bucket:   os.Getenv("TEST_S3_BUCKET"),
 		LogDir:       logDir,
 		SkipTeardown: *skipTearDown,
+		Duration:     *duration,
 	}
 	return Global.setup()
 }

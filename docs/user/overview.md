@@ -16,6 +16,8 @@ By creating our own custom Couchbase controller, we can add Couchbase specific k
 
 The goal of the Couchbase Operator is to fully manage one or more Couchbase deployments so that you as a developer/SRE don't need to worry about the operational complexities of running Couchbase. This is, however, our 0.7 Beta release, so not all features have been added yet. Below is a list of the management tasks we currently support:
 
+* Cluster configuration
 * Cluster provisioning
-* Elastic Scalability
-* Auto Recovery
+* Ad-hoc scalability
+* Auto recovery
+* Logging

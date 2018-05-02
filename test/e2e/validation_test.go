@@ -326,7 +326,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
-				_, err = e2eutil.WaitPodsDeleted(f.KubeClient, ns, e2eutil.Retries10, metav1.ListOptions{LabelSelector: "app=couchbase"})
+				_, err = e2eutil.WaitPodsDeleted(f.KubeClient, ns, e2eutil.Retries30, metav1.ListOptions{LabelSelector: "app=couchbase"})
 				if err != nil {
 					failures = append(failures, failure{testName: test.name, testError: err})
 					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)

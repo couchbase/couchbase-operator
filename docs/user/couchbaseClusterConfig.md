@@ -81,6 +81,18 @@ spec:
             storage: 1Gi
 ```
 
+<!-- TOC depthFrom:2 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [Top-Level Definitions](#top-level-definitions)
+- [Spec: The Top-Level](#spec-the-top-level)
+- [Spec: The Cluster Settings](#spec-the-cluster-settings)
+- [Spec: Bucket Settings](#spec-bucket-settings)
+- [Spec: Servers](#spec-servers)
+	- [The Pod Policy](#the-pod-policy)
+		- [Resources](#resources)
+
+<!-- /TOC -->
+
 ## Top-Level Definitions
 
 The following parameters are the top level parameters for a CouchbaseCluster configuration:
