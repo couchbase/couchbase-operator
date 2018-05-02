@@ -29,6 +29,7 @@ K8S-80 | The Couchbase Web Console may redirect to a node even after it has been
 
 K8S-195 | The OpenShift bootstrap script has issues running in OpenShift clusters, but works in MiniShift. Note that we don't recommend using this bootstrap script in production clusters.
 
+K8S-205 | Sometimes an extra bucket event will show up in the events log if a node is manually failed over.
 
 ## Fixed Issues
 
