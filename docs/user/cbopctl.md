@@ -1,25 +1,29 @@
 # Ensuring Valid CouchbaseCluster Configurations with cbopctl
 
-The `cbopctl` command implements a subset of the kubectl/oc commands and ensures that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes. Checking that a configuration is valid before uploading it is important because once a configuration is uploaded to Kubernetes the Couchbase Operator is unable to handle configuration errors. To better understand why this is the case see the diagram below which shows what happens when a CouchbaseCluster configuration is uploaded to Kubernetes.
+`cbopctl` is a command line tool that comes with the Couchbase Operator installation and implements a custom subset of the `kubectl` and `oc` commands to ensure that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes. It is important to check that a configuration is valid before uploading it, because once a configuration is uploaded to Kubernetes, the Couchbase Operator is unable to handle configuration errors.
+
+The following diagram shows the process of uploading a CouchbaseCluster configuration to Kubernetes using just `kubectl`:
 
 
 ![Figure 1](images/cbopctl_figure_1.jpg)
 
 
-1. A kubectl command is run and the CouchbaseCluster configuration is sent to the Kubernetes API Server.
-2. The CouchbaseCluster configuration is validated to make sure it is valid.
-3. If the CouchbaseCluster configuration is valid it is inserted into etcd. If it is not valid an error is returned to kubectl.
-4. etcd acknowleged to the API Server that the CouchbaseCluster object was persisted.
-5. A success message is returned to kubectl.
-6. The CouchbaseCluster object is sent to the Couchbase operator.
+1. The `kubectl` command is run and the CouchbaseCluster configuration is sent to the Kubernetes API Server.
+2. The CouchbaseCluster configuration undergoes partial validation by Kubernetes.
+3. If the CouchbaseCluster configuration is found to be valid by Kubernetes, it is inserted into `etcd`. If it is not valid, an error is returned to `kubectl`.
+4. `etcd` acknowledges to the API Server that the CouchbaseCluster object was persisted.
+5. A success message is returned to `kubectl`.
+6. The CouchbaseCluster object is sent to the Couchbase Operator.
 
-This means that the only place to do validation is in the API Server because errors in the configuration must be caught before the CouchbaseCluster configuration makes it to etcd.
+Since Kubernetes can only do a partial validation, the only place to do full validation is in the API Server, because errors in the configuration must be caught before the CouchbaseCluster configuration makes it to `etcd`.
 
-Kubernetes is a constantly evolving project and the ability to validate Custom Resources is still being improved. In Kubernetes 1.8 for example, there is no ability to do validation. In Kubernetes 1.9, there is support for CRD validation, but it isn't complete and doesn't allow for defaulting of configuration parameters. In Kubernetes 1.11 defaulting will be added, but there still won't be support for more complex types of validation. What this means is that in the short term we need to provide a way for users to validate that their configurations are correct before submitting them to Kubernetes and this is why we built the cbopctl tool. cbopctl allows us to add all of our validation code into a command line tool that is run by the user and ensures that invalid configurations can't make it into Kubernetes.
+Kubernetes is a constantly evolving project and the ability to validate Custom Resource Definitions is still being improved. In Kubernetes 1.8, for example, there is no ability to do validation. In Kubernetes 1.9, there is some CRD validation, but it is incomplete and doesn't allow for the defaulting of configuration parameters. In Kubernetes 1.11, defaulting will be added, but there still won't be support for more complex types of validation.
+
+Until Kubernetes provides full native validation, the Couchbase Operator needs to provide a way to validate that configurations are correct before submitting them to Kubernetes. The `cbopctl` command contains all of Couchbase's validation code in one command line tool to ensure that invalid configurations can't make it into Kubernetes.
 
 ### cbopctl commands
 
-cbopctl implements the create, delete, and apply commands in a similar way as kubectl/oc.
+`cbopctl` implements the create, delete, and apply commands in a similar way to `kubectl` and `oc`.
 
 ```bash
 $ cbopctl
@@ -33,13 +37,11 @@ Optional Flags:
 
      --version                Prints version information
   -h,--help                   Prints the help message
-
-
 ```
 
-The create command should be used to create new CouchbaseClusters, delete can be used to delete CouchbaseClusters (although no validation takes place during a delete so this command is here for completeness), and apply should be used when updating a cluster.
+The `create` command should be used to create new CouchbaseClusters, `delete` can be used to delete CouchbaseClusters (although no validation takes place during a delete so this command is here for completeness), and `apply` should be used when updating a cluster.
 
-Each subcommand has three flags; one that is required and two that are optional.
+Each subcommand has three flags - one that is required and two that are optional.
 
 ```bash
 Required Flags:
@@ -54,4 +56,4 @@ Optional Flags:
   -h,--help                   Prints the help message
 ```
 
-Specifying a filename to the CouchbaseCluster configuration is required for all commands. The dry run flag can be used to run validation on the configuration file specified without uploading it to Kubernetes. This is particularly useful if you want to use features in kubectl that are not in cbopctl, but you still want to validate the configuration before pushing it to Kubernetes. The kubeconfig flag is also available in case the configuration to your Kubernetes cluster is located on a non-default path.
+Specifying the filename of a CouchbaseCluster configuration is required for all commands. The `dry-run` flag can be used to run validation on the specified configuration file without uploading it to Kubernetes. This is particularly useful if you want to use features in `kubectl` that are not in `cbopctl`, but you still want to validate the configuration before pushing it to Kubernetes. The `kubeconfig` flag is also available in case the configuration to your Kubernetes cluster is located on a non-default path.
