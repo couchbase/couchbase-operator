@@ -21,7 +21,7 @@ $ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchb
 couchbasecluster "cb-example" created
 ```
 
-*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for more information about this tool.
+*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for download instructions.
 
 2. **Create a Couchbase RBAC user**
 

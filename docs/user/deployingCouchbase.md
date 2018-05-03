@@ -76,7 +76,7 @@ $ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchb
 couchbasecluster "cb-example" created
 ```
 
-*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for more information about this tool.
+*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for download instructions.
 
 The Couchbase Operator automatically begins creating the cluster. Depending on the configuration, creating a cluster can take some time. You can track the progress of cluster creation using the ```kubectl describe``` command. For details on how to use this command and an explanation of the output, see [Displaying Information about a Couchbase Cluster](clusterStatusGuide.md).
 
