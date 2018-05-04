@@ -1,8 +1,8 @@
-## Installing on Kubernetes With RBAC
+# Installing on Kubernetes With RBAC
 
 In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in a Kubernetes cluster that has RBAC enabled. This guide assumes that you are installing on a new Kubernetes cluster, but if you have an existing system and need to do a custom setup, then you should be able to modify a few of the parameters in the various commands and configuration files in order to install the Couchbase Operator.
 
-### Creating a ClusterRole
+## Creating a ClusterRole
 
 The first step for installing the Couchbase Operator is to create a *ClusterRole* that allows the Operator to access the resources it needs to run. Since the Couchbase Operator might run in many different namespaces, it is best to create a ClusterRole because you can assign that role to a *ServiceAccount* in any namespace.
 
@@ -13,7 +13,7 @@ $ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/k8s-rb
 ```
 *Note*: This role only needs to be created once.
 
-### Creating a ServiceAccount
+## Creating a ServiceAccount
 
 After the ClusterRole is created, you need to create a ServiceAccount in the namespace where you are installing the Couchbase Operator, and then assign the ClusterRole to that ServiceAccount using a *ClusterRoleBinding*. In this guide we will use the `default` namespace to create the ServiceAccount.
 
@@ -24,7 +24,7 @@ $ kubectl create clusterrolebinding couchbase-operator --clusterrole couchbase-o
 
 *Note*: If you would prefer to use a *RoleBinding* instead of a ClusterRoleBinding, then the CRD needs to be installed separately from the Couchbase Operator. This can be accomplished by removing the ```-create-crd argument``` from the ```operator.yaml``` file and uploading the CouchbaseCluster CRD separately.
 
-### Starting the Operator
+## Starting the Operator
 
 Now that the ServiceAccount is set up with the appropriate permissions, you can start the Couchbase Operator by running the following command:
 
@@ -47,7 +47,7 @@ NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator   1         1         1            0           10s
 ```
 
-In this case, the deployment is called "couchbase-operator". The DESIRED field in the output shows that this deployment will create 1 pod running the Couchbase Operator. The CURRENT field shows that 1 Couchbase Operator pod has been created. However, the AVAILABLE field indicates that that pod is not ready yet since its value is 0 and not 1. This means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task it will be able to start managing Couchbase clusters and the status will be shown as AVAILABLE.
+In this case, the deployment is called ```couchbase-operator```. The DESIRED field in the output shows that this deployment will create 1 pod running the Couchbase Operator. The CURRENT field shows that 1 Couchbase Operator pod has been created. However, the AVAILABLE field indicates that that pod is not ready yet since its value is 0 and not 1. This means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task it will be able to start managing Couchbase clusters and the status will be shown as AVAILABLE.
 
 You should continue to poll the status of the Operator until your output looks similar to the following output:
 
@@ -68,7 +68,7 @@ NAME                                  READY   STATUS   RESTARTS   AGE
 couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
 ```
 
-You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: "CRD initialized, listening for events... module=controller".
+You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: ```CRD initialized, listening for events... module=controller```.
 
 ```bash
 $ kubectl logs couchbase-operator-1917615544-t5mhp

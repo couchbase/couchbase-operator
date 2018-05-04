@@ -25,7 +25,7 @@ NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator   1         1         1            0           10s
 ```
 
-In this case, the deployment is called "couchbase-operator". The DESIRED field in the output shows that this deployment will create 1 pod running the Couchbase Operator. The CURRENT field shows that 1 Couchbase Operator pod has been created. However, the AVAILABLE field indicates that that pod is not ready yet since its value is 0 and not 1. This means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task it will be able to start managing Couchbase clusters and the status will be shown as AVAILABLE.
+In this case, the deployment is called ```couchbase-operator```. The DESIRED field in the output shows that this deployment will create 1 pod running the Couchbase Operator. The CURRENT field shows that 1 Couchbase Operator pod has been created. However, the AVAILABLE field indicates that that pod is not ready yet since its value is 0 and not 1. This means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task it will be able to start managing Couchbase clusters and the status will be shown as AVAILABLE.
 
 You should continue to poll the status of the Operator until your output looks similar to the following output:
 
@@ -46,7 +46,7 @@ NAME                                  READY   STATUS   RESTARTS   AGE
 couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
 ```
 
-You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: "CRD initialized, listening for events... module=controller.
+You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: ```CRD initialized, listening for events... module=controller```.
 
 ```bash
 $ kubectl logs couchbase-operator-1917615544-t5mhp

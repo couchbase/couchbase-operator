@@ -52,7 +52,7 @@ By taking a quick look at this configuration file you can see that it defines a 
 * Size: 3 node cluster with all services on each node (spec.servers)
 * Auth secret: cb-example-auth
 
-One thing that's important to note is the `authSecret` field. The Couchbase Operator uses Kubernetes Secrets to create and manage the Couchbase super-user credentials. As a result, the `authSecret` field must refer to secret that contains both a user name and a password field. For convenience, we provide a sample secret that can be pushed into your Kubernetes cluster. The secret sets the user name to "Administrator" and the password to "password". To load this secret into your Kubernetes cluster, run the following command:
+One thing that's important to note is the `authSecret` field. The Couchbase Operator uses Kubernetes Secrets to create and manage the Couchbase super-user credentials. As a result, the `authSecret` field must refer to secret that contains both a user name and a password field. For convenience, we provide a sample secret that can be pushed into your Kubernetes cluster. The secret sets the user name to ```Administrator``` and the password to ```password```. To load this secret into your Kubernetes cluster, run the following command:
 On Kubernetes:
 ```bash
 $ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/secret.yaml

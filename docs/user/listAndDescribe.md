@@ -85,6 +85,7 @@ Containers:
 ## Server Pods
 
 Couchbase pods can be listed using the ```-lapp=couchbase``` label.
+
 On Kubernetes:
 ```console
 $ kubectl get po -l app=couchbase
@@ -94,7 +95,9 @@ cb-development-0001   1/1       Running   0          1h
 cb-production-0000    1/1       Running   0          1h
 cb-production-0001    1/1       Running   0          1h
 ```
+
 On OpenShift, use the following command:
+
 ```console
 $ oc get po -l app=couchbase
 ```

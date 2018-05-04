@@ -9,7 +9,7 @@ To use the ```kubectl replace``` command, first edit a field in the Couchbase cl
 kubectl replace -f <path to updated config>
 ```
 
-Using the ```kubectl edit``` command you can edit the Couchbase cluster configuration directly. For example, if your cluster name is "cb-example", use the following command to edit the configuration:
+Using the ```kubectl edit``` command you can edit the Couchbase cluster configuration directly. For example, if your cluster name is ```cb-example```, use the following command to edit the configuration:
 
 ```bash
 kubectl edit cbc cb-example
