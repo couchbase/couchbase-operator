@@ -414,6 +414,35 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets.name in body should match '^[a-zA-Z0-9._\\-%]*$'"},
 		},
+
+		{
+			name: "Validate server-settings services fields",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Services"},
+					fieldType:  "array",
+					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"cluster failed to setup: Invalid service name: indxe"},
+		},
+
+		{
+			name: "Validate AdminConsoleService fields",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "AdminConsoleServices"},
+					fieldType:  "array",
+					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"validation failure list:\nspec.adminConsoleServices in body should be one of [data index query search]"},
+		},
+
 		{
 			name: "create invalid bucket type",
 			paramsIn: []parameter{
