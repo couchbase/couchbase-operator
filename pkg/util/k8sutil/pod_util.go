@@ -69,7 +69,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 			// Find volumes that already exist for this mount path
 			// to allow pod recovery. Otherwise, create a new PVC
 			mountPath := pathForVolumeMountName(mountName, config)
-			pvc := findMemberPVC(kubeCli, pod.Name, clusterName, namespace, mountPath)
+			pvc, _ := findMemberPVC(kubeCli, pod.Name, clusterName, namespace, mountPath)
 			if pvc == nil {
 				// Label and Annotate so that volumes
 				// can be easily targeted when recovering pods
@@ -619,17 +619,42 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 
 // Find the PVC belonging to a member that was mounted at the specified path.
 // It's not considered an error in the case that PVC cannot be found
-func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namespace, path string) *v1.PersistentVolumeClaim {
+func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namespace, path string) (*v1.PersistentVolumeClaim, error) {
 	pvcList, err := listMemberPVCS(kubeCli, memberName, clusterName, namespace)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	for _, pvc := range pvcList.Items {
 		if pvcPath, ok := pvc.Annotations["path"]; ok {
 			if pvcPath == path {
 				if pvc.Status.Phase == v1.ClaimBound {
-					return &pvc
+					return &pvc, nil
 				}
+			}
+		}
+	}
+	return nil, fmt.Errorf("Member `%s` does not have a healty volume for path: %s", memberName, path)
+}
+
+// pod is recoverable if it has volume mounts with existing
+// persistentVolumeClaims.  The claims must also be bound to
+// backing volumes.  Every claim used by the pod must be bound
+func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, podName, clusterName, namespace string) error {
+	if mounts := config.GetVolumeMounts(); mounts == nil {
+		return fmt.Errorf("no volume mounts defined")
+	} else {
+		// default volume claim is required for recovery
+		defaultClaim := mounts.DefaultClaim
+		if defaultClaim == nil {
+			return fmt.Errorf("no claim defined for default volume")
+		}
+		// all volume mounts must be healthy
+		mountPaths := getPathsToPersist(mounts)
+		for mountName, _ := range mountPaths {
+			mountPath := pathForVolumeMountName(mountName, config)
+			_, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
+			if err != nil {
+				return err
 			}
 		}
 	}

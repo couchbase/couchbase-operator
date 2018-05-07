@@ -172,26 +172,49 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 }
 
 func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) {
-	// These nodes are failed over, but are responding and can be added back into the cluster,
-	// but for now we will just consider them failed and remove them.
+	// These nodes are failed over, but are responding and can be added back into the cluster
 	for _, m := range r.couchbase.AddBackNodes {
-		c.logger.Infof("Removing healthy node %s because it is failed over", m.ClientURL())
-		r.ejectNodes.Add(m)
+		// Add back node
+		err := c.client.SetRecoveryTypeDelta(r.couchbase.ActiveNodes, m.HostURLPlaintext())
+		if err != nil {
+			c.logger.Infof("Removing healthy node %s because it cannot be added back %v", err)
+			r.ejectNodes.Add(m)
+		} else {
+			c.logger.Infof("Preparing to add back healthy node after being failed over: %s", m.ClientURL())
+			r.couchbase.NeedsRebalance = true
+		}
 	}
 
 	r.transitionState(ReconcileFailedNodes)
 }
 
+func (r *ReconcileMachine) handleAddBackFailedNodes(c *Cluster) {
+
+}
+
+// Failed nodes can be recovered if the pod's volumes are healthy,
+// otherwise the node is ejected from the cluster and it's node deleted.
 func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
 	for _, m := range r.couchbase.FailedNodes {
-		c.logger.Infof("An auto-failover has taken place on %s, planning removal", m.ClientURL())
+		c.logger.Infof("An auto-failover has taken place")
+		if c.isPodRecoverable(m) {
+			if err := c.recreatePod(m); err != nil {
+				c.logger.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
+			} else {
+				c.logger.Infof("recovering node %s", m.ClientURL())
+				r.errored = true
+				r.transitionState(ReconcileFinished)
+				return
+			}
+		}
+
+		c.logger.Infof("planning removal of %s", m.ClientURL())
 		r.ejectNodes.Add(m)
 		r.runningPods.Remove(m.Name)
 	}
 
 	r.transitionState(ReconcileServerConfigs)
 }
-
 func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) {
 	// If a server configuration was deleted in a spec update then we will clean
 	// up all of the nodes from that server config here.

@@ -430,6 +430,19 @@ func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 	return nil
 }
 
+func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
+	recoverable := false
+	if config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig); config != nil {
+		err := k8sutil.IsPodRecoverable(c.config.KubeCli, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
+		if err != nil {
+			c.logger.Warningf("%s is unrecoverable: %v", m.Name, err)
+		} else {
+			recoverable = true
+		}
+	}
+	return recoverable
+}
+
 func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 	podList, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Name))
 	if err != nil {

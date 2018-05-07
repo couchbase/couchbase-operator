@@ -27,6 +27,7 @@ const (
 	NodeStateFailedAdd
 	NodeStateDown
 	NodeStateFailed
+	NodeStateAddBack
 	NodeStateUnclustered
 )
 
@@ -120,6 +121,9 @@ func (cs *ClusterStatus) LogStatus(logger *logrus.Entry) {
 	if !cs.FailedNodes.Empty() {
 		logger.Infof("failed nodes: %s", cs.FailedNodes)
 	}
+	if !cs.AddBackNodes.Empty() {
+		logger.Infof("add back: %s", cs.AddBackNodes)
+	}
 	if !cs.UnclusteredNodes.Empty() {
 		logger.Infof("unclustered nodes: %s", cs.UnclusteredNodes)
 	}
@@ -136,6 +140,7 @@ func (cs *ClusterStatus) AllManagedNodesHealthy() bool {
 		cs.FailedAddNodes.Empty() &&
 		cs.DownNodes.Empty() &&
 		cs.FailedNodes.Empty() &&
+		cs.AddBackNodes.Empty() &&
 		cs.UnclusteredNodes.Empty()
 }
 
@@ -167,6 +172,8 @@ func (cs *ClusterStatus) NodeInState(name string, states ...NodeState) bool {
 			_, ok = cs.DownNodes[name]
 		case NodeStateFailed:
 			_, ok = cs.FailedNodes[name]
+		case NodeStateAddBack:
+			_, ok = cs.AddBackNodes[name]
 		case NodeStateUnclustered:
 			_, ok = cs.UnclusteredNodes[name]
 		}
@@ -185,6 +192,7 @@ func (cs *ClusterStatus) ContainsNode(name string) bool {
 		NodeStateFailedAdd,
 		NodeStateDown,
 		NodeStateFailed,
+		NodeStateAddBack,
 		NodeStateUnclustered)
 }
 
@@ -196,6 +204,7 @@ func (cs *ClusterStatus) NewClusterStateMap() ClusterStateMap {
 		NodeStateFailedAdd:  cs.FailedAddNodes,
 		NodeStateDown:       cs.DownNodes,
 		NodeStateFailed:     cs.FailedNodes,
+		NodeStateAddBack:    cs.AddBackNodes,
 	}
 
 	states := ClusterStateMap{}
@@ -293,6 +302,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	status.FailedAddNodes = NewMemberSet()
 	status.DownNodes = NewMemberSet()
 	status.FailedNodes = NewMemberSet()
+	status.AddBackNodes = NewMemberSet()
 	status.UnclusteredNodes = NewMemberSet()
 	status.UnmanagedNodes = []string{}
 
@@ -317,7 +327,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 				} else if node.Membership == "inactiveAdded" {
 					status.PendingAddNodes.Add(member)
 				} else if node.Membership == "inactiveFailed" {
-					status.FailedNodes.Add(member) // Caused by manual failover
+					status.AddBackNodes.Add(member) // Caused by manual failover
 				} else {
 					return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
 				}
@@ -553,6 +563,11 @@ func (c *CouchbaseClient) DeleteAlternateAddressesExternal(m *Member) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteAlternateAddressesExternal()
+}
+
+func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
 }
 
 func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
