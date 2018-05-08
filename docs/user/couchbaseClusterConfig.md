@@ -105,13 +105,6 @@ spec:
 	- [dataPath](#datapath)
 	- [indexPath](#indexpath)
 	- [The Pod Policy](#the-pod-policy)
-		- [couchbaseEnv](#couchbaseenv)
-		- [Resources](#resources)
-			- [limits](#limits)
-			- [requests](#requests)
-		- [labels](#labels)
-		- [nodeSelector](#nodeselector)
-		- [tolerations](#tolerations)
 
 <!-- /TOC -->
 
@@ -441,13 +434,13 @@ The pod policy defines settings that apply to all pods deployed with this node c
           effect: NoSchedule
 ```
 
-#### couchbaseEnv
+**couchbaseEnv**
 
 This field specifies the environment variables (as key-values pairs) that should be set when the pod is started. The key in this case is the environment variable name and the value is the value of the environment variable. This section is optional.
 
 > *Field rules:* The value of this field cannot be changed after a server has been defined.
 
-#### Resources
+**Resources**
 
 ```yaml
 ...
@@ -463,17 +456,17 @@ This field specifies the environment variables (as key-values pairs) that should
 ...
 ```
 
-##### limits
+**limits**
 
 This field lets you reserve resources on a specific node. It defines the maximum amount of CPU, memory, and storage the pods created in this node specification will reserve.
 
-##### requests
+**requests**
 
 This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU, memory, and storage the pods created in this node specification will reserve.
 
 See the Kubernetes documentation for further information about [managing compute resources](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/).
 
-#### labels
+**labels**
 
 Labels are key-value pairs that are attached to objects in Kubernetes. They are intended to specify identifying attributes of objects that are meaningful to the user and do not directly imply semantics to the core system. Labels can be used to organize and select subsets of objects. They do not need to be unique across multiple objects. This section is optional.
 
@@ -492,13 +485,13 @@ For more information, see the Kubernetes documentation about [labels](https://ku
 
 > *Field rules:* The value of this field cannot be changed after a server has been defined.
 
-#### nodeSelector
+**nodeSelector**
 
 This field specifies a key-value map of the constraints on node placement for pods. For a pod to be eligible to run on a node, the node must have each of the indicated key-value pairs as labels (it can have additional labels as well). If this section is not specified, then Kubernetes will place the pod on any available node. For more information, see the Kubernetes documentation about [label selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors).
 
 > *Field rules:* The value of this field cannot be changed after a server has been defined.
 
-#### tolerations
+**tolerations**
 
 This field specifies conditions upon which a node should not be selected when deploying a pod. From the sample configuration file referenced in this topic, you can see that any node with a label ```app:cbapp``` should not be allowed to run the pod defined in this node specification. You might do this if you have nodes dedicated for running an application using Couchbase where you don’t want the database and application to be running on the same node. For more information about tolerations, see the Kubernetes documentation on [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/). The tolerations section is optional.
 

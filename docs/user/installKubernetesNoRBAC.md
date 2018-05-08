@@ -1,6 +1,8 @@
 ## Installing on Kubernetes Without RBAC
 
-In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in a Kubernetes cluster that does not have RBAC enabled. This guide is recommended mainly for development clusters or MiniKube. Running a Kubernetes cluster without RBAC is not recommended in production.
+In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in a Kubernetes cluster that does not have RBAC enabled. This guide is recommended mainly for development clusters or minikube. Running a Kubernetes cluster without RBAC is not recommended in production.
+
+*Note:* If you are using a minikube cluster with Kubernetes 1.10 or later, RBAC is enabled by default. You can either disable RBAC, or follow the instructions to [install the operator on Kubernetes with RBAC enabled](installKubernetes.md).
 
 ### Starting the Operator
 
