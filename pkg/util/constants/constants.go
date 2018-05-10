@@ -45,6 +45,13 @@ var (
 	ServiceData   = "data"
 	ServiceQuery  = "query"
 	ServiceSearch = "search"
+
+	AutoFailoverTimeoutMin                    uint64 = 5
+	AutoFailoverTimeoutMax                    uint64 = 3600
+	AutoFailoverMaxCountMin                   uint64 = 1
+	AutoFailoverMaxCountMax                   uint64 = 3
+	AutoFailoverOnDataDiskIssuesTimePeriodMin uint64 = 5
+	AutoFailoverOnDataDiskIssuesTimePeriodMax uint64 = 3600
 )
 
 // Represents the Kubernetes version by its major and minor parts. The first

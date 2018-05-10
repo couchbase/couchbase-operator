@@ -133,6 +133,18 @@ type ClusterConfig struct {
 
 	// Timeout that expires to trigger the auto failover.
 	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout"`
+
+	// The number of failover events we can tolerate
+	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount"`
+
+	// Whether to auto failover if disk issues are detected
+	AutoFailoverOnDataDiskIssues bool `json:"autoFailoverOnDataDiskIssues"`
+
+	// How long to wait for transient errors before failing over a faulty disk
+	AutoFailoverOnDataDiskIssuesTimePeriod uint64 `json:"autoFailoverOnDataDiskIssuesTimePeriod"`
+
+	// Whether to enable failing over a server group
+	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup"`
 }
 
 type BucketConfig struct {

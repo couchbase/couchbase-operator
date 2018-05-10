@@ -27,6 +27,7 @@ var (
 		SearchServiceMemQuota: 256,
 		IndexStorageSetting:   constants.IndexStorageModeMemoryOptimized,
 		AutoFailoverTimeout:   30,
+		AutoFailoverMaxCount:  1,
 	}
 )
 
@@ -203,6 +204,9 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 				case setting == "autoFailoverTimeout":
 					autoFailoverTimeout, _ := strconv.ParseUint(config[key][setting], 0, 64)
 					clusterSettings.AutoFailoverTimeout = autoFailoverTimeout
+				case setting == "autoFailoverMaxCount":
+					autoFailoverMaxCount, _ := strconv.ParseUint(config[key][setting], 0, 64)
+					clusterSettings.AutoFailoverMaxCount = autoFailoverMaxCount
 				}
 			}
 		case strings.Contains(key, "bucket"):

@@ -25,7 +25,11 @@ spec:
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
     indexStorageSetting: default
-    autoFailoverTimeout: 30
+    autoFailoverTimeout: 120
+    autoFailoverMaxCount: 3
+    autoFailoverOnDataDiskIssues: true
+    autoFailoverOnDataDiskIssuesTimePeriod: 120
+    autoFailoverServerGroup: false
   buckets:
     - name: default
       type: couchbase
@@ -226,7 +230,11 @@ This section specifies the various Couchbase cluster settings. This section is n
     indexServiceMemoryQuota: 1024
     searchServiceMemoryQuota: 2048
     indexStorageType: plasma
-    autoFailoverTimeout: 30
+    autoFailoverTimeout: 120
+    autoFailoverMaxCount: 3
+    autoFailoverOnDataDiskIssues: true
+    autoFailoverOnDataDiskIssuesTimePeriod: 120
+    autoFailoverServerGroup: false
 ...
 ```
 
@@ -258,7 +266,31 @@ Specifies the backend storage type to use for the index service. If the cluster 
 
 Specifies the auto-failover timeout in seconds. The Operator relies on the CouchbaseCluster to auto-failover nodes before removing them, so setting this field to an appropriate value is important.
 
-> *Field rules:* The ```autoFailoverTimeout``` is required and must be greater than or equal to 5.
+> *Field rules:* The ```autoFailoverTimeout``` is required and must be in the range 5-3600
+
+**autoFailoverMaxCount**
+
+Specifies the maximum number of failover events we can tolerate before manual intervention is required.  If a bucket as 2 replicas we can tolerate 2 pods failing over.  Applies to entire server groups also.
+
+> *Field rules:* The ```autoFailoverMaxCount``` is required and must be in the range 1-3
+
+**autoFailoverOnDataDiskIssues**
+
+Specifies whether a node will automatically fail over on data disk issues.
+
+> *Field rules:* The ```autoFailoverOnDataDiskIssues``` is required and must be ```true``` or ```false```.
+
+**autoFailoverOnDataDiskIssuesTimePeriod**
+
+Specifies the time period to wait before automatically failing over a node experiencing data disk issues.  This field's units are in seconds.
+
+> *Field rules:* The ```autoFailoverOnDataDiskIssuesTimePeriod``` is only required if ```autoFailoverOnDataDiskIssues``` is also set to ```true```.  Must be in the range 5-3600
+
+**autoFailoverServerGroup**
+
+Specifies whether the cluster will automatically failover an entire server group.
+
+> *Field rules:* The ```autoFailoverServerGroup``` is optional, defaulting to false.
 
 ## Spec: Bucket Settings
 

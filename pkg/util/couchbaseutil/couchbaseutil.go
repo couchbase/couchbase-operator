@@ -463,11 +463,11 @@ func (c *CouchbaseClient) GetBucketsToEdit(ms MemberSet, spec *cbapi.ClusterSpec
 	return bucketNames, nil
 }
 
-func (c *CouchbaseClient) SetAutoFailoverTimeout(ms MemberSet, enabled bool, timeout uint64) error {
+func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.AutoFailoverSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "set autofailover timeout", c.clusterName,
 		func() error {
-			return c.client.SetAutoFailoverTimeout(enabled, timeout)
+			return c.client.SetAutoFailoverSettings(settings)
 		})
 }
 

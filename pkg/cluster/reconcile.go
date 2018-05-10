@@ -500,7 +500,17 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 	}
 
 	// enables autofailover by default
-	return c.client.SetAutoFailoverTimeout(c.members, true, settings.AutoFailoverTimeout)
+	autoFailoverSettings := &cbmgr.AutoFailoverSettings{
+		Enabled:  true,
+		Timeout:  settings.AutoFailoverTimeout,
+		MaxCount: settings.AutoFailoverMaxCount,
+		FailoverOnDataDiskIssues: cbmgr.FailoverOnDiskFailureSettings{
+			Enabled:    settings.AutoFailoverOnDataDiskIssues,
+			TimePeriod: settings.AutoFailoverOnDataDiskIssuesTimePeriod,
+		},
+		FailoverServerGroup: settings.AutoFailoverServerGroup,
+	}
+	return c.client.SetAutoFailoverSettings(c.members, autoFailoverSettings)
 }
 
 // Initialize a member with TLS certificates
@@ -660,20 +670,45 @@ func (c *Cluster) reconcileClusterSettings() bool {
 
 // ensure autofailover timeout matches spec setting
 func (c *Cluster) reconcileAutoFailoverSettings() bool {
+	// Get the existing settings
 	failoverSettings, err := c.client.GetAutoFailoverSettings(c.members)
 	if err != nil {
 		c.logger.Warnf("Unable to get auto failover settings: %s", err.Error())
 		return false
 	}
 
+	// Marshal the CR spec into the same type as the existing failover settings
 	clusterSettings := c.cluster.Spec.ClusterSettings
-	if (failoverSettings.Timeout != clusterSettings.AutoFailoverTimeout) ||
-		(failoverSettings.Enabled != true) {
+	specFailoverSettings := &cbmgr.AutoFailoverSettings{
+		Enabled:  true,
+		Timeout:  clusterSettings.AutoFailoverTimeout,
+		MaxCount: clusterSettings.AutoFailoverMaxCount,
+		FailoverOnDataDiskIssues: cbmgr.FailoverOnDiskFailureSettings{
+			Enabled:    clusterSettings.AutoFailoverOnDataDiskIssues,
+			TimePeriod: clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod,
+		},
+		FailoverServerGroup: clusterSettings.AutoFailoverServerGroup,
+	}
 
-		// reset autofailover timeout
-		err = c.client.SetAutoFailoverTimeout(c.members, true, clusterSettings.AutoFailoverTimeout)
+	// Mask out any existing read only values, e.g. set it to the default value
+	failoverSettings.Count = 0
+
+	// NS server will not allow certain updates if a service is not enabled
+	// which could result in spamming the server continuously with API update
+	// requests when it refuses to obey our commands. Mask these out too if
+	// irrelevant
+	if !failoverSettings.FailoverOnDataDiskIssues.Enabled {
+		failoverSettings.FailoverOnDataDiskIssues.TimePeriod = 0
+	}
+	if !specFailoverSettings.FailoverOnDataDiskIssues.Enabled {
+		specFailoverSettings.FailoverOnDataDiskIssues.TimePeriod = 0
+	}
+
+	// Check to see if we need to reconcile
+	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
+		err = c.client.SetAutoFailoverSettings(c.members, specFailoverSettings)
 		if err != nil {
-			message := fmt.Sprintf("Unable to set autofailover timeout to %d: %s", clusterSettings.AutoFailoverTimeout, err.Error())
+			message := fmt.Sprintf("Unable to set autofailover settings: %v", err)
 			c.status.SetConfigRejectedCondition(message)
 			c.logger.Warnf(message)
 			return false

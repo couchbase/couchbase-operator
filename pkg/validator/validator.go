@@ -11,10 +11,12 @@ import (
 )
 
 const (
-	DefaultBaseImage           = "couchbase/server"
-	DefaultIndexStorageSetting = "default"
-	DefaultAutoFailoverTimeout = 30
-	DefaultServiceMemQuota     = 256
+	DefaultBaseImage                              = "couchbase/server"
+	DefaultIndexStorageSetting                    = "default"
+	DefaultAutoFailoverTimeout                    = 120
+	DefaultAutoFailoverMaxCount                   = 3
+	DefaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
+	DefaultServiceMemQuota                        = 256
 )
 
 type Warning string
@@ -40,6 +42,15 @@ func (e EnumList) Interfaces() []interface{} {
 		i = append(i, element)
 	}
 	return i
+}
+
+func BoundedErrorUint(name, in string, value, min, max uint64) error {
+	if value < min {
+		return errors.ExceedsMinimumUint(name, in, min, false)
+	} else if value > max {
+		return errors.ExceedsMaximumUint(name, in, max, false)
+	}
+	return nil
 }
 
 func Create(resource *api.CouchbaseCluster) error {
@@ -109,6 +120,13 @@ func applyDefaults(customResource *api.CouchbaseCluster) {
 		customResource.Spec.ClusterSettings.AutoFailoverTimeout = DefaultAutoFailoverTimeout
 	}
 
+	if customResource.Spec.ClusterSettings.AutoFailoverMaxCount == 0 {
+		customResource.Spec.ClusterSettings.AutoFailoverMaxCount = DefaultAutoFailoverMaxCount
+	}
+
+	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
+		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = DefaultAutoFailoverOnDataDiskIssuesTimePeriod
+	}
 }
 
 func checkConstraints(customResource *api.CouchbaseCluster) error {
@@ -261,6 +279,22 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	maxBucketQuota := customResource.Spec.ClusterSettings.DataServiceMemQuota
 	if totalBucketMemory > maxBucketQuota {
 		err := errors.ExceedsMaximumInt("spec.buckets[*].memoryQuota", "body", int64(maxBucketQuota), false)
+		errs = append(errs, err)
+	}
+
+	// Check auto failover settings
+	timeout := customResource.Spec.ClusterSettings.AutoFailoverTimeout
+	if err := BoundedErrorUint("spec.cluster.autoFailoverTimeout", "body", timeout, constants.AutoFailoverTimeoutMin, constants.AutoFailoverTimeoutMax); err != nil {
+		errs = append(errs, err)
+	}
+
+	maxCount := customResource.Spec.ClusterSettings.AutoFailoverMaxCount
+	if err := BoundedErrorUint("spec.cluster.autoFailoverMaxCount", "body", maxCount, constants.AutoFailoverMaxCountMin, constants.AutoFailoverMaxCountMax); err != nil {
+		errs = append(errs, err)
+	}
+
+	dataDiskIssuesTimePeriod := customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod
+	if err := BoundedErrorUint("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body", dataDiskIssuesTimePeriod, constants.AutoFailoverOnDataDiskIssuesTimePeriodMin, constants.AutoFailoverOnDataDiskIssuesTimePeriodMax); err != nil {
 		errs = append(errs, err)
 	}
 
