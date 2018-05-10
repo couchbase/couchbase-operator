@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -940,4 +941,8 @@ func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVer
 	major, _ := strconv.Atoi(version.Major)
 	minor, _ := strconv.Atoi(version.Minor)
 	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
+}
+
+func getStorageClass(kubeCli kubernetes.Interface, name string) (*storage.StorageClass, error) {
+	return kubeCli.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
 }

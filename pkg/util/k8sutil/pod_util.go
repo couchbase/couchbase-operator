@@ -154,11 +154,23 @@ func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 // Creates custom PVC from the generic spec
 func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
 
-	addOwnerRefToObject(claim.GetObjectMeta(), owner)
+	// storage class must exist
+	if err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName); err != nil {
+		return nil, err
+	}
 
 	// can be mounted read/write mode to exactly 1 host
+	addOwnerRefToObject(claim.GetObjectMeta(), owner)
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
+}
+
+func verifyStorageClass(kubeCli kubernetes.Interface, storageClassName *string) error {
+	if storageClassName == nil {
+		return fmt.Errorf("storage class required")
+	}
+	_, err := getStorageClass(kubeCli, *storageClassName)
+	return err
 }
 
 func podVolumeSpecForClaim(configName, claimName string) v1.Volume {

@@ -410,6 +410,118 @@ var testDefs = []testDef{
 			errors.ExceedsMaximumInt("spec.buckets[*].memoryQuota", "body", int64(256), false),
 		),
 	},
+	{
+		name:        "TestSpecWithVolumes",
+		path:        "tests/0050.yaml",
+		description: "Tests that spec with volume mounts is valid",
+		expectedErr: nil,
+	},
+	{
+		name:        "TestMissingDefaultMount",
+		path:        "tests/0051.yaml",
+		description: "Tests that default volume mount is specified",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required(`"default"`, "spec.servers[*].Pod.VolumeMounts"),
+		),
+	},
+	{
+		name:        "TestMissingClaimTemplate",
+		path:        "tests/0052.yaml",
+		description: "Tests that template for volume mount is specified",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
+		),
+	},
+	{
+		name:        "TestUpdateAddedVolumeMountSpec",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0050.yaml",
+		description: "Tests that VolumeMounts cannot be added after pod creation",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.servers[*].Pod.VolumeMounts", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateAddIndexVolumeMount",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0053.yaml",
+		description: "Tests that index volume mount cannot be added to list of VolumeMounts",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"},
+		),
+	},
+	{
+		name:        "TestUpdateRemoveVolumeMountSpec",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0001.yaml",
+		description: "Tests that VolumeMounts cannot be removed after pod creation",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.servers[*].Pod.VolumeMounts", "body"},
+		),
+	},
+	{
+		name:        "TestUpdateRemoveDataVolumeMount",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0054.yaml",
+		description: "Tests that data volume mount cannot be removed from list of VolumeMounts",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"},
+		),
+	},
+	{
+		name:        "TestChangeVolumeMountClaimTemplate",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0055.yaml",
+		description: "Tests that name of claim template of a volume cannot be changed",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"},
+		),
+	},
+	{
+		name:        "TestChangeClaimTemplateName",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0056.yaml",
+		description: "Tests that name of claim template cannot be changed",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
+			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
+		),
+	},
+	{
+		name:        "TestChangeStorageClass",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0057.yaml",
+		description: "Tests that storage class cannot be changed",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{`"storageClassName"`, "spec.volumeClaimTemplates[*]"},
+		),
+	},
+	{
+		name:        "TestChangeStorageSize",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0058.yaml",
+		description: "Tests that storage size cannot be changed",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{`"storage"`, "spec.volumeClaimTemplates[*].resources.requests"},
+		),
+	},
+	{
+		name:        "TestClaimTemplateRequiresStorageClass",
+		path:        "tests/0059.yaml",
+		description: "Tests that storage class is specified",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required(`"storageClassName"`, "spec.volumeClaimTemplates[*]"),
+		),
+	},
+	{
+		name:        "TestClaimTemplateRequiresStorageRequests",
+		path:        "tests/0050.yaml",
+		updatePath:  "tests/0060.yaml",
+		description: "Tests that storage request size is specified",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits"),
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {

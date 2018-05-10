@@ -348,6 +348,65 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		errs = append(errs, err)
 	}
 
+	// validate persistent volume spec such that when volumeMounts are specified, claim for
+	// `default` must be provided, and all mounts much pair to associated persistentVolumeClaims
+	for _, config := range customResource.Spec.ServerSettings {
+		if config.Pod != nil && config.Pod.VolumeMounts != nil {
+			mounts := config.Pod.VolumeMounts
+			if mounts.DefaultClaim == nil {
+				err := errors.Required(`"default"`, "spec.servers[*].Pod.VolumeMounts")
+				errs = append(errs, err)
+			} else {
+				if template := customResource.Spec.GetVolumeClaimTemplate(*mounts.DefaultClaim); template == nil {
+					err := errors.Required(fmt.Sprintf(`"%s"`, *mounts.DefaultClaim), "spec.volumeClaimTemplates[*].metadata.name")
+					errs = append(errs, err)
+				}
+				if mounts.DataClaim != nil {
+					if template := customResource.Spec.GetVolumeClaimTemplate(*mounts.DataClaim); template == nil {
+						err := errors.Required(fmt.Sprintf(`"%s"`, *mounts.DataClaim), "spec.volumeClaimTemplates[*].metadata.name")
+						errs = append(errs, err)
+					}
+				}
+				if mounts.IndexClaim != nil {
+					if template := customResource.Spec.GetVolumeClaimTemplate(*mounts.IndexClaim); template == nil {
+						err := errors.Required(fmt.Sprintf(`"%s"`, *mounts.IndexClaim), "spec.volumeClaimTemplates[*].metadata.name")
+						errs = append(errs, err)
+					}
+				}
+			}
+		}
+	}
+
+	// validate claim templates such that storage class is provided along with valid request
+	for _, pvc := range customResource.Spec.VolumeClaimTemplates {
+
+		if pvc.Spec.StorageClassName == nil {
+			err := errors.Required(`"storageClassName"`, "spec.volumeClaimTemplates[*]")
+			errs = append(errs, err)
+		}
+
+		// requests or limits required
+		hasStorageQuantity := false
+		for resource, quantity := range pvc.Spec.Resources.Requests {
+			if string(resource) == "storage" {
+				if !quantity.IsZero() {
+					hasStorageQuantity = true
+				}
+			}
+		}
+		for resource, quantity := range pvc.Spec.Resources.Limits {
+			if string(resource) == "storage" {
+				if !quantity.IsZero() {
+					hasStorageQuantity = true
+				}
+			}
+		}
+		if !hasStorageQuantity {
+			err := errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits")
+			errs = append(errs, err)
+		}
+	}
+
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
@@ -431,6 +490,68 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 	if hasIndexSvc && updated.Spec.ClusterSettings.IndexStorageSetting != current.Spec.ClusterSettings.IndexStorageSetting {
 		err := &UpdateError{"spec.cluster.indexStorageSetting", "body"}
 		errs = append(errs, err)
+	}
+
+	// volume mounts cannot be added/removed nor can they specify different claim templates
+	for _, cur := range current.Spec.ServerSettings {
+		for _, up := range updated.Spec.ServerSettings {
+			curPersisted := cur.Pod != nil && cur.Pod.VolumeMounts != nil
+			upPersisted := up.Pod != nil && up.Pod.VolumeMounts != nil
+			if curPersisted != upPersisted {
+				err := &UpdateError{"spec.servers[*].Pod.VolumeMounts", "body"}
+				errs = append(errs, err)
+			}
+			if curPersisted && upPersisted {
+				if !stringPtrEquals(cur.Pod.VolumeMounts.DefaultClaim, up.Pod.VolumeMounts.DefaultClaim) {
+					err := &UpdateError{"default", "spec.servers[*].Pod.VolumeMounts"}
+					errs = append(errs, err)
+				}
+				if !stringPtrEquals(cur.Pod.VolumeMounts.DataClaim, up.Pod.VolumeMounts.DataClaim) {
+					err := &UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"}
+					errs = append(errs, err)
+				}
+				if !stringPtrEquals(cur.Pod.VolumeMounts.IndexClaim, up.Pod.VolumeMounts.IndexClaim) {
+					err := &UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"}
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	// persistent volume claim templates are immutable
+	for _, cur := range current.Spec.VolumeClaimTemplates {
+		for _, up := range updated.Spec.VolumeClaimTemplates {
+			if cur.Name == up.Name {
+				if !stringPtrEquals(cur.Spec.StorageClassName, up.Spec.StorageClassName) {
+					err := &UpdateError{`"storageClassName"`, "spec.volumeClaimTemplates[*]"}
+					errs = append(errs, err)
+				}
+
+				// cannot change storage requests or limits
+				for resource, curQuantity := range cur.Spec.Resources.Requests {
+					if string(resource) == "storage" {
+						upStorageQuantity, ok := up.Spec.Resources.Requests[resource]
+						if ok {
+							if curQuantity.Cmp(upStorageQuantity) != 0 {
+								err := &UpdateError{`"storage"`, "spec.volumeClaimTemplates[*].resources.requests"}
+								errs = append(errs, err)
+							}
+						}
+					}
+				}
+				for resource, curQuantity := range cur.Spec.Resources.Limits {
+					if string(resource) == "storage" {
+						upStorageQuantity, ok := up.Spec.Resources.Limits[resource]
+						if ok {
+							if curQuantity.Cmp(upStorageQuantity) != 0 {
+								err := &UpdateError{`"storage"`, "spec.volumeClaimTemplates[*].resources.limits"}
+								errs = append(errs, err)
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	if len(warns) == 0 {
