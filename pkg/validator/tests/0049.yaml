@@ -18,6 +18,7 @@ spec:
       evictionPolicy: valueOnly
       conflictResolution: seqno
       enableFlush: false
+      enableIndexReplica: false
   servers:
     - size: 3
       name: all_services

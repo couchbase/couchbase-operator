@@ -23,6 +23,25 @@ func (w Warning) String() string {
 	return fmt.Sprintf("Warning: %s", string(w))
 }
 
+type EnumList []string
+
+func (e EnumList) Contains(s string) bool {
+	for _, element := range e {
+		if element == s {
+			return true
+		}
+	}
+	return false
+}
+
+func (e EnumList) Interfaces() []interface{} {
+	i := []interface{}{}
+	for _, element := range e {
+		i = append(i, element)
+	}
+	return i
+}
+
 func Create(resource *api.CouchbaseCluster) error {
 	applyDefaults(resource)
 
@@ -178,48 +197,58 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	// Check bucket parameter constraints
-	for i, _ := range customResource.Spec.BucketSettings {
-		if customResource.Spec.BucketSettings[i].BucketType == constants.BucketTypeMemcached {
+	for _, bucket := range customResource.Spec.BucketSettings {
+		if bucket.BucketType == constants.BucketTypeMemcached {
 			continue
 		}
 
-		if *customResource.Spec.BucketSettings[i].BucketReplicas < 0 {
-			err := errors.ExceedsMinimumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasZero), false)
-			errs = append(errs, err)
-		} else if *customResource.Spec.BucketSettings[i].BucketReplicas > 3 {
-			err := errors.ExceedsMaximumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasThree), false)
-			errs = append(errs, err)
+		if bucket.BucketReplicas == nil {
+			errs = append(errs, errors.Required("spec.buckets.replicas", "body"))
 		}
 
-		if *customResource.Spec.BucketSettings[i].IoPriority != constants.BucketIoPriorityHigh &&
-			*customResource.Spec.BucketSettings[i].IoPriority != constants.BucketIoPriorityLow {
-			err := errors.EnumFail("spec.buckets.ioPriority", "body", nil,
-				[]interface{}{constants.BucketIoPriorityHigh, constants.BucketIoPriorityLow})
-			errs = append(errs, err)
+		if *bucket.BucketReplicas < 0 {
+			errs = append(errs, errors.ExceedsMinimumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasZero), false))
+		} else if *bucket.BucketReplicas > 3 {
+			errs = append(errs, errors.ExceedsMaximumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasThree), false))
 		}
 
-		if *customResource.Spec.BucketSettings[i].ConflictResolution != constants.BucketConflictResolutionSeqno &&
-			*customResource.Spec.BucketSettings[i].ConflictResolution != constants.BucketConflictResolutionTimestamp {
-			err := errors.EnumFail("spec.buckets.conflictResolution", "body", nil,
-				[]interface{}{constants.BucketConflictResolutionSeqno, constants.BucketConflictResolutionTimestamp})
-			errs = append(errs, err)
+		ioPriorities := EnumList{
+			constants.BucketIoPriorityHigh,
+			constants.BucketIoPriorityLow,
+		}
+		if bucket.IoPriority == nil || !ioPriorities.Contains(*bucket.IoPriority) {
+			errs = append(errs, errors.EnumFail("spec.buckets.ioPriority", "body", nil, ioPriorities.Interfaces()))
 		}
 
-		if customResource.Spec.BucketSettings[i].BucketType == constants.BucketTypeEphemeral {
-			if *customResource.Spec.BucketSettings[i].EvictionPolicy != constants.BucketEvictionPolicyNoEviction &&
-				*customResource.Spec.BucketSettings[i].EvictionPolicy != constants.BucketEvictionPolicyNRUEviction {
-				err := errors.EnumFail("spec.buckets.evictionPolicy", "body", nil,
-					[]interface{}{constants.BucketEvictionPolicyNoEviction, constants.BucketEvictionPolicyNRUEviction})
-				errs = append(errs, err)
+		conflictResolutions := EnumList{
+			constants.BucketConflictResolutionSeqno,
+			constants.BucketConflictResolutionTimestamp,
+		}
+		if bucket.ConflictResolution == nil || !conflictResolutions.Contains(*bucket.ConflictResolution) {
+			errs = append(errs, errors.EnumFail("spec.buckets.conflictResolution", "body", nil, conflictResolutions.Interfaces()))
+		}
+
+		switch bucket.BucketType {
+		case constants.BucketTypeEphemeral:
+			evictionPolicies := EnumList{
+				constants.BucketEvictionPolicyNoEviction,
+				constants.BucketEvictionPolicyNRUEviction,
 			}
-			continue
-		}
+			if bucket.EvictionPolicy == nil || !evictionPolicies.Contains(*bucket.EvictionPolicy) {
+				errs = append(errs, errors.EnumFail("spec.buckets.evictionPolicy", "body", nil, evictionPolicies.Interfaces()))
+			}
+		case constants.BucketTypeCouchbase:
+			evictionPolicies := EnumList{
+				constants.BucketEvictionPolicyValueOnly,
+				constants.BucketEvictionPolicyFullEviction,
+			}
+			if bucket.EvictionPolicy == nil || !evictionPolicies.Contains(*bucket.EvictionPolicy) {
+				errs = append(errs, errors.EnumFail("spec.buckets.evictionPolicy", "body", nil, evictionPolicies.Interfaces()))
+			}
 
-		if *customResource.Spec.BucketSettings[i].EvictionPolicy != constants.BucketEvictionPolicyValueOnly &&
-			*customResource.Spec.BucketSettings[i].EvictionPolicy != constants.BucketEvictionPolicyFullEviction {
-			err := errors.EnumFail("spec.buckets.evictionPolicy", "body", nil,
-				[]interface{}{constants.BucketEvictionPolicyValueOnly, constants.BucketEvictionPolicyFullEviction})
-			errs = append(errs, err)
+			if bucket.EnableIndexReplica == nil {
+				errs = append(errs, errors.Required("spec.buckets.enableIndexReplica", "body"))
+			}
 		}
 	}
 

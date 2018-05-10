@@ -338,11 +338,11 @@ This field specifies whether or not to enable the flush command on this bucket. 
 
 > *Field rules:* The ```enableFlush``` field can be set to either true or false. If defaults to false.
 
-**enableIndexReplicas**
+**enableIndexReplica**
 
 This field specifies whether or not to enable view index replicas for this bucket. This parameter defaults to false if it is not specified. This parameter only affects Couchbase buckets.
 
-> *Field rules:* The ```enableIndexReplicas``` field is required for buckets with type "couchbase" and can be set to either true or false. Memcached and ephemeral buckets will ignore values in this field.
+> *Field rules:* The ```enableIndexReplica``` field is required for buckets with type "couchbase" and can be set to either true or false. Memcached and ephemeral buckets will ignore values in this field.
 
 ## Spec: Servers
 
