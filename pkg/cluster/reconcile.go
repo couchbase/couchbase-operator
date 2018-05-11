@@ -49,14 +49,16 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		state:       ReconcileInit,
 	}
 
-	c.reconcileClusterSettings()
+	if err := c.reconcileClusterSettings(); err != nil {
+		return err
+	}
 
 	if !c.reconcileMembers(state) {
 		return nil
 	}
 
-	if !c.reconcileBuckets() {
-		return nil
+	if err := c.reconcileBuckets(); err != nil {
+		return err
 	}
 
 	c.reconcileAdminService()
@@ -299,11 +301,10 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 // reconcile buckets by adding or removing
 // buckets one at a time based on comparison
 // of existing buckets to cluster spec
-func (c *Cluster) reconcileBuckets() bool {
+func (c *Cluster) reconcileBuckets() error {
 	existingBuckets, err := c.client.GetBucketNames(c.members)
 	if err != nil {
-		c.logger.Warnf("Unable to get buckets from cluster: %s", err.Error())
-		return false
+		return fmt.Errorf("Unable to get buckets from cluster: %v", err)
 	}
 
 	// when reconciling buckets, any buckets in cluster
@@ -314,8 +315,7 @@ func (c *Cluster) reconcileBuckets() bool {
 	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
 	bucketsToEdit, err := c.client.GetBucketsToEdit(c.members, &spec)
 	if err != nil {
-		c.logger.Warnf("Unable to get list of buckets to edit: %s", err.Error())
-		return false
+		return fmt.Errorf("Unable to get list of buckets to edit: %v", err)
 	}
 
 	if len(bucketsToRemove) > 0 {
@@ -324,8 +324,7 @@ func (c *Cluster) reconcileBuckets() bool {
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket delete failed", msg)
-			c.logger.Warnf("Unable to delete bucket named - %s: %s", bucketName, err.Error())
-			return false
+			return fmt.Errorf("Unable to delete bucket named - %s: %v", bucketName, err)
 		}
 		c.logger.Infof("Removed bucket %s", bucketName)
 	} else if len(bucketsToEdit) > 0 {
@@ -334,8 +333,7 @@ func (c *Cluster) reconcileBuckets() bool {
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket edit failed", msg)
-			c.logger.Warnf("Unable to edit bucket named - %s: %s", bucketName, err.Error())
-			return false
+			return fmt.Errorf("Unable to edit bucket named - %s: %v", bucketName, err)
 		}
 		c.logger.Infof("Edited bucket %s", bucketName)
 	} else if len(bucketsToAdd) > 0 {
@@ -344,15 +342,14 @@ func (c *Cluster) reconcileBuckets() bool {
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket add failed", msg)
-			c.logger.Warnf("Unable to create bucket named - %s: %s", bucketName, err.Error())
-			return false
+			return fmt.Errorf("Unable to create bucket named - %s: %v", bucketName, err)
 		}
 		c.logger.Infof("Created bucket %s", bucketName)
 	}
 
 	c.status.ClearCondition(api.ClusterConditionManageBuckets)
 
-	return true
+	return nil
 }
 
 // reconcile changes to selected pod labels for
@@ -657,32 +654,31 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	return nil
 }
 
-func (c *Cluster) reconcileClusterSettings() bool {
+func (c *Cluster) reconcileClusterSettings() error {
 
-	if ok := c.reconcileAutoFailoverSettings(); !ok {
-		return false
+	if err := c.reconcileAutoFailoverSettings(); err != nil {
+		return err
 	}
-	if ok := c.reconcileMemoryQuotaSettings(); !ok {
-		return false
+	if err := c.reconcileMemoryQuotaSettings(); err != nil {
+		return err
 	}
-	if ok := c.reconcileSoftwareUpdateNotificationSettings(); !ok {
-		return false
+	if err := c.reconcileSoftwareUpdateNotificationSettings(); err != nil {
+		return err
 	}
-	if ok := c.reconcileIndexStorageSettings(); !ok {
-		return false
+	if err := c.reconcileIndexStorageSettings(); err != nil {
+		return err
 	}
 
 	c.status.ClearCondition(api.ClusterConditionManageConfig)
-	return true
+	return nil
 }
 
 // ensure autofailover timeout matches spec setting
-func (c *Cluster) reconcileAutoFailoverSettings() bool {
+func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// Get the existing settings
 	failoverSettings, err := c.client.GetAutoFailoverSettings(c.members)
 	if err != nil {
-		c.logger.Warnf("Unable to get auto failover settings: %s", err.Error())
-		return false
+		return err
 	}
 
 	// Marshal the CR spec into the same type as the existing failover settings
@@ -718,20 +714,18 @@ func (c *Cluster) reconcileAutoFailoverSettings() bool {
 		if err != nil {
 			message := fmt.Sprintf("Unable to set autofailover settings: %v", err)
 			c.status.SetConfigRejectedCondition(message)
-			c.logger.Warnf(message)
-			return false
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
 // ensure memory quota's matche spec setting
-func (c *Cluster) reconcileMemoryQuotaSettings() bool {
+func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	info, err := c.client.GetClusterInfo(c.members)
 	if err != nil {
-		c.logger.Warnf("Unable to get cluster info: %s", err.Error())
-		return false
+		return err
 	}
 
 	current := info.PoolsDefaults()
@@ -750,40 +744,36 @@ func (c *Cluster) reconcileMemoryQuotaSettings() bool {
 		if err := c.client.SetPoolsDefault(c.members, requested); err != nil {
 			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: %s", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.status.SetConfigRejectedCondition(message)
-			c.logger.Warnf(message)
-			return false
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
 // reconcileSoftwareUpdateNotificationSettings looks to see if the UI displays software
 // update notifications, and updates if different from the cluster specification.
-func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() bool {
+func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 	actual, err := c.client.GetUpdatesEnabled(c.members)
 	if err != nil {
-		c.logger.Warnf("Unable to get cluster software updates: %v", err)
-		return false
+		return err
 	}
 
 	requested := c.cluster.Spec.SoftwareUpdateNotifications
 	if actual != requested {
 		if err := c.client.SetUpdatesEnabled(c.members, requested); err != nil {
-			c.logger.Warnf("Unable to set cluster software updates: %v", err)
-			return false
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
 // Compare cluster index settings with spec, reconcile if necessary
-func (c *Cluster) reconcileIndexStorageSettings() bool {
+func (c *Cluster) reconcileIndexStorageSettings() error {
 	settings, err := c.client.GetIndexSettings(c.members, c.username, c.password)
 	if err != nil {
-		c.logger.Warnf("Unable to get index storage settings: %v", err)
-		return false
+		return err
 	}
 
 	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
@@ -791,10 +781,9 @@ func (c *Cluster) reconcileIndexStorageSettings() bool {
 		if err := c.client.SetIndexSettings(c.members, c.username, c.password, specStorageMode, settings); err != nil {
 			emsg := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
 			c.status.SetConfigRejectedCondition(emsg)
-			c.logger.Warnf(emsg)
-			return false
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
