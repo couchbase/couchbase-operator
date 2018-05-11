@@ -182,9 +182,22 @@ func startChaos(ctx context.Context, kubecli kubernetes.Interface, ns string, ch
 			time.Sleep(60 * time.Second) // don't start until quorum up
 			m.CrushPods(ctx, c)
 		}()
-
 	case 2:
-		logrus.Info("chaos level = 2: randomly kill at most five couchbase pods every 30 seconds at 50%")
+		logrus.Info("chaos level = 2: randomly kill at most two couchbase pod every 2 minutes at 50%")
+		c := &chaos.CrashConfig{
+			Namespace: ns,
+			Selector:  ls,
+
+			KillRate:        rate.Every(120 * time.Second),
+			KillProbability: 0.5,
+			KillMax:         2,
+		}
+		go func() {
+			time.Sleep(300 * time.Second) // don't start until quorum up
+			m.CrushPods(ctx, c)
+		}()
+	case 3:
+		logrus.Info("chaos level = 3: randomly kill at most five couchbase pods every 30 seconds at 50%")
 		c := &chaos.CrashConfig{
 			Namespace: ns,
 			Selector:  ls,
