@@ -83,7 +83,7 @@ var testSuiteP0 = TestSuite{
 	TestNegEditClusterSettings,
 	TestBasicMDSScaling,
 	TestSwapNodesBetweenServices,
-	TestCreateClusterWithoutDataService,
+	//TestCreateClusterWithoutDataService,
 	TestCreateClusterDataServiceNotFirst,
 	TestRemoveLastDataService,
 	TestKillOperator,
@@ -93,7 +93,7 @@ var testSuiteP0 = TestSuite{
 var testSuiteP1 = TestSuite{
 	TestBucketAddRemoveExtended,
 	TestRevertExternalBucketUpdates,
-	TestInvalidAuthSecret,
+	//TestInvalidAuthSecret,
 	TestInvalidBaseImage,
 	TestInvalidVersion,
 	TestNodeUnschedulable,
