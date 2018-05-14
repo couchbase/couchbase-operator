@@ -352,22 +352,39 @@ func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVer
 	if err != nil {
 		return constants.KubernetesVersionUnknown, err
 	}
+	return ParseKubernetesVersion(version.Major, version.Minor, version.GitVersion)
+}
 
+func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (constants.KubernetesVersion, error) {
 	// Sometimes the Major and Minor values are not set so we need to parse them
 	// from the GitVersion field.
-	if version.Major == "" || version.Minor == "" {
-		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}(\\+[0-9abcdef]*)?$")
-		if !rx.MatchString(version.GitVersion) {
+	if versionMajor == "" || versionMinor == "" {
+		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}")
+		if !rx.MatchString(gitVersion) {
 			err := fmt.Errorf("Unable to get version from Kubernetes API response")
 			return constants.KubernetesVersionUnknown, err
 		}
-
-		parts := strings.Split(version.GitVersion[1:], ".")
-		version.Major = parts[0]
-		version.Minor = parts[1]
+		gitVersion = rx.FindString(gitVersion)
+		parts := strings.Split(gitVersion[1:], ".")
+		versionMajor = parts[0]
+		versionMinor = parts[1]
 	}
 
-	major, _ := strconv.Atoi(version.Major)
-	minor, _ := strconv.Atoi(version.Minor)
+	rx := regexp.MustCompile("^[0-9]{1,2}")
+	// simply require that version starts with a number to be valid
+	if !rx.MatchString(versionMajor) || !rx.MatchString(versionMinor) {
+		err := fmt.Errorf("Unable to get version from Kubernetes API response")
+		return constants.KubernetesVersionUnknown, err
+	}
+	major, err := strconv.Atoi(rx.FindString(versionMajor))
+	if err != nil {
+		err := fmt.Errorf("Unable to get version from Kubernetes API response")
+		return constants.KubernetesVersionUnknown, err
+	}
+	minor, err := strconv.Atoi(rx.FindString(versionMinor))
+	if err != nil {
+		err := fmt.Errorf("Unable to get version from Kubernetes API response")
+		return constants.KubernetesVersionUnknown, err
+	}
 	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
 }
