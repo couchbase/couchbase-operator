@@ -420,21 +420,21 @@ func DefaultIoPriorityVerifier(t *testing.T, b *cbmgr.Bucket) bool {
 }
 
 func DataServiceMemQuotaVerifier(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool {
-	valueInt, _ := strconv.Atoi(value)
+	valueInt, _ := strconv.ParseUint(value, 10, 64)
 	dataServiceMemQuota := ci.DataMemoryQuotaMB == valueInt
 	t.Logf("data service mem quota: %v", ci.DataMemoryQuotaMB)
 	return dataServiceMemQuota
 }
 
 func IndexServiceMemQuotaVerifier(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool {
-	valueInt, _ := strconv.Atoi(value)
+	valueInt, _ := strconv.ParseUint(value, 10, 64)
 	indexServiceMemQuota := ci.IndexMemoryQuotaMB == valueInt
 	t.Logf("index service mem quota: %v", ci.IndexMemoryQuotaMB)
 	return indexServiceMemQuota
 }
 
 func SearchServiceMemQuotaVerifier(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool {
-	valueInt, _ := strconv.Atoi(value)
+	valueInt, _ := strconv.ParseUint(value, 10, 64)
 	searchServiceMemQuota := ci.SearchMemoryQuotaMB == valueInt
 	t.Logf("search service mem quota: %v", ci.SearchMemoryQuotaMB)
 	return searchServiceMemQuota

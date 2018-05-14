@@ -247,11 +247,17 @@ func UpdateClusterSettings(field string, value string, crClient versioned.Interf
 
 	switch {
 	case field == "DataServiceMemQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.DataServiceMemQuota, _ = strconv.Atoi(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) {
+			cl.Spec.ClusterSettings.DataServiceMemQuota, _ = strconv.ParseUint(value, 10, 64)
+		}
 	case field == "IndexServiceMemQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.IndexServiceMemQuota, _ = strconv.Atoi(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) {
+			cl.Spec.ClusterSettings.IndexServiceMemQuota, _ = strconv.ParseUint(value, 10, 64)
+		}
 	case field == "SearchServiceMemQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.SearchServiceMemQuota, _ = strconv.Atoi(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) {
+			cl.Spec.ClusterSettings.SearchServiceMemQuota, _ = strconv.ParseUint(value, 10, 64)
+		}
 	case field == "IndexStorageSetting":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.IndexStorageSetting = value }
 	case field == "AutoFailoverTimeout":

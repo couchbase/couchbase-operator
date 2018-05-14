@@ -18,6 +18,8 @@ spec:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
+    eventingServiceMemoryQuota: 256
+    analyticsServiceMemoryQuota: 1024
     indexStorageSetting: default
     autoFailoverTimeout: 120
     autoFailoverMaxCount: 3

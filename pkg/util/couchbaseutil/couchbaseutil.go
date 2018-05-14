@@ -345,12 +345,12 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	return err
 }
 
-func (c *CouchbaseClient) InitializeCluster(m *Member, username, password, name string, dataMemQuota, indexMemQuota,
-	searchMemQuota int, services []string, dataPath, indexPath, indexStorageMode string) error {
+func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
+	services []string, dataPath, indexPath, indexStorageMode string) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "node init", name,
+	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "node init", defaults.ClusterName,
 		func() error {
 			return c.client.NodeInitialize(m.Addr(), dataPath, indexPath)
 		})
@@ -364,10 +364,10 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password, name 
 		return err
 	}
 
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster init", name,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster init", defaults.ClusterName,
 		func() error {
-			return c.client.ClusterInitialize(username, password, name, dataMemQuota,
-				indexMemQuota, searchMemQuota, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
+			return c.client.ClusterInitialize(username, password, defaults,
+				8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
 		})
 }
 
@@ -487,24 +487,9 @@ func (c *CouchbaseClient) GetClusterInfo(ms MemberSet) (*cbmgr.ClusterInfo, erro
 	return c.client.ClusterInfo()
 }
 
-func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota int) error {
+func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, defaults *cbmgr.PoolsDefaults) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetPoolsDefault(c.clusterName, dataServiceMemQuota, indexServiceMemQuota, searchServiceMemQuota)
-}
-
-func (c *CouchbaseClient) SetDataMemoryQuota(ms MemberSet, quota int) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetDataMemoryQuota(quota)
-}
-
-func (c *CouchbaseClient) SetIndexMemoryQuota(ms MemberSet, quota int) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetIndexMemoryQuota(quota)
-}
-
-func (c *CouchbaseClient) SetSearchMemoryQuota(ms MemberSet, quota int) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetSearchMemoryQuota(quota)
+	return c.client.SetPoolsDefault(defaults)
 }
 
 func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {

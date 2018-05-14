@@ -24,6 +24,8 @@ spec:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
+    eventingServiceMemoryQuota: 256
+    analyticsServiceMemoryQuota: 1024
     indexStorageSetting: default
     autoFailoverTimeout: 120
     autoFailoverMaxCount: 3
@@ -229,6 +231,8 @@ This section specifies the various Couchbase cluster settings. This section is n
     dataServiceMemoryQuota: 4096
     indexServiceMemoryQuota: 1024
     searchServiceMemoryQuota: 2048
+    eventingServiceMemoryQuota: 256
+    analyticsServiceMemoryQuota: 1024
     indexStorageType: plasma
     autoFailoverTimeout: 120
     autoFailoverMaxCount: 3
@@ -255,6 +259,18 @@ The amount of memory to assign to the index service if present on a specific Cou
 The amount of memory to assign to the search service if present on a specific Couchbase node in MiB. This parameter defaults to 256MiB if it is not set.
 
 > *Field rules:* The ```searchServiceMemoryQuota``` field is required and must be set to be greater than or equal to 256. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
+
+**eventingServiceMemoryQuota**
+
+The amount of memory to assign to the eventing service if present on a specific Couchbase node in MiB.
+
+> *Field rules:* The ```eventingServiceMemoryQuota``` field is required and must be set to be greater than or equal to 256. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
+
+**analyticsServiceMemoryQuota**
+
+The amount of memory to assign to the analytics service if present on a specific Couchbase node in MiB.
+
+> *Field rules:* The ```analyticsServiceMemoryQuota``` field is required and must be set to be greater than or equal to 1024. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
 
 **indexStorageType**
 

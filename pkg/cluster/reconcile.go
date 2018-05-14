@@ -481,6 +481,15 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 	settings := c.cluster.Spec.ClusterSettings
 
+	defaults := &cbmgr.PoolsDefaults{
+		ClusterName:          c.cluster.Name,
+		DataMemoryQuota:      settings.DataServiceMemQuota,
+		IndexMemoryQuota:     settings.IndexServiceMemQuota,
+		SearchMemoryQuota:    settings.SearchServiceMemQuota,
+		EventingMemoryQuota:  settings.EventingServiceMemQuota,
+		AnalyticsMemoryQuota: settings.AnalyticsServiceMemQuota,
+	}
+
 	// set default volume paths and allow for override of via spec
 	dataPath := constants.DefaultDataPath
 	indexPath := constants.DefaultDataPath
@@ -493,8 +502,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 		}
 	}
 
-	if err := c.client.InitializeCluster(m, c.username, c.password, c.cluster.Name,
-		settings.DataServiceMemQuota, settings.IndexServiceMemQuota, settings.SearchServiceMemQuota,
+	if err := c.client.InitializeCluster(m, c.username, c.password, defaults,
 		serverSpec.Services, dataPath, indexPath, settings.IndexStorageSetting); err != nil {
 		return err
 	}
@@ -726,12 +734,20 @@ func (c *Cluster) reconcileMemoryQuotaSettings() bool {
 		return false
 	}
 
+	current := info.PoolsDefaults()
+
 	config := c.cluster.Spec.ClusterSettings
-	if config.DataServiceMemQuota != info.DataMemoryQuotaMB ||
-		config.IndexServiceMemQuota != info.IndexMemoryQuotaMB ||
-		config.SearchServiceMemQuota != info.SearchMemoryQuotaMB {
-		err = c.client.SetPoolsDefault(c.members, config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota)
-		if err != nil {
+	requested := &cbmgr.PoolsDefaults{
+		ClusterName:          c.cluster.Name,
+		DataMemoryQuota:      config.DataServiceMemQuota,
+		IndexMemoryQuota:     config.IndexServiceMemQuota,
+		SearchMemoryQuota:    config.SearchServiceMemQuota,
+		EventingMemoryQuota:  config.EventingServiceMemQuota,
+		AnalyticsMemoryQuota: config.AnalyticsServiceMemQuota,
+	}
+
+	if !reflect.DeepEqual(current, requested) {
+		if err := c.client.SetPoolsDefault(c.members, requested); err != nil {
 			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: %s", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.status.SetConfigRejectedCondition(message)
 			c.logger.Warnf(message)

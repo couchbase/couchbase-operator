@@ -191,21 +191,21 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 			for setting := range config[key] {
 				switch {
 				case setting == "dataServiceMemQuota":
-					dataServiceMemQuota, _ := strconv.Atoi(config[key][setting])
+					dataServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
 					clusterSettings.DataServiceMemQuota = dataServiceMemQuota
 				case setting == "indexServiceMemQuota":
-					indexServiceMemQuota, _ := strconv.Atoi(config[key][setting])
+					indexServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
 					clusterSettings.IndexServiceMemQuota = indexServiceMemQuota
 				case setting == "searchServiceMemQuota":
-					searchServiceMemQuota, _ := strconv.Atoi(config[key][setting])
+					searchServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
 					clusterSettings.SearchServiceMemQuota = searchServiceMemQuota
 				case setting == "indexStorageSetting":
 					clusterSettings.IndexStorageSetting = config[key][setting]
 				case setting == "autoFailoverTimeout":
-					autoFailoverTimeout, _ := strconv.ParseUint(config[key][setting], 0, 64)
+					autoFailoverTimeout, _ := strconv.ParseUint(config[key][setting], 10, 64)
 					clusterSettings.AutoFailoverTimeout = autoFailoverTimeout
 				case setting == "autoFailoverMaxCount":
-					autoFailoverMaxCount, _ := strconv.ParseUint(config[key][setting], 0, 64)
+					autoFailoverMaxCount, _ := strconv.ParseUint(config[key][setting], 10, 64)
 					clusterSettings.AutoFailoverMaxCount = autoFailoverMaxCount
 				}
 			}

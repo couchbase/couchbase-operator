@@ -17,6 +17,7 @@ const (
 	DefaultAutoFailoverMaxCount                   = 3
 	DefaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
 	DefaultServiceMemQuota                        = 256
+	DefaultAnalyticsServiceMemQuota               = 1024
 )
 
 type Warning string
@@ -112,6 +113,14 @@ func applyDefaults(customResource *api.CouchbaseCluster) {
 		customResource.Spec.ClusterSettings.SearchServiceMemQuota = DefaultServiceMemQuota
 	}
 
+	if customResource.Spec.ClusterSettings.EventingServiceMemQuota == 0 {
+		customResource.Spec.ClusterSettings.EventingServiceMemQuota = DefaultServiceMemQuota
+	}
+
+	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota == 0 {
+		customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota = DefaultAnalyticsServiceMemQuota
+	}
+
 	if customResource.Spec.ClusterSettings.IndexStorageSetting == "" {
 		customResource.Spec.ClusterSettings.IndexStorageSetting = DefaultIndexStorageSetting
 	}
@@ -158,19 +167,38 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	if customResource.Spec.AdminConsoleServices != nil {
-		if len(customResource.Spec.AdminConsoleServices) > 4 {
-			err := errors.TooManyItems("spec.adminConsoleServices", "body", 4)
+		services := EnumList{"data", "index", "query", "search", "eventing", "analytics"}
+
+		if len(customResource.Spec.AdminConsoleServices) > len(services) {
+			err := errors.TooManyItems("spec.adminConsoleServices", "body", int64(len(services)))
 			errs = append(errs, err)
 		}
 
 		for _, svc := range customResource.Spec.AdminConsoleServices {
-			if svc != "data" && svc != "index" && svc != "query" && svc != "search" {
+			if !services.Contains(svc) {
 				err := errors.EnumFail("spec.adminConsoleServices", "body", nil,
-					[]interface{}{"data", "index", "query", "search"})
+					services.Interfaces())
 				errs = append(errs, err)
 				continue
 			}
 		}
+	}
+
+	// Check memory quota limits
+	if customResource.Spec.ClusterSettings.DataServiceMemQuota < DefaultServiceMemQuota {
+		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.dataServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
+	}
+	if customResource.Spec.ClusterSettings.IndexServiceMemQuota < DefaultServiceMemQuota {
+		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.indexServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
+	}
+	if customResource.Spec.ClusterSettings.SearchServiceMemQuota < DefaultServiceMemQuota {
+		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.searchServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
+	}
+	if customResource.Spec.ClusterSettings.EventingServiceMemQuota < DefaultServiceMemQuota {
+		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.eventingServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
+	}
+	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota < DefaultAnalyticsServiceMemQuota {
+		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.analyticsServiceMemoryQuota", "body", DefaultAnalyticsServiceMemQuota, false))
 	}
 
 	// Ensure unnecessary settings in memcached and ephemeral buckets are nil
@@ -271,9 +299,9 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	// Check that the total memory quota is valid
-	totalBucketMemory := 0
+	var totalBucketMemory uint64
 	for _, bucket := range customResource.Spec.BucketSettings {
-		totalBucketMemory += bucket.BucketMemoryQuota
+		totalBucketMemory += uint64(bucket.BucketMemoryQuota)
 	}
 
 	maxBucketQuota := customResource.Spec.ClusterSettings.DataServiceMemQuota

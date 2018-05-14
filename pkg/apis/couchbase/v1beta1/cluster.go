@@ -120,13 +120,19 @@ type ClusterSpec struct {
 
 type ClusterConfig struct {
 	// The amount of memory that should be allocated to the data service
-	DataServiceMemQuota int `json:"dataServiceMemoryQuota"`
+	DataServiceMemQuota uint64 `json:"dataServiceMemoryQuota"`
 
 	// The amount of memory that should be allocated to the index service
-	IndexServiceMemQuota int `json:"indexServiceMemoryQuota"`
+	IndexServiceMemQuota uint64 `json:"indexServiceMemoryQuota"`
 
 	// The amount of memory that should be allocated to the search service
-	SearchServiceMemQuota int `json:"searchServiceMemoryQuota"`
+	SearchServiceMemQuota uint64 `json:"searchServiceMemoryQuota"`
+
+	// The amount of memory that should be allocated to the eventing service
+	EventingServiceMemQuota uint64 `json:"eventingServiceMemoryQuota"`
+
+	// The amount of memory that should be allocated to the analytics service
+	AnalyticsServiceMemQuota uint64 `json:"analyticsServiceMemoryQuota"`
 
 	// The index storage mode to use for secondary indexing
 	IndexStorageSetting string `json:"indexStorageSetting"`
