@@ -104,6 +104,13 @@ func TestPodResourcesLow(t *testing.T) {
 	t.Skip("test not fully implemented...")
 }
 
+// TestPodResourcesCannotBePlaced tests for additional pods failing creation due to
+// resource starvation.
+// 1. Get the minimum memory on any node, set pods to reserve this amount
+// 2. Calculate the maximum number of pods which can be allocated on the k8s cluster
+// 3. Create a Couchbase cluster with this number of pods, saturating memory
+// 4. Try scaling up by one pod
+// 5. Expect to see an event indicating that pod creation failed
 func TestPodResourcesCannotBePlaced(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -124,7 +131,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	t.Logf("Mem Request: %s MB", memReq)
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
-		"size":               "1",
+		"size":               strconv.Itoa(scaleNum),
 		"name":               "test_config_1",
 		"services":           "data",
 		"resourceMemRequest": memReq,
@@ -134,6 +141,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 
+	// Scale the cluster up to just below the memory threshold
 	t.Logf("Pod Policy Resource Memory Request=%s MB...\n Cluster Capacity=%d  \n scaling until pods cannot be placed", memReq, scaleNum)
 	testCouchbase, err := e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
 	if err != nil {
@@ -141,40 +149,27 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	}
 	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
 
+	// Add in a new node which should cause a memory allocation error
+	if err := e2eutil.ResizeClusterNoWait(t, 0, scaleNum+1, f.CRClient, testCouchbase); err != nil {
+		t.Fatalf("failed to scale cluster")
+	}
+
+	// Wait for the creation failure event to be raised
+	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, scaleNum)
+	if err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60); err != nil {
+		t.Fatalf("failed to raise member creation failed event")
+	}
+
+	// Check the event stream is as expected
 	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	clusterSize := 1
-	for err == nil {
-		clusterSize = clusterSize + 1
-		err = e2eutil.ResizeCluster(t, 0, clusterSize, f.CRClient, testCouchbase)
-		if err != nil {
-			t.Logf("failed to place pod: %v", clusterSize)
-			break
-		}
-
-		expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+	for i := 0; i < scaleNum; i++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, i)
+	}
+	if scaleNum > 1 {
 		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-		t.Logf("Pods placed: %v", clusterSize)
 	}
-	actualSize := clusterSize - 1
-
-	t.Logf("Cluster size: %v", actualSize)
-
-	if actualSize != scaleNum {
-		t.Fatalf("failed to saturate cluster memory: %v", err)
-	}
-
-	t.Logf("Cluster memory saturated with cluster size: %v", actualSize)
-
-	if scaleNum != 1 {
-		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, actualSize, e2eutil.Retries5)
-		if err != nil {
-			t.Fatalf("failed to see healthy and balanced cluster: %v", err)
-		}
-	}
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, scaleNum)
 
 	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {

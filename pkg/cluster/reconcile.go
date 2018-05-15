@@ -160,18 +160,9 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	defer cancel()
 	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
 		if _, failed := err.(cberrors.ErrPodUnschedulable); failed {
-			// remove pod
+			c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 			c.removePod(newMember.Name)
 		}
-		return nil, err
-	}
-
-	// Increment the next member counter
-	c.memberCounter++
-
-	// Notify that we have created a new member
-	c.clusterAddMember(newMember)
-	if err := c.updateCRStatus(); err != nil {
 		return nil, err
 	}
 
@@ -183,8 +174,19 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 
 	// Enable TLS if requested
 	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
+		c.removePod(newMember.Name)
 		return nil, err
 	}
+
+	// Notify that we have created a new member
+	c.clusterAddMember(newMember)
+	if err := c.updateCRStatus(); err != nil {
+		return nil, err
+	}
+
+	// Increment the next member counter
+	c.memberCounter++
 
 	return newMember, nil
 }

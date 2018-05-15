@@ -12,6 +12,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func MemberCreationFailedEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = "MemberCreationFailed"
+	event.Message = fmt.Sprintf("New member %s creation failed", memberName)
+	return event
+}
+
 func MemberAddEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal

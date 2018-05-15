@@ -42,6 +42,11 @@ func (e *EventList) AddEvent(add v1.Event) {
 	*e = append(*e, add)
 }
 
+func (e *EventList) AddMemberCreationFailedEvent(cl *api.CouchbaseCluster, memberId int) {
+	event := NewMemberCreationFailedEvent(cl, memberId)
+	*e = append(*e, *event)
+}
+
 func (e *EventList) AddMemberAddEvent(cl *api.CouchbaseCluster, memberId int) {
 	event := NewMemberAddEvent(cl, memberId)
 	*e = append(*e, *event)
@@ -107,6 +112,11 @@ func (e EventList) String() string {
 
 func EventListCompareFailedString(expected, actual EventList) string {
 	return fmt.Sprintf("Expected events to be:\n%s\nbut got:\n%s", expected, actual)
+}
+
+func NewMemberCreationFailedEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	return k8sutil.MemberCreationFailedEvent(name, cl)
 }
 
 func NewMemberAddEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {

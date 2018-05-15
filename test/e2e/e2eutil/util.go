@@ -509,10 +509,14 @@ func isMasterNode(nodeMap map[string]string) bool {
 	return false
 }
 
-func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
+func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
 	_, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), crClient, cl, 10)
-	if err != nil {
+	return err
+}
+
+func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
+	if err := ResizeClusterNoWait(t, service, clusterSize, crClient, cl); err != nil {
 		return err
 	}
 	t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
