@@ -26,6 +26,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	ClusterNamePrefix = "test-couchbase-"
+)
+
 var (
 	Size1 = 1
 	Size2 = 2
@@ -203,29 +207,36 @@ func NewClusterBasicQuick(t *testing.T, crClient versioned.Interface, namespace,
 // NewClusterMultiQuick attempts to create a multi cluster only once.  The returned
 // cluster object may still be valid upon error
 func NewClusterMultiQuick(t *testing.T, crClient versioned.Interface, namespace, secretName string, config map[string]map[string]string, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
+	clusterSpec := e2espec.NewMultiCluster(ClusterNamePrefix, secretName, config, exposed)
 	return newClusterFromSpecQuick(t, crClient, namespace, clusterSpec, retries)
 }
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
+	clusterSpec := e2espec.NewBasicCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an
 // error is encountered and performing garbage collection
 func NewStatefulCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewStatefulCluster("test-couchbase-", secretName, size, withBucket, exposed)
+	clusterSpec := e2espec.NewStatefulCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
 }
 
-// NewClusterBasic creates a multi cluster, retrying if an error is encountered and
+// NewClusterMulti creates a multi cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster("test-couchbase-", secretName, config, exposed)
+	clusterSpec := e2espec.NewMultiCluster(ClusterNamePrefix, secretName, config, exposed)
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
+}
+
+// NewClusterMultiNoWait creates a multi cluster, but doesn't wait for any events.
+// Used in cases where the cluster is expected to fail
+func NewClusterMultiNoWait(t *testing.T, crClient versioned.Interface, namespace, secretName string, config map[string]map[string]string) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster(ClusterNamePrefix, secretName, config, false)
+	return CreateCluster(t, crClient, namespace, clusterSpec)
 }
 
 func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {

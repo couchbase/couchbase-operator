@@ -208,12 +208,20 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 	t.Logf("Pod Policy Resource Memory Request=%sMB... \n attempting to create 1 pod cluster with max allocatable memory of %dMB", memReq, int(maxMem))
-	_, err = e2eutil.NewClusterMulti(t, f.KubeClient, f.CRClient, f.Namespace, "basic-test-secret", configMap, false)
-	if err == nil {
-		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
-		t.Fatalf("%s MB request placed on node with max allocatable memory of %dMB, fail: %v", memReq, int(maxMem), err)
+
+	// Asynchronously create the cluster
+	cluster, err := e2eutil.NewClusterMultiNoWait(t, f.CRClient, f.Namespace, "basic-test-secret", configMap)
+	if err != nil {
+		t.Fatalf("failed to create cluster")
 	}
-	t.Logf("Pod not placed")
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	// Expect the cluster to enter a failed state
+	if err := e2eutil.WaitClusterPhaseFailed(t, f.CRClient, cluster.Name, f.Namespace, 10); err != nil {
+		t.Fatalf("cluster failed to enter failed state")
+	}
+
+	t.Logf("Cluster failed, pod not scheduled")
 }
 
 func TestAntiAffinityOn(t *testing.T) {

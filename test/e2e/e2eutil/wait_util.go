@@ -144,6 +144,19 @@ func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, bucke
 	return nil
 }
 
+// WaitClusterPhaseFailed expects the cluster to enter a failed state, useful for passing
+// quickly rather than wating for a cluster to not become healthy
+func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, name, namespace string, retries int) error {
+	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (bool, error) {
+		cluster, err := GetCouchbaseCluster(crClient, name, namespace)
+		if err != nil {
+			return false, err
+		}
+		return cluster.Status.Phase == api.ClusterPhaseFailed, nil
+	})
+	return err
+}
+
 func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, namespace string, expectedNodes, retries int) error {
 	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (done bool, err error) {
 		cl, err := GetCouchbaseCluster(crClient, name, namespace)
