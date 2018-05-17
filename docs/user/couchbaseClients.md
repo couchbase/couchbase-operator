@@ -15,10 +15,10 @@ To create a connection to the cluster from within the overlay (as a pod in the s
 ```python
 from couchbase.cluster import Cluster
 
-c = Cluster('couchbase://my-cluster.default.svc.cluster.local')
+c = Cluster('couchbase://{}-srv.default.svc.cluster.local'.format(cluster_name))
 ```
 
-Where the domain is composed of ```my-cluster```, which is the name of the ```CouchbaseCluster``` resource and the super domain.
+Where the domain is composed of ```my-cluster```, which is the name of the ```CouchbaseCluster``` resource, the namespace and the domain of the cluster.  Note that we use a separate service record to only advertise nodes with the data service enabled, this provides optimal bootstrapping of Couchbase clients.
 
 ## From an External Address
 
