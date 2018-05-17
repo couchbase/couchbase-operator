@@ -1,3 +1,13 @@
+# v0.8.1 [Beta 2] Update
+
+The v0.8.1 build of the Couchbase Operator resolves a GitVersion check issue that prevented the Operator from initializing after deployment. An error similar to the following could be seen in the Kubernetes log:
+
+```
+Initialization failed: kubernetes version 1.0 is too old, 1.8 is minimum supported version " module=controller
+```
+
+If you encountered this issue, please reinstall the Operator using the latest documentation, as the commands have been updated to reflect the latest version number.
+
 # v0.8.0 [Beta 2] Release Notes
 
 The Couchbase Operator is a Kubernetes native integration that enables you to automate the management of common Couchbase tasks such as the configuration, creation, and scaling of Couchbase clusters.
@@ -10,7 +20,7 @@ Since the release is still under active development, you can have a big impact o
 
 The Beta 2 release has the following limitations:
 
-- CRD validation is supported through cbopctl and partial CRD validation is supported though standard Kubernetes/OpenShift tools suchas kubectl/oc. We recommend using cbopctl when submitting CouchbaseCluster configurations to Kubernetes/OpenShift.
+- CRD validation is supported through cbopctl and partial CRD validation is supported though standard Kubernetes/OpenShift tools such as kubectl/oc. We recommend using cbopctl when submitting CouchbaseCluster configurations to Kubernetes/OpenShift.
 - The Couchbase Operator can only failover one node at a time in the cluster during auto-failover. This means that if multiple nodes fail, some manual intervention is needed.
 - The Couchbase Operator does not support the use of Persistent Volumes.
 
