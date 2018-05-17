@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-const version = "0.8.0"
+const version = "0.8.1"
 
 var (
 	listenAddr   string

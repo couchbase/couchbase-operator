@@ -21,7 +21,7 @@ var (
 	path string
 )
 
-var versionId string = "0.8"
+var versionId string = "0.8.1"
 var versionHash string = "unknown"
 
 type CbopctlContext struct {
