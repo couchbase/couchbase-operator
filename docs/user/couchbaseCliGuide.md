@@ -39,7 +39,7 @@ Note that the cluster is being managed by the Couchbase Operator.  Therefore, ce
 The most secure way to use the couchbase-cli with your Kubernetes cluster is to run as batch jobs. This option allows you to hide the user name and password of your cluster by allowing the use of Secrets. For example, you can run a collect info job using the same secret provided in the cluster spec:
 
 ```console
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
 job "collect-info" created
 
 # check status
@@ -51,5 +51,5 @@ collect-info   1         1            10s
 On OpenShift, use the following command:
 
 ```console
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
 ```

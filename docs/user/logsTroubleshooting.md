@@ -14,10 +14,10 @@ The following topics are also helpful to understand when troubleshooting the Ope
 
 ## Full Deployment Logs
 
-To retrieve the logs for the Operator and the entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-kubernetes-support.sh)
+To retrieve the logs for the Operator and the entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-kubernetes-support.sh)
 
 ```bash
-wget https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-kubernetes-support.sh
+wget https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-kubernetes-support.sh
 chmod +x couchbase-kubernetes-support.sh
 ./couchbase-kubernetes-support.sh
 ```
@@ -81,12 +81,12 @@ You can also deploy a job within Kubernetes to trigger log collection. The follo
 On Kubernetes:
 
 ```bash
-kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
+kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
 ```
 On OpenShift:
 
 ```bash
-oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
+oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
 ```
 
 *Note*: If you are not using the default namespace, you must download and update the `couchbase-cli-collect-logs.yaml` file to reflect your namespace.

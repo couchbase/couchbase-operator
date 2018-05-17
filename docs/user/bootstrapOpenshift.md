@@ -13,7 +13,7 @@ OpenShift offers an application catalog that provides templated deployment of ap
 Since templates can be imported using the standard `oc` cli tool, we've created a bootstrap script to assist with importing Couchbase templates into an OpenShift cluster.
 
 ```console
-$ wget https://packages.couchbase.com/kubernetes/0.8.0-beta2/openshift-bootstrap.zip
+$ wget https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift-bootstrap.zip
 $ unzip openshift-bootstrap.zip
 $ cd openshift-bootstrap
 $ chmod +x openshift-bootstrap.sh

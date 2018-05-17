@@ -55,24 +55,24 @@ By taking a quick look at this configuration file you can see that it defines a 
 One thing that's important to note is the `authSecret` field. The Couchbase Operator uses Kubernetes Secrets to create and manage the Couchbase super-user credentials. As a result, the `authSecret` field must refer to secret that contains both a user name and a password field. For convenience, we provide a sample secret that can be pushed into your Kubernetes cluster. The secret sets the user name to ```Administrator``` and the password to ```password```. To load this secret into your Kubernetes cluster, run the following command:
 On Kubernetes:
 ```bash
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/secret.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/secret.yaml
 secret "cb-example-auth" created
 ```
 On OpenShift:
 ```bash
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/secret.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/secret.yaml
 secret "cb-example-auth" created
 ```
 
 The Couchbase Operator configuration is now ready to be pushed to Kubernetes. To push the Couchbase Operator configuration, run the following command:
 On Kubernetes:
 ```bash
-$ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cluster.yaml
+$ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 On OpenShift:
 ```bash
-$ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cluster.yaml
+$ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 
