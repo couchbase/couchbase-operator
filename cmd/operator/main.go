@@ -19,11 +19,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"golang.org/x/time/rate"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -119,7 +116,7 @@ func run(stop <-chan struct{}) {
 	mainLogger.Info("I'm the leader, attempt to start the operator")
 	cfg := newControllerConfig()
 
-	startChaos(context.Background(), cfg.KubeCli, cfg.Namespace, chaosLevel)
+	chaos.Start(context.Background(), cfg.KubeCli, cfg.Namespace, chaosLevel)
 
 	c := controller.New(cfg)
 	c.Start()
@@ -161,56 +158,6 @@ func getMyPodServiceAccount(kubecli kubernetes.Interface) (string, error) {
 		mainLogger.Infof("Found pod service account: %s", sa)
 	}
 	return sa, err
-}
-
-func startChaos(ctx context.Context, kubecli kubernetes.Interface, ns string, chaosLevel int) {
-	m := chaos.NewMonkeys(kubecli)
-	ls := labels.SelectorFromSet(map[string]string{"app": "couchbase"})
-
-	switch chaosLevel {
-	case 1:
-		logrus.Info("chaos level = 1: randomly kill one couchbase pod every 30 seconds at 50%")
-		c := &chaos.CrashConfig{
-			Namespace: ns,
-			Selector:  ls,
-
-			KillRate:        rate.Every(30 * time.Second),
-			KillProbability: 0.5,
-			KillMax:         1,
-		}
-		go func() {
-			time.Sleep(60 * time.Second) // don't start until quorum up
-			m.CrushPods(ctx, c)
-		}()
-	case 2:
-		logrus.Info("chaos level = 2: randomly kill at most two couchbase pod every 2 minutes at 50%")
-		c := &chaos.CrashConfig{
-			Namespace: ns,
-			Selector:  ls,
-
-			KillRate:        rate.Every(120 * time.Second),
-			KillProbability: 0.5,
-			KillMax:         2,
-		}
-		go func() {
-			time.Sleep(300 * time.Second) // don't start until quorum up
-			m.CrushPods(ctx, c)
-		}()
-	case 3:
-		logrus.Info("chaos level = 3: randomly kill at most five couchbase pods every 30 seconds at 50%")
-		c := &chaos.CrashConfig{
-			Namespace: ns,
-			Selector:  ls,
-
-			KillRate:        rate.Every(30 * time.Second),
-			KillProbability: 0.5,
-			KillMax:         5,
-		}
-
-		go m.CrushPods(ctx, c)
-
-	default:
-	}
 }
 
 func createRecorder(kubecli kubernetes.Interface, name, namespace string) record.EventRecorder {
