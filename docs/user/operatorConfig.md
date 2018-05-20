@@ -61,3 +61,7 @@ By default the name of the deployment created to maintain the Couchbase Operator
 **Changing the Service Account**
 
 We recommend using a ServiceAccount named couchbase-operator, but depending on your environment you may want to use a service account with a different name. Note that this field only takes effect if your Kubernetes environment has RBAC enabled.
+
+**Changing the Replica Count**
+
+Normally Deployments are used to create multiple instances of a pod in order to provide redundancy. However, when deploying the Couchbase Operator, you should always set replicas to 1. This is because the Operator pod uses leader election to ensure that only one Operator is running in a specific namespace. If you start more than one Operator pod in the same namespace, only the first one will start successfully. We use Deployments so that if the Operator dies, a new operator pod gets created and picks up from where the old one left off.
