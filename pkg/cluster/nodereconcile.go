@@ -165,6 +165,7 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 			return
 		}
 
+		c.clusterRemoveMember(m.Name)
 		r.runningPods.Remove(m.Name)
 	}
 
