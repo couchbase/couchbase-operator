@@ -34,7 +34,7 @@ objects:
         name: "${CLUSTER_NAME}-ui"
 
   # Cluster CRD Spec
-  - apiVersion: couchbase.database.couchbase.com/v1beta1
+  - apiVersion: couchbase.database.couchbase.com/v1
     kind: CouchbaseCluster
     metadata:
       name: "${CLUSTER_NAME}"

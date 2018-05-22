@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"

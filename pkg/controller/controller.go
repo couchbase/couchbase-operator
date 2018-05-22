@@ -9,7 +9,7 @@ import (
 	"github.com/coreos/operator-sdk/pkg/sdk/handler"
 	"github.com/coreos/operator-sdk/pkg/sdk/types"
 
-	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"

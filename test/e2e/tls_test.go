@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"

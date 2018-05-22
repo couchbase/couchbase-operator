@@ -9,7 +9,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -27,7 +27,7 @@ type CouchbaseCrd struct {
 }
 
 // Populates CouchbaseCrd struct from the input yaml file
-func ReadClusterCrd(cbCluster *v1beta1.CouchbaseCluster) (crd CouchbaseCrd, err error) {
+func ReadClusterCrd(cbCluster *api.CouchbaseCluster) (crd CouchbaseCrd, err error) {
 	crdFilePath := "./resources/crd_" + cbCluster.Name + ".yml"
 	if err = ClusterToYAML(cbCluster, crdFilePath); err != nil {
 		return
@@ -45,7 +45,7 @@ func ReadClusterCrd(cbCluster *v1beta1.CouchbaseCluster) (crd CouchbaseCrd, err 
 
 // Generic function to run rebalance out test case
 // Rebalance out xdcrCluster nodes one by one for the provided clustersize
-func rebalanceOutXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterSize int, kubeName string) error {
+func rebalanceOutXdcrNodes(t *testing.T, xdcrCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -84,7 +84,7 @@ func rebalanceOutXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, 
 
 // Generic function to kill xdcrCluster nodes
 // Will kill all the nodes one by one for the given clusterSize number and wait for the new pod to get replaced
-func killXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterSize int, kubeName string) error {
+func killXdcrNodes(t *testing.T, xdcrCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -101,7 +101,7 @@ func killXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterS
 }
 
 // Generic function to resize the xdcrCluster to the given clusterSize value and wait for healthy cluster
-func resizeXdcrCluster(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterSize int, kubeName string) error {
+func resizeXdcrCluster(t *testing.T, xdcrCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
 	f := framework.Global
 	service := 0
 	targetKube := f.ClusterSpec[kubeName]

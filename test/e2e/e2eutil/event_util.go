@@ -3,7 +3,7 @@ package e2eutil
 import (
 	"fmt"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"k8s.io/api/core/v1"

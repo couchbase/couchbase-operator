@@ -19,7 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/sirupsen/logrus"
 
@@ -458,7 +458,7 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		kubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
 	}
 
-	clusters, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	clusters, err := crClient.CouchbaseV1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Logf("Error: %v", err)
 	}

@@ -3,7 +3,7 @@ package decoder
 import (
 	"fmt"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/ghodss/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 )

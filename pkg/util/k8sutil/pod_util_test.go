@@ -3,7 +3,7 @@ package k8sutil
 import (
 	"testing"
 
-	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 )
 
 // Test paths to persist method returns appropriate claims

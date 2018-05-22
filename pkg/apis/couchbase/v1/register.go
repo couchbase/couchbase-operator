@@ -1,4 +1,4 @@
-package v1beta1
+package v1
 
 import (
 	sdkK8sutil "github.com/coreos/operator-sdk/pkg/util/k8sutil"
@@ -18,7 +18,7 @@ var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
 
-	SchemeGroupVersion = schema.GroupVersion{Group: groupName, Version: "v1beta1"}
+	SchemeGroupVersion = schema.GroupVersion{Group: groupName, Version: "v1"}
 	CRDName            = CRDResourcePlural + "." + groupName
 )
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -50,14 +50,14 @@ func UpdateCluster(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRe
 func AtomicUpdateClusterCR(crClient versioned.Interface, name, namespace string, maxRetries int, updateFunc k8sutil.CouchbaseClusterCRUpdateFunc) (*api.CouchbaseCluster, error) {
 	result := &api.CouchbaseCluster{}
 	err := retryutil.Retry(Context, 1*time.Second, maxRetries, func() (done bool, err error) {
-		couchbaseCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
+		couchbaseCluster, err := crClient.CouchbaseV1().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
 		updateFunc(couchbaseCluster)
 
-		result, err = crClient.CouchbaseV1beta1().CouchbaseClusters(namespace).Update(couchbaseCluster)
+		result, err = crClient.CouchbaseV1().CouchbaseClusters(namespace).Update(couchbaseCluster)
 		if err != nil {
 			if apierrors.IsConflict(err) {
 				return false, nil
@@ -79,7 +79,7 @@ func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubern
 }
 
 func GetClusterCRD(crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
-	return crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+	return crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 }
 
 // NameLabelSelector returns a label selector of the form name=<name>

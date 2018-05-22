@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 

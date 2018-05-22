@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
@@ -68,7 +68,7 @@ func (c *Cluster) startUpgrade() error {
 	sort.Strings(members)
 
 	// Start the upgrade procedure
-	status := &v1beta1.UpgradeStatus{
+	status := &api.UpgradeStatus{
 		TargetVersion: c.cluster.Spec.Version,
 		ReadyNodes:    members[1:],
 		UpgradingNode: members[0],
@@ -99,7 +99,7 @@ func (c *Cluster) updateUpgrade() error {
 	}
 
 	c.logger.Infof("updating upgrade state. %d nodes left to upgrade", len(c.status.UpgradeStatus.ReadyNodes))
-	status := &v1beta1.UpgradeStatus{
+	status := &api.UpgradeStatus{
 		TargetVersion: c.status.UpgradeStatus.TargetVersion,
 		ReadyNodes:    c.status.UpgradeStatus.ReadyNodes[1:],
 		UpgradingNode: c.status.UpgradeStatus.ReadyNodes[0],
@@ -121,7 +121,7 @@ func (c *Cluster) updateUpgrade() error {
 // Atomically retry the upgrade, essentially allocates a new upgraded node name
 func (c *Cluster) retryUpgrade() error {
 	c.logger.Infof("updating upgrade state")
-	status := &v1beta1.UpgradeStatus{
+	status := &api.UpgradeStatus{
 		TargetVersion: c.status.UpgradeStatus.TargetVersion,
 		ReadyNodes:    c.status.UpgradeStatus.ReadyNodes,
 		UpgradingNode: c.status.UpgradeStatus.UpgradingNode,

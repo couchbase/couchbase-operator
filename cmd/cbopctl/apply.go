@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -45,7 +45,7 @@ func (ctx *ApplyContext) Run() {
 	}
 
 	crClient := client.MustNew(config)
-	current, err := crClient.CouchbaseV1beta1().CouchbaseClusters(resource.Namespace).Get(resource.Name, metav1.GetOptions{})
+	current, err := crClient.CouchbaseV1().CouchbaseClusters(resource.Namespace).Get(resource.Name, metav1.GetOptions{})
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)

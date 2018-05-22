@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"

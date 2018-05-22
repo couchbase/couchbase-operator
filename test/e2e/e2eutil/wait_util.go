@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -61,7 +61,7 @@ func WaitUntilSizeReached(t *testing.T, crClient versioned.Interface, size, retr
 func waitSizeReachedWithAccept(t *testing.T, crClient versioned.Interface, size, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) ([]string, error) {
 	var names []string
 	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -87,7 +87,7 @@ func waitSizeReachedWithAccept(t *testing.T, crClient versioned.Interface, size,
 
 func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
 	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -117,7 +117,7 @@ func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets 
 
 func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
 	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -522,7 +522,7 @@ func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType
 func WaitUntilAccepts(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
 	interval := 5 * time.Second
 	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -11,6 +11,6 @@ go install k8s.io/code-generator/cmd/...
   "all" \
   "github.com/couchbase/couchbase-operator/pkg/generated" \
   "github.com/couchbase/couchbase-operator/pkg/apis" \
-  "couchbase:v1beta1" \
+  "couchbase:v1" \
   --go-header-file "./scripts/codegen/boilerplate.go.txt" \
   $@

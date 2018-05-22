@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -194,12 +194,12 @@ func cleanUpNamespace() (err error) {
 		}
 
 		// Clear couchbase pods
-		clusters, err := targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
+		clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return errors.New("Failed to list clusters: " + err.Error())
 		}
 		for _, cluster := range clusters.Items {
-			targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+			targetKube.CRClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
 			pods, err := targetKube.KubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
 			if err != nil {
 				return errors.New("Failed to list pods for cluster: " + err.Error())
@@ -280,14 +280,14 @@ func (f *Framework) setup(kubeName string) error {
 		Global.DeleteCouchbaseOperatorCompletely(targetKube, deployment.GetName())
 	}
 
-	clusters, _ := targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
+	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 	/*
 		if err != nil {
 			return errors.New("Unable to get clusters: " + err.Error())
 		}
 	*/
 	for _, cluster := range clusters.Items {
-		targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+		targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
 		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
 		if err != nil {
 			return errors.New("failed to list pods for cluster: " + err.Error())

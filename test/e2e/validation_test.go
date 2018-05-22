@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -287,7 +287,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			continue
 		}
 
-		clusters, err := targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
+		clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 
 		if test.shouldWarn {
 			if !strings.Contains(string(cmdOut), test.expectedWarn) || test.expectedWarn == "" {

@@ -1,5 +1,5 @@
 # This configuration contains no spec section and is invalid.
-apiVersion: couchbase.database.couchbase.com/v1beta1
+apiVersion: couchbase.database.couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example

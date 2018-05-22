@@ -1,5 +1,5 @@
 # Used to test chaing the order to server services passes
-apiVersion: couchbase.database.couchbase.com/v1beta1
+apiVersion: couchbase.database.couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example

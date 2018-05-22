@@ -1,5 +1,5 @@
 # Default claim does not have matching template 
-apiVersion: couchbase.database.couchbase.com/v1beta1
+apiVersion: couchbase.database.couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example

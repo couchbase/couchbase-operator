@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -376,7 +376,7 @@ func (c *Cluster) updateCRStatus() error {
 	// hence what's in etcd need not reflect what's locally cached and the k8s
 	// server will reject any updates that fail the CAS test.  We only pick up
 	// these updates between reconcile executions (see handleUpdateEvent).
-	cluster, err := c.config.CouchbaseCRCli.CouchbaseV1beta1().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	cluster, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -392,7 +392,7 @@ func (c *Cluster) updateCRStatus() error {
 
 	// Copy the updated status to our cluster object and try update it
 	c.cluster.Status = c.status
-	newCluster, err := c.config.CouchbaseCRCli.CouchbaseV1beta1().CouchbaseClusters(c.cluster.Namespace).Update(c.cluster)
+	newCluster, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Update(c.cluster)
 	if err != nil {
 		return err
 	}
