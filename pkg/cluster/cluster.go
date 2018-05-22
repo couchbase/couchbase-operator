@@ -294,13 +294,17 @@ func (c *Cluster) run() {
 				continue
 			}
 
-			// On controller restore, we could have "members == nil"
-			if rerr != nil || c.members == nil {
+			// When cluster is being restored or reconcile error has occured then
+			// then the memberset can be updated from the status of running pods.
+			// Otherwise restore members from any config maps we can find
+			if (rerr != nil || c.members == nil) && len(running) > 0 {
 				rerr = c.updateMembers(podsToMemberSet(running, c.isSecureClient()))
 				if rerr != nil {
 					c.logger.Errorf("failed to update members: %v", rerr)
 					break
 				}
+			} else if c.members == nil {
+				c.members, _ = k8sutil.PVCToMemberset(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, c.isSecureClient())
 			}
 
 			rerr = c.reconcile(running)
@@ -481,6 +485,21 @@ func (c *Cluster) elapsedRecoveryDuration(ts time.Time) bool {
 	// require a duration of 30s after autofailover timeout
 	requiredDuration := time.Duration(c.cluster.Spec.ClusterSettings.AutoFailoverTimeout+30) * time.Second
 	return elapsedDuration > requiredDuration
+}
+
+// Selects any member that can be recovered and attempts to restart it
+func (c *Cluster) recoverClusterDown() error {
+	for _, m := range c.members {
+		if c.isPodRecoverable(m) {
+			if err := c.recreatePod(m); err != nil {
+				return fmt.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
+			} else {
+				c.logger.Infof("recovering node %s", m.ClientURL())
+				break
+			}
+		}
+	}
+	return nil
 }
 
 func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {

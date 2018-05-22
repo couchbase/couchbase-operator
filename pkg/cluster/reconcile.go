@@ -23,6 +23,13 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	c.logger.Infoln("Start reconciling")
 	defer c.logger.Infoln("Finish reconciling")
 
+	if len(pods) == 0 {
+		err := c.recoverClusterDown()
+		if err != nil {
+			return err
+		}
+	}
+
 	status, err := c.client.GetClusterStatus(c.members)
 	if err != nil {
 		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %s", err.Error())

@@ -718,11 +718,11 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 	opts := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
+	ms := couchbaseutil.MemberSet{}
 	pvcList, err := listPersistentVolumeClaims(kubeCli, namespace, opts)
 	if err != nil {
-		return nil, err
+		return ms, err
 	}
-	ms := couchbaseutil.MemberSet{}
 	for _, pvc := range pvcList.Items {
 
 		if pvc.Status.Phase != v1.ClaimBound {
