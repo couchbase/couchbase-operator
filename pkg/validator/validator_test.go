@@ -112,7 +112,7 @@ var testDefs = []testDef{
 		path:        "tests/0013.yaml",
 		description: "Tests a config with too many adminConsoleService services",
 		expectedErr: errors.CompositeValidationError(
-			errors.TooManyItems("spec.adminConsoleServices", "body", 4),
+			errors.TooManyItems("spec.adminConsoleServices", "body", 6),
 		),
 	},
 	{
@@ -121,7 +121,7 @@ var testDefs = []testDef{
 		description: "Tests a config with an invalid adminConsoleService services",
 		expectedErr: errors.CompositeValidationError(
 			errors.EnumFail("spec.adminConsoleServices", "body", "invalid",
-				[]interface{}{"data", "index", "query", "search"}),
+				[]interface{}{"data", "index", "query", "search", "eventing", "analytics"}),
 		),
 	},
 	{

@@ -12,7 +12,9 @@ spec:
     - index
     - query
     - search
-    - search
+    - eventing
+    - analytics
+    - analytics
   cluster:
     indexStorageSetting: plasma
   servers:
