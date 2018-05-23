@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -286,8 +287,8 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 
 	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
-	container := containerWithLivenessProbe(couchbaseContainer("", cs.BaseImage, version),
-		couchbaseLivenessProbe())
+	container := containerWithReadinessProbe(couchbaseContainer("", cs.BaseImage, version),
+		couchbaseReadinessProbe())
 
 	if ns.Pod != nil {
 		container = containerWithRequirements(container, ns.Pod.Resources)
@@ -646,8 +647,8 @@ func applyPodTlsConfiguration(cs cbapi.ClusterSpec, pod *v1.Pod) error {
 	return nil
 }
 
-func containerWithLivenessProbe(c v1.Container, lp *v1.Probe) v1.Container {
-	c.LivenessProbe = lp
+func containerWithReadinessProbe(c v1.Container, rp *v1.Probe) v1.Container {
+	c.ReadinessProbe = rp
 	return c
 }
 
@@ -656,18 +657,17 @@ func containerWithRequirements(c v1.Container, r v1.ResourceRequirements) v1.Con
 	return c
 }
 
-func couchbaseLivenessProbe() *v1.Probe {
-	cmd := "true" // TODO - Needs to be a real command
+func couchbaseReadinessProbe() *v1.Probe {
 	return &v1.Probe{
 		Handler: v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{"/bin/sh", "-ec", cmd},
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.FromInt(8091),
 			},
 		},
 		InitialDelaySeconds: 10,
-		TimeoutSeconds:      10,
-		PeriodSeconds:       60,
-		FailureThreshold:    3,
+		TimeoutSeconds:      5,
+		PeriodSeconds:       20,
+		FailureThreshold:    1,
 	}
 }
 
