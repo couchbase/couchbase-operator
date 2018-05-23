@@ -78,7 +78,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 
 			// Find volumes that already exist for this mount path
 			// to allow pod recovery. Otherwise, create a new PVC
-			mountPath := pathForVolumeMountName(mountName, config)
+			mountPath := pathForVolumeMountName(mountName)
 			pvc, _ := findMemberPVC(kubeCli, pod.Name, clusterName, namespace, mountPath)
 			if pvc == nil {
 				// Label and Annotate so that volumes
@@ -135,7 +135,7 @@ func getPathsToPersist(mounts *cbapi.VolumeMounts) map[cbapi.VolumeMountName]str
 	return mountPaths
 }
 
-func pathForVolumeMountName(id cbapi.VolumeMountName, config cbapi.ServerConfig) string {
+func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 	var path string
 	switch id {
 	case cbapi.DefaultVolumeMount:
@@ -720,7 +720,7 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 		// all volume mounts must be healthy
 		mountPaths := getPathsToPersist(mounts)
 		for mountName, _ := range mountPaths {
-			mountPath := pathForVolumeMountName(mountName, config)
+			mountPath := pathForVolumeMountName(mountName)
 			_, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
 			if err != nil {
 				return err
