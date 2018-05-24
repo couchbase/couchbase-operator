@@ -16,6 +16,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
@@ -597,10 +598,11 @@ func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, me
 }
 
 func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *api.CouchbaseCluster, clusterName, namespace string) (*v1.Pod, error) {
+	scheduler := scheduler.NewNullScheduler()
 
 	for _, config := range cl.Spec.ServerSettings {
 		if config.Name == m.ServerConfig {
-			pod, err := k8sutil.CreateCouchbasePod(kubeCli, cl, m, cl.Status.CurrentVersion, config)
+			pod, err := k8sutil.CreateCouchbasePod(kubeCli, scheduler, cl, m, cl.Status.CurrentVersion, config)
 			if err != nil {
 				return nil, err
 			}

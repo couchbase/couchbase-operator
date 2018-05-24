@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
 	"github.com/sirupsen/logrus"
 
@@ -74,6 +75,7 @@ type Cluster struct {
 	cancel        context.CancelFunc             // Closure on the context to indicate cancellation
 	lastEvent     time.Time                      // When we raised the last event (see raiseEvent)
 	recorder      record.EventRecorder           // Buffers and aggegates events
+	scheduler     scheduler.Scheduler            // Pod placement scheduler
 }
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
@@ -88,6 +90,7 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		eventCh:   make(chan *clusterEvent, 100),
 		stopCh:    make(chan struct{}),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
+		scheduler: scheduler.New(cl),
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 
@@ -406,7 +409,7 @@ func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig
 		version = c.status.UpgradeStatus.TargetVersion
 	}
 
-	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.cluster, m, version, serverSpec)
+	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec)
 	return err
 }
 

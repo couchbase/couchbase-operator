@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"k8s.io/api/core/v1"
 )
@@ -46,7 +47,7 @@ func podsToMemberSet(pods []*v1.Pod, sc bool) couchbaseutil.MemberSet {
 	for _, pod := range pods {
 		config := ""
 		labels := pod.GetLabels()
-		if val, ok := labels["couchbase_node_conf"]; ok {
+		if val, ok := labels[constants.LabelNodeConf]; ok {
 			config = val
 		}
 

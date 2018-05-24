@@ -54,6 +54,14 @@ var (
 	AutoFailoverOnDataDiskIssuesTimePeriodMax uint64 = 3600
 )
 
+// Label types added to pods
+const (
+	LabelCluster  = "couchbase_cluster"
+	LabelNodeConf = "couchbase_node_conf"
+
+	ServerGroupLabel = "server-group.couchbase.com/zone"
+)
+
 // Represents the Kubernetes version by its major and minor parts. The first
 // two digits represent the major version and the last two digits represent the
 // minor version. We do not track the maintainence version.

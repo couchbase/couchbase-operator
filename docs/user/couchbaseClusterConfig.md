@@ -56,6 +56,8 @@ spec:
         - search
         - eventing
         - analytics
+      serverGroups:
+        - us-east-1a
       pod:
         couchabseEnv:
           ENV1: value
@@ -229,7 +231,7 @@ This field specifies whether or not software update notifications are displayed 
 
 > *Field rules:* The ```softwareUpdateNotifications``` field is optional and defaults to false if not specified.  This setting can be modified at any point in the cluster life-cycle.
 
-**serverGroups**
+<a id="server_groups_main"></a>**serverGroups**
 
 Setting the server groups field enables automatic management of Couchbase server groups.  The end user is responsible for adding labels to thier Kubernetes nodes which will be used to evenly distribute nodes across server groups so the cluster is tolerant to the loss of an entire data center (or any other desired failure domain).  Nodes are labelled with a key of ```server-group.couchbase.com/zone``` and an arbitrary name string.  Multiple nodes may have the same server group to allow multiple pods to be scheduled there regardless of anti-affinity settings.  An example of applying the label is as follows:
 
@@ -239,9 +241,9 @@ kubectl label nodes ip-172-16-0-10 server-group.couchbase.com/zone=us-east-1a
 
 As the list of server groups to use is explicit the end user has flexibility in controlling exactly where pods will be scheduled e.g. one cluster may reside in one set of server groups, and another cluster in another set of server groups.
 
-At present the scheduling simply stripes pods across the server groups; each new pod is run in a server group with the fewest existing cluster members.  The scheduler is not currently service aware, so it is possible that a server class exposing only the query service may be scheduled to a single server group.  This may lead to service unavailability in the event of a data center failure.
+At present the scheduling simply stripes pods across the server groups; each new pod is run in a server group with the fewest existing cluster members.  This is performed on a per-server configuration basis to ensure individual classes of servers are equally distributed for high-availability.  For each class of server configuration you may choose override the set of server groups to schedule across; see the documentation under the ```spec.servers.serverGroups``` configuration key.
 
-The server group feature also does not support service redistribution at this time, so scaling the set of server groups will not result in any pods being 'moved' to make best use of the new topology or evacuated from a removed server group.
+The server group feature also not support service redistribution at this time, so scaling the set of server groups will not result in any pods being 'moved' to make best use of the new topology or evacuated from a removed server group.
 
 > *Field rules:* The ```serverGroups``` field is optional.  If set pods will be scheduled across the specified set of server groups.  The server groups must be set at cluster creation time, and currently should be assumed to be immutable.
 
@@ -432,6 +434,8 @@ You must specify at least one, but possibly multiple node specifications. A node
       - search
       - eventing
       - analytics
+    serverGroups:
+      - us-east-1a
     pod:
       couchabseEnv:
         CB_ENV_VAR: value
@@ -474,6 +478,10 @@ This field specifies a name for this group of servers.
 This field specifies a list of services that should be run on nodes of this type. Users can specify data, index, query, search, eventing and analytics in the list. At least one service must be specified and all clusters must contain at least one node specification that includes the data service.
 
 > *Field rules:* The ```services``` list is required and must contain at least one service. Valid values for services are "data", "index", "query", "search", "eventing" and "analytics". The values of this list cannot be changed after a server has been defined.
+
+**serverGroups**
+
+This controls the set of server groups to schedule pods in.  Functionality is identical to that defined in the top level specification, but overrides it and allows the end user to specify exactly where pods of individual server/service configuration are scheduled.  See the [main documentation](#server_groups_main) for details.
 
 ### The Pod Policy
 

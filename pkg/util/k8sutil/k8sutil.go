@@ -128,10 +128,8 @@ const (
 	dataServicePortTLS     = 11207
 
 	// Labels
-	labelApp      = "app"
-	labelCluster  = "couchbase_cluster"
-	labelNode     = "couchbase_node"
-	labelNodeConf = "couchbase_node_conf"
+	labelApp  = "app"
+	labelNode = "couchbase_node"
 )
 
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
@@ -464,7 +462,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, cluster *cbapi.Couchbas
 	}
 
 	// Get a list of all cluster services that belong to a specific nodes
-	clusterRequirement, err := labels.NewRequirement(labelCluster, selection.Equals, []string{cluster.Name})
+	clusterRequirement, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{cluster.Name})
 	if err != nil {
 		return nil, err
 	}
@@ -588,7 +586,7 @@ func GetServerGroup(kubecli kubernetes.Interface, ns, name string) string {
 	if pod.Spec.NodeSelector == nil {
 		return ""
 	}
-	serverGroup, _ := pod.Spec.NodeSelector[serverGroupLabel]
+	serverGroup, _ := pod.Spec.NodeSelector[constants.ServerGroupLabel]
 	return serverGroup
 }
 
@@ -631,8 +629,8 @@ func LabelsForAdminConsole(clusterName string, services []string) map[string]str
 // pod within a specific cluster.
 func LabelsForCluster(clusterName string) map[string]string {
 	return map[string]string{
-		labelCluster: clusterName,
-		labelApp:     "couchbase",
+		constants.LabelCluster: clusterName,
+		labelApp:               "couchbase",
 	}
 }
 

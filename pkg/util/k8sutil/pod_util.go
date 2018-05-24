@@ -2,16 +2,15 @@ package k8sutil
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 )
@@ -24,12 +23,11 @@ const (
 	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
 	CouchbaseVolumeMountDataDir     = "/mnt/data"
 	CouchbaseVolumeMountIndexDir    = "/mnt/index"
-	serverGroupLabel                = "server-group.couchbase.com/zone"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(kubeCli kubernetes.Interface, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig) (*v1.Pod, error) {
+func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig) (*v1.Pod, error) {
 
 	pod, err := createCouchbasePodSpec(m, cluster.Name, cluster.Spec, version, config, cluster.AsOwner())
 	if err != nil {
@@ -43,7 +41,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, cluster *cbapi.CouchbaseCl
 		}
 	}
 
-	if err := schedulePod(kubeCli, cluster, pod); err != nil {
+	if err := scheduler.Create(kubeCli, cluster, pod); err != nil {
 		return nil, err
 	}
 
@@ -241,66 +239,6 @@ func NameForPersistentVolumeClaim(claimName string, memberName string, index int
 	return fmt.Sprintf("pvc-%s-%s-%02d-%s", claimName, memberName, index, mountName)
 }
 
-// schedulePod applies the necessary node selectors if a user has set the
-// set of server groups
-func schedulePod(kubeCli kubernetes.Interface, cluster *cbapi.CouchbaseCluster, pod *v1.Pod) error {
-	// Nothing defined, let the chips land where they may
-	if !cluster.Spec.ServerGroupsEnabled() {
-		return nil
-	}
-
-	// List all pods in our cluster
-	clusterRequirement, err := labels.NewRequirement(labelCluster, selection.Equals, []string{cluster.Name})
-	if err != nil {
-		return err
-	}
-	selector := labels.NewSelector()
-	selector = selector.Add(*clusterRequirement)
-	existingPods, err := kubeCli.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return err
-	}
-
-	// Map from server group to pods
-	serverGroupPodMap := map[string][]*v1.Pod{}
-	for _, serverGroup := range cluster.Spec.ServerGroups {
-		serverGroupPodMap[serverGroup] = []*v1.Pod{}
-	}
-	for _, existingPod := range existingPods.Items {
-		serverGroup, ok := existingPod.Spec.NodeSelector[serverGroupLabel]
-		if !ok {
-			return fmt.Errorf("pod %s does not have server group selector", existingPod.Name)
-		}
-		if _, ok := serverGroupPodMap[serverGroup]; !ok {
-			return fmt.Errorf("pod %s has undefined server group selector", existingPod.Name)
-		}
-		serverGroupPodMap[serverGroup] = append(serverGroupPodMap[serverGroup], &existingPod)
-	}
-
-	// Select the server groups with the fewest pods
-	smallestSize := int(^uint(0) >> 1)
-	var smallestServerGroups []string
-	for serverGroup, pods := range serverGroupPodMap {
-		size := len(pods)
-		if size < smallestSize {
-			smallestSize = size
-			smallestServerGroups = []string{}
-		}
-		if size == smallestSize {
-			smallestServerGroups = append(smallestServerGroups, serverGroup)
-		}
-	}
-
-	// Deterministically select the server group to create the pod in
-	sort.Strings(smallestServerGroups)
-	if _, ok := pod.Spec.NodeSelector[serverGroupLabel]; !ok {
-		pod.Spec.NodeSelector = map[string]string{}
-	}
-	pod.Spec.NodeSelector[serverGroupLabel] = smallestServerGroups[0]
-
-	return nil
-}
-
 // Couchbase pod spec with default configuration
 func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, version string, ns cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
 
@@ -348,10 +286,10 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 
 func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
 	labels := map[string]string{
-		labelApp:      "couchbase",
-		labelNode:     memberName,
-		labelNodeConf: ns.Name,
-		labelCluster:  clusterName,
+		labelApp:                "couchbase",
+		labelNode:               memberName,
+		constants.LabelNodeConf: ns.Name,
+		constants.LabelCluster:  clusterName,
 	}
 
 	for _, s := range ns.Services {
@@ -566,7 +504,7 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 func PodWithAntiAffinity(pod *v1.Pod, clusterName string) *v1.Pod {
 	// set pod anti-affinity with the pods that belongs to the same couchbase cluster
 	ls := &metav1.LabelSelector{MatchLabels: map[string]string{
-		labelCluster: clusterName,
+		constants.LabelCluster: clusterName,
 	}}
 	return podWithAntiAffinity(pod, ls)
 }

@@ -201,6 +201,11 @@ type ServerConfig struct {
 	// The services to run on nodes created with this spec
 	Services []string `json:"services"`
 
+	// ServerGroups define the set of availability zones we want to distribute
+	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
+	// nodes, but use a specific subset for a particular Couchbase cluster.
+	ServerGroups []string `json:"serverGroups"`
+
 	// Pod defines the policy to create pod for the couchbase pod.
 	//
 	// Updating Pod does not take effect on any existing couchbase pods.
@@ -328,8 +333,15 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 	return bucketsToAdd, bucketsToRemove
 }
 
+// ServerGroupsEnabled returns true if any server config contains server group
+// settings or it is defined globally
 func (cs *ClusterSpec) ServerGroupsEnabled() bool {
-	return cs.ServerGroups != nil && len(cs.ServerGroups) > 0
+	for _, setting := range cs.ServerSettings {
+		if len(setting.ServerGroups) > 0 {
+			return true
+		}
+	}
+	return len(cs.ServerGroups) > 0
 }
 
 func (c *BucketConfig) Equals(other *BucketConfig) bool {
