@@ -516,7 +516,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, cluster *cbapi.Couchbas
 
 	// Add any services to nodes which aren't already defined
 	if servicesDefined {
-		for _, nodeName := range status.Members.Ready {
+		for _, nodeName := range status.Members.Ready.Names() {
 			// Define the new service name
 			exposedServiceName := GetExposedServiceName(nodeName)
 

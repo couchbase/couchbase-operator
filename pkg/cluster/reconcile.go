@@ -311,7 +311,7 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 // buckets one at a time based on comparison
 // of existing buckets to cluster spec
 func (c *Cluster) reconcileBuckets() error {
-	existingBuckets, err := c.client.GetBucketNames(c.members)
+	existingBuckets, err := c.client.GetBucketNames(c.readyMembers())
 	if err != nil {
 		return fmt.Errorf("Unable to get buckets from cluster: %v", err)
 	}
@@ -322,7 +322,7 @@ func (c *Cluster) reconcileBuckets() error {
 	// if still present in active spec
 	spec := c.cluster.Spec
 	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
-	bucketsToEdit, err := c.client.GetBucketsToEdit(c.members, &spec)
+	bucketsToEdit, err := c.client.GetBucketsToEdit(c.readyMembers(), &spec)
 	if err != nil {
 		return fmt.Errorf("Unable to get list of buckets to edit: %v", err)
 	}
@@ -426,7 +426,7 @@ func (c *Cluster) reconcileExposedFeatures() error {
 // create bucket on cluster
 func (c *Cluster) createClusterBucket(bucketName string) error {
 	config := c.cluster.Spec.GetBucketByName(bucketName)
-	err := c.client.CreateBucket(c.members, config)
+	err := c.client.CreateBucket(c.readyMembers(), config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 		c.raiseEvent(k8sutil.BucketCreateEvent(bucketName, c.cluster))
@@ -435,7 +435,7 @@ func (c *Cluster) createClusterBucket(bucketName string) error {
 }
 
 func (c *Cluster) deleteClusterBucket(bucketName string) error {
-	err := c.client.DeleteBucket(c.members, bucketName)
+	err := c.client.DeleteBucket(c.readyMembers(), bucketName)
 	if err == nil {
 		c.status.RemoveBucket(bucketName)
 		c.raiseEvent(k8sutil.BucketDeleteEvent(bucketName, c.cluster))
@@ -450,7 +450,7 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 	if err := c.validateEditBucket(config); err != nil {
 		return err
 	}
-	err := c.client.EditBucket(c.members, config)
+	err := c.client.EditBucket(c.readyMembers(), config)
 	if err == nil {
 		c.status.UpdateBuckets(bucketName, config)
 		c.raiseEvent(k8sutil.BucketEditEvent(bucketName, c.cluster))
@@ -524,7 +524,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 		},
 		FailoverServerGroup: settings.AutoFailoverServerGroup,
 	}
-	return c.client.SetAutoFailoverSettings(c.members, autoFailoverSettings)
+	return c.client.SetAutoFailoverSettings(c.readyMembers(), autoFailoverSettings)
 }
 
 // Initialize a member with TLS certificates
@@ -764,8 +764,9 @@ func (c *Cluster) reconcileClusterSettings() error {
 
 // ensure autofailover timeout matches spec setting
 func (c *Cluster) reconcileAutoFailoverSettings() error {
+
 	// Get the existing settings
-	failoverSettings, err := c.client.GetAutoFailoverSettings(c.members)
+	failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
 	if err != nil {
 		return err
 	}
@@ -799,7 +800,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 
 	// Check to see if we need to reconcile
 	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
-		err = c.client.SetAutoFailoverSettings(c.members, specFailoverSettings)
+		err = c.client.SetAutoFailoverSettings(c.readyMembers(), specFailoverSettings)
 		if err != nil {
 			message := fmt.Sprintf("Unable to set autofailover settings: %v", err)
 			c.status.SetConfigRejectedCondition(message)
@@ -812,7 +813,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 
 // ensure memory quota's matche spec setting
 func (c *Cluster) reconcileMemoryQuotaSettings() error {
-	info, err := c.client.GetClusterInfo(c.members)
+	info, err := c.client.GetClusterInfo(c.readyMembers())
 	if err != nil {
 		return err
 	}
@@ -830,7 +831,7 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	}
 
 	if !reflect.DeepEqual(current, requested) {
-		if err := c.client.SetPoolsDefault(c.members, requested); err != nil {
+		if err := c.client.SetPoolsDefault(c.readyMembers(), requested); err != nil {
 			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: %s", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.status.SetConfigRejectedCondition(message)
 			return err
@@ -843,14 +844,14 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 // reconcileSoftwareUpdateNotificationSettings looks to see if the UI displays software
 // update notifications, and updates if different from the cluster specification.
 func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
-	actual, err := c.client.GetUpdatesEnabled(c.members)
+	actual, err := c.client.GetUpdatesEnabled(c.readyMembers())
 	if err != nil {
 		return err
 	}
 
 	requested := c.cluster.Spec.SoftwareUpdateNotifications
 	if actual != requested {
-		if err := c.client.SetUpdatesEnabled(c.members, requested); err != nil {
+		if err := c.client.SetUpdatesEnabled(c.readyMembers(), requested); err != nil {
 			return err
 		}
 	}
@@ -860,14 +861,14 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 
 // Compare cluster index settings with spec, reconcile if necessary
 func (c *Cluster) reconcileIndexStorageSettings() error {
-	settings, err := c.client.GetIndexSettings(c.members, c.username, c.password)
+	settings, err := c.client.GetIndexSettings(c.readyMembers(), c.username, c.password)
 	if err != nil {
 		return err
 	}
 
 	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
 	if specStorageMode != string(settings.StorageMode) {
-		if err := c.client.SetIndexSettings(c.members, c.username, c.password, specStorageMode, settings); err != nil {
+		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, specStorageMode, settings); err != nil {
 			emsg := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
 			c.status.SetConfigRejectedCondition(emsg)
 			return err

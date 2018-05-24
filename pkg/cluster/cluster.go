@@ -469,6 +469,17 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 	return recoverable
 }
 
+// Checks if a timestamp has elapsed recommended duration for cluster recovery
+func (c *Cluster) elapsedRecoveryDuration(ts time.Time) bool {
+
+	// get duration since timestamp
+	elapsedDuration := time.Now().Sub(ts)
+
+	// require a duration of 30s after autofailover timeout
+	requiredDuration := time.Duration(c.cluster.Spec.ClusterSettings.AutoFailoverTimeout+30) * time.Second
+	return elapsedDuration > requiredDuration
+}
+
 func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 	podList, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Name))
 	if err != nil {
@@ -501,22 +512,21 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 	return running, pending, nil
 }
 
-func (c *Cluster) updateMemberStatus(members couchbaseutil.MemberSet) {
-	var ready, unready []string
-	for _, m := range members {
-		url := m.ClientURL()
-		healthy, err := couchbaseutil.CheckHealth(url, c.tlsConfig)
-		if err != nil {
-			c.logger.Warningf("health check of couchbase member (%s) failed: %v", url, err)
-		}
-		if healthy {
-			ready = append(ready, m.Name)
-		} else {
-			unready = append(unready, m.Name)
-		}
+func (c *Cluster) updateMemberStatus() {
+	info, err := c.client.GetClusterStatus(c.members)
+	if err != nil {
+		c.logger.Warningf("update member status failed failed: %v", err)
+		return
 	}
-	c.status.Members.SetReady(ready)
-	c.status.Members.SetUnready(unready)
+	c.updateMemberStatusWithClusterInfo(info)
+}
+
+// use cluster info to set ready members from active nodes
+// and all remaining nodes as unready
+func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) {
+	c.status.Members.SetReady(cs.ActiveNodes.Names())
+	c.status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
+	c.updateCRStatus()
 }
 
 // Use username and password from secret store
@@ -610,14 +620,14 @@ func (c *Cluster) indexOfServerConfigWithService(svc string) int {
 func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) {
 	c.members.Add(member)
 	c.status.Size = c.members.Size()
-	c.updateMemberStatus(c.members)
+	c.updateMemberStatus()
 }
 
 // Removes a member from our cluster object and updates the cluster status
 func (c *Cluster) clusterRemoveMember(name string) {
 	c.members.Remove(name)
 	c.status.Size = c.members.Size()
-	c.updateMemberStatus(c.members)
+	c.updateMemberStatus()
 }
 
 // Raises an event.  Unfortunately the event stream only appears to have a
@@ -649,4 +659,20 @@ func (c *Cluster) raiseEvent(event *v1.Event) {
 // aggregates events together
 func (c *Cluster) raiseEventCached(event *v1.Event) {
 	c.recorder.Event(c.cluster, event.Type, event.Reason, event.Message)
+}
+
+// clients should use ready members that are available to service requests
+// according to status readiness.  Otherwise, fallback to cluster members
+func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
+	members := couchbaseutil.MemberSet{}
+	readyNodes := c.status.Members.Ready.Names()
+	for _, node := range readyNodes {
+		if m, ok := c.members[node]; ok {
+			members.Add(m)
+		}
+	}
+	if members.Empty() && c.members != nil {
+		members = c.members
+	}
+	return members
 }

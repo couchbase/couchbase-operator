@@ -89,7 +89,10 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					"couchbase_cluster": clusterName,
 					"couchbase_volume":  claimName,
 				}
-				claim.SetAnnotations(map[string]string{"path": mountPath})
+				claim.SetAnnotations(map[string]string{
+					"path":         mountPath,
+					"serverConfig": config.Name,
+				})
 				claim.Name = NameForPersistentVolumeClaim(claimName, pod.Name, claimUsageCnt[claimName], mountName)
 				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner)
 				if err != nil {
@@ -211,6 +214,10 @@ func listMemberPVCS(kubeCli kubernetes.Interface, memberName, clusterName, names
 	opts := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
+	return listPersistentVolumeClaims(kubeCli, namespace, opts)
+}
+
+func listPersistentVolumeClaims(kubeCli kubernetes.Interface, namespace string, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).List(opts)
 }
 
@@ -703,6 +710,42 @@ func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namesp
 		}
 	}
 	return nil, fmt.Errorf("Member `%s` does not have a healty volume for path: %s", memberName, path)
+}
+
+// Recreate list of members from persistent volumes
+func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName string, secure bool) (couchbaseutil.MemberSet, error) {
+	labelSelector := fmt.Sprintf("couchbase_cluster=%s", clusterName)
+	opts := metav1.ListOptions{
+		LabelSelector: labelSelector,
+	}
+	pvcList, err := listPersistentVolumeClaims(kubeCli, namespace, opts)
+	if err != nil {
+		return nil, err
+	}
+	ms := couchbaseutil.MemberSet{}
+	for _, pvc := range pvcList.Items {
+
+		if pvc.Status.Phase != v1.ClaimBound {
+			// claim must be bound to a volume
+			continue
+		}
+
+		m := couchbaseutil.Member{}
+		if config, ok := pvc.Annotations["serverConfig"]; ok {
+			m.ServerConfig = config
+		} else {
+			continue
+		}
+		if name, ok := pvc.Labels["couchbase_node"]; ok {
+			m.Name = name
+		} else {
+			continue
+		}
+		m.Namespace = namespace
+		m.SecureClient = secure
+		ms.Add(&m)
+	}
+	return ms, nil
 }
 
 // pod is recoverable if it has volume mounts with existing

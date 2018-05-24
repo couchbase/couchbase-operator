@@ -121,15 +121,46 @@ type ClusterStatus struct {
 	UpgradeStatus *UpgradeStatus `json:"upgrade,omitempty"`
 }
 
-type MemberStatusList []string
+type MemberTimestamp struct {
+	Name      string
+	timestamp int64
+}
+
+func (m MemberTimestamp) Ts() time.Time {
+	return time.Unix(m.timestamp, 0)
+}
+
+func NewMemberTimestamp(name string) MemberTimestamp {
+	return MemberTimestamp{name, time.Now().Unix()}
+}
+
+type MemberStatusList []MemberTimestamp
 
 func (l MemberStatusList) Contains(name string) bool {
-	for _, member := range l {
-		if member == name {
-			return true
+	return l.GetMember(name) != nil
+}
+
+func (l MemberStatusList) GetMember(name string) *MemberTimestamp {
+	for _, m := range l {
+		if m.Name == name {
+			return &m
 		}
 	}
-	return false
+	return nil
+}
+
+func (l MemberStatusList) Names() []string {
+	names := []string{}
+	for _, m := range l {
+		names = append(names, m.Name)
+	}
+	return names
+}
+
+func (l *MemberStatusList) Add(name string) {
+	if !l.Contains(name) {
+		*l = append(*l, NewMemberTimestamp(name))
+	}
 }
 
 type MembersStatus struct {
@@ -140,14 +171,29 @@ type MembersStatus struct {
 	Unready MemberStatusList `json:"unready,omitempty"`
 }
 
+// Set ready members from list.
 func (ms *MembersStatus) SetReady(ready []string) {
 	sort.Strings(ready)
-	ms.Ready = ready
+	ms.Ready = MemberStatusList{}
+	for _, m := range ready {
+		ms.Ready.Add(m)
+	}
 }
 
+// Set Unready members from list.
+// If the member is already in the list
+// then it's old timestamp is retained
 func (ms *MembersStatus) SetUnready(unready []string) {
 	sort.Strings(unready)
-	ms.Unready = unready
+	unreadyList := MemberStatusList{}
+	for _, m := range unready {
+		if oldMember := ms.Unready.GetMember(m); oldMember != nil {
+			unreadyList = append(unreadyList, *oldMember)
+		} else {
+			unreadyList.Add(m)
+		}
+	}
+	ms.Unready = unreadyList
 }
 
 func (cs *ClusterStatus) SetVersion(v string) {

@@ -10,6 +10,8 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	if err != nil {
 		return err
 	}
+	c.updateMemberStatusWithClusterInfo(status)
+
 	members := couchbaseutil.MemberSet{}
 	members.Append(status.ActiveNodes)
 	members.Append(status.PendingAddNodes)

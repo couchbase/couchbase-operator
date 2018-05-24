@@ -45,6 +45,9 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 		needsReconcile = true
 	}
 
+	// Update ready and unready members at end of reconciliation
+	defer c.updateMemberStatusWithClusterInfo(r.couchbase)
+
 	// If we have any server specs that are not properly sized then we need to
 	// reconcile the nodes.
 	serverSpecs := c.cluster.Spec.ServerSettings
@@ -133,18 +136,41 @@ func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) {
 }
 
 func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
+
 	if r.couchbase.DownNodes.Size() > 0 {
 		// Ensure the cluster is visibly unhealthy before triggering any events
 		c.status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
 		c.updateCRStatus()
 
-		c.logger.Warnln("Unable to reconcile nodes, waiting for auto-failover to take place")
-		r.errored = true
+		// Get the duration that the node has been down from the status
+		// and check if it has persistent volumes to be recovered
+		for _, m := range r.couchbase.DownNodes {
+			c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
+			if _, ok := r.runningPods[m.Name]; ok {
+				// node is not actually down, may have just been restarted
+				continue
+			}
+			if c.status.Members.Unready.Contains(m.Name) {
+				if c.isPodRecoverable(m) {
+					ts := c.status.Members.Unready.GetMember(m.Name).Ts()
 
-		for _, name := range r.couchbase.DownNodes.Names() {
-			c.raiseEventCached(k8sutil.MemberDownEvent(name, c.cluster))
+					// Recover node if it has been down longer than auto-failover time
+					if c.elapsedRecoveryDuration(ts) {
+						if err := c.recreatePod(m); err != nil {
+							c.logger.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
+						} else {
+							c.logger.Infof("recovering node %s", m.ClientURL())
+							r.errored = true
+							r.transitionState(ReconcileFinished)
+							return
+						}
+					}
+				}
+			}
 		}
 
+		c.logger.Warnln("Unable to reconcile nodes, waiting for auto-failover to take place")
+		r.errored = true
 		r.transitionState(ReconcileFinished)
 	} else {
 		c.status.SetReadyCondition()

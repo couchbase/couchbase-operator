@@ -64,7 +64,7 @@ func (c *Cluster) startUpgrade() error {
 
 	// Make the upgrade path deterministic
 	members := make([]string, len(c.status.Members.Ready))
-	copy(members, c.status.Members.Ready)
+	copy(members, c.status.Members.Ready.Names())
 	sort.Strings(members)
 
 	// Start the upgrade procedure
