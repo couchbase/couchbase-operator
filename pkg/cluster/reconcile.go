@@ -110,6 +110,8 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) bool {
 			rm.handleUnknownMembers(c)
 		case ReconcileRebalanceCheck:
 			rm.handleRebalanceCheck(c)
+		case ReconcileWarmupNodes:
+			rm.handleWarmupNodes(c)
 		case ReconcileDownNodes:
 			rm.handleDownNodes(c)
 		case ReconcileUnclusteredNodes:

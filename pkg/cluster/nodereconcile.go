@@ -12,17 +12,18 @@ const (
 	ReconcileInit             ReconcileState = 0x01
 	ReconcileUnknownMembers                  = 0x02
 	ReconcileRebalanceCheck                  = 0x03
-	ReconcileDownNodes                       = 0x04
-	ReconcileUnclusteredNodes                = 0x05
-	ReconcileFailedAddNodes                  = 0x06
-	ReconcileAddBackNodes                    = 0x07
-	ReconcileFailedNodes                     = 0x08
-	ReconcileServerConfigs                   = 0x09
-	ReconcileRemoveNodes                     = 0x0a
-	ReconcileRemoveUnmanaged                 = 0x0b
-	ReconcileAddNodes                        = 0x0c
-	ReconcileRebalance                       = 0x0d
-	ReconcileDeadMembers                     = 0x0e
+	ReconcileWarmupNodes                     = 0x04
+	ReconcileDownNodes                       = 0x05
+	ReconcileUnclusteredNodes                = 0x06
+	ReconcileFailedAddNodes                  = 0x07
+	ReconcileAddBackNodes                    = 0x08
+	ReconcileFailedNodes                     = 0x09
+	ReconcileServerConfigs                   = 0x0a
+	ReconcileRemoveNodes                     = 0x0b
+	ReconcileRemoveUnmanaged                 = 0x0c
+	ReconcileAddNodes                        = 0x0d
+	ReconcileRebalance                       = 0x0e
+	ReconcileDeadMembers                     = 0x0f
 	ReconcileFinished                        = 0xff
 )
 
@@ -105,6 +106,18 @@ func (r *ReconcileMachine) handleUnknownMembers(c *Cluster) {
 	unknownMembers := r.runningPods.Diff(c.members)
 	for name, _ := range unknownMembers {
 		r.runningPods.Remove(name)
+	}
+	r.transitionState(ReconcileWarmupNodes)
+}
+
+// If we have nodes that are warming up then we need to wait for them to finish
+// before doing any cluster operations.
+func (r *ReconcileMachine) handleWarmupNodes(c *Cluster) {
+	if r.couchbase.WarmupNodes.Size() > 0 && r.couchbase.DownNodes.Empty() {
+		c.logger.Infoln("Skipping reconcile loop while some nodes are warming up")
+		r.errored = true
+		r.transitionState(ReconcileFinished)
+		return
 	}
 	r.transitionState(ReconcileRebalanceCheck)
 }

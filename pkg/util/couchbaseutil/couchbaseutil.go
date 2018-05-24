@@ -25,6 +25,7 @@ const (
 	NodeStateActive NodeState = iota
 	NodeStatePendingAdd
 	NodeStateFailedAdd
+	NodeStateWarmup
 	NodeStateDown
 	NodeStateFailed
 	NodeStateAddBack
@@ -36,6 +37,7 @@ type ClusterStatus struct {
 	PendingAddNodes  MemberSet // status=healthy,   clusterMembership=inactiveAdded
 	AddBackNodes     MemberSet // status=healthy, clusterMembership=inactiveFailed
 	FailedAddNodes   MemberSet // status=unhealthy, clusterMembership=inactiveAdded
+	WarmupNodes      MemberSet // status=warmup, clusterMembership=inactiveAdded
 	DownNodes        MemberSet // status=unhealthy, clusterMembership=active
 	FailedNodes      MemberSet // status=unhealthy, clusterMembership=inactiveFailed
 	UnclusteredNodes MemberSet // Managed by Kubernetes, but not part of the cluster
@@ -115,6 +117,9 @@ func (cs *ClusterStatus) LogStatus(logger *logrus.Entry) {
 	if !cs.FailedAddNodes.Empty() {
 		logger.Infof("failed add nodes: %s", cs.FailedAddNodes)
 	}
+	if !cs.WarmupNodes.Empty() {
+		logger.Infof("warmup nodes: %s", cs.WarmupNodes)
+	}
 	if !cs.DownNodes.Empty() {
 		logger.Infof("down nodes: %s", cs.DownNodes)
 	}
@@ -138,6 +143,7 @@ func (cs *ClusterStatus) LogStatus(logger *logrus.Entry) {
 func (cs *ClusterStatus) AllManagedNodesHealthy() bool {
 	return cs.PendingAddNodes.Empty() &&
 		cs.FailedAddNodes.Empty() &&
+		cs.WarmupNodes.Empty() &&
 		cs.DownNodes.Empty() &&
 		cs.FailedNodes.Empty() &&
 		cs.AddBackNodes.Empty() &&
@@ -168,6 +174,8 @@ func (cs *ClusterStatus) NodeInState(name string, states ...NodeState) bool {
 			_, ok = cs.PendingAddNodes[name]
 		case NodeStateFailedAdd:
 			_, ok = cs.FailedAddNodes[name]
+		case NodeStateWarmup:
+			_, ok = cs.WarmupNodes[name]
 		case NodeStateDown:
 			_, ok = cs.DownNodes[name]
 		case NodeStateFailed:
@@ -205,6 +213,7 @@ func (cs *ClusterStatus) NewClusterStateMap() ClusterStateMap {
 		NodeStateDown:       cs.DownNodes,
 		NodeStateFailed:     cs.FailedNodes,
 		NodeStateAddBack:    cs.AddBackNodes,
+		NodeStateWarmup:     cs.WarmupNodes,
 	}
 
 	states := ClusterStateMap{}
@@ -304,6 +313,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	status.FailedNodes = NewMemberSet()
 	status.AddBackNodes = NewMemberSet()
 	status.UnclusteredNodes = NewMemberSet()
+	status.WarmupNodes = NewMemberSet()
 	status.UnmanagedNodes = []string{}
 
 	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster status", c.clusterName, func() error {
@@ -321,7 +331,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 			}
 
 			managed.Add(member)
-			if node.Status == "healthy" || node.Status == "warmup" {
+			if node.Status == "healthy" {
 				if node.Membership == "active" {
 					status.ActiveNodes.Add(member)
 				} else if node.Membership == "inactiveAdded" {
@@ -331,6 +341,8 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 				} else {
 					return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
 				}
+			} else if node.Status == "warmup" {
+				status.WarmupNodes.Add(member)
 			} else if node.Status == "unhealthy" {
 				if node.Membership == "active" {
 					status.DownNodes.Add(member)
