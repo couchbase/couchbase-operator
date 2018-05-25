@@ -162,6 +162,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
 							c.logger.Infof("recovering node %s", m.ClientURL())
 							r.errored = true
 							r.transitionState(ReconcileFinished)
+							c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 							return
 						}
 					}
@@ -252,6 +253,7 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
 				c.logger.Infof("recovering node %s", m.ClientURL())
 				r.errored = true
 				r.transitionState(ReconcileFinished)
+				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 				return
 			}
 		}

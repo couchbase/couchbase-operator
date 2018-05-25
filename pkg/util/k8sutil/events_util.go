@@ -44,6 +44,14 @@ func MemberDownEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
 	return event
 }
 
+func MemberRecoveredEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "MemberRecovered"
+	event.Message = fmt.Sprintf("Existing member %s recovered", memberName)
+	return event
+}
+
 func MemberFailedOverEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeWarning
