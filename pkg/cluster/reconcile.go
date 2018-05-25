@@ -161,10 +161,8 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	ctx, cancel := context.WithTimeout(c.ctx, 300*time.Second)
 	defer cancel()
 	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
-		if _, failed := err.(cberrors.ErrPodUnschedulable); failed {
-			c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
-			c.removePod(newMember.Name)
-		}
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
+		c.removePod(newMember.Name)
 		return nil, err
 	}
 

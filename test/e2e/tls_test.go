@@ -1,10 +1,7 @@
 package e2e
 
 import (
-	"crypto"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -16,181 +13,139 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// randomSuffix generates a 5 character random suffix to be appended to
-// k8s resources to avoid namespace collisions (especially events)
-func randomSuffix() string {
-	// Seed the PRNG so we get vagely random suffixes across runs
-	rand.Seed(time.Now().UnixNano())
+type TlsDecorator struct {
+	certValidFrom      time.Time
+	certValidTo        time.Time
+	keyType            e2eutil.KeyType
+	certType           e2eutil.CertType
+	ca                 *e2eutil.CertificateAuthority
+	test               TestFunc
+	dnsNames           []string
+	randomNameSuffix   string
+	clusterName        string
+	caCommonName       string
+	operatorCommonName string
+	clusterCommonName  string
+	operatorSecretName string
+	clusterSecretName  string
+}
 
-	// Generate a random 5 character suffix for the cluster name
-	suffix := ""
-	for i := 0; i < 5; i++ {
-		// Our alphabet is 0-9 a-z, so 36 characters
-		ordinal := rand.Intn(36)
-		// Less than 10 places it in the 0-9 range, otherwise in
-		// the a-z range
-		if ordinal < 10 {
-			ordinal = ordinal + int('0')
-		} else {
-			ordinal = ordinal - 10 + int('a')
-		}
-		// Append to the name
-		suffix = suffix + string(rune(ordinal))
+func (obj *TlsDecorator) Init(randSuffix, namespace string, keyType e2eutil.KeyType) {
+	obj.randomNameSuffix = randSuffix
+	obj.certValidFrom = time.Now().In(time.UTC)
+	obj.certValidTo = (obj.certValidFrom).AddDate(10, 0, 0)
+	obj.caCommonName = "Couchbase CA"
+	obj.keyType = keyType
+	obj.certType = e2eutil.CertTypeCA
+	obj.operatorCommonName = "Couchbase Operator"
+	obj.operatorSecretName = "operator-secret-tls-" + randSuffix
+	obj.clusterCommonName = "Couchbase Cluster"
+	obj.clusterSecretName = "cluster-secret-tls-" + randSuffix
+	obj.clusterName = randomClusterName(randSuffix)
+	obj.dnsNames = []string{
+		"*." + obj.clusterName + "." + namespace + ".svc",
+	}
+}
+
+func (obj *TlsDecorator) CreateCaRootCert(t *testing.T) {
+	var (
+		err error
+	)
+	// Create the root CA (self signed)
+	obj.ca, err = e2eutil.NewCertificateAuthority(obj.keyType, obj.caCommonName, obj.certValidFrom, obj.certValidTo, obj.certType)
+	if err != nil {
+		t.Fatal("Unable to generate CA:", err)
+	}
+}
+
+func (obj *TlsDecorator) CreateOperatorSecret(t *testing.T, f *framework.Framework) *corev1.Secret {
+	// Generate CB operator certificate key data
+	certReq := e2eutil.CreateOperatorCertReq(obj.operatorCommonName)
+	req := e2eutil.CreateKeyPairReqData(obj.keyType, certReq)
+	operatorKeyPEM, operatorCertPEM, err := req.Generate(obj.ca, obj.certValidFrom, obj.certValidTo)
+	if err != nil {
+		t.Fatal("unable to generate operator key pair", err)
 	}
 
-	return suffix
+	// Create the operator secret
+	operatorSecretData := e2eutil.CreateOperatorSecretData(f.Namespace, obj.operatorSecretName, obj.ca.Certificate, operatorCertPEM, operatorKeyPEM)
+	operatorSecret, err := e2eutil.CreateSecret(f.KubeClient, f.Namespace, operatorSecretData)
+	if err != nil {
+		t.Fatal("unable to create operator secret:", err)
+	}
+	return operatorSecret
+}
+
+func (obj *TlsDecorator) CreateClusterSecret(t *testing.T, f *framework.Framework) *corev1.Secret {
+	// Generate CB cluster certificate key data
+	certReq := e2eutil.CreateClusterCertReq(obj.clusterCommonName, obj.dnsNames)
+	req := e2eutil.CreateKeyPairReqData(obj.keyType, certReq)
+	clusterKeyPEM, clusterCertPEM, err := req.Generate(obj.ca, obj.certValidFrom, obj.certValidTo)
+	if err != nil {
+		t.Fatal("unable to generate cluster key pair", err)
+	}
+
+	// Create the cluster secret
+	clusterSecretData := e2eutil.CreateClusterSecretData(f.Namespace, obj.clusterSecretName, clusterCertPEM, clusterKeyPEM)
+	clusterSecret, err := e2eutil.CreateSecret(f.KubeClient, f.Namespace, clusterSecretData)
+	if err != nil {
+		t.Fatal("unable to create cluster secret:", err)
+	}
+	return clusterSecret
+}
+
+func (obj *TlsDecorator) SetTlsForTesting(operatorSecret, clusterSecret *corev1.Secret) {
+	tls := &api.TLSPolicy{
+		Static: &api.StaticTLS{
+			Member: &api.MemberSecret{
+				ServerSecret: clusterSecret.Name,
+			},
+			OperatorSecret: operatorSecret.Name,
+		},
+	}
+	e2espec.SetTLS(tls)
+}
+
+func CreateWrapperFunc(decoratorObj *TlsDecorator, keyType e2eutil.KeyType) TestFunc {
+	wrapperFunc := func(t *testing.T) {
+		f := framework.Global
+		decoratorObj.CreateCaRootCert(t)
+		operatorSecret := decoratorObj.CreateOperatorSecret(t, f)
+		defer e2eutil.DeleteSecret(f.KubeClient, f.Namespace, operatorSecret.Name, &metav1.DeleteOptions{})
+
+		clusterSecret := decoratorObj.CreateClusterSecret(t, f)
+		defer e2eutil.DeleteSecret(f.KubeClient, f.Namespace, clusterSecret.Name, &metav1.DeleteOptions{})
+
+		// Update cluster parameters
+		e2espec.SetClusterName(decoratorObj.clusterName)
+		defer e2espec.ResetClusterName()
+
+		decoratorObj.SetTlsForTesting(operatorSecret, clusterSecret)
+		defer e2espec.ResetTLS()
+
+		if decoratorObj.test != nil {
+			// Run the test!
+			decoratorObj.test(t)
+		}
+	}
+	return wrapperFunc
 }
 
 // randomClusterName returns a randomized cluster name
-func randomClusterName() string {
-	return "test-couchbase-" + randomSuffix()
-}
-
-// KeyPairRequest contains the necessary configuration to generate
-// a private key and signed public key pair by a CA
-type keyPairRequest struct {
-	keyType  e2eutil.KeyType
-	certType e2eutil.CertType
-	req      *x509.CertificateRequest
-}
-
-// Generate returns a PEM encoded private key and signed certificate
-// from the specified CA
-func (req *keyPairRequest) generate(ca *e2eutil.CertificateAuthority) (key, cert []byte, err error) {
-	// Generate the private key
-	var pkey crypto.PrivateKey
-	if pkey, err = e2eutil.GeneratePrivateKey(req.keyType); err != nil {
-		return
-	}
-
-	// PEM encode the private key
-	if key, err = e2eutil.CreatePrivateKey(pkey); err != nil {
-		return
-	}
-
-	// Add the keying material to the CSR
-	var csr *x509.CertificateRequest
-	if csr, err = e2eutil.CreateCertificateRequest(req.req, pkey); err != nil {
-		return
-	}
-
-	// Sign and PEM encode the certificate
-	if cert, err = ca.SignCertificateRequest(csr, req.certType); err != nil {
-		return
-	}
-
-	return
+func randomClusterName(randomSuffix string) string {
+	return "test-couchbase-" + randomSuffix
 }
 
 // tlsDecorator accepts a test function and key type and returns a decorated
 // version of the function which creates cluster specific TLS certificates and
 // installs them into K8S before running the test(s)
 func tlsDecorator(test TestFunc, keyType e2eutil.KeyType) TestFunc {
-	wrapper := func(t *testing.T) {
-		f := framework.Global
-
-		// Create the root CA (self signed)
-		ca, err := e2eutil.NewCertificateAuthority(keyType, "Couchbase CA")
-		if err != nil {
-			t.Fatal("unable to generate CA:", err)
-		}
-
-		// Create the operator client certificate
-		req := &keyPairRequest{
-			keyType:  keyType,
-			certType: e2eutil.CertTypeClient,
-			req: &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName: "Couchbase Operator",
-				},
-			},
-		}
-		operatorKeyPEM, operatorCertPEM, err := req.generate(ca)
-		if err != nil {
-			t.Fatal("unable to generate operator key pair", err)
-		}
-
-		// Create the cluster certificate, this is cluster specific with static
-		// TLS configuration due to the dynamic nature of k8s DNS domains
-		cluserName := randomClusterName()
-
-		req = &keyPairRequest{
-			keyType:  keyType,
-			certType: e2eutil.CertTypeServer,
-			req: &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName: "Couchbase Cluster",
-				},
-				DNSNames: []string{
-					"*." + cluserName + "." + f.Namespace + ".svc",
-				},
-			},
-		}
-		clusterKeyPEM, clusterCertPEM, err := req.generate(ca)
-		if err != nil {
-			t.Fatal("unable to generate cluster key pair", err)
-		}
-
-		// Create the operator secret
-		operatorSecretData := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: f.Namespace,
-				Name:      "operator-secret-tls-" + randomSuffix(),
-			},
-			Data: map[string][]byte{
-				"ca.crt":                 ca.Certificate,
-				"couchbase-operator.crt": operatorCertPEM,
-				"couchbase-operator.key": operatorKeyPEM,
-			},
-		}
-
-		operatorSecret, err := e2eutil.CreateSecret(f.KubeClient, f.Namespace, operatorSecretData)
-		if err != nil {
-			t.Fatal("unable to create operator secret:", err)
-		}
-
-		defer e2eutil.DeleteSecret(f.KubeClient, f.Namespace, operatorSecret.Name, &metav1.DeleteOptions{})
-
-		// Create the cluster secret
-		clusterSecretData := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: f.Namespace,
-				Name:      "cluster-secret-tls-" + randomSuffix(),
-			},
-			Data: map[string][]byte{
-				"chain.pem": clusterCertPEM,
-				"pkey.key":  clusterKeyPEM,
-			},
-		}
-
-		clusterSecret, err := e2eutil.CreateSecret(f.KubeClient, f.Namespace, clusterSecretData)
-		if err != nil {
-			t.Fatal("unable to create cluster secret:", err)
-		}
-
-		defer e2eutil.DeleteSecret(f.KubeClient, f.Namespace, clusterSecret.Name, &metav1.DeleteOptions{})
-
-		tls := &api.TLSPolicy{
-			Static: &api.StaticTLS{
-				Member: &api.MemberSecret{
-					ServerSecret: clusterSecret.Name,
-				},
-				OperatorSecret: operatorSecret.Name,
-			},
-		}
-
-		// Update cluster parameters
-		e2espec.SetClusterName(cluserName)
-		defer e2espec.ResetClusterName()
-
-		e2espec.SetTLS(tls)
-		defer e2espec.ResetTLS()
-
-		// Run the test!
-		test(t)
-	}
-
-	return wrapper
+	f := framework.Global
+	RandomNameSuffix = e2eutil.RandomSuffix()
+	decoratorObj := &TlsDecorator{}
+	decoratorObj.Init(RandomNameSuffix, f.Namespace, keyType)
+	decoratorObj.test = test
+	return CreateWrapperFunc(decoratorObj, keyType)
 }
 
 // rsaDecorator runs a test with static TLS and RSA based keys
@@ -216,4 +171,734 @@ func ellipticP384Decorator(test TestFunc) TestFunc {
 // ellipticP521Decorator runs a test with static TLS and EC P521 based keys
 func ellipticP521Decorator(test TestFunc) TestFunc {
 	return tlsDecorator(test, e2eutil.KeyTypeEllipticP521)
+}
+
+// Create couchbase cluster over TLS certificates
+// Check TLS handshake is successful with all nodes
+func TestTlsCreateCluster(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	if err != nil {
+		t.Fatal("Create cluster failed:", err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	if err != nil {
+		t.Fatal("Cluster failed to become healthy:", err.Error())
+	}
+
+	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if err != nil {
+		t.Fatal("Unable to get couchbase pods:", err)
+	}
+
+	// TLS handshake with pods
+	for _, pod := range pods.Items {
+		err = e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), f.Config)
+		if err != nil {
+			t.Fatal("TLS verification failed:", err)
+		}
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("failed to get coucbase cluster events: %v\n", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+// Tests scenario where a third node is being added to a cluster, and a separate
+// node goes down immediately after the add & before the rebalance.
+// Expects: autofailover of down node occurs and a replacement node is added
+// Check TLS handshake is successful with all nodes
+func TestTlsKillClusterNode(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	podToKillMemberId := 1
+
+	// create 1 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+	// async scale up to 3 node cluster
+	if err := e2eutil.ResizeClusterNoWait(t, 0, e2eutil.Size3, f.CRClient, testCouchbase); err != nil {
+		t.Fatal("Failed to trigger cluster resize")
+	}
+
+	// wait for add member event
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
+	if err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300); err != nil {
+		t.Fatal(err)
+	}
+
+	for nodeIndex := 1; nodeIndex < e2eutil.Size3; nodeIndex++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	}
+
+	// kill pod 1
+	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, podToKillMemberId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
+	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	// cluster should also be balanced
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries20)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+// Create Couchbase cluster using certificates
+// Resize cluster to different sizes in loop
+// Check TLS handshake is successful with all cluster nodes
+func TestTlsResizeCluster(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	t.Logf("Creating New Couchbase Cluster...\n")
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+
+	clusterSizes := []int{2, 3, 2, 1}
+
+	prevClusterSize := e2eutil.Size1
+
+	for _, clusterSize := range clusterSizes {
+		service := 0
+		err = e2eutil.ResizeCluster(t, service, clusterSize, f.CRClient, testCouchbase)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
+		if err != nil {
+			t.Fatal("Cluster not healthy:", err)
+		}
+
+		switch {
+		case clusterSize-prevClusterSize > 0:
+			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+		case clusterSize-prevClusterSize < 0:
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
+			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+		}
+		prevClusterSize = clusterSize
+	}
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+
+}
+
+// Remove Operator certificate after cluster deployment
+// Kill a node from cluster and new node addition should fail
+// Add the operator certificate back and check new node addition is successful
+func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	podToKillMemberId := 1
+
+	// create 3 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+	// Get current secret to re-create later
+	operatorSecret, err := e2eutil.GetSecret(f.KubeClient, f.Namespace, "operator-secret-tls-"+RandomNameSuffix)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = e2eutil.DeleteSecret(f.KubeClient, f.Namespace, "operator-secret-tls-"+RandomNameSuffix, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Couchbase operator certificate deleted")
+
+	// kill pod 1
+	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, podToKillMemberId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+
+	// Recreating the operator certificate with old data
+	operatorSecretData := e2eutil.CreateOperatorSecretData(f.Namespace, "operator-secret-tls-"+RandomNameSuffix, operatorSecret.Data["ca.crt"], operatorSecret.Data["couchbase-operator.crt"], operatorSecret.Data["couchbase-operator.key"])
+	_, err = e2eutil.CreateSecret(f.KubeClient, f.Namespace, operatorSecretData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 3 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+	pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TLS handshake with pods
+	for _, pod := range pods.Items {
+		err = e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), f.Config)
+		if err != nil {
+			t.Fatal("TLS verification failed:", err)
+		}
+	}
+
+	resizeErr := make(chan error)
+	operatorSecret, err := e2eutil.GetSecret(f.KubeClient, f.Namespace, "operator-secret-tls-"+RandomNameSuffix)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := e2eutil.DeleteSecret(f.KubeClient, f.Namespace, "operator-secret-tls-"+RandomNameSuffix, &metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Couchbase operator certificate deleted")
+
+	go func() {
+		service := 0
+		resizeErr <- e2eutil.ResizeCluster(t, service, e2eutil.Size5, f.CRClient, testCouchbase)
+	}()
+
+	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
+
+	// Recreating the operator certificate with old data
+	operatorSecretData := e2eutil.CreateOperatorSecretData(f.Namespace, "operator-secret-tls-"+RandomNameSuffix, operatorSecret.Data["ca.crt"], operatorSecret.Data["couchbase-operator.crt"], operatorSecret.Data["couchbase-operator.key"])
+	_, err = e2eutil.CreateSecret(f.KubeClient, f.Namespace, operatorSecretData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = <-resizeErr
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	podToKillMemberId := 1
+
+	// create 3 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+	clusterSecret, err := e2eutil.GetSecret(f.KubeClient, f.Namespace, "cluster-secret-tls-"+RandomNameSuffix)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = e2eutil.DeleteSecret(f.KubeClient, f.Namespace, "cluster-secret-tls-"+RandomNameSuffix, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Couchbase Cluster certificate deleted")
+
+	// kill pod 1
+	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, podToKillMemberId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This will take an absolute eternity as we need to allow a large leeway for a
+	// node to pull container images down before timing out
+	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
+	if err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 360); err != nil {
+		t.Fatal("Failed to observe member fail addition")
+	}
+
+	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+
+	// Recreate the cluster certificate with old data
+	clusterSecretData := e2eutil.CreateClusterSecretData(f.Namespace, "cluster-secret-tls-"+RandomNameSuffix, clusterSecret.Data["chain.pem"], clusterSecret.Data["pkey.key"])
+	_, err = e2eutil.CreateSecret(f.KubeClient, f.Namespace, clusterSecretData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries30)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// create 3 node cluster
+	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+	err = e2eutil.DeleteSecret(f.KubeClient, f.Namespace, "cluster-secret-tls-"+RandomNameSuffix, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Couchbase Cluster certificate deleted")
+
+	// Set the resize off
+	service := 0
+	if err := e2eutil.ResizeClusterNoWait(t, service, e2eutil.Size4, f.CRClient, testCouchbase); err != nil {
+		t.Fatal(err)
+	}
+
+	// This will take an absolute eternity as we need to allow a large leeway for a
+	// node to pull container images down before timing out
+	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
+	if err := e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 360); err != nil {
+		t.Fatal("Failed to observe member fail addition")
+	}
+
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+
+	// Event checking
+	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get couchbase cluster events: %v", err)
+	}
+	if !expectedEvents.Compare(events) {
+		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+	}
+}
+
+func TestTlsNegRSACertificateDnsName(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// Actual Test case function
+	TestToRun := func(t *testing.T) {
+		cluster, err := e2eutil.NewClusterBasicNoWait(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		if err != nil {
+			t.Fatal("Cluster creation failed:", err)
+		}
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+		// Expect the cluster to enter a failed state
+		if err := e2eutil.WaitClusterPhaseFailed(t, f.CRClient, cluster.Name, f.Namespace, 10); err != nil {
+			t.Fatalf("cluster failed to enter failed state: %v\n", err)
+		}
+	}
+
+	dnsNames := []string{
+		"*.test-couchbase-invalid-name." + f.Namespace + ".svc",
+	}
+
+	// Setting up TLS certificates into K8S
+	RandomNameSuffix = e2eutil.RandomSuffix()
+	decoratorObj := &TlsDecorator{}
+	decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
+
+	// Setting invalid DNS host value
+	decoratorObj.dnsNames = dnsNames
+	decoratorObj.test = TestToRun
+	execFunc := CreateWrapperFunc(decoratorObj, e2eutil.KeyTypeRSA)
+	execFunc(t)
+}
+
+func TestTlsCertificateExpiry(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// Setting up TLS certificates into K8S
+	RandomNameSuffix = e2eutil.RandomSuffix()
+	decoratorObj := &TlsDecorator{}
+	decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
+
+	// Actual Test case function
+	TestToRun := func(t *testing.T) {
+		testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+		pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, pod := range pods.Items {
+			err = e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), f.Config)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		t.Log("Waiting for certificate to expire")
+		for {
+			currTime := time.Now().In(time.UTC)
+			if currTime.After(decoratorObj.certValidTo) {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+
+		service := 0
+		err = e2eutil.ResizeCluster(t, service, e2eutil.Size4, f.CRClient, testCouchbase)
+		if err != nil {
+			t.Fatalf("Resize cluster failed: %v\n", err)
+		}
+
+		err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size4, e2eutil.Retries5)
+		if err == nil {
+			t.Fatal("Cluster scaled with expired certificates")
+		}
+	}
+
+	// Setting Certificate expiry time of 2mins from current time
+	decoratorObj.certValidTo = decoratorObj.certValidFrom.Add(time.Second * 120)
+	decoratorObj.test = TestToRun
+	execFunc := CreateWrapperFunc(decoratorObj, e2eutil.KeyTypeRSA)
+	execFunc(t)
+}
+
+func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// Actual Test case function
+	TestToRun := func(t *testing.T) {
+		cluster, err := e2eutil.NewClusterBasicNoWait(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		if err != nil {
+			t.Fatalf("Cluster creation failed: %v\n", err)
+		}
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+		// Expect the cluster to enter a failed state
+		if err := e2eutil.WaitClusterPhaseFailed(t, f.CRClient, cluster.Name, f.Namespace, 10); err != nil {
+			t.Fatalf("cluster failed to enter failed state: %v\n", err)
+		}
+	}
+
+	// Setting up TLS certificates into K8S
+	RandomNameSuffix = e2eutil.RandomSuffix()
+	decoratorObj := &TlsDecorator{}
+	decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
+
+	// Setting Certificate expiry time before deployment time
+	decoratorObj.certValidTo = decoratorObj.certValidFrom.Add(time.Second * -1)
+	decoratorObj.test = TestToRun
+	execFunc := CreateWrapperFunc(decoratorObj, e2eutil.KeyTypeRSA)
+	execFunc(t)
+}
+
+func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// Setting up TLS certificates into K8S
+	RandomNameSuffix = e2eutil.RandomSuffix()
+	decoratorObj := &TlsDecorator{}
+	decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
+
+	// Actual Test case function
+	TestToRun := func(t *testing.T) {
+		var err error
+		createClusterErrChan := make(chan error)
+		go func() {
+			_, err = e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+			createClusterErrChan <- err
+		}()
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+		time.Sleep(time.Second)
+
+		t.Log("Retrying to deploy operator on valid TLS time-slot")
+		for {
+			currTime := time.Now().In(time.UTC)
+			if currTime.After(decoratorObj.certValidFrom) {
+				break
+			}
+
+			pods, err := f.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(pods.Items) > 1 {
+				t.Fatal("Cluster initialized before vertificate activation period")
+			}
+			time.Sleep(time.Second)
+		}
+
+		err = <-createClusterErrChan
+		if err != nil {
+			t.Fatal("Cluster creation failed:", err)
+		}
+	}
+
+	// Setting Certificate validaity after 3mins from current time
+	decoratorObj.certValidFrom = decoratorObj.certValidFrom.Add(time.Second * 180)
+	decoratorObj.certValidTo = decoratorObj.certValidFrom.AddDate(10, 0, 0)
+	decoratorObj.test = TestToRun
+	execFunc := CreateWrapperFunc(decoratorObj, e2eutil.KeyTypeRSA)
+	execFunc(t)
+}
+
+func TestTlsGenerateWrongCACertType(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+
+	// Actual Test case function
+	TestToRun := func(t *testing.T) {
+		// Create cluster
+		testCouchbase, err := e2eutil.NewClusterBasicNoWait(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		if err != nil {
+			t.Fatalf("Error while creating cluster: %v\n", err)
+		}
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+		// Expect the cluster to enter a failed state
+		if err := e2eutil.WaitClusterPhaseFailed(t, f.CRClient, testCouchbase.Name, f.Namespace, 10); err != nil {
+			t.Fatalf("cluster failed to enter failed state: %v\n", err)
+		}
+		t.Log(err)
+	}
+
+	// Setting up TLS certificates into K8S
+	RandomNameSuffix = e2eutil.RandomSuffix()
+	decoratorObj := &TlsDecorator{}
+	decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
+
+	// Setting wrong CA cert type
+	decoratorObj.certType = e2eutil.CertTypeServer
+	decoratorObj.test = TestToRun
+	execFunc := CreateWrapperFunc(decoratorObj, e2eutil.KeyTypeRSA)
+	execFunc(t)
+}
+
+func TestTlsGenerateWrongCertType(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+
+	f := framework.Global
+
+	TestToRun := func(t *testing.T) {
+		cluster, err := e2eutil.NewClusterBasicNoWait(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		if err != nil {
+			t.Fatalf("Cluster creation failed: %v\n", err)
+		}
+		defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+
+		// Expect the cluster to enter a failed state
+		if err := e2eutil.WaitClusterPhaseFailed(t, f.CRClient, cluster.Name, f.Namespace, 10); err != nil {
+			t.Fatalf("cluster failed to enter failed state: %v\n", err)
+		}
+	}
+
+	RandomNameSuffix = e2eutil.RandomSuffix()
+	decoratorObj := &TlsDecorator{}
+	decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
+
+	decoratorObj.CreateCaRootCert(t)
+	operatorSecret := decoratorObj.CreateOperatorSecret(t, f)
+	defer e2eutil.DeleteSecret(f.KubeClient, f.Namespace, operatorSecret.Name, &metav1.DeleteOptions{})
+
+	clusterSecret := decoratorObj.CreateClusterSecret(t, f)
+	defer e2eutil.DeleteSecret(f.KubeClient, f.Namespace, clusterSecret.Name, &metav1.DeleteOptions{})
+
+	// Update cluster parameters
+	e2espec.SetClusterName(decoratorObj.clusterName)
+	defer e2espec.ResetClusterName()
+
+	// Creating invalid TLS by swapping secrets
+	decoratorObj.SetTlsForTesting(clusterSecret, operatorSecret)
+	defer e2espec.ResetTLS()
+
+	TestToRun(t)
 }

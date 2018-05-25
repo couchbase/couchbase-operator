@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -15,7 +16,12 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"testing"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	restclient "k8s.io/client-go/rest"
 )
 
 // KeyType defines the supported types of private key that can be used with
@@ -45,6 +51,42 @@ const (
 	CertTypeClient
 	CertTypeCA
 )
+
+// KeyPairRequest contains the necessary configuration to generate
+// a private key and signed public key pair by a CA
+type keyPairRequest struct {
+	keyType  KeyType
+	certType CertType
+	req      *x509.CertificateRequest
+}
+
+// Generate returns a PEM encoded private key and signed certificate
+// from the specified CA
+func (req *keyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, certValidTo time.Time) (key, cert []byte, err error) {
+	// Generate the private key
+	var pkey crypto.PrivateKey
+	if pkey, err = GeneratePrivateKey(req.keyType); err != nil {
+		return
+	}
+
+	// PEM encode the private key
+	if key, err = CreatePrivateKey(pkey); err != nil {
+		return
+	}
+
+	// Add the keying material to the CSR
+	var csr *x509.CertificateRequest
+	if csr, err = CreateCertificateRequest(req.req, pkey); err != nil {
+		return
+	}
+
+	// Sign and PEM encode the certificate
+	if cert, err = ca.SignCertificateRequest(csr, req.certType, certValidFrom, certValidTo); err != nil {
+		return
+	}
+
+	return
+}
 
 // GeneratePrivateKey generates a private key as defined by KeyType.
 func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
@@ -141,7 +183,7 @@ type CertificateAuthority struct {
 
 // NewCertificateAuthority creates a new CA.  It automatically generates a new
 // private key based on preference, then self signs a certificate.
-func NewCertificateAuthority(keyType KeyType, commonName string) (*CertificateAuthority, error) {
+func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, certValidTo time.Time, caCertType CertType) (*CertificateAuthority, error) {
 	key, err := GeneratePrivateKey(keyType)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate CA key: %v", err)
@@ -162,7 +204,7 @@ func NewCertificateAuthority(keyType KeyType, commonName string) (*CertificateAu
 		return nil, fmt.Errorf("unable to generate CA req: %v", err)
 	}
 
-	pem, err := ca.SignCertificateRequest(req, CertTypeCA)
+	pem, err := ca.SignCertificateRequest(req, caCertType, certValidFrom, certValidTo)
 	if err != nil {
 		return nil, fmt.Errorf("unable to sign CA cert: %v", err)
 	}
@@ -215,14 +257,11 @@ func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 // The certType defines the key usage and extended key usage defined
 // by the CertType.
 // The returned slice is the PEM encoded certificate.
-func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequest, certType CertType) ([]byte, error) {
+func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequest, certType CertType, validFrom, validTo time.Time) ([]byte, error) {
 	serialNumber, err := generateSerial()
 	if err != nil {
 		return nil, err
 	}
-
-	notBefore := time.Now()
-	notAfter := notBefore.AddDate(10, 0, 0)
 
 	subjectKeyId, err := generateSubjectKeyIdentifier(req.PublicKey)
 	if err != nil {
@@ -232,8 +271,8 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 	cert := &x509.Certificate{
 		SerialNumber:          serialNumber,
 		Subject:               req.Subject,
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
+		NotBefore:             validFrom,
+		NotAfter:              validTo,
 		BasicConstraintsValid: true,
 		SubjectKeyId:          subjectKeyId,
 		DNSNames:              req.DNSNames,
@@ -270,4 +309,95 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 	}
 
 	return pem, nil
+}
+
+func CreateOperatorCertReq(commonName string) *x509.CertificateRequest {
+	return &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+	}
+}
+
+func CreateClusterCertReq(commonName string, dnsNames []string) *x509.CertificateRequest {
+	return &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		DNSNames: dnsNames,
+	}
+}
+
+func CreateKeyPairReqData(keyType KeyType, certReq *x509.CertificateRequest) *keyPairRequest {
+	return &keyPairRequest{
+		keyType:  keyType,
+		certType: CertTypeServer,
+		req:      certReq,
+	}
+}
+
+func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, certPEM, keyPEM []byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      secretName,
+		},
+		Data: map[string][]byte{
+			"ca.crt":                 caCertData,
+			"couchbase-operator.crt": certPEM,
+			"couchbase-operator.key": keyPEM,
+		},
+	}
+}
+
+func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      secretName,
+		},
+		Data: map[string][]byte{
+			"chain.pem": certPEM,
+			"pkey.key":  keyPEM,
+		},
+	}
+}
+
+// Verifies the certificate values of pos certificate and installed are same
+func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restclient.Config) error {
+	// Start the port forwarder
+	pf := PortForwarder{
+		Config:    kubeConfig,
+		Namespace: namespace,
+		Pod:       podName,
+		Port:      "18091",
+	}
+	if err := pf.ForwardPorts(); err != nil {
+		return err
+	}
+	defer pf.Close(t)
+
+	// Get the server certificate
+	// * Note I do not advise doing insecure verification, you aren't actually testing
+	//   that the libraries work
+	// * Instead add "localhost" to the DNS alt names when creating the certificate and
+	//   add in the signing CA
+	// * Other option is alter /etc/hosts which is more horrible :)
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+	conn, err := tls.Dial("tcp", "localhost:18091", tlsConfig)
+	if err != nil {
+		return err
+	}
+	podCert := conn.ConnectionState().PeerCertificates[0]
+
+	t.Logf("Serial:     %v\n", podCert.SerialNumber)
+	t.Logf("Subject CN: %v\n", podCert.Subject.CommonName)
+	t.Logf("Not Before: %v\n", podCert.NotBefore)
+	t.Logf("Not After:  %v\n", podCert.NotAfter)
+	for _, dnsAltName := range podCert.DNSNames {
+		t.Logf("DNS Alt Name: %v\n", dnsAltName)
+	}
+	return nil
 }

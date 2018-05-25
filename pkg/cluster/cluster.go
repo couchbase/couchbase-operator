@@ -28,8 +28,11 @@ import (
 )
 
 var (
-	reconcileInterval         = 8 * time.Second
-	podTerminationGracePeriod = int64(5)
+	reconcileInterval = 8 * time.Second
+	// Be very aggressive here.  If pods are deleted with volumes missing then
+	// they stay Terminating forever.  This should emulate --grace-period=0 --force
+	// See: https://github.com/kubernetes/kubernetes/issues/51835
+	podTerminationGracePeriod = int64(0)
 )
 
 type clusterEventType string

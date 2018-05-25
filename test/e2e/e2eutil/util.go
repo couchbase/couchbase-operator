@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -141,6 +142,30 @@ type ClusterReadyRetries struct {
 	Service int
 }
 
+// randomSuffix generates a 5 character random suffix to be appended to
+// k8s resources to avoid namespace collisions (especially events)
+func RandomSuffix() string {
+	// Seed the PRNG so we get vagely random suffixes across runs
+	rand.Seed(time.Now().UnixNano())
+
+	// Generate a random 5 character suffix for the cluster name
+	suffix := ""
+	for i := 0; i < 5; i++ {
+		// Our alphabet is 0-9 a-z, so 36 characters
+		ordinal := rand.Intn(36)
+		// Less than 10 places it in the 0-9 range, otherwise in
+		// the a-z range
+		if ordinal < 10 {
+			ordinal = ordinal + int('0')
+		} else {
+			ordinal = ordinal - 10 + int('a')
+		}
+		// Append to the name
+		suffix = suffix + string(rune(ordinal))
+	}
+	return suffix
+}
+
 // newClusterFromSpecQuick creates a cluster and waits for various ready conditions.
 // Returns the cluster object regardless so we can test for error conditions
 func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
@@ -216,6 +241,11 @@ func NewClusterMultiQuick(t *testing.T, crClient versioned.Interface, namespace,
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
+}
+
+func NewClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
+	return CreateCluster(t, crClient, namespace, clusterSpec)
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an

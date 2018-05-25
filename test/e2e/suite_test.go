@@ -24,6 +24,10 @@ type TestResult struct {
 	result bool
 }
 
+// String variable to store the random suffix used for couchbase-server
+// name and tls certificates
+var RandomNameSuffix string
+
 // Test suite definitions
 //
 // TODO: We should start thinking about a sane hierarchy here e.g. all devs want to
@@ -200,8 +204,25 @@ var testSuiteAll = TestSuite{
 }
 
 var testSuiteTLS = TestSuite{
-	// Only TLS specific code is to do with node addition/removal
-	TestResizeCluster,
+	// Basic tests
+	TestTlsCreateCluster,
+	TestTlsKillClusterNode,
+	TestTlsResizeCluster,
+
+	// Certificate remove tests
+	TestTlsRemoveOperatorCertificateAndAddBack,
+	TestTlsRemoveClusterCertificateAndAddBack,
+	TestTlsRemoveOperatorCertificateAndResizeCluster,
+	TestTlsRemoveClusterCertificateAndResizeCluster,
+}
+
+var testSuiteTLSCustCert = TestSuite{
+	// Customized certificate cases
+	TestTlsNegRSACertificateDnsName,
+	TestTlsCertificateExpiry,
+	TestTlsNegCertificateExpiredBeforeDeployment,
+	TestTlsCertificateDeployedBeforeValidity,
+	TestTlsGenerateWrongCACertType,
 }
 
 // TestFuncName return the name of a test function
@@ -269,6 +290,7 @@ func TestAll(t *testing.T) {
 
 func TestRSA(t *testing.T) {
 	runSuite(t, testSuiteTLS, rsaDecorator)
+	runSuite(t, testSuiteTLSCustCert)
 }
 
 func TestEllipticP224(t *testing.T) {

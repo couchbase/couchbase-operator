@@ -38,7 +38,7 @@ type Framework struct {
 	Deployment    *v1beta1.Deployment
 	Namespace     string
 	DefaultSecret *v1.Secret
-	config        *rest.Config
+	Config        *rest.Config
 	LogDir        string
 	SkipTeardown  bool
 	Duration      int
@@ -109,7 +109,7 @@ func Setup() error {
 		Deployment: deployment,
 		Namespace:  *ns,
 		opImage:    *opImage,
-		config:     config,
+		Config:     config,
 		//S3Bucket:   os.Getenv("TEST_S3_BUCKET"),
 		LogDir:       logDir,
 		SkipTeardown: *skipTearDown,
@@ -259,7 +259,7 @@ func (f *Framework) deleteCouchbaseOperator(deploymentName string) error {
 }
 
 func (f *Framework) ApiServerHost() string {
-	return f.config.Host
+	return f.Config.Host
 }
 
 func (f *Framework) PodClient() typedv1.PodInterface {

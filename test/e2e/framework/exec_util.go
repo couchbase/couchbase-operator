@@ -66,7 +66,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
-	err := execute("POST", req.URL(), f.config, options.Stdin, &stdout, &stderr, tty)
+	err := execute("POST", req.URL(), f.Config, options.Stdin, &stdout, &stderr, tty)
 	if err != nil {
 		return "", "", err
 	}
