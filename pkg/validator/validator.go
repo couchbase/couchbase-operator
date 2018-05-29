@@ -250,9 +250,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 
 		if bucket.BucketReplicas == nil {
 			errs = append(errs, errors.Required("spec.buckets.replicas", "body"))
-		}
-
-		if *bucket.BucketReplicas < 0 {
+		} else if *bucket.BucketReplicas < 0 {
 			errs = append(errs, errors.ExceedsMinimumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasZero), false))
 		} else if *bucket.BucketReplicas > 3 {
 			errs = append(errs, errors.ExceedsMaximumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasThree), false))
