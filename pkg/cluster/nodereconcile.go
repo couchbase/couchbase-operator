@@ -293,20 +293,42 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) {
 }
 
 func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
+	// Bookkeep the scaling information for only the affected server classes
+	currentSize := 0
+	desiredSize := 0
+
 	serverSpecs := c.cluster.Spec.ServerSettings
 	for _, serverSpec := range serverSpecs {
-		removeCount := 0
+		// Check to see if we need to remove anything
 		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
-		for (nodes.Size() - removeCount) > serverSpec.Size {
-			originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
-			c.status.SetScalingDownCondition(originalSize, c.cluster.Spec.TotalSize())
-
-			r.couchbase.NeedsRebalance = true
-			toRemove := nodes.Highest()
-			r.knownNodes.Remove(toRemove.Name)
-			r.ejectNodes.Add(toRemove)
-			removeCount++
+		nodesToRemove := nodes.Size() - serverSpec.Size
+		if nodesToRemove <= 0 {
+			continue
 		}
+
+		// Update global scaling information
+		currentSize += nodes.Size()
+		desiredSize += serverSpec.Size
+
+		// Schedule deletion based on server class
+		for i := 0; i < nodesToRemove; i++ {
+			server, err := c.scheduler.Delete(serverSpec.Name)
+			if err != nil {
+				c.logger.Infof("Failed to schedule removal of member '%s': %v", serverSpec.Name, err)
+				r.transitionState(ReconcileFinished)
+				return
+			}
+			r.knownNodes.Remove(server)
+			r.ejectNodes.Add(c.members[server])
+		}
+
+	}
+
+	// If we are performing any scaling update the status and request a rebalance
+	// to eject the scheduled servers
+	if currentSize != desiredSize {
+		c.status.SetScalingDownCondition(currentSize, desiredSize)
+		r.couchbase.NeedsRebalance = true
 	}
 
 	r.transitionState(ReconcileRemoveUnmanaged)

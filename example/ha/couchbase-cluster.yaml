@@ -34,12 +34,16 @@ spec:
       enableFlush: true
       enableIndexReplica: false
   servers:
-    - size: 3
-      name: all_services
+    - name: data
+      size: 3
       services:
         - data
         - index
+    - name: query
+      size: 2
+      services:
         - query
         - search
-      dataPath: /opt/couchbase/var/lib/couchbase/data
-      indexPath: /opt/couchbase/var/lib/couchbase/data
+      serverGroups:
+        - us-east-1a
+        - us-east-1b

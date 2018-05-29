@@ -96,3 +96,4 @@ test-indv:
 
 test-unit:
 	go test -v github.com/couchbase/couchbase-operator/pkg/validator
+	go test -v github.com/couchbase/couchbase-operator/pkg/util/scheduler

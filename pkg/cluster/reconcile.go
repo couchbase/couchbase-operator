@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
 	"k8s.io/api/core/v1"
 )
@@ -22,6 +23,14 @@ import (
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	c.logger.Infoln("Start reconciling")
 	defer c.logger.Infoln("Finish reconciling")
+
+	// Initialize the scheduler each time around, this saves us having to update
+	// internal state in all the cases when a pod fails to be created, deleted,
+	// or disappears
+	var err error
+	if c.scheduler, err = scheduler.New(c.config.KubeCli, c.cluster); err != nil {
+		return err
+	}
 
 	if len(pods) == 0 {
 		err := c.recoverClusterDown()

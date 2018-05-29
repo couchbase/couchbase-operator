@@ -13,14 +13,23 @@ type Scheduler interface {
 	// Create examines the cluster state and cluster specification in order to
 	// schedule the creation of a new pod.  The pod parameter is mutated to
 	// contain the necessary label selectors to facilitate correct placement.
-	Create(client kubernetes.Interface, cluster *api.CouchbaseCluster, pod *v1.Pod) error
+	Create(pod *v1.Pod) error
+
+	// Delete selects a server name to delete from a specific server class.
+	Delete(class string) (string, error)
 }
 
 // New is a factory method to return the correct scheduler type for
 // the cluster configuration
-func New(cluster *api.CouchbaseCluster) Scheduler {
+func New(client kubernetes.Interface, cluster *api.CouchbaseCluster) (Scheduler, error) {
+	podGetter := NewK8SPodGetter(client, cluster)
+
+	// At present we only support a scheduler which evenly stripes servers
+	// across server groups on a per server class basis
 	if cluster.Spec.ServerGroupsEnabled() {
-		return NewStripeScheduler()
+		return NewStripeScheduler(podGetter, cluster)
 	}
-	return NewNullScheduler()
+
+	// The default does virtually nothing
+	return NewNullScheduler(podGetter, cluster)
 }

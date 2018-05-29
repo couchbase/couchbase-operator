@@ -598,7 +598,8 @@ func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, me
 }
 
 func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *api.CouchbaseCluster, clusterName, namespace string) (*v1.Pod, error) {
-	scheduler := scheduler.NewNullScheduler()
+	podGetter := scheduler.NewNullPodGetter()
+	scheduler, _ := scheduler.NewNullScheduler(podGetter, cl)
 
 	for _, config := range cl.Spec.ServerSettings {
 		if config.Name == m.ServerConfig {

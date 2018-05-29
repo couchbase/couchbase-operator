@@ -90,7 +90,6 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		eventCh:   make(chan *clusterEvent, 100),
 		stopCh:    make(chan struct{}),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
-		scheduler: scheduler.New(cl),
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 
@@ -104,6 +103,12 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: config.KubeCli.Core().Events(c.cluster.Namespace)})
 
 	c.logger.Info("Watching new cluster")
+
+	// Initialize the scheduler for the initial pod
+	var err error
+	if c.scheduler, err = scheduler.New(c.config.KubeCli, c.cluster); err != nil {
+		return nil
+	}
 
 	go func() {
 		if err := c.setup(); err != nil {

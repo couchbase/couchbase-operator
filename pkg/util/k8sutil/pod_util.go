@@ -41,7 +41,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 		}
 	}
 
-	if err := scheduler.Create(kubeCli, cluster, pod); err != nil {
+	if err := scheduler.Create(pod); err != nil {
 		return nil, err
 	}
 
@@ -266,6 +266,7 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 				{Name: couchbaseVolumeName,
 					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 			},
+			NodeSelector: map[string]string{},
 		},
 	}
 	if cs.AntiAffinity {
