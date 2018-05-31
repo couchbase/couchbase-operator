@@ -5,7 +5,7 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  version: enterprise-5.0.1
+  version: enterprise-5.5.0
   authSecret: cb-example-auth
   adminConsoleServices:
     - data

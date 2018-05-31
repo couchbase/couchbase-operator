@@ -522,6 +522,22 @@ var testDefs = []testDef{
 			errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits"),
 		),
 	},
+	{
+		name:        "TestVersionMin",
+		path:        "tests/0061.yaml",
+		description: "Tests a config with version < min fails",
+		expectedErr: errors.CompositeValidationError(
+			errors.FailedPattern("version", "spec.Version", `i.e "enterprise-5.5.0"`),
+		),
+	},
+	{
+		name:        "TestVersionInvalid",
+		path:        "tests/0062.yaml",
+		description: "Tests a config with invalid",
+		expectedErr: errors.CompositeValidationError(
+			errors.FailedPattern("version", "spec.Version", `i.e "enterprise-5.5.0"`),
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {

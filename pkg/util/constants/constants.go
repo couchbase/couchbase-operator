@@ -95,3 +95,7 @@ func (v KubernetesVersion) String() string {
 
 	return major + "." + minor
 }
+
+const (
+	CouchbaseVersionMin = "enterprise-5.5.0"
+)

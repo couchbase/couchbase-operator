@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 
@@ -51,6 +52,7 @@ type Config struct {
 	CreateCrd      bool
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
+	VerifyVersion  bool
 }
 
 func New(cfg Config) *Controller {
@@ -149,6 +151,12 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 			return fmt.Errorf("unsafe state. cluster (%s) was created before but we received event (%s)", clus.Name, event.Type)
 		}
 
+		if c.VerifyVersion {
+			err := couchbaseutil.VerifyVersion(clus.Spec.Version)
+			if err != nil {
+				return fmt.Errorf("Cluster create failed, Please delete its CR: %s, %v", clus.Name, err)
+			}
+		}
 		c.clusters[clus.Name] = cluster.New(c.makeClusterConfig(), clus)
 
 	case kwatch.Modified:

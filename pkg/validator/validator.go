@@ -5,6 +5,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/go-openapi/errors"
@@ -405,6 +406,13 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 			err := errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits")
 			errs = append(errs, err)
 		}
+	}
+
+	// version check
+	err := couchbaseutil.VerifyVersion(customResource.Spec.Version)
+	if err != nil {
+		err := errors.FailedPattern("version", "spec.Version", `i.e "enterprise-5.5.0"`)
+		errs = append(errs, err)
 	}
 
 	if len(errs) > 0 {

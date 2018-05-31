@@ -4,6 +4,8 @@ import (
 	E "errors"
 	"fmt"
 	"reflect"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
 var (
@@ -42,6 +44,10 @@ type ErrPodUnschedulable struct {
 	Reason string
 }
 
+type ErrUnsupportedVersion struct {
+	Version string
+}
+
 func (e ErrSecretMissingUsername) Error() string {
 	return fmt.Sprintf("secret is missing username key: %s", e.Reason)
 }
@@ -78,6 +84,10 @@ func (e ErrInvalidBucketParamChange) Error() string {
 
 func (e ErrPodUnschedulable) Error() string {
 	return fmt.Sprintf("unable to schedule pod pod: %s", e.Reason)
+}
+
+func (e ErrUnsupportedVersion) Error() string {
+	return fmt.Sprintf("version not supported: %s, min version: %s", e.Version, constants.CouchbaseVersionMin)
 }
 
 func hasValue(v interface{}) bool {

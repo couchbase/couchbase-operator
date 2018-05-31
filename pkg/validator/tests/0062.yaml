@@ -1,12 +1,10 @@
-# This configuration sets antiAffinity to a non-boolean value
+# The minimum base configuration
 apiVersion: couchbase.database.couchbase.com/v1beta1
 kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  baseImage: couchbase/server
-  version: enterprise-5.5.0
-  antiAffinity: blah
+  version: enterprise-5.a.0
   authSecret: cb-example-auth
   cluster:
     indexStorageSetting: plasma

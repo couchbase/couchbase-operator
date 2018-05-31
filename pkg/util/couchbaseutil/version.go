@@ -4,8 +4,11 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
-	"strings"
+
+	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
 // A Couchbase version.  This type is immutable
@@ -24,37 +27,24 @@ func NewVersion(version string) (*Version, error) {
 		return nil, fmt.Errorf("null version")
 	}
 
-	// Try split on the last '-'.  If there is one, assume that everything
-	// before is the prefix (edition) and everything after us the semver
-	// otherwise we just assume the whole version string is the semver.
-	// This handles both "5.0.1" and "enterprise-5.0.1"
-	semverString := version
-	prefix := ""
-	index := strings.LastIndex(version, "-")
-	if index != -1 {
-		// "enterprise-" will cause array out of bounds
-		if index+1 >= len(version) {
-			return nil, fmt.Errorf("malformed version '%s'", version)
-		}
-		prefix = version[:index]
-		semverString = version[index+1:]
+	// Gather semver and optional edition with expected format
+	// "<edition>-<semver>" or "<semver>-<edition>", ie:
+	//			"5.0.1" and "enterprise-5.0.1" and "5.5.0-beta"
+	re := regexp.MustCompile(`^(?:(\w+)-)?(\d+)\.(\d+)\.(\d+)(?:-(\w+))?`)
+	matches := re.FindStringSubmatch(version)
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("malformed version '%s'", version)
 	}
 
-	// Split into individual fields, we expect this to be in the form:
-	// major.minor.patch
-	semverFields := strings.Split(semverString, ".")
-	if len(semverFields) != 3 {
-		return nil, fmt.Errorf("badly formed semantic version '%s'", semverString)
+	prefix := matches[1]
+	if prefix == "" {
+		prefix = matches[5]
 	}
 
-	// Convert into the output slice
-	semver := make([]int, len(semverFields))
-	for index, valueRaw := range semverFields {
-		value, err := strconv.Atoi(valueRaw)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected field '%s' in semver '%s'", valueRaw, semverString)
-		}
-		semver[index] = value
+	semver := make([]int, 3)
+	for i := 0; i < 3; i++ {
+		val, _ := strconv.Atoi(matches[i+2])
+		semver[i] = val
 	}
 
 	return &Version{version, prefix, semver}, nil
@@ -97,4 +87,17 @@ func (a *Version) Compare(b *Version) int {
 		}
 	}
 	return 0
+}
+
+func VerifyVersion(version string) error {
+	v, err := NewVersion(version)
+	if err != nil {
+		return err
+	} else {
+		minVersion, _ := NewVersion(constants.CouchbaseVersionMin)
+		if v.Compare(minVersion) == -1 {
+			return cberrors.ErrUnsupportedVersion{Version: version}
+		}
+	}
+	return nil
 }

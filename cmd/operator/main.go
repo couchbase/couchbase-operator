@@ -30,11 +30,12 @@ import (
 )
 
 var (
-	listenAddr   string
-	name         string
-	namespace    string
-	createCrd    bool
-	printVersion bool
+	listenAddr    string
+	name          string
+	namespace     string
+	createCrd     bool
+	printVersion  bool
+	verifyVersion bool
 
 	chaosLevel int
 
@@ -47,6 +48,7 @@ func init() {
 	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
 	flag.BoolVar(&createCrd, "create-crd", false, "Create the crd if it does not exist")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
+	flag.BoolVar(&verifyVersion, "verify-version", true, "Skip verification of required couchbase min version")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
 	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
@@ -137,6 +139,7 @@ func newControllerConfig() controller.Config {
 		KubeCli:        kubecli,
 		CouchbaseCRCli: client.MustNewInCluster(),
 		CreateCrd:      createCrd,
+		VerifyVersion:  verifyVersion,
 	}
 
 	return cfg
