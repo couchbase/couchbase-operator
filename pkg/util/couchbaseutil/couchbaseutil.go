@@ -399,7 +399,8 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait b
 		func() error {
 			status, err := c.client.Rebalance(nodesToRemove)
 			if wait && status != nil {
-				status.SetLogger(retryutil.Log(c.clusterName))
+				logger := c.ctx.Value("logger").(*logrus.Entry)
+				status.SetLogger(logger)
 				return status.Wait()
 			}
 			return err

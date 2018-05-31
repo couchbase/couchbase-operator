@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -80,7 +81,7 @@ type Cluster struct {
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 	c := &Cluster{
-		logger: logrus.WithFields(logrus.Fields{
+		logger: logrus.New().WithFields(logrus.Fields{
 			"module":       "cluster",
 			"cluster-name": cl.Name,
 		}),
@@ -91,7 +92,12 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		stopCh:    make(chan struct{}),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
 	}
+
+	// Cancel is used to abort the go routine when the operator is deleted
+	// The logger value is used by other clients who don't have access to the
+	// per cluster log
 	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c.ctx = context.WithValue(c.ctx, "logger", c.logger)
 
 	// Set up our event logger.  Note that this will cache and aggregate
 	// events over a 10 minute window.
@@ -137,6 +143,8 @@ func (c *Cluster) Update(cl *api.CouchbaseCluster) {
 }
 
 func (c *Cluster) Delete() {
+	// Inhibit logging as this will just be error messages
+	c.logger.Logger.Out = ioutil.Discard
 	// Notify client operations to stop what they are doing e.g. abort retry loops
 	c.cancel()
 	c.send(&clusterEvent{typ: eventDeleteCluster})

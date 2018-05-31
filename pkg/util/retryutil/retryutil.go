@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type RetryError struct {
@@ -62,7 +64,8 @@ func RetryOnErr(ctx context.Context, interval time.Duration, maxRetries int, tas
 		if err := f(); err != nil {
 
 			// failed, log attempt
-			Log(clusterName).Warningf("%s: failed with error %v ...retrying", task, err)
+			logger := ctx.Value("logger").(*logrus.Entry)
+			logger.Warningf("%s: failed with error %v ...retrying", task, err)
 			return false, nil
 		}
 
