@@ -18,6 +18,7 @@ func TestPauseOperator(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
+	failOverMemberId := 0
 	testCouchbase, err := e2eutil.NewClusterBasic(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
@@ -68,17 +69,17 @@ func TestPauseOperator(t *testing.T) {
 		t.Fatalf("failed to resize to 3 members couchbase cluster: %v", err)
 	}
 
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, failOverMemberId)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
+	event := e2eutil.NewMemberRemoveEvent(testCouchbase, failOverMemberId)
 	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 60)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, failOverMemberId)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 	if err != nil {

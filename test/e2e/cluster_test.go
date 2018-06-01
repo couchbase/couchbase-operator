@@ -953,6 +953,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
 	expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
 
 	// cluster should also be balanced
