@@ -121,7 +121,7 @@ type ClusterSpec struct {
 	// ServerGroups define the set of availability zones we want to distribute
 	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
 	// nodes, but use a specific subset for a particular Couchbase cluster.
-	ServerGroups []string `json:"serverGroups"`
+	ServerGroups []string `json:"serverGroups,omitempty"`
 }
 
 type ClusterConfig struct {
@@ -204,7 +204,7 @@ type ServerConfig struct {
 	// ServerGroups define the set of availability zones we want to distribute
 	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
 	// nodes, but use a specific subset for a particular Couchbase cluster.
-	ServerGroups []string `json:"serverGroups"`
+	ServerGroups []string `json:"serverGroups,omitempty"`
 
 	// Pod defines the policy to create pod for the couchbase pod.
 	//
