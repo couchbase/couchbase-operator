@@ -65,6 +65,21 @@ Watch for the following messages which indicate that the Operator is unable to r
 * Logs with ```level=error```
 * Operator is unable to get cluster state after N retries
 
+## Profiling the operator
+
+The Couchbase operator serves profiling data on it's default listenAddress ```localhost:8080```.  You can access this endpoint by performing a ```kubectl exec``` into the operator pod, for example:
+```console
+$ kubectl exec -it couchbase-operator-599bcf47f-8wswh sh
+$ wget -O- "localhost:8080/debug/pprof/trace" | less
+```
+
+Another option is to create a custom service or forward the service directly to your localhost.
+```console
+$ kubectl port-forward couchbase-operator-599bcf47f-8wswh  8080:8080
+$ go tool pprof localhost:8080/debug/pprof/heap
+$ (pprof) traces
+```
+
 ## Getting Couchbase Server Logs
 
 The easiest way to get ```cbcollect``` logs is to use the standard logs collection feature in the Couchbase Server Web Console. Go to **Logs > Collect Information**, select the desired nodes, and click **Collect Logs**. You can also deploy a job within Kubernetes to trigger log collection:
