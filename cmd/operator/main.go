@@ -31,12 +31,13 @@ import (
 )
 
 var (
-	listenAddr    string
-	name          string
-	namespace     string
-	createCrd     bool
-	printVersion  bool
-	verifyVersion bool
+	listenAddr     string
+	name           string
+	namespace      string
+	createCrd      bool
+	printVersion   bool
+	verifyVersion  bool
+	enableUpgrades bool
 
 	chaosLevel int
 
@@ -50,6 +51,7 @@ func init() {
 	flag.BoolVar(&createCrd, "create-crd", false, "Create the crd if it does not exist")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.BoolVar(&verifyVersion, "verify-version", true, "Skip verification of required couchbase min version")
+	flag.BoolVar(&enableUpgrades, "enable-upgrades", true, "Enable or disable rolling upgrades")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
 	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
@@ -141,6 +143,7 @@ func newControllerConfig() controller.Config {
 		CouchbaseCRCli: client.MustNewInCluster(),
 		CreateCrd:      createCrd,
 		VerifyVersion:  verifyVersion,
+		EnableUpgrades: enableUpgrades,
 	}
 
 	return cfg

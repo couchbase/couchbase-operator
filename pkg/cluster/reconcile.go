@@ -45,17 +45,23 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return nil
 	}
 
-	// Upgrading must override reconciliation as during the process the
-	// cluster will be oversized and we don't want nodes to disappear ...
-	upgrading := c.upgrading()
-	if err := c.upgrade(status); err != nil {
-		return err
-	}
-	// ... addtionally if we were previously or currently are upgrading then
-	// state may have altered and reality may not match 'pods' without
-	// probing the API again
-	if upgrading || c.upgrading() {
-		return nil
+	if c.config.EnableUpgrades {
+		// Upgrading must override reconciliation as during the process the
+		// cluster will be oversized and we don't want nodes to disappear ...
+		upgrading := c.upgrading()
+		if err := c.upgrade(status); err != nil {
+			return err
+		}
+		// ... addtionally if we were previously or currently are upgrading then
+		// state may have altered and reality may not match 'pods' without
+		// probing the API again
+		if upgrading || c.upgrading() {
+			return nil
+		}
+	} else {
+		if c.cluster.Spec.Version != c.status.CurrentVersion {
+			return fmt.Errorf("cluster upgrades are unsupported")
+		}
 	}
 
 	state := &ReconcileMachine{

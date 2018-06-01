@@ -538,6 +538,15 @@ var testDefs = []testDef{
 			errors.FailedPattern("version", "spec.Version", `i.e "enterprise-5.5.0"`),
 		),
 	},
+	{
+		name:        "TestVersionUpgrade",
+		path:        "tests/0001.yaml",
+		updatePath:  "tests/0063.yaml",
+		description: "Tests version upgrades are rejected",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.version", "body"},
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {

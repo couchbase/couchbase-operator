@@ -56,6 +56,7 @@ type Config struct {
 	ServiceAccount string
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
+	EnableUpgrades bool
 }
 
 type Cluster struct {

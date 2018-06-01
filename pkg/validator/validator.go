@@ -434,6 +434,11 @@ func (e *UpdateError) Error() string {
 func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warning) {
 	warns := []Warning{}
 	errs := []error{}
+
+	if current.Spec.Version != updated.Spec.Version {
+		errs = append(errs, &UpdateError{"spec.version", "body"})
+	}
+
 	if current.Spec.AuthSecret != updated.Spec.AuthSecret {
 		err := &UpdateError{"spec.authSecret", "body"}
 		errs = append(errs, err)
