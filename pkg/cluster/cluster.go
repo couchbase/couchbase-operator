@@ -551,10 +551,18 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 }
 
 func (c *Cluster) updateMemberStatus() {
-	info, err := c.client.GetClusterStatus(c.members)
-	if err != nil {
-		c.logger.Warningf("update member status failed failed: %v", err)
-		return
+	// The first member will get here when the pod is brought up, however calls
+	// to get the cluster status will fail as it hasn't been initialized yet, so
+	// instead just return an empty status
+	var info *couchbaseutil.ClusterStatus
+	if c.cluster.Status.ClusterID == "" {
+		info = couchbaseutil.NewClusterStatus()
+	} else {
+		var err error
+		if info, err = c.client.GetClusterStatus(c.members); err != nil {
+			c.logger.Warningf("update member status failed failed: %v", err)
+			return
+		}
 	}
 	c.updateMemberStatusWithClusterInfo(info)
 }

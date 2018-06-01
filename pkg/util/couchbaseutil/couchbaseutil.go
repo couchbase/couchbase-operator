@@ -46,6 +46,30 @@ type ClusterStatus struct {
 	NeedsRebalance   bool
 }
 
+// NewClusterStatus returns a cluster status object with all
+// lists and maps initialized
+func NewClusterStatus() *ClusterStatus {
+	status := &ClusterStatus{}
+	status.Reset()
+	return status
+}
+
+// Reset replaces all sets in the cluster status with empty versions
+// and returns scalars to the zero state
+func (c *ClusterStatus) Reset() {
+	c.ActiveNodes = NewMemberSet()
+	c.PendingAddNodes = NewMemberSet()
+	c.AddBackNodes = NewMemberSet()
+	c.FailedAddNodes = NewMemberSet()
+	c.WarmupNodes = NewMemberSet()
+	c.DownNodes = NewMemberSet()
+	c.FailedNodes = NewMemberSet()
+	c.UnclusteredNodes = NewMemberSet()
+	c.UnmanagedNodes = []string{}
+	c.IsRebalancing = false
+	c.NeedsRebalance = false
+}
+
 const (
 	RetryCount         = 5
 	ExtendedRetryCount = 36
@@ -306,15 +330,7 @@ func (c *CouchbaseClient) GetClusterStatus(ms MemberSet) (*ClusterStatus, error)
 func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatus) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	status.ActiveNodes = NewMemberSet()
-	status.PendingAddNodes = NewMemberSet()
-	status.FailedAddNodes = NewMemberSet()
-	status.DownNodes = NewMemberSet()
-	status.FailedNodes = NewMemberSet()
-	status.AddBackNodes = NewMemberSet()
-	status.UnclusteredNodes = NewMemberSet()
-	status.WarmupNodes = NewMemberSet()
-	status.UnmanagedNodes = []string{}
+	status.Reset()
 
 	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster status", c.clusterName, func() error {
 		info, err := c.client.ClusterInfo()
