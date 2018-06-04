@@ -415,7 +415,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 
 	// kill pod that was just added
 	err = e2eutil.KillPodForMember(f.KubeClient, testCouchbase, podToKillMemberId)
@@ -433,8 +433,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
 	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries30); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)

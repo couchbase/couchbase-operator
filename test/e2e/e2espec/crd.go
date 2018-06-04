@@ -22,12 +22,14 @@ var (
 // cluster settings
 var (
 	defaultClusterSettings = api.ClusterConfig{
-		DataServiceMemQuota:   256,
-		IndexServiceMemQuota:  256,
-		SearchServiceMemQuota: 256,
-		IndexStorageSetting:   constants.IndexStorageModeMemoryOptimized,
-		AutoFailoverTimeout:   30,
-		AutoFailoverMaxCount:  1,
+		DataServiceMemQuota:      256,
+		IndexServiceMemQuota:     256,
+		SearchServiceMemQuota:    256,
+		EventingServiceMemQuota:  256,
+		AnalyticsServiceMemQuota: 1024,
+		IndexStorageSetting:      constants.IndexStorageModeMemoryOptimized,
+		AutoFailoverTimeout:      30,
+		AutoFailoverMaxCount:     1,
 	}
 )
 
@@ -201,6 +203,12 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 					clusterSettings.SearchServiceMemQuota = searchServiceMemQuota
 				case setting == "indexStorageSetting":
 					clusterSettings.IndexStorageSetting = config[key][setting]
+				case setting == "eventingServiceMemQuota":
+					eventingServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
+					clusterSettings.EventingServiceMemQuota = eventingServiceMemQuota
+				case setting == "analyticsServiceMemQuota":
+					analyticsServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
+					clusterSettings.AnalyticsServiceMemQuota = analyticsServiceMemQuota
 				case setting == "autoFailoverTimeout":
 					autoFailoverTimeout, _ := strconv.ParseUint(config[key][setting], 10, 64)
 					clusterSettings.AutoFailoverTimeout = autoFailoverTimeout

@@ -59,20 +59,24 @@ var (
 
 var (
 	BasicClusterConfig = map[string]string{
-		"dataServiceMemQuota":   "256",
-		"indexServiceMemQuota":  "256",
-		"searchServiceMemQuota": "256",
-		"indexStorageSetting":   "memory_optimized",
-		"autoFailoverTimeout":   "10",
-		"autoFailoverMaxCount":  "1"}
+		"dataServiceMemQuota":      "256",
+		"indexServiceMemQuota":     "256",
+		"searchServiceMemQuota":    "256",
+		"eventingServiceMemQuota":  "256",
+		"analyticsServiceMemQuota": "1024",
+		"indexStorageSetting":      "memory_optimized",
+		"autoFailoverTimeout":      "10",
+		"autoFailoverMaxCount":     "1"}
 
 	BasicClusterConfig2 = map[string]string{
-		"dataServiceMemQuota":   "1024",
-		"indexServiceMemQuota":  "256",
-		"searchServiceMemQuota": "256",
-		"indexStorageSetting":   "memory_optimized",
-		"autoFailoverTimeout":   "10",
-		"autoFailoverMaxCount":  "1"}
+		"dataServiceMemQuota":      "1024",
+		"indexServiceMemQuota":     "256",
+		"searchServiceMemQuota":    "256",
+		"eventingServiceMemQuota":  "256",
+		"analyticsServiceMemQuota": "1024",
+		"indexStorageSetting":      "memory_optimized",
+		"autoFailoverTimeout":      "10",
+		"autoFailoverMaxCount":     "1"}
 
 	BasicServiceOneDataNode = map[string]string{
 		"size":     "1",
