@@ -411,9 +411,10 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 
 	resultChan := watch.ResultChan()
 	duration := time.Duration(seconds) * time.Second
+	timeoutChan := time.After(duration)
 	for {
 		select {
-		case <-time.After(duration):
+		case <-timeoutChan:
 			return fmt.Errorf("Time out waiting for cluster event %s, %s:", event.Reason, event.Message)
 
 		case watchEvent := <-resultChan:
