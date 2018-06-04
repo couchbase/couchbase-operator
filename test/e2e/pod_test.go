@@ -364,10 +364,15 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	}
 
 	t.Logf("Attempting to add a node")
-	err = e2eutil.ResizeCluster(t, 0, numNodes+1, targetKube.CRClient, testCouchbase)
-	if err == nil {
+	if err = e2eutil.ResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase); err == nil {
 		t.Fatalf("cluster scaled to %d pods on %d nodes, fail: %v", numNodes+1, numNodes, err)
 	}
+
+	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, numNodes)
 	t.Logf("Node not added")
 
 	t.Logf("Reverting add")

@@ -320,8 +320,7 @@ func (c *Cluster) run() {
 				c.members, _ = k8sutil.PVCToMemberset(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, c.isSecureClient())
 			}
 
-			rerr = c.reconcile(running)
-			if rerr != nil {
+			if err := c.reconcile(running); err != nil {
 				c.logger.Errorf("failed to reconcile: %v", rerr)
 			}
 

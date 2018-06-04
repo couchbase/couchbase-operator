@@ -80,8 +80,8 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	if !c.reconcileMembers(state) {
-		return nil
+	if err := c.reconcileMembers(state); err != nil {
+		return err
 	}
 
 	if err := c.reconcileBuckets(); err != nil {
@@ -98,6 +98,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	c.status.ClearCondition(api.ClusterConditionScaling)
 	c.status.SetReadyCondition()
 
 	return nil
@@ -126,53 +127,8 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 // 7. Remove any nodes from the cached member set that are not part actually
 //    part of the cluster.
 // Returns true if reconciliation completed properly
-func (c *Cluster) reconcileMembers(rm *ReconcileMachine) bool {
-	done := false
-	for !done {
-		switch rm.state {
-		case ReconcileInit:
-			rm.handleInit(c)
-		case ReconcileUnknownMembers:
-			rm.handleUnknownMembers(c)
-		case ReconcileRebalanceCheck:
-			rm.handleRebalanceCheck(c)
-		case ReconcileWarmupNodes:
-			rm.handleWarmupNodes(c)
-		case ReconcileDownNodes:
-			rm.handleDownNodes(c)
-		case ReconcileUnclusteredNodes:
-			rm.handleUnclusteredNodes(c)
-		case ReconcileFailedAddNodes:
-			rm.handleFailedAddNodes(c)
-		case ReconcileAddBackNodes:
-			rm.handleAddBackNodes(c)
-		case ReconcileFailedNodes:
-			rm.handleFailedNodes(c)
-		case ReconcileServerConfigs:
-			rm.handleUnknownServerConfigs(c)
-		case ReconcileRemoveNodes:
-			rm.handleRemoveNode(c)
-		case ReconcileRemoveUnmanaged:
-			rm.handleUnmanagedNodes(c)
-		case ReconcileAddNodes:
-			rm.handleAddNode(c)
-		case ReconcileRebalance:
-			rm.handleRebalance(c)
-		case ReconcileDeadMembers:
-			rm.handleDeadMembers(c)
-		case ReconcileFinished:
-			rm.handleFinished(c)
-			done = true
-		default:
-			panic("Invalid state\n")
-		}
-
-		if err := c.updateCRStatus(); err != nil {
-			c.logger.Warnf("update CR status failed: %v", err)
-		}
-	}
-
-	return !rm.errored
+func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
+	return rm.exec(c)
 }
 
 // Create a new Couchbase cluster member

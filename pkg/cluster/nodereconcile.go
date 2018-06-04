@@ -1,30 +1,70 @@
 package cluster
 
 import (
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"fmt"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
 
+// ReconcileState is an enumeration used to define the current
+// node in the state machine
 type ReconcileState int
 
 const (
-	ReconcileInit             ReconcileState = 0x01
-	ReconcileUnknownMembers                  = 0x02
-	ReconcileRebalanceCheck                  = 0x03
-	ReconcileWarmupNodes                     = 0x04
-	ReconcileDownNodes                       = 0x05
-	ReconcileUnclusteredNodes                = 0x06
-	ReconcileFailedAddNodes                  = 0x07
-	ReconcileAddBackNodes                    = 0x08
-	ReconcileFailedNodes                     = 0x09
-	ReconcileServerConfigs                   = 0x0a
-	ReconcileRemoveNodes                     = 0x0b
-	ReconcileRemoveUnmanaged                 = 0x0c
-	ReconcileAddNodes                        = 0x0d
-	ReconcileRebalance                       = 0x0e
-	ReconcileDeadMembers                     = 0x0f
-	ReconcileFinished                        = 0xff
+	ReconcileInit ReconcileState = iota
+	ReconcileUnknownMembers
+	ReconcileRebalanceCheck
+	ReconcileWarmupNodes
+	ReconcileDownNodes
+	ReconcileUnclusteredNodes
+	ReconcileFailedAddNodes
+	ReconcileAddBackNodes
+	ReconcileFailedNodes
+	ReconcileServerConfigs
+	ReconcileRemoveNodes
+	ReconcileRemoveUnmanaged
+	ReconcileAddNodes
+	ReconcileRebalance
+	ReconcileDeadMembers
+	ReconcileFinished
+)
+
+// reconcileFunc represents a function used to reconcile the cluster state,
+// it must transition the state if necessary, or return an error
+type reconcileFunc func(*ReconcileMachine, *Cluster) error
+
+// reconcileFuncMap maps from a reconciliation state to a reconcile function
+type reconcileFuncMap map[ReconcileState]reconcileFunc
+
+// lookup finds the matching reconcile function for a specific state and returns
+// a reference to it, or an error
+func (r reconcileFuncMap) lookup(state ReconcileState) (reconcileFunc, error) {
+	f, ok := r[state]
+	if !ok {
+		return nil, fmt.Errorf("Invalid reconcile state")
+	}
+	return f, nil
+}
+
+var (
+	reconcileFunctions = reconcileFuncMap{
+		ReconcileInit:             handleInit,
+		ReconcileUnknownMembers:   handleUnknownMembers,
+		ReconcileRebalanceCheck:   handleRebalanceCheck,
+		ReconcileWarmupNodes:      handleWarmupNodes,
+		ReconcileDownNodes:        handleDownNodes,
+		ReconcileUnclusteredNodes: handleUnclusteredNodes,
+		ReconcileFailedAddNodes:   handleFailedAddNodes,
+		ReconcileAddBackNodes:     handleAddBackNodes,
+		ReconcileFailedNodes:      handleFailedNodes,
+		ReconcileServerConfigs:    handleUnknownServerConfigs,
+		ReconcileRemoveNodes:      handleRemoveNode,
+		ReconcileRemoveUnmanaged:  handleUnmanagedNodes,
+		ReconcileAddNodes:         handleAddNode,
+		ReconcileRebalance:        handleRebalance,
+		ReconcileDeadMembers:      handleDeadMembers,
+	}
 )
 
 type ReconcileMachine struct {
@@ -34,10 +74,44 @@ type ReconcileMachine struct {
 	unknownNodes couchbaseutil.MemberSet
 	couchbase    *couchbaseutil.ClusterStatus
 	state        ReconcileState
-	errored      bool
 }
 
-func (r *ReconcileMachine) handleInit(c *Cluster) {
+func (r *ReconcileMachine) transitionState(to ReconcileState) {
+	r.state = to
+}
+
+// step runs a single step of the state machine
+func (r *ReconcileMachine) step(c *Cluster) error {
+	f, err := reconcileFunctions.lookup(r.state)
+	if err != nil {
+		return err
+	}
+	if err := f(r, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+// done reports whether the reconciliation has completed
+func (r *ReconcileMachine) done() bool {
+	return r.state == ReconcileFinished
+}
+
+// exec runs the state machine until a finished condition or error
+// is encountered
+func (r *ReconcileMachine) exec(c *Cluster) error {
+	for !r.done() {
+		if err := r.step(c); err != nil {
+			return err
+		}
+		if err := c.updateCRStatus(); err != nil {
+			c.logger.Warnf("update CR status failed: %v", err)
+		}
+	}
+	return nil
+}
+
+func handleInit(r *ReconcileMachine, c *Cluster) error {
 	needsReconcile := false
 
 	// If we have any cluster related issues like failed nodes or if the cluster
@@ -78,7 +152,7 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 	if !needsReconcile {
 		c.status.SetBalancedCondition()
 		r.transitionState(ReconcileFinished)
-		return
+		return nil
 	}
 
 	// Catch all "needs rebalance" check handles things like auto-failover
@@ -89,7 +163,7 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 		if err := c.updateCRStatus(); err != nil {
 			// TODO: we should handle errors properly
 			r.transitionState(ReconcileFinished)
-			return
+			return nil
 		}
 	}
 
@@ -101,40 +175,39 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 	r.knownNodes.Append(r.couchbase.ActiveNodes)
 	r.knownNodes.Append(r.couchbase.PendingAddNodes)
 	r.transitionState(ReconcileUnknownMembers)
+
+	return nil
 }
 
 // Unknown members are members who are currently running, but not part
 // of the set of nodes the operator is tracking.
-func (r *ReconcileMachine) handleUnknownMembers(c *Cluster) {
+func handleUnknownMembers(r *ReconcileMachine, c *Cluster) error {
 	// Safely balance out these illegal members
 	r.unknownNodes = r.runningPods.Diff(c.members)
 	r.runningPods = r.runningPods.Diff(r.unknownNodes)
 	r.transitionState(ReconcileWarmupNodes)
+	return nil
 }
 
 // If we have nodes that are warming up then we need to wait for them to finish
 // before doing any cluster operations.
-func (r *ReconcileMachine) handleWarmupNodes(c *Cluster) {
+func handleWarmupNodes(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.WarmupNodes.Size() > 0 && r.couchbase.DownNodes.Empty() {
-		c.logger.Infoln("Skipping reconcile loop while some nodes are warming up")
-		r.errored = true
-		r.transitionState(ReconcileFinished)
-		return
+		return fmt.Errorf("Skipping reconcile loop while some nodes are warming up")
 	}
 	r.transitionState(ReconcileRebalanceCheck)
+	return nil
 }
 
-func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) {
+func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.IsRebalancing {
-		c.logger.Infoln("Skipping reconcile loop because the cluster is currently rebalancing")
-		r.errored = true
-		r.transitionState(ReconcileFinished)
-	} else {
-		r.transitionState(ReconcileDownNodes)
+		return fmt.Errorf("Skipping reconcile loop because the cluster is currently rebalancing")
 	}
+	r.transitionState(ReconcileDownNodes)
+	return nil
 }
 
-func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
+func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 
 	if r.couchbase.DownNodes.Size() > 0 {
 		// Ensure the cluster is visibly unhealthy before triggering any events
@@ -158,58 +231,52 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) {
 						if err := c.recreatePod(m); err != nil {
 							c.logger.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
 						} else {
-							c.logger.Infof("recovering node %s", m.ClientURL())
-							r.errored = true
-							r.transitionState(ReconcileFinished)
 							c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-							return
+							return fmt.Errorf("recovering node %s", m.ClientURL())
 						}
 					}
 				}
 			}
 		}
 
-		c.logger.Warnln("Unable to reconcile nodes, waiting for auto-failover to take place")
-		r.errored = true
-		r.transitionState(ReconcileFinished)
-	} else {
-		c.status.SetReadyCondition()
-		r.transitionState(ReconcileUnclusteredNodes)
+		return fmt.Errorf("Unable to reconcile nodes, waiting for auto-failover to take place")
 	}
+
+	c.status.SetReadyCondition()
+	r.transitionState(ReconcileUnclusteredNodes)
+	return nil
 }
 
-func (r *ReconcileMachine) handleUnclusteredNodes(c *Cluster) {
+func handleUnclusteredNodes(r *ReconcileMachine, c *Cluster) error {
 	for name, _ := range r.couchbase.UnclusteredNodes {
 		if err := c.destroyMember(name); err != nil {
-			c.logger.Errorf("Unable to remove unclustered node: %s", err.Error())
-		} else {
-			c.logger.Infof("Removed unclustered node: %s", name)
-			r.runningPods.Remove(name)
-
-			// Nodes may be rebalanced out in a previous iteration (caused by
-			// node failover) and thus miss out the ejection events from rebalance().
-			//
-			// TODO: it makes sense to unify handling all unclustered nodes *after*
-			// reblancing has occurred, however tests will probably fail left right
-			// and center due to the events occurring after the cluster is in a healthy
-			// state.
-			c.raiseEvent(k8sutil.MemberRemoveEvent(name, c.cluster))
+			return fmt.Errorf("Unable to remove unclustered node: %s", err.Error())
 		}
+
+		c.logger.Infof("Removed unclustered node: %s", name)
+		r.runningPods.Remove(name)
+
+		// Nodes may be rebalanced out in a previous iteration (caused by
+		// node failover) and thus miss out the ejection events from rebalance().
+		//
+		// TODO: it makes sense to unify handling all unclustered nodes *after*
+		// reblancing has occurred, however tests will probably fail left right
+		// and center due to the events occurring after the cluster is in a healthy
+		// state.
+		c.raiseEvent(k8sutil.MemberRemoveEvent(name, c.cluster))
 	}
 
 	r.transitionState(ReconcileFailedAddNodes)
+	return nil
 }
 
-func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
+func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 	// These nodes have been added, but the node failed before a rebalance could
 	// start. We will remove these nodes and re-add them in other pods later.
 	for _, m := range r.couchbase.FailedAddNodes {
 		err := c.cancelAddMember(r.knownNodes, m)
 		if err != nil {
-			c.logger.Errorf("Unable to removed a failed pending add node: %s", err.Error())
-			r.errored = true
-			r.transitionState(ReconcileFinished)
-			return
+			return fmt.Errorf("Unable to removed a failed pending add node: %s", err.Error())
 		}
 
 		c.clusterRemoveMember(m.Name)
@@ -217,9 +284,10 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) {
 	}
 
 	r.transitionState(ReconcileAddBackNodes)
+	return nil
 }
 
-func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) {
+func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 	// These nodes are failed over, but are responding and can be added back into the cluster
 	for _, m := range r.couchbase.AddBackNodes {
 		// Add back node
@@ -234,26 +302,24 @@ func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) {
 	}
 
 	r.transitionState(ReconcileFailedNodes)
+	return nil
 }
 
-func (r *ReconcileMachine) handleAddBackFailedNodes(c *Cluster) {
-
+func handleAddBackFailedNodes(r *ReconcileMachine, c *Cluster) error {
+	return nil
 }
 
 // Failed nodes can be recovered if the pod's volumes are healthy,
 // otherwise the node is ejected from the cluster and it's node deleted.
-func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
+func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 	for _, m := range r.couchbase.FailedNodes {
 		c.logger.Infof("An auto-failover has taken place")
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				c.logger.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
 			} else {
-				c.logger.Infof("recovering node %s", m.ClientURL())
-				r.errored = true
-				r.transitionState(ReconcileFinished)
 				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-				return
+				return fmt.Errorf("recovering node %s", m.ClientURL())
 			}
 		}
 
@@ -267,8 +333,10 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) {
 	}
 
 	r.transitionState(ReconcileServerConfigs)
+	return nil
 }
-func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) {
+
+func handleUnknownServerConfigs(r *ReconcileMachine, c *Cluster) error {
 	// If a server configuration was deleted in a spec update then we will clean
 	// up all of the nodes from that server config here.
 	for _, m := range r.runningPods {
@@ -289,9 +357,10 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) {
 	}
 
 	r.transitionState(ReconcileRemoveNodes)
+	return nil
 }
 
-func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
+func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 	// Bookkeep the scaling information for only the affected server classes
 	currentSize := 0
 	desiredSize := 0
@@ -313,9 +382,7 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
 		for i := 0; i < nodesToRemove; i++ {
 			server, err := c.scheduler.Delete(serverSpec.Name)
 			if err != nil {
-				c.logger.Infof("Failed to schedule removal of member '%s': %v", serverSpec.Name, err)
-				r.transitionState(ReconcileFinished)
-				return
+				return fmt.Errorf("Failed to schedule removal of member '%s': %v", serverSpec.Name, err)
 			}
 			r.knownNodes.Remove(server)
 			r.ejectNodes.Add(c.members[server])
@@ -331,32 +398,35 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) {
 	}
 
 	r.transitionState(ReconcileRemoveUnmanaged)
+	return nil
 }
 
-func (r *ReconcileMachine) handleUnmanagedNodes(c *Cluster) {
+func handleUnmanagedNodes(r *ReconcileMachine, c *Cluster) error {
 	if len(r.couchbase.UnmanagedNodes) > 0 {
 		r.couchbase.NeedsRebalance = true
 	}
 
 	r.transitionState(ReconcileAddNodes)
+	return nil
 }
 
-func (r *ReconcileMachine) handleAddNode(c *Cluster) {
+func handleAddNode(r *ReconcileMachine, c *Cluster) error {
 	serverSpecs := c.cluster.Spec.ServerSettings
 	for _, serverSpec := range serverSpecs {
 		addCount := 0
 		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
 		for nodes.Size()+addCount < serverSpec.Size {
 			originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
+
 			c.status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
+			if err := c.updateCRStatus(); err != nil {
+				c.logger.Warnf("Failed to update scale up condition")
+			}
 
 			r.couchbase.NeedsRebalance = true
 			m, err := c.addMember(serverSpec)
 			if err != nil {
-				c.logger.Warnf("Failed to add new node to cluster: %v", err)
-				r.errored = true
-				r.transitionState(ReconcileFinished)
-				return
+				return fmt.Errorf("Failed to add new node to cluster: %v", err)
 			}
 			r.knownNodes.Add(m)
 			r.runningPods.Add(m)
@@ -365,15 +435,13 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) {
 	}
 
 	r.transitionState(ReconcileRebalance)
+	return nil
 }
 
-func (r *ReconcileMachine) handleRebalance(c *Cluster) {
+func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.NeedsRebalance {
 		if err := c.rebalance(r.ejectNodes, r.couchbase.UnmanagedNodes); err != nil {
-			c.logger.Warnf("Failed to rebalance: %s", err.Error())
-			r.errored = true
-			r.transitionState(ReconcileFinished)
-			return
+			return fmt.Errorf("Failed to rebalance: %s", err.Error())
 		}
 
 		for _, toRemove := range r.ejectNodes {
@@ -382,36 +450,26 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) {
 		}
 	}
 
-	c.status.SetReadyCondition()
-	c.status.ClearCondition(api.ClusterConditionScaling)
-
 	r.transitionState(ReconcileDeadMembers)
+	return nil
 }
 
 // Dead members are members that the operator is tracking, but do not have a
 // corresponding running pod.
-func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
+func handleDeadMembers(r *ReconcileMachine, c *Cluster) error {
 	dead := c.members.Diff(r.runningPods)
 	for name, _ := range dead {
 		if err := c.destroyMember(name); err != nil {
-			c.logger.Errorf("Failed to remove dead members: %s", err.Error())
-			r.errored = true
+			return fmt.Errorf("Failed to remove dead members: %s", err.Error())
 		}
 	}
 
 	for name, _ := range r.unknownNodes {
 		if err := c.removePod(name); err != nil {
-			c.logger.Errorf("Failed to remove unknown member: %s", err.Error())
-			r.errored = true
+			return fmt.Errorf("Failed to remove unknown member: %s", err.Error())
 		}
 	}
 
 	r.transitionState(ReconcileFinished)
-}
-
-func (r *ReconcileMachine) handleFinished(c *Cluster) {
-}
-
-func (r *ReconcileMachine) transitionState(to ReconcileState) {
-	r.state = to
+	return nil
 }
