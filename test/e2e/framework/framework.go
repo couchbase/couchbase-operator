@@ -1,7 +1,6 @@
 package framework
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -235,7 +234,7 @@ func (f *Framework) DeleteCouchbaseOperatorCompletely(deploymentName string) err
 	}
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
-	err = retryutil.Retry(context.Background(), 5*time.Second, 24, func() (bool, error) {
+	err = retryutil.Retry(e2eutil.Context, 5*time.Second, 24, func() (bool, error) {
 		_, err := f.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Get("couchbase-operator", metav1.GetOptions{})
 		if err == nil {
 			return false, nil

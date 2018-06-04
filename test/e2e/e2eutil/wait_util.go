@@ -2,7 +2,6 @@ package e2eutil
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -28,7 +27,7 @@ type filterFunc func(*v1.Pod) bool
 
 func WaitUntilPodSizeReached(t *testing.T, kubeClient kubernetes.Interface, size, retries int, cl *api.CouchbaseCluster) ([]string, error) {
 	var names []string
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
 		podList, err := kubeClient.Core().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 		if err != nil {
 			return false, err
@@ -61,7 +60,7 @@ func WaitUntilSizeReached(t *testing.T, crClient versioned.Interface, size, retr
 
 func waitSizeReachedWithAccept(t *testing.T, crClient versioned.Interface, size, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) ([]string, error) {
 	var names []string
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
 		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -87,7 +86,7 @@ func waitSizeReachedWithAccept(t *testing.T, crClient versioned.Interface, size,
 }
 
 func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
 		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -117,7 +116,7 @@ func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets 
 }
 
 func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
 		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -147,7 +146,7 @@ func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, bucke
 // WaitClusterPhaseFailed expects the cluster to enter a failed state, useful for passing
 // quickly rather than wating for a cluster to not become healthy
 func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, name, namespace string, retries int) error {
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (bool, error) {
+	err := retryutil.Retry(Context, retryInterval, retries, func() (bool, error) {
 		cluster, err := GetCouchbaseCluster(crClient, name, namespace)
 		if err != nil {
 			return false, err
@@ -158,7 +157,7 @@ func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, name, na
 }
 
 func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, namespace string, expectedNodes, retries int) error {
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
 		cl, err := GetCouchbaseCluster(crClient, name, namespace)
 		if err != nil {
 			LogfWithTimestamp(t, "could not get cluster: (%v)", err)
@@ -230,7 +229,7 @@ func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
 
-	err = retryutil.Retry(context.Background(), retryInterval, 3, func() (done bool, err error) {
+	err = retryutil.Retry(Context, retryInterval, 3, func() (done bool, err error) {
 		list, err := kubeClient.CoreV1().Services(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 		if err != nil {
 			return false, err
@@ -296,7 +295,7 @@ func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int
 
 func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions, filters ...filterFunc) ([]*v1.Pod, error) {
 	var pods []*v1.Pod
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (bool, error) {
+	err := retryutil.Retry(Context, retryInterval, retries, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
@@ -325,7 +324,7 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string
 	lo := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(NameLabelSelector(name)).String(),
 	}
-	err := retryutil.Retry(context.Background(), time.Second, 180, func() (bool, error) {
+	err := retryutil.Retry(Context, time.Second, 180, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
@@ -348,7 +347,7 @@ func WaitUntilOperatorDeleted(kubecli kubernetes.Interface, namespace, name stri
 	lo := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(NameLabelSelector(name)).String(),
 	}
-	err := retryutil.Retry(context.Background(), 10*time.Second, 6, func() (bool, error) {
+	err := retryutil.Retry(Context, 10*time.Second, 6, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
@@ -372,7 +371,7 @@ func CreateAndWaitPod(kubecli kubernetes.Interface, ns string, pod *v1.Pod, time
 
 	interval := 5 * time.Second
 	var retPod *v1.Pod
-	err = retryutil.Retry(context.Background(), interval, int(timeout/(interval)), func() (bool, error) {
+	err = retryutil.Retry(Context, interval, int(timeout/(interval)), func() (bool, error) {
 		retPod, err = kubecli.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -521,7 +520,7 @@ func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType
 
 func WaitUntilAccepts(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
 	interval := 5 * time.Second
-	err := retryutil.Retry(context.Background(), interval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {
 		currCluster, err := crClient.CouchbaseV1beta1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -542,7 +541,7 @@ func WaitUntilAccepts(t *testing.T, crClient versioned.Interface, retries int, c
 
 func WaitUntilEventsCompare(t *testing.T, kubecli kubernetes.Interface, retries int, cl *api.CouchbaseCluster, compareEvents EventList, namespace string) error {
 	interval := 5 * time.Second
-	err := retryutil.Retry(context.Background(), interval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {
 		events, err := GetCouchbaseEvents(kubecli, cl.Name, namespace)
 		if err != nil {
 			return false, fmt.Errorf("failed to get coucbase cluster events: %v", err)
@@ -560,7 +559,7 @@ func WaitUntilEventsCompare(t *testing.T, kubecli kubernetes.Interface, retries 
 
 func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, conditionType api.ClusterConditionType, message string) error {
 	interval := 5 * time.Second
-	err := retryutil.Retry(context.Background(), interval, retries, func() (done bool, err error) {
+	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {
 		cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
 		if err != nil {
 			return false, err

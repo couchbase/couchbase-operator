@@ -21,6 +21,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,7 +135,14 @@ var (
 		"conflictResolution": "seqno",
 		"enableFlush":        "true",
 		"enableIndexReplica": "false"}
+
+	// Global dummy context used buy blocking calls
+	Context context.Context
 )
+
+func init() {
+	Context = context.WithValue(context.Background(), "logger", logrus.WithField("module", "e2eutil"))
+}
 
 // ClusterReadyRetries specifies how many times to retry various ready checks
 type ClusterReadyRetries struct {
@@ -608,7 +616,7 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 				return nil, err
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, cancel := context.WithTimeout(Context, 60*time.Second)
 			defer cancel()
 			err = k8sutil.WaitForPod(ctx, kubeCli, namespace, pod.Name, "")
 			if err != nil {

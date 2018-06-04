@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"os"
 	"strconv"
 	"strings"
@@ -655,7 +654,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	// Balanced cluster with foreign node
-	ctx := context.Background()
+	ctx := e2eutil.Context
 	err = retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.Retries30, "rebalance", testCouchbase.GetName(),
 		func() error {
 			status, err := client.Rebalance([]string{""})
