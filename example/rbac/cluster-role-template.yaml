@@ -28,6 +28,7 @@ rules:
   - services
   - endpoints
   - persistentvolumeclaims
+  - persistentvolumes
   - events
   - secrets
   verbs:
