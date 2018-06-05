@@ -175,7 +175,7 @@ func (f *Framework) setup() error {
 
 	clusters, err := f.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("Unable to get clusters: %v", err)
+		fmt.Printf("Unable to get clusters: %v /n", err)
 	}
 	for _, cluster := range clusters.Items {
 		f.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))

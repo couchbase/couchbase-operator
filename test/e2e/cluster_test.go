@@ -499,7 +499,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	}
 	f := framework.Global
 	couchbaseBaseImage := "basecouch/123"
-	couchbaseVerString := "enterprise-5.0.1"
+	couchbaseVerString := "enterprise-5.5.0"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
 	otherConfig1 := map[string]string{
@@ -572,7 +572,7 @@ func TestInvalidVersion(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	couchbaseVerString := "enterprise-1.9.1"
+	couchbaseVerString := "enterprise-9.9.9"
 	couchbaseBaseImage := "couchbase/server"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
