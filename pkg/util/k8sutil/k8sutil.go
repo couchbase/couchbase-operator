@@ -916,6 +916,113 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 	return fmt.Errorf("failed to wait for pod to delete: %s", podName)
 }
 
+// Waits for a persistent volume claim belonging to be created with bounded volumes
+func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interface, namespace, claimName string) error {
+
+	opts := metav1.ListOptions{
+		FieldSelector: "metadata.name=" + claimName,
+	}
+
+	watcher, err := kubeCli.CoreV1().PersistentVolumeClaims(namespace).Watch(opts)
+	if err != nil {
+		return err
+	}
+	events := watcher.ResultChan()
+
+	// Loop until success
+	done := false
+	for !done {
+		select {
+		// Handle timeout and cancellation events
+		case <-ctx.Done():
+			return cberrors.ErrCreatingPersistentVolumeClaim{Reason: ctx.Err().Error()}
+
+		// Process K8S events of creation cycle
+		case ev := <-events:
+			obj := ev.Object.(*v1.PersistentVolumeClaim)
+			status := obj.Status
+
+			conditions := []string{}
+			for _, c := range status.Conditions {
+				msg := fmt.Sprintf("%s: %s", c.Reason, c.Message)
+				conditions = append(conditions, msg)
+			}
+			reason := strings.Join(conditions, ",")
+
+			switch ev.Type {
+			// check if any error occurred while creating
+			case watch.Error:
+				return cberrors.ErrCreatingPersistentVolumeClaim{Reason: reason}
+			case watch.Deleted:
+				return cberrors.ErrCreatingPersistentVolumeClaim{Reason: reason}
+			case watch.Added, watch.Modified:
+				// make sure claim is bound to a volume
+				switch status.Phase {
+				case v1.ClaimPending:
+					continue
+				case v1.ClaimBound:
+					// Claim object is ready, ensure volume created
+					return WaitForPersistentVolume(ctx, kubeCli, obj.Spec.VolumeName)
+				case v1.ClaimLost:
+					return cberrors.ErrCreatingPersistentVolumeClaim{Reason: reason}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// Wait for volume which is bound by claim.  In general when the claim status is 'ClaimBound' then it may
+// be assumed that it's volume is ready, but we should check actual volume for the sake of complemetness.
+func WaitForPersistentVolume(ctx context.Context, kubeCli kubernetes.Interface, volumeName string) error {
+
+	opts := metav1.ListOptions{
+		FieldSelector: "metadata.name=" + volumeName,
+	}
+
+	watcher, err := kubeCli.CoreV1().PersistentVolumes().Watch(opts)
+	if err != nil {
+		return err
+	}
+	events := watcher.ResultChan()
+
+	// Loop until success
+	done := false
+	for !done {
+		select {
+		// Handle timeout and cancellation events
+		case <-ctx.Done():
+			return cberrors.ErrCreatingPersistentVolume{Reason: ctx.Err().Error()}
+
+		// Process K8S events of creation cycle
+		case ev := <-events:
+			obj := ev.Object.(*v1.PersistentVolume)
+			status := obj.Status
+
+			switch ev.Type {
+			// check if any error occurred while creating
+			case watch.Error:
+				return cberrors.ErrCreatingPersistentVolume{Reason: status.Reason}
+			case watch.Deleted:
+				return cberrors.ErrCreatingPersistentVolume{Reason: status.Reason}
+			case watch.Added, watch.Modified:
+				// make sure volume status is bound
+				switch status.Phase {
+				case v1.VolumePending, v1.VolumeAvailable:
+					continue
+				case v1.VolumeBound:
+					done = true
+				default:
+					return cberrors.ErrCreatingPersistentVolume{Reason: status.Reason}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
 	version, err := kubeCli.Discovery().ServerVersion()
 	if err != nil {

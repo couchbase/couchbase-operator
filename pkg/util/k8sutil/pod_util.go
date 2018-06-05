@@ -1,8 +1,10 @@
 package k8sutil
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -28,11 +30,12 @@ const (
 var (
 	defaultSecurityContextUid          int64 = 1000
 	defaultSecurityContextRunAsNonRoot bool  = true
+	defaultVolumeCreateTimeout         int64 = 120
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig) (*v1.Pod, error) {
+func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig, ctx context.Context) (*v1.Pod, error) {
 
 	pod, err := createCouchbasePodSpec(m, cluster.Name, cluster.Spec, version, config, cluster.AsOwner())
 	if err != nil {
@@ -40,7 +43,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 	}
 
 	if config.GetDefaultVolumeClaim() != nil {
-		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, cluster.AsOwner())
+		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, cluster.AsOwner(), ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +59,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused
-func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
+func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
 
 	var err error
 	volumes := []v1.Volume{}
@@ -97,7 +100,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					"serverConfig": config.Name,
 				})
 				claim.Name = NameForPersistentVolumeClaim(claimName, pod.Name, claimUsageCnt[claimName], mountName)
-				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner)
+				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner, ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -156,7 +159,7 @@ func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 }
 
 // Creates custom PVC from the generic spec
-func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
+func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference, ctx context.Context) (*v1.PersistentVolumeClaim, error) {
 
 	// storage class must exist
 	if err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName); err != nil {
@@ -166,7 +169,19 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim.GetObjectMeta(), owner)
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
+	pvc, err := kubeCli.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
+	if err != nil {
+		return nil, err
+	}
+
+	// wait for claim to be created before allowing it to be mounted by pod
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(defaultVolumeCreateTimeout)*time.Second)
+	defer cancel()
+	err = WaitForPersistentVolumeClaim(ctx, kubeCli, namespace, pvc.Name)
+	if err != nil {
+		return nil, err
+	}
+	return pvc, nil
 }
 
 func verifyStorageClass(kubeCli kubernetes.Interface, storageClassName *string) error {

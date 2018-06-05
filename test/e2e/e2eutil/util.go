@@ -614,12 +614,14 @@ func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *
 
 	for _, config := range cl.Spec.ServerSettings {
 		if config.Name == m.ServerConfig {
-			pod, err := k8sutil.CreateCouchbasePod(kubeCli, scheduler, cl, m, cl.Status.CurrentVersion, config)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(60)*time.Second)
+			defer cancel()
+			pod, err := k8sutil.CreateCouchbasePod(kubeCli, scheduler, cl, m, cl.Status.CurrentVersion, config, ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			ctx, cancel := context.WithTimeout(Context, 60*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), time.Duration(60)*time.Second)
 			defer cancel()
 			err = k8sutil.WaitForPod(ctx, kubeCli, namespace, pod.Name, "")
 			if err != nil {

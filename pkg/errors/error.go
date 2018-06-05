@@ -48,6 +48,14 @@ type ErrUnsupportedVersion struct {
 	Version string
 }
 
+type ErrCreatingPersistentVolumeClaim struct {
+	Reason string
+}
+
+type ErrCreatingPersistentVolume struct {
+	Reason string
+}
+
 func (e ErrSecretMissingUsername) Error() string {
 	return fmt.Sprintf("secret is missing username key: %s", e.Reason)
 }
@@ -88,6 +96,14 @@ func (e ErrPodUnschedulable) Error() string {
 
 func (e ErrUnsupportedVersion) Error() string {
 	return fmt.Sprintf("version not supported: %s, min version: %s", e.Version, constants.CouchbaseVersionMin)
+}
+
+func (e ErrCreatingPersistentVolumeClaim) Error() string {
+	return fmt.Sprintf("failed to create persistent volume claim: %s", e.Reason)
+}
+
+func (e ErrCreatingPersistentVolume) Error() string {
+	return fmt.Sprintf("failed to create persistent volume: %s", e.Reason)
 }
 
 func hasValue(v interface{}) bool {
