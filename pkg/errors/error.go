@@ -83,7 +83,7 @@ func (e ErrInvalidBucketParamChange) Error() string {
 }
 
 func (e ErrPodUnschedulable) Error() string {
-	return fmt.Sprintf("unable to schedule pod pod: %s", e.Reason)
+	return fmt.Sprintf("unable to schedule pod: %s", e.Reason)
 }
 
 func (e ErrUnsupportedVersion) Error() string {
