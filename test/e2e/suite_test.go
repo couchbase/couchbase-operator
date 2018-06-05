@@ -309,11 +309,14 @@ func TestSanity(t *testing.T) {
 
 func TestP0(t *testing.T) {
 	runSuite(t, testSuiteP0)
+	runSuite(t, testSuiteTLSP0, rsaDecorator)
 	analyzeResults(t)
 }
 
 func TestP1(t *testing.T) {
 	runSuite(t, testSuiteP1)
+	runSuite(t, testSuiteTLSP1, rsaDecorator)
+	runSuite(t, testSuiteTLSCustCert)
 	analyzeResults(t)
 }
 
