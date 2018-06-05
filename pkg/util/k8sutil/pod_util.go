@@ -328,8 +328,8 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 
 func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
 	labels := map[string]string{
-		labelApp:                "couchbase",
-		labelNode:               memberName,
+		constants.LabelApp:      constants.App,
+		constants.LabelNode:     memberName,
 		constants.LabelNodeConf: ns.Name,
 		constants.LabelCluster:  clusterName,
 	}

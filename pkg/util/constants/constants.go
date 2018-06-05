@@ -56,7 +56,11 @@ var (
 
 // Label types added to pods
 const (
+	App = "couchbase"
+
+	LabelApp      = "app"
 	LabelCluster  = "couchbase_cluster"
+	LabelNode     = "couchbase_node"
 	LabelNodeConf = "couchbase_node_conf"
 
 	ServerGroupLabel = "server-group.couchbase.com/zone"

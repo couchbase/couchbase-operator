@@ -126,10 +126,6 @@ const (
 	dataServicePortNameTLS = "data-tls"
 	dataServicePort        = 11210
 	dataServicePortTLS     = 11207
-
-	// Labels
-	labelApp  = "app"
-	labelNode = "couchbase_node"
 )
 
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
@@ -466,7 +462,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, cluster *cbapi.Couchbas
 	if err != nil {
 		return nil, err
 	}
-	nodeRequirement, err := labels.NewRequirement(labelNode, selection.Exists, []string{})
+	nodeRequirement, err := labels.NewRequirement(constants.LabelNode, selection.Exists, []string{})
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +479,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, cluster *cbapi.Couchbas
 	// Remove any node services that shouldn't be defined or perform any updates
 	for _, service := range services.Items {
 		// Extract metadata from the service
-		nodeName := service.Labels[labelNode]
+		nodeName := service.Labels[constants.LabelNode]
 
 		// Node no longer exists or no ports are defined so delete the service
 		if !servicesDefined || !status.Members.Ready.Contains(nodeName) {
@@ -612,7 +608,7 @@ func ClusterListOpt(clusterName string) metav1.ListOptions {
 func getNodeServiceSelectors(cluster *cbapi.CouchbaseCluster, nodeName string) map[string]string {
 	// Apply to a specific couchbase pod within the named cluster
 	selectors := LabelsForCluster(cluster.Name)
-	selectors[labelNode] = nodeName
+	selectors[constants.LabelNode] = nodeName
 	return selectors
 }
 
@@ -630,7 +626,7 @@ func LabelsForAdminConsole(clusterName string, services []string) map[string]str
 func LabelsForCluster(clusterName string) map[string]string {
 	return map[string]string{
 		constants.LabelCluster: clusterName,
-		labelApp:               "couchbase",
+		constants.LabelApp:     constants.App,
 	}
 }
 
@@ -642,7 +638,7 @@ func AdminServiceName(clusterName string) string {
 // for a specific node.
 func labelsForNodeService(clusterName, nodeName string) map[string]string {
 	labels := LabelsForCluster(clusterName)
-	labels[labelNode] = nodeName
+	labels[constants.LabelNode] = nodeName
 	return labels
 }
 
@@ -754,7 +750,7 @@ var servicePorts = map[string][]v1.ServicePort{
 
 func NodeListOpt(clusterName, memberName string) metav1.ListOptions {
 	l := LabelsForCluster(clusterName)
-	l[labelNode] = memberName
+	l[constants.LabelNode] = memberName
 	return metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(l).String(),
 	}

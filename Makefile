@@ -27,6 +27,7 @@ $(BINARY): $(SOURCE)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopctl ./cmd/cbopctl/
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/crdgen ./cmd/crdgen/
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopinfo ./cmd/cbopinfo
 	build/bin/crdgen -outfile example/crd.yaml
 
 container: build

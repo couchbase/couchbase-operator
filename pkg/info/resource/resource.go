@@ -1,0 +1,70 @@
+package resource
+
+import (
+	"github.com/couchbase/couchbase-operator/pkg/info/backend"
+	"github.com/couchbase/couchbase-operator/pkg/info/config"
+	"github.com/couchbase/couchbase-operator/pkg/info/context"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+)
+
+// ResourceReference contains data so other modules can extract data associated
+// with discovered associated with resource instances
+type ResourceReference interface {
+	// Kind is the Kubernetes kind of a resource
+	Kind() string
+	// Name is the name of the resource
+	Name() string
+}
+
+// Resource abstracts away the details of handling different Kubernetes
+// resource types.  It should be used to collect a class of resources
+// from a global or namespaced scope.  The scope may be further limited
+// by context specific parameters.
+type Resource interface {
+	// Kind returns the Kubernetes kind of the resource
+	Kind() string
+	// Fetch requests a list of the required resource type from Kubernetes
+	Fetch() error
+	// Write writes the resources to the requested backend
+	Write(backend.Backend) error
+	// References returns a list of resources that were discovered by a Fetch
+	References() []ResourceReference
+}
+
+// ResourceInitializer is a function signature used to get resource handlers
+type ResourceInitializer func(*context.Context) Resource
+
+// GetResourceSelector returns a label selector which will scope the resources we
+// can collect in the requested namespace based on configuration directives
+func GetResourceSelector(c *config.Configuration) (labels.Selector, error) {
+	// Collect everything we can
+	if c.All {
+		return labels.Everything(), nil
+	}
+
+	// Collect requirements for the label selector
+	requirements := []labels.Requirement{}
+
+	// By default we only collect items labeled as couchbase
+	if req, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App}); err != nil {
+		return nil, err
+	} else {
+		requirements = append(requirements, *req)
+	}
+
+	// If we specify specific clusters add this requirement
+	if len(c.Clusters) != 0 {
+		if req, err := labels.NewRequirement(constants.LabelCluster, selection.In, c.Clusters); err != nil {
+			return nil, err
+		} else {
+			requirements = append(requirements, *req)
+		}
+	}
+
+	// Create and return the selector
+	selector := labels.NewSelector()
+	return selector.Add(requirements...), nil
+}
