@@ -1,6 +1,6 @@
 # Ensuring Valid CouchbaseCluster Configurations with cbopctl
 
-`cbopctl` is a command line tool that comes with the Couchbase Operator installation and implements a custom subset of the `kubectl` and `oc` commands to ensure that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes. It is important to check that a configuration is valid before uploading it, because once a configuration is uploaded to Kubernetes, the Couchbase Operator is unable to handle configuration errors.
+`cbopctl` is a command line tool that is provided with the Couchbase Operator that implements a custom subset of the `kubectl` and `oc` commands to ensure that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes. It is important to check that a configuration is valid before uploading it, because once a configuration is uploaded to Kubernetes, the Couchbase Operator is unable to handle configuration errors.
 
 The following diagram shows the process of uploading a CouchbaseCluster configuration to Kubernetes using just `kubectl`:
 
@@ -20,6 +20,29 @@ Since Kubernetes can only do a partial validation, the only place to do full val
 Kubernetes is a constantly evolving project and the ability to validate Custom Resource Definitions is still being improved. In Kubernetes 1.8, for example, there is no ability to do validation. In Kubernetes 1.9, there is some CRD validation, but it is incomplete and doesn't allow for the defaulting of configuration parameters. In Kubernetes 1.11, defaulting will be added, but there still won't be support for more complex types of validation.
 
 Until Kubernetes provides full native validation, the Couchbase Operator needs to provide a way to validate that configurations are correct before submitting them to Kubernetes. The `cbopctl` command contains all of Couchbase's validation code in one command line tool to ensure that invalid configurations can't make it into Kubernetes.
+
+### Downloading
+
+OS X:
+
+```bash
+$ curl -O https://packages.couchbase.com/kubernetes/0.8.1-beta2/darwin/cbopctl
+$ chmod +x cbopctl
+```
+
+Linux:
+
+```bash
+$ curl -O https://packages.couchbase.com/kubernetes/0.8.1-beta2/linux/cbopctl
+$ chmod +x cbopctl
+```
+
+Windows:
+
+```bash
+$ curl -O https://packages.couchbase.com/kubernetes/0.8.1-beta2/windows/cbopctl
+$ chmod +x cbopctl
+```
 
 ### cbopctl commands
 

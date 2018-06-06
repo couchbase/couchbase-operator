@@ -1,13 +1,15 @@
 ## Installing on Kubernetes Without RBAC
 
-In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in a Kubernetes cluster that does not have RBAC enabled. This guide is recommended mainly for development clusters or MiniKube. Running a Kubernetes cluster without RBAC is not recommended in production.
+In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in a Kubernetes cluster that does not have RBAC enabled. This guide is recommended mainly for development clusters or minikube. Running a Kubernetes cluster without RBAC is not recommended in production.
+
+*Note:* If you are using a minikube cluster with Kubernetes 1.10 or later, RBAC is enabled by default. You can either disable RBAC, or follow the instructions to [install the operator on Kubernetes with RBAC enabled](installKubernetes.md).
 
 ### Starting the Operator
 
 Run the following command to install the Couchbase Operator:
 
 ```bash
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/k8s/operator.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/k8s/operator.yaml
 ```
 
 Running this command downloads the Couchbase Operator Docker image that is specified in the ```operator.yaml``` file and creates a *deployment* which manages a single instance of the Couchbase Operator. The Couchbase Operator uses a deployment so that it can restart if the pod it's running in dies.
@@ -25,7 +27,7 @@ NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator   1         1         1            0           10s
 ```
 
-In this case, the deployment is called "couchbase-operator". The DESIRED field in the output shows that this deployment will create 1 pod running the Couchbase Operator. The CURRENT field shows that 1 Couchbase Operator pod has been created. However, the AVAILABLE field indicates that that pod is not ready yet since its value is 0 and not 1. This means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task it will be able to start managing Couchbase clusters and the status will be shown as AVAILABLE.
+In this case, the deployment is called ```couchbase-operator```. The DESIRED field in the output shows that this deployment will create 1 pod running the Couchbase Operator. The CURRENT field shows that 1 Couchbase Operator pod has been created. However, the AVAILABLE field indicates that that pod is not ready yet since its value is 0 and not 1. This means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task it will be able to start managing Couchbase clusters and the status will be shown as AVAILABLE.
 
 You should continue to poll the status of the Operator until your output looks similar to the following output:
 
@@ -46,7 +48,7 @@ NAME                                  READY   STATUS   RESTARTS   AGE
 couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
 ```
 
-You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: "CRD initialized, listening for events... module=controller.
+You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: ```CRD initialized, listening for events... module=controller```.
 
 ```bash
 $ kubectl logs couchbase-operator-1917615544-t5mhp

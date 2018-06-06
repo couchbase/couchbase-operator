@@ -1,24 +1,32 @@
 # CouchbaseCluster Status
 
-Kubernetes users often need to check the status of various objects (for example, pods, deployments, and StatefulSets) that have been deployed inside their Kubernetes clusters. Status checking is done by "describing" one of the objects in the cluster using ```kubectl describe``` command. This command outputs the configuration for the specified object, a status section, and an event section. The status section varies depending on the object type and shows various health metrics related to the object described. The events sections is printed last and shows major events that have happened during the life of the object.
+Kubernetes users often need to check the status of various objects (such as pods, deployments, and StatefulSets) that have been deployed inside their Kubernetes clusters. Status checking is done by *describing* one of the objects in the cluster using ```kubectl describe``` command.
 
-Since the Couchbase Operator registers a "CouchbaseCluster" Custom Resource Definition(CRD) with Kubernetes, it allows Kuberentes to know about Couchbase clusters natively. This means that the CouchbaseCluster becomes another object that can be described to get the configuration, status, and events specific to a particular Couchbase cluster.
+The ```kubectl describe``` command outputs the configuration for the specified object, a status section, and an event section. The status section varies depending on the object type and shows various health metrics related to the object described. The events sections is printed last and shows major events that have happened during the life of the object.
 
-To describe a Couchbase cluster named "cb-example", run the following command:
+Since the Couchbase Operator registers a CouchbaseCluster Custom Resource Definition (CRD) with Kubernetes, it allows Kubernetes to know about Couchbase clusters natively. This means that the CouchbaseCluster becomes another object that can be described to get the configuration, status, and events specific to a particular Couchbase cluster.
+
+To describe a Couchbase cluster named ```cb-example```, run the following command:
+
 On Kubernetes:
+
 ```bash
 kubectl describe couchbasecluster cb-example
 ```
 
-Note that the object name in the above command is "couchbasecluster". You can also use the shorthand name "cbc" as the object name to save some typing.
+Note that the object name in the above command is ```couchbasecluster```. You can also use the shorthand name ```cbc``` as the object name to save some typing.
+
 On Kubernetes:
+
 ```bash
 kubectl describe cbc cb-example
 ```
 On OpenShift:
+
 ```bash
 oc describe cbc cb-example
 ```
+
 Below is an example of the output of the ```kubectl describe``` command. The various parts of the output and their significance will be discussed in detail in the following sections.
 
 ```yaml
@@ -63,18 +71,17 @@ Status:
 
 ```
 
-# Status And Events
+## Status And Events
 
-Often when the status spec of the schema is updated, an associated event is generated which details the reason why the change occurred.  For instance, increasing the size of the cluster causes an add member event to appear in the Events section of the status result.  The following section explains the information provided in the status response along with any events associated with value updates.
+Often when the status spec of the schema is updated, an associated event is generated which details the reason why the change occurred.  For instance, increasing the size of the cluster causes an add member event to appear in the Events section of the status result. The following section explains the information provided in the status response, along with any events associated with value updates.
 
 ### Admin Console
 
     Admin Console Port: 30239
     Admin Console Port SSL:	31628
 
-
-The ports used for exposing the Couchbase cluster's Web Console. This section of the status is only visible when the ```exposeAdminConsole``` setting of the cluster spec is enabled.
-See [Accessing the Couchbase Web Console](adminConsoleAccess.md) for information on how to expose and access the Couchbase Web Console.
+These ports are used for exposing the Couchbase cluster's web console. This section of the status is only visible when the ```exposeAdminConsole``` setting of the cluster spec is enabled.
+See [Accessing the Couchbase Web Console](adminConsoleAccess.md) for information on how to expose and access the Couchbase Server Web Console.
 
 Enabling and disabling the ```exposeAdminConsole``` setting produces the following events, respectively:
 
@@ -97,7 +104,7 @@ A list of buckets currently active within the Couchbase cluster. The values of t
       ... BucketEdited		Bucket `default` was edited
       ... BucketDeleted		Bucket `default` was deleted
 
-The bucket section of the status only reflects valid changes that have been made to the cluster.  In the case of attempts to update bucket section with an invalid specification, the following message will be seen in the ```Conditions``` section of the Status:
+The bucket section of the status only reflects valid changes that have been made to the cluster.  In the case of attempts to update the bucket section with an invalid specification, the following message will be seen in the ```Conditions``` section of the Status:
 
     Conditions:
       ManageBuckets:
@@ -123,7 +130,7 @@ The cluster identifier as provided by the Couchbase cluster.  This value is prov
         cb-example-0002
 
 
-Members represent pods that are managed by the Couchbase Operator. All members in the Ready section represent pods that make up the Couchbase cluster.  The status of cluster members is directly affected by the value of ```Size``` in the cluster spec.  When `Size` is increased a member add event is generated, followed by rebalance:
+Members represent pods that are managed by the Couchbase Operator. All members in the Ready section represent pods that make up the Couchbase cluster.  The status of cluster members is directly affected by the value of ```Size``` in the cluster spec.  When ```Size``` is increased, a member add event is generated, followed by rebalance:
 
     Events:
       ... NewMemberAdded		New member cb-example-0003 added to cluster
@@ -135,12 +142,13 @@ Removing a member generates the expected removal event, followed by a rebalance:
       ... RebalanceStarted	A rebalance has been started to balance data across the cluster
       ... MemberRemoved		Existing member cb-example-0003 removed from the cluster
 
-Note: It is also possible for a MemberRemoved event to be generated when an auto-failover occurs and a member is replaced by a new member.
+*Note:* It is also possible for a MemberRemoved event to be generated when an auto-failover occurs and a member is replaced by a new member.
 
-The ```Conditions``` section of the status is also updated as the operator works to resolve changes to cluster spec size or failures.  Important condition to check when scaling are:
+The ```Conditions``` section of the status is also updated as the operator works to resolve changes to cluster spec size or failures. Important conditions to check when scaling are:
+
  * Balanced: Denoting whether data is equally distributed across all nodes in the cluster.
- * Available: Denoting whether all members are up and all VBuckets are available.
- * Scaling: Denoting whether cluster is currently scaling.
+ * Available: Denoting whether all members are up and all vBuckets are available.
+ * Scaling: Denoting whether the cluster is currently scaling.
 
 See [Conditions and Events](conditionsAndEvents.md) for more information about these conditions and their statuses.
 
@@ -149,11 +157,11 @@ See [Conditions and Events](conditionsAndEvents.md) for more information about t
     Phase:		Running
 
 The current phase of the cluster displayed as one of the following phases:
+
 *  Creating: When a cluster is first deployed.
 *  Running:  After the ```couchbasecluster``` resource object is available and the first orchestrator pod is running.
 *  Failed: When a failure occurs within the creation or running phase of the cluster.
 *  None: Initial state denoted by an empty string.
-
 
 ### Size
 
