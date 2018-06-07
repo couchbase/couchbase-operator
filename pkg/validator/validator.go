@@ -150,6 +150,8 @@ func uniqueString(strList []string) bool {
 func checkConstraints(customResource *api.CouchbaseCluster) error {
 	errs := []error{}
 
+	services := EnumList{"data", "index", "query", "search", "eventing", "analytics"}
+
 	if customResource.Spec.ExposedFeatures != nil {
 		if len(customResource.Spec.ExposedFeatures) > len(api.SupportedFeatures) {
 			err := errors.TooManyItems("spec.exposedFeatures", "body", int64(len(api.SupportedFeatures)))
@@ -176,8 +178,6 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	if customResource.Spec.AdminConsoleServices != nil {
-		services := EnumList{"data", "index", "query", "search", "eventing", "analytics"}
-
 		for _, svc := range customResource.Spec.AdminConsoleServices {
 			if !services.Contains(svc) {
 				err := errors.EnumFail("spec.adminConsoleServices", "body", nil,
@@ -330,6 +330,19 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	dataDiskIssuesTimePeriod := customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod
 	if err := BoundedErrorUint("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body", dataDiskIssuesTimePeriod, constants.AutoFailoverOnDataDiskIssuesTimePeriodMin, constants.AutoFailoverOnDataDiskIssuesTimePeriodMax); err != nil {
 		errs = append(errs, err)
+	}
+
+	for i, config := range customResource.Spec.ServerSettings {
+		for j, service := range config.Services {
+			if !services.Contains(service) {
+				errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].services[%d]", i, j), "body", nil,
+					services.Interfaces()))
+			}
+		}
+
+		if !uniqueString(config.Services) {
+			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
+		}
 	}
 
 	// Check to make sure:

@@ -428,7 +428,7 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"cluster failed to setup: Invalid service name: indxe"},
+			expectedMessages: []string{"spec.servers[0].services[1] in body should be one of [data index query search eventing analytics]"},
 		},
 
 		{
