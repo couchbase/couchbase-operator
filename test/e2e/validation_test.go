@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type testDef struct {
@@ -362,6 +363,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			}
 		}
 		e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+		time.Sleep(10 * time.Second) //should add a wait for number of couchbase pods to be 0
 	}
 	return failures
 }
@@ -440,7 +442,7 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"validation failure list:\nspec.adminConsoleServices in body should be one of [data index query search]"},
+			expectedMessages: []string{"validation failure list:\nspec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
 
 		{
@@ -606,7 +608,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.adminConsoleServices in body should be one of [data index query search]"},
+			expectedMessages: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
 
 		{
@@ -874,27 +876,7 @@ func TestValidationDefaultApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ClusterSettings", "AutoFailoverTimeout"},
 					fieldType:  "int",
-					fieldValue: "30",
-				},
-			},
-			shouldFail:       false,
-			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
-		},
-
-		{
-			name: "apply defaults to index path",
-			paramsIn: []parameter{
-				{
-					field:      []string{"Spec", "ServerSettings", "0", "IndexPath"},
-					fieldType:  "string",
-					fieldValue: "",
-				},
-			},
-			paramsOut: []parameter{
-				{
-					field:      []string{"Spec", "ServerSettings", "0", "IndexPath"},
-					fieldType:  "string",
-					fieldValue: "/opt/couchbase/var/lib/couchbase/data",
+					fieldValue: "120",
 				},
 			},
 			shouldFail:       false,
@@ -1111,14 +1093,6 @@ func TestValidationDelete(t *testing.T) {
 	f := framework.Global
 	testDefs := []testDef{
 		{
-			name:             "delete",
-			paramsIn:         []parameter{},
-			paramsOut:        []parameter{},
-			shouldFail:       false,
-			expectedMessages: []string{"couchbaseclusters \"cb-example\" deleted"},
-		},
-
-		{
 			name: "delete after modifying",
 			paramsIn: []parameter{
 				{
@@ -1127,6 +1101,14 @@ func TestValidationDelete(t *testing.T) {
 					fieldValue: "newBucketName",
 				},
 			},
+			paramsOut:        []parameter{},
+			shouldFail:       false,
+			expectedMessages: []string{"couchbaseclusters \"cb-example\" deleted"},
+		},
+
+		{
+			name:             "delete",
+			paramsIn:         []parameter{},
 			paramsOut:        []parameter{},
 			shouldFail:       false,
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" deleted"},
