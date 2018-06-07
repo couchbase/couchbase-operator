@@ -5,6 +5,7 @@ This section provides information about how to diagnose and troubleshoot problem
 When troubleshooting the Couchbase Operator, it is important to rule out Kubernetes itself as the root cause of the problem you are experiencing.  See the Kubernetes [Troubleshooting Guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/) for information about debugging applications within a Kubernetes cluster.
 
 The following topics are also helpful to understand when troubleshooting the Operator:
+
 * [Cluster Status and Conditions](clusterStatusGuide.md)
   * [Understanding Conditions and Events](conditionsAndEvents.md)
 * [Listing And Describing Resources](listAndDescribe.md)
@@ -13,19 +14,22 @@ The following topics are also helpful to understand when troubleshooting the Ope
 
 ## Full Deployment Logs
 
-To retrieve the logs for the Operator and the entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-kubernetes-support.sh)
+To retrieve the logs for the Operator and the entire Kubernetes deployment (nodes, pods, services...), run the following script: [cb_k8s_support.sh](https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-kubernetes-support.sh)
+
 ```bash
-wget https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-kubernetes-support.sh
+wget https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-kubernetes-support.sh
 chmod +x couchbase-kubernetes-support.sh
 ./couchbase-kubernetes-support.sh
 ```
 
 The script gathers information about your Kubernetes deployment and creates an archive within your current working directory:
+
 ```bash
 <cwd>/cb-k8s-support-01182018-14_00_18.tgz
 ```
 
 The script runs ```kubectl top pod``` to gather pod metrics such as CPU and memory.  By default, these metrics are empty unless you have ```heapster``` deployed alongside your cluster.  Run the following commands to deploy ```heapster``` within your Kubernetes environment:
+
 ```bash
 git clone https://github.com/kubernetes/heapster.git
 cd heapster
@@ -41,9 +45,10 @@ Run the script again to generate new logs that include pod metrics.
 The Couchbase Operator generates logs that can help troubleshoot your deployment.  Using ```kubectl``` or ```oc```, you can choose to print the Operator logs to ```stdout```.
 
 On Kubernetes:
+
 ```console
 # Get name of operator pod
-$ kubectl get po -lname=couchbase-operator
+$ kubectl get po -lapp=couchbase-operator
 NAME                                  READY     STATUS    RESTARTS   AGE
 couchbase-operator-1917615544-h20bm   1/1       Running   0          20h
 
@@ -56,12 +61,14 @@ time="2018-01-23T22:56:51Z" level=info msg="I'm the leader, attempt to start the
 time="2018-01-23T22:56:51Z" level=info msg="Creating the couchbase-operator controller" module=main
 ```
 On OpenShift:
+
 ```console
 # Get name of operator pod
-$ oc get po -lname=couchbase-operator
+$ oc get po -lapp=couchbase-operator
 ```
 
 Watch for the following messages which indicate that the Operator is unable to reconcile your cluster into a desired state:
+
 * Logs with ```level=error```
 * Operator is unable to get cluster state after N retries
 
@@ -82,17 +89,20 @@ $ (pprof) traces
 
 ## Getting Couchbase Server Logs
 
-The easiest way to get ```cbcollect``` logs is to use the standard logs collection feature in the Couchbase Server Web Console. Go to **Logs > Collect Information**, select the desired nodes, and click **Collect Logs**. You can also deploy a job within Kubernetes to trigger log collection:
+The easiest way to get ```cbcollect``` logs is to use the standard logs collection feature in the Couchbase Server Web Console. Go to **Logs > Collect Information**, select the desired nodes, and click **Collect Logs**.
+
+You can also deploy a job within Kubernetes to trigger log collection. The following commands collect the logs from all the nodes in the cluster. The logs (when the default configuration is used) are found under ```/opt/couchbase/var/lib/couchbase/tmp location```.
 
 On Kubernetes:
+
 ```bash
-kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
+kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
 ```
 On OpenShift:
-```bash
-oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-collect-logs.yaml
-```
 
+```bash
+oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
+```
 
 *Note*: If you are not using the default namespace, you must download and update the `couchbase-cli-collect-logs.yaml` file to reflect your namespace.
 For example, if your namespace is `myproject`, edit the `command` field in the YAML file to replace `cb-example-0000.cb-example.default.svc` with `cb-example-0000.cb-example.myproject.svc`.
@@ -111,23 +121,28 @@ command: [""/bin/sh"", ""-c"", ""couchbase-cli-secure collect-logs-start
 Once the log collection is complete, you can view the log location for each node from the Couchbase Server Web Console by going to **Logs > Collect Information** and clicking **Show Current Collection**. You can then run a command like the following for each node in the cluster to collect their logs.
 
 On Kubernetes:
+
 ```bash
 kubectl cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
 ```
 On OpenShift:
+
 ```bash
 oc cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
 ```
 Here is an example command to collect the logs for node `cb-example-0000`.
 
 On Kubernetes:
+
 ```bash
 kubectl cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
 ```
 On OpenShift:
+
 ```bash
     oc cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
 ```
+
 ## See Also
 
 Refer to the [Couchbase Server Troubleshooting](https://developer.couchbase.com/documentation/server/current/troubleshooting/troubleshooting-intro.html) guide for additional information about reporting issues.

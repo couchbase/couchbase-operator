@@ -2,58 +2,82 @@
 
 This tutorial walks you through the steps to deploy a 3-nodes cluster and load data into the cluster.
 
-**Prerequisites**
+<!-- TOC depthFrom:2 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [Prerequisites](#prerequisites)
+- [1. Create a Couchbase Cluster](#1-create-a-couchbase-cluster)
+- [2. Create a Couchbase RBAC User](#2-create-a-couchbase-rbac-user)
+	- [Option 1: Create a default user using the CLI](#option-1-create-a-default-user-using-the-cli)
+	- [Option 2: Create a default user with Kubernetes job](#option-2-create-a-default-user-with-kubernetes-job)
+- [3. Loading data](#3-loading-data)
+
+<!-- /TOC -->
+
+## Prerequisites
+
 Before proceeding to perform the steps in this tutorial, ensure that you've prepared your Kubernetes cluster to run Couchbase pods. See [Prerequisites and Setup](prerequisiteAndSetup.md) for details.
 The tutorial also requires the following artifacts that are bundled with the Couchbase Operator package:
-- `create-user.yaml` spec to create secrets for the Couchbase RBAC user.
-- `pillowfight-data-loader.yaml` job to load data into your cluster.
 
-1. **Create a Couchbase cluster**
+* `create-user.yaml` spec to create secrets for the Couchbase RBAC user.
+* `pillowfight-data-loader.yaml` job to load data into your cluster.
+
+
+## 1. Create a Couchbase Cluster
 
 On Kubernetes:
+
 ```console
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
+
 On OpenShift:
+
 ```console
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
 
-*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for more information about this tool.
+*Note:* `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See [Ensuring Valid CouchbaseCluster Configurations With cbopctl](cbopctl.md) for download instructions.
 
-2. **Create a Couchbase RBAC user**
+## 2. Create a Couchbase RBAC User
 
-This tutorial will be loading data in Couchbase and hence requires a Couchbase RBAC user to be created. RBAC users can be created by directly using the CLI, or as a job within the Kubernetes cluster. See [Accessing the Couchbase CLI](couchbaseCliGuide.md) for details.
+*Note:* This tutorial will be loading data into Couchbase and hence requires a Couchbase RBAC user to be created. RBAC users can be created by directly using the CLI, or as a job within the Kubernetes cluster. See [Accessing the Couchbase CLI](couchbaseCliGuide.md) for details.
 
- - **Option 1: Create a default user using the CLI**
+### Option 1: Create a default user using the CLI
 
 Use the `describe` command to get the Web Console port:
 
 On Kubernetes:
+
 ```console
 $ kubectl describe cbc cb-example |  grep "Admin Console Port:"
-   Admin Console Port:		32486
+Admin Console Port:		32486
 ```
+
 On OpenShift:
+
 ```console
 $ oc describe cbc cb-example |  grep "Admin Console Port:"
-   Admin Console Port:		32486
+Admin Console Port:		32486
 ```
+
 Create a Couchbase RBAC user by running the following command:
+
 ```console
 $ ./couchbase-cli user-manage -c 192.168.99.100:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
 SUCCESS: RBAC user set
 ```
+
 (You can skip to the next step: Loading data)
 
- - **Option 2: Create a default user with Kubernetes job**
+### Option 2: Create a default user with Kubernetes job
 
 Just as the admin user has a secret, the RBAC user also requires its own secret. Create a secret for the RBAC user by running the following commands:
 
 ```console
-# secret for user named 'default'
+secret for user named 'default'
+
 $ echo -n "default" | base64
 ZGVmYXVsdA==
 $ echo -n "password" | base64
@@ -75,17 +99,20 @@ secret "cb-user-auth" created
 Now, use the RBAC user's secret to securely create a Couchbase RBAC user using a Kubernetes/OpenShift job:
 
 On Kubernetes:
+
 ```console
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-create-user.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ kubectl get job
 NAME          DESIRED   SUCCESSFUL   AGE
 create-user   1         1            4s
 ```
+
 On OpenShift:
+
 ```console
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-create-user.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ oc get job
@@ -109,7 +136,7 @@ command: ["/bin/sh", "-c", "/couchbase-cli-secure user-manage
 The name of the secret and its keys are very important as the sample `create-user` spec mounts the secrets into a volume.
 
 ```yaml
-# https://packages.couchbase.com/kubernetes/0.8.0-beta2/couchbase-cli-create-user.yaml
+https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-create-user.yaml
 ---
 apiVersion: batch/v1
 kind: Job
@@ -126,7 +153,7 @@ spec:
             secretName: cb-user-auth
 ```
 
-3. **Loading data**
+## 3. Loading data
 
 Use the sample `pillowfight` job to load items into your cluster. The following spec loads 10k items into the Couchbase cluster:
 
@@ -150,18 +177,31 @@ spec:
       restartPolicy: Never
 ```
 
+*Note*: If you are not using the default namespace, you must download and update the ```pillowfight-data-loader.yaml``` file to reflect your namespace. For example, if your namespace is myproject, edit the command field in the YAML file to replace ```cb-example-0000.cb-example.default.svc``` with ```cb-example-0000.cb-example.myproject.svc```. The updated field will now look like the following snippet:
+
+```yaml
+command: ["cbc-pillowfight",
+
+                  "-U", "couchbase://cb-example-0000.cb-example.myproject.svc/default?select_bucket=true",
+                  "-I", "10000", "-B", "1000", "-c", "10", "-t", "1", "-P", "password"]
+```
+
 To deploy the `pillowfight` data loader, run the following command:
 
 On Kubernetes:
+
 ```console
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/pillowfight-data-loader.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/pillowfight-data-loader.yaml
 job "pillowfight" created
 ```
+
 On OpenShift:
+
 ```console
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/pillowfight-data-loader-openshift.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/pillowfight-data-loader-openshift.yaml
 job "pillowfight" created
 ```
+
 Once it completes, you should have 10k items loaded in your cluster.
 
-See [Accessing the Couchbase Web Console](adminConsoleAccess.md) for information about how to access the Web Console.
+See [Accessing the Couchbase Web Console](adminConsoleAccess.md) for information about how to access the Couchbase Server Web Console.

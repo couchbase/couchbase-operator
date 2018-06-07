@@ -20,7 +20,7 @@ To install the CRD, log in as the system:admin user and run the following comman
 
 ```bash
 $ oc login -u system:admin
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/openshift/crd.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/crd.yaml
 ```
 
 *Note*: You only need to install the CRD once. After that, the Couchbase Operator can be created in any OpenShift project.
@@ -30,7 +30,7 @@ Once the CRD is installed, you need to create a role that allows the Operator to
 To create the ClusterRole for the Couchbase Operator, run the following command as the system:admin user:
 
 ```bash
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/openshift/cluster-role-sa.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/cluster-role-sa.yaml
 ```
 
 *Note*: You only need to create the ClusterRole once.
@@ -40,7 +40,7 @@ Next, since the `developer` user needs to be able to create and delete the Couch
 Run the following command to create the ClusterRole for `developer`:
 
 ```bash
-oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/openshift/cluster-role-user.yaml
+oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/cluster-role-user.yaml
 ```
 
 ### Setting Up RBAC for an OpenShift Project
@@ -77,7 +77,7 @@ oc create clusterrolebinding couchbasecluster --clusterrole couchbasecluster --u
 At this point you can now create the Couchbase Operator with the `developer` user in the `operator-example` project. To start the Couchbase Operator, run the following command:
 
 ```bash
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.0-beta2/openshift/operator.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/operator.yaml
 ```
 
 Running this command downloads the Couchbase Operator Docker image that is specified in the ```operator.yaml``` file and creates a *deployment* which manages a single instance of the Couchbase Operator. The Couchbase Operator uses a deployment so that it can restart if the pod it's running in dies.
