@@ -594,7 +594,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.adminConsoleServices in body should have at most 4 items"},
+			expectedMessages: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 
 		{
@@ -942,7 +942,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.adminConsoleServices in body should be one of [data index query search]"},
+			expectedMessages: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
 
 		{

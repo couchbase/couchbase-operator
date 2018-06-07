@@ -112,7 +112,7 @@ var testDefs = []testDef{
 		path:        "tests/0013.yaml",
 		description: "Tests a config with too many adminConsoleService services",
 		expectedErr: errors.CompositeValidationError(
-			errors.TooManyItems("spec.adminConsoleServices", "body", 6),
+			errors.DuplicateItems("spec.adminConsoleServices", "body"),
 		),
 	},
 	{

@@ -139,6 +139,14 @@ func applyDefaults(customResource *api.CouchbaseCluster) {
 	}
 }
 
+func uniqueString(strList []string) bool {
+	set := map[string]interface{}{}
+	for _, str := range strList {
+		set[str] = nil
+	}
+	return len(set) == len(strList)
+}
+
 func checkConstraints(customResource *api.CouchbaseCluster) error {
 	errs := []error{}
 
@@ -170,11 +178,6 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	if customResource.Spec.AdminConsoleServices != nil {
 		services := EnumList{"data", "index", "query", "search", "eventing", "analytics"}
 
-		if len(customResource.Spec.AdminConsoleServices) > len(services) {
-			err := errors.TooManyItems("spec.adminConsoleServices", "body", int64(len(services)))
-			errs = append(errs, err)
-		}
-
 		for _, svc := range customResource.Spec.AdminConsoleServices {
 			if !services.Contains(svc) {
 				err := errors.EnumFail("spec.adminConsoleServices", "body", nil,
@@ -182,6 +185,10 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 				errs = append(errs, err)
 				continue
 			}
+		}
+
+		if !uniqueString(customResource.Spec.AdminConsoleServices) {
+			errs = append(errs, errors.DuplicateItems("spec.adminConsoleServices", "body"))
 		}
 	}
 
