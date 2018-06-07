@@ -1,0 +1,17 @@
+---
+suite: TestSanity
+timeout: 240m
+tcGroups:
+  - name: Group1
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestCreateCluster
+      - name: TestCreateBucketCluster
+      - name: TestBucketAddRemoveBasic
+      - name: TestEditBucket
+      - name: TestResizeCluster
+      - name: TestEditClusterSettings
+      - name: TestRecoveryAfterOnePodFailureNoBucket
+      - name: TestAntiAffinityOn
+      - name: TestPodResourcesBasic

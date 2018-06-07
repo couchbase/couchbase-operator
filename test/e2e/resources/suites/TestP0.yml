@@ -1,0 +1,38 @@
+---
+suite: TestP0
+tcGroups:
+  - name: Group1
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestNegBucketAdd
+      - name: TestNegBucketEdit
+      - name: TestResizeClusterWithBucket
+      - name: TestEditServiceConfig
+      - name: TestNegEditServiceConfig
+      - name: TestRecoveryAfterTwoPodFailureNoBucket
+      - name: TestRecoveryAfterOnePodFailureBucketOneReplica
+      - name: TestRecoveryAfterTwoPodFailureBucketOneReplica
+      - name: TestRecoveryAfterOnePodFailureBucketTwoReplica
+      - name: TestRecoveryAfterTwoPodFailureBucketTwoReplica
+      - name: TestPodResourcesCannotBePlaced
+      - name: TestFirstNodePodResourcesCannotBePlaced
+      - name: TestAntiAffinityOnCannotBePlaced
+      - name: TestAntiAffinityOff
+      - name: TestNegEditClusterSettings
+      - name: TestBasicMDSScaling
+      - name: TestSwapNodesBetweenServices
+      - name: TestCreateClusterWithoutDataService
+      - name: TestCreateClusterDataServiceNotFirst
+      - name: TestRemoveLastDataService
+      - name: TestKillOperator
+      - name: TestKillOperatorAndUpdateClusterConfig
+      - name: TestTlsCreateCluster
+        decorators:
+          - rsaDecorator
+      - name: TestTlsKillClusterNode
+        decorators:
+          - rsaDecorator
+      - name: TestTlsResizeCluster
+        decorators:
+          - rsaDecorator

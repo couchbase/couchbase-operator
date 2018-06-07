@@ -163,6 +163,8 @@ imports:
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+- name: gopkg.in/ini.v1
+  version: 6ecc596bd756a16c6e93e4ef9225ecdb9f54ed2c
 - name: k8s.io/api
   version: 006a217681ae70cbacdd66a5e2fca1a61a8ff28e
   subpackages:

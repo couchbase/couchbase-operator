@@ -1,0 +1,30 @@
+---
+suite: TestP1
+tcGroups:
+  - name: Group1
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestBucketAddRemoveExtended
+      - name: TestRevertExternalBucketUpdates
+      - name: TestInvalidAuthSecret
+      - name: TestInvalidBaseImage
+      - name: TestInvalidVersion
+      - name: TestNodeUnschedulable
+      - name: TestNodeServiceDownRecovery
+      - name: TestNodeServiceDownDuringRebalance
+      - name: TestReplaceManuallyRemovedNode
+      - name: TestManageMultipleClusters
+      - name: TestNodeManualFailover
+      - name: TestNodeRecoveryAfterMemberAdd
+      - name: TestNodeRecoveryKilledNewMember
+      - name: TestKillNodesAfterRebalanceAndFailover
+      - name: TestRemoveForeignNode
+      - name: TestRecoveryAfterOneNsServerFailureBucketOneReplica
+      - name: TestRecoveryAfterOneNodeUnreachableBucketOneReplica
+      - name: TestRecoveryNodeTmpUnreachableBucketOneReplica
+      - name: TestPauseOperator
+      - name: TestNegPodResourcesBasic
+      - name: TestPodResourcesHigh
+      - name: TestPodResourcesLow
+      - name: TestAntiAffinityOnCannotBeScaled

@@ -1,0 +1,20 @@
+---
+suite: TestCRDValidation
+tcGroups:
+  - name: Group1
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestValidationCreate
+      - name: TestNegValidationCreate
+      - name: TestValidationDefaultCreate
+      - name: TestNegValidationDefaultCreate
+      - name: TestNegValidationConstraintsCreate
+      - name: TestValidationApply
+      - name: TestNegValidationApply
+      - name: TestValidationDefaultApply
+      - name: TestNegValidationDefaultApply
+      - name: TestNegValidationConstraintsApply
+      - name: TestNegValidationImmutableApply
+      - name: TestValidationDelete
+      - name: TestNegValidationDelete

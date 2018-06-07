@@ -1,0 +1,114 @@
+- hosts: all
+  vars:
+    k8sConfFile: /etc/sysctl.d/k8s.conf
+    k8sConfFileContent: "net.bridge.bridge-nf-call-ip6tables = 1\nnet.bridge.bridge-nf-call-iptables = 1\n"
+
+  tasks:
+    - name: Adding Kubernetes repo
+      yum_repository:
+        name: Kubernetes
+        description: Kubernetes repo
+        file: kubernetes
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+        enabled: yes
+        gpgcheck: no
+        repo_gpgcheck: no
+        gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gp
+      register: kuberepo
+
+    - name: Disabling SELinux
+      lineinfile:
+        dest: /etc/sysconfig/selinux
+        regexp: 'SELINUX=.*$'
+        line: 'SELINUX=disabled'
+
+    - name: setenforce to 0
+      shell: setenforce 0
+      ignore_errors: yes
+
+    - name: Removing hosts data from /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        state: absent
+        regexp: " k8s.*$"
+
+    - name: Adding k8s-masters in /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        state: present
+        line: "{{ item }} k8s-master-{{ my_idx + 1 }}"
+      loop: "{{ groups['master_node'] }}"
+      loop_control:
+        index_var: my_idx
+
+    - name: Adding k8sWorkers in /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        state: present
+        line: "{{ item }} k8s-worker-{{ my_idx + 1 }}"
+      loop: "{{ groups['worker_node'] }}"
+      loop_control:
+        index_var: my_idx
+
+    - name: Removing old kube packages
+      yum: state=absent name={{ item }}
+      with_items:
+        - kubectl
+        - kubeadm
+        - kubelet
+
+    - name: Installing kubelet package
+      yum:
+        state: present
+        name: kubelet-{{ kubeVersion }}.x86_64
+
+    - name: Installing required packages
+      yum: state=present name={{ item }}
+      with_items:
+        - docker
+        - kubectl-{{ kubeVersion }}.x86_64
+        - kubeadm-{{ kubeVersion }}.x86_64
+
+    - name: Editing k8s config for ipv4 network bridge
+      lineinfile: dest={{ k8sConfFile }} line={{ item }}
+      with_items:
+        - net.bridge.bridge-nf-call-ip6tables = 1
+        - net.bridge.bridge-nf-call-iptables = 1
+
+    - name: Stopping firewall
+      shell: systemctl stop firewalld.service
+
+    - name: Disabling firewall
+      shell: systemctl disable firewalld
+
+    - name: Masking firewall
+      shell: systemctl mask firewalld.service
+
+    - name: Load sysctl data
+      shell: sysctl --system
+
+    - name: Rebooting host
+      shell: 'shutdown -r +1 "Reboot triggered by Ansible"'
+      async: yes
+ 
+    - wait_for_connection:
+        delay: 90
+        timeout: 300
+
+    - name: Reloading systemctl deamon
+      shell: systemctl daemon-reload
+
+    - name: Enabling docker service
+      shell: systemctl enable docker 
+
+    - name: Starting docker
+      shell: systemctl restart docker
+
+    - name: Enabling Kubelet service
+      shell: systemctl enable kubelet
+
+    - name: Starting Kubelet service
+      shell: systemctl restart kubelet
+
+    - name: Resetting kubeadm
+      shell: kubeadm reset
