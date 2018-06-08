@@ -246,31 +246,6 @@ func TestNodeManualFailover(t *testing.T) {
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(t, f.CRClient, testCouchbase, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// expect member add for node being replaced
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-
-	// expect operator to rebalance in the node
-	event = k8sutil.RebalanceStartedEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(f.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// healthy 2 node cluster
