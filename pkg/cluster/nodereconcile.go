@@ -28,12 +28,13 @@ const (
 )
 
 type ReconcileMachine struct {
-	runningPods couchbaseutil.MemberSet
-	knownNodes  couchbaseutil.MemberSet
-	ejectNodes  couchbaseutil.MemberSet
-	couchbase   *couchbaseutil.ClusterStatus
-	state       ReconcileState
-	errored     bool
+	runningPods  couchbaseutil.MemberSet
+	knownNodes   couchbaseutil.MemberSet
+	ejectNodes   couchbaseutil.MemberSet
+	unknownNodes couchbaseutil.MemberSet
+	couchbase    *couchbaseutil.ClusterStatus
+	state        ReconcileState
+	errored      bool
 }
 
 func (r *ReconcileMachine) handleInit(c *Cluster) {
@@ -106,10 +107,8 @@ func (r *ReconcileMachine) handleInit(c *Cluster) {
 // of the set of nodes the operator is tracking.
 func (r *ReconcileMachine) handleUnknownMembers(c *Cluster) {
 	// Safely balance out these illegal members
-	unknownMembers := r.runningPods.Diff(c.members)
-	for name, _ := range unknownMembers {
-		r.runningPods.Remove(name)
-	}
+	r.unknownNodes = r.runningPods.Diff(c.members)
+	r.runningPods = r.runningPods.Diff(r.unknownNodes)
 	r.transitionState(ReconcileWarmupNodes)
 }
 
@@ -396,6 +395,13 @@ func (r *ReconcileMachine) handleDeadMembers(c *Cluster) {
 	for name, _ := range dead {
 		if err := c.destroyMember(name); err != nil {
 			c.logger.Errorf("Failed to remove dead members: %s", err.Error())
+			r.errored = true
+		}
+	}
+
+	for name, _ := range r.unknownNodes {
+		if err := c.removePod(name); err != nil {
+			c.logger.Errorf("Failed to remove unknown member: %s", err.Error())
 			r.errored = true
 		}
 	}

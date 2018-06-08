@@ -673,7 +673,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	// resize to 2 member cluster
-	err = e2eutil.ResizeCluster(t, 0, e2eutil.Size2, f.CRClient, testCouchbase)
+	err = e2eutil.ResizeClusterNoWait(t, 0, e2eutil.Size2, f.CRClient, testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 
 	// wait rebalance event
