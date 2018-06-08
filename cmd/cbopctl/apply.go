@@ -65,9 +65,9 @@ func (ctx *ApplyContext) Run() {
 
 	if errs != nil {
 		// when verify version is disabled then ignore this error
-		_, versionErr := err.(cberrors.ErrUnsupportedVersion)
+		_, versionErr := errs.(cberrors.ErrUnsupportedVersion)
 		if !versionErr || ctx.verifyVersion {
-			fmt.Printf("%v\n", err)
+			fmt.Printf("%v\n", errs)
 			os.Exit(1)
 		}
 	}
