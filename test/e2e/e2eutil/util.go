@@ -86,12 +86,12 @@ var (
 	BasicServiceOneDataN1qlIndex = map[string]string{
 		"size":     "1",
 		"name":     "test_config_1",
-		"services": "data,n1ql,index"}
+		"services": "data,query,index"}
 
 	BasicServiceOneN1qlIndexSearch = map[string]string{
 		"size":     "1",
 		"name":     "test_config_1",
-		"services": "n1ql,index,fts"}
+		"services": "query,index,search"}
 
 	BasicSecondaryServiceOneData = map[string]string{
 		"size":     "1",
@@ -101,7 +101,7 @@ var (
 	BasicServiceThreeDataN1qlIndex = map[string]string{
 		"size":     "3",
 		"name":     "test_config_1",
-		"services": "data,n1ql,index"}
+		"services": "data,query,index"}
 
 	BasicServiceThreeDataNode = map[string]string{
 		"size":     "3",
@@ -116,7 +116,7 @@ var (
 	BasicServiceFiveDataN1qlIndex = map[string]string{
 		"size":     "5",
 		"name":     "test_config_1",
-		"services": "data,n1ql,index"}
+		"services": "data,query,index"}
 
 	BasicOneReplicaBucket = map[string]string{
 		"bucketName":         "default",
@@ -410,14 +410,14 @@ func UpdateBucketSpec(bucketName string, field string, value string, crClient ve
 	case field == "BucketReplicas":
 		updateFunc = func(cl *api.CouchbaseCluster) {
 			replicas, _ := strconv.Atoi(value)
-			cl.Spec.BucketSettings[bucketIndex].BucketReplicas = &replicas
+			cl.Spec.BucketSettings[bucketIndex].BucketReplicas = replicas
 		}
 	case field == "IoPriority":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].IoPriority = &value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].IoPriority = value }
 	case field == "EvictionPolicy":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].EvictionPolicy = &value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].EvictionPolicy = value }
 	case field == "ConflictResolution":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].ConflictResolution = &value }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].ConflictResolution = value }
 	case field == "EnableFlush":
 		updateFunc = func(cl *api.CouchbaseCluster) {
 			flush, _ := strconv.ParseBool(value)
@@ -426,7 +426,7 @@ func UpdateBucketSpec(bucketName string, field string, value string, crClient ve
 	case field == "EnableIndexReplica":
 		updateFunc = func(cl *api.CouchbaseCluster) {
 			enableReplicas, _ := strconv.ParseBool(value)
-			cl.Spec.BucketSettings[bucketIndex].EnableIndexReplica = &enableReplicas
+			cl.Spec.BucketSettings[bucketIndex].EnableIndexReplica = enableReplicas
 		}
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)

@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,12 +105,12 @@ type ClusterSpec struct {
 	ExposeAdminConsole bool `json:"exposeAdminConsole"`
 
 	// Specific services to use when exposing ui
-	AdminConsoleServices []string `json:"adminConsoleServices"`
+	AdminConsoleServices []string `json:"adminConsoleServices,omitempty"`
 
 	// ExposedFeatures is a list of features to expose on the K8S node
 	// network.  They represent a subset of ports e.g. admin=8091,
 	// xdcr=8091,8092,11210, and thus may overlap.
-	ExposedFeatures ExposedFeatureList `json:"exposedFeatures"`
+	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
 
 	// Enables software update notifications in the UI
 	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications"`
@@ -118,7 +119,7 @@ type ClusterSpec struct {
 	// that can be requested/claimed by a pod.
 	// When specified, each claim should map to the name of a volumeMount
 	// defined in a PodPolicy
-	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates"`
+	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
 	// ServerGroups define the set of availability zones we want to distribute
 	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
@@ -179,22 +180,22 @@ type BucketConfig struct {
 	BucketMemoryQuota int `json:"memoryQuota"`
 
 	// The number of bucket replicates
-	BucketReplicas *int `json:"replicas"`
+	BucketReplicas int `json:"replicas,omitempty"`
 
 	// The priority when compared to other buckets
-	IoPriority *string `json:"ioPriority"`
+	IoPriority string `json:"ioPriority,omitempty"`
 
 	// The bucket eviction policy which determines behavior during expire and high mem usage
-	EvictionPolicy *string `json:"evictionPolicy,omitempty"`
+	EvictionPolicy string `json:"evictionPolicy,omitempty"`
 
 	// The bucket's conflict resolution mechanism; which is to be used if a conflict occurs during Cross Data-Center Replication (XDCR). Sequence-based and timestamp-based mechanisms are supported.
-	ConflictResolution *string `json:"conflictResolution,omitempty"`
+	ConflictResolution string `json:"conflictResolution,omitempty"`
 
 	// The enable flush option denotes wether the data in the bucket can be flushed
 	EnableFlush bool `json:"enableFlush,omitempty"`
 
 	// Enable Index replica specifies whether or not to enable view index replicas for this bucket. This parameter defaults to false if it is not specified. This parameter only affects Couchbase buckets.
-	EnableIndexReplica *bool `json:"enableIndexReplica,omitempty"`
+	EnableIndexReplica bool `json:"enableIndexReplica,omitempty"`
 }
 
 type ServerConfig struct {
@@ -380,11 +381,7 @@ func (cs *ClusterSpec) ServerGroupsEnabled() bool {
 }
 
 func (c *BucketConfig) Equals(other *BucketConfig) bool {
-	return c.BucketName == other.BucketName && c.BucketType == other.BucketType &&
-		c.BucketMemoryQuota == other.BucketMemoryQuota && intPtrEquals(c.BucketReplicas, other.BucketReplicas) &&
-		stringPtrEquals(c.IoPriority, other.IoPriority) && stringPtrEquals(c.EvictionPolicy, other.EvictionPolicy) &&
-		stringPtrEquals(c.ConflictResolution, other.ConflictResolution) && c.EnableFlush == other.EnableFlush &&
-		boolPtrEquals(c.EnableIndexReplica, other.EnableIndexReplica)
+	return reflect.DeepEqual(c, other)
 }
 
 // check wether item exists within array

@@ -430,7 +430,7 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.servers[0].services[1] in body should be one of [data index query search eventing analytics]"},
+			expectedMessages: []string{"spec.servers.services in body should be one of [data index query search eventing analytics]"},
 		},
 
 		{
@@ -617,10 +617,9 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			name: "ephemeral bucket with index replicas enabled",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "3", "EnableIndexReplica"},
-					fieldType:      "bool",
-					fieldValue:     "true",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "3", "EnableIndexReplica"},
+					fieldType:  "bool",
+					fieldValue: "true",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -632,10 +631,9 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			name: "memcached bucket with seqno conflict resolution",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "2", "ConflictResolution"},
-					fieldType:      "string",
-					fieldValue:     "seqno",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "2", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "seqno",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -647,10 +645,9 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			name: "couchbase bucket with invalid io priority",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "0", "IoPriority"},
-					fieldType:      "string",
-					fieldValue:     "lighow",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "0", "IoPriority"},
+					fieldType:  "string",
+					fieldValue: "lighow",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -662,10 +659,9 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			name: "couchbase bucket with invalid conflict resolution",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "0", "ConflictResolution"},
-					fieldType:      "string",
-					fieldValue:     "selwwno",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "0", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "selwwno",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -677,30 +673,28 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			name: "ephemeral bucket with invalid eviction policy",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "3", "EvictionPolicy"},
-					fieldType:      "string",
-					fieldValue:     "valueOnly",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "3", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "valueOnly",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets.evictionPolicy in body should be one of [noEviction nruEviction]"},
+			expectedMessages: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
 		},
 
 		{
 			name: "couchbase bucket with invalid eviction policy",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
-					fieldType:      "string",
-					fieldValue:     "nruEviction",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "nruEviction",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets.evictionPolicy in body should be one of [valueOnly fullEviction]"},
+			expectedMessages: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
 		},
 	}
 	failures := runTest(t, f, testDefs, "create")
@@ -930,7 +924,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.adminConsoleServices in body should have at most 4 items"},
+			expectedMessages: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 
 		{
@@ -951,10 +945,9 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			name: "ephemeral bucket with index replicas enabled",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "3", "EnableIndexReplica"},
-					fieldType:      "bool",
-					fieldValue:     "true",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "3", "EnableIndexReplica"},
+					fieldType:  "bool",
+					fieldValue: "true",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -966,10 +959,9 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			name: "couchbase bucket with invalid io priority",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "0", "IoPriority"},
-					fieldType:      "string",
-					fieldValue:     "lighow",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "0", "IoPriority"},
+					fieldType:  "string",
+					fieldValue: "lighow",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -983,15 +975,14 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			name: "ephemeral bucket with invalid eviction policy",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "3", "EvictionPolicy"},
-					fieldType:      "string",
-					fieldValue:     "valueOnly",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "3", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "valueOnly",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets.evictionPolicy in body should be one of [noEviction nruEviction]"},
+			expectedMessages: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
 			shouldWarn:       true,
 			expectedWarn:     "Changing the Eviction Policy will cause the bucket default4 to be temporarily unavailable",
 		},
@@ -1000,15 +991,14 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			name: "couchbase bucket with invalid eviction policy",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
-					fieldType:      "string",
-					fieldValue:     "nruEviction",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "nruEviction",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets.evictionPolicy in body should be one of [valueOnly fullEviction]"},
+			expectedMessages: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
 			shouldWarn:       true,
 			expectedWarn:     "Changing the Eviction Policy will cause the bucket default1 to be temporarily unavailable",
 		},
@@ -1027,10 +1017,9 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name: "ephemeral bucket with seqno conflict resolution",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "4", "ConflictResolution"},
-					fieldType:      "string",
-					fieldValue:     "seqno",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "4", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "seqno",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1042,10 +1031,9 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name: "memcached bucket with seqno conflict resolution",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "2", "ConflictResolution"},
-					fieldType:      "string",
-					fieldValue:     "seqno",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "2", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "seqno",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1057,10 +1045,9 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name: "couchbase bucket with invalid conflict resolution",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "BucketSettings", "0", "ConflictResolution"},
-					fieldType:      "string",
-					fieldValue:     "selwwno",
-					fieldIsPointer: true,
+					field:      []string{"Spec", "BucketSettings", "0", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "selwwno",
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1071,10 +1058,9 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name: "change index storage mode",
 			paramsIn: []parameter{
 				{
-					field:          []string{"Spec", "ClusterSettings", "IndexStorageSetting"},
-					fieldType:      "string",
-					fieldValue:     "plasma",
-					fieldIsPointer: false,
+					field:      []string{"Spec", "ClusterSettings", "IndexStorageSetting"},
+					fieldType:  "string",
+					fieldValue: "plasma",
 				},
 			},
 			paramsOut:        []parameter{},

@@ -7,6 +7,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1beta1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/go-openapi/errors"
 
@@ -260,7 +261,7 @@ var testDefs = []testDef{
 		path:        "tests/0030.yaml",
 		description: "Tests a config with a ephemeral bucket with invalid eviction policy",
 		expectedErr: errors.CompositeValidationError(
-			errors.EnumFail("spec.buckets.evictionPolicy", "body", nil, []interface{}{"noEviction", "nruEviction"}),
+			errors.EnumFail("evictionPolicy", "spec.buckets[0]", nil, []interface{}{"noEviction", "nruEviction"}),
 		),
 	},
 	{
@@ -268,7 +269,7 @@ var testDefs = []testDef{
 		path:        "tests/0031.yaml",
 		description: "Tests a config with a couchbase bucket with invalid eviction policy",
 		expectedErr: errors.CompositeValidationError(
-			errors.EnumFail("spec.buckets.evictionPolicy", "body", nil, []interface{}{"valueOnly", "fullEviction"}),
+			errors.EnumFail("evictionPolicy", "spec.buckets[0]", nil, []interface{}{"valueOnly", "fullEviction"}),
 		),
 	},
 	{
@@ -527,7 +528,7 @@ var testDefs = []testDef{
 		path:        "tests/0061.yaml",
 		description: "Tests a config with version < min fails",
 		expectedErr: errors.CompositeValidationError(
-			errors.FailedPattern("version", "spec.Version", `i.e "enterprise-5.5.0"`),
+			errors.FailedPattern("spec.version", "body", k8sutil.VersionPattern),
 		),
 	},
 	{
@@ -535,7 +536,7 @@ var testDefs = []testDef{
 		path:        "tests/0062.yaml",
 		description: "Tests a config with invalid",
 		expectedErr: errors.CompositeValidationError(
-			errors.FailedPattern("version", "spec.Version", `i.e "enterprise-5.5.0"`),
+			errors.FailedPattern("spec.version", "body", k8sutil.VersionPattern),
 		),
 	},
 	{

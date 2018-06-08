@@ -148,65 +148,26 @@ func uniqueString(strList []string) bool {
 }
 
 func checkConstraints(customResource *api.CouchbaseCluster) error {
+	// Custom validation
 	errs := []error{}
 
-	services := EnumList{"data", "index", "query", "search", "eventing", "analytics"}
-
-	if customResource.Spec.ExposedFeatures != nil {
-		if len(customResource.Spec.ExposedFeatures) > len(api.SupportedFeatures) {
-			err := errors.TooManyItems("spec.exposedFeatures", "body", int64(len(api.SupportedFeatures)))
-			errs = append(errs, err)
+	// Uniqueness, although in the schema types, the API denies it.
+	if !uniqueString(customResource.Spec.AdminConsoleServices) {
+		errs = append(errs, errors.DuplicateItems("spec.adminConsoleServices", "body"))
+	}
+	if !uniqueString(customResource.Spec.ExposedFeatures) {
+		errs = append(errs, errors.DuplicateItems("spec.exposedFeatures", "body"))
+	}
+	if !uniqueString(customResource.Spec.ServerGroups) {
+		errs = append(errs, errors.DuplicateItems("spec.serverGroups", "body"))
+	}
+	for i, class := range customResource.Spec.ServerSettings {
+		if !uniqueString(class.Services) {
+			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
 		}
-
-		for _, feature := range customResource.Spec.ExposedFeatures {
-			found := false
-			for _, f := range api.SupportedFeatures {
-				if feature == f {
-					found = true
-					break
-				}
-			}
-			if !found {
-				enums := make([]interface{}, len(api.SupportedFeatures))
-				for idx, enum := range api.SupportedFeatures {
-					enums[idx] = enum
-				}
-				err := errors.EnumFail("spec.exposedFeatures", "body", nil, enums)
-				errs = append(errs, err)
-			}
+		if !uniqueString(class.ServerGroups) {
+			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
 		}
-	}
-
-	if customResource.Spec.AdminConsoleServices != nil {
-		for _, svc := range customResource.Spec.AdminConsoleServices {
-			if !services.Contains(svc) {
-				err := errors.EnumFail("spec.adminConsoleServices", "body", nil,
-					services.Interfaces())
-				errs = append(errs, err)
-				continue
-			}
-		}
-
-		if !uniqueString(customResource.Spec.AdminConsoleServices) {
-			errs = append(errs, errors.DuplicateItems("spec.adminConsoleServices", "body"))
-		}
-	}
-
-	// Check memory quota limits
-	if customResource.Spec.ClusterSettings.DataServiceMemQuota < DefaultServiceMemQuota {
-		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.dataServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
-	}
-	if customResource.Spec.ClusterSettings.IndexServiceMemQuota < DefaultServiceMemQuota {
-		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.indexServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
-	}
-	if customResource.Spec.ClusterSettings.SearchServiceMemQuota < DefaultServiceMemQuota {
-		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.searchServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
-	}
-	if customResource.Spec.ClusterSettings.EventingServiceMemQuota < DefaultServiceMemQuota {
-		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.eventingServiceMemoryQuota", "body", DefaultServiceMemQuota, false))
-	}
-	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota < DefaultAnalyticsServiceMemQuota {
-		errs = append(errs, errors.ExceedsMinimumUint("spec.cluster.analyticsServiceMemoryQuota", "body", DefaultAnalyticsServiceMemQuota, false))
 	}
 
 	// Ensure unnecessary settings in memcached and ephemeral buckets are nil
@@ -215,7 +176,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 			continue
 		}
 
-		if customResource.Spec.BucketSettings[i].EnableIndexReplica != nil {
+		if customResource.Spec.BucketSettings[i].EnableIndexReplica == true {
 			err := errors.InvalidType("enableReplicaIndex", fmt.Sprintf("spec.buckets[%d]", i),
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
@@ -225,25 +186,25 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 			continue
 		}
 
-		if customResource.Spec.BucketSettings[i].BucketReplicas != nil {
+		if customResource.Spec.BucketSettings[i].BucketReplicas != 0 {
 			err := errors.InvalidType("bucketReplicas", fmt.Sprintf("spec.buckets[%d]", i),
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
 		}
 
-		if customResource.Spec.BucketSettings[i].ConflictResolution != nil {
+		if customResource.Spec.BucketSettings[i].ConflictResolution != "" {
 			err := errors.InvalidType("conflictResolution", fmt.Sprintf("spec.buckets[%d]", i),
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
 		}
 
-		if customResource.Spec.BucketSettings[i].EvictionPolicy != nil {
+		if customResource.Spec.BucketSettings[i].EvictionPolicy != "" {
 			err := errors.InvalidType("evictionPolicy", fmt.Sprintf("spec.buckets[%d]", i),
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
 		}
 
-		if customResource.Spec.BucketSettings[i].IoPriority != nil {
+		if customResource.Spec.BucketSettings[i].IoPriority != "" {
 			err := errors.InvalidType("ioPriority", fmt.Sprintf("spec.buckets[%d]", i),
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
@@ -251,33 +212,21 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	// Check bucket parameter constraints
-	for _, bucket := range customResource.Spec.BucketSettings {
+	for i, bucket := range customResource.Spec.BucketSettings {
 		if bucket.BucketType == constants.BucketTypeMemcached {
 			continue
 		}
 
-		if bucket.BucketReplicas == nil {
-			errs = append(errs, errors.Required("spec.buckets.replicas", "body"))
-		} else if *bucket.BucketReplicas < 0 {
-			errs = append(errs, errors.ExceedsMinimumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasZero), false))
-		} else if *bucket.BucketReplicas > 3 {
-			errs = append(errs, errors.ExceedsMaximumInt("spec.buckets.replicas", "body", int64(constants.BucketReplicasThree), false))
+		if customResource.Spec.BucketSettings[i].ConflictResolution == "" {
+			errs = append(errs, errors.Required("conflictResolution", fmt.Sprintf("spec.buckets[%d]", i)))
 		}
 
-		ioPriorities := EnumList{
-			constants.BucketIoPriorityHigh,
-			constants.BucketIoPriorityLow,
-		}
-		if bucket.IoPriority == nil || !ioPriorities.Contains(*bucket.IoPriority) {
-			errs = append(errs, errors.EnumFail("spec.buckets.ioPriority", "body", nil, ioPriorities.Interfaces()))
+		if customResource.Spec.BucketSettings[i].EvictionPolicy == "" {
+			errs = append(errs, errors.Required("evictionPolicy", fmt.Sprintf("spec.buckets[%d]", i)))
 		}
 
-		conflictResolutions := EnumList{
-			constants.BucketConflictResolutionSeqno,
-			constants.BucketConflictResolutionTimestamp,
-		}
-		if bucket.ConflictResolution == nil || !conflictResolutions.Contains(*bucket.ConflictResolution) {
-			errs = append(errs, errors.EnumFail("spec.buckets.conflictResolution", "body", nil, conflictResolutions.Interfaces()))
+		if customResource.Spec.BucketSettings[i].IoPriority == "" {
+			errs = append(errs, errors.Required("ioPriority", fmt.Sprintf("spec.buckets[%d]", i)))
 		}
 
 		switch bucket.BucketType {
@@ -286,20 +235,16 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 				constants.BucketEvictionPolicyNoEviction,
 				constants.BucketEvictionPolicyNRUEviction,
 			}
-			if bucket.EvictionPolicy == nil || !evictionPolicies.Contains(*bucket.EvictionPolicy) {
-				errs = append(errs, errors.EnumFail("spec.buckets.evictionPolicy", "body", nil, evictionPolicies.Interfaces()))
+			if !evictionPolicies.Contains(bucket.EvictionPolicy) {
+				errs = append(errs, errors.EnumFail("evictionPolicy", fmt.Sprintf("spec.buckets[%d]", i), nil, evictionPolicies.Interfaces()))
 			}
 		case constants.BucketTypeCouchbase:
 			evictionPolicies := EnumList{
 				constants.BucketEvictionPolicyValueOnly,
 				constants.BucketEvictionPolicyFullEviction,
 			}
-			if bucket.EvictionPolicy == nil || !evictionPolicies.Contains(*bucket.EvictionPolicy) {
-				errs = append(errs, errors.EnumFail("spec.buckets.evictionPolicy", "body", nil, evictionPolicies.Interfaces()))
-			}
-
-			if bucket.EnableIndexReplica == nil {
-				errs = append(errs, errors.Required("spec.buckets.enableIndexReplica", "body"))
+			if !evictionPolicies.Contains(bucket.EvictionPolicy) {
+				errs = append(errs, errors.EnumFail("evictionPolicy", fmt.Sprintf("spec.buckets[%d]", i), nil, evictionPolicies.Interfaces()))
 			}
 		}
 	}
@@ -314,35 +259,6 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	if totalBucketMemory > maxBucketQuota {
 		err := errors.ExceedsMaximumInt("spec.buckets[*].memoryQuota", "body", int64(maxBucketQuota), false)
 		errs = append(errs, err)
-	}
-
-	// Check auto failover settings
-	timeout := customResource.Spec.ClusterSettings.AutoFailoverTimeout
-	if err := BoundedErrorUint("spec.cluster.autoFailoverTimeout", "body", timeout, constants.AutoFailoverTimeoutMin, constants.AutoFailoverTimeoutMax); err != nil {
-		errs = append(errs, err)
-	}
-
-	maxCount := customResource.Spec.ClusterSettings.AutoFailoverMaxCount
-	if err := BoundedErrorUint("spec.cluster.autoFailoverMaxCount", "body", maxCount, constants.AutoFailoverMaxCountMin, constants.AutoFailoverMaxCountMax); err != nil {
-		errs = append(errs, err)
-	}
-
-	dataDiskIssuesTimePeriod := customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod
-	if err := BoundedErrorUint("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body", dataDiskIssuesTimePeriod, constants.AutoFailoverOnDataDiskIssuesTimePeriodMin, constants.AutoFailoverOnDataDiskIssuesTimePeriodMax); err != nil {
-		errs = append(errs, err)
-	}
-
-	for i, config := range customResource.Spec.ServerSettings {
-		for j, service := range config.Services {
-			if !services.Contains(service) {
-				errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].services[%d]", i, j), "body", nil,
-					services.Interfaces()))
-			}
-		}
-
-		if !uniqueString(config.Services) {
-			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
-		}
 	}
 
 	// Check to make sure:
@@ -437,9 +353,8 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	// version check
-	err := couchbaseutil.VerifyVersion(customResource.Spec.Version)
-	if err != nil {
-		err := errors.FailedPattern("version", "spec.Version", `i.e "enterprise-5.5.0"`)
+	if err := couchbaseutil.VerifyVersion(customResource.Spec.Version); err != nil {
+		err := errors.FailedPattern("spec.version", "body", k8sutil.VersionPattern)
 		errs = append(errs, err)
 	}
 
@@ -480,17 +395,17 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 					errs = append(errs, err)
 				}
 
-				if !stringPtrEquals(cur.ConflictResolution, up.ConflictResolution) {
+				if cur.ConflictResolution != up.ConflictResolution {
 					err := &UpdateError{fmt.Sprintf("spec.buckets[%d].conflictResolution", i), "body"}
 					errs = append(errs, err)
 				}
 
-				if !stringPtrEquals(cur.IoPriority, up.IoPriority) {
+				if cur.IoPriority != up.IoPriority {
 					warn := Warning(fmt.Sprintf("Changing the IO Priority will cause the bucket %s to be temporarily unavailable", cur.BucketName))
 					warns = append(warns, warn)
 				}
 
-				if !stringPtrEquals(cur.EvictionPolicy, up.EvictionPolicy) {
+				if cur.EvictionPolicy != up.EvictionPolicy {
 					warn := Warning(fmt.Sprintf("Changing the Eviction Policy will cause the bucket %s to be temporarily unavailable", cur.BucketName))
 					warns = append(warns, warn)
 				}

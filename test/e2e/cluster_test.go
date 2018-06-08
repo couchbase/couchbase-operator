@@ -402,7 +402,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	if err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
-	if !strings.Contains(err.Error(), "spec.cluster.autoFailoverTimeout in body should be greater than or equal to 1") {
+	if !strings.Contains(err.Error(), "spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5") {
 		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
 	err = e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier)
@@ -1022,12 +1022,12 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 
 // Tests basic MDS Scaling
 // 1. Create 1 node cluster with data service only
-// 2. Add n1ql service to cluster (verify via rest call to cluster)
+// 2. Add query service to cluster (verify via rest call to cluster)
 // 3. Add index service to cluster (verify via rest call to cluster)
 // 4. Add search service to cluster (verify via rest call to cluster)
 // 5. Remove search service from cluster (verify via rest call to cluster)
 // 6. Remove index service from cluster (verify via rest call to cluster)
-// 7. Remove n1ql service from cluster (verify via rest call to cluster)
+// 7. Remove query service from cluster (verify via rest call to cluster)
 func TestBasicMDSScaling(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1062,12 +1062,12 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	// adding n1ql service
-	t.Log("adding n1ql service")
+	// adding query service
+	t.Log("adding query service")
 	newService := api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_2",
-		Services: []string{"n1ql"},
+		Services: []string{"query"},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1090,7 +1090,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
-		t.Fatalf("failed to add n1ql service: %v", err)
+		t.Fatalf("failed to add query service: %v", err)
 	}
 
 	// adding index service
@@ -1125,11 +1125,11 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 
 	// adding search service
-	t.Log("adding fts service")
+	t.Log("adding search service")
 	newService = api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_4",
-		Services: []string{"fts"},
+		Services: []string{"search"},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries5)
 	if err != nil {
@@ -1152,11 +1152,11 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
-		t.Fatalf("failed to add fts service: %v", err)
+		t.Fatalf("failed to add search service: %v", err)
 	}
 
 	// removing search service
-	t.Log("removing fts service")
+	t.Log("removing search service")
 	removeServiceName := "test_config_4"
 	testCouchbase, err = e2eutil.RemoveServices(targetKube.CRClient, testCouchbase, removeServiceName, e2eutil.Retries10)
 	if err != nil {
@@ -1179,7 +1179,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
-		t.Fatalf("failed to remove fts service: %v", err)
+		t.Fatalf("failed to remove search service: %v", err)
 	}
 
 	// removing index service
@@ -1209,8 +1209,8 @@ func TestBasicMDSScaling(t *testing.T) {
 		t.Fatalf("failed to remove index service: %v", err)
 	}
 
-	// removing n1ql service
-	t.Log("removing n1ql service")
+	// removing query service
+	t.Log("removing query service")
 	removeServiceName = "test_config_2"
 	testCouchbase, err = e2eutil.RemoveServices(targetKube.CRClient, testCouchbase, removeServiceName, e2eutil.Retries10)
 	if err != nil {
@@ -1233,7 +1233,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
-		t.Fatalf("failed to remove n1ql service: %v", err)
+		t.Fatalf("failed to remove query service: %v", err)
 	}
 
 	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
@@ -1252,12 +1252,12 @@ func TestBasicMDSScaling(t *testing.T) {
 
 // Tests swapping nodes between services
 // 1. Create 1 node cluster with data service only
-// 2. Add n1ql service to cluster, 1 node (verify via rest call to cluster)
+// 2. Add query service to cluster, 1 node (verify via rest call to cluster)
 // 3. Add index service to cluster, 1 node (verify via rest call to cluster)
 // 4. Add search service to cluster, 2 nodes (verify via rest call to cluster)
 // 5. Swap node from search service to index service (verify via rest call to cluster)
-// 6. Swap node from index service to n1ql service (verify via rest call to cluster)
-// 7. Swap node from n1ql service to data service (verify via rest call to cluster)
+// 6. Swap node from index service to query service (verify via rest call to cluster)
+// 7. Swap node from query service to data service (verify via rest call to cluster)
 func TestSwapNodesBetweenServices(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1294,12 +1294,12 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	// adding n1ql service
-	t.Log("adding n1ql service")
+	// adding query service
+	t.Log("adding query service")
 	newService := api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_2",
-		Services: []string{"n1ql"},
+		Services: []string{"query"},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1322,7 +1322,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
-		t.Fatalf("failed to add n1ql service: %v", err)
+		t.Fatalf("failed to add query service: %v", err)
 	}
 
 	// adding index service
@@ -1357,11 +1357,11 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	// adding search services
-	t.Log("adding fts service")
+	t.Log("adding search service")
 	newService = api.ServerConfig{
 		Size:     2,
 		Name:     "test_config_4",
-		Services: []string{"fts"},
+		Services: []string{"search"},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1385,7 +1385,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
-		t.Fatalf("failed to add fts service: %v", err)
+		t.Fatalf("failed to add search service: %v", err)
 	}
 
 	// swapping nodes search - 1 and index + 1
@@ -1419,7 +1419,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		t.Fatalf("failed to scale test_config_4--, test_config_3++: %v", err)
 	}
 
-	// swapping nodes index - 1 and n1ql + 1
+	// swapping nodes index - 1 and query + 1
 	t.Log("swaping nodes: test_config_3--, test_config_2++")
 	swapMap = map[string]int{
 		"test_config_3": 1,
@@ -1450,7 +1450,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		t.Fatalf("failed to scale test_config_3--, test_config_2++: %v", err)
 	}
 
-	// swapping nodes n1ql - 1 and data + 1
+	// swapping nodes query - 1 and data + 1
 	t.Log("swaping nodes: test_config_2--, test_config_1++")
 	swapMap = map[string]int{
 		"test_config_2": 1,
@@ -1533,7 +1533,7 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 }
 
 // Tests creating a cluster where the data service is the second service listed in the spec
-// 1. Attempt to create a 2 node cluster with cluster spec order {[n1ql,fts,search], [data]}
+// 1. Attempt to create a 2 node cluster with cluster spec order {[query,search,search], [data]}
 // 2. Verify cluster was created via rest call
 func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
@@ -1773,12 +1773,12 @@ func TestManageMultipleClusters(t *testing.T) {
 		BucketName:         "default1",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
+		EnableIndexReplica: constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig1 := []api.BucketConfig{bucketSetting1}
 	t.Logf("Desired Bucket Properties: %v\n", bucketConfig1)
@@ -1807,12 +1807,12 @@ func TestManageMultipleClusters(t *testing.T) {
 		BucketName:         "default2",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
+		EnableIndexReplica: constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig2 := []api.BucketConfig{bucketSetting2}
 	t.Logf("Desired Bucket Properties: %v\n", bucketConfig2)
@@ -1841,12 +1841,12 @@ func TestManageMultipleClusters(t *testing.T) {
 		BucketName:         "default3",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
+		EnableIndexReplica: constants.BucketIndexReplicasEnabled,
 	}
 	bucketConfig3 := []api.BucketConfig{bucketSetting3}
 	t.Logf("Desired Bucket Properties: %v\n", bucketConfig3)

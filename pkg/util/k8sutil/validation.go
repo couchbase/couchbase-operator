@@ -5,15 +5,24 @@ import (
 )
 
 var (
-	maximumAutofailoverTimeout float64 = 3600
-	minimumServiceMemoryQuota  float64 = 256
-	minimumBucketQuota         float64 = 100
-	minimumAutofailoverTimeout float64 = 1
-	minimumServersSize         float64 = 1
-	minimumServicesLength      int64   = 1
-	minimumServersLength       int64   = 1
-	minimumStringLength        int64   = 1
-	maximumServicesLength      int64   = 4
+	maximumAutofailoverTimeout         float64 = 3600
+	minimumServiceMemoryQuota          float64 = 256
+	minimumAnalyticsServiceMemoryQuota float64 = 1024
+	minimumBucketQuota                 float64 = 100
+	minimumAutofailoverTimeout         float64 = 5
+	minimumServersSize                 float64 = 1
+	minimumServicesLength              int64   = 1
+	minimumServersLength               int64   = 1
+	minimumStringLength                int64   = 1
+	maximumAdminConsoleServices        int64   = 6
+	minimumBucketReplicas              float64 = 0
+	maximumBucketReplicas              float64 = 3
+	minimumAutofailoverMaxCount        float64 = 1
+	maximumAutofailoverMaxCount        float64 = 3
+)
+
+const (
+	VersionPattern = `^([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
 )
 
 func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidation {
@@ -33,7 +42,8 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 							Type: "string",
 						},
 						"version": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "string",
+							Type:    "string",
+							Pattern: VersionPattern,
 						},
 						"paused": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "boolean",
@@ -48,8 +58,47 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 						"exposeAdminConsole": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "boolean",
 						},
-						"adminConsoleServices": apiextensionsv1beta1.JSONSchemaProps{},
-						"DisableBucketManagement": apiextensionsv1beta1.JSONSchemaProps{
+						"adminConsoleServices": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "array",
+							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+								Schema: &apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+									Enum: []apiextensionsv1beta1.JSON{
+										{Raw: []byte(`"data"`)},
+										{Raw: []byte(`"index"`)},
+										{Raw: []byte(`"query"`)},
+										{Raw: []byte(`"search"`)},
+										{Raw: []byte(`"eventing"`)},
+										{Raw: []byte(`"analytics"`)},
+									},
+								},
+							},
+						},
+						"exposedFeatures": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "array",
+							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+								Schema: &apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+									Enum: []apiextensionsv1beta1.JSON{
+										{Raw: []byte(`"admin"`)},
+										{Raw: []byte(`"xdcr"`)},
+										{Raw: []byte(`"client"`)},
+									},
+								},
+							},
+						},
+						"softwareUpdateNotifications": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "boolean",
+						},
+						"serverGroups": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "array",
+							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+								Schema: &apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+						"disableBucketManagement": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "boolean",
 						},
 						"cluster": apiextensionsv1beta1.JSONSchemaProps{
@@ -74,21 +123,41 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 									Type:    "integer",
 									Minimum: &minimumServiceMemoryQuota,
 								},
+								"eventingServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "integer",
+									Minimum: &minimumServiceMemoryQuota,
+								},
+								"analyticsServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "integer",
+									Minimum: &minimumAnalyticsServiceMemoryQuota,
+								},
 								"indexStorageSetting": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 									Enum: []apiextensionsv1beta1.JSON{
-										{
-											Raw: []byte(`"plasma"`),
-										},
-										{
-											Raw: []byte(`"memory_optimized"`),
-										},
+										{Raw: []byte(`"plasma"`)},
+										{Raw: []byte(`"memory_optimized"`)},
 									},
 								},
 								"autoFailoverTimeout": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "integer",
 									Minimum: &minimumAutofailoverTimeout,
 									Maximum: &maximumAutofailoverTimeout,
+								},
+								"autoFailoverMaxCount": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "integer",
+									Minimum: &minimumAutofailoverMaxCount,
+									Maximum: &maximumAutofailoverMaxCount,
+								},
+								"autoFailoverOnDataDiskIssues": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
+								},
+								"autoFailoverOnDataDiskIssuesTimePeriod": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "integer",
+									Minimum: &minimumAutofailoverTimeout,
+									Maximum: &maximumAutofailoverTimeout,
+								},
+								"autoFailoverServerGroup": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
 								},
 							},
 						},
@@ -110,27 +179,49 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 										"type": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "string",
 											Enum: []apiextensionsv1beta1.JSON{
-												{
-													Raw: []byte(`"couchbase"`),
-												},
-												{
-													Raw: []byte(`"ephemeral"`),
-												},
-												{
-													Raw: []byte(`"memcached"`),
-												},
+												{Raw: []byte(`"couchbase"`)},
+												{Raw: []byte(`"ephemeral"`)},
+												{Raw: []byte(`"memcached"`)},
 											},
 										},
 										"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{
 											Type:    "integer",
 											Minimum: &minimumBucketQuota,
 										},
-										"replicas":           apiextensionsv1beta1.JSONSchemaProps{},
-										"ioPriority":         apiextensionsv1beta1.JSONSchemaProps{},
-										"evictionPolicy":     apiextensionsv1beta1.JSONSchemaProps{},
-										"conflictResolution": apiextensionsv1beta1.JSONSchemaProps{},
-										"enableFlush":        apiextensionsv1beta1.JSONSchemaProps{},
-										"enableIndexReplica": apiextensionsv1beta1.JSONSchemaProps{},
+										"replicas": apiextensionsv1beta1.JSONSchemaProps{
+											Type:    "integer",
+											Minimum: &minimumBucketReplicas,
+											Maximum: &maximumBucketReplicas,
+										},
+										"ioPriority": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+											Enum: []apiextensionsv1beta1.JSON{
+												{Raw: []byte(`"high"`)},
+												{Raw: []byte(`"low"`)},
+											},
+										},
+										"evictionPolicy": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+											Enum: []apiextensionsv1beta1.JSON{
+												{Raw: []byte(`"valueOnly"`)},
+												{Raw: []byte(`"fullEviction"`)},
+												{Raw: []byte(`"noEviction"`)},
+												{Raw: []byte(`"nruEviction"`)},
+											},
+										},
+										"conflictResolution": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+											Enum: []apiextensionsv1beta1.JSON{
+												{Raw: []byte(`"seqno"`)},
+												{Raw: []byte(`"lww"`)},
+											},
+										},
+										"enableFlush": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "boolean",
+										},
+										"enableIndexReplica": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "boolean",
+										},
 									},
 								},
 							},
@@ -157,8 +248,30 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 											MinLength: &minimumStringLength,
 										},
 										"services": apiextensionsv1beta1.JSONSchemaProps{
-											Type:      "array",
+											Type: "array",
+											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+													Enum: []apiextensionsv1beta1.JSON{
+														{Raw: []byte(`"data"`)},
+														{Raw: []byte(`"index"`)},
+														{Raw: []byte(`"query"`)},
+														{Raw: []byte(`"search"`)},
+														{Raw: []byte(`"eventing"`)},
+														{Raw: []byte(`"analytics"`)},
+													},
+												},
+											},
 											MinLength: &minimumServicesLength,
+										},
+
+										"serverGroups": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "array",
+											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+											},
 										},
 										"pod": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "object",

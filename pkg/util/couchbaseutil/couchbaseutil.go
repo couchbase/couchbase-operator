@@ -632,20 +632,16 @@ func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 		return rv
 	}
 
-	if config.BucketReplicas != nil {
-		rv.BucketReplicas = *config.BucketReplicas
-	}
+	// Required ephemeral/couchbase fields
+	rv.BucketReplicas = config.BucketReplicas
+	rv.IoPriority = cbmgr.IoPriorityType(config.IoPriority)
+	rv.EvictionPolicy = &config.EvictionPolicy
+	rv.ConflictResolution = &config.ConflictResolution
 
-	if config.IoPriority != nil {
-		rv.IoPriority = cbmgr.IoPriorityType(*config.IoPriority)
-	}
-
-	rv.ConflictResolution = config.ConflictResolution
-	rv.EvictionPolicy = config.EvictionPolicy
-
+	// Required couchbase only fields
 	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {
 		rv.BucketType = constants.BucketTypeCouchbase
-		rv.EnableIndexReplica = config.EnableIndexReplica
+		rv.EnableIndexReplica = &config.EnableIndexReplica
 	}
 
 	return rv
@@ -658,25 +654,22 @@ func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) *cbapi.BucketConfig {
 		BucketMemoryQuota: bucket.BucketMemoryQuota,
 	}
 
-	if bucket.EnableFlush == nil || *bucket.EnableFlush == false {
-		rv.EnableFlush = false
-	} else {
-		rv.EnableFlush = true
-	}
+	rv.EnableFlush = bucket.EnableFlush != nil && *bucket.EnableFlush
 
 	if rv.BucketType == constants.BucketTypeMemcached {
 		return rv
 	}
 
-	ioPriority := string(bucket.IoPriority)
-	rv.BucketReplicas = &bucket.BucketReplicas
-	rv.IoPriority = &ioPriority
-	rv.ConflictResolution = bucket.ConflictResolution
-	rv.EvictionPolicy = bucket.EvictionPolicy
+	// Required ephemeral/couchbase fields
+	rv.BucketReplicas = bucket.BucketReplicas
+	rv.IoPriority = string(bucket.IoPriority)
+	rv.EvictionPolicy = *bucket.EvictionPolicy
+	rv.ConflictResolution = *bucket.ConflictResolution
 
+	// Required couchbase only fields
 	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {
 		rv.BucketType = constants.BucketTypeCouchbase
-		rv.EnableIndexReplica = bucket.EnableIndexReplica
+		rv.EnableIndexReplica = *bucket.EnableIndexReplica
 	}
 
 	return rv

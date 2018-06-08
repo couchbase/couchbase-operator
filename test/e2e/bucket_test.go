@@ -28,12 +28,12 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		BucketName:         "default1",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: &constants.BucketIndexReplicasEnabled,
+		EnableIndexReplica: constants.BucketIndexReplicasEnabled,
 	}
 	bucket2 := api.BucketConfig{
 		BucketName:        "default2",
@@ -45,20 +45,20 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		BucketName:         "default3",
 		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyNoEviction,
-		ConflictResolution: &constants.BucketConflictResolutionTimestamp,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyNoEviction,
+		ConflictResolution: constants.BucketConflictResolutionTimestamp,
 		EnableFlush:        constants.BucketFlushEnabled,
 	}
 	bucket4 := api.BucketConfig{
 		BucketName:         "default4",
 		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyNRUEviction,
-		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyNRUEviction,
+		ConflictResolution: constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
 	}
 	bucketSettingsList := []api.BucketConfig{bucket1, bucket2, bucket3, bucket4}
@@ -302,12 +302,12 @@ func TestNegBucketAdd(t *testing.T) {
 		BucketName:         "default",
 		BucketType:         constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: &constants.BucketIndexReplicasDisabled,
+		EnableIndexReplica: constants.BucketIndexReplicasDisabled,
 	}
 	bucketConfig := []api.BucketConfig{bucketSettings}
 
@@ -447,7 +447,7 @@ func TestEditBucket(t *testing.T) {
 	// verify
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return *bucket.BucketReplicas == 2
+			return bucket.BucketReplicas == 2
 		}
 		return false
 	}
@@ -471,7 +471,7 @@ func TestEditBucket(t *testing.T) {
 	// verify
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return *bucket.BucketReplicas == 1
+			return bucket.BucketReplicas == 1
 		}
 		return false
 	}
@@ -694,65 +694,6 @@ func TestNegBucketEdit(t *testing.T) {
 		t.Fatalf("failed to verify bucket: %v", err)
 	}
 
-	// edit conflict resolution
-	timestamp := "timestamp"
-	updateFunc = func(cl *api.CouchbaseCluster) {
-		cl.Spec.BucketSettings[0].ConflictResolution = &timestamp
-	}
-
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
-		t.Fatalf("failed to post updated cluster spec: %v", err)
-	}
-
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return *bucket.ConflictResolution == timestamp
-		}
-		return false
-	}
-	err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
-	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
-		t.Fatalf("failed to prevent changing conflict resolution: %v", err)
-	}
-
-	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "ConflictResolution", "timestamp", e2eutil.BucketInfoVerifier)
-	if err == nil {
-		t.Fatalf("failed to verify prevent changing conflict resolution: %v", err)
-	}
-
-	message = "Bucket: default cannot change (default) bucket param='conflictResolution' from 'seqno' to 'timestamp'"
-	err = e2eutil.WaitForConditionMessage(t, targetKube.CRClient, 10, testCouchbase, api.ClusterConditionManageBuckets, message)
-	if err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
-	}
-
-	// revert edit conflict resolution
-	t.Logf("reverting conflict resoltuion edit")
-	seqno := "seqno"
-	updateFunc = func(cl *api.CouchbaseCluster) {
-		cl.Spec.BucketSettings[0].ConflictResolution = &seqno
-	}
-
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, e2eutil.Retries5, updateFunc); err != nil {
-		t.Fatalf("failed to post updated cluster spec: %v", err)
-	}
-
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return *bucket.ConflictResolution == seqno
-		}
-		return false
-	}
-	err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, e2eutil.Retries5, testCouchbase, acceptsBucketFunc)
-	if err != nil {
-		t.Fatalf("failed to revert bucket edit: %v", err)
-	}
-
-	err = e2eutil.VerifyBucketInfo(t, client, e2eutil.Retries5, "default", "ConflictResolution", "seqno", e2eutil.BucketInfoVerifier)
-	if err != nil {
-		t.Fatalf("failed to verify bucket: %v", err)
-	}
-
 	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
@@ -938,7 +879,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// make a bucket spec with bucket replicas = 3
 	t.Logf("externally changing bucket replicas to: 3")
 	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.BucketReplicas = &constants.BucketReplicasThree
+		b.BucketReplicas = constants.BucketReplicasThree
 	})
 	if err != nil {
 		t.Fatalf("error occurred converting bucket spec %v", err)
@@ -959,7 +900,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
 			t.Logf("bucket replicas: %v", bucket.BucketReplicas)
-			if *bucket.BucketReplicas == 1 {
+			if bucket.BucketReplicas == 1 {
 				return true
 			}
 		}
@@ -983,7 +924,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// make a bucket spec with io priority = "low"
 	t.Logf("externally changing bucket io priority to: low")
 	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.IoPriority = &constants.BucketIoPriorityLow
+		b.IoPriority = constants.BucketIoPriorityLow
 	})
 	if err != nil {
 		t.Fatalf("error occurred converting bucket spec %v", err)
@@ -1004,7 +945,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
 		if bucket, ok := c.Status.Buckets["default"]; ok {
 			t.Logf("io priority: %v", bucket.IoPriority)
-			if *bucket.IoPriority == "high" {
+			if bucket.IoPriority == "high" {
 				return true
 			}
 		}

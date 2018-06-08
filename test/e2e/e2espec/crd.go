@@ -22,14 +22,15 @@ var (
 // cluster settings
 var (
 	defaultClusterSettings = api.ClusterConfig{
-		DataServiceMemQuota:      256,
-		IndexServiceMemQuota:     256,
-		SearchServiceMemQuota:    256,
-		EventingServiceMemQuota:  256,
-		AnalyticsServiceMemQuota: 1024,
-		IndexStorageSetting:      constants.IndexStorageModeMemoryOptimized,
-		AutoFailoverTimeout:      30,
-		AutoFailoverMaxCount:     1,
+		DataServiceMemQuota:                    256,
+		IndexServiceMemQuota:                   256,
+		SearchServiceMemQuota:                  256,
+		EventingServiceMemQuota:                256,
+		AnalyticsServiceMemQuota:               1024,
+		IndexStorageSetting:                    constants.IndexStorageModeMemoryOptimized,
+		AutoFailoverTimeout:                    30,
+		AutoFailoverMaxCount:                   1,
+		AutoFailoverOnDataDiskIssuesTimePeriod: 120,
 	}
 )
 
@@ -39,12 +40,12 @@ var (
 		BucketName:         "default",
 		BucketType:         constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  256,
-		BucketReplicas:     &constants.BucketReplicasOne,
-		IoPriority:         &constants.BucketIoPriorityHigh,
-		EvictionPolicy:     &constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: &constants.BucketConflictResolutionSeqno,
+		BucketReplicas:     constants.BucketReplicasOne,
+		IoPriority:         constants.BucketIoPriorityHigh,
+		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+		ConflictResolution: constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: &constants.BucketIndexReplicasDisabled,
+		EnableIndexReplica: constants.BucketIndexReplicasDisabled,
 	}
 )
 
@@ -53,7 +54,7 @@ var (
 	defaultServerSettings = api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_1",
-		Services: []string{"data", "n1ql", "index"},
+		Services: []string{"data", "query", "index"},
 	}
 )
 
@@ -80,12 +81,12 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 											BucketName:         "default",
 											BucketType:         bucketType,
 											BucketMemoryQuota:  bucketMemoryQuota,
-											BucketReplicas:     &bucketReplica,
-											IoPriority:         &ioPriority,
-											EvictionPolicy:     &evictionPolicy,
-											ConflictResolution: &conflictResolution,
+											BucketReplicas:     bucketReplica,
+											IoPriority:         ioPriority,
+											EvictionPolicy:     evictionPolicy,
+											ConflictResolution: conflictResolution,
 											EnableFlush:        enableFlush,
-											EnableIndexReplica: &enableIndexReplica,
+											EnableIndexReplica: enableIndexReplica,
 										}
 										generatedSettings = append(generatedSettings, bucketSetting)
 									}
@@ -126,10 +127,10 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 										BucketName:         "default",
 										BucketType:         bucketType,
 										BucketMemoryQuota:  bucketMemoryQuota,
-										BucketReplicas:     &bucketReplica,
-										IoPriority:         &ioPriority,
-										EvictionPolicy:     &evictionPolicy,
-										ConflictResolution: &conflictResolution,
+										BucketReplicas:     bucketReplica,
+										IoPriority:         ioPriority,
+										EvictionPolicy:     evictionPolicy,
+										ConflictResolution: conflictResolution,
 										EnableFlush:        enableFlush,
 									}
 									generatedSettings = append(generatedSettings, bucketSetting)
@@ -162,7 +163,7 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 		ServerSettings: []api.ServerConfig{api.ServerConfig{
 			Size:     size,
 			Name:     "test_config_1",
-			Services: []string{"data", "n1ql", "index"},
+			Services: []string{"data", "query", "index"},
 		}},
 		ExposedFeatures: []string{},
 	}
@@ -259,22 +260,22 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 					bucketSettings.BucketMemoryQuota = bucketMemoryQuota
 				case setting == "bucketReplicas":
 					bucketReplicas, _ := strconv.Atoi(config[key][setting])
-					bucketSettings.BucketReplicas = &bucketReplicas
+					bucketSettings.BucketReplicas = bucketReplicas
 				case setting == "ioPriority":
 					ioPriority := config[key][setting]
-					bucketSettings.IoPriority = &ioPriority
+					bucketSettings.IoPriority = ioPriority
 				case setting == "evictionPolicy":
 					policy := config[key][setting]
-					bucketSettings.EvictionPolicy = &policy
+					bucketSettings.EvictionPolicy = policy
 				case setting == "conflictResolution":
 					confResoultion := config[key][setting]
-					bucketSettings.ConflictResolution = &confResoultion
+					bucketSettings.ConflictResolution = confResoultion
 				case setting == "enableFlush":
 					enableFlush, _ := strconv.ParseBool(config[key][setting])
 					bucketSettings.EnableFlush = enableFlush
 				case setting == "enableIndexReplica":
 					enableIndexReplica, _ := strconv.ParseBool(config[key][setting])
-					bucketSettings.EnableIndexReplica = &(enableIndexReplica)
+					bucketSettings.EnableIndexReplica = enableIndexReplica
 				}
 			}
 			bucketConfig = append(bucketConfig, bucketSettings)
