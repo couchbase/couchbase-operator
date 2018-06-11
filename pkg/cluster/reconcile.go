@@ -331,6 +331,10 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 // buckets one at a time based on comparison
 // of existing buckets to cluster spec
 func (c *Cluster) reconcileBuckets() error {
+	if c.cluster.Spec.DisableBucketManagement {
+		return nil
+	}
+
 	existingBuckets, err := c.client.GetBucketNames(c.readyMembers())
 	if err != nil {
 		return fmt.Errorf("Unable to get buckets from cluster: %v", err)

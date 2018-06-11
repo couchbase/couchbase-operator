@@ -125,6 +125,10 @@ type ClusterSpec struct {
 
 	// Security Context for all pods
 	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// DisableBucketManagement tells the reconcile loop to ignore all
+	// buckets in the system and leave that entirely to the customer
+	DisableBucketManagement bool `json:"disableBucketManagement,omitempty"`
 }
 
 type ClusterConfig struct {

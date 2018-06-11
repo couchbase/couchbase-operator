@@ -49,6 +49,9 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 							Type: "boolean",
 						},
 						"adminConsoleServices": apiextensionsv1beta1.JSONSchemaProps{},
+						"DisableBucketManagement": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "boolean",
+						},
 						"cluster": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
 							Required: []string{
