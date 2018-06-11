@@ -52,47 +52,8 @@ prod: container
 	cd build && tar -czf artifacts.zip artifacts && cd ..
 	rm -r $(ARTIFACTS)
 
-test:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestAll -v -timeout 360m \
-		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec)
-
-test-sanity:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestSanity -v -timeout 240m \
-		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec)
-
-test-p0:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestP0 -v -timeout 240m \
-		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec)
-
-test-p1:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestP1 -v -timeout 240m \
-		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec)
-
-test-cbopctl:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestCRDValidation -v -timeout 240m \
-		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec)
-
-test-system-beta:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestSystem -v -timeout 4320m \
-		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec) --duration 3 --skip-teardown
-
-test-system-full:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestSystem -v -timeout 4320m \
-		--race --kubeconfig $(kubeconfig) --operator-image $(operatorImage) \
-		--namespace $(namespace) --deployment-spec $(deploymentSpec) --duration 7 --skip-teardown
-
-
-test-indv:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run $(testname) \
-		-v -timeout 60m --race --kubeconfig $(kubeconfig) --operator-image \
-		$(operatorImage) --namespace $(namespace) --deployment-spec \
-		$(deploymentSpec)
+test-operator:
+	go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race
 
 test-unit:
 	go test -v github.com/couchbase/couchbase-operator/pkg/validator

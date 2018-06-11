@@ -18,13 +18,16 @@ func TestCreateStatefulCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
+	kubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[kubeName]
+
 	clusterSize := e2eutil.Size3
-	testCouchbase, err := e2eutil.NewStatefulCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.DefaultSecret.Name, clusterSize, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewStatefulCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	defer e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -33,7 +36,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	testCouchbase, err = e2eutil.GetClusterCRD(f.CRClient, testCouchbase)
+	testCouchbase, err = e2eutil.GetClusterCRD(targetKube.CRClient, testCouchbase)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -42,18 +45,18 @@ func TestCreateStatefulCluster(t *testing.T) {
 	claimTemplate := testCouchbase.Spec.VolumeClaimTemplates[0].Name
 	for i := 0; i < clusterSize; i++ {
 		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, i)
-		_, err := e2eutil.GetMemberPVC(f.KubeClient, f.Namespace, claimTemplate, memberName, 0, "default")
+		_, err := e2eutil.GetMemberPVC(targetKube.KubeClient, f.Namespace, claimTemplate, memberName, 0, "default")
 		if err != nil {
 			t.Fatalf("could not find persistent volume for member: %s, %v", memberName, err)
 		}
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	events, err := e2eutil.GetCouchbaseEvents(f.KubeClient, testCouchbase.Name, f.Namespace)
+	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}

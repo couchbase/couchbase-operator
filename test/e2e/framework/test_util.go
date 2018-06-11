@@ -1,0 +1,304 @@
+package framework
+
+import (
+	"bytes"
+	"errors"
+	"io/ioutil"
+	"os/exec"
+	"strconv"
+	"testing"
+
+	"gopkg.in/ini.v1"
+	"gopkg.in/yaml.v2"
+)
+
+// TestFunc defines the test function type
+type TestFunc func(*testing.T)
+
+// TestDecorator decorates a test function.  This is used to augment an
+// existing test usually to perform setup and tear-down tasks e.g.
+// initializing and deleting a cluster or applying TLS configuration
+type TestDecorator func(TestFunc) TestFunc
+
+// TestSuite defines a suite of tests
+type TestSuite map[string]TestFunc
+type TestSuiteDecorator map[string]TestDecorator
+
+// Map to store Testcase name to their respective Function objects
+type FuncMap map[string]func(*testing.T)
+type DecoratorMap map[string]TestDecorator
+
+// TestResult simply maps a test name to a pass/fail flag
+type TestResult struct {
+	Name   string
+	Result bool
+}
+
+// Variable to store the results globally
+var Results = []TestResult{}
+
+// Runtime configuration
+type KubeConfData struct {
+	ClusterName   string `yaml:"name"`
+	ClusterConfig string `yaml:"config"`
+}
+
+type TestRunParam struct {
+	Namespace      string         `yaml:"namespace"`
+	OperatorImage  string         `yaml:"operator-image"`
+	SuiteToRun     string         `yaml:"suite"`
+	DeploymentSpec string         `yaml:"deployment-spec"`
+	KubeType       string         `yaml:"kube-type"`
+	KubeVersion    string         `yaml:"kube-version"`
+	KubeConfig     []KubeConfData `yaml:"kube-config"`
+	TestDuration   string         `yaml:"duration"`
+	SkipTearDown   bool           `yaml:"skip-tear-down"`
+}
+
+// To decode cluster yaml file
+type ClusterInfo struct {
+	ClusterName    string   `yaml:"name"`
+	MasterNodeList []string `yaml:"master"`
+	WorkerNodeList []string `yaml:"worker"`
+}
+
+type ClusterConfig struct {
+	ClusterInfo []struct {
+		Type        string        `yaml:"type"`
+		ClusterList []ClusterInfo `yaml:"clusters"`
+	} `yaml:"types"`
+}
+
+// To decode test-suite yaml file
+type SuiteData struct {
+	SuiteName     string `yaml:"suite"`
+	TestCaseGroup []struct {
+		GroupName   string   `yaml:"name"`
+		ClusterName []string `yaml:"clusters"`
+		TestCase    []struct {
+			TcName     string   `yaml:"name"`
+			Decorators []string `yaml:"decorators"`
+		} `yaml:"testcases"`
+	} `yaml:"tcGroups"`
+}
+
+// analyzeResults accepts a list of test results and displays success rates
+func AnalyzeResults(t *testing.T) {
+	t.Logf("Suite Test Results: \n")
+
+	failures := []string{}
+	for i, result := range Results {
+		if result.Result {
+			t.Logf("%d: %s...PASS", i+1, result.Name)
+		}
+		if !result.Result {
+			t.Logf("%d: %s...FAIL", i+1, result.Name)
+			failures = append(failures, result.Name)
+
+		}
+	}
+
+	pass := float64(len(Results) - len(failures))
+	fail := float64(len(failures))
+	total := float64(len(Results))
+	passRate := float64((pass / total) * 100.0)
+
+	if fail > 0 {
+		t.Logf("Failures: ")
+		for i, test := range failures {
+			t.Logf("%d: %s", i+1, test)
+		}
+	}
+
+	t.Logf("\n Pass: %f \n Fail: %f \n Pass Rate: %f", pass, fail, passRate)
+	if fail > 0 {
+		t.Fatalf("suite contains failures")
+	}
+}
+
+// Create hosts file for each cluster to be used by Ansible script
+func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) error {
+	loadOptions := ini.LoadOptions{}
+	loadOptions.UnparseableSections = []string{"master_node", "worker_node"}
+	loadOptions.Loose = true
+
+	loginSectionData := map[string]string{
+		"ansible_connection":      "ssh",
+		"ansible_ssh_user":        "root",
+		"ansible_ssh_pass":        "couchbase",
+		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no",
+	}
+	masterSectionData := ""
+	workerSectionData := ""
+
+	newClusterConfig, err := ini.LoadSources(loadOptions, "")
+	if err != nil {
+		return errors.New("Unable to initialize cluster file: " + err.Error())
+	}
+
+	loginSectionForCluster, err := newClusterConfig.NewSection("all:vars")
+	if err != nil {
+		return errors.New("Error while creating new section 'all'")
+	}
+
+	for key, value := range loginSectionData {
+		loginSectionForCluster.NewKey(key, value)
+	}
+
+	for index, ip := range kubeClusterSpec.MasterNodeList {
+		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-master" + strconv.Itoa(index+1)
+		masterSectionData += ip + " " + hostnameStr + "\n"
+	}
+	for index, ip := range kubeClusterSpec.WorkerNodeList {
+		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-worker" + strconv.Itoa(index+1)
+		workerSectionData += ip + " " + hostnameStr + "\n"
+	}
+
+	_, err = newClusterConfig.NewRawSection("master_node", masterSectionData)
+	if err != nil {
+		return errors.New("Unable to create master_node section: " + err.Error())
+	}
+	_, err = newClusterConfig.NewRawSection("worker_node", workerSectionData)
+	if err != nil {
+		return errors.New("Unable to create worker_node section: " + err.Error())
+	}
+
+	err = newClusterConfig.SaveTo(filePathToSave)
+	if err != nil {
+		return errors.New("Unable to save cluster file: " + err.Error())
+	}
+	return nil
+}
+
+func runExecCommand(command *exec.Cmd) (string, string, error) {
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	err := command.Run()
+	return stdout.String(), stderr.String(), err
+}
+
+func ElementExistsInArr(itemToSearch string, itemList []string) bool {
+	for _, item := range itemList {
+		if item == itemToSearch {
+			return true
+		}
+	}
+	return false
+}
+
+// Read Test run params from test_config yaml file
+func ReadRuntimeConfig() (runTimeConfig TestRunParam, err error) {
+	ymlFilePath := "./resources/test_config.yml"
+	ymlFileContent, err := ioutil.ReadFile(ymlFilePath)
+	if err != nil {
+		err = errors.New("Unable to read test config file:" + err.Error())
+		return
+	}
+
+	err = yaml.Unmarshal(ymlFileContent, &runTimeConfig)
+	if err != nil {
+		err = errors.New("Unable to decode test config:" + err.Error())
+		return
+	}
+	return
+}
+
+// Function to read cluster specific data
+func GetClusterConfigFromYml(reqClusterType string, reqClusters []string) (clusters []ClusterInfo, err error) {
+	var clusterConf ClusterConfig
+
+	ymlFilePath := "./resources/cluster_conf.yml"
+	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
+	if err != nil {
+		err = errors.New("Unable to read cluster config file: " + err.Error())
+		return
+	}
+
+	err = yaml.Unmarshal(yamlFileContent, &clusterConf)
+	if err != nil {
+		err = errors.New("Unable to decode cluster config: " + err.Error())
+		return
+	}
+
+	for _, currClusterType := range clusterConf.ClusterInfo {
+		if currClusterType.Type == reqClusterType {
+			for _, currCluster := range currClusterType.ClusterList {
+				if ElementExistsInArr(currCluster.ClusterName, reqClusters) {
+					clusters = append(clusters, currCluster)
+				}
+			}
+		}
+	}
+	if len(reqClusters) != len(clusters) {
+		err = errors.New("Unable to get cluster config for all required clusters")
+	}
+	return
+}
+
+func GetKubeClusterForKubeName(targetKubeName string) (kubeClusterData ClusterInfo, err error) {
+	kubeClustersToSetup, err := GetClusterConfigFromYml(Global.KubeType, []string{targetKubeName})
+	if err != nil {
+		return
+	}
+	for _, kubeCluster := range kubeClustersToSetup {
+		if kubeCluster.ClusterName == targetKubeName {
+			kubeClusterData = kubeCluster
+			return
+		}
+	}
+	return
+}
+
+// Function to read Suite and required cluster info from suite.yaml file
+func GetSuiteDataFromYml(currSuiteName string) (suiteData SuiteData, err error) {
+	ymlFilePath := "./resources/suites/" + currSuiteName + ".yml"
+	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
+	if err != nil {
+		err = errors.New("Unable to read suite config file: " + err.Error())
+		return
+	}
+
+	err = yaml.Unmarshal(yamlFileContent, &suiteData)
+	if err != nil {
+		err = errors.New("Unable to decode suite config: " + err.Error())
+		return
+	}
+	return
+}
+
+func SetupK8SCluster(t *testing.T, kubeType, kubeVersion, ymlFilePath string, kubeClusterSpec ClusterInfo) error {
+	clusterHostFile := ymlFilePath + "/" + kubeClusterSpec.ClusterName
+	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yml"
+	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yml"
+
+	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
+	if err != nil {
+		return err
+	}
+
+	switch kubeType {
+	case "kubernetes":
+		t.Logf("Running ansible script for %s", kubeClusterSpec.ClusterName)
+
+		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
+		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam)
+		stdout, stderr, err := runExecCommand(ansibleCmd)
+		if err != nil {
+			t.Log(stdout)
+			t.Fatalf("Error during ansible execution: %v %s", stderr, err)
+		}
+
+		ansibleExtraVarParam = "kubeConfPathToSave=config_" + kubeClusterSpec.ClusterName
+		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "--extra-vars", ansibleExtraVarParam)
+		stdout, stderr, err = runExecCommand(ansibleCmd)
+		if err != nil {
+			t.Log(stdout)
+			return errors.New("Error during ansible execution: " + stderr + ":" + err.Error())
+		}
+		t.Logf("Cluster %s created successfully", kubeClusterSpec.ClusterName)
+	default:
+		return errors.New("Unsupported kube-type in test_config")
+	}
+	return nil
+}

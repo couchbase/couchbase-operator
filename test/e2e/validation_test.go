@@ -202,6 +202,8 @@ func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
 
 func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command string) []failure {
 	failures := []failure{}
+	kubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[kubeName]
 	for _, test := range testDefs {
 		t.Logf("Running test: %s", test.name)
 
@@ -209,12 +211,12 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 		if err != nil {
 			t.Logf("error: %v", err)
 			failures = append(failures, failure{testName: test.name, testError: err})
-			e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
 
-		t.Logf("setting secret: %+v", f.DefaultSecret)
-		testCouchbase.Spec.AuthSecret = f.DefaultSecret.Name
+		t.Logf("setting secret: %+v", targetKube.DefaultSecret)
+		testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
 
 		ns := os.Getenv("KUBENAMESPACE")
 		if ns != "" {
@@ -227,24 +229,24 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures = append(failures, failure{testName: test.name, testError: err})
-				e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 			cmdOut, err := RunCBOPCTL("create")
 			t.Logf("Returned: %s", string(cmdOut))
 			if err != nil && !test.shouldFail {
 				failures = append(failures, failure{testName: test.name, testError: err})
-				e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 
 			if !test.shouldFail {
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20)
+				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20)
 				if err != nil {
 					t.Logf("error: %v", err)
 					failures = append(failures, failure{testName: test.name, testError: err})
-					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 			}
@@ -253,7 +255,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures = append(failures, failure{testName: test.name, testError: err})
-				e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -264,7 +266,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures = append(failures, failure{testName: test.name, testError: err})
-				e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -273,7 +275,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 		if err != nil {
 			t.Logf("error: %v", err)
 			failures = append(failures, failure{testName: test.name, testError: err})
-			e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
 
@@ -281,17 +283,17 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 		t.Logf("Returned: %s", string(cmdOut))
 		if err != nil && !test.shouldFail {
 			failures = append(failures, failure{testName: test.name, testError: err})
-			e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
 
-		clusters, err := f.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
+		clusters, err := targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 
 		if test.shouldWarn {
 			if !strings.Contains(string(cmdOut), test.expectedWarn) || test.expectedWarn == "" {
 				t.Logf("expected warning: %+v \n returned message: %+v \n", test.expectedWarn, string(cmdOut))
 				failures = append(failures, failure{testName: test.name, testError: errors.New("incorrect warning")})
-				e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -300,7 +302,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			if !strings.Contains(string(cmdOut), message) || message == "" {
 				t.Logf("expected message: %+v \n returned message: %+v \n", message, string(cmdOut))
 				failures = append(failures, failure{testName: test.name, testError: errors.New("incorrect message")})
-				e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -308,7 +310,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			if command == "delete" || command == "apply" {
 				if len(clusters.Items) != 1 {
 					failures = append(failures, failure{testName: test.name, testError: errors.New("cluster deletion should fail")})
-					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 			}
@@ -316,7 +318,7 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			if command == "create" {
 				if len(clusters.Items) != 0 {
 					failures = append(failures, failure{testName: test.name, testError: errors.New("cluster creation should fail")})
-					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 			}
@@ -324,20 +326,20 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 			if command == "delete" {
 				if len(clusters.Items) != 0 {
 					failures = append(failures, failure{testName: test.name, testError: errors.New("cluster deletion should work")})
-					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
-				_, err = e2eutil.WaitPodsDeleted(f.KubeClient, ns, e2eutil.Retries30, metav1.ListOptions{LabelSelector: "app=couchbase"})
+				_, err = e2eutil.WaitPodsDeleted(targetKube.KubeClient, ns, e2eutil.Retries30, metav1.ListOptions{LabelSelector: "app=couchbase"})
 				if err != nil {
 					failures = append(failures, failure{testName: test.name, testError: err})
-					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				t.Logf("deleted couchbase cluster: \n%+v", testCouchbase)
 			} else {
 				if len(clusters.Items) != 1 {
 					failures = append(failures, failure{testName: test.name, testError: errors.New("only one cluster should be created")})
-					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				testCouchbase = &clusters.Items[0]
@@ -346,23 +348,23 @@ func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command s
 					err = VerifyClusterParameter(testCouchbase, param)
 					if err != nil {
 						failures = append(failures, failure{testName: test.name, testError: err})
-						e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+						e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 						continue
 					}
 				}
 
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				err = e2eutil.WaitClusterStatusHealthy(t, f.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
+				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
 				if err != nil {
 					t.Logf("error: %v", err)
 					failures = append(failures, failure{testName: test.name, testError: err})
-					e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				t.Logf("created couchbase cluster: \n%+v", testCouchbase)
 			}
 		}
-		e2eutil.CleanUpCluster(t, f.KubeClient, f.CRClient, f.Namespace, f.LogDir)
+		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 		time.Sleep(10 * time.Second) //should add a wait for number of couchbase pods to be 0
 	}
 	return failures

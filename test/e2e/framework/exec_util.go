@@ -47,10 +47,10 @@ type ExecOptions struct {
 // ExecWithOptions executes a command in the specified container,
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
-func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error) {
+func (f *Framework) ExecWithOptions(kubeName string, options ExecOptions) (string, string, error) {
 	const tty = false
 
-	req := f.KubeClient.CoreV1().RESTClient().Post().
+	req := f.ClusterSpec[kubeName].KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
 		Namespace(options.Namespace).
@@ -66,7 +66,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
-	err := execute("POST", req.URL(), f.Config, options.Stdin, &stdout, &stderr, tty)
+	err := execute("POST", req.URL(), f.ClusterSpec[kubeName].Config, options.Stdin, &stdout, &stderr, tty)
 	if err != nil {
 		return "", "", err
 	}
@@ -79,8 +79,8 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 
 // ExecCommandInContainerWithFullOutput executes a command in the
 // specified container and return stdout, stderr and error
-func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName string, cmd ...string) (string, string, error) {
-	return f.ExecWithOptions(ExecOptions{
+func (f *Framework) ExecCommandInContainerWithFullOutput(kubeName string, podName, containerName string, cmd ...string) (string, string, error) {
+	return f.ExecWithOptions(kubeName, ExecOptions{
 		Command:       cmd,
 		Namespace:     f.Namespace,
 		PodName:       podName,
@@ -94,37 +94,37 @@ func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName 
 }
 
 // ExecCommandInContainer executes a command in the specified container.
-func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ...string) (string, error) {
-	stdout, _, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
+func (f *Framework) ExecCommandInContainer(kubeName string, podName, containerName string, cmd ...string) (string, error) {
+	stdout, _, err := f.ExecCommandInContainerWithFullOutput(kubeName, podName, containerName, cmd...)
 	return stdout, err
 }
 
-func (f *Framework) ExecShellInContainer(podName, containerName string, cmd string) (string, error) {
-	return f.ExecCommandInContainer(podName, containerName, "/bin/sh", "-c", cmd)
+func (f *Framework) ExecShellInContainer(kubeName string, podName, containerName string, cmd string) (string, error) {
+	return f.ExecCommandInContainer(kubeName, podName, containerName, "/bin/sh", "-c", cmd)
 }
 
-func (f *Framework) ExecCommandInPod(podName string, cmd ...string) (string, error) {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+func (f *Framework) ExecCommandInPod(kubeName string, podName string, cmd ...string) (string, error) {
+	pod, err := f.PodClient(kubeName).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
-	return f.ExecCommandInContainer(podName, pod.Spec.Containers[0].Name, cmd...)
+	return f.ExecCommandInContainer(kubeName, podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
-func (f *Framework) ExecCommandInPodWithFullOutput(podName string, cmd ...string) (string, string, error) {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+func (f *Framework) ExecCommandInPodWithFullOutput(kubeName string, podName string, cmd ...string) (string, string, error) {
+	pod, err := f.PodClient(kubeName).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
-	return f.ExecCommandInContainerWithFullOutput(podName, pod.Spec.Containers[0].Name, cmd...)
+	return f.ExecCommandInContainerWithFullOutput(kubeName, podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
-func (f *Framework) ExecShellInPod(podName string, cmd string) (string, error) {
-	return f.ExecCommandInPod(podName, "/bin/sh", "-c", cmd)
+func (f *Framework) ExecShellInPod(kubeName string, podName string, cmd string) (string, error) {
+	return f.ExecCommandInPod(kubeName, podName, "/bin/sh", "-c", cmd)
 }
 
-func (f *Framework) ExecShellInPodWithFullOutput(podName string, cmd string) (string, string, error) {
-	return f.ExecCommandInPodWithFullOutput(podName, "/bin/sh", "-c", cmd)
+func (f *Framework) ExecShellInPodWithFullOutput(kubeName string, podName string, cmd string) (string, string, error) {
+	return f.ExecCommandInPodWithFullOutput(kubeName, podName, "/bin/sh", "-c", cmd)
 }
 
 func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {

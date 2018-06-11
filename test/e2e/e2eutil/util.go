@@ -438,7 +438,6 @@ func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		t.Logf("Error: %v", err)
 	}
 	CleanK8Cluster(t, kubeClient, crClient, namespace)
-
 }
 
 func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string) {
