@@ -269,13 +269,13 @@ const (
 
 type VolumeMounts struct {
 	// Name of claim to use for couchbases default install path
-	DefaultClaim *string `json:"default"`
+	DefaultClaim string `json:"default,omitempty"`
 	// Name of claim to use for index path
-	IndexClaim *string `json:"index"`
+	IndexClaim string `json:"index,omitempty"`
 	// Name of claim to use for data path
-	DataClaim *string `json:"data"`
+	DataClaim string `json:"data,omitempty"`
 	// Name of claims to use for analytics paths
-	AnalyticsClaims *[]string `json:"analytics"`
+	AnalyticsClaims []string `json:"analytics,omitempty"`
 }
 
 // Get all of the volume mounts to be used for analytics service
@@ -283,7 +283,7 @@ type VolumeMounts struct {
 func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 	mountClaims := make(map[string]string)
 	if v.AnalyticsClaims != nil {
-		for i, claim := range *v.AnalyticsClaims {
+		for i, claim := range v.AnalyticsClaims {
 			mount := fmt.Sprintf("%s-%02d", AnalyticsVolumeMount, i)
 			mountClaims[mount] = claim
 		}
@@ -307,11 +307,11 @@ func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
 	}
 	return nil
 }
-func (sc *ServerConfig) GetDefaultVolumeClaim() *string {
+func (sc *ServerConfig) GetDefaultVolumeClaim() string {
 	if mounts := sc.GetVolumeMounts(); mounts != nil {
 		return mounts.DefaultClaim
 	}
-	return nil
+	return ""
 }
 
 func (c *ClusterSpec) Cleanup() {

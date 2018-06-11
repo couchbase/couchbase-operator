@@ -42,7 +42,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 		return nil, err
 	}
 
-	if config.GetDefaultVolumeClaim() != nil {
+	if config.GetDefaultVolumeClaim() != "" {
 		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, cluster.AsOwner(), ctx)
 		if err != nil {
 			return nil, err
@@ -133,14 +133,14 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 // Get all paths to that should be persisted within pod
 func getPathsToPersist(mounts *cbapi.VolumeMounts) map[cbapi.VolumeMountName]string {
 	mountPaths := make(map[cbapi.VolumeMountName]string)
-	if defaultClaim := mounts.DefaultClaim; defaultClaim != nil {
-		mountPaths[cbapi.DefaultVolumeMount] = *defaultClaim
+	if defaultClaim := mounts.DefaultClaim; defaultClaim != "" {
+		mountPaths[cbapi.DefaultVolumeMount] = defaultClaim
 	}
-	if dataClaim := mounts.DataClaim; dataClaim != nil {
-		mountPaths[cbapi.DataVolumeMount] = *dataClaim
+	if dataClaim := mounts.DataClaim; dataClaim != "" {
+		mountPaths[cbapi.DataVolumeMount] = dataClaim
 	}
-	if indexClaim := mounts.IndexClaim; indexClaim != nil {
-		mountPaths[cbapi.IndexVolumeMount] = *indexClaim
+	if indexClaim := mounts.IndexClaim; indexClaim != "" {
+		mountPaths[cbapi.IndexVolumeMount] = indexClaim
 	}
 	if analyticsClaims := mounts.AnalyticsClaims; analyticsClaims != nil {
 		for mount, claim := range mounts.GetAnalyticsMountClaims() {
@@ -749,7 +749,7 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 	} else {
 		// default volume claim is required for recovery
 		defaultClaim := mounts.DefaultClaim
-		if defaultClaim == nil {
+		if defaultClaim == "" {
 			return fmt.Errorf("no claim defined for default volume")
 		}
 		// all volume mounts must be healthy

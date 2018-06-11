@@ -529,6 +529,15 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 
 	// set default volume paths and allow for override of via spec
 	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
+	if mounts := serverSpec.GetVolumeMounts(); mounts != nil {
+		if mounts.DataClaim != "" {
+			dataPath = k8sutil.CouchbaseVolumeMountDataDir
+		}
+		if mounts.IndexClaim != "" {
+			indexPath = k8sutil.CouchbaseVolumeMountIndexDir
+		}
+	}
+
 	if err := c.client.InitializeCluster(m, c.username, c.password, defaults,
 		serverSpec.Services, dataPath, indexPath, analyticsPaths, settings.IndexStorageSetting); err != nil {
 		return err
@@ -911,13 +920,13 @@ func getServiceDataPaths(mounts *api.VolumeMounts) (string, string, []string) {
 	indexPath := constants.DefaultDataPath
 	analyticsPaths := []string{}
 	if mounts != nil {
-		if mounts.DataClaim != nil {
+		if mounts.DataClaim != "" {
 			dataPath = k8sutil.CouchbaseVolumeMountDataDir
 		}
-		if mounts.IndexClaim != nil {
+		if mounts.IndexClaim != "" {
 			indexPath = k8sutil.CouchbaseVolumeMountIndexDir
 		}
-		if mounts.AnalyticsClaims != nil {
+		if len(mounts.AnalyticsClaims) > 0 {
 			analyticsPaths = mounts.GetAnalyticsVolumePaths()
 		}
 	}

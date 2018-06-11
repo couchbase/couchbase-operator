@@ -11,9 +11,9 @@ import (
 func TestPathsToPersist(t *testing.T) {
 	claimName := "couchbase"
 	mounts := &cbapi.VolumeMounts{
-		DefaultClaim: &claimName,
-		DataClaim:    &claimName,
-		IndexClaim:   &claimName,
+		DefaultClaim: claimName,
+		DataClaim:    claimName,
+		IndexClaim:   claimName,
 	}
 
 	paths := getPathsToPersist(mounts)

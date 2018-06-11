@@ -422,7 +422,7 @@ var testDefs = []testDef{
 		path:        "tests/0051.yaml",
 		description: "Tests that default volume mount is specified",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required(`"default"`, "spec.servers[*].Pod.VolumeMounts"),
+			errors.Required("spec.servers.pod.volumeMounts.default", "body"),
 		),
 	},
 	{
@@ -511,7 +511,7 @@ var testDefs = []testDef{
 		path:        "tests/0059.yaml",
 		description: "Tests that storage class is specified",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required(`"storageClassName"`, "spec.volumeClaimTemplates[*]"),
+			errors.Required("spec.volumeClaimTemplates.spec.storageClassName", "body"),
 		),
 	},
 	{

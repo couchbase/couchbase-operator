@@ -361,7 +361,7 @@ func NewStatefulCluster(genName, secretName string, size int, withBucket bool, e
 	crd := NewBasicCluster(genName, secretName, size, withBucket, exposed)
 	couchbase := "couchbase"
 	crd.Spec.ServerSettings[0].Pod = &api.PodPolicy{
-		VolumeMounts: &api.VolumeMounts{DefaultClaim: &couchbase},
+		VolumeMounts: &api.VolumeMounts{DefaultClaim: couchbase},
 	}
 
 	standardStorageClass := "standard"

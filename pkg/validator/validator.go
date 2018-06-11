@@ -290,32 +290,27 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	for _, config := range customResource.Spec.ServerSettings {
 		if config.Pod != nil && config.Pod.VolumeMounts != nil {
 			mounts := config.Pod.VolumeMounts
-			if mounts.DefaultClaim == nil {
-				err := errors.Required(`"default"`, "spec.servers[*].Pod.VolumeMounts")
+			if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
+				err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DefaultClaim), "spec.volumeClaimTemplates[*].metadata.name")
 				errs = append(errs, err)
-			} else {
-				if template := customResource.Spec.GetVolumeClaimTemplate(*mounts.DefaultClaim); template == nil {
-					err := errors.Required(fmt.Sprintf(`"%s"`, *mounts.DefaultClaim), "spec.volumeClaimTemplates[*].metadata.name")
+			}
+			if mounts.DataClaim != "" {
+				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DataClaim); template == nil {
+					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DataClaim), "spec.volumeClaimTemplates[*].metadata.name")
 					errs = append(errs, err)
 				}
-				if mounts.DataClaim != nil {
-					if template := customResource.Spec.GetVolumeClaimTemplate(*mounts.DataClaim); template == nil {
-						err := errors.Required(fmt.Sprintf(`"%s"`, *mounts.DataClaim), "spec.volumeClaimTemplates[*].metadata.name")
-						errs = append(errs, err)
-					}
+			}
+			if mounts.IndexClaim != "" {
+				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.IndexClaim); template == nil {
+					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.IndexClaim), "spec.volumeClaimTemplates[*].metadata.name")
+					errs = append(errs, err)
 				}
-				if mounts.IndexClaim != nil {
-					if template := customResource.Spec.GetVolumeClaimTemplate(*mounts.IndexClaim); template == nil {
-						err := errors.Required(fmt.Sprintf(`"%s"`, *mounts.IndexClaim), "spec.volumeClaimTemplates[*].metadata.name")
+			}
+			if len(mounts.AnalyticsClaims) > 0 {
+				for _, claim := range mounts.AnalyticsClaims {
+					if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
+						err := errors.Required(fmt.Sprintf(`"%s"`, claim), "spec.volumeClaimTemplates[*].metadata.name")
 						errs = append(errs, err)
-					}
-				}
-				if mounts.AnalyticsClaims != nil {
-					for _, claim := range *mounts.AnalyticsClaims {
-						if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
-							err := errors.Required(fmt.Sprintf(`"%s"`, claim), "spec.volumeClaimTemplates[*].metadata.name")
-							errs = append(errs, err)
-						}
 					}
 				}
 			}
@@ -324,27 +319,12 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 
 	// validate claim templates such that storage class is provided along with valid request
 	for _, pvc := range customResource.Spec.VolumeClaimTemplates {
-
-		if pvc.Spec.StorageClassName == nil {
-			err := errors.Required(`"storageClassName"`, "spec.volumeClaimTemplates[*]")
-			errs = append(errs, err)
-		}
-
-		// requests or limits required
 		hasStorageQuantity := false
-		for resource, quantity := range pvc.Spec.Resources.Requests {
-			if string(resource) == "storage" {
-				if !quantity.IsZero() {
-					hasStorageQuantity = true
-				}
-			}
+		if quantity, ok := pvc.Spec.Resources.Requests["storage"]; ok {
+			hasStorageQuantity = hasStorageQuantity || !quantity.IsZero()
 		}
-		for resource, quantity := range pvc.Spec.Resources.Limits {
-			if string(resource) == "storage" {
-				if !quantity.IsZero() {
-					hasStorageQuantity = true
-				}
-			}
+		if quantity, ok := pvc.Spec.Resources.Limits["storage"]; ok {
+			hasStorageQuantity = hasStorageQuantity || !quantity.IsZero()
 		}
 		if !hasStorageQuantity {
 			err := errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits")
@@ -458,21 +438,29 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 				errs = append(errs, err)
 			}
 			if curPersisted && upPersisted {
-				if !stringPtrEquals(cur.Pod.VolumeMounts.DefaultClaim, up.Pod.VolumeMounts.DefaultClaim) {
+				if cur.Pod.VolumeMounts.DefaultClaim != up.Pod.VolumeMounts.DefaultClaim {
 					err := &UpdateError{"default", "spec.servers[*].Pod.VolumeMounts"}
 					errs = append(errs, err)
 				}
-				if !stringPtrEquals(cur.Pod.VolumeMounts.DataClaim, up.Pod.VolumeMounts.DataClaim) {
+				if cur.Pod.VolumeMounts.DataClaim != up.Pod.VolumeMounts.DataClaim {
 					err := &UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"}
 					errs = append(errs, err)
 				}
-				if !stringPtrEquals(cur.Pod.VolumeMounts.IndexClaim, up.Pod.VolumeMounts.IndexClaim) {
+				if cur.Pod.VolumeMounts.IndexClaim != up.Pod.VolumeMounts.IndexClaim {
 					err := &UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"}
 					errs = append(errs, err)
 				}
-				if !stringPtrArrayCompare(cur.Pod.VolumeMounts.AnalyticsClaims, up.Pod.VolumeMounts.AnalyticsClaims) {
+				if len(cur.Pod.VolumeMounts.AnalyticsClaims) != len(up.Pod.VolumeMounts.AnalyticsClaims) {
 					err := &UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"}
 					errs = append(errs, err)
+				} else {
+					for i, _ := range cur.Pod.VolumeMounts.AnalyticsClaims {
+						if cur.Pod.VolumeMounts.AnalyticsClaims[i] != up.Pod.VolumeMounts.AnalyticsClaims[i] {
+							err := &UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"}
+							errs = append(errs, err)
+							break
+						}
+					}
 				}
 			}
 		}
