@@ -142,6 +142,11 @@ func getPathsToPersist(mounts *cbapi.VolumeMounts) map[cbapi.VolumeMountName]str
 	if indexClaim := mounts.IndexClaim; indexClaim != nil {
 		mountPaths[cbapi.IndexVolumeMount] = *indexClaim
 	}
+	if analyticsClaims := mounts.AnalyticsClaims; analyticsClaims != nil {
+		for mount, claim := range mounts.GetAnalyticsMountClaims() {
+			mountPaths[cbapi.VolumeMountName(mount)] = claim
+		}
+	}
 	return mountPaths
 }
 
@@ -154,6 +159,11 @@ func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 		path = CouchbaseVolumeMountDataDir
 	case cbapi.IndexVolumeMount:
 		path = CouchbaseVolumeMountIndexDir
+	default:
+		if strings.Contains(string(id), string(cbapi.AnalyticsVolumeMount)) {
+			// path resolves to /mnt/analytics-00 when matching on analytics volume
+			path = fmt.Sprintf("/mnt/%s", id)
+		}
 	}
 	return path
 }

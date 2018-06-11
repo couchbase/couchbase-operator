@@ -1,6 +1,8 @@
 package v1beta1
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -258,9 +260,10 @@ type PodPolicy struct {
 type VolumeMountName string
 
 const (
-	DefaultVolumeMount VolumeMountName = "default"
-	DataVolumeMount                    = "data"
-	IndexVolumeMount                   = "index"
+	DefaultVolumeMount   VolumeMountName = "default"
+	DataVolumeMount                      = "data"
+	IndexVolumeMount                     = "index"
+	AnalyticsVolumeMount                 = "analytics"
 )
 
 type VolumeMounts struct {
@@ -270,6 +273,31 @@ type VolumeMounts struct {
 	IndexClaim *string `json:"index"`
 	// Name of claim to use for data path
 	DataClaim *string `json:"data"`
+	// Name of claims to use for analytics paths
+	AnalyticsClaims *[]string `json:"analytics"`
+}
+
+// Get all of the volume mounts to be used for analytics service
+// as an indexed list mapped to their claims
+func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
+	mountClaims := make(map[string]string)
+	if v.AnalyticsClaims != nil {
+		for i, claim := range *v.AnalyticsClaims {
+			mount := fmt.Sprintf("%s-%02d", AnalyticsVolumeMount, i)
+			mountClaims[mount] = claim
+		}
+	}
+	return mountClaims
+}
+
+// Get all of the paths which correspond to the mounts to be used
+// for analytics service
+func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
+	paths := []string{}
+	for mount, _ := range v.GetAnalyticsMountClaims() {
+		paths = append(paths, fmt.Sprintf("/mnt/%s", mount))
+	}
+	return paths
 }
 
 func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {

@@ -1,5 +1,5 @@
-hash: ef0d7e41e9e3ee3c732a09afe96e62b03f0cbc34216fc160dd5d53b535ff4cb3
-updated: 2018-05-14T16:55:57.0382573+01:00
+hash: b2b2fb08ed73299d88780b80b46b17edff1cb08e1c7ce2915cbb01a7a51650b2
+updated: 2018-06-11T10:35:33.556325-07:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 593d64559f7600f29581a3ee42177f5dbded27a9
@@ -19,7 +19,7 @@ imports:
   - man
   - pwd
 - name: github.com/couchbase/gocbmgr
-  version: 461c9b72054c2814ed6de76e1e4afa9f5c8145b8
+  version: ac9190414c24a557b3d267a0ed04737bc855255a
   subpackages:
   - urlencoding
 - name: github.com/davecgh/go-spew
@@ -70,12 +70,10 @@ imports:
 - name: github.com/golang/protobuf
   version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
   subpackages:
-  - jsonpb
   - proto
   - ptypes
   - ptypes/any
   - ptypes/duration
-  - ptypes/struct
   - ptypes/timestamp
 - name: github.com/google/btree
   version: 7d79101e329e5a3adf994758c578dab82b90c017
@@ -127,15 +125,10 @@ imports:
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
-  - html
-  - html/atom
   - http2
   - http2/hpack
   - idna
-  - internal/timeseries
   - lex/httplex
-  - trace
-  - websocket
 - name: golang.org/x/sys
   version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:
@@ -168,7 +161,6 @@ imports:
 - name: k8s.io/api
   version: 006a217681ae70cbacdd66a5e2fca1a61a8ff28e
   subpackages:
-  - admission/v1beta1
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
   - apps/v1
@@ -305,6 +297,7 @@ imports:
   - tools/leaderelection/resourcelock
   - tools/metrics
   - tools/pager
+  - tools/portforward
   - tools/record
   - tools/reference
   - tools/remotecommand
@@ -320,9 +313,6 @@ imports:
 - name: k8s.io/kube-openapi
   version: 39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1
   subpackages:
-  - pkg/builder
   - pkg/common
-  - pkg/handler
-  - pkg/util
   - pkg/util/proto
 testImports: []

@@ -383,16 +383,22 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	return err
 }
 
-func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
-	services []string, dataPath, indexPath, indexStorageMode string) error {
+func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath string, indexPath string, analyticsPaths []string) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "node init", defaults.ClusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "node init", clusterName,
 		func() error {
-			return c.client.NodeInitialize(m.Addr(), dataPath, indexPath)
+			return c.client.NodeInitialize(m.Addr(), dataPath, indexPath, analyticsPaths)
 		})
+}
 
+func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
+	services []string, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+
+	err := c.NodeInitialize(m, defaults.ClusterName, dataPath, indexPath, analyticsPaths)
 	if err != nil {
 		return err
 	}

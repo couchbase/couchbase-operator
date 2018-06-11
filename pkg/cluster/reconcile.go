@@ -201,6 +201,13 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 		return nil, err
 	}
 
+	// Initialize node paths
+	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
+	err := c.client.NodeInitialize(newMember, c.cluster.Name, dataPath, indexPath, analyticsPaths)
+	if err != nil {
+		return nil, err
+	}
+
 	// Notify that we have created a new member
 	c.clusterAddMember(newMember)
 	if err := c.updateCRStatus(); err != nil {
@@ -521,19 +528,9 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 	}
 
 	// set default volume paths and allow for override of via spec
-	dataPath := constants.DefaultDataPath
-	indexPath := constants.DefaultDataPath
-	if mounts := serverSpec.GetVolumeMounts(); mounts != nil {
-		if mounts.DataClaim != nil {
-			dataPath = k8sutil.CouchbaseVolumeMountDataDir
-		}
-		if mounts.IndexClaim != nil {
-			indexPath = k8sutil.CouchbaseVolumeMountIndexDir
-		}
-	}
-
+	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
 	if err := c.client.InitializeCluster(m, c.username, c.password, defaults,
-		serverSpec.Services, dataPath, indexPath, settings.IndexStorageSetting); err != nil {
+		serverSpec.Services, dataPath, indexPath, analyticsPaths, settings.IndexStorageSetting); err != nil {
 		return err
 	}
 
@@ -904,4 +901,25 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 	}
 
 	return nil
+}
+
+// Gets paths to use when initializing data, index, and analytics service.
+// Default paths are used unless a claim is specified for the service in which
+// case a custom mount path is used
+func getServiceDataPaths(mounts *api.VolumeMounts) (string, string, []string) {
+	dataPath := constants.DefaultDataPath
+	indexPath := constants.DefaultDataPath
+	analyticsPaths := []string{}
+	if mounts != nil {
+		if mounts.DataClaim != nil {
+			dataPath = k8sutil.CouchbaseVolumeMountDataDir
+		}
+		if mounts.IndexClaim != nil {
+			indexPath = k8sutil.CouchbaseVolumeMountIndexDir
+		}
+		if mounts.AnalyticsClaims != nil {
+			analyticsPaths = mounts.GetAnalyticsVolumePaths()
+		}
+	}
+	return dataPath, indexPath, analyticsPaths
 }

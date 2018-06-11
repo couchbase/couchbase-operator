@@ -547,6 +547,30 @@ var testDefs = []testDef{
 			&UpdateError{"spec.version", "body"},
 		),
 	},
+	{
+		name:        "TestAnalyticsMounts",
+		path:        "tests/0064.yaml",
+		description: "Tests mounts with analytics claims",
+		expectedErr: nil,
+	},
+	{
+		name:        "TestAnalyticsMissingClaim",
+		path:        "tests/0065.yaml",
+		description: "Tests analytics specify missing claim",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required(`"couchbase2"`, "spec.volumeClaimTemplates[*].metadata.name"),
+			errors.Required(`"couchbase2"`, "spec.volumeClaimTemplates[*].metadata.name"),
+		),
+	},
+	{
+		name:        "TestUpdateAnalyticsVolumes",
+		path:        "tests/0065.yaml",
+		updatePath:  "tests/0066.yaml",
+		description: "Tests updating analytics volumes",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"},
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {

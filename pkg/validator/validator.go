@@ -394,6 +394,14 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 						errs = append(errs, err)
 					}
 				}
+				if mounts.AnalyticsClaims != nil {
+					for _, claim := range *mounts.AnalyticsClaims {
+						if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
+							err := errors.Required(fmt.Sprintf(`"%s"`, claim), "spec.volumeClaimTemplates[*].metadata.name")
+							errs = append(errs, err)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -547,6 +555,10 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 					err := &UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"}
 					errs = append(errs, err)
 				}
+				if !stringPtrArrayCompare(cur.Pod.VolumeMounts.AnalyticsClaims, up.Pod.VolumeMounts.AnalyticsClaims) {
+					err := &UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"}
+					errs = append(errs, err)
+				}
 			}
 		}
 	}
@@ -621,6 +633,10 @@ func stringArrayCompare(a1, a2 []string) bool {
 	}
 
 	return true
+}
+
+func stringPtrArrayCompare(p1, p2 *[]string) bool {
+	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && stringArrayCompare(*p1, *p2))
 }
 
 func stringPtrEquals(p1, p2 *string) bool {
