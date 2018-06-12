@@ -256,6 +256,13 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
 }
 
+// NewClusterBasic creates a basic cluster, retrying if an error is encountered and
+// performing garbage collection
+func NewXdcrClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicXdcrCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
+}
+
 func NewClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
 	return CreateCluster(t, crClient, namespace, clusterSpec)

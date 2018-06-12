@@ -101,6 +101,10 @@ func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *api.CouchbaseCluster) {
 	*e = append(*e, *k8sutil.AdminConsoleSvcCreateEvent(cl.Name+"-ui", cl))
 }
 
+func (e *EventList) NodeServiceCreateEvent(cl *api.CouchbaseCluster, serviceName string) {
+	*e = append(*e, *k8sutil.NodeServiceCreateEvent(serviceName, cl))
+}
+
 func (e EventList) String() string {
 	s := ""
 	for _, c := range e {

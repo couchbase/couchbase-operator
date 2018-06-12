@@ -147,7 +147,6 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 
 // basic 3 node cluster
 func NewBasicCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
-
 	bucketConfig := []api.BucketConfig{}
 	if withBucket == true {
 		bucketSettings := api.BucketConfig(DefaultBucketSettings)
@@ -166,6 +165,34 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 			Services: []string{"data", "n1ql", "index"},
 		}},
 		ExposedFeatures: []string{},
+	}
+	crd := NewClusterCRD(genName, spec)
+	if exposed {
+		crd.Spec.ExposeAdminConsole = true
+	}
+	return crd
+}
+
+// basic 3 node cluster with Xdcr cluster
+func NewBasicXdcrCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+	bucketConfig := []api.BucketConfig{}
+	if withBucket == true {
+		bucketSettings := api.BucketConfig(DefaultBucketSettings)
+		bucketSettings.BucketName = "default"
+		bucketConfig = []api.BucketConfig{bucketSettings}
+	}
+	spec := api.ClusterSpec{
+		BaseImage:       baseImage,
+		Version:         version,
+		AuthSecret:      secretName,
+		ClusterSettings: defaultClusterSettings,
+		BucketSettings:  bucketConfig,
+		ServerSettings: []api.ServerConfig{api.ServerConfig{
+			Size:     size,
+			Name:     "test_config_1",
+			Services: []string{"data", "n1ql", "index"},
+		}},
+		ExposedFeatures: []string{"xdcr"},
 	}
 	crd := NewClusterCRD(genName, spec)
 	if exposed {

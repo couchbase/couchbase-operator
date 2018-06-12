@@ -1,32 +1,76 @@
 ---
 suite: TestP0
 tcGroups:
-  - name: Group1
+  - name: ClusterTests
     clusters:
       - BasicCluster
     testcases:
+      - name: TestCreateCluster
+      - name: TestCreateBucketCluster
+      - name: TestResizeCluster
+      - name: TestResizeClusterWithBucket
+      - name: TestEditClusterSettings
+      - name: TestNegEditClusterSettings
+      - name: TestBasicMDSScaling
+
+  - name: BucketTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestBucketAddRemoveBasic
+      - name: TestEditBucket
       - name: TestNegBucketAdd
       - name: TestNegBucketEdit
-      - name: TestResizeClusterWithBucket
+
+  - name: ServiceTests
+    clusters:
+      - BasicCluster
+    testcases:
       - name: TestEditServiceConfig
       - name: TestNegEditServiceConfig
+      - name: TestCreateClusterWithoutDataService
+      - name: TestCreateClusterDataServiceNotFirst
+      - name: TestRemoveLastDataService
+      - name: TestSwapNodesBetweenServices
+
+  - name: PodTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestPodResourcesBasic
+      - name: TestPodResourcesCannotBePlaced
+      - name: TestFirstNodePodResourcesCannotBePlaced
+
+  - name: RecoveryTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestRecoveryAfterOnePodFailureNoBucket
       - name: TestRecoveryAfterTwoPodFailureNoBucket
       - name: TestRecoveryAfterOnePodFailureBucketOneReplica
       - name: TestRecoveryAfterTwoPodFailureBucketOneReplica
       - name: TestRecoveryAfterOnePodFailureBucketTwoReplica
       - name: TestRecoveryAfterTwoPodFailureBucketTwoReplica
-      - name: TestPodResourcesCannotBePlaced
-      - name: TestFirstNodePodResourcesCannotBePlaced
-      - name: TestAntiAffinityOnCannotBePlaced
+
+  - name: AntiAffinityTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestAntiAffinityOn
       - name: TestAntiAffinityOff
-      - name: TestNegEditClusterSettings
-      - name: TestBasicMDSScaling
-      - name: TestSwapNodesBetweenServices
-      - name: TestCreateClusterWithoutDataService
-      - name: TestCreateClusterDataServiceNotFirst
-      - name: TestRemoveLastDataService
+      - name: TestAntiAffinityOnCannotBePlaced
+
+  - name: OperatorTests
+    clusters:
+      - BasicCluster
+    testcases:
       - name: TestKillOperator
       - name: TestKillOperatorAndUpdateClusterConfig
+
+  - name: TLS case
+    clusters:
+      - BasicCluster
+    testcases:
       - name: TestTlsCreateCluster
         decorators:
           - rsaDecorator

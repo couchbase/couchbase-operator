@@ -9,8 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// String variable to store the random suffix used for couchbase-server
-// name and tls certificates
+// Variable to store random suffix for couchbase-server name & tls certificates
 var RandomNameSuffix string
 
 var (
@@ -98,7 +97,22 @@ var (
 		"TestTlsCertificateDeployedBeforeValidity":         TestTlsCertificateDeployedBeforeValidity,
 		"TestTlsGenerateWrongCACertType":                   TestTlsGenerateWrongCACertType,
 
-		//"TestXdcrCreateCluster": TestXdcrCreateCluster,
+		"TestXdcrCreateCluster":                      TestXdcrCreateCluster,
+		"TestXdcrCreateTlsCluster":                   TestXdcrCreateTlsCluster,
+		"TestXdcrCreateInterCluster":                 TestXdcrCreateInterCluster,
+		"TestXdcrCreateK8SVMCluster":                 TestXdcrCreateK8SVMCluster,
+		"TestXdcrNodeDownDuringSetupDuringConfigure": TestXdcrNodeDownDuringSetupDuringConfigure,
+		"TestXdcrNodeDownDuringSetupAfterConfigure":  TestXdcrNodeDownDuringSetupAfterConfigure,
+		"TestXdcrNodeAddDuringSetupDuringConfigure":  TestXdcrNodeAddDuringSetupDuringConfigure,
+		"TestXdcrNodeAddDuringSetupAfterConfigure":   TestXdcrNodeAddDuringSetupAfterConfigure,
+		"TestXdcrNodeServiceKilledDuringConfigure":   TestXdcrNodeServiceKilledDuringConfigure,
+		"TestXdcrNodeServiceKilledAfterConfigure":    TestXdcrNodeServiceKilledAfterConfigure,
+		"TestXdcrRebalanceOutSourceClusterNodes":     TestXdcrRebalanceOutSourceClusterNodes,
+		"TestXdcrRebalanceOutTargetClusterNodes":     TestXdcrRebalanceOutTargetClusterNodes,
+		"TestXdcrRemoveSourceClusterNodes":           TestXdcrRemoveSourceClusterNodes,
+		"TestXdcrRemoveTargetClusterNodes":           TestXdcrRemoveTargetClusterNodes,
+		"TestXdcrResizedOutSourceClusterNodes":       TestXdcrResizedOutSourceClusterNodes,
+		"TestXdcrResizedOutTargetClusterNodes":       TestXdcrResizedOutTargetClusterNodes,
 	}
 	DecoratorFuncMap = framework.DecoratorMap{
 		"rsaDecorator": rsaDecorator,
