@@ -164,6 +164,14 @@ func UpgradeFinishedEvent(sourceVersion, targetVersion string, cl *api.Couchbase
 	return event
 }
 
+func ClusterSettingsEditedEvent(settingName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "ClusterSettingsEdited"
+	event.Message = fmt.Sprintf("Setting for `%s` was edited", settingName)
+	return event
+}
+
 func newClusterEvent(cl *api.CouchbaseCluster) *v1.Event {
 	t := time.Now()
 	return &v1.Event{

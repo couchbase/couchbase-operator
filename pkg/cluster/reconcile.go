@@ -830,6 +830,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 			c.status.SetConfigRejectedCondition(message)
 			return err
 		}
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("autofailover", c.cluster))
 	}
 
 	return nil
@@ -860,6 +861,7 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 			c.status.SetConfigRejectedCondition(message)
 			return err
 		}
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memory quota", c.cluster))
 	}
 
 	return nil
@@ -878,6 +880,7 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 		if err := c.client.SetUpdatesEnabled(c.readyMembers(), requested); err != nil {
 			return err
 		}
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
 	}
 
 	return nil
@@ -897,6 +900,7 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 			c.status.SetConfigRejectedCondition(emsg)
 			return err
 		}
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 	}
 
 	return nil
