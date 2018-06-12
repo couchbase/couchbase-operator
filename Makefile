@@ -53,7 +53,7 @@ prod: container
 	rm -r $(ARTIFACTS)
 
 test-operator:
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race
+	go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race -timeout 240m
 
 test-unit:
 	go test -v github.com/couchbase/couchbase-operator/pkg/validator
