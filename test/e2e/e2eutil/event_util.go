@@ -105,6 +105,10 @@ func (e *EventList) NodeServiceCreateEvent(cl *api.CouchbaseCluster, serviceName
 	*e = append(*e, *k8sutil.NodeServiceCreateEvent(serviceName, cl))
 }
 
+func (e *EventList) AddClusterSettingsEditedEvent(cl *api.CouchbaseCluster, settingName string) {
+	*e = append(*e, *k8sutil.ClusterSettingsEditedEvent(settingName, cl))
+}
+
 func (e EventList) String() string {
 	s := ""
 	for _, c := range e {

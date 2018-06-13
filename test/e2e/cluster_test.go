@@ -200,6 +200,8 @@ func TestEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to change cluster data service mem quota: %v", err)
 	}
 
+	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
+
 	// edit cluster indexServiceMemQuota
 	newIndexServiceMemQuota := "257"
 	t.Log("Changing cluster index service mem quota")
@@ -211,6 +213,8 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to change cluster index service mem quota: %v", err)
 	}
+
+	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
 
 	// edit cluster searchServiceMemQuota
 	newSearchServiceMemQuota := "257"
@@ -224,6 +228,8 @@ func TestEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to change cluster search service mem quota: %v", err)
 	}
 
+	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
+
 	// edit cluster autoFailoverTimeout
 	newAutoFailoverTimeout := "31"
 	t.Log("Changing cluster autofailover timeout")
@@ -236,6 +242,8 @@ func TestEditClusterSettings(t *testing.T) {
 		t.Fatalf("failed to change cluster autofailover timeout: %v", err)
 	}
 
+	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "autofailover")
+
 	// edit cluster indexStorageSetting
 	newIndexStorageSetting := "plasma"
 	t.Log("Changing cluster index storage setting")
@@ -247,6 +255,8 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to change cluster indexer storage setting: %v", err)
 	}
+
+	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "index service")
 
 	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
 	if err != nil {
