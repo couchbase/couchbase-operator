@@ -17,6 +17,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// To parse the Couchbase deployment CRD from yaml
+// Used to read UUID and exposed admin port values for XDCR configuration
 type CouchbaseCrd struct {
 	Status struct {
 		AdminConsolePort string `yaml:"adminConsolePort"`
@@ -24,6 +26,7 @@ type CouchbaseCrd struct {
 	} `yaml:"status"`
 }
 
+// Populates CouchbaseCrd struct from the input yaml file
 func ReadClusterCrd(cbCluster *v1beta1.CouchbaseCluster) (crd CouchbaseCrd, err error) {
 	crdFilePath := "./resources/crd_" + cbCluster.Name + ".yml"
 	if err = ClusterToYAML(cbCluster, crdFilePath); err != nil {
@@ -40,6 +43,8 @@ func ReadClusterCrd(cbCluster *v1beta1.CouchbaseCluster) (crd CouchbaseCrd, err 
 	return
 }
 
+// Generic function to run rebalance out test case
+// Rebalance out xdcrCluster nodes one by one for the provided clustersize
 func rebalanceOutXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterSize int, kubeName string) error {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]
@@ -68,9 +73,6 @@ func rebalanceOutXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, 
 		if err = e2eutil.RebalanceOutMember(t, client, xdcrCluster.Name, f.Namespace, memberIndex, true); err != nil {
 			return errors.New("Rebalance-out failed: %s" + err.Error())
 		}
-		if err = e2eutil.DeleteService(t, targetKube.KubeClient, f.Namespace, service.Name, nil); err != nil {
-			return errors.New("Delete client service failed: %s" + err.Error())
-		}
 
 		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, xdcrCluster.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 		if err != nil {
@@ -80,6 +82,8 @@ func rebalanceOutXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, 
 	return nil
 }
 
+// Generic function to kill xdcrCluster nodes
+// Will kill all the nodes one by one for the given clusterSize number and wait for the new pod to get replaced
 func killXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterSize int, kubeName string) error {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]
@@ -96,6 +100,7 @@ func killXdcrNodes(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterS
 	return nil
 }
 
+// Generic function to resize the xdcrCluster to the given clusterSize value and wait for healthy cluster
 func resizeXdcrCluster(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clusterSize int, kubeName string) error {
 	f := framework.Global
 	service := 0
@@ -110,6 +115,10 @@ func resizeXdcrCluster(t *testing.T, xdcrCluster *v1beta1.CouchbaseCluster, clus
 	return nil
 }
 
+// Generic function to run all pod removal/resize tests
+// Remove nodes using diff ways based on operationType value
+// This will in-turn call rebalanceOutXdcrNodes / killXdcrNodes / resizeXdcrCluster function appropiately
+// targetClusterNodes will be source / destination to decide target cluster from xdcrCluster1 / xdccrCluster2
 func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNodes, operationType string) {
 	f := framework.Global
 	xdcr1KubeName := kubeNameList[0]
@@ -246,6 +255,9 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	ValidateClusterEvents(t, xdcr2Kube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
 
+// Generic test case for creating Xdcr clusters
+// Can support 2 clusters within same K8S kube or
+// different kube based on the kubeNames provided in kubeNameList
 func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	f := framework.Global
 	xdcr1KubeName := kubeNameList[0]
@@ -342,6 +354,8 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	ValidateClusterEvents(t, xdcr2Kube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
 
+// Generic testcase to run NodeDown test cases on kubeNames given by kubeNameList
+// This can support bringing down a cluster node either during XDCR configration / post XDCR configuration
 func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []string) {
 	f := framework.Global
 	defKubeName := kubeNameList[0]
@@ -474,6 +488,8 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	ValidateClusterEvents(t, xdcrKube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
 
+// Generic testcase to run AddNode test cases on kubeNames given by kubeNameList
+// This can support adding new node to the cluster either during XDCR configration / post XDCR configuration
 func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []string) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -621,6 +637,8 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	ValidateClusterEvents(t, xdcrKube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
 
+// Generic testcase to kill the XDCR exposed service test cases on kubeNames given by kubeNameList
+// This supports killing the xdcr port service either during XDCR configration / post XDCR configuration
 func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList []string) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -681,11 +699,14 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		services, err := defKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + xdcrCluster1.Name})
 		if err != nil {
 			errChan <- err
+			return
 		}
 		for _, service := range services.Items {
 			if strings.HasSuffix(service.Name, "-exposed-ports") {
-				t.Logf("Killing service %s", service.Name)
-				defKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+				if err := e2eutil.DeleteService(t, defKube.KubeClient, f.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
+					errChan <- err
+					return
+				}
 			}
 		}
 		errChan <- nil
@@ -764,6 +785,7 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	ValidateClusterEvents(t, xdcrKube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
 
+// Create XDCR cluster within same k8s cluster
 func TestXdcrCreateCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -772,14 +794,15 @@ func TestXdcrCreateCluster(t *testing.T) {
 	CreateXdcrCluster(t, []string{"BasicCluster", "BasicCluster"})
 }
 
+// Create XDCR cluster using two distinct k8s clusters
 func TestXdcrCreateInterCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	// Create XDCR clusters with two different clusters
 	CreateXdcrCluster(t, []string{"BasicCluster", "XdcrCluster"})
 }
 
+// Create cb clusters on top of TLS certificates
 func TestXdcrCreateTlsCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -919,6 +942,8 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	ValidateClusterEvents(t, xdcrKube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
 
+// Create two clusters one on k8s using operator
+// and one directly running on usual VMs and verify
 func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1002,6 +1027,8 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
 }
 
+// Create two clusters and while trying to configure XDCR,
+// couchbase pod goes down
 func TestXdcrNodeDownDuringSetupDuringConfigure(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1011,6 +1038,8 @@ func TestXdcrNodeDownDuringSetupDuringConfigure(t *testing.T) {
 	ClusterNodeDownWithXdcr(t, "duringXdcrSetup", kubeNameList)
 }
 
+// Create two clusters and XDCR is configured between the two clusters
+// Couchbase pod goes down after setup is successful, replaced by new node
 func TestXdcrNodeDownDuringSetupAfterConfigure(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1020,6 +1049,8 @@ func TestXdcrNodeDownDuringSetupAfterConfigure(t *testing.T) {
 	ClusterNodeDownWithXdcr(t, "afterXdcrSetup", kubeNameList)
 }
 
+// Create two clusters and while trying to configure XDCR,
+// new couchbase pod is added to the existing cluster
 func TestXdcrNodeAddDuringSetupDuringConfigure(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1029,6 +1060,8 @@ func TestXdcrNodeAddDuringSetupDuringConfigure(t *testing.T) {
 	ClusterAddNodeWithXdcr(t, "duringXdcrSetup", kubeNameList)
 }
 
+// Create two clusters and XDCR is configured between the two clusters
+// New couchbase pod is added to the existing cluster
 func TestXdcrNodeAddDuringSetupAfterConfigure(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1038,6 +1071,8 @@ func TestXdcrNodeAddDuringSetupAfterConfigure(t *testing.T) {
 	ClusterAddNodeWithXdcr(t, "afterXdcrSetup", kubeNameList)
 }
 
+// Create two clusters and while trying to configure XDCR,
+// XDCR exposed node port service is killed
 func TestXdcrNodeServiceKilledDuringConfigure(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1047,6 +1082,8 @@ func TestXdcrNodeServiceKilledDuringConfigure(t *testing.T) {
 	ClusterNodeXdcrServiceKill(t, "duringXdcrSetup", kubeNameList)
 }
 
+// Create two clusters and XDCR is configured between the two clusters
+// XDCR exposed node port service is killed after the replication is progress
 func TestXdcrNodeServiceKilledAfterConfigure(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1056,6 +1093,9 @@ func TestXdcrNodeServiceKilledAfterConfigure(t *testing.T) {
 	ClusterNodeXdcrServiceKill(t, "afterXdcrSetup", kubeNameList)
 }
 
+// Create two clusters and while trying to configure XDCR
+// Cluster nodes from the source bucket cluster are rebalanced out
+// one by one until there is only one node in cluster
 func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1066,6 +1106,9 @@ func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 	XdcrClusterRemoveNode(t, kubeNameList, "source", "rebalanceOutXdcrNodes")
 }
 
+// Create two clusters and while trying to configure XDCR
+// Cluster nodes from the destination bucket cluster are rebalanced out
+// one by one until there is only one node in cluster
 func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1076,6 +1119,9 @@ func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 	XdcrClusterRemoveNode(t, kubeNameList, "remote", "rebalanceOutXdcrNodes")
 }
 
+// Create two clusters and while trying to configure XDCR
+// Cluster nodes from the source bucket cluster are killed one by one
+// At the end all nodes are replaced by new nodes in the cluster
 func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1086,6 +1132,9 @@ func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 	XdcrClusterRemoveNode(t, kubeNameList, "source", "killNodes")
 }
 
+// Create two clusters and while trying to configure XDCR
+// Cluster nodes from the destination bucket cluster are killed one by one
+// At the end all nodes are replaced by new nodes in the cluster
 func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1096,6 +1145,8 @@ func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
 	XdcrClusterRemoveNode(t, kubeNameList, "remote", "killNodes")
 }
 
+// Create two clusters and while trying to configure XDCR
+// Cluster nodes of source bucket cluster is resized to single node cluster
 func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1106,6 +1157,8 @@ func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
 	XdcrClusterRemoveNode(t, kubeNameList, "source", "resizeOut")
 }
 
+// Create two clusters and while trying to configure XDCR
+// Cluster nodes of destination bucket cluster is resized to single node cluster
 func TestXdcrResizedOutTargetClusterNodes(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()

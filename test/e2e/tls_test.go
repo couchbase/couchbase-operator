@@ -13,6 +13,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Decorator struct to store all the required parameters for
+// setting up TLS secrets on cluster
 type TlsDecorator struct {
 	certValidFrom      time.Time
 	certValidTo        time.Time
@@ -30,6 +32,7 @@ type TlsDecorator struct {
 	clusterSecretName  string
 }
 
+// Initializes the TlsDecorator struct will default working values
 func (obj *TlsDecorator) Init(randSuffix, namespace string, keyType e2eutil.KeyType) {
 	obj.randomNameSuffix = randSuffix
 	obj.certValidFrom = time.Now().In(time.UTC)
@@ -48,9 +51,7 @@ func (obj *TlsDecorator) Init(randSuffix, namespace string, keyType e2eutil.KeyT
 }
 
 func (obj *TlsDecorator) CreateCaRootCert(t *testing.T) {
-	var (
-		err error
-	)
+	var err error
 	// Create the root CA (self signed)
 	obj.ca, err = e2eutil.NewCertificateAuthority(obj.keyType, obj.caCommonName, obj.certValidFrom, obj.certValidTo, obj.certType)
 	if err != nil {
@@ -108,6 +109,7 @@ func (obj *TlsDecorator) SetTlsForTesting(operatorSecret, clusterSecret *corev1.
 	e2espec.SetTLS(tls)
 }
 
+// Returns a wrapper function after embedding the passed function within it
 func CreateWrapperFunc(kubeName string, decoratorObj *TlsDecorator, keyType e2eutil.KeyType) framework.TestFunc {
 	wrapperFunc := func(t *testing.T) {
 		f := framework.Global
@@ -444,6 +446,10 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	}
 }
 
+// Deploy cluster using valid TLS certificates
+// Remove the operator certificate from the cluster and try to scale up the cluster
+// New pods will be removed the operator since it cannot communicate with the new pods
+// Add back the operator certificate back to ensure scaling up succeeds
 func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -535,6 +541,9 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	}
 }
 
+// Deploy cluster using valid TLS certificates
+// Remove the cluster certificate from the cluster and kill one of the cluster pod
+// New pod creation with fail unless the valid cluster certificate is available
 func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -614,6 +623,9 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	}
 }
 
+// Deploy cluster using valid TLS certificates
+// Remove the cluster certificate from the cluster and scale up the cluster
+// New pod creation with fail due to the missing certificate data
 func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -668,6 +680,8 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	}
 }
 
+// Deploy cluster using invalid DNS name value in the certificate
+// Cluster creation should fail due to the invalid DNS value
 func TestTlsNegRSACertificateDnsName(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -706,6 +720,10 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 	execFunc(t)
 }
 
+// Deploy cluster using a TLS certificates which will expire after few minutes
+// Cluster creation will be successful.
+// Wait for certificate to expire and try to scale up the cluster
+// Cluster scaling will fail due to new pod creation failure
 func TestTlsCertificateExpiry(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -766,6 +784,8 @@ func TestTlsCertificateExpiry(t *testing.T) {
 	execFunc(t)
 }
 
+// Deploy a couchbase cluster using a expired TLS certificate
+// Cluster creation should fail
 func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -800,6 +820,8 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	execFunc(t)
 }
 
+// Deploy the cluster using the certificate which is not yet valid
+// Cluster creation should not happen until the validity time crosses the current time
 func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -836,7 +858,7 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 				t.Fatal(err)
 			}
 			if len(pods.Items) > 1 {
-				t.Fatal("Cluster initialized before vertificate activation period")
+				t.Fatal("Cluster initialized before certificate activation period")
 			}
 			time.Sleep(time.Second)
 		}
@@ -855,6 +877,8 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	execFunc(t)
 }
 
+// Create a couchbase cluster using the wrong CA certificate type
+// Cluster deployment should fail
 func TestTlsGenerateWrongCACertType(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -891,6 +915,8 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 	execFunc(t)
 }
 
+// Create a couchbase cluster using the wrong certificate type
+// Cluster deployment should fail
 func TestTlsGenerateWrongCertType(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
