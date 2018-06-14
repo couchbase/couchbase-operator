@@ -117,68 +117,6 @@ func AnalyzeResults(t *testing.T) {
 	}
 }
 
-// Create hosts file for each cluster to be used by Ansible script
-func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) error {
-	loadOptions := ini.LoadOptions{}
-	loadOptions.UnparseableSections = []string{"master_node", "worker_node"}
-	loadOptions.Loose = true
-
-	loginSectionData := map[string]string{
-		"ansible_connection":      "ssh",
-		"ansible_ssh_user":        "root",
-		"ansible_ssh_pass":        "couchbase",
-		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no",
-	}
-	masterSectionData := ""
-	workerSectionData := ""
-
-	newClusterConfig, err := ini.LoadSources(loadOptions, "")
-	if err != nil {
-		return errors.New("Unable to initialize cluster file: " + err.Error())
-	}
-
-	loginSectionForCluster, err := newClusterConfig.NewSection("all:vars")
-	if err != nil {
-		return errors.New("Error while creating new section 'all'")
-	}
-
-	for key, value := range loginSectionData {
-		loginSectionForCluster.NewKey(key, value)
-	}
-
-	for index, ip := range kubeClusterSpec.MasterNodeList {
-		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-master" + strconv.Itoa(index+1)
-		masterSectionData += ip + " " + hostnameStr + "\n"
-	}
-	for index, ip := range kubeClusterSpec.WorkerNodeList {
-		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-worker" + strconv.Itoa(index+1)
-		workerSectionData += ip + " " + hostnameStr + "\n"
-	}
-
-	_, err = newClusterConfig.NewRawSection("master_node", masterSectionData)
-	if err != nil {
-		return errors.New("Unable to create master_node section: " + err.Error())
-	}
-	_, err = newClusterConfig.NewRawSection("worker_node", workerSectionData)
-	if err != nil {
-		return errors.New("Unable to create worker_node section: " + err.Error())
-	}
-
-	err = newClusterConfig.SaveTo(filePathToSave)
-	if err != nil {
-		return errors.New("Unable to save cluster file: " + err.Error())
-	}
-	return nil
-}
-
-func runExecCommand(command *exec.Cmd) (string, string, error) {
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	err := command.Run()
-	return stdout.String(), stderr.String(), err
-}
-
 func ElementExistsInArr(itemToSearch string, itemList []string) bool {
 	for _, item := range itemList {
 		if item == itemToSearch {
@@ -265,10 +203,85 @@ func GetSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	return
 }
 
-func SetupK8SCluster(t *testing.T, kubeType, kubeVersion, ymlFilePath string, kubeClusterSpec ClusterInfo) error {
+// Execute shell command and returns the stderr and stdout buffers
+func runExecCommand(t *testing.T, command *exec.Cmd) error {
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+
+	if err := command.Run(); err != nil {
+		t.Log(stdout.String())
+		return errors.New("Error during ansible execution: " + stderr.String() + "\n" + err.Error())
+	}
+	return nil
+}
+
+// Create hosts file for each cluster to be used by Ansible script
+func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) error {
+	loadOptions := ini.LoadOptions{}
+	loadOptions.UnparseableSections = []string{"master_node", "worker_node"}
+	loadOptions.Loose = true
+
+	loginSectionData := map[string]string{
+		"ansible_connection":      "ssh",
+		"ansible_ssh_user":        "root",
+		"ansible_ssh_pass":        "couchbase",
+		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no",
+	}
+	masterSectionData := ""
+	workerSectionData := ""
+
+	newClusterConfig, err := ini.LoadSources(loadOptions, "")
+	if err != nil {
+		return errors.New("Unable to initialize cluster file: " + err.Error())
+	}
+
+	loginSectionForCluster, err := newClusterConfig.NewSection("all:vars")
+	if err != nil {
+		return errors.New("Error while creating new section 'all'")
+	}
+
+	for key, value := range loginSectionData {
+		loginSectionForCluster.NewKey(key, value)
+	}
+
+	for index, ip := range kubeClusterSpec.MasterNodeList {
+		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-master" + strconv.Itoa(index+1)
+		masterSectionData += ip + " " + hostnameStr + "\n"
+	}
+	for index, ip := range kubeClusterSpec.WorkerNodeList {
+		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-worker" + strconv.Itoa(index+1)
+		workerSectionData += ip + " " + hostnameStr + "\n"
+	}
+
+	_, err = newClusterConfig.NewRawSection("master_node", masterSectionData)
+	if err != nil {
+		return errors.New("Unable to create master_node section: " + err.Error())
+	}
+	_, err = newClusterConfig.NewRawSection("worker_node", workerSectionData)
+	if err != nil {
+		return errors.New("Unable to create worker_node section: " + err.Error())
+	}
+
+	err = newClusterConfig.SaveTo(filePathToSave)
+	if err != nil {
+		return errors.New("Unable to save cluster file: " + err.Error())
+	}
+	return nil
+}
+
+func createNamespaceFile(namespace string) error {
+	nsJsonStr := "{\"kind\": \"Namespace\",\"apiVersion\": \"v1\",\"metadata\": { \"name\": \"" + namespace + "\", \"labels\": { \"name\": \"" + namespace + "\" }}}"
+	fileByteData := []byte(nsJsonStr)
+	return ioutil.WriteFile("/tmp/namespace.json", fileByteData, 0644)
+}
+
+func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath, reqOpImage string, kubeClusterSpec ClusterInfo) error {
 	clusterHostFile := ymlFilePath + "/" + kubeClusterSpec.ClusterName
 	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yml"
 	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yml"
+	clusterNamespaceFile := ymlFilePath + "/" + kubeType + "/createNamespace.yml"
+	pullDockerImageFile := ymlFilePath + "/docker/pullDockerImage.yml"
 
 	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
 	if err != nil {
@@ -281,19 +294,33 @@ func SetupK8SCluster(t *testing.T, kubeType, kubeVersion, ymlFilePath string, ku
 
 		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
 		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam)
-		stdout, stderr, err := runExecCommand(ansibleCmd)
-		if err != nil {
-			t.Log(stdout)
-			t.Fatalf("Error during ansible execution: %v %s", stderr, err)
+		if err := runExecCommand(t, ansibleCmd); err != nil {
+			return err
 		}
 
 		ansibleExtraVarParam = "kubeConfPathToSave=config_" + kubeClusterSpec.ClusterName
 		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "--extra-vars", ansibleExtraVarParam)
-		stdout, stderr, err = runExecCommand(ansibleCmd)
-		if err != nil {
-			t.Log(stdout)
-			return errors.New("Error during ansible execution: " + stderr + ":" + err.Error())
+		if err := runExecCommand(t, ansibleCmd); err != nil {
+			return err
 		}
+
+		if namespace != "default" {
+			t.Logf("Creating namespace %s", namespace)
+			if err = createNamespaceFile(namespace); err != nil {
+				return errors.New("Failed to create namespace file: " + err.Error())
+			}
+			ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterNamespaceFile)
+			if err := runExecCommand(t, ansibleCmd); err != nil {
+				return err
+			}
+		}
+
+		ansibleExtraVarParam = "dockerImgName=" + reqOpImage
+		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, pullDockerImageFile, "--extra-vars", ansibleExtraVarParam)
+		if err := runExecCommand(t, ansibleCmd); err != nil {
+			return err
+		}
+
 		t.Logf("Cluster %s created successfully", kubeClusterSpec.ClusterName)
 	default:
 		return errors.New("Unsupported kube-type in test_config")

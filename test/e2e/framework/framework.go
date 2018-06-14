@@ -261,7 +261,7 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 
 func (f *Framework) setup(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
-	logrus.Info("Cleaning up namespace before deployment")
+	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
 	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
 	for _, job := range jobs.Items {
 		targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
@@ -275,10 +275,12 @@ func (f *Framework) setup(kubeName string) error {
 		Global.DeleteCouchbaseOperatorCompletely(targetKube, deployment.GetName())
 	}
 
-	clusters, err := targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Unable to get clusters: " + err.Error())
-	}
+	clusters, _ := targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
+	/*
+		if err != nil {
+			return errors.New("Unable to get clusters: " + err.Error())
+		}
+	*/
 	for _, cluster := range clusters.Items {
 		targetKube.CRClient.CouchbaseV1beta1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
 		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
@@ -298,7 +300,6 @@ func (f *Framework) setup(kubeName string) error {
 	}
 	e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
-	logrus.Info("Setting up couchbase-operator")
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
 		return errors.New("Failed to setup couchbase operator: " + err.Error())
 	}
@@ -313,6 +314,7 @@ func (f *Framework) setup(kubeName string) error {
 }
 
 func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
+	logrus.Info("Setting up couchbase-operator")
 	_, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(f.Deployment)
 	if err != nil {
 		return err

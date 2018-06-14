@@ -3,11 +3,15 @@ package e2e
 import (
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+
+	"github.com/sirupsen/logrus"
 )
 
 func runSuite(t *testing.T) {
 	f := framework.Global
+	reqOpImage := f.Deployment.Spec.Template.Spec.Containers[0].Image
 	ymlFilePath := "./resources/ansible"
 	t.Logf("Starting suite %s", f.SuiteYmlData.SuiteName)
 
@@ -29,8 +33,9 @@ func runSuite(t *testing.T) {
 			if _, ok := f.ClusterSpec[kubeCluster.ClusterName]; ok {
 				continue
 			}
-
-			if err := framework.SetupK8SCluster(t, f.KubeType, f.KubeVersion, ymlFilePath, kubeCluster); err != nil {
+			kubeName := kubeCluster.ClusterName
+			logrus.Info("Creating K8S cluster for " + kubeName + " for " + testGroup.GroupName)
+			if err := framework.SetupK8SCluster(t, f.Namespace, f.KubeType, f.KubeVersion, ymlFilePath, reqOpImage, kubeCluster); err != nil {
 				t.Fatal(err)
 			}
 
@@ -40,8 +45,17 @@ func runSuite(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			f.ClusterSpec[kubeCluster.ClusterName] = &clusterSpec
-			if err = f.CreateSecretInKubeCluster(kubeCluster.ClusterName); err != nil {
+			f.ClusterSpec[kubeName] = &clusterSpec
+
+			logrus.Info("Waiting for Kube nodes to become available")
+			if err = e2eutil.WaitForKubeNodesToBeReady(t, f.ClusterSpec[kubeName].KubeClient, 300); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
+				t.Fatalf("Failed to setup couchbase operator: %v", err)
+			}
+			if err = f.CreateSecretInKubeCluster(kubeName); err != nil {
 				t.Fatal(err)
 			}
 		}

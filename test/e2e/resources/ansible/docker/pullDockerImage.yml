@@ -1,0 +1,14 @@
+- hosts: all
+  tasks:
+    - name: Creating docker dir
+      file:
+        path: /root/.docker
+        state: directory 
+
+    - name: Copying docker auth file
+      copy:
+        src: /root/.docker/config.json
+        dest: /root/.docker/config.json
+
+    - name: Pull docker image
+      shell: "docker pull {{ dockerImgName }}"
