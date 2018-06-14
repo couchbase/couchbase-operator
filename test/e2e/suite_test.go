@@ -19,7 +19,7 @@ func runSuite(t *testing.T) {
 			}
 		}
 
-		kubeClustersToSetup, err := framework.GetClusterConfigFromYml(f.KubeType, requiredClusters)
+		kubeClustersToSetup, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, requiredClusters)
 		if err != nil {
 			t.Logf("Skipping %s.. %s", testGroup.GroupName, err)
 			break

@@ -2,8 +2,9 @@
 operator-image: couchbase/couchbase-operator:v1               # Operator image to use for testing
 namespace: default                                            # Cluster namespace to run the tests
 deployment-spec: couchbase-operator/example/deployment.yaml   # Deployment yaml file path
+cluster-config: resources/cluster_config.yml                  # cluster config file path
 
-kube-config:                    # List of Cluster KUBECONFIG to be used during tests
+kube-config:                    # List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
   - name: BasicCluster
     config: /root/.kube/config
 duration: 7                     # In days. Used for system tests

@@ -2,6 +2,7 @@ package framework
 
 import (
 	"errors"
+	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -39,40 +40,50 @@ type Cluster struct {
 type ClusterMap map[string]*Cluster
 
 type Framework struct {
-	opImage      string
-	Deployment   *v1beta1.Deployment
-	Namespace    string
-	KubeType     string
-	KubeVersion  string
-	ClusterSpec  ClusterMap
-	LogDir       string
-	SkipTeardown bool
-	Duration     int
-	SuiteYmlData SuiteData
+	opImage         string
+	Deployment      *v1beta1.Deployment
+	Namespace       string
+	KubeType        string
+	KubeVersion     string
+	ClusterSpec     ClusterMap
+	LogDir          string
+	SkipTeardown    bool
+	Duration        int
+	SuiteYmlData    SuiteData
+	ClusterConfFile string
 	//S3Cli         *s3.S3
 	//S3Bucket      string
 }
 
 var Global *Framework
+var runtimeParams TestRunParam
+var suiteData SuiteData
+
+func ReadYamlData() (err error) {
+	testConfigFilePath := flag.String("testconfig", "resources/test_config.yml", "test_config.yml path. eg: $HOME/test_config.yml")
+	flag.Parse()
+
+	logrus.Info("Using test_config file ", *testConfigFilePath)
+	runtimeParams, err = ReadRuntimeConfig(*testConfigFilePath)
+	if err != nil {
+		return err
+	}
+
+	suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yml"
+
+	logrus.Info("Using suite file ", suiteFilePath)
+	suiteData, err = GetSuiteDataFromYml(suiteFilePath)
+	return err
+}
 
 // Setup setups a test framework and points "Global" to it.
 func Setup(t *testing.T) error {
 	//var clusterSpecMap map[string]*Cluster
 	clusterSpecMap := make(ClusterMap)
 
-	runtimeParams, err := ReadRuntimeConfig()
-	if err != nil {
-		return err
-	}
-
-	suiteData, err := GetSuiteDataFromYml(runtimeParams.SuiteToRun)
-	if err != nil {
-		return err
-	}
-
 	//runtimeParams.KubeConfig = append(runtimeParams.KubeConfig, KubeConfData{"NewCluster", "/Users/ashwin/go/src/github.com/couchbase/couchbase-operator/test/e2e/resources/ansible/kubernetes/config_NewCluster"})
 
-	err = v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return err
 	}
@@ -125,17 +136,17 @@ func Setup(t *testing.T) error {
 	}
 
 	Global = &Framework{
-		Deployment:   deployment,
-		Namespace:    runtimeParams.Namespace,
-		KubeType:     runtimeParams.KubeType,
-		KubeVersion:  runtimeParams.KubeVersion,
-		opImage:      runtimeParams.OperatorImage,
-		LogDir:       logDir,
-		SkipTeardown: runtimeParams.SkipTearDown,
-		Duration:     duration,
-		ClusterSpec:  clusterSpecMap,
-		SuiteYmlData: suiteData,
-		//S3Bucket:   os.Getenv("TEST_S3_BUCKET"),
+		Deployment:      deployment,
+		Namespace:       runtimeParams.Namespace,
+		KubeType:        runtimeParams.KubeType,
+		KubeVersion:     runtimeParams.KubeVersion,
+		opImage:         runtimeParams.OperatorImage,
+		LogDir:          logDir,
+		SkipTeardown:    runtimeParams.SkipTearDown,
+		Duration:        duration,
+		ClusterSpec:     clusterSpecMap,
+		SuiteYmlData:    suiteData,
+		ClusterConfFile: runtimeParams.ClusterConfFile,
 	}
 	for kubeName, _ := range Global.ClusterSpec {
 		if err = Global.setup(kubeName); err != nil {

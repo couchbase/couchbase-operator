@@ -44,15 +44,16 @@ type KubeConfData struct {
 }
 
 type TestRunParam struct {
-	Namespace      string         `yaml:"namespace"`
-	OperatorImage  string         `yaml:"operator-image"`
-	SuiteToRun     string         `yaml:"suite"`
-	DeploymentSpec string         `yaml:"deployment-spec"`
-	KubeType       string         `yaml:"kube-type"`
-	KubeVersion    string         `yaml:"kube-version"`
-	KubeConfig     []KubeConfData `yaml:"kube-config"`
-	TestDuration   string         `yaml:"duration"`
-	SkipTearDown   bool           `yaml:"skip-tear-down"`
+	Namespace       string         `yaml:"namespace"`
+	OperatorImage   string         `yaml:"operator-image"`
+	SuiteToRun      string         `yaml:"suite"`
+	DeploymentSpec  string         `yaml:"deployment-spec"`
+	KubeType        string         `yaml:"kube-type"`
+	KubeVersion     string         `yaml:"kube-version"`
+	KubeConfig      []KubeConfData `yaml:"kube-config"`
+	TestDuration    string         `yaml:"duration"`
+	SkipTearDown    bool           `yaml:"skip-tear-down"`
+	ClusterConfFile string         `yaml:"cluster-config"`
 }
 
 // To decode cluster yaml file
@@ -188,8 +189,7 @@ func ElementExistsInArr(itemToSearch string, itemList []string) bool {
 }
 
 // Read Test run params from test_config yaml file
-func ReadRuntimeConfig() (runTimeConfig TestRunParam, err error) {
-	ymlFilePath := "./resources/test_config.yml"
+func ReadRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err error) {
 	ymlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
 		err = errors.New("Unable to read test config file:" + err.Error())
@@ -205,10 +205,9 @@ func ReadRuntimeConfig() (runTimeConfig TestRunParam, err error) {
 }
 
 // Function to read cluster specific data
-func GetClusterConfigFromYml(reqClusterType string, reqClusters []string) (clusters []ClusterInfo, err error) {
+func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []string) (clusters []ClusterInfo, err error) {
 	var clusterConf ClusterConfig
 
-	ymlFilePath := "./resources/cluster_conf.yml"
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
 		err = errors.New("Unable to read cluster config file: " + err.Error())
@@ -237,7 +236,7 @@ func GetClusterConfigFromYml(reqClusterType string, reqClusters []string) (clust
 }
 
 func GetKubeClusterForKubeName(targetKubeName string) (kubeClusterData ClusterInfo, err error) {
-	kubeClustersToSetup, err := GetClusterConfigFromYml(Global.KubeType, []string{targetKubeName})
+	kubeClustersToSetup, err := GetClusterConfigFromYml(Global.ClusterConfFile, Global.KubeType, []string{targetKubeName})
 	if err != nil {
 		return
 	}
@@ -251,8 +250,7 @@ func GetKubeClusterForKubeName(targetKubeName string) (kubeClusterData ClusterIn
 }
 
 // Function to read Suite and required cluster info from suite.yaml file
-func GetSuiteDataFromYml(currSuiteName string) (suiteData SuiteData, err error) {
-	ymlFilePath := "./resources/suites/" + currSuiteName + ".yml"
+func GetSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
 		err = errors.New("Unable to read suite config file: " + err.Error())
