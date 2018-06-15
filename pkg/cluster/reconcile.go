@@ -64,6 +64,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		}
 	}
 
+	if err := c.reconcileServerGroups(); err != nil {
+		return err
+	}
+
 	state := &ReconcileMachine{
 		runningPods: podsToMemberSet(pods, c.isSecureClient()),
 		knownNodes:  couchbaseutil.NewMemberSet(),
@@ -239,10 +243,6 @@ func (c *Cluster) addMember(serverSpec api.ServerConfig) (*couchbaseutil.Member,
 
 	c.logger.Infof("added member (%s)", newMember.Name)
 	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name, c.cluster))
-
-	if err := c.initMemberServerGroups(newMember); err != nil {
-		return newMember, err
-	}
 
 	return newMember, nil
 }
@@ -608,84 +608,141 @@ func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) err
 	return nil
 }
 
-// initMemberServerGroups looks at the cluster specification, if we have enabled
-// server groups, lookup the availability zone the member is in, create the server
-// group if it doesn't exist and add the member to the group
-func (c *Cluster) initMemberServerGroups(member *couchbaseutil.Member) error {
-	// Cluster not server group aware
-	if !c.cluster.Spec.ServerGroupsEnabled() {
-		return nil
+// getServerGroups looks over the spec and collects all server groups
+// which are defined
+func (c *Cluster) getServerGroups() []string {
+	// Gather a set of unique server groups
+	serverGroups := map[string]interface{}{}
+	for _, serverGroup := range c.cluster.Spec.ServerGroups {
+		serverGroups[serverGroup] = nil
+	}
+	for _, serverClass := range c.cluster.Spec.ServerSettings {
+		for _, serverGroup := range serverClass.ServerGroups {
+			serverGroups[serverGroup] = nil
+		}
 	}
 
-	// Extract the scheduled server group
-	serverGroup := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, member.Name)
-	if serverGroup == "" {
-		return fmt.Errorf("server group unset for pod %s", member.Name)
+	// Map into a list
+	serverGroupList := []string{}
+	for serverGroup, _ := range serverGroups {
+		serverGroupList = append(serverGroupList, serverGroup)
 	}
 
-	// Get a list of existing server groups, adding a new one if required to
-	// allow the addition of the new member
-	groups, err := c.client.GetServerGroups(c.members)
-	if err != nil {
-		return err
-	}
-	if groups.GetServerGroup(serverGroup) == nil {
+	return serverGroupList
+}
+
+// createServerGroups creates any server groups defined in the specification
+// whuch Couchbase doesn't know about
+func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr.ServerGroups, error) {
+	serverGroups := c.getServerGroups()
+
+	// Create any that do not exist
+	for _, serverGroup := range serverGroups {
+		if existingGroups.GetServerGroup(serverGroup) != nil {
+			continue
+		}
+
 		if err := c.client.CreateServerGroup(c.members, serverGroup); err != nil {
-			return err
+			return nil, err
 		}
 
 		// 409s have been seen due to this not being updated quick enough, ensure the
 		// new server group exists before continuing
 		err := retryutil.Retry(c.ctx, 5*time.Second, couchbaseutil.RetryCount, func() (bool, error) {
-			groups, err = c.client.GetServerGroups(c.members)
+			var err error
+			existingGroups, err = c.client.GetServerGroups(c.members)
 			if err != nil {
 				return false, err
 			}
-			return groups.GetServerGroup(serverGroup) != nil, nil
+			return existingGroups.GetServerGroup(serverGroup) != nil, nil
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	// Pass 1: Take the existing configuration and copy over into an update
-	// request.  When we hit the member we are adding ignore it, the target
-	// server group may not have been processed yet.
-	var newNode *cbmgr.NodeInfo = nil
+	return existingGroups, nil
+}
+
+// reconcileServerGroups looks at the cluster specification, if we have enabled
+// server groups, lookup the availability zone the member is in, create the server
+// group if it doesn't exist and add the member to the group
+func (c *Cluster) reconcileServerGroups() error {
+	// Cluster not server group aware
+	if !c.cluster.Spec.ServerGroupsEnabled() {
+		return nil
+	}
+
+	// Poll the server for exising information
+	existingGroups, err := c.client.GetServerGroups(c.members)
+	if err != nil {
+		return err
+	}
+
+	// Create any server groups which need defining
+	existingGroups, err = c.createServerGroups(existingGroups)
+	if err != nil {
+		return err
+	}
+
+	// Create a server group update
 	newGroups := cbmgr.ServerGroupsUpdate{
 		Groups: []cbmgr.ServerGroupUpdate{},
 	}
-	for _, group := range groups.Groups {
+	for _, existingGroup := range existingGroups.Groups {
 		newGroup := cbmgr.ServerGroupUpdate{
-			Name:  group.Name,
-			URI:   group.URI,
+			Name:  existingGroup.Name,
+			URI:   existingGroup.URI,
 			Nodes: []cbmgr.ServerGroupUpdateOTPNode{},
-		}
-		for _, node := range group.Nodes {
-			if node.HostName == member.HostURLPlaintext() {
-				newNode = &node
-				continue
-			}
-			otpNode := cbmgr.ServerGroupUpdateOTPNode{
-				OTPNode: node.OTPNode,
-			}
-			newGroup.Nodes = append(newGroup.Nodes, otpNode)
 		}
 		newGroups.Groups = append(newGroups.Groups, newGroup)
 	}
 
-	// Pass 2: Find the target server group and add the new member to it
-	for index, group := range newGroups.Groups {
-		if group.Name == serverGroup {
+	// Look at each node in each existing group building up the update
+	// structure and also checking to see whether we need to dispatch this
+	// change to Couchbase server
+	update := false
+	for _, existingGroup := range existingGroups.Groups {
+		for _, existingMember := range existingGroup.Nodes {
+			// Extract the scheduled server group for the node
+			podName := strings.Split(existingMember.HostName, ".")[0]
+			scheduledServerGroup := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, podName)
+			if scheduledServerGroup == "" {
+				return fmt.Errorf("server group unset for pod %s", podName)
+			}
+
+			// If the node is in the wrong server group schedule an update
+			if scheduledServerGroup != existingGroup.Name {
+				update = true
+			}
+
+			// Calculate the server group to add the node to
+			index := -1
+			for i, _ := range newGroups.Groups {
+				if newGroups.Groups[i].Name == scheduledServerGroup {
+					index = i
+					break
+				}
+			}
+			if index < 0 {
+				// You have done something stupid like change the pod label
+				return fmt.Errorf("server group %s for pod %s undefined", scheduledServerGroup, podName)
+			}
+
+			// Insert the node in the correct server group
 			otpNode := cbmgr.ServerGroupUpdateOTPNode{
-				OTPNode: newNode.OTPNode,
+				OTPNode: existingMember.OTPNode,
 			}
 			newGroups.Groups[index].Nodes = append(newGroups.Groups[index].Nodes, otpNode)
-			break
 		}
 	}
 
-	return c.client.UpdateServerGroups(c.members, groups.GetRevision(), &newGroups)
+	// Nothing to do
+	if !update {
+		return nil
+	}
+
+	return c.client.UpdateServerGroups(c.members, existingGroups.GetRevision(), &newGroups)
 }
 
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate

@@ -234,10 +234,6 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	if err := c.initMemberServerGroups(m); err != nil {
-		return err
-	}
-
 	uuid, err := c.client.ClusterUUID(m)
 	if err != nil {
 		return err
