@@ -187,8 +187,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostUrl := xdcr1KubeData.MasterNodeList[0] + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcr2KubeData.MasterNodeList[0] + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := xdcr1KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
+	destUrl := xdcr2KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
@@ -322,8 +322,8 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostUrl := xdcr1KubeData.MasterNodeList[0] + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcr2KubeData.MasterNodeList[0] + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := xdcr1KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
+	destUrl := xdcr2KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
@@ -424,8 +424,8 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostUrl := defKubeData.MasterNodeList[0] + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0] + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
+	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
@@ -584,8 +584,8 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostUrl := defKubeData.MasterNodeList[0] + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0] + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
+	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
@@ -729,8 +729,8 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostUrl := defKubeData.MasterNodeList[0] + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0] + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
+	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
@@ -799,7 +799,7 @@ func TestXdcrCreateInterCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	CreateXdcrCluster(t, []string{"BasicCluster", "XdcrCluster"})
+	CreateXdcrCluster(t, []string{"BasicCluster", "XdcrCluster1"})
 }
 
 // Create cb clusters on top of TLS certificates
@@ -893,8 +893,8 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostUrl := defKubeData.MasterNodeList[0] + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0] + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
+	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
@@ -990,8 +990,8 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hostUrl := defKubeData.MasterNodeList[0] + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := externalVmClusterData.MasterNodeList[0] + ":8091"
+	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
+	destUrl := externalVmClusterData.MasterNodeList[0].Ip + ":8091"
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"

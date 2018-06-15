@@ -34,7 +34,7 @@ func runSuite(t *testing.T) {
 				continue
 			}
 			kubeName := kubeCluster.ClusterName
-			logrus.Info("Creating K8S cluster for " + kubeName + " for " + testGroup.GroupName)
+			logrus.Info("Creating K8S cluster " + kubeName + " for " + testGroup.GroupName)
 			if err := framework.SetupK8SCluster(t, f.Namespace, f.KubeType, f.KubeVersion, ymlFilePath, reqOpImage, kubeCluster); err != nil {
 				t.Fatal(err)
 			}

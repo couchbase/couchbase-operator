@@ -58,9 +58,15 @@ type TestRunParam struct {
 
 // To decode cluster yaml file
 type ClusterInfo struct {
-	ClusterName    string   `yaml:"name"`
-	MasterNodeList []string `yaml:"master"`
-	WorkerNodeList []string `yaml:"worker"`
+	ClusterName    string `yaml:"name"`
+	MasterNodeList []struct {
+		Ip        string `yaml:"ip"`
+		NodeLabel string `yaml:"label"`
+	} `yaml:"master"`
+	WorkerNodeList []struct {
+		Ip        string `yaml:"ip"`
+		NodeLabel string `yaml:"label"`
+	} `yaml:"worker"`
 }
 
 type ClusterConfig struct {
@@ -245,13 +251,13 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 		loginSectionForCluster.NewKey(key, value)
 	}
 
-	for index, ip := range kubeClusterSpec.MasterNodeList {
+	for index, nodeData := range kubeClusterSpec.MasterNodeList {
 		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-master" + strconv.Itoa(index+1)
-		masterSectionData += ip + " " + hostnameStr + "\n"
+		masterSectionData += nodeData.Ip + " " + hostnameStr + "\n"
 	}
-	for index, ip := range kubeClusterSpec.WorkerNodeList {
+	for index, nodeData := range kubeClusterSpec.WorkerNodeList {
 		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-worker" + strconv.Itoa(index+1)
-		workerSectionData += ip + " " + hostnameStr + "\n"
+		workerSectionData += nodeData.Ip + " " + hostnameStr + "\n"
 	}
 
 	_, err = newClusterConfig.NewRawSection("master_node", masterSectionData)
@@ -293,7 +299,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 		t.Logf("Running ansible script for %s", kubeClusterSpec.ClusterName)
 
 		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
-		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam)
+		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam, "--skip-tags", "one_time_configuration")
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}

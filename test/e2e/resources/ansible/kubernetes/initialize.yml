@@ -16,15 +16,51 @@
         gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gp
       register: kuberepo
 
+    - name: Commenting swap volume in /etc/fstab
+      shell: sed -i.bak '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+      tags: one_time_configuration
+
+    - name: Turning off swap partition
+      shell: swapoff -a
+      tags: one_time_configuration
+
     - name: Disabling SELinux
       lineinfile:
         dest: /etc/sysconfig/selinux
         regexp: 'SELINUX=.*$'
         line: 'SELINUX=disabled'
+      tags: one_time_configuration
 
     - name: setenforce to 0
       shell: setenforce 0
       ignore_errors: yes
+      tags: one_time_configuration
+
+    - name: Stopping firewall
+      shell: systemctl stop firewalld.service
+      tags: one_time_configuration
+
+    - name: Disabling firewall
+      shell: systemctl disable firewalld
+      tags: one_time_configuration
+
+    - name: Masking firewall
+      shell: systemctl mask firewalld.service
+      tags: one_time_configuration
+
+    - name: Load sysctl data
+      shell: sysctl --system
+      tags: one_time_configuration
+
+    - name: Rebooting host
+      shell: 'shutdown -r +1 "Reboot triggered by Ansible"'
+      async: yes
+      tags: one_time_configuration
+ 
+    - wait_for_connection:
+        delay: 90
+        timeout: 300
+      tags: one_time_configuration
 
     - name: Removing hosts data from /etc/hosts
       lineinfile:
@@ -69,31 +105,16 @@
         - kubectl-{{ kubeVersion }}.x86_64
         - kubeadm-{{ kubeVersion }}.x86_64
 
+    - name: Creating k8s config file
+      file:
+        path: "{{ k8sConfFile }}"
+        state: touch
+
     - name: Editing k8s config for ipv4 network bridge
       lineinfile: dest={{ k8sConfFile }} line={{ item }}
       with_items:
         - net.bridge.bridge-nf-call-ip6tables = 1
         - net.bridge.bridge-nf-call-iptables = 1
-
-    - name: Stopping firewall
-      shell: systemctl stop firewalld.service
-
-    - name: Disabling firewall
-      shell: systemctl disable firewalld
-
-    - name: Masking firewall
-      shell: systemctl mask firewalld.service
-
-    - name: Load sysctl data
-      shell: sysctl --system
-
-    - name: Rebooting host
-      shell: 'shutdown -r +1 "Reboot triggered by Ansible"'
-      async: yes
- 
-    - wait_for_connection:
-        delay: 90
-        timeout: 300
 
     - name: Reloading systemctl deamon
       shell: systemctl daemon-reload

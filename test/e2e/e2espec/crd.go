@@ -174,7 +174,7 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 }
 
 // basic 3 node cluster with Xdcr cluster
-func NewBasicXdcrCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, exposed bool) *api.CouchbaseCluster {
 	bucketConfig := []api.BucketConfig{}
 	if withBucket == true {
 		bucketSettings := api.BucketConfig(DefaultBucketSettings)
@@ -206,6 +206,8 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 	clusterSettings := api.ClusterConfig(defaultClusterSettings)
 	bucketConfig := []api.BucketConfig{}
 	serverConfig := []api.ServerConfig{}
+	exposedFeatures := api.ExposedFeatureList{}
+	serverGroups := []string{}
 	baseImageName := baseImage
 	versionNum := version
 	antiAffinity := ""
@@ -307,6 +309,10 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 				}
 			}
 			serverConfig = append(serverConfig, serverSettings)
+		case key == "exposedFeatures":
+			exposedFeatures = strings.Split(config[key]["featureNames"], ",")
+		case key == "serverGroups":
+			serverGroups = strings.Split(config[key]["groupNames"], ",")
 		case strings.Contains(key, "other"):
 			for setting := range config[key] {
 				switch {
@@ -320,40 +326,24 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 			}
 		}
 	}
+
 	spec := api.ClusterSpec{
-		ExposedFeatures: []string{},
+		BaseImage:       baseImageName,
+		Version:         versionNum,
+		AuthSecret:      secretName,
+		ClusterSettings: clusterSettings,
+		BucketSettings:  bucketConfig,
+		ServerSettings:  serverConfig,
+		ExposedFeatures: exposedFeatures,
+		ServerGroups:    serverGroups,
 	}
+
 	switch {
 	case antiAffinity == "on":
-		spec = api.ClusterSpec{
-			BaseImage:       baseImageName,
-			Version:         versionNum,
-			AuthSecret:      secretName,
-			AntiAffinity:    true,
-			ClusterSettings: clusterSettings,
-			BucketSettings:  bucketConfig,
-			ServerSettings:  serverConfig,
-		}
+		spec.AntiAffinity = true
 
 	case antiAffinity == "off":
-		spec = api.ClusterSpec{
-			BaseImage:       baseImageName,
-			Version:         versionNum,
-			AuthSecret:      secretName,
-			AntiAffinity:    false,
-			ClusterSettings: clusterSettings,
-			BucketSettings:  bucketConfig,
-			ServerSettings:  serverConfig,
-		}
-	case antiAffinity == "":
-		spec = api.ClusterSpec{
-			BaseImage:       baseImageName,
-			Version:         versionNum,
-			AuthSecret:      secretName,
-			ClusterSettings: clusterSettings,
-			BucketSettings:  bucketConfig,
-			ServerSettings:  serverConfig,
-		}
+		spec.AntiAffinity = false
 	}
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
