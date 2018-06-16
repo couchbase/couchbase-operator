@@ -4,24 +4,25 @@ types:
     clusters:
       - name: BasicCluster
         master:
-          - 172.23.99.12
+          - ip: 172.23.99.12
         worker:
-          - 172.23.99.13
-          - 172.23.99.27
-          - 172.23.99.29
+          - ip: 172.23.99.13
+          - ip: 172.23.99.27
+          - ip: 172.23.99.29
+
       - name: NewCluster
         master:
-          - 172.23.104.100
+          - ip: 172.23.104.100
         worker:
-          - 172.23.104.103
+          - ip: 172.23.104.103
 
 
   - type: aws_openshift
     clusters:
       - name: BasicCluster
         master:
-          - ec2-54-219-186-129.us-west-1.compute.amazonaws.com
+          - ip: ec2-54-219-186-129.us-west-1.compute.amazonaws.com
         worker:
-          - ec2-13-56-163-123.us-west-1.compute.amazonaws.com
-          - ec2-18-144-39-28.us-west-1.compute.amazonaws.com
-          - ec2-13-56-212-142.us-west-1.compute.amazonaws.com
+          - ip: ec2-13-56-163-123.us-west-1.compute.amazonaws.com
+          - ip: ec2-18-144-39-28.us-west-1.compute.amazonaws.com
+          - ip: ec2-13-56-212-142.us-west-1.compute.amazonaws.com
