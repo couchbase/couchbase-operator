@@ -83,6 +83,7 @@ On Kubernetes:
 ```bash
 kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
 ```
+
 On OpenShift:
 
 ```bash
@@ -110,6 +111,7 @@ On Kubernetes:
 ```bash
 kubectl cp <namespace>/<pod_name>:<path_to_logs> -c couchbase-server ./logs.zip
 ```
+
 On OpenShift:
 
 ```bash
@@ -125,7 +127,7 @@ kubectl cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collecti
 On OpenShift:
 
 ```bash
-    oc cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
+oc cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
 ```
 
 ## See Also

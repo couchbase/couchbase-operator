@@ -18,20 +18,27 @@ servers:
 This configuration specifies that the cluster should contain 3 nodes running the data, index, query, and search services and that the data and index path are each set to ```/opt/couchbase/var/lib/couchbase/data```. To scale these servers, you only need to change the ```size``` parameter and then push the new configuration into Kubernetes to increase or decrease the number of nodes in the cluster. To update the configuration in Kubernetes, run the following command:
 
 On Kubernetes:
+
 ```bash
 kubectl replace -f <path to config>
 ```
+
 On OpenShift:
+
 ```bash
 oc replace -f <path to config>
 ```
 
 Alternatively you can also edit the configuration of a Couchbase cluster directly by running the command below.
+
 On Kubernetes:
+
 ```bash
 kubectl edit cbc <name of cluster>
 ```
+
 On OpenShift:
+
 ```bash
 oc edit cbc <name of cluster>
 ```

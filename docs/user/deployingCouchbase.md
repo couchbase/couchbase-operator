@@ -1,9 +1,11 @@
 # Deploying a Couchbase Cluster
 
-**Prerequisites**
+## Prerequisites
+
 Before proceeding to deploy a Couchbase cluster, ensure that the [prerequisites](prerequisiteAndSetup.md) are met and the Couchbase Operator is up and running.
 
-**Deploying a Cluster**
+## Deploying a Cluster
+
 Deploying a Couchbase cluster requires creating a configuration file that describes what the cluster should look like. Like all Kubernetes configurations, Couchbase clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes. Below is a sample configuration file for a Couchbase cluster.
 
 ```yaml
@@ -53,24 +55,32 @@ By taking a quick look at this configuration file you can see that it defines a 
 * Auth secret: cb-example-auth
 
 One thing that's important to note is the `authSecret` field. The Couchbase Operator uses Kubernetes Secrets to create and manage the Couchbase super-user credentials. As a result, the `authSecret` field must refer to secret that contains both a user name and a password field. For convenience, we provide a sample secret that can be pushed into your Kubernetes cluster. The secret sets the user name to ```Administrator``` and the password to ```password```. To load this secret into your Kubernetes cluster, run the following command:
+
 On Kubernetes:
+
 ```bash
 $ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/secret.yaml
 secret "cb-example-auth" created
 ```
+
 On OpenShift:
+
 ```bash
 $ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/secret.yaml
 secret "cb-example-auth" created
 ```
 
 The Couchbase Operator configuration is now ready to be pushed to Kubernetes. To push the Couchbase Operator configuration, run the following command:
+
 On Kubernetes:
+
 ```bash
 $ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ```
+
 On OpenShift:
+
 ```bash
 $ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
@@ -84,6 +94,7 @@ Once the cluster has been provisioned, you'll see that various pods, a service, 
 Run the following command to see the newly created pods:
 
 On Kubernetes:
+
 ```bash
 $ kubectl get pods
 NAME                                  READY     STATUS    RESTARTS   AGE
@@ -92,10 +103,13 @@ cb-example-0001                       1/1       Running   0          1m
 cb-example-0002                       1/1       Running   0          1m
 couchbase-operator-1917615544-pd4q6   1/1       Running   0          8m
 ```
+
 On OpenShift, run the following command:
+
 ```bash
 $ oc get pods
 ```
+
 A CouchbaseCluster object is also created for the cluster and can be used to get health and status information about the cluster. For details on how to inspect these objects, see [Listing and Describing Pods, Services, and CouchbaseClusters](listAndDescribe.md)
 
 For further details on what each field in the CouchbaseCluster configuration does, as well as a list of all available fields see [CouchbaseCluster Configuration](couchbaseClusterConfig.md).

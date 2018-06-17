@@ -8,7 +8,9 @@ Similarly, if you are using OpenShift, the commands `oc` use the default namespa
 ## Operator Deployment
 
 The Operator is started as a deployment resource.  The name of the object will match the name provided in your deployment specification. (See [Prerequisites and Setup](prerequisiteAndSetup.md) for details.) The Operator deployment can be listed and described as follows:
+
 On Kubernetes:
+
 ```console
 $ kubectl get deployments couchbase-operator
 NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
@@ -27,7 +29,9 @@ Pod Template:
     Port:	8080/TCP
     ...
 ```
+
 On OpenShift:
+
 ```console
 $ oc get deployments couchbase-operator
 NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
@@ -50,7 +54,9 @@ Pod Template:
 Notice that the deployment resource manages a ReplicaSet, which means it's important to check that the desired number of replicas match the total number of available replicas when describing the Operator deployment.
 
 Additional information about the ReplicaSets and pods created by the Operator deployment can be described using the deployment name as a label selector.
+
 On Kubernetes:
+
 ```console
 # replicasets created by couchbase-operator deployment
 $ kubectl describe rs -lname=couchbase-operator
@@ -66,7 +72,9 @@ Containers:
     Image:		couchbase/couchbase-operator:v1
     ...
 ```
+
 On OpenShift:
+
 ```console
 # replicasets created by couchbase-operator deployment
 $ oc describe rs -lname=couchbase-operator
@@ -82,11 +90,13 @@ Containers:
     Image:		couchbase/couchbase-operator:v1
     ...
 ```
+
 ## Server Pods
 
 Couchbase pods can be listed using the ```-lapp=couchbase``` label.
 
 On Kubernetes:
+
 ```console
 $ kubectl get po -l app=couchbase
 NAME                  READY     STATUS    RESTARTS   AGE
@@ -103,7 +113,9 @@ $ oc get po -l app=couchbase
 ```
 
 The pods are also labeled by cluster and according to Couchbase service, which makes it possible to get only the pods providing a specific service for a specific cluster. For example, the following command gets only the pods providing the query service on the `cb-development` cluster.
+
 On Kubernetes:
+
 ```console
 # query pods on dev deployment
 $ kubectl get po -l couchbase_cluster=cb-development,couchbase_service_query
@@ -111,7 +123,9 @@ NAME                  READY     STATUS    RESTARTS   AGE
 cb-development-0000   1/1       Running   0          1h
 cb-development-0001   1/1       Running   0          1h
 ```
+
 On OpenShift, use the following command:
+
 ```console
 # query pods on dev deployment
 $ oc get po -l couchbase_cluster=cb-development,couchbase_service_query
@@ -135,6 +149,7 @@ Containers:
     Image:		couchbase/server:enterprise-5.0.1
 
 ```
+
 On OpenShift, use the following command:
 
 ```console
@@ -146,7 +161,9 @@ $ oc describe po cb-development-0000
 Services are created to facilitate both pod to pod communication and connections from external clients to the internal cluster. The former is established using a headless ClusterIP service, and the latter via the NodePort service.  You can read more about the Kubernetes services [here](https://kubernetes.io/docs/concepts/services-networking/service/).  When listing the services, the name of the ClusterIP service will match the name provided in the CouchbaseCluster spec.  The NodePort service is also named after the CouchbaseCluster name, except with a '-ui' suffix.
 
 Services belonging to the Operator can be listed as follows:
+
 On Kubernetes:
+
 ```console
 # all services managed by the operator
 $ kubectl get service -lapp=couchbase
@@ -162,7 +179,9 @@ NAME               CLUSTER-IP   EXTERNAL-IP   PORT(S)                          A
 cb-production      None         <none>        8091/TCP,18091/TCP               2m
 cb-production-ui   10.0.0.216   <nodes>       8091:30139/TCP,18091:30461/TCP   2m
 ```
+
 On OpenShift, use the following commands:
+
 ```console
 # all services managed by the operator
 $ oc get service -lapp=couchbase
@@ -201,17 +220,21 @@ Endpoints:		172.17.0.10:18091,172.17.0.9:18091
 Session Affinity:	None
 Events:			<none>
 ```
+
 On OpenShift, use the following command:
+
 ```console
 $ oc describe service cb-production
 ```
-*You should expect that all pods within a cluster also exist as an endpoint to each service.*
 
+*You should expect that all pods within a cluster also exist as an endpoint to each service.*
 
 ## Listing Custom Resources
 
 Custom resources are extensions of the Kubernetes API. The Couchbase Operator creates custom resources of type ```CouchbaseCluster``` for each cluster being deployed. Custom resources can be listed and described using `kubectl` just as other built-in resources.
+
 On Kubernetes:
+
 ```console
 $ kubectl get couchbasecluster
 NAME             KIND
@@ -227,7 +250,9 @@ API Version:	couchbase.database.couchbase.com/v1beta1
 Kind:		CouchbaseCluster
 ...
 ```
+
 On OpenShift:
+
 ```console
 $ oc get couchbasecluster
 NAME             KIND
@@ -243,4 +268,5 @@ API Version:	couchbase.database.couchbase.com/v1beta1
 Kind:		CouchbaseCluster
 ...
 ```
+
 Describing the cluster resource returns the deployed specification and its active status. For more information about the response returned from the describe command, see [Cluster Status Guide](clusterStatusGuide.md).
