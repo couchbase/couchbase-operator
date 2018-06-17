@@ -4,9 +4,7 @@
 
 The following diagram shows the process of uploading a CouchbaseCluster configuration to Kubernetes using just `kubectl`:
 
-
 ![Figure 1](images/cbopctl_figure_1.jpg)
-
 
 1. The `kubectl` command is run and the CouchbaseCluster configuration is sent to the Kubernetes API Server.
 2. The CouchbaseCluster configuration undergoes partial validation by Kubernetes.

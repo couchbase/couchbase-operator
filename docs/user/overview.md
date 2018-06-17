@@ -24,6 +24,5 @@ The goal of the Couchbase Operator is to fully manage one or more Couchbase depl
 
 ## Get Started
 
-[Prerequisites and Setup](prerequisiteAndSetup.md)
-
-[Release Notes](releaseNotes.md)
+* [Prerequisites and Setup](prerequisiteAndSetup.md)
+* [Release Notes](releaseNotes.md)

@@ -30,15 +30,10 @@ The Beta 2 release has the following limitations:
 Issue | Description
 --- | ---
 K8S-155 | The Couchbase Operator logs show error messages while the cluster is being built. These are harmless and do not impact the cluster creation.
-
 K8S-119 | If a cluster is scaled up beyond the available memory, rebalance fails and the cluster becomes unavailable.
-
 K8S-112 | A rebalance started event is posted after the actual rebalance operation is completed. And no event is posted to indicate that the operation has completed.
-
 K8S-80 | The Couchbase Web Console may redirect to a node even after it has been removed from the cluster.
-
 K8S-195 | The OpenShift bootstrap script has issues running in OpenShift clusters, but works in MiniShift. Note that we don't recommend using this bootstrap script in production clusters.
-
 K8S-205 | Sometimes an extra bucket event will show up in the events log if a node is manually failed over.
 
 ## Fixed Issues
@@ -46,16 +41,10 @@ K8S-205 | Sometimes an extra bucket event will show up in the events log if a no
 --- | ---
 Issue | Description
 --- | ---
-
 K8S-172 | The index storage mode cannot be changed.
-
 K8S-169 | There is no CRD validation, so the Couchbase configurations uploaded to Kubernetes are not validated. An incorrect configuration can cause all kinds of problems, including potentially crashing the Operator.
-
 K8S-155 | The Couchbase Operator logs show error messages while the cluster is being built. These are harmless and do not impact the cluster creation.
-
 K8S-92 | Changing the `cluster-name` field in the example/couchbase-cluster.yaml file causes the cluster get into an inconsistent state.
-
-
 
 # v0.7 [Beta] Release Notes
 
@@ -79,15 +68,9 @@ The Beta release has the following limitations:
 Issue | Description
 --- | ---
 K8S-172 | The index storage mode cannot be changed.
-
 K8S-169 | There is no CRD validation, so the Couchbase configurations uploaded to Kubernetes are not validated. An incorrect configuration can cause all kinds of problems, including potentially crashing the Operator.
-
 K8S-155 | The Couchbase Operator logs show error messages while the cluster is being built. These are harmless and do not impact the cluster creation.
-
 K8S-119 | If a cluster is scaled up beyond the available memory, rebalance fails and the cluster becomes unavailable.
-
 K8S-112 | A rebalance started event is posted after the actual rebalance operation is completed. And no event is posted to indicate that the operation has completed.
-
 K8S-92 | Changing the `cluster-name` field in the example/couchbase-cluster.yaml file causes the cluster get into an inconsistent state.
-
 K8S-80 | The Couchbase Web Console continues to display a node even after it has been removed from the cluster.

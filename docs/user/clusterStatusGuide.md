@@ -21,6 +21,7 @@ On Kubernetes:
 ```bash
 kubectl describe cbc cb-example
 ```
+
 On OpenShift:
 
 ```bash

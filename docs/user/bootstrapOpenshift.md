@@ -1,4 +1,3 @@
-
 # Using OpenShift Templates with Couchbase Operator
 
 ### DISCLAIMER
@@ -19,6 +18,7 @@ $ cd openshift-bootstrap
 $ chmod +x openshift-bootstrap.sh
 $ ./openshift-bootstrap.sh
 ```
+
 *Note*: The bootstrap will also create a utility project named `admin-ct-ctl`. This utility project consists of a controller that detects when a new Couchbase cluster is being created from your template, and ensures that there is an instance of the couchbase-operator within your clusters project.
 
 Refreshing the application catalog page should reveal a new Couchbase template in the catalog. Click the Couchbase template to deploy a cluster into a new or existing project. Upon completion, you will see a link to the Couchbase Server Web Console of the cluster that is being created. This link is also available in the clusters project under **Resources > Routes** for future referencing.
@@ -34,6 +34,7 @@ Templates are stored in the OpenShift namespace. Try listing the templates to en
 ```bash
 oc get template -n openshift | grep couchbase
 ```
+
 If the template is listed there, then you may need to wait for the catalog to sync. If not, then you may need to debug your [template service broker](https://docs.openshift.com/container-platform/3.6/architecture/service_catalog/template_service_broker.html) for any issues.
 
 ### The Couchbase cluster isn't starting
