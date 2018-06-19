@@ -116,6 +116,7 @@ func Setup(t *testing.T) error {
 		logrus.Info("Setting Operator image: " + oi)
 		deployment.Spec.Template.Spec.Containers[0].Image = oi
 	}
+	deployment.Spec.Template.Spec.ServiceAccountName = "couchbase-operator"
 
 	logDir, err := makeLogDir()
 	if err != nil {
