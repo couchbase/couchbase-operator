@@ -1,0 +1,20 @@
+# This configuration sets the value of antiAffinity to true.
+apiVersion: couchbase.database.couchbase.com/v1beta1
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  baseImage: couchbase/server
+  version: enterprise-5.5.0
+  antiAffinity: false
+  authSecret: cb-example-auth
+  cluster:
+    indexStorageSetting: plasma
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search

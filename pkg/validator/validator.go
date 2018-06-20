@@ -170,6 +170,15 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		}
 	}
 
+	// Ensure buckets are named uniquely
+	bucketNames := []string{}
+	for _, bucket := range customResource.Spec.BucketSettings {
+		bucketNames = append(bucketNames, bucket.BucketName)
+	}
+	if !uniqueString(bucketNames) {
+		errs = append(errs, errors.DuplicateItems("spec.buckets.name", "body"))
+	}
+
 	// Ensure unnecessary settings in memcached and ephemeral buckets are nil
 	for i, _ := range customResource.Spec.BucketSettings {
 		if customResource.Spec.BucketSettings[i].BucketType == constants.BucketTypeCouchbase {
@@ -360,6 +369,10 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 
 	if current.Spec.Version != updated.Spec.Version {
 		errs = append(errs, &UpdateError{"spec.version", "body"})
+	}
+
+	if current.Spec.AntiAffinity != updated.Spec.AntiAffinity {
+		errs = append(errs, &UpdateError{"spec.antiAffinity", "body"})
 	}
 
 	if current.Spec.AuthSecret != updated.Spec.AuthSecret {

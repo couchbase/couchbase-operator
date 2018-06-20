@@ -572,6 +572,23 @@ var testDefs = []testDef{
 			&UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"},
 		),
 	},
+	{
+		name:        "TestUpdateAntiAffinity",
+		path:        "tests/0007.yaml",
+		updatePath:  "tests/0067.yaml",
+		description: "Tests anti affinity is immutable",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.antiAffinity", "body"},
+		),
+	},
+	{
+		name:        "TestBucketNamesUnique",
+		path:        "tests/0068.yaml",
+		description: "Tests bucket names are unique",
+		expectedErr: errors.CompositeValidationError(
+			errors.DuplicateItems("spec.buckets.name", "body"),
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {
