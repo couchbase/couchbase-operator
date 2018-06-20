@@ -14,6 +14,16 @@ spec:
     - data
   exposedFeatures:
     - xdcr
+  tls:
+    static:
+      member:
+        serverSecret: serverTlsSecret
+      operatorSecret: operatorTlsSecret
+  softwareUpdateNotifications: false
+  serverGroups:
+   - group1
+   - group2
+  disableBucketManagement: false
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
@@ -44,11 +54,19 @@ spec:
       - index
       - query
       - search
+      - eventing
+      - analytics
+    serverGroups:
+     - group1
+     - group2
     pod:
       volumeMounts:
         default: couchbase
         data:  couchbase
         index: couchbase
+        analytics:
+         - couchbase
+         - couchbase
       couchabseEnv:
         ENV1: value
       resources:
