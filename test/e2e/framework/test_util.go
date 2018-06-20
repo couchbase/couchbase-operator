@@ -44,16 +44,17 @@ type KubeConfData struct {
 }
 
 type TestRunParam struct {
-	Namespace       string         `yaml:"namespace"`
-	OperatorImage   string         `yaml:"operator-image"`
-	SuiteToRun      string         `yaml:"suite"`
-	DeploymentSpec  string         `yaml:"deployment-spec"`
-	KubeType        string         `yaml:"kube-type"`
-	KubeVersion     string         `yaml:"kube-version"`
-	KubeConfig      []KubeConfData `yaml:"kube-config"`
-	TestDuration    string         `yaml:"duration"`
-	SkipTearDown    bool           `yaml:"skip-tear-down"`
-	ClusterConfFile string         `yaml:"cluster-config"`
+	Namespace          string         `yaml:"namespace"`
+	OperatorImage      string         `yaml:"operator-image"`
+	SuiteToRun         string         `yaml:"suite"`
+	DeploymentSpec     string         `yaml:"deployment-spec"`
+	KubeType           string         `yaml:"kube-type"`
+	KubeVersion        string         `yaml:"kube-version"`
+	ServiceAccountName string         `yaml:"serviceAccountName"`
+	KubeConfig         []KubeConfData `yaml:"kube-config"`
+	TestDuration       string         `yaml:"duration"`
+	SkipTearDown       bool           `yaml:"skip-tear-down"`
+	ClusterConfFile    string         `yaml:"cluster-config"`
 }
 
 // To decode cluster yaml file
