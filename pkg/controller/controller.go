@@ -91,6 +91,7 @@ func (c *Controller) Start() {
 
 func (c *Controller) Handle(ctx types.Context, event types.Event) error {
 	if cluster, ok := event.Object.(*cbapi.CouchbaseCluster); ok {
+		cluster.Initialize()
 		ev := &Event{
 			Type:   kwatch.Added,
 			Object: cluster,

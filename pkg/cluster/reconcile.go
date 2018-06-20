@@ -866,7 +866,7 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 
 	config := c.cluster.Spec.ClusterSettings
 	requested := &cbmgr.PoolsDefaults{
-		ClusterName:          c.cluster.Name,
+		ClusterName:          c.cluster.Spec.ClusterSettings.ClusterName,
 		DataMemoryQuota:      config.DataServiceMemQuota,
 		IndexMemoryQuota:     config.IndexServiceMemQuota,
 		SearchMemoryQuota:    config.SearchServiceMemQuota,

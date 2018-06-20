@@ -111,6 +111,9 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 								"autoFailoverTimeout",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"clusterName": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
 								"dataServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "integer",
 									Minimum: &minimumServiceMemoryQuota,
