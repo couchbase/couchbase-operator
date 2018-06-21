@@ -1,0 +1,8 @@
+---
+suite: TestCustom
+tcGroups:
+  - name: Group1
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestCreateCluster

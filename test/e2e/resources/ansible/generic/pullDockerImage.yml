@@ -7,7 +7,7 @@
 
     - name: Copying docker auth file
       copy:
-        src: /root/.docker/config.json
+        src: config.json
         dest: /root/.docker/config.json
 
     - name: Pull docker image

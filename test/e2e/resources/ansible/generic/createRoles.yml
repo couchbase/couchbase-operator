@@ -5,7 +5,7 @@
   tasks:
     - name: Copying cluster-role yaml
       copy:
-        src: ../../../../../example/rbac/cluster-role-template.yaml
+        src: cluster-role-template.yml
         dest: ~/.kube/cluster-role.yml
 
     - name: Editing role name in cluster-role yaml
@@ -18,19 +18,30 @@
       shell: kubectl delete -f ~/.kube/cluster-role.yml
       ignore_errors: yes
 
-    - name: Removing old service account
+    - name: Removing old couchbase-operator service account
       shell: "kubectl delete serviceaccount couchbase-operator --namespace {{ namespace }}"
       ignore_errors: yes
 
-    - name: Removing old clusterrolebinding
+    - name: Removing old couchbase-operator clusterrolebinding
       shell: "kubectl delete clusterrolebinding couchbase-operator-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:couchbase-operator"
+      ignore_errors: yes
+
+    - name: Removing old default service account
+      shell: "kubectl delete serviceaccount default --namespace {{ namespace }}"
+      ignore_errors: yes
+
+    - name: Removing old default clusterrolebinding
+      shell: "kubectl delete clusterrolebinding default-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:default"
       ignore_errors: yes
 
     - name: Creating cluster role
       shell: kubectl create -f ~/.kube/cluster-role.yml
 
-    - name: Creating service account
+    - name: Creating couchbase-operator service account
       shell: "kubectl create serviceaccount couchbase-operator --namespace {{ namespace }}"
 
-    - name: Creating clusterrolebinding
+    - name: Creating couchbase-operator clusterrolebinding
       shell: "kubectl create clusterrolebinding couchbase-operator-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:couchbase-operator"
+
+    - name: Creating default clusterrolebinding
+      shell: "kubectl create clusterrolebinding default-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:default"
