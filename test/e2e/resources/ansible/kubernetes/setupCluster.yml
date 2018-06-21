@@ -1,3 +1,23 @@
+- hosts: all
+  tasks:
+    - name: Adding k8s masters in /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        state: present
+        line: "{{ item }} k8s-master-{{ my_idx + 1 }}"
+      loop: "{{ groups['master_node'] }}"
+      loop_control:
+        index_var: my_idx
+
+    - name: Adding k8s workers in /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        state: present
+        line: "{{ item }} k8s-worker-{{ my_idx + 1 }}"
+      loop: "{{ groups['worker_node'] }}"
+      loop_control:
+        index_var: my_idx
+
 - hosts: master_node
   vars:
     etcdLibPath: /var/lib/etcd
@@ -62,14 +82,14 @@
       shell: kubeadm reset
 
     - name: Joining worker nodes
-      shell: "kubeadm join --token {{ kubeAdmToken }} {{ masterNodeIp }}:6443"
+      shell: "kubeadm join --token {{ kubeAdmToken }} {{ masterNodeIp }}:6443 --discovery-token-unsafe-skip-ca-verification"
 
 - hosts: master_node
   tasks:
     - name: Applying cluster network settings using weave
       shell: kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 
-    - name: Getting node deatils
+    - name: Getting node details
       shell: kubectl get nodes -o wide
       register: shellOutput
 

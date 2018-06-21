@@ -301,6 +301,13 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 						services = append(services, service)
 					}
 					serverSettings.Services = services
+				case setting == "serverGroups":
+					serverGroups := []string{}
+					parsedGroups := strings.Split(config[key][setting], ",")
+					for _, group := range parsedGroups {
+						serverGroups = append(serverGroups, group)
+					}
+					serverSettings.ServerGroups = serverGroups
 				case setting == "resourceMemLimit":
 					limit, _ := strconv.Atoi(config[key][setting])
 					serverSettings.Pod.Resources.Limits[v1.ResourceMemory] = resource.MustParse(fmt.Sprintf("%d%s", limit, "Mi"))

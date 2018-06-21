@@ -64,7 +64,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	bucketSettingsList := []api.BucketConfig{bucket1, bucket2, bucket3, bucket4}
 
 	clusterConfig := e2eutil.BasicClusterConfig2
-	serviceConfig1 := e2eutil.BasicServiceThreeDataNode
+	serviceConfig1 := e2eutil.GetServiceConfigMap(3, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}

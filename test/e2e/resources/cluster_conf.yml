@@ -4,18 +4,31 @@ types:
     clusters:
       - name: BasicCluster
         master:
-          - ip: 172.23.99.12
+          - ip: 172.23.96.203
         worker:
-          - ip: 172.23.99.13
-          - ip: 172.23.99.27
-          - ip: 172.23.99.29
+          - ip: 172.23.96.217
+          - ip: 172.23.96.218
+          - ip: 172.23.96.221
 
-      - name: NewCluster
+      - name: XdcrCluster
         master:
-          - ip: 172.23.104.100
+          - ip: 172.23.96.234
         worker:
-          - ip: 172.23.104.103
+          - ip: 172.23.96.235
+          - ip: 172.23.96.202
+          - ip: 172.23.96.198
 
+      - name: RzaCluster
+        master:
+          - ip: 172.23.96.203
+            label: RzaGroup-2
+        worker:
+          - ip: 172.23.96.217
+            label: RzaGroup-1
+          - ip: 172.23.96.218
+            label: RzaGroup-2
+          - ip: 172.23.96.221
+            label: RzaGroup-3
 
   - type: aws_openshift
     clusters:

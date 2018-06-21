@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -27,7 +29,7 @@ func TestEditServiceConfig(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataNode
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
@@ -103,7 +105,7 @@ func TestNegEditServiceConfig(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
@@ -716,7 +718,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
@@ -801,7 +803,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
 	if err != nil {
@@ -892,7 +894,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -984,7 +986,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -1090,7 +1092,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicTwoReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -1182,7 +1184,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicTwoReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -1287,7 +1289,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1": bucketConfig1}
 	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
@@ -1390,7 +1392,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -1501,7 +1503,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		"searchServiceMemQuota": "256",
 		"indexStorageSetting":   "memory_optimized",
 		"autoFailoverTimeout":   strconv.Itoa(autofailoverTimeout)}
-	serviceConfig1 := e2eutil.BasicServiceFiveDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -1629,4 +1631,87 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	if !expectedEvents.Compare(events) {
 		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
+}
+
+func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
+	f := framework.Global
+	targetKubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[targetKubeName]
+
+	// Create cluster spec for RZA feature
+	clusterSize := 3
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
+	bucketConfig1 := e2eutil.BasicOneReplicaBucket
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"bucket1":  bucketConfig1,
+	}
+
+	// Deploy couchbase cluster
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+
+	expectedEvents := e2eutil.EventList{}
+	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
+	}
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+	// Set taint properties
+	podTaint := v1.Taint{
+		Key:    "noExecKey",
+		Value:  "noExecVal",
+		Effect: "NoExecute",
+	}
+	podTaintList := []v1.Taint{podTaint}
+
+	nodeIndex := 2
+	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
+		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
+	}
+	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
+
+	/*
+		event := e2eutil.NewMemberRemoveEvent(testCouchbase, 2)
+		err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
+		if err != nil {
+			t.Fatalf("Failed to remove pod from tainted node: %v", err)
+		}
+	*/
+
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("Unable to get Client for cluster: %v", err)
+	}
+
+	if err = e2eutil.WaitForUnhealthyNodes(t, client, 5, 1); err != nil {
+		t.Fatalf("No unhealthy nodes in cluster: %v", err)
+	}
+
+	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
+		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)
+	}
+
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatalf("Failed to remove pod from tainted node: %v", err)
+	}
+
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 3, e2eutil.Retries30); err != nil {
+		t.Fatalf("Cluster failed to become healthy: %v", err)
+	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }

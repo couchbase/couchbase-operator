@@ -68,24 +68,6 @@
         state: absent
         regexp: " k8s.*$"
 
-    - name: Adding k8s-masters in /etc/hosts
-      lineinfile:
-        path: /etc/hosts
-        state: present
-        line: "{{ item }} k8s-master-{{ my_idx + 1 }}"
-      loop: "{{ groups['master_node'] }}"
-      loop_control:
-        index_var: my_idx
-
-    - name: Adding k8sWorkers in /etc/hosts
-      lineinfile:
-        path: /etc/hosts
-        state: present
-        line: "{{ item }} k8s-worker-{{ my_idx + 1 }}"
-      loop: "{{ groups['worker_node'] }}"
-      loop_control:
-        index_var: my_idx
-
     - name: Removing old kube packages
       yum: state=absent name={{ item }}
       with_items:

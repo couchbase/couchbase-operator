@@ -288,7 +288,8 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yml"
 	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yml"
 	clusterNamespaceFile := ymlFilePath + "/" + kubeType + "/createNamespace.yml"
-	pullDockerImageFile := ymlFilePath + "/docker/pullDockerImage.yml"
+	clusterRoleSetupFile := ymlFilePath + "/generic/createRoles.yml"
+	pullDockerImageFile := ymlFilePath + "/generic/pullDockerImage.yml"
 
 	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
 	if err != nil {
@@ -320,6 +321,13 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 			if err := runExecCommand(t, ansibleCmd); err != nil {
 				return err
 			}
+		}
+
+		t.Logf("Creating role bindings for namespace %s", namespace)
+		ansibleExtraVarParam = "namespace=" + namespace
+		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterRoleSetupFile, "--exta-vars", ansibleExtraVarParam)
+		if err := runExecCommand(t, ansibleCmd); err != nil {
+			return err
 		}
 
 		ansibleExtraVarParam = "dockerImgName=" + reqOpImage

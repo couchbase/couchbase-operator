@@ -13,4 +13,4 @@ suite: TestSanity               # Test suite to run. Same named yaml file should
 kube-type: kubernetes           # Cluster type kubernetes | aws-openshift
 kube-version: 1.8.0-0           # KUBE version to install
 
-serviceAccountName: couchbase-operator    # Service account to use while running Tests
+serviceAccountName: default     # Service account to use while running Tests

@@ -200,10 +200,9 @@ func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
 	return clusterSize
 }
 
-func runTest(t *testing.T, f *framework.Framework, testDefs []testDef, command string) []failure {
+func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef, targetKubeName, command string) []failure {
 	failures := []failure{}
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.ClusterSpec[targetKubeName]
 	for _, test := range testDefs {
 		t.Logf("Running test: %s", test.name)
 
@@ -395,7 +394,8 @@ func TestValidationCreate(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "create")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "create")
 	checkFailures(t, failures)
 }
 
@@ -495,7 +495,8 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedMessages: []string{"spec.servers.name in body shouldn't contain duplicates"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "create")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "create")
 	checkFailures(t, failures)
 }
 
@@ -545,7 +546,8 @@ func TestValidationDefaultCreate(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "create")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "create")
 	checkFailures(t, failures)
 }
 
@@ -575,7 +577,8 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "create")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "create")
 	checkFailures(t, failures)
 }
 
@@ -697,7 +700,8 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			expectedMessages: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "create")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "create")
 	checkFailures(t, failures)
 }
 
@@ -737,7 +741,8 @@ func TestValidationApply(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "apply")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
 	checkFailures(t, failures)
 }
 
@@ -789,7 +794,8 @@ func TestNegValidationApply(t *testing.T) {
 			expectedMessages: []string{"spec.servers[0].services in body cannot be updated"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "apply")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
 	checkFailures(t, failures)
 }
 
@@ -879,7 +885,8 @@ func TestValidationDefaultApply(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "apply")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
 	checkFailures(t, failures)
 }
 
@@ -903,7 +910,8 @@ func TestNegValidationDefaultApply(t *testing.T) {
 			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "create")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "create")
 	checkFailures(t, failures)
 }
 
@@ -1003,7 +1011,8 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			expectedWarn:     "Changing the Eviction Policy will cause the bucket default1 to be temporarily unavailable",
 		},
 	}
-	failures := runTest(t, f, testDefs, "apply")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
 	checkFailures(t, failures)
 }
 
@@ -1068,7 +1077,8 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			expectedMessages: []string{"spec.cluster.indexStorageSetting in body cannot be updated"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "apply")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
 	checkFailures(t, failures)
 }
 
@@ -1102,7 +1112,8 @@ func TestValidationDelete(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" deleted"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "delete")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "delete")
 	checkFailures(t, failures)
 }
 
@@ -1126,6 +1137,7 @@ func TestNegValidationDelete(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters.couchbase.database.couchbase.com \"cb-example1\" not found"},
 		},
 	}
-	failures := runTest(t, f, testDefs, "delete")
+	kubeName := "BasicCluster"
+	failures := runValidationTest(t, f, testDefs, kubeName, "delete")
 	checkFailures(t, failures)
 }

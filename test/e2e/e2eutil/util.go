@@ -78,46 +78,6 @@ var (
 		"autoFailoverTimeout":      "10",
 		"autoFailoverMaxCount":     "1"}
 
-	BasicServiceOneDataNode = map[string]string{
-		"size":     "1",
-		"name":     "test_config_1",
-		"services": "data"}
-
-	BasicServiceOneDataN1qlIndex = map[string]string{
-		"size":     "1",
-		"name":     "test_config_1",
-		"services": "data,query,index"}
-
-	BasicServiceOneN1qlIndexSearch = map[string]string{
-		"size":     "1",
-		"name":     "test_config_1",
-		"services": "query,index,search"}
-
-	BasicSecondaryServiceOneData = map[string]string{
-		"size":     "1",
-		"name":     "test_config_2",
-		"services": "data"}
-
-	BasicServiceThreeDataN1qlIndex = map[string]string{
-		"size":     "3",
-		"name":     "test_config_1",
-		"services": "data,query,index"}
-
-	BasicServiceThreeDataNode = map[string]string{
-		"size":     "3",
-		"name":     "test_config_1",
-		"services": "data"}
-
-	BasicServiceFourDataNode = map[string]string{
-		"size":     "4",
-		"name":     "test_config_1",
-		"services": "data"}
-
-	BasicServiceFiveDataN1qlIndex = map[string]string{
-		"size":     "5",
-		"name":     "test_config_1",
-		"services": "data,query,index"}
-
 	BasicOneReplicaBucket = map[string]string{
 		"bucketName":         "default",
 		"bucketType":         "couchbase",
@@ -177,6 +137,23 @@ func RandomSuffix() string {
 		suffix = suffix + string(rune(ordinal))
 	}
 	return suffix
+}
+
+func GetServiceConfigMap(size int, configName string, serviceList []string) map[string]string {
+	return map[string]string{
+		"name":     configName,
+		"size":     strconv.Itoa(size),
+		"services": strings.Join(serviceList, ","),
+	}
+}
+
+func GetClassSpecificServiceConfigMap(size int, configName string, serviceList, serverGroupList []string) map[string]string {
+	return map[string]string{
+		"name":         configName,
+		"services":     strings.Join(serviceList, ","),
+		"size":         strconv.Itoa(size),
+		"serverGroups": strings.Join(serverGroupList, ","),
+	}
 }
 
 // newClusterFromSpecQuick creates a cluster and waits for various ready conditions.
@@ -290,16 +267,18 @@ func NewClusterMultiNoWait(t *testing.T, crClient versioned.Interface, namespace
 }
 
 func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
-
 	updateFunc := func(cl *api.CouchbaseCluster) {}
-
 	switch {
 	case field == "Paused":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.Paused, _ = strconv.ParseBool(value) }
+	case field == "ExposedFeatures":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ExposedFeatures = strings.Split(value, ",") }
+	case field == "ServerGroups":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerGroups = strings.Split(value, ",") }
+	case field == "AntiAffinity":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.AntiAffinity, _ = strconv.ParseBool(value) }
 	}
-
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
-
 }
 
 func UpdateClusterSettings(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
@@ -327,15 +306,11 @@ func UpdateClusterSettings(field string, value string, crClient versioned.Interf
 			cl.Spec.ClusterSettings.AutoFailoverTimeout = uint64(newTimeout)
 		}
 	}
-
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
-
 }
 
 func UpdateServiceSpec(service int, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
-
 	updateFunc := func(cl *api.CouchbaseCluster) {}
-
 	switch {
 	case field == "Size":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[0].Size = ConvertToInt(value) }

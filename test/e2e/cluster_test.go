@@ -162,7 +162,7 @@ func TestEditClusterSettings(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataNode
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
@@ -288,7 +288,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
@@ -478,7 +478,7 @@ func TestInvalidAuthSecret(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
@@ -528,7 +528,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	couchbaseBaseImage := "basecouch/123"
 	couchbaseVerString := "enterprise-5.5.0"
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
 	otherConfig1 := map[string]string{
 		"baseImageName": couchbaseBaseImage,
 		"versionNum":    couchbaseVerString,
@@ -605,7 +605,7 @@ func TestInvalidVersion(t *testing.T) {
 	couchbaseVerString := "enterprise-9.9.9"
 	couchbaseBaseImage := "couchbase/server"
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
 	otherConfig1 := map[string]string{
 		"versionNum":    couchbaseVerString,
 		"baseImageName": couchbaseBaseImage,
@@ -1037,7 +1037,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataNode
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
@@ -1266,7 +1266,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataNode
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
 
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -1513,7 +1513,7 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneN1qlIndexSearch
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"query", "index", "search"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
@@ -1544,8 +1544,8 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneN1qlIndexSearch
-	serviceConfig2 := e2eutil.BasicSecondaryServiceOneData
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"query", "index", "search"})
+	serviceConfig2 := e2eutil.GetServiceConfigMap(1, "test_config_2", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
@@ -1609,8 +1609,8 @@ func TestRemoveLastDataService(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.BasicServiceOneDataN1qlIndex
-	serviceConfig2 := e2eutil.BasicSecondaryServiceOneData
+	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
+	serviceConfig2 := e2eutil.GetServiceConfigMap(1, "test_config_2", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,

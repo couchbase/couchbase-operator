@@ -1,0 +1,22 @@
+- hosts: master_node
+  tasks:
+    - name: Cleaning up previous cluster role
+      shell: kubectl delete -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/k8s-rbac/cluster-role.yaml
+      ignore_errors: yes
+
+    - name: Removing old service account
+      shell: "kubectl delete serviceaccount couchbase-operator --namespace {{ namespace }}"
+      ignore_errors: yes
+
+    - name: Removing old clusterrolebinding
+      shell: "kubectl delete clusterrolebinding couchbase-operator-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:couchbase-operator"
+      ignore_errors: yes
+
+    - name: Creating cluster role
+      shell: kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/k8s-rbac/cluster-role.yaml
+
+    - name: Creating service account
+      shell: "kubectl create serviceaccount couchbase-operator --namespace {{ namespace }}"
+
+    - name: Creating clusterrolebinding
+      shell: "kubectl create clusterrolebinding couchbase-operator-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:couchbase-operator"

@@ -57,3 +57,20 @@ func GetK8SAllocatableMemory(kubeCli kubernetes.Interface, namespace string, nam
 	memQuantityMB := int(memQuantity.Value() >> 20)
 	return memQuantityMB, nil
 }
+
+// Updates K8S nodes with given Unschedulable and Taint values
+func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnschedulable bool, podTaintList []v1.Taint, nodeIndex int) (err error) {
+	for retryCount := 0; retryCount < 3; retryCount++ {
+		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		nodeToTaint := k8sNodeList.Items[nodeIndex]
+		nodeToTaint.Spec.Unschedulable = isUnschedulable
+		nodeToTaint.Spec.Taints = podTaintList
+		if _, err = kubeClient.CoreV1().Nodes().Update(&nodeToTaint); err == nil {
+			break
+		}
+	}
+	return err
+}
