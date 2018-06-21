@@ -1141,3 +1141,37 @@ func TestNegValidationDelete(t *testing.T) {
 	failures := runValidationTest(t, f, testDefs, kubeName, "delete")
 	checkFailures(t, failures)
 }
+
+/*******************************************************************
+************ Test cases wrt RZA / Server group testing *************
+********************************************************************/
+
+// Deploy couchbase cluster over non existent server group
+func TestRzaNegCreateCluster(t *testing.T) {
+	f := framework.Global
+	testDefs := []testDef{
+		{
+			name: "Creating cluster with incorrect server-group in static config",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerGroups"},
+					fieldType:  "array",
+					fieldValue: "[\"InvalidGroup-1\", \"InvalidGroup-2\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servergroups in body is invalid"},
+		},
+		{
+			name:             "Create cluster with server-group missing in default and class specific config",
+			paramsIn:         []parameter{},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servergroups missing for "},
+		},
+	}
+	targetKubeName := "RzaCluster"
+	failures := runValidationTest(t, f, testDefs, targetKubeName, "create")
+	checkFailures(t, failures)
+}

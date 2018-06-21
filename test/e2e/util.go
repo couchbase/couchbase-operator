@@ -83,6 +83,7 @@ var (
 		"TestNegValidationImmutableApply":                     TestNegValidationImmutableApply,
 		"TestValidationDelete":                                TestValidationDelete,
 		"TestNegValidationDelete":                             TestNegValidationDelete,
+		"TestTaintK8SNodeAndRemoveTaint":                      TestTaintK8SNodeAndRemoveTaint,
 
 		"TestTlsCreateCluster":                             TestTlsCreateCluster,
 		"TestTlsKillClusterNode":                           TestTlsKillClusterNode,
@@ -113,9 +114,24 @@ var (
 		"TestXdcrRemoveTargetClusterNodes":           TestXdcrRemoveTargetClusterNodes,
 		"TestXdcrResizedOutSourceClusterNodes":       TestXdcrResizedOutSourceClusterNodes,
 		"TestXdcrResizedOutTargetClusterNodes":       TestXdcrResizedOutTargetClusterNodes,
+
+		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,
+		"TestRzaCreateClusterWithClassBasedConfig": TestRzaCreateClusterWithClassBasedConfig,
+		"TestRzaResizeCluster":                     TestRzaResizeCluster,
+		"TestRzaServerGroupRemoval":                TestRzaServerGroupRemoval,
+		"TestRzaServerGroupAddition":               TestRzaServerGroupAddition,
+		"TestRzaKillServerPods":                    TestRzaKillServerPods,
+		"TestRzaNegCreateCluster":                  TestRzaNegCreateCluster,
+		"TestRzaNegScaleupCluster":                 TestRzaNegScaleupCluster,
+		"TestRzaServerGroupDown":                   TestRzaServerGroupDown,
+		"TestRzaAntiAffinityOn":                    TestRzaAntiAffinityOn,
+		"TestRzaAntiAffinityOff":                   TestRzaAntiAffinityOff,
+		"TestRzaUpdateK8SNodeLabelAndCrd":          TestRzaUpdateK8SNodeLabelAndCrd,
+		"TestRzaRemoveK8SNodeLabel":                TestRzaRemoveK8SNodeLabel,
 	}
 	DecoratorFuncMap = framework.DecoratorMap{
-		"rsaDecorator": rsaDecorator,
+		"rsaDecorator":    rsaDecorator,
+		"rzaNodeLabeller": rzaNodeLabeller,
 	}
 )
 

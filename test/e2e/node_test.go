@@ -1657,6 +1657,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
@@ -1686,7 +1687,8 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 		}
 	*/
 
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
+	expectedEvents.AddMemberDownEvent(testCouchbase, 2)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 2)
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
@@ -1706,10 +1708,11 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 		t.Fatalf("Failed to remove pod from tainted node: %v", err)
 	}
 
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 3, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
