@@ -13,7 +13,7 @@ func runSuite(t *testing.T) {
 	f := framework.Global
 	reqOpImage := f.Deployment.Spec.Template.Spec.Containers[0].Image
 	ymlFilePath := "./resources/ansible"
-	t.Logf("Starting suite %s", f.SuiteYmlData.SuiteName)
+	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
 
 	for _, testGroup := range f.SuiteYmlData.TestCaseGroup {
 		requiredClusters := []string{}
@@ -25,7 +25,7 @@ func runSuite(t *testing.T) {
 
 		kubeClustersToSetup, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, requiredClusters)
 		if err != nil {
-			t.Logf("Skipping %s.. %s", testGroup.GroupName, err)
+			logrus.Info("Skipping ", testGroup.GroupName, ".. ", err.Error())
 			break
 		}
 
@@ -52,11 +52,8 @@ func runSuite(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
-				t.Fatalf("Failed to setup couchbase operator: %v", err)
-			}
-			if err = f.CreateSecretInKubeCluster(kubeName); err != nil {
-				t.Fatal(err)
+			if err := f.SetupFramework(kubeName); err != nil {
+				t.Fatalf("Failed to setup framework: %v", err)
 			}
 		}
 

@@ -799,7 +799,7 @@ func TestXdcrCreateInterCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	CreateXdcrCluster(t, []string{"BasicCluster", "XdcrCluster1"})
+	CreateXdcrCluster(t, []string{"BasicCluster", "NewCluster1"})
 }
 
 // Create cb clusters on top of TLS certificates
@@ -810,7 +810,7 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 
 	f := framework.Global
 	kubeName1 := "BasicCluster"
-	kubeName2 := "BasicCluster"
+	kubeName2 := "NewCluster1"
 	defKube := f.ClusterSpec[kubeName1]
 	xdcrKube := f.ClusterSpec[kubeName2]
 
@@ -1034,7 +1034,7 @@ func TestXdcrNodeDownDuringSetupDuringConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	ClusterNodeDownWithXdcr(t, "duringXdcrSetup", kubeNameList)
 }
 
@@ -1045,7 +1045,7 @@ func TestXdcrNodeDownDuringSetupAfterConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	ClusterNodeDownWithXdcr(t, "afterXdcrSetup", kubeNameList)
 }
 
@@ -1056,7 +1056,7 @@ func TestXdcrNodeAddDuringSetupDuringConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	ClusterAddNodeWithXdcr(t, "duringXdcrSetup", kubeNameList)
 }
 
@@ -1067,7 +1067,7 @@ func TestXdcrNodeAddDuringSetupAfterConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	ClusterAddNodeWithXdcr(t, "afterXdcrSetup", kubeNameList)
 }
 
@@ -1078,7 +1078,7 @@ func TestXdcrNodeServiceKilledDuringConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	ClusterNodeXdcrServiceKill(t, "duringXdcrSetup", kubeNameList)
 }
 
@@ -1089,7 +1089,7 @@ func TestXdcrNodeServiceKilledAfterConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	ClusterNodeXdcrServiceKill(t, "afterXdcrSetup", kubeNameList)
 }
 
@@ -1101,7 +1101,6 @@ func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	//kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
 	kubeNameList := []string{"BasicCluster", "BasicCluster"}
 	XdcrClusterRemoveNode(t, kubeNameList, "source", "rebalanceOutXdcrNodes")
 }
@@ -1114,8 +1113,7 @@ func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	//kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
-	kubeNameList := []string{"BasicCluster", "BasicCluster"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	XdcrClusterRemoveNode(t, kubeNameList, "remote", "rebalanceOutXdcrNodes")
 }
 
@@ -1127,8 +1125,7 @@ func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	//kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
-	kubeNameList := []string{"BasicCluster", "BasicCluster"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	XdcrClusterRemoveNode(t, kubeNameList, "source", "killNodes")
 }
 
@@ -1140,8 +1137,7 @@ func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	//kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
-	kubeNameList := []string{"BasicCluster", "BasicCluster"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	XdcrClusterRemoveNode(t, kubeNameList, "remote", "killNodes")
 }
 
@@ -1152,8 +1148,7 @@ func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	//kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
-	kubeNameList := []string{"BasicCluster", "BasicCluster"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	XdcrClusterRemoveNode(t, kubeNameList, "source", "resizeOut")
 }
 
@@ -1164,7 +1159,6 @@ func TestXdcrResizedOutTargetClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	//kubeNameList := []string{"BasicCluster", "XdcrCluster1"}
-	kubeNameList := []string{"BasicCluster", "BasicCluster"}
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
 	XdcrClusterRemoveNode(t, kubeNameList, "remote", "resizeOut")
 }

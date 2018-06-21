@@ -10,24 +10,16 @@ types:
           - ip: 172.23.96.218
           - ip: 172.23.96.221
 
-      - name: XdcrCluster
+      - name: NewCluster1
         master:
           - ip: 172.23.96.234
+            label: RzaGroup-2
         worker:
           - ip: 172.23.96.235
-          - ip: 172.23.96.202
-          - ip: 172.23.96.198
-
-      - name: RzaCluster
-        master:
-          - ip: 172.23.96.203
-            label: RzaGroup-2
-        worker:
-          - ip: 172.23.96.217
             label: RzaGroup-1
-          - ip: 172.23.96.218
+          - ip: 172.23.96.202
             label: RzaGroup-2
-          - ip: 172.23.96.221
+          - ip: 172.23.96.198
             label: RzaGroup-3
 
   - type: aws_openshift

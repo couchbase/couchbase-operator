@@ -59,7 +59,7 @@ tcGroups:
       - name: TestPodResourcesHigh
       - name: TestPodResourcesLow
 
-  - name: TLS cases
+  - name: TlsTests
     clusters:
       - BasicCluster
     testcases:
@@ -72,3 +72,38 @@ tcGroups:
       - name: TestTlsNegCertificateExpiredBeforeDeployment
       - name: TestTlsCertificateDeployedBeforeValidity
       - name: TestTlsGenerateWrongCACertType
+
+  - name: RzaTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRzaServerGroupRemoval
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaServerGroupAddition
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaKillServerPods
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaNegCreateCluster
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaNegScaleupCluster
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaServerGroupDown
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaAntiAffinityOn
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaAntiAffinityOff
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaUpdateK8SNodeLabelAndCrd
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaUpdateK8SNodeLabelAndCrd
+        decorators:
+          - rzaNodeLabeller

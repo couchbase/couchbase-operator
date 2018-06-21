@@ -1,7 +1,21 @@
 - hosts: master_node
+  vars:
+    clusterRoleValue: "couchbase-operator"
+
   tasks:
+    - name: Copying cluster-role yaml
+      copy:
+        src: ../../../../../example/rbac/cluster-role-template.yaml
+        dest: ~/.kube/cluster-role.yml
+
+    - name: Editing role name in cluster-role yaml
+      replace:
+        path: ~/.kube/cluster-role.yml
+        regexp: '<ROLE_NAME>'
+        replace: "{{ clusterRoleValue }}"
+
     - name: Cleaning up previous cluster role
-      shell: kubectl delete -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/k8s-rbac/cluster-role.yaml
+      shell: kubectl delete -f ~/.kube/cluster-role.yml
       ignore_errors: yes
 
     - name: Removing old service account
@@ -13,7 +27,7 @@
       ignore_errors: yes
 
     - name: Creating cluster role
-      shell: kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/k8s-rbac/cluster-role.yaml
+      shell: kubectl create -f ~/.kube/cluster-role.yml
 
     - name: Creating service account
       shell: "kubectl create serviceaccount couchbase-operator --namespace {{ namespace }}"

@@ -185,7 +185,7 @@ func rzaNodeLabeller(testFunc framework.TestFunc) framework.TestFunc {
 			t.Parallel()
 		}
 		f := framework.Global
-		targetKubeName := "RzaCluster"
+		targetKubeName := "NewCluster1"
 		targetKube := f.ClusterSpec[targetKubeName]
 
 		k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -214,7 +214,7 @@ func rzaNodeLabeller(testFunc framework.TestFunc) framework.TestFunc {
 // Generic function to test AntiAffinity test case with values on / off
 func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -307,7 +307,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 // Generic test cases to update K8S node's server group labels
 func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -399,7 +399,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 // Deploy the cluster through operator and verify the server groups are balanced
 func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -459,7 +459,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 // Deploy the cb cluster and verify the server groups are balanced as specified in the CRD
 func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -549,7 +549,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 // Scale up the couchbase nodes both general scalling and service based scalling
 func TestRzaResizeCluster(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -655,7 +655,7 @@ func TestRzaResizeCluster(t *testing.T) {
 // Expects pods to redistribute to available groups
 func TestRzaServerGroupRemoval(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -745,7 +745,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 // Expected new pods scaled up is added to new groups to balance the pods
 func TestRzaServerGroupAddition(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -846,7 +846,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 // Expects pods to be spawed in the same server-groups again
 func TestRzaKillServerPods(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -959,7 +959,7 @@ func TestRzaKillServerPods(t *testing.T) {
 // New pod creation should fail because of unavailable server group
 func TestRzaNegScaleupCluster(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -1044,7 +1044,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 // Expects recration of new pods should fail due to the server group down
 func TestRzaServerGroupDown(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "RzaCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -1080,6 +1080,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
@@ -1107,20 +1108,15 @@ func TestRzaServerGroupDown(t *testing.T) {
 	podTaintList := []v1.Taint{podTaint}
 
 	nodeIndex := 2
+	memberIdToGoDown := 1
+
 	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
 		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
 	}
 	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
 
-	/*
-		event := e2eutil.NewMemberRemoveEvent(testCouchbase, 2)
-		err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatalf("Failed to remove pod from tainted node: %v", err)
-		}
-	*/
-
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
+	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
@@ -1135,15 +1131,19 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 
 	event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatalf("Failed to remove pod from tainted node: %v", err)
+	if err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+		t.Fatalf("Failed to add pod after removing the taint: %v", err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown)
+	if err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+		t.Fatalf("Failed to remove unclusteres pod: %v", err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 3, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}

@@ -1674,21 +1674,14 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	podTaintList := []v1.Taint{podTaint}
 
 	nodeIndex := 2
+	memberIdToGoDown := 1
 	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
 		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
 	}
 	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
 
-	/*
-		event := e2eutil.NewMemberRemoveEvent(testCouchbase, 2)
-		err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-		if err != nil {
-			t.Fatalf("Failed to remove pod from tainted node: %v", err)
-		}
-	*/
-
-	expectedEvents.AddMemberDownEvent(testCouchbase, 2)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 2)
+	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
@@ -1707,10 +1700,16 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to remove pod from tainted node: %v", err)
 	}
-
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown)
+	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
+	if err != nil {
+		t.Fatalf("Failed to remove failed pod: %v", err)
+	}
+
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
+	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 3, e2eutil.Retries30); err != nil {

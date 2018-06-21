@@ -154,7 +154,7 @@ func Setup(t *testing.T) error {
 		ClusterConfFile: runtimeParams.ClusterConfFile,
 	}
 	for kubeName, _ := range Global.ClusterSpec {
-		if err = Global.setup(kubeName); err != nil {
+		if err = Global.SetupFramework(kubeName); err != nil {
 			return err
 		}
 	}
@@ -264,7 +264,7 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 	return err
 }
 
-func (f *Framework) setup(kubeName string) error {
+func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
 	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})

@@ -325,7 +325,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 
 		t.Logf("Creating role bindings for namespace %s", namespace)
 		ansibleExtraVarParam = "namespace=" + namespace
-		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterRoleSetupFile, "--exta-vars", ansibleExtraVarParam)
+		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterRoleSetupFile, "--extra-vars", ansibleExtraVarParam)
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}

@@ -80,3 +80,17 @@ tcGroups:
       - name: TestTlsResizeCluster
         decorators:
           - rsaDecorator
+
+  - name: RzaTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRzaCreateClusterWithStaticConfig
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaCreateClusterWithClassBasedConfig
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaResizeCluster
+        decorators:
+          - rzaNodeLabeller
