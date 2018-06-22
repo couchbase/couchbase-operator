@@ -293,7 +293,7 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 		// Add back node
 		err := c.client.SetRecoveryTypeDelta(r.couchbase.ActiveNodes, m.HostURLPlaintext())
 		if err != nil {
-			c.logger.Infof("Removing healthy node %s because it cannot be added back %v", err)
+			c.logger.Infof("Removing healthy node %s because it cannot be added back %v", m.Name, err)
 			r.ejectNodes.Add(m)
 		} else {
 			c.logger.Infof("Preparing to add back healthy node after being failed over: %s", m.ClientURL())
