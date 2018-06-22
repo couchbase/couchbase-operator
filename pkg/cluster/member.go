@@ -3,10 +3,14 @@ package cluster
 import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+
 	"k8s.io/api/core/v1"
 )
 
 func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
+
+	known.Append(c.pvcMembers())
 	status, err := c.client.GetClusterStatus(known)
 	if err != nil {
 		return err
@@ -23,6 +27,7 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	if ct+1 > c.memberCounter {
 		c.memberCounter = ct + 1
 	}
+
 	c.members = members
 	return nil
 }
@@ -40,6 +45,20 @@ func (c *Cluster) newMember(id int, serverSpecName string) *couchbaseutil.Member
 		ServerConfig: serverSpecName,
 		SecureClient: false,
 	}
+}
+
+func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
+	members := couchbaseutil.MemberSet{}
+	pvcMembers, err := k8sutil.PVCToMemberset(c.config.KubeCli,
+		c.cluster.Namespace,
+		c.cluster.Name,
+		c.isSecureClient())
+	if err != nil {
+		c.logger.Warningf("Error occured listing members: %v", err)
+	} else {
+		members = pvcMembers
+	}
+	return members
 }
 
 func podsToMemberSet(pods []*v1.Pod, sc bool) couchbaseutil.MemberSet {
