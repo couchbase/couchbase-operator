@@ -605,7 +605,18 @@ func (c *CouchbaseClient) DeleteAlternateAddressesExternal(m *Member) error {
 
 func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "set delta recovery", c.clusterName,
+		func() error {
+			return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
+		})
+}
+
+func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "set full recovery", c.clusterName,
+		func() error {
+			return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeFull)
+		})
 }
 
 func (c *CouchbaseClient) GetServerGroups(ms MemberSet) (*cbmgr.ServerGroups, error) {

@@ -289,17 +289,42 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 	return nil
 }
 
+// Add back failed nodes to cluster.
+// Delta recover is performed for data nodes,
+// otherwise a full recovery is performed
 func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
-	// These nodes are failed over, but are responding and can be added back into the cluster
 	for _, m := range r.couchbase.AddBackNodes {
-		// Add back node
-		err := c.client.SetRecoveryTypeDelta(r.couchbase.ActiveNodes, m.HostURLPlaintext())
-		if err != nil {
-			c.logger.Infof("Removing healthy node %s because it cannot be added back %v", m.Name, err)
-			r.ejectNodes.Add(m)
+
+		// Set recovery type as delta for data nodes
+		if sc := c.cluster.Spec.GetServerConfigByName(m.ServerConfig); sc != nil {
+			deltaRecovery := false
+			for _, svc := range sc.Services {
+				if svc == "data" {
+					deltaRecovery = true
+					break
+				}
+			}
+
+			var err error
+			if deltaRecovery {
+				c.logger.Infof("Add back node `%s` is being marked for delta recovery", m.Name)
+				err = c.client.SetRecoveryTypeDelta(r.couchbase.ActiveNodes, m.HostURLPlaintext())
+			} else {
+				c.logger.Infof("Add back node `%s` is being marked for full recovery since it is not running the data service", m.Name)
+				err = c.client.SetRecoveryTypeFull(r.couchbase.ActiveNodes, m.HostURLPlaintext())
+			}
+
+			if err != nil {
+				c.logger.Infof("Unable to set recovery type for node %s,  node will be rebalanced out since it cannot be added back %v", m.Name, err)
+				r.ejectNodes.Add(m)
+				break
+			} else {
+				r.couchbase.NeedsRebalance = true
+			}
 		} else {
-			c.logger.Infof("Preparing to add back healthy node after being failed over: %s", m.ClientURL())
-			r.couchbase.NeedsRebalance = true
+			c.logger.Infof("Add back node `%s` is missing from cluster spec: %s, removing", m.Name, m.ServerConfig)
+			r.ejectNodes.Add(m)
+			break
 		}
 	}
 
