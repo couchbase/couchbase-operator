@@ -48,7 +48,7 @@ func runSuite(t *testing.T) {
 			f.ClusterSpec[kubeName] = &clusterSpec
 
 			logrus.Info("Waiting for Kube nodes to become available")
-			if err = e2eutil.WaitForKubeNodesToBeReady(t, f.ClusterSpec[kubeName].KubeClient, 300); err != nil {
+			if err = e2eutil.WaitForKubeNodesToBeReady(t, f.ClusterSpec[kubeName].KubeClient, 600); err != nil {
 				t.Fatal(err)
 			}
 

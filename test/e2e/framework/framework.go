@@ -60,7 +60,7 @@ var runtimeParams TestRunParam
 var suiteData SuiteData
 
 func ReadYamlData() (err error) {
-	testConfigFilePath := flag.String("testconfig", "resources/test_config.yml", "test_config.yml path. eg: $HOME/test_config.yml")
+	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
 	flag.Parse()
 
 	logrus.Info("Using test_config file ", *testConfigFilePath)
@@ -69,7 +69,7 @@ func ReadYamlData() (err error) {
 		return err
 	}
 
-	suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yml"
+	suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
 
 	logrus.Info("Using suite file ", suiteFilePath)
 	suiteData, err = GetSuiteDataFromYml(suiteFilePath)
