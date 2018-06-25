@@ -61,6 +61,10 @@ func NewStripeScheduler(podGetter PodGetter, cluster *api.CouchbaseCluster) (Sch
 		return nil, fmt.Errorf("%s: %v", stripeErrorHeader, err)
 	}
 	for _, pod := range pods {
+		// Pod is faulty ignore it
+		if pod.Status.Phase != v1.PodPending && pod.Status.Phase != v1.PodRunning {
+			continue
+		}
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
 			return nil, fmt.Errorf("%s: pod %s does not have server class label", stripeErrorHeader, pod.Name)

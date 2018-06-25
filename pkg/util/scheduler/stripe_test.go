@@ -111,6 +111,13 @@ var (
 		podFixture(podName6, serverClass1, serverGroup3),
 	}
 
+	// A set of pods where one server has failed
+	fixturePodsFailure = []v1.Pod{
+		podFixture(podName1, serverClass1, serverGroup1),
+		podFixture(podName2, serverClass1, serverGroup2),
+		podFixtureFailed(podName3, serverClass1, serverGroup3),
+	}
+
 	// A set of pods who are missing the server class label
 	fixturePodsInvalidServerClassLabels = []v1.Pod{
 		podFixture(podName1, "", serverGroup1),
@@ -149,6 +156,32 @@ func podFixture(name, class, group string) v1.Pod {
 		},
 		Spec: v1.PodSpec{
 			NodeSelector: map[string]string{},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+	if class != "" {
+		pod.Labels[constants.LabelNodeConf] = class
+	}
+	if group != "" {
+		pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
+	}
+	return pod
+}
+
+// podFixtureFailed returns a pod object with the node configuration (server class) set
+func podFixtureFailed(name, class, group string) v1.Pod {
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodFailed,
 		},
 	}
 	if class != "" {
@@ -401,5 +434,23 @@ func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 	}
 
 	checkDeleteScheduling(t, server1, podName6)
+	checkCreateScheduling(t, &p1, serverGroup3)
+}
+
+// Test that the scheduler correctly interrogates pod state
+func TestStripeAddGlobalSingleOnPodFailure(t *testing.T) {
+	c := fixtureCluster
+	g := newTestStripePodGetter(fixturePodsFailure)
+	s, err := NewStripeScheduler(g, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p1 := podFixture(podName4, serverClass1, "")
+
+	if err := s.Create(&p1); err != nil {
+		t.Fatal(err)
+	}
+
 	checkCreateScheduling(t, &p1, serverGroup3)
 }
