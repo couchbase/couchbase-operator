@@ -287,7 +287,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 	clusterHostFile := ymlFilePath + "/" + kubeClusterSpec.ClusterName
 	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yaml"
 	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yaml"
-	clusterNamespaceFile := ymlFilePath + "/" + kubeType + "/createNamespace.yaml"
+	clusterNamespaceFile := ymlFilePath + "/generic/createNamespace.yaml"
 	clusterRoleSetupFile := ymlFilePath + "/generic/createRoles.yaml"
 	pullDockerImageFile := ymlFilePath + "/generic/pullDockerImage.yaml"
 
