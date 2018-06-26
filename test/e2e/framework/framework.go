@@ -303,6 +303,12 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	for _, service := range services.Items {
 		targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
+
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	for _, pod := range pods.Items {
+		targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+	}
+
 	e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {

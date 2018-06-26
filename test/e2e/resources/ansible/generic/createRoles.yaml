@@ -5,17 +5,17 @@
   tasks:
     - name: Copying cluster-role yaml
       copy:
-        src: cluster-role-template.yml
-        dest: ~/.kube/cluster-role.yml
+        src: cluster-role-template.yaml
+        dest: ~/.kube/cluster-role.yaml
 
     - name: Editing role name in cluster-role yaml
       replace:
-        path: ~/.kube/cluster-role.yml
+        path: ~/.kube/cluster-role.yaml
         regexp: '<ROLE_NAME>'
         replace: "{{ clusterRoleValue }}"
 
     - name: Cleaning up previous cluster role
-      shell: kubectl delete -f ~/.kube/cluster-role.yml
+      shell: kubectl delete -f ~/.kube/cluster-role.yaml
       ignore_errors: yes
 
     - name: Removing old couchbase-operator service account
@@ -23,7 +23,7 @@
       ignore_errors: yes
 
     - name: Removing old couchbase-operator clusterrolebinding
-      shell: "kubectl delete clusterrolebinding couchbase-operator-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:couchbase-operator"
+      shell: "kubectl delete clusterrolebinding couchbase-operator-{{ namespace }}"
       ignore_errors: yes
 
     - name: Removing old default service account
@@ -31,11 +31,11 @@
       ignore_errors: yes
 
     - name: Removing old default clusterrolebinding
-      shell: "kubectl delete clusterrolebinding default-{{ namespace }} --clusterrole couchbase-operator --serviceaccount {{ namespace }}:default"
+      shell: "kubectl delete clusterrolebinding default-{{ namespace }}"
       ignore_errors: yes
 
     - name: Creating cluster role
-      shell: kubectl create -f ~/.kube/cluster-role.yml
+      shell: kubectl create -f ~/.kube/cluster-role.yaml
 
     - name: Creating couchbase-operator service account
       shell: "kubectl create serviceaccount couchbase-operator --namespace {{ namespace }}"

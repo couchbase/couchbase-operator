@@ -88,6 +88,7 @@ func CreateJobSpec(op operation) *batchv1.Job {
 	labels := make(map[string]string)
 	labels["app"] = "couchbase"
 	labels["job"] = op.name
+	labels["type"] = "job"
 	batchJob := &batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Job",
@@ -212,21 +213,25 @@ func NewBucket(name string) map[string]string {
 // runs a system test based on a sysTestDef
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
-	kubeName := "BasicCluster"
+	//kubeName := "BasicCluster"
+	kubeName := "SystemTestCluster1"
 	targetKube := f.ClusterSpec[kubeName]
 
 	// cluster configuration, 10 buckets, 4 nodes, all services
 	clusterConfig := map[string]string{
-		"dataServiceMemQuota":   "3000",
-		"indexServiceMemQuota":  "1000",
-		"searchServiceMemQuota": "1000",
+		"dataServiceMemQuota":   "1000",
+		"indexServiceMemQuota":  "800",
+		"searchServiceMemQuota": "800",
 		"indexStorageSetting":   "plasma",
 		"autoFailoverTimeout":   "120",
 	}
 	serviceConfig1 := map[string]string{
-		"size":     "4",
+		"size":     "2",
 		"name":     "test_config_1",
-		"services": "data,n1ql,index,fts",
+		"services": "data,query,index",
+	}
+	otherConfig1 := map[string]string{
+		"antiAffinity": "off",
 	}
 	bucketConfig1 := NewBucket("default")
 	bucketConfig2 := NewBucket("CUSTOMER")
@@ -251,6 +256,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		"bucket8":  bucketConfig8,
 		"bucket9":  bucketConfig9,
 		"bucket10": bucketConfig10,
+		"other1":   otherConfig1,
 	}
 
 	// create cluster
@@ -261,6 +267,20 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 	if !f.SkipTeardown {
 		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+	}
+
+	// check tls
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if err != nil {
+		t.Fatal("Unable to get couchbase pods:", err)
+	}
+
+	// TLS handshake with pods
+	for _, pod := range pods.Items {
+		err = e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), targetKube.Config)
+		if err != nil {
+			t.Fatal("TLS verification failed:", err)
+		}
 	}
 
 	// create connection to couchbase nodes
@@ -417,6 +437,7 @@ outerLoop:
 		}
 		cycles = cycles + 1
 		time.Sleep(1 * time.Second)
+		break outerLoop
 	}
 }
 
@@ -433,7 +454,7 @@ func TestFeaturesAll(t *testing.T) {
 			{
 				name:     "pillowfight-htp-1",
 				image:    "sequoiatools/pillowfight:v5.0.1",
-				cmd:      []string{"cbc-pillowfight", "-U", "couchbase://{{FIRST_NODE}}/default?select_bucket=true", "-I", "1000", "-B", "100", "-c", "100", "-t", "4", "-u", "default_user", "-P", "password"},
+				cmd:      []string{"cbc-pillowfight", "-U", "couchbase://{{FIRST_NODE}}/default?select_bucket=true", "-I", "1000", "-B", "100", "-c", "100", "-t", "4"},
 				wait:     true,
 				timeout:  10,
 				duration: 11,

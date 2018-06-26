@@ -285,11 +285,11 @@ func createNamespaceFile(namespace string) error {
 
 func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath, reqOpImage string, kubeClusterSpec ClusterInfo) error {
 	clusterHostFile := ymlFilePath + "/" + kubeClusterSpec.ClusterName
-	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yml"
-	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yml"
-	clusterNamespaceFile := ymlFilePath + "/" + kubeType + "/createNamespace.yml"
-	clusterRoleSetupFile := ymlFilePath + "/generic/createRoles.yml"
-	pullDockerImageFile := ymlFilePath + "/generic/pullDockerImage.yml"
+	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yaml"
+	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yaml"
+	clusterNamespaceFile := ymlFilePath + "/" + kubeType + "/createNamespace.yaml"
+	clusterRoleSetupFile := ymlFilePath + "/generic/createRoles.yaml"
+	pullDockerImageFile := ymlFilePath + "/generic/pullDockerImage.yaml"
 
 	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
 	if err != nil {
@@ -301,7 +301,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 		t.Logf("Running ansible script for %s", kubeClusterSpec.ClusterName)
 
 		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
-		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam, "--skip-tags", "one_time_configuration")
+		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam)
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}

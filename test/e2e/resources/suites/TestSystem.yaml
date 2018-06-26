@@ -1,0 +1,11 @@
+---
+suite: TestSystem
+tcGroups:
+  - name: Group1
+    clusters:
+      - SystemTestCluster1
+      - SystemTestCluster2
+    testcases:
+      - name: TestFeaturesAll
+        decorators:
+          - rsaDecorator

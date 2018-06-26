@@ -191,7 +191,7 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 		ServerSettings: []api.ServerConfig{api.ServerConfig{
 			Size:     size,
 			Name:     "test_config_1",
-			Services: []string{"data", "n1ql", "index"},
+			Services: []string{"data", "query", "index"},
 		}},
 		ExposedFeatures: []string{"xdcr"},
 	}

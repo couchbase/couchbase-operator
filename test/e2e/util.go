@@ -85,6 +85,8 @@ var (
 		"TestNegValidationDelete":                             TestNegValidationDelete,
 		"TestTaintK8SNodeAndRemoveTaint":                      TestTaintK8SNodeAndRemoveTaint,
 
+		"TestFeaturesAll":					  TestFeaturesAll,
+
 		"TestTlsCreateCluster":                             TestTlsCreateCluster,
 		"TestTlsKillClusterNode":                           TestTlsKillClusterNode,
 		"TestTlsResizeCluster":                             TestTlsResizeCluster,

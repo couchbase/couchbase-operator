@@ -22,6 +22,18 @@ types:
           - ip: 172.23.96.198
             label: RzaGroup-3
 
+      - name: SystemTestCluster1
+        master:
+          - ip: 172.23.109.251
+        worker:
+          - ip: 172.23.121.245
+
+      - name: SystemTestCluster2
+        master:
+          - ip: 172.23.121.38
+        worker:
+          - ip: 172.23.123.244
+
   - type: aws_openshift
     clusters:
       - name: BasicCluster

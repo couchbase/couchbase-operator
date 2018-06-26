@@ -582,10 +582,6 @@ func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries
 }
 
 func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, waitTimeInSec int) error {
-	nodesList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
 
 	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
@@ -595,6 +591,10 @@ func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, wa
 			return errors.New("Timed out to get K8S node to ready state")
 
 		case <-tickChan:
+			nodesList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
 			allNodesReady := true
 			for _, node := range nodesList.Items {
 				if node.Status.Conditions[3].Status != "True" {
