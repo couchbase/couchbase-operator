@@ -140,7 +140,7 @@ kubectl cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collecti
 On OpenShift:
 
 ```bash
-    oc cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
+oc cp default/cb-example-0000:/opt/couchbase/var/lib/couchbase/tmp/collectinfo-2017-09-28T175135-ns_1@127.0.0.1.zip -c couchbase-server ./logs.zip
 ```
 
 ## See Also

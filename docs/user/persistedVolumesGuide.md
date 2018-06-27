@@ -10,6 +10,6 @@ Pods can persist data to a storage system via persistent volumes.  To define a p
 
 ### Drawbacks of using persistent volumes
 
-* **Variable Performance:**  Persistent volumes support a wide variety of storage provisioners.  The majority of provisioners are network attached which may result in a reduction of overall i/o performance.  Refer to documentation about [Storage Provisioners] (https://kubernetes.io/docs/concepts/storage/storage-classes/#provisioner) for information about supported storage classes.
+* **Variable Performance:**  Persistent volumes support a wide variety of storage provisioners.  The majority of provisioners are network attached which may result in a reduction of overall i/o performance.  Refer to documentation about [Storage Provisioners](https://kubernetes.io/docs/concepts/storage/storage-classes/#provisioner) for information about supported storage classes.
 
 * **Additional point of failure:**  In the case that connectivity to your storage system is lost or becomes corrupt causing the persistent volumes to go offline, then the Pods will also be affected.  Data recovery will not be possible unless the persistent volumes become available again.

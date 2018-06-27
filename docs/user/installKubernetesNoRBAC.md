@@ -74,7 +74,7 @@ Uninstalling the Couchbase Operator is a two-step process.
 
 2. Delete the CRD
 
-  *Note*: Make sure all instances of the Couchbase Operator have been deleted from the Kubernetes cluster before you delete the CRD.
+   *Note*: Make sure all instances of the Couchbase Operator have been deleted from the Kubernetes cluster before you delete the CRD.
 
    Once all instances of the Couchbase Operator have been deleted, run the following command to delete the CRD:
 
