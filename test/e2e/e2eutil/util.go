@@ -139,6 +139,22 @@ func RandomSuffix() string {
 	return suffix
 }
 
+func GetClusterConfigMap(dataMem, indexMem, searchMem, eventingMem, cbasMem, autoFailoverTimeout, autoFailoverMaxCount int, autoFailoverServerGroup bool) map[string]string {
+	return map[string]string{
+		"dataServiceMemQuota":      strconv.Itoa(dataMem),
+		"indexServiceMemQuota":     strconv.Itoa(indexMem),
+		"searchServiceMemQuota":    strconv.Itoa(searchMem),
+		"eventingServiceMemQuota":  strconv.Itoa(eventingMem),
+		"analyticsServiceMemQuota": strconv.Itoa(cbasMem),
+		"indexStorageSetting":      "memory_optimized",
+		"autoFailoverTimeout":      strconv.Itoa(autoFailoverTimeout),
+		"autoFailoverMaxCount":     strconv.Itoa(autoFailoverMaxCount),
+		"autoFailoverServerGroup":  strconv.FormatBool(autoFailoverServerGroup),
+		//"autoFailoverOnDiskIssues":        strconv.FormatBool(diskFailover),
+		//"autoFailoverOnDiskIssuesTimeout": strconv.Itoa(diskFailoverTimeout),
+	}
+}
+
 func GetServiceConfigMap(size int, configName string, serviceList []string) map[string]string {
 	return map[string]string{
 		"name":     configName,
@@ -153,6 +169,20 @@ func GetClassSpecificServiceConfigMap(size int, configName string, serviceList, 
 		"services":     strings.Join(serviceList, ","),
 		"size":         strconv.Itoa(size),
 		"serverGroups": strings.Join(serverGroupList, ","),
+	}
+}
+
+func GetBucketConfigMap(bucketName, bucketType, ioPriority string, memQuotaInMB, replicas int, enableFlush, enableIndexReplicas bool) map[string]string {
+	return map[string]string{
+		"bucketName":         bucketName,
+		"bucketType":         bucketType,
+		"bucketMemoryQuota":  strconv.Itoa(memQuotaInMB),
+		"bucketReplicas":     strconv.Itoa(replicas),
+		"ioPriority":         ioPriority,
+		"evictionPolicy":     "fullEviction",
+		"conflictResolution": "seqno",
+		"enableFlush":        strconv.FormatBool(enableFlush),
+		"enableIndexReplica": strconv.FormatBool(enableIndexReplicas),
 	}
 }
 
@@ -192,7 +222,7 @@ func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient 
 		time.Sleep(10 * time.Second)
 
 		retries := &ClusterReadyRetries{
-			Size:    Retries20,
+			Size:    Retries120,
 			Bucket:  Retries20,
 			Service: Retries20,
 		}

@@ -94,3 +94,17 @@ tcGroups:
       - name: TestRzaResizeCluster
         decorators:
           - rzaNodeLabeller
+
+  - name: FailoverTests
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestServerGroupAutoFailover
+        decorators:
+          - rzaNodeLabeller
+      - name: TestServerGroupWithSingleServiceNodeInFailoverGroup
+        decorators:
+          - rzaNodeLabeller
+      - name: TestMultiNodeAutoFailover
+      - name: TestDiskFailureAutoFailover

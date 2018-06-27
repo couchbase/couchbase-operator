@@ -595,12 +595,20 @@ func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, wa
 			if err != nil {
 				return err
 			}
+
 			allNodesReady := true
+			var nodeConditionReady v1.NodeCondition
 			for _, node := range nodesList.Items {
-				if node.Status.Conditions[3].Status != "True" {
-					allNodesReady = false
-					break
+				for _, nodeCondition := range node.Status.Conditions {
+					if nodeCondition.Type == "Ready" {
+						nodeConditionReady = nodeCondition
+						break
+					}
 				}
+			}
+			if nodeConditionReady.Status != "True" {
+				allNodesReady = false
+				break
 			}
 			if allNodesReady {
 				return nil

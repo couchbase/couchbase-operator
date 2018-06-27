@@ -10,6 +10,9 @@ import (
 
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // TestFunc defines the test function type
@@ -208,6 +211,27 @@ func GetSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 		return
 	}
 	return
+}
+
+func CreateK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) error {
+	namespaceList, err := kubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Return if namespace already exists
+	for _, temNs := range namespaceList.Items {
+		if temNs.GetName() == namespaceName {
+			return nil
+		}
+	}
+
+	nsLabel := map[string]string{
+		"name": namespaceName,
+	}
+	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabel}}
+	_, err = kubeClient.CoreV1().Namespaces().Create(nsSpec)
+	return err
 }
 
 // Execute shell command and returns the stderr and stdout buffers

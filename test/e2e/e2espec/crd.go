@@ -245,6 +245,15 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 				case setting == "autoFailoverMaxCount":
 					autoFailoverMaxCount, _ := strconv.ParseUint(config[key][setting], 10, 64)
 					clusterSettings.AutoFailoverMaxCount = autoFailoverMaxCount
+				case setting == "autoFailoverServerGroup":
+					autoFailoverServerGroup, _ := strconv.ParseBool(config[key][setting])
+					clusterSettings.AutoFailoverServerGroup = autoFailoverServerGroup
+				case setting == "autoFailoverOnDiskIssues":
+					autoFailoverOnDiskIssues, _ := strconv.ParseBool(config[key][setting])
+					clusterSettings.AutoFailoverOnDataDiskIssues = autoFailoverOnDiskIssues
+				case setting == "autoFailoverOnDiskIssuesTimeout":
+					autoFailoverOnDiskIssuesTimeout, _ := strconv.ParseUint(config[key][setting], 10, 64)
+					clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = autoFailoverOnDiskIssuesTimeout
 				}
 			}
 		case strings.Contains(key, "bucket"):

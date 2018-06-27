@@ -146,3 +146,11 @@ func NewMemberFailedOverEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event 
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberFailedOverEvent(name, cl)
 }
+
+func RebalanceStartedEvent(cl *api.CouchbaseCluster) *v1.Event {
+	return k8sutil.RebalanceStartedEvent(cl)
+}
+
+func RebalanceCompletedEvent(cl *api.CouchbaseCluster) *v1.Event {
+	return k8sutil.RebalanceCompletedEvent(cl)
+}

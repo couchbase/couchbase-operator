@@ -130,6 +130,11 @@ var (
 		"TestRzaAntiAffinityOff":                   TestRzaAntiAffinityOff,
 		"TestRzaUpdateK8SNodeLabelAndCrd":          TestRzaUpdateK8SNodeLabelAndCrd,
 		"TestRzaRemoveK8SNodeLabel":                TestRzaRemoveK8SNodeLabel,
+
+		"TestServerGroupAutoFailover":                         TestServerGroupAutoFailover,
+		"TestServerGroupWithSingleServiceNodeInFailoverGroup": TestServerGroupWithSingleServiceNodeInFailoverGroup,
+		"TestDiskFailureAutoFailover":                         TestDiskFailureAutoFailover,
+		"TestMultiNodeAutoFailover":                           TestMultiNodeAutoFailover,
 	}
 	DecoratorFuncMap = framework.DecoratorMap{
 		"rsaDecorator":    rsaDecorator,
