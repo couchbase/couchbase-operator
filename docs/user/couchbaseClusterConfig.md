@@ -662,8 +662,7 @@ The metadata name identifies the claim template.  This name is used by the volum
 
 **StorageClassName**
 
-The StorageClass required by the claim. A StorageClass provides a way for administrators to describe the classes of storage they offer. If no StorageClass is specified, then the default StorageClass will be used.  See kubernetes documentation for more information about (Storage Classes.)[https://kubernetes.io/docs/concepts/storage/storage-classes/]
-
+The StorageClass required by the claim. A StorageClass provides a way for administrators to describe the classes of storage they offer. If no StorageClass is specified, then the default StorageClass will be used.  See kubernetes documentation for more information about [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/).
 
 **Resources**
 
