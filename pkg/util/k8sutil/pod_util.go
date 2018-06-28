@@ -23,8 +23,11 @@ const (
 	couchbaseTlsVolumeMountDir      = "/opt/couchbase/var/lib/couchbase/inbox"
 	couchbaseVolumeName             = "couchbase-data"
 	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
+	couchbaseVolumeDefaultEtcDir    = "/opt/couchbase/etc"
 	CouchbaseVolumeMountDataDir     = "/mnt/data"
 	CouchbaseVolumeMountIndexDir    = "/mnt/index"
+	defaultSubPathName              = "default"
+	etcSubPathName                  = "etc"
 )
 
 var (
@@ -43,7 +46,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 	}
 
 	if config.GetDefaultVolumeClaim() != "" {
-		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, cluster.AsOwner(), ctx)
+		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, version, cluster.AsOwner(), ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +62,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused
-func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
+func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, version string, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
 
 	var err error
 	volumes := []v1.Volume{}
@@ -104,14 +107,39 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 				if err != nil {
 					return nil, err
 				}
+
+				// Bootstraping the persisted volume when creating for the first time
+				// so that it has couchbase/etc directory from the install, because
+				// when the volume is mounted into the container the path is overwritten
+				if mountName == cbapi.DefaultVolumeMount {
+					initContainer := couchbaseInitContainer(cs.BaseImage, version, claim.Name)
+					pod.Spec.InitContainers = []v1.Container{initContainer}
+				}
 			}
 
 			// Volumes will be added to Pod spec
 			volume := podVolumeSpecForClaim(config.Name, pvc.Name)
 			volumes = append(volumes, volume)
 
-			// Mount point for Pod Container spec to reference volume by name
-			mounts = append(mounts, v1.VolumeMount{Name: volume.Name, MountPath: mountPath})
+			// Mount point for Pod Container spec to reference volume by name.
+			if mountName == cbapi.DefaultVolumeMount {
+
+				// Default mount consits of 2 mounts for default(config) and etc data
+				configMount := v1.VolumeMount{
+					Name:      volume.Name,
+					MountPath: mountPath,
+					SubPath:   defaultSubPathName,
+				}
+				etcMount := v1.VolumeMount{
+					Name:      volume.Name,
+					MountPath: couchbaseVolumeDefaultEtcDir,
+					SubPath:   etcSubPathName,
+				}
+				mounts = append(mounts, configMount)
+				mounts = append(mounts, etcMount)
+			} else {
+				mounts = append(mounts, v1.VolumeMount{Name: volume.Name, MountPath: mountPath})
+			}
 		} else {
 			// It is invalid to have volumeMounts that do not
 			// map to a volumeClaimTemplates
@@ -541,6 +569,20 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 	}
 
 	return c
+}
+
+// Init container is same as runtime container except it used
+// to copy the etc dir into a persisted volume which will be
+// shared with with the Pod's main container
+func couchbaseInitContainer(baseImage, version, claimName string) v1.Container {
+	initContainer := couchbaseContainer("", baseImage, version)
+	initContainer.Name = fmt.Sprintf("%s-init", couchbaseContainerName)
+	initContainer.Args = []string{"cp", "-a", "/opt/couchbase/etc", "/mnt/"}
+	initContainer.VolumeMounts = []v1.VolumeMount{
+		{Name: claimName,
+			MountPath: "/mnt"},
+	}
+	return initContainer
 }
 
 func PodWithAntiAffinity(pod *v1.Pod, clusterName string) *v1.Pod {
