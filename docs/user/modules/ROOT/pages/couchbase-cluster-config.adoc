@@ -26,6 +26,7 @@ spec:
     - us-east-1a
     - us-east-1b
     - us-east-1c
+  disableBucketManagement: false
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
@@ -163,6 +164,7 @@ This section describes the top-level parameters related to a Couchbase cluster d
     - us-east-1a
     - us-east-1b
     - us-east-1c
+  disableBucketManagement: false
 ...
 ----
 
@@ -267,6 +269,14 @@ The server group feature also not support service redistribution at this time, s
 
 ____
 _Field rules:_ The `serverGroups` field is optional.  If set pods will be scheduled across the specified set of server groups.  The server groups must be set at cluster creation time, and currently should be assumed to be immutable.
+____
+
+*disableBucketManagement*
+
+This field specifies whether to ignore bucket configuration.  If bucket management is enabled the operator will be responsible for creation of buckets in the specification and deletion of buckets that are not.  If disabled then it is up to the end user to manage buckets either via the Couchbase APIs or the UI.
+
+____
+_Field rules:_ The `disableBucketManagement` field is optional and defaults to false.
 ____
 
 == Spec: The Cluster Settings
