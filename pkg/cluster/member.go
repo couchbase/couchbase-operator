@@ -23,18 +23,18 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	members.Append(status.FailedAddNodes)
 	members.Append(status.DownNodes)
 
-	ct := members.GetHighestMemberCounter()
-	if ct+1 > c.memberCounter {
-		c.memberCounter = ct + 1
-	}
-
 	c.members = members
 	return nil
 }
 
 // What would the next member name allocated by the cluster be?
 func (c *Cluster) nextMemberName() string {
-	return couchbaseutil.CreateMemberName(c.cluster.Name, c.memberCounter)
+	index, err := c.getPodIndex()
+	if err != nil {
+		// TODO: propagate an error
+		return ""
+	}
+	return couchbaseutil.CreateMemberName(c.cluster.Name, index)
 }
 
 func (c *Cluster) newMember(id int, serverSpecName string) *couchbaseutil.Member {

@@ -60,24 +60,23 @@ type Config struct {
 }
 
 type Cluster struct {
-	logger        *logrus.Entry
-	config        Config
-	cluster       *api.CouchbaseCluster
-	status        api.ClusterStatus
-	memberCounter int
-	eventCh       chan *clusterEvent
-	stopCh        chan struct{}
-	members       couchbaseutil.MemberSet
-	tlsConfig     *tls.Config
-	eventsCli     corev1.EventInterface
-	username      string
-	password      string
-	client        *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
-	ctx           context.Context                // Context used to cancel long running operations
-	cancel        context.CancelFunc             // Closure on the context to indicate cancellation
-	lastEvent     time.Time                      // When we raised the last event (see raiseEvent)
-	recorder      record.EventRecorder           // Buffers and aggegates events
-	scheduler     scheduler.Scheduler            // Pod placement scheduler
+	logger    *logrus.Entry
+	config    Config
+	cluster   *api.CouchbaseCluster
+	status    api.ClusterStatus
+	eventCh   chan *clusterEvent
+	stopCh    chan struct{}
+	members   couchbaseutil.MemberSet
+	tlsConfig *tls.Config
+	eventsCli corev1.EventInterface
+	username  string
+	password  string
+	client    *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
+	ctx       context.Context                // Context used to cancel long running operations
+	cancel    context.CancelFunc             // Closure on the context to indicate cancellation
+	lastEvent time.Time                      // When we raised the last event (see raiseEvent)
+	recorder  record.EventRecorder           // Buffers and aggegates events
+	scheduler scheduler.Scheduler            // Pod placement scheduler
 }
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
@@ -92,6 +91,11 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		eventCh:   make(chan *clusterEvent, 100),
 		stopCh:    make(chan struct{}),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
+	}
+
+	// Initialise the pod name index annotation before creating any pods
+	if _, err := c.getPodIndex(); err != nil {
+		c.setPodIndex(0)
 	}
 
 	// Cancel is used to abort the go routine when the operator is deleted
@@ -720,4 +724,37 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 		members = c.members
 	}
 	return members
+}
+
+// getPodIndex returns the current pod naming index
+func (c *Cluster) getPodIndex() (int, error) {
+	return c.cluster.GetPodIndex()
+}
+
+// setPodIndex updates the current pod naming index and commits to etcd
+func (c *Cluster) setPodIndex(index int) {
+	c.cluster.SetPodIndex(index)
+	if err := c.updateCRStatus(); err != nil {
+		c.logger.Warnf("failed to update custom resource pod index: %v", err)
+	}
+}
+
+// incPodIndex gets the current pod naming index and increments it
+func (c *Cluster) incPodIndex() error {
+	index, err := c.getPodIndex()
+	if err != nil {
+		return err
+	}
+	c.setPodIndex(index + 1)
+	return nil
+}
+
+// decPodIndex gets the current pod naming index and decrements it
+func (c *Cluster) decPodIndex() error {
+	index, err := c.getPodIndex()
+	if err != nil {
+		return err
+	}
+	c.setPodIndex(index - 1)
+	return nil
 }

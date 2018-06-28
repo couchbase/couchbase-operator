@@ -133,9 +133,21 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
 
 // Create a new Couchbase cluster member
 func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
-	// Allocate and create a new member
-	newMember := c.newMember(c.memberCounter, serverSpec.Name)
+	// Allocate an index to be used in the name.  Get the current index then increment
+	// and commit back to etcd.  That way we are guaranteed to never have conflicting
+	// names
+	index, err := c.getPodIndex()
+	if err != nil {
+		return nil, err
+	}
+	if err := c.incPodIndex(); err != nil {
+		return nil, err
+	}
+
+	// Create a new member
+	newMember := c.newMember(index, serverSpec.Name)
 	if err := c.createPod(newMember, serverSpec); err != nil {
+		c.decPodIndex()
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
 
@@ -145,6 +157,7 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		c.removePod(newMember.Name)
+		c.decPodIndex()
 		return nil, err
 	}
 
@@ -158,13 +171,13 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		c.removePod(newMember.Name)
+		c.decPodIndex()
 		return nil, err
 	}
 
 	// Initialize node paths
 	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
-	err := c.client.NodeInitialize(newMember, c.cluster.Name, dataPath, indexPath, analyticsPaths)
-	if err != nil {
+	if err := c.client.NodeInitialize(newMember, c.cluster.Name, dataPath, indexPath, analyticsPaths); err != nil {
 		return nil, err
 	}
 
@@ -173,9 +186,6 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	if err := c.updateCRStatus(); err != nil {
 		return nil, err
 	}
-
-	// Increment the next member counter
-	c.memberCounter++
 
 	return newMember, nil
 }

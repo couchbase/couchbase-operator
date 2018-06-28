@@ -52,6 +52,8 @@ var (
 	AutoFailoverMaxCountMax                   uint64 = 3
 	AutoFailoverOnDataDiskIssuesTimePeriodMin uint64 = 5
 	AutoFailoverOnDataDiskIssuesTimePeriodMax uint64 = 3600
+
+	PodIndexAnnotation = "pod.couchbase.com/index"
 )
 
 // Label types added to pods
