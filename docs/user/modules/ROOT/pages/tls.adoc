@@ -6,7 +6,6 @@ The basic requirements are:
 
 * A certificate authority [CA] certificate which will be used by all actors to validate that peer certificates have been digitally signed by a trusted CA
 * A server certificate/key pair for all nodes in the Couchbase cluster.  If using a hierarchy of intermediate CAs these must be appended to the client certificate, ending in the intermediate CA signed by the top-level CA.  Server certificates must have a subject alternative name [SAN] set so that a client can assert that the host name it is connecting to is the same as that in the certificate.  We currently support using wildcard entries only e.g. `*.cluster.domain.svc`, where _cluster_ is the name of the _couchbasecluster_ resource, and _domain_ is the namespace the cluster is running in (typically _default_).
-* A client certificate/key pair for all Couchbase operator pods.  Again the certificate is expected to contain all intermediate CAs.
 
 == Configuration
 
@@ -43,14 +42,12 @@ $ kubectl create secret generic couchbase-server-tls \
 
 === spec.tls.static.operatorSecret
 
-The operator client secrets are read directly from the API.  We expect three values to be present; _ca.crt_ is the top-level CA which is used to authenticate all TLS certificate chains, _couchbase_operator.crt_ is the certificate chain for the operator, and _couchbase-operator.key_ is the private key for the operator.
+The operator client secrets are read directly from the API.  We expect only a single value to be present; _ca.crt_ is the top-level CA which is used to authenticate all TLS server certificate chains.
 
 [source,shell]
 ----
 $ kubectl create secret generic couchbase-operator-tls \
-  --from-file example/tls/certs/ca.crt \
-  --from-file example/tls/certs/couchbase-operator.crt \
-  --from-file example/tls/certs/couchbase-operator.key
+  --from-file example/tls/certs/ca.crt
 ----
 
 == Creating Certificates
@@ -82,13 +79,6 @@ Create a server wildcard certificate and key to be used on Couchbase Server pods
 [source,shell]
 ----
 $ ./easyrsa --subject-alt-name=DNS:*.cb-example.default.svc build-server-full couchbase-server nopass
-----
-
-Finally for all clients, including the operator itself, create a client key/certificate pair.  These files can be found in the directories listed above and can be used directly in the _operatorSecret_.
-
-[source,shell]
-----
-$ ./easyrsa build-client-full couchbase-operator nopass
 ----
 
 Please note that password protected keys are supported by neither Couchbase Server nor Couchbase Operator.
