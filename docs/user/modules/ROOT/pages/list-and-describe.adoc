@@ -1,0 +1,287 @@
+= Listing And Describing Resources
+
+When a Couchbase cluster is deployed, additional Kubernetes resources such as pods and services are created by the Operator to facilitate its deployment.  All resources originating from the Couchbase Operator are labeled in order to make it easy to list and describe resources belonging to a specific cluster.  The following sections list and explain the resources created by the Operator when the cluster is running.
+
+Note that each of the commands below use `kubectl` with the default namespace `+kubectl -n default ...+` when using Kubernetes. If you've deployed your cluster using a different namespace, you will need to explicitly provide the namespace where your cluster is deployed.
+Similarly, if you are using OpenShift, the commands `oc` use the default namespace `+oc -n default ...+`.
+
+== Operator Deployment
+
+The Operator is started as a deployment resource.  The name of the object will match the name provided in your deployment specification. (See xref:prerequisite-and-setup.adoc[Prerequisites and Setup] for details.) The Operator deployment can be listed and described as follows:
+
+On Kubernetes:
+
+[source,console]
+----
+$ kubectl get deployments couchbase-operator
+NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+couchbase-operator   1         1         1            1           27m
+
+$ kubectl describe deployments couchbase-operator
+Name:			couchbase-operator
+Namespace:		default
+Labels:			name=couchbase-operator
+Replicas:		1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+Pod Template:
+  Labels:	name=couchbase-operator
+  Containers:
+   couchbase-operator:
+    Image:	couchbase/couchbase-operator:v1
+    Port:	8080/TCP
+    ...
+----
+
+On OpenShift:
+
+[source,console]
+----
+$ oc get deployments couchbase-operator
+NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+couchbase-operator   1         1         1            1           27m
+
+$ oc describe deployments couchbase-operator
+Name:			couchbase-operator
+Namespace:		default
+Labels:			name=couchbase-operator
+Replicas:		1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+Pod Template:
+  Labels:	name=couchbase-operator
+  Containers:
+   couchbase-operator:
+    Image:	couchbase/couchbase-operator:v1
+    Port:	8080/TCP
+    ...
+----
+
+Notice that the deployment resource manages a ReplicaSet, which means it's important to check that the desired number of replicas match the total number of available replicas when describing the Operator deployment.
+
+Additional information about the ReplicaSets and pods created by the Operator deployment can be described using the deployment name as a label selector.
+
+On Kubernetes:
+
+[source,console]
+----
+# replicasets created by couchbase-operator deployment
+$ kubectl describe rs -lname=couchbase-operator
+
+# pods created by the deployments replicaset
+$ kubectl describe pods -lname=couchbase-operator
+Name:		couchbase-operator-1917615544-8kgw9
+Status:		Running
+IP:		172.17.0.3
+Created By:	ReplicaSet/couchbase-operator-1917615544
+Containers:
+  couchbase-operator:
+    Image:		couchbase/couchbase-operator:v1
+    ...
+----
+
+On OpenShift:
+
+[source,console]
+----
+# replicasets created by couchbase-operator deployment
+$ oc describe rs -lname=couchbase-operator
+
+# pods created by the deployments replicaset
+$ oc describe pods -lname=couchbase-operator
+Name:		couchbase-operator-1917615544-8kgw9
+Status:		Running
+IP:		172.17.0.3
+Created By:	ReplicaSet/couchbase-operator-1917615544
+Containers:
+  couchbase-operator:
+    Image:		couchbase/couchbase-operator:v1
+    ...
+----
+
+== Server Pods
+
+Couchbase pods can be listed using the `-lapp=couchbase` label.
+
+On Kubernetes:
+
+[source,console]
+----
+$ kubectl get po -l app=couchbase
+NAME                  READY     STATUS    RESTARTS   AGE
+cb-development-0000   1/1       Running   0          1h
+cb-development-0001   1/1       Running   0          1h
+cb-production-0000    1/1       Running   0          1h
+cb-production-0001    1/1       Running   0          1h
+----
+
+On OpenShift, use the following command:
+
+[source,console]
+----
+$ oc get po -l app=couchbase
+----
+
+The pods are also labeled by cluster and according to Couchbase service, which makes it possible to get only the pods providing a specific service for a specific cluster. For example, the following command gets only the pods providing the query service on the `cb-development` cluster.
+
+On Kubernetes:
+
+[source,console]
+----
+# query pods on dev deployment
+$ kubectl get po -l couchbase_cluster=cb-development,couchbase_service_query
+NAME                  READY     STATUS    RESTARTS   AGE
+cb-development-0000   1/1       Running   0          1h
+cb-development-0001   1/1       Running   0          1h
+----
+
+On OpenShift, use the following command:
+
+[source,console]
+----
+# query pods on dev deployment
+$ oc get po -l couchbase_cluster=cb-development,couchbase_service_query
+----
+
+After listing the pods, additional information can be collecting using `kubectl
+describe` on Kubernetes as follows:
+
+[source,console]
+----
+$ kubectl describe po cb-development-0000
+Name:		cb-development-0000
+Namespace:	default
+Node:		minikube/192.168.99.100
+Start Time:	Tue, 23 Jan 2018 07:49:38 -0700
+Labels:		app=couchbase
+		couchbase_cluster=cb-development
+...
+Containers:
+  couchbase-server:
+    Container ID:	docker://6b7aeb66cb540c6904b8e514776c180f7fbbea25656e6175972c408042db5713
+    Image:		couchbase/server:enterprise-5.0.1
+----
+
+On OpenShift, use the following command:
+
+[source,console]
+----
+$ oc describe po cb-development-0000
+----
+
+== Services
+
+Services are created to facilitate both pod to pod communication and connections from external clients to the internal cluster. The former is established using a headless ClusterIP service, and the latter via the NodePort service.  You can read more about the Kubernetes services https://kubernetes.io/docs/concepts/services-networking/service/[here].  When listing the services, the name of the ClusterIP service will match the name provided in the CouchbaseCluster spec.  The NodePort service is also named after the CouchbaseCluster name, except with a '-ui' suffix.
+
+Services belonging to the Operator can be listed as follows:
+
+On Kubernetes:
+
+[source,console]
+----
+# all services managed by the operator
+$ kubectl get service -lapp=couchbase
+NAME                CLUSTER-IP   EXTERNAL-IP   PORT(S)                          AGE
+cb-development      None         <none>        8091/TCP,18091/TCP               2m
+cb-development-ui   10.0.0.7     <nodes>       8091:31822/TCP,18091:30155/TCP   2m
+cb-production       None         <none>        8091/TCP,18091/TCP               1m
+cb-production-ui    10.0.0.216   <nodes>       8091:30139/TCP,18091:30461/TCP   1m
+
+# only services used by cb-production cluster
+$ kubectl get service -lcouchbase_cluster=cb-production
+NAME               CLUSTER-IP   EXTERNAL-IP   PORT(S)                          AGE
+cb-production      None         <none>        8091/TCP,18091/TCP               2m
+cb-production-ui   10.0.0.216   <nodes>       8091:30139/TCP,18091:30461/TCP   2m
+----
+
+On OpenShift, use the following commands:
+
+[source,console]
+----
+# all services managed by the operator
+$ oc get service -lapp=couchbase
+NAME                CLUSTER-IP   EXTERNAL-IP   PORT(S)                          AGE
+cb-development      None         <none>        8091/TCP,18091/TCP               2m
+cb-development-ui   10.0.0.7     <nodes>       8091:31822/TCP,18091:30155/TCP   2m
+cb-production       None         <none>        8091/TCP,18091/TCP               1m
+cb-production-ui    10.0.0.216   <nodes>       8091:30139/TCP,18091:30461/TCP   1m
+
+# only services used by cb-production cluster
+$ oc get service -lcouchbase_cluster=cb-production
+NAME               CLUSTER-IP   EXTERNAL-IP   PORT(S)                          AGE
+cb-production      None         <none>        8091/TCP,18091/TCP               2m
+cb-production-ui   10.0.0.216   <nodes>       8091:30139/TCP,18091:30461/TCP   2m
+----
+
+=== Describing services
+
+After listing the services, additional information about ports and endpoints can be gathered on Kubernetes using `kubectl describe` as follows:
+
+[source,console]
+----
+$ kubectl describe service cb-production
+
+Name:			cb-production
+Namespace:		default
+Labels:			app=couchbase
+			couchbase_cluster=cb-production
+Annotations:		service.alpha.kubernetes.io/tolerate-unready-endpoints=true
+Selector:		app=couchbase,couchbase_cluster=cb-production
+Type:			ClusterIP
+IP:			None
+Port:			cb-admin	8091/TCP
+Endpoints:		172.17.0.10:8091,172.17.0.9:8091
+Port:			cb-admin-ssl	18091/TCP
+Endpoints:		172.17.0.10:18091,172.17.0.9:18091
+Session Affinity:	None
+Events:			<none>
+----
+
+On OpenShift, use the following command:
+
+[source,console]
+----
+$ oc describe service cb-production
+----
+
+_You should expect that all pods within a cluster also exist as an endpoint to each service._
+
+== Listing Custom Resources
+
+Custom resources are extensions of the Kubernetes API. The Couchbase Operator creates custom resources of type `CouchbaseCluster` for each cluster being deployed. Custom resources can be listed and described using `kubectl` just as other built-in resources.
+
+On Kubernetes:
+
+[source,console]
+----
+$ kubectl get couchbasecluster
+NAME             KIND
+cb-development   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
+cb-production    CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
+
+$ kubectl describe couchbasecluster cb-production
+Name:		cb-production
+Namespace:	default
+Labels:		<none>
+Annotations:	kubectl.kubernetes.io/last-applied-configuration={"apiVersion":"couchbase.database.couchbase.com/v1beta1","kind":"CouchbaseCluster","metadata":{"annotations":{},"name":"cb-production","namespace":"def...
+API Version:	couchbase.database.couchbase.com/v1beta1
+Kind:		CouchbaseCluster
+...
+----
+
+On OpenShift:
+
+[source,console]
+----
+$ oc get couchbasecluster
+NAME             KIND
+cb-development   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
+cb-production    CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
+
+$ oc describe couchbasecluster cb-production
+Name:		cb-production
+Namespace:	default
+Labels:		<none>
+Annotations:	kubectl.kubernetes.io/last-applied-configuration={"apiVersion":"couchbase.database.couchbase.com/v1beta1","kind":"CouchbaseCluster","metadata":{"annotations":{},"name":"cb-production","namespace":"def...
+API Version:	couchbase.database.couchbase.com/v1beta1
+Kind:		CouchbaseCluster
+...
+----
+
+Describing the cluster resource returns the deployed specification and its active status. For more information about the response returned from the describe command, see xref:cluster-status-guide.adoc[Cluster Status Guide].
