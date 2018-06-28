@@ -311,6 +311,20 @@ func (f *Framework) SetupFramework(kubeName string) error {
 
 	e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
+	// Creating required namespaces and cluster roles before deploying the operator
+	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
+		return err
+	}
+	if err := RecreateClusterRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+		return err
+	}
+	if err := RecreateServiceAccount(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+		return err
+	}
+	if err := RecreateClusterRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+		return err
+	}
+
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
 		return errors.New("Failed to setup couchbase operator: " + err.Error())
 	}

@@ -11,6 +11,7 @@ import (
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -234,6 +235,103 @@ func CreateK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) e
 	return err
 }
 
+func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) error {
+	clusterRoleList, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, clusterRole := range clusterRoleList.Items {
+		if clusterRole.GetName() == roleName {
+			kubeClient.RbacV1beta1().ClusterRoles().Delete(roleName, &metav1.DeleteOptions{})
+			break
+		}
+	}
+
+	policyRule1 := rbacv1.PolicyRule{
+		APIGroups: []string{"couchbase.database.couchbase.com"},
+		Resources: []string{"couchbaseclusters"},
+		Verbs:     []string{"*"},
+	}
+
+	policyRule2 := rbacv1.PolicyRule{
+		APIGroups: []string{"storage.k8s.io"},
+		Resources: []string{"storageclasses"},
+		Verbs:     []string{"get"},
+	}
+
+	policyRule3 := rbacv1.PolicyRule{
+		APIGroups: []string{"apiextensions.k8s.io"},
+		Resources: []string{"customresourcedefinitions"},
+		Verbs:     []string{"*"},
+	}
+
+	policyRule4 := rbacv1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"pods", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes", "events", "secrets"},
+		Verbs:     []string{"*"},
+	}
+
+	policyRule5 := rbacv1.PolicyRule{
+		APIGroups: []string{"apps"},
+		Resources: []string{"deployments"},
+		Verbs:     []string{"*"},
+	}
+
+	clusterRoleSpec := &rbacv1.ClusterRole{
+		TypeMeta:   metav1.TypeMeta{Kind: "ClusterRole", APIVersion: "rbac.authorization.k8s.io/v1beta1"},
+		ObjectMeta: metav1.ObjectMeta{Name: roleName},
+		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3, policyRule4, policyRule5},
+	}
+	_, err = kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
+	return err
+}
+
+func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAccountName string) error {
+	if serviceAccountName == "default" {
+		return nil
+	}
+
+	// Delete service accounts apart from default one
+	svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, svcAcc := range svcAccList.Items {
+		if svcAcc.GetName() == "default" {
+			continue
+		}
+		kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{})
+	}
+
+	// Create service account given by the name
+	serviceAccountSpec := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName, Namespace: namespace},
+	}
+	_, err = kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccountSpec)
+	return err
+}
+
+func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
+	kubeClient.RbacV1beta1().ClusterRoleBindings().DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
+
+	clusterRoleBindingSubjects := []rbacv1.Subject{
+		rbacv1.Subject{
+			Kind:      "ServiceAccount",
+			Name:      clusterRoleName,
+			Namespace: namespace,
+		},
+	}
+
+	clusterRoleBindingSpec := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "couchbase-operator-" + namespace},
+		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: clusterRoleName},
+		Subjects:   clusterRoleBindingSubjects,
+	}
+	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	return err
+}
+
 // Execute shell command and returns the stderr and stdout buffers
 func runExecCommand(t *testing.T, command *exec.Cmd) error {
 	var stdout, stderr bytes.Buffer
@@ -311,8 +409,6 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 	clusterHostFile := ymlFilePath + "/" + kubeClusterSpec.ClusterName
 	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yaml"
 	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yaml"
-	clusterNamespaceFile := ymlFilePath + "/generic/createNamespace.yaml"
-	clusterRoleSetupFile := ymlFilePath + "/generic/createRoles.yaml"
 	pullDockerImageFile := ymlFilePath + "/generic/pullDockerImage.yaml"
 
 	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
@@ -332,24 +428,6 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 
 		ansibleExtraVarParam = "kubeConfPathToSave=config_" + kubeClusterSpec.ClusterName
 		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "--extra-vars", ansibleExtraVarParam)
-		if err := runExecCommand(t, ansibleCmd); err != nil {
-			return err
-		}
-
-		if namespace != "default" {
-			t.Logf("Creating namespace %s", namespace)
-			if err = createNamespaceFile(namespace); err != nil {
-				return errors.New("Failed to create namespace file: " + err.Error())
-			}
-			ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterNamespaceFile)
-			if err := runExecCommand(t, ansibleCmd); err != nil {
-				return err
-			}
-		}
-
-		t.Logf("Creating role bindings for namespace %s", namespace)
-		ansibleExtraVarParam = "namespace=" + namespace
-		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterRoleSetupFile, "--extra-vars", ansibleExtraVarParam)
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}
