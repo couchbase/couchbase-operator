@@ -578,16 +578,16 @@ func GetHostIP(kubecli kubernetes.Interface, ns, name string) (string, error) {
 	return pod.Status.HostIP, nil
 }
 
-func GetServerGroup(kubecli kubernetes.Interface, ns, name string) string {
+func GetServerGroup(kubecli kubernetes.Interface, ns, name string) (string, error) {
 	pod, err := GetPod(kubecli, ns, name)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	if pod.Spec.NodeSelector == nil {
-		return ""
+		return "", err
 	}
 	serverGroup, _ := pod.Spec.NodeSelector[constants.ServerGroupLabel]
-	return serverGroup
+	return serverGroup, nil
 }
 
 func GetSecret(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Secret, error) {

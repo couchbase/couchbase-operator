@@ -18,6 +18,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
@@ -62,10 +63,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		if c.cluster.Spec.Version != c.status.CurrentVersion {
 			return fmt.Errorf("cluster upgrades are unsupported")
 		}
-	}
-
-	if err := c.reconcileServerGroups(); err != nil {
-		return err
 	}
 
 	state := &ReconcileMachine{
@@ -630,25 +627,36 @@ func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr
 	return existingGroups, nil
 }
 
+// Given a server group update return the index of the named group
+// TODO: Move to gocbmgr as a receiver function
+func serverGroupIndex(update *cbmgr.ServerGroupsUpdate, name string) (int, error) {
+	for index, group := range update.Groups {
+		if group.Name == name {
+			return index, nil
+		}
+	}
+	return -1, fmt.Errorf("server group %s undefined", name)
+}
+
 // reconcileServerGroups looks at the cluster specification, if we have enabled
 // server groups, lookup the availability zone the member is in, create the server
 // group if it doesn't exist and add the member to the group
-func (c *Cluster) reconcileServerGroups() error {
+func (c *Cluster) reconcileServerGroups() (bool, error) {
 	// Cluster not server group aware
 	if !c.cluster.Spec.ServerGroupsEnabled() {
-		return nil
+		return false, nil
 	}
 
 	// Poll the server for exising information
 	existingGroups, err := c.client.GetServerGroups(c.members)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Create any server groups which need defining
 	existingGroups, err = c.createServerGroups(existingGroups)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Create a server group update
@@ -672,9 +680,22 @@ func (c *Cluster) reconcileServerGroups() error {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
 			podName := strings.Split(existingMember.HostName, ".")[0]
-			scheduledServerGroup := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, podName)
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, podName)
+
+			// A status error from the API probably means a 404, just reuse the old
+			// server group location
+			if err != nil {
+				switch err.(type) {
+				case *errors.StatusError:
+					scheduledServerGroup = existingGroup.Name
+				default:
+					return false, err
+				}
+			}
+
+			// TODO: should we flag this as a warning and leave it where it is?
 			if scheduledServerGroup == "" {
-				return fmt.Errorf("server group unset for pod %s", podName)
+				return false, fmt.Errorf("server group unset for pod %s", podName)
 			}
 
 			// If the node is in the wrong server group schedule an update
@@ -683,16 +704,10 @@ func (c *Cluster) reconcileServerGroups() error {
 			}
 
 			// Calculate the server group to add the node to
-			index := -1
-			for i, _ := range newGroups.Groups {
-				if newGroups.Groups[i].Name == scheduledServerGroup {
-					index = i
-					break
-				}
-			}
-			if index < 0 {
+			index, err := serverGroupIndex(&newGroups, scheduledServerGroup)
+			if err != nil {
 				// You have done something stupid like change the pod label
-				return fmt.Errorf("server group %s for pod %s undefined", scheduledServerGroup, podName)
+				return false, fmt.Errorf("server group %s for pod %s undefined", scheduledServerGroup, podName)
 			}
 
 			// Insert the node in the correct server group
@@ -705,10 +720,10 @@ func (c *Cluster) reconcileServerGroups() error {
 
 	// Nothing to do
 	if !update {
-		return nil
+		return false, nil
 	}
 
-	return c.client.UpdateServerGroups(c.members, existingGroups.GetRevision(), &newGroups)
+	return true, c.client.UpdateServerGroups(c.members, existingGroups.GetRevision(), &newGroups)
 }
 
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate

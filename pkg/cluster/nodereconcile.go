@@ -25,6 +25,7 @@ const (
 	ReconcileRemoveNodes
 	ReconcileRemoveUnmanaged
 	ReconcileAddNodes
+	ReconcileServerGroups
 	ReconcileRebalance
 	ReconcileDeadMembers
 	ReconcileFinished
@@ -62,6 +63,7 @@ var (
 		ReconcileRemoveNodes:      handleRemoveNode,
 		ReconcileRemoveUnmanaged:  handleUnmanagedNodes,
 		ReconcileAddNodes:         handleAddNode,
+		ReconcileServerGroups:     handleServerGroups,
 		ReconcileRebalance:        handleRebalance,
 		ReconcileDeadMembers:      handleDeadMembers,
 	}
@@ -432,6 +434,17 @@ func handleAddNode(r *ReconcileMachine, c *Cluster) error {
 			r.runningPods.Add(m)
 			addCount++
 		}
+	}
+
+	r.transitionState(ReconcileServerGroups)
+	return nil
+}
+
+func handleServerGroups(r *ReconcileMachine, c *Cluster) error {
+	if updated, err := c.reconcileServerGroups(); err != nil {
+		return err
+	} else if updated {
+		r.couchbase.NeedsRebalance = true
 	}
 
 	r.transitionState(ReconcileRebalance)
