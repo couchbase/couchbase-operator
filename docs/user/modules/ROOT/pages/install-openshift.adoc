@@ -10,7 +10,7 @@ Before installing the Couchbase Operator into OpenShift, you should create a pro
  $ oc new-project operator-example
  $ oc logout
 
-== CRD and ClusterRole Creation
+== Creating the Custom Resource Definition
 
 The next step in setting up the Couchbase Operator is to install the CouchbaseCluster Custom Resource Definition (CRD). The Couchbase Operator can do this for you automatically, but in OpenShift it's better to do it manually since installing CRDs is a cluster-level operation and requires cluster-level permissions that should not be given to typical users.
 
@@ -21,13 +21,24 @@ To install the CRD, log in as the system:admin user and run the following comman
 
 NOTE: You only need to install the CRD once. After that, the Couchbase Operator can be created in any OpenShift project.
 
-Once the CRD is installed, you need to create a role that allows the Operator to access the resources it needs to run. Since the Couchbase Operator might run in many different projects, it is best to create a _ClusterRole_ because you can assign that role to a _ServiceAccount_ in any OpenShift project.
+== Creating a Role and Service Account for the Operator
+
+You need to create a role that allows the Operator to access the resources it needs to run. Since the Couchbase Operator might run in many different projects, it is best to create a _ClusterRole_ because you can assign that role to a _ServiceAccount_ in any OpenShift project.
 
 To create the ClusterRole for the Couchbase Operator, run the following command as the system:admin user:
 
  $ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/cluster-role-sa.yaml
 
 NOTE: You only need to create the ClusterRole once.
+
+After the ClusterRole is created, you need to create a _ServiceAccount_ in the project where you are installing the Couchbase Operator, and then assign the ClusterRole to that ServiceAccount using a _RoleBinding_. (A ServiceAccount is used as opposed to a User for the Couchbase Operator because ServiceAccounts are meant to be used for processes running in OpenShift.)
+
+ $ oc create serviceaccount couchbase-operator --namespace operator-example
+ $ oc create rolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount operator-example:couchbase-operator
+
+NOTE: To set up a ServiceAccount for the operator in another OpenShift project, repeat the steps above.
+
+== Creating a Role for a User
 
 Next, since the `developer` user needs to be able to create and delete the Couchbase cluster, you need to create another ClusterRole that gives permissions to handle management of the CouchbaseCluster resource.
 
@@ -38,29 +49,18 @@ Run the following command to create the ClusterRole for `developer`:
 oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/cluster-role-user.yaml
 ----
 
-== Setting Up RBAC for an OpenShift Project
+Next you need to allow the `developer` user to be able to manage the CouchbaseCluster resource in the `operator-example` project.
 
-After the ClusterRole is created, you need to create a _ServiceAccount_ in the project where you are installing the Couchbase Operator, and then assign the ClusterRole to that ServiceAccount using a _RoleBinding_. (A ServiceAccount is used as opposed to a User for the Couchbase Operator because ServiceAccounts are meant to be used for processes running in OpenShift.)
-
- $ oc create serviceaccount couchbase-operator --namespace operator-example
- $ oc create rolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount operator-example:couchbase-operator
-
-Couchbase Server containers must be run by the root user, so you need to set a policy on the ServiceAccount to allow Couchbase Server pods to be started by the Couchbase Operator. Use the following command to set the policy for the couchbase-operator ServiceAccount:
-
- $ oc adm policy add-scc-to-user anyuid system:serviceaccount:operator-example:couchbase-operator
-
-Now that the ServiceAccount that the Couchbase Operator uses to run has been set up, you need to allow the `developer` user to be able to manage the CouchbaseCluster resource in the `operator-example` project.
-
- $ oc create rolebinding couchbasecluster --clusterrole couchbasecluster --user developer --namespace operator-example
+ $ oc create rolebinding couchbasecluster-developer --clusterrole couchbasecluster --user developer --namespace operator-example
 
 If you want the `developer` user to be able to manage CouchbaseCluster objects in all projects, then you can run the following command instead:
 
 [source,console]
 ----
-oc create clusterrolebinding couchbasecluster --clusterrole couchbasecluster --user developer
+oc create clusterrolebinding couchbasecluster-developer --clusterrole couchbasecluster --user developer
 ----
 
-NOTE: To set up a ServiceAccount for the operator in another OpenShift project, repeat the steps above.
+NOTE: If you wish to create role bindings for multiple users either at the cluster or namespace level they will need to have unique names.  In the above examples if we were to create a role binding for user `alice` we'd use the name `couchbasecluster-alice` in place of `couchbasecluster-developer`.
 
 == Starting the Operator
 
@@ -109,14 +109,19 @@ couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
 
 You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: "starting couchbaseclusters controller".
 
- $ oc logs couchbase-operator-1917615544-t5mhp
- time="2018-04-25T03:01:56Z" level=info msg="Obtaining resource lock" module=main
- time="2018-04-25T03:01:56Z" level=info msg="Starting event recorder" module=main
- time="2018-04-25T03:01:56Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
- time="2018-04-25T03:02:13Z" level=info msg="I'm the leader, attempt to start the operator" module=main
- time="2018-04-25T03:02:13Z" level=info msg="Creating the couchbase-operator controller" module=main
- time="2018-04-25T03:02:13Z" level=info msg="Event(v1.ObjectReference{Kind:\"Endpoints\", Namespace:\"default\", Name:\"couchbase-operator\", UID:\"9b86c750-47e7-11e8-866e-080027b2a68d\", APIVersion:\"v1\", ResourceVersion:\"23482\", FieldPath:\"\"}): type: 'Normal' reason: 'LeaderElection' couchbase-operator-75ddfdbdb5-bz7ng became leader" module=event_recorder
- time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controller"
+[source,console]
+----
+$ oc logs couchbase-operator-1917615544-t5mhp
+time="2018-04-25T03:01:56Z" level=info msg="Obtaining resource lock" module=main
+time="2018-04-25T03:01:56Z" level=info msg="Starting event recorder" module=main
+time="2018-04-25T03:01:56Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
+time="2018-04-25T03:02:13Z" level=info msg="I'm the leader, attempt to start the operator" module=main
+time="2018-04-25T03:02:13Z" level=info msg="Creating the couchbase-operator controller" module=main
+time="2018-04-25T03:02:13Z" level=info msg="Event(v1.ObjectReference{Kind:\"Endpoints\", Namespace:\"default\", Name:\"couchbase-operator\", UID:\"9b86c750-47e7-11e8-866e-080027b2a68d\", APIVersion:\"v1\", ResourceVersion:\"23482\", FieldPath:\"\"}): type: 'Normal' reason: 'LeaderElection' couchbase-operator-75ddfdbdb5-bz7ng became leader" module=event_recorder
+time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controller"
+----
+
+The next step you may wish to perform is the xref:deploying-couchbase.adoc[deployment of a Couchbase cluster].
 
 == Uninstall
 
