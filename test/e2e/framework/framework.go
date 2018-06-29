@@ -267,11 +267,12 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
+	logrus.Info("deleteing jobs")
 	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
 	for _, job := range jobs.Items {
 		targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
 	}
-
+	logrus.Info("deleteing deployments")
 	deployments, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.New("Failed to list deployments: " + err.Error())
@@ -279,13 +280,14 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	for _, deployment := range deployments.Items {
 		Global.DeleteCouchbaseOperatorCompletely(targetKube, deployment.GetName())
 	}
+	deployments, err = targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return errors.New("Failed to list deployments: " + err.Error())
+	}
+	logrus.Info("deployments after delete: " + string(len(deployments.Items)))
 
+	logrus.Info("deleteing clusters")
 	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
-	/*
-		if err != nil {
-			return errors.New("Unable to get clusters: " + err.Error())
-		}
-	*/
 	for _, cluster := range clusters.Items {
 		targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
 		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
@@ -298,48 +300,51 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 		e2eutil.KillMembers(targetKube.KubeClient, Global.Namespace, cluster.Name, killPods...)
 	}
-
+	logrus.Info("deleteing services")
 	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	for _, service := range services.Items {
 		targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
-
+	logrus.Info("deleteing orphaned pods")
 	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	for _, pod := range pods.Items {
 		targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}
-
+	logrus.Info("deleteing secrets")
 	e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
+
 	// Creating required namespaces and cluster roles before deploying the operator
+	logrus.Info("creating namespace")
 	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
 		return err
 	}
+	logrus.Info("recreating cluster role")
 	if err := RecreateClusterRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
+	logrus.Info("recreating service account")
 	if err := RecreateServiceAccount(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
+	logrus.Info("recreating cluster role binding")
 	if err := RecreateClusterRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
-
-	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
-		return errors.New("Failed to setup couchbase operator: " + err.Error())
-	}
-
+	logrus.Info("creating secret")
 	if err = f.CreateSecretInKubeCluster(kubeName); err != nil {
 		return err
 	}
-
+	logrus.Info("setting up operator")
+	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
+		return errors.New("Failed to setup couchbase operator: " + err.Error())
+	}
 	logrus.Info("couchbase operator created successfully")
 	logrus.Info("e2e setup successfully")
 	return nil
 }
 
 func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
-	logrus.Info("Setting up couchbase-operator")
 	_, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(f.Deployment)
 	if err != nil {
 		return err

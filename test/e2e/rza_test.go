@@ -179,7 +179,7 @@ func GetAvailableServerGroupsFromYmlData(k8sNodesData framework.ClusterInfo) []s
 
 // Wrapper function to Label the K8S nodes and
 // remove the labels after the test case execution
-func rzaNodeLabeller(testFunc framework.TestFunc) framework.TestFunc {
+func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
 	wrapperFunc := func(t *testing.T) {
 		if os.Getenv(envParallelTest) == envParallelTestTrue {
 			t.Parallel()

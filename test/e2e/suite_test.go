@@ -72,7 +72,10 @@ func runSuite(t *testing.T) {
 					testFunc = nil
 					break
 				}
-				testFunc = DecoratorFuncMap[funcName](testFunc)
+				decoratorArgs := framework.DecoratorArgs{
+					KubeNames: testGroup.ClusterName,
+				}
+				testFunc = DecoratorFuncMap[funcName](testFunc, decoratorArgs)
 			}
 			if testFunc != nil {
 				testResult := t.Run(testName, testFunc)

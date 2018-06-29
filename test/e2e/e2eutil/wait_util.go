@@ -591,10 +591,8 @@ func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, wa
 			return errors.New("Timed out to get K8S node to ready state")
 
 		case <-tickChan:
-			nodesList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-			if err != nil {
-				return err
-			}
+			nodesList, _ := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+
 
 			allNodesReady := true
 			var nodeConditionReady v1.NodeCondition

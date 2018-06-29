@@ -145,39 +145,48 @@ func randomClusterName(randomSuffix string) string {
 // tlsDecorator accepts a test function and key type and returns a decorated
 // version of the function which creates cluster specific TLS certificates and
 // installs them into K8S before running the test(s)
-func tlsDecorator(test framework.TestFunc, keyType e2eutil.KeyType) framework.TestFunc {
+func tlsDecorator(test framework.TestFunc, keyType e2eutil.KeyType, args framework.DecoratorArgs) framework.TestFunc {
 	f := framework.Global
-	kubeName := "BasicCluster"
-	RandomNameSuffix = e2eutil.RandomSuffix()
-	decoratorObj := &TlsDecorator{}
-	decoratorObj.Init(RandomNameSuffix, f.Namespace, keyType)
-	decoratorObj.test = test
-	return CreateWrapperFunc(kubeName, decoratorObj, keyType)
+	var wrapper framework.TestFunc
+	for i, kubeName := range args.KubeNames {
+		for j := 0; j < 3; j++ {
+			RandomNameSuffix = e2eutil.RandomSuffix()
+			decoratorObj := &TlsDecorator{}
+			decoratorObj.Init(RandomNameSuffix, f.Namespace, keyType)
+			if i == 0 && j == 0 {
+				decoratorObj.test = test
+			} else {
+				decoratorObj.test = wrapper
+			}
+			wrapper = CreateWrapperFunc(kubeName, decoratorObj, keyType)
+		}
+	}
+	return wrapper
 }
 
 // rsaDecorator runs a test with static TLS and RSA based keys
-func rsaDecorator(test framework.TestFunc) framework.TestFunc {
-	return tlsDecorator(test, e2eutil.KeyTypeRSA)
+func rsaDecorator(test framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
+	return tlsDecorator(test, e2eutil.KeyTypeRSA, args)
 }
 
 // ellipticP224Decorator runs a test with static TLS and EC P224 based keys
-func ellipticP224Decorator(test framework.TestFunc) framework.TestFunc {
-	return tlsDecorator(test, e2eutil.KeyTypeEllipticP224)
+func ellipticP224Decorator(test framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
+	return tlsDecorator(test, e2eutil.KeyTypeEllipticP224, args)
 }
 
 // ellipticP256Decorator runs a test with static TLS and EC P256 based keys
-func ellipticP256Decorator(test framework.TestFunc) framework.TestFunc {
-	return tlsDecorator(test, e2eutil.KeyTypeEllipticP256)
+func ellipticP256Decorator(test framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
+	return tlsDecorator(test, e2eutil.KeyTypeEllipticP256, args)
 }
 
 // ellipticP384Decorator runs a test with static TLS and EC P384 based keys
-func ellipticP384Decorator(test framework.TestFunc) framework.TestFunc {
-	return tlsDecorator(test, e2eutil.KeyTypeEllipticP384)
+func ellipticP384Decorator(test framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
+	return tlsDecorator(test, e2eutil.KeyTypeEllipticP384, args)
 }
 
 // ellipticP521Decorator runs a test with static TLS and EC P521 based keys
-func ellipticP521Decorator(test framework.TestFunc) framework.TestFunc {
-	return tlsDecorator(test, e2eutil.KeyTypeEllipticP521)
+func ellipticP521Decorator(test framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
+	return tlsDecorator(test, e2eutil.KeyTypeEllipticP521, args)
 }
 
 // Create couchbase cluster over TLS certificates

@@ -171,6 +171,7 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 	if exposed {
 		crd.Spec.ExposeAdminConsole = true
 	}
+	fmt.Printf("crd: %+v\n", crd)
 	return crd
 }
 
@@ -399,30 +400,30 @@ func NewStatefulCluster(genName, secretName string, size int, withBucket bool, e
 // Explicitly generated cluster name.  Used by TLS tests where we need to know
 // the cluster DNS names before creating the cluster to generate certificates.
 // This is non-reentrant so do not parallelize tests when in use.
-var clusterName = ""
+var clusterName = []string{}
 
 // Generates a random (mostly unique!) name for a new cluster
 func SetClusterName(name string) {
-	clusterName = name
+	clusterName = append(clusterName, name)
 }
 
 // Resets the explicit cluster name
 func ResetClusterName() {
-	clusterName = ""
+	clusterName = []string{}
 }
 
 // tlsPolicy points to a TLS configuration.  If not nil it is attached to the
 // next CRD to be created
-var tlsPolicy *api.TLSPolicy = nil
+var tlsPolicy = []*api.TLSPolicy{}
 
 // SetTLS sets the TLS configuration for the next CRD
 func SetTLS(tls *api.TLSPolicy) {
-	tlsPolicy = tls
+	tlsPolicy = append(tlsPolicy, tls)
 }
 
 // ResetTLS resets the TLS configuration so it is not applied to the next CRD
 func ResetTLS() {
-	tlsPolicy = nil
+	tlsPolicy = []*api.TLSPolicy{}
 }
 
 // NewClusterCRD creates a new Couchbase cluster CRD and associates the specified
@@ -440,12 +441,18 @@ func NewClusterCRD(genName string, spec api.ClusterSpec) *api.CouchbaseCluster {
 		},
 		Spec: spec,
 	}
-	if clusterName == "" {
+	if len(clusterName) == 0 {
 		cluster.ObjectMeta.GenerateName = genName
 	} else {
-		cluster.ObjectMeta.Name = clusterName
+		cluster.ObjectMeta.Name = clusterName[0]
+		clusterName = clusterName[1:]
 	}
-	cluster.Spec.TLS = tlsPolicy
+	if len(tlsPolicy) == 0 {
+		cluster.Spec.TLS = nil
+	} else {
+		cluster.Spec.TLS = tlsPolicy[0]
+		tlsPolicy = tlsPolicy[1:]
+	}
 	return cluster
 }
 

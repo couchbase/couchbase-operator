@@ -24,15 +24,24 @@ types:
 
       - name: SystemTestCluster1
         master:
-          - ip: 172.23.109.251
+          - ip: 172.23.96.199
         worker:
-          - ip: 172.23.121.245
+          - ip: 172.23.96.200
+          - ip: 172.23.96.246
+          - ip: 172.23.96.248
+          - ip: 172.23.96.249
+          - ip: 172.23.97.44
+          - ip: 172.23.97.46
+          - ip: 172.23.97.47
+          - ip: 172.23.97.48
 
-      - name: SystemTestCluster2
+      - name: SharedCluster1
         master:
-          - ip: 172.23.121.38
+          - ip: 172.23.121.245
         worker:
+          - ip: 172.23.121.38
           - ip: 172.23.123.244
+          - ip: 172.23.109.251
 
   - type: aws_openshift
     clusters:

@@ -50,7 +50,7 @@
         masterNodeIp: "{{ inventory_hostname }}"        
 
     - name: Initializing master node
-      shell: "kubeadm init --token {{ kubeAdmToken }}"
+      shell: "kubeadm init --token {{ kubeAdmToken }} --pod-network-cidr=192.168.0.0/16"
 
     - name: Creating kube config dir
       file:
@@ -72,6 +72,30 @@
         dest: "{{ kubeConfPathToSave }}"
         flat: yes
 
+- hosts: master_node
+  tasks:
+    - name: Applying cluster network settings using weave
+      shell: kubectl apply -f https://docs.projectcalico.org/v3.1/getting-started/kubernetes/installation/hosted/kubeadm/1.7/calico.yaml
+
+    - name: Getting node details
+      shell: kubectl get nodes -o wide
+      register: shellOutput
+
+    - debug:
+        msg: "{{ shellOutput.stdout }}"
+
+#- hosts: master_node
+#  tasks:
+#    - name: Applying cluster network settings using weave
+#      shell: kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+#    - name: Getting node details
+#      shell: kubectl get nodes -o wide
+#      register: shellOutput
+
+#    - debug:
+#        msg: "{{ shellOutput.stdout }}"
+
 - hosts: worker_node
   tasks:
     - set_fact:
@@ -84,14 +108,4 @@
     - name: Joining worker nodes
       shell: "kubeadm join --token {{ kubeAdmToken }} {{ masterNodeIp }}:6443 --discovery-token-unsafe-skip-ca-verification"
 
-- hosts: master_node
-  tasks:
-    - name: Applying cluster network settings using weave
-      shell: kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 
-    - name: Getting node details
-      shell: kubectl get nodes -o wide
-      register: shellOutput
-
-    - debug:
-        msg: "{{ shellOutput.stdout }}"

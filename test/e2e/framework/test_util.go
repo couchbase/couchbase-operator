@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"testing"
+	"time"
 
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
@@ -19,10 +20,15 @@ import (
 // TestFunc defines the test function type
 type TestFunc func(*testing.T)
 
+// DecoratorArgs will be used to pass arguments to decorators
+type DecoratorArgs struct {
+	KubeNames []string
+}
+
 // TestDecorator decorates a test function.  This is used to augment an
 // existing test usually to perform setup and tear-down tasks e.g.
 // initializing and deleting a cluster or applying TLS configuration
-type TestDecorator func(TestFunc) TestFunc
+type TestDecorator func(TestFunc, DecoratorArgs) TestFunc
 
 // TestSuite defines a suite of tests
 type TestSuite map[string]TestFunc
@@ -240,10 +246,13 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 	if err != nil {
 		return err
 	}
-
 	for _, clusterRole := range clusterRoleList.Items {
 		if clusterRole.GetName() == roleName {
 			kubeClient.RbacV1beta1().ClusterRoles().Delete(roleName, &metav1.DeleteOptions{})
+			err = WaitForClusterRoleDeleted(kubeClient, roleName, 30)
+			if err != nil {
+				return err
+			}
 			break
 		}
 	}
@@ -301,7 +310,14 @@ func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceA
 		if svcAcc.GetName() == "default" {
 			continue
 		}
-		kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{})
+		if svcAcc.GetName() == serviceAccountName {
+			kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{})
+			err = WaitForServiceAccountDeleted(kubeClient, serviceAccountName, namespace, 30)
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
 	// Create service account given by the name
@@ -313,8 +329,21 @@ func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceA
 }
 
 func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
-	kubeClient.RbacV1beta1().ClusterRoleBindings().DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
-
+	clusterRoleBindingName := clusterRoleName + "-" + namespace
+	clusterRoleBindingList, err := kubeClient.RbacV1beta1().ClusterRoleBindings().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, clusterRoleBinding := range clusterRoleBindingList.Items {
+		if clusterRoleBinding.GetName() == clusterRoleBindingName {
+			kubeClient.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, &metav1.DeleteOptions{})
+			err = WaitForClusterRoleBindingDeleted(kubeClient, clusterRoleBindingName, 30)
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
 	clusterRoleBindingSubjects := []rbacv1.Subject{
 		rbacv1.Subject{
 			Kind:      "ServiceAccount",
@@ -324,11 +353,11 @@ func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clu
 	}
 
 	clusterRoleBindingSpec := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "couchbase-operator-" + namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
 		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: clusterRoleName},
 		Subjects:   clusterRoleBindingSubjects,
 	}
-	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	_, err = kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
 	return err
 }
 
@@ -444,3 +473,79 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 	}
 	return nil
 }
+
+func WaitForClusterRoleDeleted(kubeClient kubernetes.Interface, roleName string, waitTimeInSec int) error {
+	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return errors.New("Timed out waiting for role to be delete: " + roleName)
+
+		case <-tickChan:
+			clusterRoleList, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+
+			for _, clusterRole := range clusterRoleList.Items {
+				if clusterRole.GetName() == roleName {
+					break
+				}
+			}
+			return nil
+		}
+	}
+}
+
+func WaitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccountName string, namespace string, waitTimeInSec int) error {
+	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return errors.New("Timed out waiting for service account to be delete: " + serviceAccountName)
+
+		case <-tickChan:
+			svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			for _, svcAcc := range svcAccList.Items {
+				if svcAcc.GetName() == "default" {
+					break
+				}
+				if svcAcc.GetName() == serviceAccountName {
+					break
+				}
+
+			}
+			return nil
+		}
+	}
+}
+
+func WaitForClusterRoleBindingDeleted(kubeClient kubernetes.Interface, clusterRoleBindingName string, waitTimeInSec int) error {
+	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return errors.New("Timed out waiting for cluster role binding to be delete: " + clusterRoleBindingName)
+
+		case <-tickChan:
+			clusterRoleBindingList, err := kubeClient.RbacV1beta1().ClusterRoleBindings().List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			for _, clusterRoleBinding := range clusterRoleBindingList.Items {
+				if clusterRoleBinding.GetName() == clusterRoleBindingName {
+					break
+				}
+
+			}
+			return nil
+		}
+	}
+}
+

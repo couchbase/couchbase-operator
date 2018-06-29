@@ -27,6 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
+
+	"k8s.io/client-go/rest"
+
 )
 
 const (
@@ -192,10 +195,12 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 	// Create the cluster
 	var err error
 	if cluster, err = CreateCluster(t, crClient, namespace, cluster); err != nil {
+		t.Logf("failed to create cluster")
 		return nil, err
 	}
 	// Wait for the cluster to reach the correct size
 	if _, err := WaitUntilSizeReached(t, crClient, cluster.Spec.TotalSize(), retries.Size, cluster); err != nil {
+		t.Logf("failed to wait until size reached")
 		return cluster, err
 	}
 	// If any buckets are specified wait for these to become active
@@ -203,12 +208,14 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 	if len(buckets) > 0 {
 		err := WaitUntilBucketsExists(t, crClient, buckets, retries.Bucket, cluster)
 		if err != nil {
+			t.Logf("failed to wait for bucket to exist")
 			return cluster, err
 		}
 	}
 	// Update the cluster status
 	updatedCluster, err := GetClusterCRD(crClient, cluster)
 	if err != nil {
+		t.Logf("failed to get updated cluster spec")
 		return cluster, err
 	}
 	return updatedCluster, nil
@@ -231,7 +238,9 @@ func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient 
 		var cluster *api.CouchbaseCluster
 		cluster, err = newClusterFromSpecQuick(t, crClient, namespace, clusterSpec, retries)
 		if err != nil {
+			t.Logf("failed to create cluster from spec")
 			if cluster != nil {
+				t.Logf("deleting failed cluster")
 				DeleteCluster(t, crClient, kubeClient, cluster, 5)
 			}
 			continue
@@ -787,4 +796,20 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 func GetMemberPVC(kubeCli kubernetes.Interface, namespace string, claimName string, memberName string, index int, mountName api.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
 	name := k8sutil.NameForPersistentVolumeClaim(claimName, memberName, index, mountName)
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
+}
+
+func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string) error {
+	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	if err != nil {
+		return fmt.Errorf("Unable to get couchbase pods:", err)
+	}
+
+	// TLS handshake with pods
+	for _, pod := range pods.Items {
+		err = TlsCheckForPod(t, namespace, pod.GetName(), restConfig)
+		if err != nil {
+			return fmt.Errorf("TLS verification failed:", err)
+		}
+	}
+	return nil
 }

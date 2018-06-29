@@ -11,6 +11,6 @@ duration: 7                     # In days. Used for system tests
 skip-tear-down: false           # Leaves the operator running after tests
 suite: TestCustom               # Test suite to run. Same named yaml file should exists in resources/suites path
 kube-type: kubernetes           # Cluster type kubernetes | aws-openshift
-kube-version: 1.8.0-0           # KUBE version to install
+kube-version: 1.10.5-0           # KUBE version to install
 
 serviceAccountName: default     # Service account to use while running Tests
