@@ -1,0 +1,43 @@
+= cbopinfo
+
+This documents the cbopinfo tool used to collect resources and logs via the Kubernetes API in order to support the Operator and Couchbase server.
+
+By default the command will collect resources for all Couchbase clusters defined in the selected namespace.  Certain resource types such as services, pods, persistent volume claims are scoped to those created by the Operator.  The scope can be further restricted to only the clusters specified on the command line.
+
+Other unscoped resources are collected without any filtering including roles, role bindings and service accounts as they cannot be distinguished as belonging to a particular cluster.
+
+Any secrets that are collected have their data redacted so only the presence of a secret or a key within it are visible.
+
+The output is a compressed archive of resource YAML manifests organized by namespace, resource type and name.  Logs and events are also collected and collated with resource configuration where relevant.
+
+== Syntax
+
+ cbopinfo [options] [clusters]
+
+=== Options
+
+--all::
+If specified the _all_ flag ignores any scoping rules for a particular resource type, and collects all instances within the name space.
+
+--collectinfo::
+If specified the _collectinfo_ flag will trigger collection of Couchbase logs via the _cbcollect_info_ command locally on each pod belonging to a Couchbase cluster.  The logs are left in situ as they may be relatively large.  The _cbopinfo_ command will report how to extract the logs from each pod.
+
+--kubeconfig <config>::
+If specified this points to a Kubernetes configuration file used to locate and poll the cluster API.  If not set it will default to _~/.kube/config_.
+
+--namespace <namespace>::
+If specified this selects which namespace to collect resources and logs from.  If not set it will default to _default_.
+
+--system::
+If specified this will additionally collect all resources from the _kube-system_ namespace which may be useful in diagnosing problems with cluster level roles, custom resource defintions or system services.
+
+== Example
+
+[source,shell]
+----
+$ cbopinfo --collectinfo --system
+Server logs accessible via: kubectl cp default/cb-example-0001:/tmp/cbinfo-default-cb-example-0001-20180629T152926+0100.zip .
+Server logs accessible via: kubectl cp default/cb-example-0002:/tmp/cbinfo-default-cb-example-0002-20180629T152926+0100.zip .
+Server logs accessible via: kubectl cp default/cb-example-0000:/tmp/cbinfo-default-cb-example-0000-20180629T152926+0100.zip .
+Wrote cluster information to cbopinfo-20180629T152926+0100.tar.gz
+----

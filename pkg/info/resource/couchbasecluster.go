@@ -26,7 +26,7 @@ func NewCouchbaseClusterResource(context *context.Context) Resource {
 }
 
 func (r *couchbaseClusterResource) Kind() string {
-	return "CouchbaseCouchbaseCluster"
+	return "CouchbaseCluster"
 }
 
 // Fetch collects all pods as defined by the configuration

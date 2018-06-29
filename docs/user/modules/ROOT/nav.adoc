@@ -23,5 +23,7 @@
 * Troubleshooting
  ** xref:logs-troubleshooting.adoc[Logs]
  ** xref:conditions-and-events.adoc[Conditions and Events]
+* Command Line Tools
+ ** xref:cbopinfo.adoc[cbopinfo]
 * xref:demo.adoc[Tutorial]
 * xref:release-notes.adoc[Release Notes]
