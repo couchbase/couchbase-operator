@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"k8s.io/client-go/rest"
-
 )
 
 const (
@@ -801,14 +800,14 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace string, claimName stri
 func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string) error {
 	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	if err != nil {
-		return fmt.Errorf("Unable to get couchbase pods:", err)
+		return fmt.Errorf("Unable to get couchbase pods: %v", err)
 	}
 
 	// TLS handshake with pods
 	for _, pod := range pods.Items {
 		err = TlsCheckForPod(t, namespace, pod.GetName(), restConfig)
 		if err != nil {
-			return fmt.Errorf("TLS verification failed:", err)
+			return fmt.Errorf("TLS verification failed: %v", err)
 		}
 	}
 	return nil

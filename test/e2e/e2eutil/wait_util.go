@@ -593,7 +593,6 @@ func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, wa
 		case <-tickChan:
 			nodesList, _ := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 
-
 			allNodesReady := true
 			var nodeConditionReady v1.NodeCondition
 			for _, node := range nodesList.Items {

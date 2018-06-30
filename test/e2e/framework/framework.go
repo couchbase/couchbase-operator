@@ -313,7 +313,6 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	logrus.Info("deleteing secrets")
 	e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
-
 	// Creating required namespaces and cluster roles before deploying the operator
 	logrus.Info("creating namespace")
 	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {

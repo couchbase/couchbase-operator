@@ -548,4 +548,3 @@ func WaitForClusterRoleBindingDeleted(kubeClient kubernetes.Interface, clusterRo
 		}
 	}
 }
-
