@@ -67,44 +67,44 @@ tcGroups:
       - name: TestKillOperator
       - name: TestKillOperatorAndUpdateClusterConfig
 
-  #- name: TLS case
-  #  clusters:
-  #    - BasicCluster
-  #  testcases:
-  #    - name: TestTlsCreateCluster
-  #      decorators:
-  #        - rsaDecorator
-  #    - name: TestTlsKillClusterNode
-  #      decorators:
-  #        - rsaDecorator
-  #    - name: TestTlsResizeCluster
-  #      decorators:
-  #        - rsaDecorator
+  - name: TLS case
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestTlsCreateCluster
+        decorators:
+          - rsaDecorator
+      - name: TestTlsKillClusterNode
+        decorators:
+          - rsaDecorator
+      - name: TestTlsResizeCluster
+        decorators:
+          - rsaDecorator
 
-  #- name: RzaTests
-  #  clusters:
-  #    - NewCluster1
-  #  testcases:
-  #    - name: TestRzaCreateClusterWithStaticConfig
-  #      decorators:
-  #        - rzaNodeLabeller
-  #    - name: TestRzaCreateClusterWithClassBasedConfig
-  #      decorators:
-  #        - rzaNodeLabeller
-  #    - name: TestRzaResizeCluster
-  #      decorators:
-  #        - rzaNodeLabeller
+  - name: RzaTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRzaCreateClusterWithStaticConfig
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaCreateClusterWithClassBasedConfig
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaResizeCluster
+        decorators:
+          - rzaNodeLabeller
 
-  #- name: FailoverTests
-  #  clusters:
-  #    - BasicCluster
-  #    - NewCluster1
-  #  testcases:
-  #    - name: TestServerGroupAutoFailover
-  #      decorators:
-  #        - rzaNodeLabeller
-  #    - name: TestServerGroupWithSingleServiceNodeInFailoverGroup
-  #      decorators:
-  #        - rzaNodeLabeller
-  #    - name: TestMultiNodeAutoFailover
-  #    - name: TestDiskFailureAutoFailover
+  - name: FailoverTests
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestServerGroupAutoFailover
+        decorators:
+          - rzaNodeLabeller
+      - name: TestServerGroupWithSingleServiceNodeInFailoverGroup
+        decorators:
+          - rzaNodeLabeller
+      - name: TestMultiNodeAutoFailover
+      - name: TestDiskFailureAutoFailover
