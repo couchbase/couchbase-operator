@@ -63,7 +63,8 @@ spec:
         - us-east-1a
       pod:
         couchabseEnv:
-          ENV1: value
+          - name: ENV1
+            value: value
         resources:
           limits:
             cpu: 4GHz
@@ -515,7 +516,8 @@ You must specify at least one - but possibly multiple - node specifications. A n
       - us-east-1a
     pod:
       couchabseEnv:
-        CB_ENV_VAR: value
+        - name: CB_ENV_VAR
+          value: value
       resources:
         limits:
           cpu: 4GHz
@@ -575,7 +577,8 @@ The pod policy defines settings that apply to all pods deployed with this node c
 ...
     pod:
       couchabseEnv:
-        CB_ENV_VAR: value
+        - name: CB_ENV_VAR
+          value: value
       resources:
         limits:
           cpu: 4GHz
@@ -602,7 +605,7 @@ The pod policy defines settings that apply to all pods deployed with this node c
 
 *couchbaseEnv*
 
-This field specifies the environment variables (as key-values pairs) that should be set when the pod is started. The key in this case is the environment variable name and the value is the value of the environment variable. This section is optional.
+This field specifies the environment variables (as key-values pairs) that should be set when the pod is started.  This section is optional.
 
 ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.

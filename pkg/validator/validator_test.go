@@ -589,6 +589,23 @@ var testDefs = []testDef{
 			errors.DuplicateItems("spec.buckets.name", "body"),
 		),
 	},
+	{
+		name:        "TestPodEnvironmentIsArray",
+		path:        "tests/0069.yaml",
+		description: "Tests pod environment is specified as an array",
+		typeFail:    true,
+	},
+	{
+		name:        "TestPodEnvironmentValueIsString",
+		path:        "tests/0070.yaml",
+		description: "Tests pod environment values are strings",
+		typeFail:    true,
+	},
+	{
+		name:        "TestPodEnvironmentValid",
+		path:        "tests/0071.yaml",
+		description: "Tests pod environment values are strings",
+	},
 }
 
 func TestValiation(t *testing.T) {
@@ -611,7 +628,7 @@ func TestValiation(t *testing.T) {
 		resource, err := decoder.DecodeCouchbaseCluster(raw)
 		if err != nil {
 			if !tc.typeFail {
-				fmt.Printf("Failed: %s %T\n", tc.name, err)
+				t.Fatalf("Failed: %s %T\n", tc.name, err)
 			}
 			continue
 		}
@@ -637,7 +654,7 @@ func TestValiation(t *testing.T) {
 			updated, err := decoder.DecodeCouchbaseCluster(raw)
 			if err != nil {
 				if !tc.typeFail {
-					fmt.Printf("Failed: %s %T\n", tc.name, err)
+					t.Fatalf("Failed: %s %T\n", tc.name, err)
 				}
 				continue
 			}

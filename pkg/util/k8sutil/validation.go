@@ -280,7 +280,20 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 											Type: "object",
 											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 												"couchbaseEnv": apiextensionsv1beta1.JSONSchemaProps{
-													Type: "object",
+													Type: "array",
+													Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+														Schema: &apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																"name": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+																"value": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+															},
+														},
+													},
 												},
 												"resources": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "object",

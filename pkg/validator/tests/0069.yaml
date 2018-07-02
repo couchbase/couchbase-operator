@@ -8,13 +8,6 @@ spec:
   authSecret: cb-example-auth
   cluster:
     indexStorageSetting: plasma
-  buckets:
-    - name: mickey
-      type: memcached
-      memoryQuota: 100
-    - name: mickey
-      type: memcached
-      memoryQuota: 100
   servers:
     - size: 3
       name: all_services
@@ -23,3 +16,6 @@ spec:
         - index
         - query
         - search
+      pod:
+        couchbaseEnv:
+          test_not: a_map
