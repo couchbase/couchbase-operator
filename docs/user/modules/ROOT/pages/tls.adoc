@@ -7,6 +7,10 @@ The basic requirements are:
 * A certificate authority [CA] certificate which will be used by all actors to validate that peer certificates have been digitally signed by a trusted CA
 * A server certificate/key pair for all nodes in the Couchbase cluster.  If using a hierarchy of intermediate CAs these must be appended to the client certificate, ending in the intermediate CA signed by the top-level CA.  Server certificates must have a subject alternative name [SAN] set so that a client can assert that the host name it is connecting to is the same as that in the certificate.  We currently support using wildcard entries only e.g. `*.cluster.domain.svc`, where _cluster_ is the name of the _couchbasecluster_ resource, and _domain_ is the namespace the cluster is running in (typically _default_).
 
+IMPORTANT: In version 1.0.0+ TLS certifcates are installed as part of the pod creation process, and cannot be enabled on an existing cluster.
+
+IMPORTANT: In version 1.0.0+ TLS csertificate rotation is not supported.
+
 == Configuration
 
 An example configuration is as follows:

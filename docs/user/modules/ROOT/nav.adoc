@@ -1,6 +1,5 @@
 .xref:overview.adoc[Overview]
 * xref:prerequisite-and-setup.adoc[Prerequisites and Setup]
- ** xref:networking.adoc[Kubernetes Networking]
  ** xref:install-kubernetes.adoc[Kubernetes Setup]
  ** xref:install-kubernetes-no-rbac.adoc[Kubernetes Setup (RBAC Disabled)]
  ** xref:install-openshift.adoc[OpenShift Setup]
