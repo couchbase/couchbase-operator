@@ -71,11 +71,11 @@ spec:
         ENV1: value
       resources:
         limits:
-          cpu: 4GHz
+          cpu: 4
           memory: 8GiB
           storage: 100GiB
         requests:
-          cpu: 2GHz
+          cpu: 2
           memory: 8GiB
           storage: 50GiB
       labels:

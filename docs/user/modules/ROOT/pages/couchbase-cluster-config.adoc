@@ -67,11 +67,11 @@ spec:
             value: value
         resources:
           limits:
-            cpu: 4GHz
+            cpu: 4
             memory: 8GiB
             storage: 100GiB
           requests:
-            cpu: 2GHz
+            cpu: 2
             memory: 8GiB
             storage: 50GiB
         labels:
@@ -520,11 +520,11 @@ You must specify at least one - but possibly multiple - node specifications. A n
           value: value
       resources:
         limits:
-          cpu: 4GHz
+          cpu: 4
           memory: 8GiB
           storage: 100GiB
         requests:
-          cpu: 2GHz
+          cpu: 2
           memory: 8GiB
           storage: 50GiB
       labels:
@@ -581,11 +581,11 @@ The pod policy defines settings that apply to all pods deployed with this node c
           value: value
       resources:
         limits:
-          cpu: 4GHz
+          cpu: 4
           memory: 8GiB
           storage: 100GiB
         requests:
-          cpu: 2GHz
+          cpu: 2
           memory: 8GiB
           storage: 50GiB
       labels:
@@ -618,11 +618,11 @@ ____
 ...
     resources:
       limits:
-        cpu: 2GHz
+        cpu: 2
         memory: 8GiB
         storage: 100GiB
       requests:
-        cpu: 1.5GHz
+        cpu: 1.5
         memory: 8GiB
         storage: 50GiB
 ...
@@ -636,7 +636,7 @@ This field lets you reserve resources on a specific node. It defines the maximum
 
 This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU, memory, and storage the pods created in this node specification will reserve.
 
-See the Kubernetes documentation for further information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
+NOTE: In general CPU limits are specified as the number of threads required on hardware or VCPUs if in the cloud, memory is specified in bytes.  See the Kubernetes documentation for further information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
 
 *labels*
 
