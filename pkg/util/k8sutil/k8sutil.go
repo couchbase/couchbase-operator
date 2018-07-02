@@ -297,6 +297,10 @@ func updateExposedPorts(portStatusMap cbapi.PortStatusMap, nodeName string, serv
 			portStatus.AnalyticsServicePort = servicePort.NodePort
 		case analyticsServicePortNameTLS:
 			portStatus.AnalyticsServicePortTLS = servicePort.NodePort
+		case eventingServicePortName:
+			portStatus.EventingServicePort = servicePort.NodePort
+		case eventingServicePortNameTLS:
+			portStatus.EventingServicePortTLS = servicePort.NodePort
 		case dataServicePortName:
 			portStatus.DataServicePort = servicePort.NodePort
 		case dataServicePortNameTLS:

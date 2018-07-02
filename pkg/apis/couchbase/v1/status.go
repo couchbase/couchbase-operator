@@ -76,6 +76,8 @@ type PortStatus struct {
 	FtsServicePortTLS       int32 `json:"ftsServicePortTLS,omitempty"`
 	AnalyticsServicePort    int32 `json:"analyticsServicePort,omitempty"`
 	AnalyticsServicePortTLS int32 `json:"analyticsServicePortTLS,omitempty"`
+	EventingServicePort     int32 `json:"eventingServicePort,omitempty"`
+	EventingServicePortTLS  int32 `json:"eventingServicePortTLS,omitempty"`
 	DataServicePort         int32 `json:"dataServicePort,omitempty"`
 	DataServicePortTLS      int32 `json:"dataServicePortTLS,omitempty"`
 }
