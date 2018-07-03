@@ -2,5 +2,5 @@ package version
 
 const (
 	Application = "couchbase-operator"
-	Version     = "1.0.0"
+	Version     = "0.9.0"
 )
