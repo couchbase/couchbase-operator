@@ -2,6 +2,8 @@
 
 In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in a Kubernetes cluster that has RBAC enabled. This guide assumes that you are installing on a new Kubernetes cluster, but if you have an existing system and need to do a custom setup, then you should be able to modify a few of the parameters in the various commands and configuration files in order to install the Couchbase Operator.
 
+NOTE: The following guide assumes you have administrative privileges for the Kubernetes cluster you are deploying into for testing purposes.  Please refer to the xref:kubernetes-rbac.adoc[RBAC doumentation] and make the necessary changes if your development environment differs.
+
 == Creating a ClusterRole
 
 The first step for installing the Couchbase Operator is to create a _ClusterRole_ that allows the Operator to access the resources it needs to run. Since the Couchbase Operator might run in many different namespaces, it is best to create a ClusterRole because you can assign that role to a _ServiceAccount_ in any namespace.

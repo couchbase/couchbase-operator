@@ -5,6 +5,11 @@
  ** xref:install-kubernetes-no-rbac.adoc[Kubernetes Setup (RBAC Disabled)]
  ** xref:install-openshift.adoc[OpenShift Setup]
  ** xref:operator-config.adoc[Operator Configuration]
+* Planning Your Deployment
+ ** xref:networking.adoc[Kubernetes Networking]
+ ** xref:kubernetes-rbac.adoc[Kubernetes RBAC]
+ ** xref:server-groups.adoc[Server Groups]
+ ** xref:tls.adoc[TLS]
 * xref:deploying-couchbase.adoc[Deploying a Couchbase Cluster]
  ** xref:couchbase-cluster-config.adoc[CouchbaseCluster Configuration]
  ** xref:cluster-status-guide.adoc[Displaying Information About a Couchbase Cluster]

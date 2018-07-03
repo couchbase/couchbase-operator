@@ -1,0 +1,124 @@
+= Kubernetes Role Based Access Control
+
+Kubernetes supports role based access control [RBAC] which allows containers to be bound to roles which give them permissions to operate on various resources.  This page aims to give a general overview of RBAC in the context of deploying the Operator and managing Couchbase clusters.
+
+RBAC is enabled by default on all Kubernetes cluster running 1.10+ so will need to be taken into consideration when planning your deployment.  The system is flexible enough to meet the challenges of most use cases, but as a side effect it does lead to some confusion.
+
+NOTE: For a full explanation of RBAC and all topics discussed here, please consult the https://kubernetes.io/docs/reference/access-authn-authz/authorization/[official documentation].
+
+== Roles
+
+A role essentially maps a name to a set of permissions that a user or service is allowed to perform on the cluster.  Roles can be scoped to the entire cluster via the `ClusterRole` resource type, or to a specifc name space via the `Role` resource type.
+
+The key distinction here is that cluster scoped roles can be specified once and used in any name space, whereas name space scoped roles have to be defined in each name space they are used in.  Another consideration is that you will need cluster administration privileges to install cluster roles, namespace scoped roles can be created by a user with sufficient privileges.
+
+=== Operator Role Requirements
+
+The Operator is currently scoped to a name space and needs access to various resources within that name space in order to function correctly.  The resources required by the Operator are:
+
+customresourcedefinitions::
+The Operator has the ability to automatically install the custom resource definition (defining the `CouchbaseCluster` resource type).  This is a cluster level operation so optional.  For further information please read the xref:operator-config.adoc[operator configuration documentation].
+
+couchbaseclusters::
+The Operator watches for changes to cluster resources and preforms the necessary steps to create a cluster in the configuration specified in the cluster spec.
+
+pods::
+The Operator needs to be able to create and delete pods to create and scale the cluster and auto-heal.
+
+services::
+The Operator needs to create services in order to generate DNS names used to address pods and also create SRV records for service discovery.
+
+endpoints::
+The Operator creates an endpoint resource in order to ensure that no more than one instance is managing clusters at any one time.
+
+events::
+The Operator will raise events associated with a `CouchbaseCluster` resource which can be used to synchronize external operations or raise alerts.  These are documented xref:conditions-and-events.adoc[here].
+
+secrets::
+The Operator consumes cluster passwords and private keys from secrets.  Secrets can be securely managed by a separate user from that which is controlling the cluster giving isolation for security compliance purposes.
+
+persistentvolumeclaims::
+The Operator needs to be able to claim persistent volumes when server pods are using the persistent storage option.
+
+persistentvolumes::
+The Operator needs to be able to monitor the status of a persistent volume comain.
+
+storageclasses::
+The Operator needs to verify the requested storage class exists before claiming a persistent volume.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: couchbase-operator-role
+rules:
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - "*"
+- apiGroups:
+  - couchbase.database.couchbase.com
+  resources:
+  - couchbaseclusters
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - endpoints
+  - persistentvolumeclaims
+  - persistentvolumes
+  - events
+  - secrets
+  verbs:
+  - "*"
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - "get"
+----
+
+TIP: You may improve security and resilience by running the Operator and Couchbase clusters in an isolated name space.  This will restrict the resources the Operator potentially has access to to only those defined in that name space.  The `NetworkPolicy` resource can also be used to restict access to the clusters at the network level.
+
+=== User Role Requirements
+
+An end user also needs a separate set of permissions in order to create the Operator and clusters.  These are:
+
+deployments::
+The user needs to be able to create a deployment containing the Operator container.  This also allows monitoring via the logs.
+
+couchbaseclusters::
+The user needs to be able to create, modify and delete couchbase cluster objects which are consumed by the Operator.  This also gives access to the cluster description which contains current state and event information.
+
+== Users and Service Accounts
+
+These are essentially the same and basically identify a person or service respectively.  The Operator should run under a service account.  When defining the Operator deployment manifest, the named service account you have created for the Operator must be defined in the pod specification template as documented xref:operator-config.adoc[here].
+
+== Role Bindings
+
+Role bindings act as the glue between roles and accounts.  There are two variants with different scoping rules.  The `RoleBinding` resource type may reference either a `ClusterRole` or a plain `Role` and grants those permissions to a user, service account or group in a specific namespace.  A `ClusterRoleBinding` resource grants permissions to an entity at the cluster level; it is unscoped meaning that those permissions apply to any name space.
+
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: couchbase-operator-binding-my-namespace
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: couchbase-operator-role
+subjects:
+- kind: ServiceAccount
+  name: couchbase-operator
+  namespace: my-namespace
+----
+
+TIP: It is recommended that a `RoleBinding` be used to grant permissions to the Operator on a per-name space basis in order to restrict access to the minimum number of resources necessary, improving security, resillience and performance

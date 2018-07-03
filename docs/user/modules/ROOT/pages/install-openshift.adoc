@@ -2,6 +2,8 @@
 
 In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in an OpenShift project. This guide assumes that you are installing on a new OpenShift cluster, that you have access to a user with cluster-admin privileges (`system:admin` in this guide), and that you have a standard user without cluster-admin privileges (`developer` in this guide). If you have an existing system and need to do a custom setup, then you should be able to modify a few of the parameters in the various commands and configuration files in order to install the Couchbase Operator.
 
+NOTE: Please refer to the xref:kubernetes-rbac.adoc[RBAC doumentation] before undertaking this quickstart guide as your developemnt environment may differ from that upon which this is based.
+
 == Create an OpenShift Project
 
 Before installing the Couchbase Operator into OpenShift, you should create a project with the `developer` user. For this guide we will create a project called `operator-example`, and later we will make sure that the `developer` user has the ability to manage the Couchbase Operator and Couchbase clusters in this project. To create a project, run the following commands:
