@@ -252,15 +252,15 @@ On Kubernetes:
 ----
 $ kubectl get couchbasecluster
 NAME             KIND
-cb-development   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
-cb-production    CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
+cb-development   CouchbaseCluster.v1.couchbase.database.couchbase.com
+cb-production    CouchbaseCluster.v1.couchbase.database.couchbase.com
 
 $ kubectl describe couchbasecluster cb-production
 Name:		cb-production
 Namespace:	default
 Labels:		<none>
-Annotations:	kubectl.kubernetes.io/last-applied-configuration={"apiVersion":"couchbase.database.couchbase.com/v1beta1","kind":"CouchbaseCluster","metadata":{"annotations":{},"name":"cb-production","namespace":"def...
-API Version:	couchbase.database.couchbase.com/v1beta1
+Annotations:	kubectl.kubernetes.io/last-applied-configuration={"apiVersion":"couchbase.database.couchbase.com/v1","kind":"CouchbaseCluster","metadata":{"annotations":{},"name":"cb-production","namespace":"def...
+API Version:	couchbase.database.couchbase.com/v1
 Kind:		CouchbaseCluster
 ...
 ----
@@ -271,15 +271,15 @@ On OpenShift:
 ----
 $ oc get couchbasecluster
 NAME             KIND
-cb-development   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
-cb-production    CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
+cb-development   CouchbaseCluster.v1.couchbase.database.couchbase.com
+cb-production    CouchbaseCluster.v1.couchbase.database.couchbase.com
 
 $ oc describe couchbasecluster cb-production
 Name:		cb-production
 Namespace:	default
 Labels:		<none>
-Annotations:	kubectl.kubernetes.io/last-applied-configuration={"apiVersion":"couchbase.database.couchbase.com/v1beta1","kind":"CouchbaseCluster","metadata":{"annotations":{},"name":"cb-production","namespace":"def...
-API Version:	couchbase.database.couchbase.com/v1beta1
+Annotations:	kubectl.kubernetes.io/last-applied-configuration={"apiVersion":"couchbase.database.couchbase.com/v1","kind":"CouchbaseCluster","metadata":{"annotations":{},"name":"cb-production","namespace":"def...
+API Version:	couchbase.database.couchbase.com/v1
 Kind:		CouchbaseCluster
 ...
 ----

@@ -10,7 +10,7 @@ Deploying a Couchbase cluster requires creating a configuration file that descri
 
 [source,yaml]
 ----
-apiVersion: couchbase.database.couchbase.com/v1beta1
+apiVersion: couchbase.database.couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example
