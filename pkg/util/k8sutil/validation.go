@@ -51,6 +51,27 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 						"antiAffinity": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "boolean",
 						},
+						"tls": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"static": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"member": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"serverSecret": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+										},
+										"operatorSecret": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
 						"authSecret": apiextensionsv1beta1.JSONSchemaProps{
 							Type:      "string",
 							MinLength: &minimumStringLength,
