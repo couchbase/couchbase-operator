@@ -4,6 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/couchbase/couchbase-operator/pkg/revision"
+	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
 const (
@@ -28,6 +31,8 @@ type Configuration struct {
 	CollectInfo bool
 	// Help determines whether to print help and exit
 	Help bool
+	// Version determines whether to print out the version string and exit
+	Version bool
 }
 
 // Parse parses configuration from the command line and returns an initialized
@@ -42,12 +47,19 @@ func Parse() Configuration {
 	flag.BoolVar(&c.System, "system", false, "collect kube-system resources and logs")
 	flag.BoolVar(&c.CollectInfo, "collectinfo", false, "collect couchbase server logs")
 	flag.BoolVar(&c.Help, "help", false, "print this message and exit")
+	flag.BoolVar(&c.Version, "version", false, "print the version string and exit")
 	flag.Parse()
 
 	// Echo out help if we need it
 	if c.Help {
 		fmt.Println(help)
 		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
+	// Echo out version if requested
+	if c.Version {
+		fmt.Printf("cbopinfo version %s (%s)\n", version.Version, revision.Revision())
 		os.Exit(0)
 	}
 
