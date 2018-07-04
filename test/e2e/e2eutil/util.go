@@ -250,6 +250,23 @@ func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient 
 	return nil, err
 }
 
+// Creates Cluster Spec object and returns it
+func CreateClusterSpec(secretName string, config map[string]map[string]string) api.ClusterSpec {
+	return e2espec.CreateClusterSpec(ClusterNamePrefix, secretName, config)
+}
+
+// Creates Couchbase cluster object and returns it
+func CreateClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+	crd := e2espec.CreateClusterCRD(ClusterNamePrefix, adminConsoleExposed, spec)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd)
+}
+
+// Creates Couchbase cluster object and returns it
+func CreateClusterFromSpecNoWait(t *testing.T, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+	crd := e2espec.CreateClusterCRD(ClusterNamePrefix, adminConsoleExposed, spec)
+	return CreateCluster(t, crClient, namespace, crd)
+}
+
 // NewClusterBasicQuick attempts to create a basic cluster only once.  The returned
 // cluster object may still be valid upon error
 func NewClusterBasicQuick(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
@@ -515,6 +532,21 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName str
 
 func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string) error {
 	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0))
+}
+
+func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberId int) error {
+	podMemberName := couchbaseutil.CreateMemberName(clusterName, memberId)
+	pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + podMemberName})
+	if err != nil {
+		return errors.New("Unable to fetch persistent volume list for pod " + podMemberName + ": " + err.Error())
+	}
+
+	for _, pvc := range pvcList.Items {
+		if err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, &metav1.DeleteOptions{}); err != nil {
+			return errors.New("Failed to delete persistent volume claim " + pvc.Name + ": " + err.Error())
+		}
+	}
+	return nil
 }
 
 func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {

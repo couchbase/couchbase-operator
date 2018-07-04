@@ -4,12 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"io/ioutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"os/exec"
 	"reflect"
@@ -17,6 +11,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"io/ioutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type testDef struct {
@@ -80,6 +81,9 @@ func SetClusterParameter(cluster *api.CouchbaseCluster, param parameter) error {
 			v = v.Index(index)
 		} else {
 			v = v.FieldByName(subfield)
+			if v.Kind().String() == "ptr" {
+				v = reflect.Indirect(v)
+			}
 		}
 	}
 
@@ -214,7 +218,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			continue
 		}
 
-		t.Logf("setting secret: %+v", targetKube.DefaultSecret)
 		testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
 
 		ns := os.Getenv("KUBENAMESPACE")
@@ -493,6 +496,34 @@ func TestNegValidationCreate(t *testing.T) {
 			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{"spec.servers.name in body shouldn't contain duplicates"},
+		},
+
+		// Persistent volume claim cases
+		{
+			name: "Create PVC cluster with unavailable default volume claim in pod spec",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DefaultClaim"},
+					fieldType:  "string",
+					fieldValue: "InvalidDefaultClaim",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"\"InvalidDefaultClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
+		},
+		{
+			name: "Create PVC cluster with unavailable volume claim template defined in spec",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "VolumeClaimTemplates", "0", "ObjectMeta", "Name"},
+					fieldType:  "string",
+					fieldValue: "InvalidVolumeClaim",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required"},
 		},
 	}
 	kubeName := "BasicCluster"
@@ -1076,6 +1107,34 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.cluster.indexStorageSetting in body cannot be updated"},
 		},
+
+		// Persistent volume claim cases
+		{
+			name:     "Apply: Persistent volume mounts spec",
+			paramsIn: []parameter{},
+			paramsOut: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DefaultClaim"},
+					fieldType:  "string",
+					fieldValue: "newValue",
+				},
+			},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[*].Pod.VolumeMounts in body cannot be updated"},
+		},
+		{
+			name:     "Apply: Remove default volume claim template name",
+			paramsIn: []parameter{},
+			paramsOut: []parameter{
+				{
+					field:      []string{"Spec", "VolumeClaimTemplates", "0", "ObjectMeta", "Name"},
+					fieldType:  "string",
+					fieldValue: "couchbase",
+				},
+			},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[*].Pod.VolumeMounts in body cannot be updated\nspec.servers[*].Pod.VolumeMounts in body cannot be updated"},
+		},
 	}
 	kubeName := "BasicCluster"
 	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
@@ -1143,7 +1202,7 @@ func TestNegValidationDelete(t *testing.T) {
 }
 
 /*******************************************************************
-************ Test cases wrt RZA / Server group testing *************
+************ Test cases for RZA / Server group testing *************
 ********************************************************************/
 
 // Deploy couchbase cluster over non existent server group

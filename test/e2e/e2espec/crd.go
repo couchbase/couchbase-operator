@@ -204,7 +204,7 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 }
 
 // new custom cluster
-func NewMultiCluster(genName, secretName string, config map[string]map[string]string, exposed bool) *api.CouchbaseCluster {
+func CreateClusterSpec(genName, secretName string, config map[string]map[string]string) api.ClusterSpec {
 	clusterSettings := api.ClusterConfig(defaultClusterSettings)
 	bucketConfig := []api.BucketConfig{}
 	serverConfig := []api.ServerConfig{}
@@ -291,7 +291,8 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 			bucketConfig = append(bucketConfig, bucketSettings)
 		case strings.Contains(key, "service"):
 			serverSettings := api.ServerConfig(defaultServerSettings)
-			podPolicy := &api.PodPolicy{}
+			volumeMnt := &api.VolumeMounts{}
+			podPolicy := &api.PodPolicy{VolumeMounts: nil}
 			podPolicy.Resources = v1.ResourceRequirements{
 				Limits:   make(v1.ResourceList),
 				Requests: make(v1.ResourceList),
@@ -324,6 +325,26 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 				case setting == "resourceMemRequest":
 					request, _ := strconv.Atoi(config[key][setting])
 					serverSettings.Pod.Resources.Requests[v1.ResourceMemory] = resource.MustParse(fmt.Sprintf("%d%s", request, "Mi"))
+				case setting == "defaultVolMnt":
+					if serverSettings.Pod.VolumeMounts == nil {
+						serverSettings.Pod.VolumeMounts = volumeMnt
+					}
+					serverSettings.Pod.VolumeMounts.DefaultClaim = config[key][setting]
+				case setting == "indexVolMnt":
+					if serverSettings.Pod.VolumeMounts == nil {
+						serverSettings.Pod.VolumeMounts = volumeMnt
+					}
+					serverSettings.Pod.VolumeMounts.IndexClaim = config[key][setting]
+				case setting == "dataVolMnt":
+					if serverSettings.Pod.VolumeMounts == nil {
+						serverSettings.Pod.VolumeMounts = volumeMnt
+					}
+					serverSettings.Pod.VolumeMounts.DataClaim = config[key][setting]
+				case setting == "analyticsVolMnt":
+					if serverSettings.Pod.VolumeMounts == nil {
+						serverSettings.Pod.VolumeMounts = volumeMnt
+					}
+					serverSettings.Pod.VolumeMounts.AnalyticsClaims = strings.Split(config[key][setting], ",")
 				}
 			}
 			serverConfig = append(serverConfig, serverSettings)
@@ -363,11 +384,20 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 	case antiAffinity == "off":
 		spec.AntiAffinity = false
 	}
+	return spec
+}
+
+func CreateClusterCRD(genName string, adminConsoleExposed bool, spec api.ClusterSpec) *api.CouchbaseCluster {
 	crd := NewClusterCRD(genName, spec)
-	if exposed {
+	if adminConsoleExposed {
 		crd.Spec.ExposeAdminConsole = true
 	}
 	return crd
+}
+
+func NewMultiCluster(genName, secretName string, config map[string]map[string]string, exposed bool) *api.CouchbaseCluster {
+	spec := CreateClusterSpec(genName, secretName, config)
+	return CreateClusterCRD(genName, exposed, spec)
 }
 
 // Stateful 3 node cluster with a single volume.

@@ -85,8 +85,10 @@ var (
 		"TestNegValidationDelete":                             TestNegValidationDelete,
 		"TestTaintK8SNodeAndRemoveTaint":                      TestTaintK8SNodeAndRemoveTaint,
 
+		// System testing cases
 		"TestFeaturesAll": TestFeaturesAll,
 
+		// Tls cases
 		"TestTlsCreateCluster":                             TestTlsCreateCluster,
 		"TestTlsKillClusterNode":                           TestTlsKillClusterNode,
 		"TestTlsResizeCluster":                             TestTlsResizeCluster,
@@ -100,6 +102,7 @@ var (
 		"TestTlsCertificateDeployedBeforeValidity":         TestTlsCertificateDeployedBeforeValidity,
 		"TestTlsGenerateWrongCACertType":                   TestTlsGenerateWrongCACertType,
 
+		// XDCR cases
 		"TestXdcrCreateCluster":                      TestXdcrCreateCluster,
 		"TestXdcrCreateTlsCluster":                   TestXdcrCreateTlsCluster,
 		"TestXdcrCreateInterCluster":                 TestXdcrCreateInterCluster,
@@ -117,6 +120,7 @@ var (
 		"TestXdcrResizedOutSourceClusterNodes":       TestXdcrResizedOutSourceClusterNodes,
 		"TestXdcrResizedOutTargetClusterNodes":       TestXdcrResizedOutTargetClusterNodes,
 
+		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,
 		"TestRzaCreateClusterWithClassBasedConfig": TestRzaCreateClusterWithClassBasedConfig,
 		"TestRzaResizeCluster":                     TestRzaResizeCluster,
@@ -130,10 +134,33 @@ var (
 		"TestRzaUpdateK8SNodeLabelAndCrd":          TestRzaUpdateK8SNodeLabelAndCrd,
 		"TestRzaRemoveK8SNodeLabel":                TestRzaRemoveK8SNodeLabel,
 
+		// 5.5 feature - Eventing cases
+		//"TestEventingOnK8sBasic": TestEventingOnK8sBasic,
+
+		// 5.5 feature - Analytics cases
+		//"TestAnalyticsCreateDataSet": TestAnalyticsCreateDataSet,
+		//"TestAnalyticsResizeCluster": TestAnalyticsResizeCluster,
+		//"TestAnalyticsKillNodes":     TestAnalyticsKillNodes,
+
+		// 5.5 feature - Node Failover cases
 		"TestServerGroupAutoFailover":                         TestServerGroupAutoFailover,
 		"TestServerGroupWithSingleServiceNodeInFailoverGroup": TestServerGroupWithSingleServiceNodeInFailoverGroup,
 		"TestDiskFailureAutoFailover":                         TestDiskFailureAutoFailover,
 		"TestMultiNodeAutoFailover":                           TestMultiNodeAutoFailover,
+
+		// Persistent Volume cases
+		"TestPersistentVolumeCreateCluster":          TestPersistentVolumeCreateCluster,
+		"TestPersistentVolumeAutoFailover":           TestPersistentVolumeAutoFailover,
+		"TestPersistentVolumeNodeFailover":           TestPersistentVolumeNodeFailover,
+		"TestPersistentVolumeKillAllPods":            TestPersistentVolumeKillAllPods,
+		"TestPersistentVolumeRemoveVolume":           TestPersistentVolumeRemoveVolume,
+		"TestPersistentVolumeKillPodAndOperator":     TestPersistentVolumeKillPodAndOperator,
+		"TestPersistentVolumeKillAllPodsAndOperator": TestPersistentVolumeKillAllPodsAndOperator,
+		"TestPersistentVolumeRzaNodesKilled":         TestPersistentVolumeRzaNodesKilled,
+		"TestPersistentVolumeRzaFailover":            TestPersistentVolumeRzaFailover,
+		"TestPersistentVolumeWithSingleNodeService":  TestPersistentVolumeWithSingleNodeService,
+		"TestPersistentVolumeResizeCluster":          TestPersistentVolumeResizeCluster,
+		"TestNegPersistentVolumeCreateCluster":       TestNegPersistentVolumeCreateCluster,
 	}
 	DecoratorFuncMap = framework.DecoratorMap{
 		"rsaDecorator":    rsaDecorator,

@@ -18,7 +18,11 @@ spec:
     dataServiceMemoryQuota: 600
     indexServiceMemoryQuota: 256
     searchServiceMemoryQuota: 256
+    eventingServiceMemoryQuota: 256
+    analyticsServiceMemoryQuota: 1024
     indexStorageSetting: memory_optimized
+    autoFailoverOnDataDiskIssuesTimePeriod: 10
+    autoFailoverMaxCount: 1
     autoFailoverTimeout: 10
   buckets:
     - name: default1
@@ -71,3 +75,19 @@ spec:
       name: data_only
       services:
         - data
+      pod:
+        volumeMounts:
+          default: couchbase
+          data: couchbase
+          index: couchbase
+          analytics:
+            - couchbase
+            - couchbase
+  volumeClaimTemplates:
+    - metadata:
+        name: couchbase
+      spec:
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 2Gi

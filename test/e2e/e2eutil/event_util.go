@@ -109,6 +109,11 @@ func (e *EventList) AddClusterSettingsEditedEvent(cl *api.CouchbaseCluster, sett
 	*e = append(*e, *k8sutil.ClusterSettingsEditedEvent(settingName, cl))
 }
 
+func (e *EventList) AddMemberRecoveredEvent(cl *api.CouchbaseCluster, memberId int) {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	*e = append(*e, *k8sutil.MemberRecoveredEvent(name, cl))
+}
+
 func (e EventList) String() string {
 	s := ""
 	for _, c := range e {
@@ -153,4 +158,9 @@ func RebalanceStartedEvent(cl *api.CouchbaseCluster) *v1.Event {
 
 func RebalanceCompletedEvent(cl *api.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceCompletedEvent(cl)
+}
+
+func MemberRecoveredEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	return k8sutil.MemberRecoveredEvent(name, cl)
 }
