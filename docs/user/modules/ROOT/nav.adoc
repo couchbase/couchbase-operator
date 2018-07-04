@@ -5,6 +5,7 @@
  ** xref:install-openshift.adoc[OpenShift Setup]
  ** xref:operator-config.adoc[Operator Configuration]
 * Planning Your Deployment
+ ** xref:best-practices.adoc[Couchbase Cluster Deployment Best Practices]
  ** xref:networking.adoc[Kubernetes Networking]
  ** xref:kubernetes-rbac.adoc[Kubernetes RBAC]
  ** xref:server-groups.adoc[Server Groups]
