@@ -123,7 +123,6 @@ var (
 		"TestRzaServerGroupRemoval":                TestRzaServerGroupRemoval,
 		"TestRzaServerGroupAddition":               TestRzaServerGroupAddition,
 		"TestRzaKillServerPods":                    TestRzaKillServerPods,
-		"TestRzaNegCreateCluster":                  TestRzaNegCreateCluster,
 		"TestRzaNegScaleupCluster":                 TestRzaNegScaleupCluster,
 		"TestRzaServerGroupDown":                   TestRzaServerGroupDown,
 		"TestRzaAntiAffinityOn":                    TestRzaAntiAffinityOn,

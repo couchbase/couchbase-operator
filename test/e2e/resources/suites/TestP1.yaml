@@ -86,9 +86,6 @@ tcGroups:
       - name: TestRzaKillServerPods
         decorators:
           - rzaNodeLabeller
-      - name: TestRzaNegCreateCluster
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaNegScaleupCluster
         decorators:
           - rzaNodeLabeller
