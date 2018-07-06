@@ -274,13 +274,21 @@ func handleUnclusteredNodes(r *ReconcileMachine, c *Cluster) error {
 
 func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 	// These nodes have been added, but the node failed before a rebalance could
-	// start. We will remove these nodes and re-add them in other pods later.
+	// start. If the node is configured to use volumes then we will recreate it,
+	// otherwise, we will remove these nodes and re-add them in other pods later.
 	for _, m := range r.couchbase.FailedAddNodes {
+		if c.isPodRecoverable(m) {
+			if err := c.recreatePod(m); err != nil {
+				c.logger.Errorf("Failed pending add node `%s` could not be recovered: %s", m.Name, err.Error())
+			} else {
+				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
+				return fmt.Errorf("recovering pending  add node %s", m.ClientURL())
+			}
+		}
 		err := c.cancelAddMember(r.knownNodes, m)
 		if err != nil {
 			return fmt.Errorf("Unable to removed a failed pending add node: %s", err.Error())
 		}
-
 		c.clusterRemoveMember(m.Name)
 		r.runningPods.Remove(m.Name)
 	}
