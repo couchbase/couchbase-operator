@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/couchbase/gocbmgr"
 	"github.com/sirupsen/logrus"
 )
 
 type RetryError struct {
 	n int
+	e error
 }
 
+type RetryOkError error
+
 func (e *RetryError) Error() string {
-	return fmt.Sprintf("still failing after %d retries", e.n)
+	return fmt.Sprintf("still failing after %d retries: %v", e.n, e.e)
 }
 
 func IsRetryFailure(err error) bool {
@@ -35,10 +39,17 @@ func Retry(ctx context.Context, interval time.Duration, maxRetries int, f RetryF
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 
+	var err error
+	var ok bool
+
 	for i := 0; ; i++ {
-		ok, err := f()
+		ok, err = f()
 		if err != nil {
-			return err
+			// Ignore error's when expected during retryOnErr
+			_, shouldRetry := err.(RetryOkError)
+			if !shouldRetry {
+				return err
+			}
 		}
 		if ok {
 			return nil
@@ -52,7 +63,7 @@ func Retry(ctx context.Context, interval time.Duration, maxRetries int, f RetryF
 			return ctx.Err()
 		}
 	}
-	return &RetryError{maxRetries}
+	return &RetryError{n: maxRetries, e: err}
 }
 
 // Retry function that can return an error and log instead as warning
@@ -66,10 +77,18 @@ func RetryOnErr(ctx context.Context, interval time.Duration, maxRetries int, tas
 			// failed, log attempt
 			logger := ctx.Value("logger").(*logrus.Entry)
 			logger.Warningf("%s: failed with error %v ...retrying", task, err)
-			return false, nil
+			return false, RetryOkError(err)
 		}
 
 		// ok
 		return true, nil
 	})
+}
+
+// Check if a specific server error occurred during the retry loop
+func DidServerErrorOccurOnRetry(err error, errorKey string) bool {
+	if retryErr, ok := err.(*RetryError); ok {
+		return cbmgr.HasErrorOccured(retryErr.e, errorKey)
+	}
+	return false
 }

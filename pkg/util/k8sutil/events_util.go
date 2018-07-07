@@ -96,7 +96,7 @@ func FailedAddBackNodeEvent(memberName string, cl *api.CouchbaseCluster) *v1.Eve
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = "FailedAddBackNode"
-	event.Message = fmt.Sprintf("Existing member `%s` could not be added back to the cluster", memberName)
+	event.Message = fmt.Sprintf("Removed existing member %s because it could not be added back to the cluster", memberName)
 	return event
 }
 

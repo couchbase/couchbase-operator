@@ -20,6 +20,7 @@ const (
 	ReconcileUnclusteredNodes
 	ReconcileFailedAddNodes
 	ReconcileAddBackNodes
+	ReconcileFailedAddBackNodes
 	ReconcileFailedNodes
 	ReconcileServerConfigs
 	ReconcileRemoveNodes
@@ -51,23 +52,24 @@ func (r reconcileFuncMap) lookup(state ReconcileState) (reconcileFunc, error) {
 
 var (
 	reconcileFunctions = reconcileFuncMap{
-		ReconcileInit:             handleInit,
-		ReconcileUnknownMembers:   handleUnknownMembers,
-		ReconcileRebalanceCheck:   handleRebalanceCheck,
-		ReconcileWarmupNodes:      handleWarmupNodes,
-		ReconcileDownNodes:        handleDownNodes,
-		ReconcileUnclusteredNodes: handleUnclusteredNodes,
-		ReconcileFailedAddNodes:   handleFailedAddNodes,
-		ReconcileAddBackNodes:     handleAddBackNodes,
-		ReconcileFailedNodes:      handleFailedNodes,
-		ReconcileServerConfigs:    handleUnknownServerConfigs,
-		ReconcileRemoveNodes:      handleRemoveNode,
-		ReconcileRemoveUnmanaged:  handleUnmanagedNodes,
-		ReconcileAddNodes:         handleAddNode,
-		ReconcileServerGroups:     handleServerGroups,
-		ReconcileNodeServices:     handleNodeServices,
-		ReconcileRebalance:        handleRebalance,
-		ReconcileDeadMembers:      handleDeadMembers,
+		ReconcileInit:               handleInit,
+		ReconcileUnknownMembers:     handleUnknownMembers,
+		ReconcileRebalanceCheck:     handleRebalanceCheck,
+		ReconcileWarmupNodes:        handleWarmupNodes,
+		ReconcileDownNodes:          handleDownNodes,
+		ReconcileUnclusteredNodes:   handleUnclusteredNodes,
+		ReconcileFailedAddNodes:     handleFailedAddNodes,
+		ReconcileAddBackNodes:       handleAddBackNodes,
+		ReconcileFailedAddBackNodes: handleFailedAddBackNodes,
+		ReconcileFailedNodes:        handleFailedNodes,
+		ReconcileServerConfigs:      handleUnknownServerConfigs,
+		ReconcileRemoveNodes:        handleRemoveNode,
+		ReconcileRemoveUnmanaged:    handleUnmanagedNodes,
+		ReconcileAddNodes:           handleAddNode,
+		ReconcileServerGroups:       handleServerGroups,
+		ReconcileNodeServices:       handleNodeServices,
+		ReconcileRebalance:          handleRebalance,
+		ReconcileDeadMembers:        handleDeadMembers,
 	}
 )
 
@@ -371,10 +373,6 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 	return nil
 }
 
-func handleAddBackFailedNodes(r *ReconcileMachine, c *Cluster) error {
-	return nil
-}
-
 // Failed nodes can be recovered if the pod's volumes are healthy,
 // otherwise the node is ejected from the cluster and it's node deleted.
 func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
@@ -535,12 +533,43 @@ func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
 func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.NeedsRebalance {
 		if err := c.rebalance(r.ejectNodes, r.couchbase.UnmanagedNodes); err != nil {
-			return fmt.Errorf("Failed to rebalance: %s", err.Error())
+			// If rebalance error occured due to a node that could not be delta
+			// recovered then it should be reconciled with FailedAddBack nodes
+			if c.didDeltaRecoveryFail(err) {
+				// TODO: K8S-530: verify that it is not actually possible add nodes
+				//       or change server groups while nodes are in delta recovery
+				c.logger.Errorf("Could not Rebalance because requested delta recovery is not possible. You probably added more nodes to the cluster or changed server groups configuration: %v", err)
+				r.transitionState(ReconcileFailedAddBackNodes)
+				return nil
+			} else {
+				return fmt.Errorf("Failed to rebalance: %s", err.Error())
+			}
 		}
 
 		for _, toRemove := range r.ejectNodes {
 			r.ejectNodes.Remove(toRemove.Name)
 			r.runningPods.Remove(toRemove.Name)
+		}
+	}
+
+	r.transitionState(ReconcileDeadMembers)
+	return nil
+}
+
+// Attempt to add back nodes that cannot be rebalanced back into the
+// cluster using delta recovery by changing to full recovery type
+func handleFailedAddBackNodes(r *ReconcileMachine, c *Cluster) error {
+
+	for _, m := range r.couchbase.AddBackNodes {
+		isDelta, _ := c.client.IsRecoveryTypeDelta(m)
+		if isDelta {
+			c.logger.Warnf("Changing recovery type from `delta` to `full` to recover node `%s`", m.Name)
+			err := c.client.SetRecoveryTypeFull(r.couchbase.ActiveNodes, m.HostURLPlaintext())
+			if err != nil {
+				c.logger.Warnf("Removing add back node %s because recovery type could not be determined: %v", m.Name, err)
+				c.raiseEvent(k8sutil.FailedAddBackNodeEvent(m.Name, c.cluster))
+				return err
+			}
 		}
 	}
 

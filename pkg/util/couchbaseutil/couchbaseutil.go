@@ -298,9 +298,17 @@ func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services cbapi.
 
 func (c *CouchbaseClient) CancelAddNode(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "add node", c.clusterName,
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "cancel add node", c.clusterName,
 		func() error {
 			return c.client.CancelAddNode(hostname)
+		})
+}
+
+func (c *CouchbaseClient) CancelAddBackNode(ms MemberSet, hostname string) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "cancel add back node", c.clusterName,
+		func() error {
+			return c.client.CancelAddBackNode(hostname)
 		})
 }
 
@@ -617,6 +625,33 @@ func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) err
 		func() error {
 			return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeFull)
 		})
+}
+
+// Get RecoveryType of node if it has been set.
+// The default type is 'full'
+func (c *CouchbaseClient) GetRecoveryType(m *Member) (cbmgr.RecoveryType, error) {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	info, err := c.client.ClusterInfo()
+	if err != nil {
+		return cbmgr.RecoveryTypeFull, err
+	}
+	for _, node := range info.Nodes {
+		member := ms[strings.Split(node.HostName, ".")[0]]
+		if member != nil && member.Name == m.Name {
+			return cbmgr.RecoveryType(node.RecoveryType), nil
+		}
+	}
+
+	return cbmgr.RecoveryTypeFull, fmt.Errorf("No member exists for %s", m.Name)
+}
+
+func (c *CouchbaseClient) IsRecoveryTypeDelta(m *Member) (bool, error) {
+	recoveryType, err := c.GetRecoveryType(m)
+	if err != nil {
+		return false, err
+	}
+	return recoveryType == cbmgr.RecoveryTypeDelta, nil
 }
 
 func (c *CouchbaseClient) GetServerGroups(ms MemberSet) (*cbmgr.ServerGroups, error) {

@@ -1124,6 +1124,12 @@ func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 	return nil
 }
 
+// Check error the response from rebalance request (RetryError) and detect
+// detect whether cause was due to inability to perform delta recovery
+func (c *Cluster) didDeltaRecoveryFail(err error) bool {
+	return retryutil.DidServerErrorOccurOnRetry(err, cbmgr.DeltaRecoveryNotPossible)
+}
+
 // Gets paths to use when initializing data, index, and analytics service.
 // Default paths are used unless a claim is specified for the service in which
 // case a custom mount path is used
