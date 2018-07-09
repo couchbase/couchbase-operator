@@ -31,6 +31,10 @@ spec:
     - us-east-1a
     - us-east-1b
     - us-east-1c
+  securityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    fsGroup: 1000
   disableBucketManagement: false
   cluster:
     dataServiceMemoryQuota: 256
@@ -169,6 +173,10 @@ spec:
     - us-east-1a
     - us-east-1b
     - us-east-1c
+  securityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    fsGroup: 1000
   disableBucketManagement: false
 ----
 
@@ -279,6 +287,14 @@ The server group feature also not support service redistribution at this time, s
 
 ____
 _Field rules:_ The `serverGroups` field is optional.  If set pods will be scheduled across the specified set of server groups.  The server groups must be set at cluster creation time, and currently should be assumed to be immutable.
+____
+
+=== securityContext
+
+This field is a Kubernetes PodSecurityContext which is attached to all pods created by the Operator.  If unspecified this will default to the `couchbase` user, mount attached volumes as that user, and ensures that the containers are running as non-root.  You may override the default behavior if using a custom container image or for testing purposes.
+
+____
+_Field rules:_ The `securityContext` field is optional.  If set this will be attached to all new pods created.  This field should not be modified during the cluster life-cycle.
 ____
 
 === disableBucketManagement
