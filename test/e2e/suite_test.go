@@ -65,18 +65,21 @@ func runSuite(t *testing.T) {
 				continue
 			}
 			testFunc := TestFuncMap[testName]
-
+			decoratorArgs := framework.DecoratorArgs{
+				KubeNames: testGroup.ClusterName,
+			}
 			for _, funcName := range currTestCase.Decorators {
 				if _, ok := DecoratorFuncMap[funcName]; !ok {
 					t.Logf("Skipping %s.. Undefined decorator %s", testName, funcName)
 					testFunc = nil
 					break
 				}
-				decoratorArgs := framework.DecoratorArgs{
-					KubeNames: testGroup.ClusterName,
-				}
+
 				testFunc = DecoratorFuncMap[funcName](testFunc, decoratorArgs)
 			}
+
+			testFunc = DecoratorFuncMap["recoverDecorator"](testFunc, decoratorArgs)
+
 			if testFunc != nil {
 				testResult := t.Run(testName, testFunc)
 				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testResult})

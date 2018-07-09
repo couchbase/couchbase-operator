@@ -15,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"runtime/debug"
 )
 
 // TestFunc defines the test function type
@@ -547,4 +548,18 @@ func WaitForClusterRoleBindingDeleted(kubeClient kubernetes.Interface, clusterRo
 			return nil
 		}
 	}
+}
+
+func RecoverDecorator(test TestFunc, args DecoratorArgs) TestFunc {
+	wrapperFunc := func(t *testing.T) {
+		defer func(t *testing.T) {
+			if r := recover(); r != nil {
+				debug.PrintStack()
+				t.Logf("Recovered: ", r)
+				t.Fatal("test failed due to panic")
+			}
+		}(t)
+		test(t)
+	}
+	return wrapperFunc
 }

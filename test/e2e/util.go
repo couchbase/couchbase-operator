@@ -138,6 +138,7 @@ var (
 	DecoratorFuncMap = framework.DecoratorMap{
 		"rsaDecorator":    rsaDecorator,
 		"rzaNodeLabeller": rzaNodeLabeller,
+		"recoverDecorator": framework.RecoverDecorator,
 	}
 )
 
