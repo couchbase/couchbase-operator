@@ -73,6 +73,18 @@ tcGroups:
       - name: TestTlsCertificateDeployedBeforeValidity
       - name: TestTlsGenerateWrongCACertType
 
+  - name: XdcrCases
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestXdcrRebalanceOutSourceClusterNodes
+      - name: TestXdcrRebalanceOutTargetClusterNodes
+      - name: TestXdcrRemoveSourceClusterNodes
+      - name: TestXdcrRemoveTargetClusterNodes
+      - name: TestXdcrResizedOutSourceClusterNodes
+      - name: TestXdcrResizedOutTargetClusterNodes
+
   - name: RzaTests
     clusters:
       - NewCluster1

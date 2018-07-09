@@ -81,6 +81,22 @@ tcGroups:
         decorators:
           - rsaDecorator
 
+  - name: XdcrCases
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestXdcrCreateCluster
+      - name: TestXdcrCreateTlsCluster
+      - name: TestXdcrCreateInterCluster
+      - name: TestXdcrCreateK8SVMCluster
+      - name: TestXdcrNodeDownDuringSetupDuringConfigure
+      - name: TestXdcrNodeDownDuringSetupAfterConfigure
+      - name: TestXdcrNodeAddDuringSetupDuringConfigure
+      - name: TestXdcrNodeAddDuringSetupAfterConfigure
+      - name: TestXdcrNodeServiceKilledDuringConfigure
+      - name: TestXdcrNodeServiceKilledAfterConfigure
+
   - name: RzaTests
     clusters:
       - NewCluster1
