@@ -44,12 +44,10 @@ prod: container
 	cp example/crd.yaml $(ARTIFACTS)/crd.yaml
 	cp example/couchbase-cluster.yaml $(ARTIFACTS)/couchbase-cluster.yaml
 	cp example/deployment.yaml $(ARTIFACTS)/operator.yaml
-	cp example/couchbase-cli-collect-logs.yaml $(ARTIFACTS)/couchbase-cli-collect-logs.yaml
 	cp example/couchbase-cli-create-user.yaml $(ARTIFACTS)/couchbase-cli-create-user.yaml
 	cp example/pillowfight-data-loader.yaml $(ARTIFACTS)/pillowfight.yaml
 	cp example/pillowfight-data-loader-openshift.yaml $(ARTIFACTS)/pillowfight-openshift.yaml
 	tar -czf $(ARTIFACTS)/rbac.zip example/rbac
-	cp scripts/support/cb_k8s_support.sh $(ARTIFACTS)/cb_k8s_support.sh
 	cd build && tar -czf artifacts.zip artifacts && cd ..
 	rm -r $(ARTIFACTS)
 
