@@ -226,10 +226,14 @@ ____
 
 === adminConsoleServices
 
-When the Couchbase Server Web Console is exposed, the pod that it is connected to is chosen based on the client IP address. Since the web console may display slightly different features based on the services running on the particular pod it is connected to, we let you specify the services so that the exposed port will only connect to pods that contain the services specified for this parameter. A list of one or more services should be provided. If you do not specify any service, then the web console will be connected to all pods in the cluster.
+When the Couchbase Server Web Console is exposed with the <<exposeAdminConsole>> property, by default opening a browser session to the admin console will be automatically load balanced across all pods in the cluster to provide high-availability.  The web console however will display different features based on the services running on the particular pod it is connected to.
+
+This property allows the UI service to be constrained to pods running one or more specific services.  The services you specify are subtractive in nature, they will only identify pods running all of those services, so care must be used.  For example, if your cluster is deployed with multi-dimensional scaling, the data service on one set of pods and the analytics service on another mutually exclusive set, then specifying _data_ and _analytics_ as your admin console services list would result in the UI being inaccessible; no pods match all the constraints i.e. are running _both_ the data and analytics services.
+
+If you require access to a specific pod running a specific service this can also be acheived by using the _admin_ option of the <<exposedFeatures>> property.  This will allow access via a node port.  You must connect directly to the IP address of the node the pod is running on.  The assigned node port is available via the cluster status structure returned by `kubectl describe` or via the output of `kubectl get services`.  See the xref:services.adoc[services documentation] for more information.
 
 ____
-_Field rules:_ The `adminConsoleServices` list is not required and defaults to an empty list. An empty list means any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
+_Field rules:_ The `adminConsoleServices` list is not required and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing` or `analytics`, and must be unique.  An empty list means any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
 ____
 
 === exposedFeatures
