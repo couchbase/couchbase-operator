@@ -1,0 +1,7 @@
+---
+suite: TestNone
+tcGroups:
+  - name: Group1
+    clusters:
+      - SharedCluster1
+    testcases:

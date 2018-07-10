@@ -278,10 +278,10 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 
 	// check tls
-	err = e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace)
-	if err != nil {
-		t.Fatal("TLS check for cluster failed: ", err)
-	}
+	//err = e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace)
+	//if err != nil {
+	//	t.Fatal("TLS check for cluster failed: ", err)
+	//}
 
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
