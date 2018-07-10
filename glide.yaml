@@ -1,5 +1,7 @@
 package: github.com/couchbase/couchbase-operator
 import:
+# NOTE: Update the code generator with the client libraries in
+#       scripts/codegen/update-generated.sh
 - package: k8s.io/client-go
   version: 9389c055a838d4f208b699b3c7c51b70f2368861 #v1.9.2
 - package: k8s.io/apimachinery

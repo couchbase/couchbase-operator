@@ -163,8 +163,8 @@ var (
 		"TestNegPersistentVolumeCreateCluster":       TestNegPersistentVolumeCreateCluster,
 	}
 	DecoratorFuncMap = framework.DecoratorMap{
-		"rsaDecorator":    rsaDecorator,
-		"rzaNodeLabeller": rzaNodeLabeller,
+		"rsaDecorator":     rsaDecorator,
+		"rzaNodeLabeller":  rzaNodeLabeller,
 		"recoverDecorator": framework.RecoverDecorator,
 	}
 )

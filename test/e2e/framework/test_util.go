@@ -555,7 +555,7 @@ func RecoverDecorator(test TestFunc, args DecoratorArgs) TestFunc {
 		defer func(t *testing.T) {
 			if r := recover(); r != nil {
 				debug.PrintStack()
-				t.Logf("Recovered: ", r)
+				t.Logf("Recovered: %v", r)
 				t.Fatal("test failed due to panic")
 			}
 		}(t)
