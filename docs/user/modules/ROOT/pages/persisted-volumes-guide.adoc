@@ -1,13 +1,31 @@
 = Using Persistent Volumes
 
-Pods can persist data to a storage system via persistent volumes.  To define a path within a Pod that should be persisted, volumeMounts need to be added to the `pod` within a group of `servers`.  These volumeMounts will only be used by the pods within its `servers` grouping.  See xref:couchbase-cluster-config.adoc[CouchbaseCluster Configuration] Guide to understand how to define a cluster with persistent volumes.  It is also recommended to have an overall understanding of kubernetes https://kubernetes.io/docs/concepts/storage/persistent-volumes/[Persistent Volumes] prior to creating a cluster with persistent volumes.
+Persistent Volumes offer a way to create Couchbase Pods with data which resides outside of the actual Pod.
 
-== Benefits of using persistent volumes
+This decoupling provides a higher degree of resilience to data within the Couchbase Cluster in the event that a node goes down or its associated Pod is terminated.  Refer to xref:node-recovery.adoc[Node Recovery] additional information about the recovery of Pods with Persistent Volumes.g
 
-* *Data Recoverability:* Persistent volumes allow the data associated within Pods to be recovered in the case that a Pod is terminated.  This helps to prevent data-loss and to avoid time-consuming index building when using the data or index services.
-* *Pod Relocation:*  Kubernetes may decide to evict pods that reach resource thresholds such as Cpu and Memory Limits.  Pods that are backed with persistent volumes can be terminated and restarted on different nodes without incurring any downtime or data-loss.
+To create a Couchbase Cluster with Persistent Volumes, volumeMounts need to be added to the `pod` within a group of `spec.servers`.  These volumeMounts will only be used by the pods within its `spec.servers` config.  See xref:couchbase-cluster-config.adoc[CouchbaseCluster Configuration] Guide to understand how to define a cluster with Persistent Volumes.  It is also recommended to have an overall understanding of kubernetes https://kubernetes.io/docs/concepts/storage/persistent-volumes/[Persistent Volumes] prior to creating a cluster with Persistent Volumes.
 
-== Drawbacks of using persistent volumes
+== Benefits of using Persistent Volumes
 
-* *Variable Performance:*  Persistent volumes support a wide variety of storage provisioners.  The majority of provisioners are network attached which may result in a reduction of overall i/o performance.  Refer to documentation about https://kubernetes.io/docs/concepts/storage/storage-classes/#provisioner[Storage Provisioners] for information about supported storage classes.
-* *Additional point of failure:*  In the case that connectivity to your storage system is lost or becomes corrupt causing the persistent volumes to go offline, then the Pods will also be affected.  Data recovery will not be possible unless the persistent volumes become available again.
+* *Data Recoverability:* Persistent Volumes allow the data associated within Pods to be recovered in the case that a Pod is terminated.  This helps to prevent data-loss and to avoid time-consuming index building when using the data or index services.
+* *Pod Relocation:*  Kubernetes may decide to evict pods that reach resource thresholds such as Cpu and Memory Limits.  Pods that are backed with Persistent Volumes can be terminated and restarted on different nodes without incurring any downtime or data-loss.
+* *Dynamic Provisioning:* The Operator will create Persistent Volumes on-demand as your cluster scales, alleviating the need to pre-provision your cluster storage prior to deployment.g
+* *Cloud Integration:* Kubernetes integrates with native storage provisioners available on major cloud vendors such as AWS and GCE.
+
+
+== Best Practices when using Persistent Volumes
+
+* When persisting data for any service, then all other pods with same service should have Persistent Volumes.  For example, configurations which spread data service across multiple server configs (`spec.servers`), should also specify volumeMounts `spec.servers[*].pod.volumeMounts`  for each server config.
+** Also, ensure that each consistent storage sizes are used across all the Pods for a service service.  For example, it is not recommended to use a 10GB template for 1 set of data nodes and a 100GB template for another.
+* It is easier to scale out a service storage when services are not all grouped into the same config `spec.servers[*].services`.  This is because when multiple services are defined within the same group of `servers` then you will have to scale out storage for all of the services within that group along with the one that actually needs to be scaled.  Note: volume resizing is not possible
+* The following storage provisioners are supported for creating Persistent Volumes:
+** AWS
+** GCE
+** Glusterfs
+** Azure Disk
+** Ceph RBD
+** Portworx Volume
+** Refer to documentation about https://kubernetes.io/docs/concepts/storage/storage-classes/#provisioner[Storage Provisioners] for more information about storage classes.
+* Configure storage classes based on service needs. For example, the AWS provisioner can produce EBS volumes of type 'io1' which are faster than 'gp2', so you may want to use faster storage for data service if write throughput will be high.
+* For deployments in clouds with multiple availability zones see xref:persistent-volume-zoning-guide.adoc[Persistent Volume Zoning Guide].

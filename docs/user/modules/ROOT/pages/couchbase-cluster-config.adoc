@@ -97,6 +97,9 @@ spec:
           default: couchbase
           data:  couchbase
           index: couchbase
+          analytics:
+            - couchbase
+            - couchbase
   volumeClaimTemplates:
     - metadata:
         name: couchbase
@@ -625,6 +628,9 @@ spec:
         default: couchbase
         data:  couchbase
         index: couchbase
+        analytics:
+          - couchbase
+          - couchbase
 ----
 
 === couchbaseEnv
@@ -709,6 +715,9 @@ spec:
         default: couchbase
         data:  couchbase
         index: couchbase
+        analytics:
+          - couchbase
+          - couchbase
 ----
 
 VolumeMounts specifies the claims to use for storage used by the couchbase cluster
@@ -723,7 +732,11 @@ Name of the volumeClaimTemplate used to create a persisted volume for the `data`
 
 === index
 
-Name of the volumeClaimTemplate used to create a persisted volume for the `index` path. When specified the data path will be `/mnt/index`. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
+Name of the volumeClaimTemplate used to create a persisted volume for the `index` path. When specified the index path will be `/mnt/index`. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
+
+=== analytics
+
+Name of the volumeClaimTemplate used to create a persisted volume for the `analytics` paths. When specified the analytics paths will `/mnt/analytics-00` where `00` denotes the first path, with all subsequent paths having incrementing values. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
 
 == spec.volumeClaimTemplates
 
