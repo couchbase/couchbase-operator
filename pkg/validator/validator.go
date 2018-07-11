@@ -380,6 +380,10 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 		errs = append(errs, err)
 	}
 
+	if !stringArrayCompare(current.Spec.ServerGroups, updated.Spec.ServerGroups) {
+		errs = append(errs, &UpdateError{"spec.serverGroups", "body"})
+	}
+
 	for _, cur := range current.Spec.BucketSettings {
 		for i, up := range updated.Spec.BucketSettings {
 			if cur.BucketName == up.BucketName {
@@ -409,6 +413,9 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 	for _, cur := range current.Spec.ServerSettings {
 		for i, up := range updated.Spec.ServerSettings {
 			if cur.Name == up.Name {
+				if !stringArrayCompare(cur.ServerGroups, up.ServerGroups) {
+					errs = append(errs, &UpdateError{fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"})
+				}
 				if !stringArrayCompare(cur.Services, up.Services) {
 					err := &UpdateError{fmt.Sprintf("spec.servers[%d].services", i), "body"}
 					errs = append(errs, err)
