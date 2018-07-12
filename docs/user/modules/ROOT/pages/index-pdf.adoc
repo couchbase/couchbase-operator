@@ -1,0 +1,115 @@
+= Couchbase Autonomous Operator v0.9 DRAFT - DO NOT DISTRIBUTE
+User Guide
+:doctype: book
+:toc:
+:toclevels: 3
+:imagesdir: ../assets/images
+:source-highlighter: highlight.js
+:numbered:
+:icons: font
+:hide-uri-scheme:
+// ======================================================================================
+
+:leveloffset: +1
+
+include::overview.adoc[]
+
+include::prerequisite-and-setup.adoc[]
+
+:leveloffset: +1
+
+include::install-kubernetes.adoc[]
+
+include::install-kubernetes-no-rbac.adoc[]
+
+include::install-openshift.adoc[]
+
+include::operator-config.adoc[]
+
+:leveloffset: -1
+
+= Planning Your Deployment
+
+:leveloffset: +1
+
+include::best-practices.adoc[]
+
+include::networking.adoc[]
+
+include::kubernetes-rbac.adoc[]
+
+include::server-groups.adoc[]
+
+include::tls.adoc[]
+
+:leveloffset: -1
+
+include::deploying-couchbase.adoc[]
+
+:leveloffset: +1
+
+include::couchbase-cluster-config.adoc[]
+
+include::cluster-status-guide.adoc[]
+
+include::list-and-describe.adoc[]
+
+include::persisted-volumes-guide.adoc[]
+
+:leveloffset: -1
+
+include::cbopctl.adoc[]
+
+include::accessing-couchbase.adoc[]
+
+:leveloffset: +1
+
+include::admin-console-access.adoc[]
+
+include::couchbase-cli-guide.adoc[]
+
+include::couchbase-clients.adoc[]
+
+:leveloffset: -1
+
+include::running-couchbase.adoc[]
+
+:leveloffset: +1
+
+include::scaling-couchbase.adoc[]
+
+include::node-recovery.adoc[]
+
+:leveloffset: -1
+
+include::updating-couchbase.adoc[]
+
+include::upgrading-couchbase.adoc[]
+
+include::delete-couchbase-cluster.adoc[]
+
+= Troubleshooting
+
+:leveloffset: +1
+
+include::logs-troubleshooting.adoc[]
+
+include::conditions-and-events.adoc[]
+
+include::services.adoc[]
+
+:leveloffset: -1
+
+= Command Line Tools
+
+:leveloffset: +1
+
+include::cbopinfo.adoc[]
+
+:leveloffset: -1
+
+include::demo.adoc[]
+
+include::release-notes.adoc[]
+
+// ======================================================================================
