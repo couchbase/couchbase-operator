@@ -83,9 +83,9 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	// Calculate sleep time for action to be taken by operator
 	timeToSleep := time.Second
 	if autoFailoverWillOccur {
-		timeToSleep = time.Duration(autofailoverTimeout) * timeToSleep
-	} else {
 		timeToSleep = time.Duration(autofailoverTimeout)*timeToSleep + 30
+	} else {
+		timeToSleep = time.Duration(autofailoverTimeout)*timeToSleep + 60
 	}
 
 	// Kill couchbase server pods in cluster and test auto failover

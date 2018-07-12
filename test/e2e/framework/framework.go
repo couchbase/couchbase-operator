@@ -267,6 +267,18 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
+	logrus.Info("Marking all nodes as schedulable")
+	nodeTaintList := []v1.Taint{}
+	k8sNodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return errors.New("Failed to get node list: " + err.Error())
+	}
+	for nodeIndex, _ := range k8sNodeList.Items {
+		if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, nodeTaintList, nodeIndex); err != nil {
+			return errors.New("Failed to update node taint: " + err.Error())
+		}
+	}
+
 	logrus.Info("deleteing jobs")
 	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
 	for _, job := range jobs.Items {

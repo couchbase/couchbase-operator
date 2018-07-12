@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
@@ -30,12 +31,12 @@ type PortForwarder struct {
 }
 
 // NodePort creates the service from pod with matching selectors to k8s cluster node
-type ServicePort v1.ServicePort
 type NodePortService struct {
-	ServiceName     string
-	ServicePortList []v1.ServicePort
-	Selectors       map[string]string
-	Namespace       string
+	ServiceName        string
+	RemotePortToExpose int32
+	Labels             map[string]string
+	Selectors          map[string]string
+	Namespace          string
 }
 
 // ForwardPorts accepts a Kubernetes configuration, pod and port and forwards
@@ -101,12 +102,23 @@ func (pf *PortForwarder) Close(t *testing.T) {
 	}
 }
 
-func (nodePort *NodePortService) CreateNodePortService(kubeClient kubernetes.Interface) error {
+func (nodePort *NodePortService) CreateNodePortService(kubeClient kubernetes.Interface, nodePortNum int32) error {
+	targetPortIntStr := intstr.IntOrString{IntVal: nodePort.RemotePortToExpose}
+	servicePortSpec := v1.ServicePort{
+		Name:       "analytics-np",
+		Port:       nodePort.RemotePortToExpose,
+		TargetPort: targetPortIntStr,
+		NodePort:   nodePortNum,
+	}
+
+	// Create node-port service to export analytics service
 	nodePortSpec := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: nodePort.ServiceName},
+		TypeMeta:   metav1.TypeMeta{Kind: "NodePort"},
+		ObjectMeta: metav1.ObjectMeta{Name: nodePort.ServiceName, Labels: nodePort.Labels},
 		Spec: v1.ServiceSpec{
-			Ports:    nodePort.ServicePortList,
+			Type:     "NodePort",
 			Selector: nodePort.Selectors,
+			Ports:    []v1.ServicePort{servicePortSpec},
 		},
 	}
 	_, err := kubeClient.CoreV1().Services(nodePort.Namespace).Create(nodePortSpec)

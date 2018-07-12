@@ -48,6 +48,11 @@ var (
 	WithoutBucket = false
 	AdminExposed  = true
 	AdminHidden   = false
+
+	BucketFlushEnabled   = true
+	BucketFlushDisabled  = false
+	IndexReplicaEnabled  = true
+	IndexReplicaDisabled = false
 )
 
 var (
@@ -57,6 +62,12 @@ var (
 	Retries20  = 20
 	Retries30  = 30
 	Retries120 = 120
+)
+
+var (
+	Mem256Mb = 256
+	Mem512Mb = 512
+	Mem1Gb   = 1024
 )
 
 var (
@@ -375,7 +386,6 @@ func UpdateServiceSpec(service int, field string, value string, crClient version
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Services = strings.Split(value, ",") }
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
-
 }
 
 // convert interfaced value to int, note this can downcast i64
@@ -389,6 +399,7 @@ func ConvertToInt(value interface{}) int {
 	}
 	return 0
 }
+
 func AddServices(crClient versioned.Interface, cl *api.CouchbaseCluster, newService api.ServerConfig, maxRetries int) (*api.CouchbaseCluster, error) {
 	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = append(cl.Spec.ServerSettings, newService) }
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)

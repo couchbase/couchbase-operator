@@ -147,10 +147,11 @@ func randomClusterName(randomSuffix string) string {
 // installs them into K8S before running the test(s)
 func tlsDecorator(test framework.TestFunc, keyType e2eutil.KeyType, args framework.DecoratorArgs) framework.TestFunc {
 	f := framework.Global
+	maxClustersPerCluster := e2eutil.Size3
 	var wrapper framework.TestFunc
-	for i, kubeName := range args.KubeNames {
-		for j := 0; j < 3; j++ {
-			RandomNameSuffix = e2eutil.RandomSuffix()
+	for j := 0; j < maxClustersPerCluster; j++ {
+		RandomNameSuffix = e2eutil.RandomSuffix()
+		for i, kubeName := range args.KubeNames {
 			decoratorObj := &TlsDecorator{}
 			decoratorObj.Init(RandomNameSuffix, f.Namespace, keyType)
 			if i == 0 && j == 0 {

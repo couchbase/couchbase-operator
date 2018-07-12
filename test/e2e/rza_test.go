@@ -486,8 +486,6 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 		"serverGroups": serverGroups,
 	}
 
-	sort.Strings(availableServerGroupList)
-
 	// Deploy couchbase cluster
 	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
 	if err != nil {
@@ -503,13 +501,13 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	}
 
 	expectedRzaPodNodeSelectorMap := map[string]string{
-		testCouchbase.Name + "0000": availableServerGroupList[0],
-		testCouchbase.Name + "0001": availableServerGroupList[2],
-		testCouchbase.Name + "0002": availableServerGroupList[0],
-		testCouchbase.Name + "0003": availableServerGroupList[1],
-		testCouchbase.Name + "0004": availableServerGroupList[0],
-		testCouchbase.Name + "0005": availableServerGroupList[2],
-		testCouchbase.Name + "0006": availableServerGroupList[0],
+		testCouchbase.Name + "-0000": availableServerGroupList[0],
+		testCouchbase.Name + "-0001": availableServerGroupList[2],
+		testCouchbase.Name + "-0002": availableServerGroupList[0],
+		testCouchbase.Name + "-0003": availableServerGroupList[1],
+		testCouchbase.Name + "-0004": availableServerGroupList[0],
+		testCouchbase.Name + "-0005": availableServerGroupList[2],
+		testCouchbase.Name + "-0006": availableServerGroupList[0],
 	}
 
 	expectedEvents := e2eutil.EventList{}
@@ -605,18 +603,38 @@ func TestRzaResizeCluster(t *testing.T) {
 
 	// Starting resize cluster test
 	service := 0
-	clusterSizes := []int{2, 7, 4, 1}
+	clusterSizes := []int{2, 7, 4}
 	prevClusterSize := clusterSize
+	memberToBeAdded := clusterSize
 
 	for _, clusterSize := range clusterSizes {
+		membersAdded := []int{}
+		membersRemoved := []int{}
+		sizeDiff := clusterSize - prevClusterSize
+		if sizeDiff > 0 {
+			for memberId := prevClusterSize; memberId < clusterSize; memberId++ {
+				membersAdded = append(membersAdded, memberToBeAdded)
+				memberToBeAdded++
+			}
+		} else {
+			for memberId := memberToBeAdded + sizeDiff; memberId < memberToBeAdded; memberId++ {
+				membersRemoved = append(membersRemoved, memberId)
+			}
+		}
+
 		// Update the expected RZA results map for verification
 		expectedRzaResultMap = GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 		// Resize cluster and wait for healthy cluster
-		err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+		if err := e2eutil.ResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
+		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, e2eutil.Retries120, testCouchbase)
 		if err != nil {
 			t.Fatal(err)
 		}
+		t.Logf("Resize Success: %v...\n", names)
 
 		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
 		if err != nil {
@@ -636,13 +654,17 @@ func TestRzaResizeCluster(t *testing.T) {
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
-			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+			for _, memberId := range membersAdded {
+				expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+			}
 			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 		case clusterSize-prevClusterSize < 0:
 			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
+			for _, memberId := range membersRemoved {
+				expectedEvents.AddMemberRemoveEvent(testCouchbase, memberId)
+			}
 			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 		}
 		prevClusterSize = clusterSize
