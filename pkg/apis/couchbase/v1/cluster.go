@@ -465,6 +465,13 @@ func (cs *ClusterSpec) ServerGroupsEnabled() bool {
 	return len(cs.ServerGroups) > 0
 }
 
+func (cs *ClusterSpec) GetFSGroup() *int64 {
+	if cs.SecurityContext != nil {
+		return cs.SecurityContext.FSGroup
+	}
+	return nil
+}
+
 func (c *BucketConfig) Equals(other *BucketConfig) bool {
 	return reflect.DeepEqual(c, other)
 }

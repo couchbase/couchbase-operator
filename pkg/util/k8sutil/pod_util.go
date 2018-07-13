@@ -103,6 +103,9 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					"path":         mountPath,
 					"serverConfig": config.Name,
 				})
+				if gid := cs.GetFSGroup(); gid != nil {
+					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
+				}
 				claim.Name = NameForPersistentVolumeClaim(claimName, pod.Name, claimUsageCnt[claimName], mountName)
 				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner, ctx)
 				if err != nil {

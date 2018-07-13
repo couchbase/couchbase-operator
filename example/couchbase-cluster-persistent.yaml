@@ -49,6 +49,8 @@ spec:
           analytics:
             - couchbase
             - couchbase
+  securityContext:
+    fsGroup: 1000
   volumeClaimTemplates:
     - metadata:
         name: couchbase
