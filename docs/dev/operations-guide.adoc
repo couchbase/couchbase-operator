@@ -23,6 +23,6 @@ couchbase operator will automatically create a Kubernetes Custom Resource Defini
 
  $ kubectl get couchbasecluster
  NAME         KIND
- cb-example   CouchbaseCluster.v1beta1.couchbase.database.couchbase.com
+ cb-example   CouchbaseCluster.v1beta1.couchbase.com
 
 With these steps complete, you can follow the steps in the xref:admin-console-access.adoc[admin console access] to connect to the cluster.

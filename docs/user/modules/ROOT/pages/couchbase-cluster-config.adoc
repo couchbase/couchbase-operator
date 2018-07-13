@@ -8,7 +8,7 @@ To use the Couchbase Autonomous Operator to deploy a Couchbase Server cluster, y
 
 [source,yaml]
 ----
-apiVersion: couchbase.database.couchbase.com/v1
+apiVersion: couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example
@@ -121,7 +121,7 @@ The following are the top-level parameters for a CouchbaseCluster configuration:
 
 [source,yaml]
 ----
-apiVersion: couchbase.database.couchbase.com/v1
+apiVersion: couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example

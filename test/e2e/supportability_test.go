@@ -858,7 +858,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
-	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.database.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":rbac-test\" cannot list couchbaseclusters.couchbase.database.couchbase.com in the namespace \"" + f.Namespace + "\""
+	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":rbac-test\" cannot list couchbaseclusters.couchbase.com in the namespace \"" + f.Namespace + "\""
 	if err == nil {
 		logFileName := getLogFileNameFromExecOutput(execOutStr)
 		defer os.Remove(logFileName)

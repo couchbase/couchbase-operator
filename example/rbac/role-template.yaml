@@ -5,7 +5,7 @@ metadata:
   namespace: <NAMESPACE>
 rules:
 - apiGroups:
-  - couchbase.database.couchbase.com
+  - couchbase.com
   resources:
   - couchbaseclusters
   verbs:

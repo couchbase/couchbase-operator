@@ -1790,7 +1790,7 @@ func TestNegValidationDelete(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"couchbaseclusters.couchbase.database.couchbase.com \"cb-example1\" not found"},
+			expectedMessages: []string{"couchbaseclusters.couchbase.com \"cb-example1\" not found"},
 		},
 	}
 	kubeName := "NewCluster1"

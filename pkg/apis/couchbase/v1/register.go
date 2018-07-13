@@ -11,7 +11,7 @@ import (
 const (
 	CRDResourceKind   = "CouchbaseCluster"
 	CRDResourcePlural = "couchbaseclusters"
-	groupName         = "couchbase.database.couchbase.com"
+	groupName         = "couchbase.com"
 )
 
 var (

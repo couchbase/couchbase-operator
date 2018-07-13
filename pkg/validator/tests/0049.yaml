@@ -1,5 +1,5 @@
 # A configuration to check the sum of all bucket quotas is less than the data service quota
-apiVersion: couchbase.database.couchbase.com/v1
+apiVersion: couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example

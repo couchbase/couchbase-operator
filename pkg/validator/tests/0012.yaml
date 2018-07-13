@@ -1,6 +1,6 @@
 # This configuration sets the adminConsoleServices to data, index, query, and
 # search
-apiVersion: couchbase.database.couchbase.com/v1
+apiVersion: couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example

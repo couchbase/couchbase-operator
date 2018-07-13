@@ -60,7 +60,7 @@ rules:
   verbs:
   - "*"
 - apiGroups:
-  - couchbase.database.couchbase.com
+  - couchbase.com
   resources:
   - couchbaseclusters
   verbs:

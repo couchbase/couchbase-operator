@@ -310,7 +310,7 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 	}
 
 	policyRule1 := rbacv1.PolicyRule{
-		APIGroups: []string{"couchbase.database.couchbase.com"},
+		APIGroups: []string{"couchbase.com"},
 		Resources: []string{"couchbaseclusters"},
 		Verbs:     []string{"*"},
 	}

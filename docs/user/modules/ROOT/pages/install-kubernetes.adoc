@@ -137,5 +137,5 @@ Make sure all instances of the Operator have been deleted from the Kubernetes cl
 +
 [source,console]
 ----
-kubectl delete crd couchbaseclusters.couchbase.database.couchbase.com
+$ kubectl delete crd couchbaseclusters.couchbase.com
 ----

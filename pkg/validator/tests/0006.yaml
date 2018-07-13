@@ -1,5 +1,5 @@
 # This configuration sets paused to a non-boolean value
-apiVersion: couchbase.database.couchbase.com/v1
+apiVersion: couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example
