@@ -209,7 +209,7 @@ func (c *Cluster) create() error {
 		return fmt.Errorf("cluster create: no server specification defined")
 	}
 
-	idx := c.indexOfServerConfigWithService("data")
+	idx := c.indexOfServerConfigWithService(api.DataService)
 	if idx == -1 {
 		return fmt.Errorf("cluster create: at least one server specification must contain the `data` service")
 	}
@@ -632,7 +632,7 @@ func (c *Cluster) initCouchbaseClient() error {
 	return nil
 }
 
-func (c *Cluster) createUIService(services []string) (*v1.Service, error) {
+func (c *Cluster) createUIService(services api.ServiceList) (*v1.Service, error) {
 	svc, err := k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, services, c.cluster.AsOwner())
 	if err == nil {
 		c.status.AdminConsolePort, c.status.AdminConsolePortSSL = k8sutil.GetAdminConsolePorts(svc)
@@ -648,7 +648,7 @@ func (c *Cluster) deleteUIService(svcName string) error {
 	return err
 }
 
-func (c *Cluster) indexOfServerConfigWithService(svc string) int {
+func (c *Cluster) indexOfServerConfigWithService(svc api.Service) int {
 	for idx, serverSpec := range c.cluster.Spec.ServerSettings {
 		for _, service := range serverSpec.Services {
 			if service == svc {

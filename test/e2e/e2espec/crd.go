@@ -52,9 +52,13 @@ var (
 // server settings
 var (
 	defaultServerSettings = api.ServerConfig{
-		Size:     1,
-		Name:     "test_config_1",
-		Services: []string{"data", "query", "index"},
+		Size: 1,
+		Name: "test_config_1",
+		Services: api.ServiceList{
+			api.DataService,
+			api.QueryService,
+			api.IndexService,
+		},
 	}
 )
 
@@ -161,9 +165,13 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 		ClusterSettings: defaultClusterSettings,
 		BucketSettings:  bucketConfig,
 		ServerSettings: []api.ServerConfig{api.ServerConfig{
-			Size:     size,
-			Name:     "test_config_1",
-			Services: []string{"data", "query", "index"},
+			Size: size,
+			Name: "test_config_1",
+			Services: api.ServiceList{
+				api.DataService,
+				api.QueryService,
+				api.IndexService,
+			},
 		}},
 		ExposedFeatures: []string{},
 	}
@@ -189,9 +197,13 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 		ClusterSettings: defaultClusterSettings,
 		BucketSettings:  bucketConfig,
 		ServerSettings: []api.ServerConfig{api.ServerConfig{
-			Size:     size,
-			Name:     "test_config_1",
-			Services: []string{"data", "query", "index"},
+			Size: size,
+			Name: "test_config_1",
+			Services: api.ServiceList{
+				api.DataService,
+				api.QueryService,
+				api.IndexService,
+			},
 		}},
 		ExposedFeatures: []string{"xdcr"},
 	}
@@ -305,12 +317,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 					size, _ := strconv.Atoi(config[key][setting])
 					serverSettings.Size = size
 				case setting == "services":
-					services := []string{}
-					parsedServices := strings.Split(config[key][setting], ",")
-					for _, service := range parsedServices {
-						services = append(services, service)
-					}
-					serverSettings.Services = services
+					serverSettings.Services = api.NewServiceList(strings.Split(config[key][setting], ","))
 				case setting == "serverGroups":
 					serverGroups := []string{}
 					parsedGroups := strings.Split(config[key][setting], ",")

@@ -383,7 +383,9 @@ func UpdateServiceSpec(service int, field string, value string, crClient version
 	case field == "Name":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Name = value }
 	case field == "Services":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Services = strings.Split(value, ",") }
+		updateFunc = func(cl *api.CouchbaseCluster) {
+			cl.Spec.ServerSettings[service].Services = api.NewServiceList(strings.Split(value, ","))
+		}
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 }

@@ -68,12 +68,12 @@ type UpgradeStatus struct {
 type PortStatus struct {
 	AdminServicePort        int32 `json:"adminServicePort,omitempty"`
 	AdminServicePortTLS     int32 `json:"adminServicePortTLS,omitempty"`
-	ViewServicePort         int32 `json:"viewServicePort,omitempty"`
-	ViewServicePortTLS      int32 `json:"viewServicePortTLS,omitempty"`
+	IndexServicePort        int32 `json:"indexServicePort,omitempty"`
+	IndexServicePortTLS     int32 `json:"indexServicePortTLS,omitempty"`
 	QueryServicePort        int32 `json:"queryServicePort,omitempty"`
 	QueryServicePortTLS     int32 `json:"queryServicePortTLS,omitempty"`
-	FtsServicePort          int32 `json:"ftsServicePort,omitempty"`
-	FtsServicePortTLS       int32 `json:"ftsServicePortTLS,omitempty"`
+	SearchServicePort       int32 `json:"searchServicePort,omitempty"`
+	SearchServicePortTLS    int32 `json:"searchServicePortTLS,omitempty"`
 	AnalyticsServicePort    int32 `json:"analyticsServicePort,omitempty"`
 	AnalyticsServicePortTLS int32 `json:"analyticsServicePortTLS,omitempty"`
 	EventingServicePort     int32 `json:"eventingServicePort,omitempty"`

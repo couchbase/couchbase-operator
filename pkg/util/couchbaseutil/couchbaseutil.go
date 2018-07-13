@@ -283,9 +283,9 @@ func CheckHealth(url string, tc *tls.Config) (bool, error) {
 	return true, nil
 }
 
-func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services []string) error {
+func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services cbapi.ServiceList) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	svcs, err := cbmgr.ServiceListFromStringArray(services)
+	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
 	}
@@ -394,7 +394,7 @@ func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath
 }
 
 func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
-	services []string, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
+	services cbapi.ServiceList, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
@@ -403,7 +403,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 		return err
 	}
 
-	svcs, err := cbmgr.ServiceListFromStringArray(services)
+	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
 	}

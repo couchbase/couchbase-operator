@@ -99,7 +99,7 @@ func applyDefaults(customResource *api.CouchbaseCluster) {
 	}
 
 	if customResource.Spec.AdminConsoleServices == nil {
-		customResource.Spec.AdminConsoleServices = []string{}
+		customResource.Spec.AdminConsoleServices = api.ServiceList{}
 	}
 
 	if customResource.Spec.ClusterSettings.DataServiceMemQuota == 0 {
@@ -152,7 +152,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	errs := []error{}
 
 	// Uniqueness, although in the schema types, the API denies it.
-	if !uniqueString(customResource.Spec.AdminConsoleServices) {
+	if !uniqueString(customResource.Spec.AdminConsoleServices.StringSlice()) {
 		errs = append(errs, errors.DuplicateItems("spec.adminConsoleServices", "body"))
 	}
 	if !uniqueString(customResource.Spec.ExposedFeatures) {
@@ -162,7 +162,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		errs = append(errs, errors.DuplicateItems("spec.serverGroups", "body"))
 	}
 	for i, class := range customResource.Spec.ServerSettings {
-		if !uniqueString(class.Services) {
+		if !uniqueString(class.Services.StringSlice()) {
 			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
 		}
 		if !uniqueString(class.ServerGroups) {
@@ -416,7 +416,7 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 				if !stringArrayCompare(cur.ServerGroups, up.ServerGroups) {
 					errs = append(errs, &UpdateError{fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"})
 				}
-				if !stringArrayCompare(cur.Services, up.Services) {
+				if !stringArrayCompare(cur.Services.StringSlice(), up.Services.StringSlice()) {
 					err := &UpdateError{fmt.Sprintf("spec.servers[%d].services", i), "body"}
 					errs = append(errs, err)
 				}
@@ -429,7 +429,7 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 	hasIndexSvc := false
 	for _, cur := range current.Spec.ServerSettings {
 		for _, svc := range cur.Services {
-			if svc == constants.ServiceIndex {
+			if svc == api.IndexService {
 				hasIndexSvc = true
 			}
 		}
@@ -437,7 +437,7 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 
 	for _, up := range updated.Spec.ServerSettings {
 		for _, svc := range up.Services {
-			if svc == constants.ServiceIndex {
+			if svc == api.IndexService {
 				hasIndexSvc = true
 			}
 		}

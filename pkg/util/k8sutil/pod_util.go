@@ -354,7 +354,7 @@ func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerCon
 	}
 
 	for _, s := range ns.Services {
-		k := "couchbase_service_" + s
+		k := "couchbase_service_" + s.String()
 		labels[k] = "enabled"
 	}
 
@@ -381,8 +381,8 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          viewServicePortName,
-				ContainerPort: int32(viewServicePort),
+				Name:          indexServicePortName,
+				ContainerPort: int32(indexServicePort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
@@ -391,8 +391,8 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          ftsServicePortName,
-				ContainerPort: int32(ftsServicePort),
+				Name:          searchServicePortName,
+				ContainerPort: int32(searchServicePort),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
@@ -531,8 +531,8 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          viewServicePortNameTLS,
-				ContainerPort: int32(viewServicePortTLS),
+				Name:          indexServicePortNameTLS,
+				ContainerPort: int32(indexServicePortTLS),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
@@ -541,8 +541,8 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 			{
-				Name:          ftsServicePortNameTLS,
-				ContainerPort: int32(ftsServicePortTLS),
+				Name:          searchServicePortNameTLS,
+				ContainerPort: int32(searchServicePortTLS),
 				Protocol:      v1.ProtocolTCP,
 			},
 			{

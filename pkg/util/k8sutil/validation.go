@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	cbapi_v1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
@@ -85,12 +86,12 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 								Schema: &apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"data"`)},
-										{Raw: []byte(`"index"`)},
-										{Raw: []byte(`"query"`)},
-										{Raw: []byte(`"search"`)},
-										{Raw: []byte(`"eventing"`)},
-										{Raw: []byte(`"analytics"`)},
+										{Raw: []byte(`"` + string(cbapi_v1.DataService) + `"`)},
+										{Raw: []byte(`"` + string(cbapi_v1.IndexService) + `"`)},
+										{Raw: []byte(`"` + string(cbapi_v1.QueryService) + `"`)},
+										{Raw: []byte(`"` + string(cbapi_v1.SearchService) + `"`)},
+										{Raw: []byte(`"` + string(cbapi_v1.EventingService) + `"`)},
+										{Raw: []byte(`"` + string(cbapi_v1.AnalyticsService) + `"`)},
 									},
 								},
 							},
@@ -277,12 +278,12 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 												Schema: &apiextensionsv1beta1.JSONSchemaProps{
 													Type: "string",
 													Enum: []apiextensionsv1beta1.JSON{
-														{Raw: []byte(`"data"`)},
-														{Raw: []byte(`"index"`)},
-														{Raw: []byte(`"query"`)},
-														{Raw: []byte(`"search"`)},
-														{Raw: []byte(`"eventing"`)},
-														{Raw: []byte(`"analytics"`)},
+														{Raw: []byte(`"` + string(cbapi_v1.DataService) + `"`)},
+														{Raw: []byte(`"` + string(cbapi_v1.IndexService) + `"`)},
+														{Raw: []byte(`"` + string(cbapi_v1.QueryService) + `"`)},
+														{Raw: []byte(`"` + string(cbapi_v1.SearchService) + `"`)},
+														{Raw: []byte(`"` + string(cbapi_v1.EventingService) + `"`)},
+														{Raw: []byte(`"` + string(cbapi_v1.AnalyticsService) + `"`)},
 													},
 												},
 											},

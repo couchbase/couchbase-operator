@@ -41,11 +41,6 @@ var (
 	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase/data"
 	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase/data"
 
-	ServiceIndex  = "index"
-	ServiceData   = "data"
-	ServiceQuery  = "query"
-	ServiceSearch = "search"
-
 	AutoFailoverTimeoutMin                    uint64 = 5
 	AutoFailoverTimeoutMax                    uint64 = 3600
 	AutoFailoverMaxCountMin                   uint64 = 1

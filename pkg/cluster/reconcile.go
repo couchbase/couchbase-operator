@@ -399,7 +399,7 @@ func (c *Cluster) reconcileAdminService() {
 // specification and add/removes services as requested, raising events as
 // appropriate.
 func (c *Cluster) reconcileExposedFeatures() error {
-	status, err := k8sutil.UpdateExposedFeatures(c.config.KubeCli, c.cluster, &c.status)
+	status, err := k8sutil.UpdateExposedFeatures(c.config.KubeCli, c.members, c.cluster, &c.status)
 	if err != nil {
 		return err
 	}
@@ -759,12 +759,13 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 				Ports: cbmgr.AlternateAddressesExternalPorts{
 					AdminServicePort:    ports.AdminServicePort,
 					AdminServicePortTLS: ports.AdminServicePortTLS,
-					ViewServicePort:     ports.ViewServicePort,
-					ViewServicePortTLS:  ports.ViewServicePortTLS,
+					// TODO: rename the library for consistency
+					ViewServicePort:    ports.IndexServicePort,
+					ViewServicePortTLS: ports.IndexServicePortTLS,
 					//QueryServicePort:        ports.QueryServicePort,
 					//QueryServicePortTLS:     ports.QueryServicePortTLS,
-					//FtsServicePort:          ports.FtsServicePort,
-					//FtsServicePortTLS:       ports.FtsServicePortTLS,
+					//FtsServicePort:          ports.SearchServicePort,
+					//FtsServicePortTLS:       ports.SearchServicePortTLS,
 					//AnalyticsServicePort:    ports.AnalyticsServicePort,
 					//AnalyticsServicePortTLS: ports.AnalyticsServicePortTLS,
 					DataServicePort: ports.DataServicePort,

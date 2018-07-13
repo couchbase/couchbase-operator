@@ -1067,7 +1067,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	newService := api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_2",
-		Services: []string{"query"},
+		Services: api.ServiceList{api.QueryService},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1098,7 +1098,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	newService = api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_3",
-		Services: []string{"index"},
+		Services: api.ServiceList{api.IndexService},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries5)
 	if err != nil {
@@ -1129,7 +1129,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	newService = api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_4",
-		Services: []string{"search"},
+		Services: api.ServiceList{api.SearchService},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries5)
 	if err != nil {
@@ -1299,7 +1299,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	newService := api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_2",
-		Services: []string{"query"},
+		Services: api.ServiceList{api.QueryService},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1330,7 +1330,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	newService = api.ServerConfig{
 		Size:     1,
 		Name:     "test_config_3",
-		Services: []string{"index"},
+		Services: api.ServiceList{api.IndexService},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {
@@ -1361,7 +1361,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	newService = api.ServerConfig{
 		Size:     2,
 		Name:     "test_config_4",
-		Services: []string{"search"},
+		Services: api.ServiceList{api.SearchService},
 	}
 	testCouchbase, err = e2eutil.AddServices(targetKube.CRClient, testCouchbase, newService, e2eutil.Retries10)
 	if err != nil {

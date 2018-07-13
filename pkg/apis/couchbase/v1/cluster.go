@@ -43,6 +43,82 @@ func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
+// Supported services
+type Service string
+
+const (
+	AdminService     Service = "admin"
+	DataService      Service = "data"
+	IndexService     Service = "index"
+	QueryService     Service = "query"
+	SearchService    Service = "search"
+	EventingService  Service = "eventing"
+	AnalyticsService Service = "analytics"
+)
+
+// Convert from typed to string
+func (s Service) String() string {
+	return string(s)
+}
+
+type ServiceList []Service
+
+// Len returns the ServiceList length
+func (l ServiceList) Len() int {
+	return len(l)
+}
+
+// Less compares two ServiceList items and returns true if a is less than b
+func (l ServiceList) Less(a, b int) bool {
+	return l[a].String() < l[b].String()
+}
+
+// Swap swaps the position of two ServiceList elements
+func (l ServiceList) Swap(a, b int) {
+	l[a], l[b] = l[b], l[a]
+}
+
+// Contains returns true if a sevice is part of a service list
+func (l ServiceList) Contains(service Service) bool {
+	for _, s := range l {
+		if s == service {
+			return true
+		}
+	}
+	return false
+}
+
+// Sub removes members from 'other' from a ServiceList
+func (l ServiceList) Sub(other ServiceList) ServiceList {
+	out := ServiceList{}
+	for _, service := range l {
+		if other.Contains(service) {
+			continue
+		}
+		out = append(out, service)
+	}
+	return out
+}
+
+func NewServiceList(services []string) ServiceList {
+	// TODO: Once the reflection stuff makes it in we can bin this
+	// as things will be happily type safe and use the enumerations
+	l := make(ServiceList, len(services))
+	for i, s := range services {
+		l[i] = Service(s)
+	}
+	return l
+}
+
+// Convert from a typed array to plain string array
+func (l ServiceList) StringSlice() []string {
+	slice := make([]string, len(l))
+	for i, s := range l {
+		slice[i] = s.String()
+	}
+	return slice
+}
+
 // Supported features
 const (
 	// Exposes the admin port/UI
@@ -111,7 +187,7 @@ type ClusterSpec struct {
 	ExposeAdminConsole bool `json:"exposeAdminConsole"`
 
 	// Specific services to use when exposing ui
-	AdminConsoleServices []string `json:"adminConsoleServices,omitempty"`
+	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`
 
 	// ExposedFeatures is a list of features to expose on the K8S node
 	// network.  They represent a subset of ports e.g. admin=8091,
@@ -218,7 +294,7 @@ type ServerConfig struct {
 	Name string `json:"name"`
 
 	// The services to run on nodes created with this spec
-	Services []string `json:"services"`
+	Services ServiceList `json:"services"`
 
 	// ServerGroups define the set of availability zones we want to distribute
 	// pods over.  This allows the Kubernetes cluster adminsitrator to label all

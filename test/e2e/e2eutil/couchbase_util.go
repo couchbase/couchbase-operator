@@ -90,10 +90,10 @@ func GetBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 }
 
 // Add a node to the cluster
-func AddNode(t *testing.T, client *cbmgr.Couchbase, services []string, username, password, hostname string) error {
+func AddNode(t *testing.T, client *cbmgr.Couchbase, services api.ServiceList, username, password, hostname string) error {
 	t.Logf("adding node: %s", hostname)
 
-	svcs, err := cbmgr.ServiceListFromStringArray(services)
+	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
 	}

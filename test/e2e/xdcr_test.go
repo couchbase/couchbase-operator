@@ -113,9 +113,9 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 
 	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -233,9 +233,9 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 
 	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -326,9 +326,9 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -445,9 +445,9 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 	}
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -576,9 +576,9 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 	}
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -741,9 +741,9 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 	}
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -849,9 +849,9 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
-	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
+	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 
 	defKubeHost, err := f.GetKubeHostname(defKubeName)
 	if err != nil {
