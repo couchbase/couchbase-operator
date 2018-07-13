@@ -310,15 +310,6 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 		container = containerWithRequirements(container, ns.Pod.Resources)
 	}
 
-	securityContext := cs.SecurityContext
-	if securityContext == nil {
-		securityContext = &v1.PodSecurityContext{
-			FSGroup:      &defaultSecurityContextUid,
-			RunAsUser:    &defaultSecurityContextUid,
-			RunAsNonRoot: &defaultSecurityContextRunAsNonRoot,
-		}
-	}
-
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        m.Name,
@@ -335,7 +326,7 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 			},
 			NodeSelector:    map[string]string{},
-			SecurityContext: securityContext,
+			SecurityContext: cs.SecurityContext,
 		},
 	}
 	if cs.AntiAffinity {
