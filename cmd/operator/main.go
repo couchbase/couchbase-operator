@@ -34,6 +34,7 @@ var (
 	listenAddr     string
 	name           string
 	namespace      string
+	logLevel       string
 	createCrd      bool
 	printVersion   bool
 	verifyVersion  bool
@@ -52,6 +53,7 @@ func init() {
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.BoolVar(&verifyVersion, "verify-version", true, "Skip verification of required couchbase min version")
 	flag.BoolVar(&enableUpgrades, "enable-upgrades", true, "Enable or disable rolling upgrades")
+	flag.StringVar(&logLevel, "log-level", "info", "Sets the logging level (panic, fatal, error, warn, info, debug)")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
 	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
@@ -59,6 +61,12 @@ func init() {
 
 // create controller from initialised config
 func main() {
+	if level, err := logrus.ParseLevel(logLevel); err != nil {
+		mainLogger.Fatalf("Invalid log level: %s", logLevel)
+	} else {
+		logrus.SetLevel(level)
+	}
+
 	namespace = os.Getenv("MY_POD_NAMESPACE")
 	if len(namespace) == 0 {
 		mainLogger.Fatalf("Must set env MY_POD_NAMESPACE")
@@ -136,6 +144,8 @@ func newControllerConfig() controller.Config {
 		mainLogger.Fatalf("Fail to get my pod's service account: %v", err)
 	}
 
+	level, _ := logrus.ParseLevel(logLevel)
+
 	cfg := controller.Config{
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
@@ -144,6 +154,7 @@ func newControllerConfig() controller.Config {
 		CreateCrd:      createCrd,
 		VerifyVersion:  verifyVersion,
 		EnableUpgrades: enableUpgrades,
+		LogLevel:       level,
 	}
 
 	return cfg

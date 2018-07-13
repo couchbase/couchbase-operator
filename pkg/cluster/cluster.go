@@ -56,6 +56,7 @@ type Config struct {
 	ServiceAccount string
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
+	LogLevel       logrus.Level
 	EnableUpgrades bool
 }
 
@@ -92,6 +93,8 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		stopCh:    make(chan struct{}),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
 	}
+
+	c.logger.Logger.SetLevel(c.config.LogLevel)
 
 	// Cancel is used to abort the go routine when the operator is deleted
 	// The logger value is used by other clients who don't have access to the

@@ -53,6 +53,7 @@ type Config struct {
 	EnableUpgrades bool
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
+	LogLevel       logrus.Level
 	VerifyVersion  bool
 }
 
@@ -182,6 +183,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 		ServiceAccount: c.Config.ServiceAccount,
 		KubeCli:        c.Config.KubeCli,
 		CouchbaseCRCli: c.Config.CouchbaseCRCli,
+		LogLevel:       c.Config.LogLevel,
 		EnableUpgrades: c.Config.EnableUpgrades,
 	}
 }
