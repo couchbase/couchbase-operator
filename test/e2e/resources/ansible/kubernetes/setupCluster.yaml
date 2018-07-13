@@ -69,7 +69,7 @@
     - name: Fetching kube config
       fetch: 
         src: /etc/kubernetes/admin.conf
-        dest: "{{ kubeConfPathToSave }}"
+        dest: "~/.kube/{{ kubeConfPathToSave }}"
         flat: yes
 
 - hosts: master_node

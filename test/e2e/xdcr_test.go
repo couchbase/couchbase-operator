@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -14,34 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"gopkg.in/yaml.v2"
 )
-
-// To parse the Couchbase deployment CRD from yaml
-// Used to read UUID and exposed admin port values for XDCR configuration
-type CouchbaseCrd struct {
-	Status struct {
-		AdminConsolePort string `yaml:"adminConsolePort"`
-		ClusterId        string `yaml:"clusterId"`
-	} `yaml:"status"`
-}
-
-// Populates CouchbaseCrd struct from the input yaml file
-func ReadClusterCrd(cbCluster *api.CouchbaseCluster) (crd CouchbaseCrd, err error) {
-	crdFilePath := "./resources/crd_" + cbCluster.Name + ".yml"
-	if err = ClusterToYAML(cbCluster, crdFilePath); err != nil {
-		return
-	}
-
-	fileContent, err := ioutil.ReadFile(crdFilePath)
-	if err != nil {
-		return
-	}
-	if err = yaml.Unmarshal(fileContent, &crd); err != nil {
-		return
-	}
-	return
-}
 
 // Generic function to run rebalance out test case
 // Rebalance out xdcrCluster nodes one by one for the provided clustersize
@@ -145,11 +117,6 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
 
-	xdcrCluster1_Crd, err := ReadClusterCrd(xdcrCluster1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -174,28 +141,23 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
 
-	xdcrCluster2_Crd, err := ReadClusterCrd(xdcrCluster2)
+	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	xdcr1KubeData, err := framework.GetKubeClusterForKubeName(xdcr1KubeName)
+	xdcr2KubeHost, err := f.GetKubeHostname(xdcr2KubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	xdcr2KubeData, err := framework.GetKubeClusterForKubeName(xdcr2KubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl := xdcr1KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcr2KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := xdcr1KubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
+	destUrl := xdcr2KubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2_Crd.Status.ClusterId, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,12 +169,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 		t.Fatal(err)
 	}
 
-	bucketStat, err := e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 10 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 10", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	switch operationType {
@@ -242,13 +200,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 		t.Fatal(err)
 	}
 
-	bucketStat, err = e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-
-	if bucketStat.BasicStats.ItemCount != 20 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 20", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	ValidateClusterEvents(t, xdcr1Kube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
@@ -275,17 +228,14 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	expectedXdcrCluster1Events := e2eutil.EventList{}
 	expectedXdcrCluster1Events.AddAdminConsoleSvcCreateEvent(xdcrCluster1)
 	for nodeIndex := 0; nodeIndex < e2eutil.Size3; nodeIndex++ {
-		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
+		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, nodeIndex)
 	}
+	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
-
-	xdcrCluster1_Crd, err := ReadClusterCrd(xdcrCluster1)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -301,36 +251,36 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 
 	expectedXdcrCluster2Events := e2eutil.EventList{}
 	expectedXdcrCluster2Events.AddAdminConsoleSvcCreateEvent(xdcrCluster2)
-	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
-		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
+	for nodeIndex := 0; nodeIndex < e2eutil.Size3; nodeIndex++ {
+		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, nodeIndex)
 	}
+	expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
+	expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "admin")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
 
-	xdcrCluster2_Crd, err := ReadClusterCrd(xdcrCluster2)
+	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	xdcr1KubeData, err := framework.GetKubeClusterForKubeName(xdcr1KubeName)
+	xdcr2KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	xdcr2KubeData, err := framework.GetKubeClusterForKubeName(xdcr2KubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl := xdcr1KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcr2KubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+
+	hostUrl := xdcr1KubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
+	destUrl := xdcr2KubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
+
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2_Crd.Status.ClusterId, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
@@ -342,12 +292,8 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 		t.Fatal(err)
 	}
 
-	bucketStat, err := e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 10 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 10", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	ValidateClusterEvents(t, xdcr1Kube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
@@ -384,11 +330,6 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
 
-	xdcrCluster1_Crd, err := ReadClusterCrd(xdcrCluster1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -411,28 +352,25 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
 
-	xdcrCluster2_Crd, err := ReadClusterCrd(xdcrCluster2)
+	defKubeHost, err := f.GetKubeHostname(defKubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	defKubeData, err := framework.GetKubeClusterForKubeName(defKubeName)
+	xdcrKubeHost, err := f.GetKubeHostname(xdcrKubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	xdcrKubeData, err := framework.GetKubeClusterForKubeName(xdcrKubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+
+	hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
+	destUrl := xdcrKubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2_Crd.Status.ClusterId, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
@@ -456,13 +394,10 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 		t.Fatal(err)
 	}
 
-	bucketStat, err := e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
-	if bucketStat.BasicStats.ItemCount != 10 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 10", bucketStat.BasicStats.ItemCount)
-	}
+
 	if triggerDuring == "afterXdcrSetup" {
 		go nodeDownFunc(0)
 	}
@@ -476,12 +411,8 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 		t.Fatal(err)
 	}
 
-	bucketStat, err = e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 20 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 20", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
@@ -517,11 +448,6 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
-
-	xdcrCluster1_Crd, err := ReadClusterCrd(xdcrCluster1)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -571,28 +497,23 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		go resizeFunction()
 	}
 
-	xdcrCluster2_Crd, err := ReadClusterCrd(xdcrCluster2)
+	defKubeHost, err := f.GetKubeHostname(defKubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	defKubeData, err := framework.GetKubeClusterForKubeName(defKubeName)
+	xdcrKubeHost, err := f.GetKubeHostname(xdcrKubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	xdcrKubeData, err := framework.GetKubeClusterForKubeName(xdcrKubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
+	destUrl := xdcrKubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2_Crd.Status.ClusterId, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
@@ -604,12 +525,8 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		t.Fatal(err)
 	}
 
-	bucketStat, err := e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 10 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 10", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	if triggerDuring == "afterXdcrSetup" {
@@ -625,12 +542,8 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		t.Fatal(err)
 	}
 
-	bucketStat, err = e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 20 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 20", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
@@ -666,11 +579,6 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "admin")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
-
-	xdcrCluster1_Crd, err := ReadClusterCrd(xdcrCluster1)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -716,28 +624,23 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		go serviceKillFunc()
 	}
 
-	xdcrCluster2_Crd, err := ReadClusterCrd(xdcrCluster2)
+	defKubeHost, err := f.GetKubeHostname(defKubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	defKubeData, err := framework.GetKubeClusterForKubeName(defKubeName)
+	xdcrKubeHost, err := f.GetKubeHostname(xdcrKubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	xdcrKubeData, err := framework.GetKubeClusterForKubeName(xdcrKubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
+	destUrl := xdcrKubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2_Crd.Status.ClusterId, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
@@ -749,12 +652,8 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		t.Fatal(err)
 	}
 
-	bucketStat, err := e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 10 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 10", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	if triggerDuring == "afterXdcrSetup" {
@@ -770,16 +669,9 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		t.Fatal(err)
 	}
 
-	bucketStat, err = e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
-	if bucketStat.BasicStats.ItemCount != 20 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 20", bucketStat.BasicStats.ItemCount)
-	}
-
-	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
-	ValidateClusterEvents(t, xdcrKube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 
 	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
 	ValidateClusterEvents(t, xdcrKube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
@@ -853,11 +745,6 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
 
-	xdcrCluster1_Crd, err := ReadClusterCrd(xdcrCluster1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -880,28 +767,23 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
 
-	xdcrCluster2_Crd, err := ReadClusterCrd(xdcrCluster2)
+	defKubeHost, err := f.GetKubeHostname(kubeName1)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	defKubeData, err := framework.GetKubeClusterForKubeName(kubeName1)
+	xdcrKubeHost, err := f.GetKubeHostname(kubeName2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	xdcrKubeData, err := framework.GetKubeClusterForKubeName(kubeName2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := xdcrKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster2_Crd.Status.AdminConsolePort
+	hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
+	destUrl := xdcrKubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2_Crd.Status.ClusterId, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
@@ -913,12 +795,8 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bucketStat, err := e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 10 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 10", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	// TLS handshake with pods
@@ -954,7 +832,6 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 
 	defKubeName := kubeNameList[0]
 	defKube := f.ClusterSpec[defKubeName]
-	externalVmClusterName := kubeNameList[1]
 
 	// Cluster 1
 	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithBucket, e2eutil.AdminExposed)
@@ -976,28 +853,23 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "data")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, "view")
 
-	xdcrCluster1_Crd, err := ReadClusterCrd(xdcrCluster1)
+	defKubeHost, err := f.GetKubeHostname(defKubeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	externalVmClusterData, err := f.GetHostNameFromUrl(kubeNameList[1])
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	defKubeData, err := framework.GetKubeClusterForKubeName(defKubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	externalVmClusterData, err := framework.GetKubeClusterForKubeName(externalVmClusterName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	hostUrl := defKubeData.MasterNodeList[0].Ip + ":" + xdcrCluster1_Crd.Status.AdminConsolePort
-	destUrl := externalVmClusterData.MasterNodeList[0].Ip + ":8091"
+	hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
+	destUrl := externalVmClusterData + ":8091"
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
-	externalCbClusterName := externalVmClusterData.ClusterName
+	externalCbClusterName := kubeNameList[1]
 
 	uuid, err := e2eutil.GetRemoteUuid(destUrl, cbUsername, cbPassword)
 	if err != nil {
@@ -1016,12 +888,8 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bucketStat, err := e2eutil.GetBucketInfo(destUrl, destBucketName, cbUsername, cbPassword)
-	if err != nil {
-		t.Fatalf("Failed to get bucket info: %s", err.Error())
-	}
-	if bucketStat.BasicStats.ItemCount != 100 {
-		t.Fatalf("Replication count did not match. Item count is %d, expecting 100", bucketStat.BasicStats.ItemCount)
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 100, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 
 	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)

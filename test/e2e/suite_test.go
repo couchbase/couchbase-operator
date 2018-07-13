@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"os"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -39,7 +40,7 @@ func runSuite(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			kubeConfigPath := ymlFilePath + "/" + f.KubeType + "/config_" + kubeCluster.ClusterName
+			kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeCluster.ClusterName
 			clusterSpec, err := framework.CreateKubeClusterObject(kubeConfigPath)
 			if err != nil {
 				t.Fatal(err)

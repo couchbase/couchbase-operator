@@ -191,20 +191,6 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 	return
 }
 
-func GetKubeClusterForKubeName(targetKubeName string) (kubeClusterData ClusterInfo, err error) {
-	kubeClustersToSetup, err := GetClusterConfigFromYml(Global.ClusterConfFile, Global.KubeType, []string{targetKubeName})
-	if err != nil {
-		return
-	}
-	for _, kubeCluster := range kubeClustersToSetup {
-		if kubeCluster.ClusterName == targetKubeName {
-			kubeClusterData = kubeCluster
-			return
-		}
-	}
-	return
-}
-
 // Function to read Suite and required cluster info from suite.yaml file
 func GetSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)

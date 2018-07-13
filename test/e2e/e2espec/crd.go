@@ -171,7 +171,6 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 	if exposed {
 		crd.Spec.ExposeAdminConsole = true
 	}
-	fmt.Printf("crd: %+v\n", crd)
 	return crd
 }
 

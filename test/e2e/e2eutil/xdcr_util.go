@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type cbClusterInfo struct {
@@ -21,7 +22,7 @@ type cbBucketInfo struct {
 		DiskUsed         int     `json:"diskUsed"`
 		ItemCount        int     `json:"itemCount"`
 		MemUsed          int     `json:"memUsed"`
-		OpsPerSec        int     `json:"opsPerSec"`
+		OpsPerSec        float32 `json:"opsPerSec"`
 		QuotaPercentUsed float32 `json:"quotaPercentUsed"`
 	} `json:"basicStats"`
 }
@@ -82,6 +83,27 @@ func PopulateBucket(hostUrl, bucketName, hostUsername, hostPassword string, numO
 		}
 	}
 	return nil, nil
+}
+
+func VerifyDocCountInBucket(url, bucketName, userName, password string, reqNumOfDocs, maxRetries int) error {
+	docMatched := false
+	currDocCount := 0
+	for retryCount := 0; retryCount < maxRetries; retryCount++ {
+		bucketStat, err := GetBucketInfo(url, bucketName, userName, password)
+		if err != nil {
+			return errors.New("Failed to get bucket info: " + err.Error())
+		}
+		currDocCount = bucketStat.BasicStats.ItemCount
+		if currDocCount == reqNumOfDocs {
+			docMatched = true
+			break
+		}
+		time.Sleep(time.Second * 5)
+	}
+	if !docMatched {
+		return errors.New("Replication count did not match. Item count is " + strconv.Itoa(currDocCount) + " expecting " + strconv.Itoa(reqNumOfDocs))
+	}
+	return nil
 }
 
 func GetRemoteUuid(hostUrl, cbUsername, cbPassword string) (uuid string, err error) {

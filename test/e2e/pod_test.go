@@ -333,6 +333,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 		t.Fatalf("Member %d added despite anti-affinity", memberId)
 	}
 	t.Logf("Failed to add extra cluster node: %v", err)
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, memberId)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 

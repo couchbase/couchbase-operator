@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -396,6 +397,19 @@ func (f *Framework) deleteCouchbaseOperator(targetKube *Cluster, deploymentName 
 
 func (f *Framework) ApiServerHost(kubeName string) string {
 	return f.ClusterSpec[kubeName].Config.Host
+}
+
+func (f *Framework) GetHostNameFromUrl(hostUrl string) (string, error) {
+	u, err := url.Parse(hostUrl)
+	if err != nil {
+		return "", err
+	}
+	return u.Hostname(), nil
+}
+
+func (f *Framework) GetKubeHostname(kubeName string) (string, error) {
+	targetHost := f.ClusterSpec[kubeName].Config.Host
+	return f.GetHostNameFromUrl(targetHost)
 }
 
 func (f *Framework) PodClient(kubeName string) typedv1.PodInterface {
