@@ -438,11 +438,14 @@ func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *cbapi.BucketConfig)
 	}
 
 	// make sure bucket exists
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "create bucket", c.clusterName,
-		func() error {
-			_, err := c.client.BucketReady(bucket.BucketName)
-			return err
-		})
+	return retryutil.Retry(c.ctx, 5*time.Second, ExtendedRetryCount, func() (bool, error) {
+		_, err := c.client.BucketReady(bucket.BucketName)
+		// Bucket doesn't exist, someone deleted it.
+		if cbmgr.IsServerError(err, 404) {
+			return false, fmt.Errorf("Bucket %s does not exist", bucket.BucketName)
+		}
+		return err == nil, nil
+	})
 }
 
 func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucketName string) error {
