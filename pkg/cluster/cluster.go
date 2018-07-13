@@ -118,12 +118,12 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 
 	go func() {
 		if err := c.setup(); err != nil {
-			c.logger.Errorf("cluster failed to setup: %v", err)
+			c.logger.Errorf("Cluster setup failed: %v", err)
 			if c.status.Phase != api.ClusterPhaseFailed {
 				c.status.SetReason(err.Error())
 				c.status.SetPhase(api.ClusterPhaseFailed)
 				if err := c.updateCRStatus(); err != nil {
-					c.logger.Errorf("failed to update cluster phase (%v): %v",
+					c.logger.Errorf("Failed to update cluster phase (%v): %v",
 						api.ClusterPhaseFailed, err)
 				}
 			}
@@ -171,7 +171,7 @@ func (c *Cluster) setup() error {
 	case api.ClusterPhaseRunning:
 		shouldCreateCluster = false
 	default:
-		return fmt.Errorf("unexpected cluster phase: %s", c.status.Phase)
+		return fmt.Errorf("Unexpected cluster phase: %s", c.status.Phase)
 	}
 
 	if err := c.setupAuth(c.cluster.Spec.AuthSecret); err != nil {
@@ -186,6 +186,8 @@ func (c *Cluster) setup() error {
 		if err := c.create(); err != nil {
 			return err
 		}
+	} else {
+		c.logger.Infof("Cluster already exists, the operator will now manage it")
 	}
 
 	// Once the cluster is guaranteed to exist, extract the UUID and inject
@@ -197,27 +199,28 @@ func (c *Cluster) setup() error {
 }
 
 func (c *Cluster) create() error {
+	c.logger.Infof("Cluster does not exist so the operator is attempting to create it")
 	c.status.SetPhase(api.ClusterPhaseCreating)
 	c.status.SetVersion(c.cluster.Spec.Version)
 
 	if err := c.updateCRStatus(); err != nil {
-		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
+		return fmt.Errorf("Cluster create: failed to update cluster phase (%v): %v",
 			api.ClusterPhaseCreating, err)
 	}
 
 	if len(c.cluster.Spec.ServerSettings) == 0 {
-		return fmt.Errorf("cluster create: no server specification defined")
+		return fmt.Errorf("Cluster create: no server specification defined")
 	}
 
 	idx := c.indexOfServerConfigWithService(api.DataService)
 	if idx == -1 {
-		return fmt.Errorf("cluster create: at least one server specification must contain the `data` service")
+		return fmt.Errorf("Cluster create: at least one server specification must contain the `data` service")
 	}
 
 	// Set up services e.g. DNS records before calling WaitForPod which will poll
 	// for the admin port via a DNS lookup
 	if err := c.setupServices(); err != nil {
-		return fmt.Errorf("cluster create: fail to create services: %v", err)
+		return fmt.Errorf("Cluster create: fail to create services: %v", err)
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
@@ -226,7 +229,7 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	c.logger.Infof("added member (%s)", m.Name)
+	c.logger.Infof("Operator added member (%s) to manage", m.Name)
 	c.raiseEvent(k8sutil.MemberAddEvent(m.Name, c.cluster))
 
 	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
@@ -244,12 +247,14 @@ func (c *Cluster) create() error {
 }
 
 func (c *Cluster) setupServices() error {
+	c.logger.Infof("Creating headless service for data nodes")
 	err := k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
 	if err != nil {
 		return err
 	}
 	if c.cluster.Spec.ExposeAdminConsole {
-
+		c.logger.Infof("Creating NodePort UI service (%s) for %s nodes", k8sutil.AdminServiceName(c.cluster.Name),
+			strings.Join(c.cluster.Spec.AdminConsoleServices.StringSlice(), ","))
 		svc, err := c.createUIService(c.cluster.Spec.AdminConsoleServices)
 		if err != nil {
 			return err
@@ -417,6 +422,7 @@ func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig
 		version = c.status.UpgradeStatus.TargetVersion
 	}
 
+	c.logger.Infof("Creating a pod (%s) running Couchbase %s", m.Name, version)
 	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, c.ctx)
 	return err
 }
@@ -594,6 +600,12 @@ func (c *Cluster) setupAuth(authSecret string) error {
 }
 
 func (c *Cluster) initCouchbaseClient() error {
+	secureStr := ""
+	if c.isSecureClient() {
+		secureStr = "secure "
+	}
+	c.logger.Infof("Setting up %sclient for operator communication with the cluster", secureStr)
+
 	c.client = couchbaseutil.NewCouchbaseClient(c.ctx, c.cluster.Name, c.username, c.password)
 
 	if c.isSecureClient() {

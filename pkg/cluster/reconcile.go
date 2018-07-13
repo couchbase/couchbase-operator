@@ -472,8 +472,9 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 	return nil
 }
 
-// initializes member with cluster settings
+// initializes the first member in the cluster
 func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
+	c.logger.Infof("Initializing the first node in the cluster")
 	settings := c.cluster.Spec.ClusterSettings
 
 	defaults := &cbmgr.PoolsDefaults{
