@@ -358,6 +358,7 @@ func runExecCommand(t *testing.T, command *exec.Cmd) error {
 		t.Log(stdout.String())
 		return errors.New("Error during ansible execution: " + stderr.String() + "\n" + err.Error())
 	}
+	t.Log(stdout.String())
 	return nil
 }
 

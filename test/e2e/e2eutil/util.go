@@ -235,11 +235,11 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 // Performs retries and garbage collection in the event of transient failure
 func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, clusterSpec *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	var err error
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 1; i++ {
 		time.Sleep(10 * time.Second)
 
 		retries := &ClusterReadyRetries{
-			Size:    Retries120,
+			Size:    Retries30,
 			Bucket:  Retries20,
 			Service: Retries20,
 		}

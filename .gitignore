@@ -12,5 +12,9 @@
 /pkg/generated/
 /pkg/revision/revision.go
 /test/e2e/logs/
-/test/e2e/resources/**
+/test/e2e/resources/*.yaml
+/test/e2e/resources/suites/TestCustom.yaml
+/test/e2e/resources/ansible/*Cluster*
+/test/e2e/resources/ansible/generic/*.retry
+/test/e2e/resources/ansible/kubernetes/*.retry
 example/crd.yaml

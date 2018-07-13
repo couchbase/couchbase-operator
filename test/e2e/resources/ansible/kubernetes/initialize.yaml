@@ -4,6 +4,18 @@
     k8sConfFileContent: "net.bridge.bridge-nf-call-ip6tables = 1\nnet.bridge.bridge-nf-call-iptables = 1\n"
 
   tasks:
+    - name: Drain all nodes
+      shell: kubectl delete node --all
+      ignore_errors: yes
+
+    - name: Resetting kubeadm
+      shell: kubeadm reset
+      ignore_errors: yes
+
+    - name: Deleteing docker containers
+      shell: docker rm -f $(docker ps -a -q)
+      ignore_errors: yes
+
     - name: Adding Kubernetes repo
       yum_repository:
         name: Kubernetes
@@ -18,49 +30,49 @@
 
     - name: Commenting swap volume in /etc/fstab
       shell: sed -i.bak '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Turning off swap partition
       shell: swapoff -a
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Disabling SELinux
       lineinfile:
         dest: /etc/sysconfig/selinux
         regexp: 'SELINUX=.*$'
         line: 'SELINUX=disabled'
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: setenforce to 0
       shell: setenforce 0
       ignore_errors: yes
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Stopping firewall
       shell: systemctl stop firewalld.service
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Disabling firewall
       shell: systemctl disable firewalld
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Masking firewall
       shell: systemctl mask firewalld.service
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Load sysctl data
       shell: sysctl --system
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Rebooting host
       shell: 'shutdown -r +1 "Reboot triggered by Ansible"'
       async: yes
-      tags: one_time_configuration
+      #tags: one_time_configuration
  
     - wait_for_connection:
         delay: 90
         timeout: 300
-      tags: one_time_configuration
+      #tags: one_time_configuration
 
     - name: Removing hosts data from /etc/hosts
       lineinfile:

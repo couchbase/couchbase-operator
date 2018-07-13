@@ -1,0 +1,28 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sdk-test
+spec:
+  template:
+    metadata:
+      name: sdk-test
+    spec:
+      containers:
+      - name: sdk-test
+        image: sdk-s435.sc.couchbase.com/sdkd-java-client:centos_7__sdkdc_754aab3__sdkd_3f5223b__java_1.6.0
+        env:
+          - name: NODE1
+            value: "cb-example-0000.cb-example.default.svc"
+          - name: NODE2
+            value: "cb-example-0001.cb-example.default.svc"
+          - name: NODE3
+            value: "cb-example-0002.cb-example.default.svc"
+          - name: NODE4
+            value: "cb-example-0003.cb-example.default.svc"
+        #command: ["sleep", "99999999"]
+        args: ["-I", "watson-basic2.ini", "--install-skip=true", "--bucket-password=password",
+               "--basic-wait=600", "--testsuite-variants=HYBRID", "--testsuite-test=passthrough",
+               "-d", "all:debug", "-A", "S3Creds_tmp", "-C", "share/rexec",
+               "--rexec_path=/root/sdkd-java/run-sdkd-java", "--rexec-port", "8050"]
+      restartPolicy: Never

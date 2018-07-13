@@ -3,8 +3,8 @@ suite: TestSystem
 tcGroups:
   - name: Group1
     clusters:
-      - SystemTestCluster1
+      - AuxillaryCluster1
     testcases:
       - name: TestFeaturesAll
-        decorators:
-          - rsaDecorator
+        #decorators:
+        #  - rsaDecorator
