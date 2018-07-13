@@ -385,7 +385,7 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 		"ansible_connection":      "ssh",
 		"ansible_ssh_user":        "root",
 		"ansible_ssh_pass":        "couchbase",
-		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no",
+		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
 	}
 	masterSectionData := ""
 	workerSectionData := ""
