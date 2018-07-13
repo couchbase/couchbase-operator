@@ -10,7 +10,7 @@ The following steps are required when deploying on a cloud spanning multiple ava
 
 
 [[nodelabels]]
-=== Label Nodes
+== Label Nodes
 
 Kubernetes nodes must be labeled according to the zones they are physically located so that we can be sure Persistent Volumes are also provisioned into the same zone as the node.  The key `server-group.couchbase.com/zone` must be used when creating the label.  For example, to label a node in ec2 within zone 'us-east-1a':
 
@@ -22,7 +22,7 @@ kubectl label nodes ip-172-16-0-10 server-group.couchbase.com/zone=us-east-1a
 For more information about Labeling nodes, see xref:server-groups.adoc[Server Groups] Guide.
 
 [[addsg]]
-=== Add Server Groups to configuration
+== Add Server Groups to configuration
 
 Once nodes are labeled according to their associating zones, these zones are added to the Couchbase Cluster spec as `Server Groups`.  Server Groups will ensure that the Operator creates Pods in a specific zone.  The following demonstrates configuring couchbase to deploy pods across 3 zone:
 
@@ -60,7 +60,7 @@ spec:
 Note: *ONLY ONE* server group should be used for each group of `spec.servers[*].serverGroups`.  This is because later in the configuration you'll notice that there is a 1:1 ratio between Storage Class and Server Groups and having multiple Server Groups would cause some Pods to be created in a different zone than the Storage Class is able to create Volumes.
 
 [[createsc]]
-=== Create Zoned Storage Classes
+== Create Zoned Storage Classes
 
 The first 2 steps deal with deploying Pods into a specific availability zones, while the next 2 steps deal with deploying Persistent Volumes into specific availability zones.  This is necessary because the default behavior of a Storage Class is to create Persistent Volumes in a round-robbin fashion across zones which unfortunately leads to Scheduling conflicts when a Pod attempts to mount a Volume that gets created outside of it's availability zone.  For example, a Volume created in zone `us-east-1a` cannot be mounted by Pods scheduled in zone `us-east-1b`. Therefore a kubernetes https://kubernetes.io/docs/concepts/storage/storage-classes/[Storage Class] must be created for each zone designated to host Pods with persistent Volumes.
 
@@ -84,7 +84,7 @@ reclaimPolicy: Delete
 
 
 [[addsc]]
-=== Add Storage Classes to Configuration
+== Add Storage Classes to Configuration
 
 Storage Classes are used by the Persistent Volume Claim Templates to dynamically create Volumes for the Pods.  Since we have a Storage Class for each zone, we'll need to create a Persistent Volume Claim Template for each Zone.
 
