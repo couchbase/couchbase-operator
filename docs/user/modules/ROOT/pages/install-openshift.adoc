@@ -1,82 +1,120 @@
 = Installing on OpenShift
 
-In this setup guide we will walk through the recommended procedure for setting up the Couchbase Operator in an OpenShift project. This guide assumes that you are installing on a new OpenShift cluster, that you have access to a user with cluster-admin privileges (`system:admin` in this guide), and that you have a standard user without cluster-admin privileges (`developer` in this guide). If you have an existing system and need to do a custom setup, then you should be able to modify a few of the parameters in the various commands and configuration files in order to install the Couchbase Operator.
+This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator in a Red Hat OpenShift project.
 
-NOTE: Please refer to the xref:kubernetes-rbac.adoc[RBAC doumentation] before undertaking this quickstart guide as your developemnt environment may differ from that upon which this is based.
+.This guide assumes the following:
+
+* You have a working knowledge of OpenShift and Kubernetes
+* You are installing on a new OpenShift cluster
+* You have access to an OpenShift user that has cluster-admin privileges (`system:admin` in this guide)
+* You have access to a standard OpenShift user without cluster-admin privileges (`developer` in this guide).
+
+If you have an OpenShift environment that already has a custom setup (non-default), you should be able to modify a few of the parameters in the various commands and configuration files mentioned in this guide in order to fit your requirements.
+
+IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your OpenShift environment. Refer to the  xref:kubernetes-rbac.adoc[RBAC doumentation] before you install the Operator, as your OpenShift environment may differ from the environment upon which this guide is based.
 
 == Create an OpenShift Project
 
-Before installing the Couchbase Operator into OpenShift, you should create a project with the `developer` user. For this guide we will create a project called `operator-example`, and later we will make sure that the `developer` user has the ability to manage the Couchbase Operator and Couchbase clusters in this project. To create a project, run the following commands:
-
- $ oc login -u developer
- $ oc new-project operator-example
- $ oc logout
-
-== Creating the Custom Resource Definition
-
-The next step in setting up the Couchbase Operator is to install the CouchbaseCluster Custom Resource Definition (CRD). The Couchbase Operator can do this for you automatically, but in OpenShift it's better to do it manually since installing CRDs is a cluster-level operation and requires cluster-level permissions that should not be given to typical users.
-
-To install the CRD, log in as the system:admin user and run the following command:
-
- $ oc login -u system:admin
- $ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/crd.yaml
-
-NOTE: You only need to install the CRD once. After that, the Couchbase Operator can be created in any OpenShift project.
-
-== Creating a Role and Service Account for the Operator
-
-You need to create a role that allows the Operator to access the resources it needs to run. Since the Couchbase Operator might run in many different projects, it is best to create a _ClusterRole_ because you can assign that role to a _ServiceAccount_ in any OpenShift project.
-
-To create the ClusterRole for the Couchbase Operator, run the following command as the system:admin user:
-
- $ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/cluster-role-sa.yaml
-
-NOTE: You only need to create the ClusterRole once.
-
-After the ClusterRole is created, you need to create a _ServiceAccount_ in the project where you are installing the Couchbase Operator, and then assign the ClusterRole to that ServiceAccount using a _RoleBinding_. (A ServiceAccount is used as opposed to a User for the Couchbase Operator because ServiceAccounts are meant to be used for processes running in OpenShift.)
-
- $ oc create serviceaccount couchbase-operator --namespace operator-example
- $ oc create rolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount operator-example:couchbase-operator
-
-NOTE: To set up a ServiceAccount for the operator in another OpenShift project, repeat the steps above.
-
-== Creating a Role for a User
-
-Next, since the `developer` user needs to be able to create and delete the Couchbase cluster, you need to create another ClusterRole that gives permissions to handle management of the CouchbaseCluster resource.
-
-Run the following command to create the ClusterRole for `developer`:
+The first thing that you need to do is use a standard OpenShift user to create a https://docs.openshift.com/container-platform/3.9/architecture/core_concepts/projects_and_users.html#projects[project] where the Operator will reside:
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/cluster-role-user.yaml
+$ oc login -u developer
+$ oc new-project operator-example
+$ oc logout
 ----
 
-Next you need to allow the `developer` user to be able to manage the CouchbaseCluster resource in the `operator-example` project.
+In this example, the standard user is `developer`, and the project is `operator-example`. Later in this guide you will give `developer` the ability to manage the Operator and the Couchbase Server clusters in `operator-example`.
 
- $ oc create rolebinding couchbasecluster-developer --clusterrole couchbasecluster --user developer --namespace operator-example
+== Install the Custom Resource Definition
 
-If you want the `developer` user to be able to manage CouchbaseCluster objects in all projects, then you can run the following command instead:
+The next step in setting up the Operator is to install the CouchbaseCluster custom resource definition (CRD). The Operator can do this for you automatically (xref:install-kubernetes.adoc[as it does when installing on open source Kubernetes]), but in OpenShift it's better to do it manually because installing a CRD is a cluster-level operation and requires cluster-level permissions that should not be given to typical users.
+
+To install the CRD, log in as an OpenShift user that has cluster-admin privileges (in this case `system:admin`) and run the following command:
+
+[source,console]
+----
+$ oc login -u system:admin
+$ oc create -f https://packages.couchbase.com/kubernetes/0.9/openshift/crd.yaml
+----
+
+NOTE: You only need to install the CRD once. After that, you can create the Operator in any OpenShift project.
+
+== Create a Role and Service Account for the Operator
+
+You need to create a https://docs.openshift.com/container-platform/3.9/architecture/additional_concepts/authorization.html#roles[role] in OpenShift that allows the Operator to access the resources that it needs to run. Since the Operator might run in many different projects, it's best to create a _cluster role_ because you can assign that role to a https://docs.openshift.com/container-platform/3.9/dev_guide/service_accounts.html[service account] in any OpenShift project.
+
+To create the cluster role for the Operator, run the following command as the `system:admin` user:
+
+[source,console]
+----
+oc create -f https://packages.couchbase.com/kubernetes/0.9/openshift/cluster-role-sa.yaml
+----
+
+NOTE: You only need to create the cluster role once.
+
+After the cluster role is created, you need to create a service account in the project where you are installing the Operator, and then assign the cluster role to that service account using a https://docs.openshift.com/container-platform/3.9/admin_guide/manage_rbac.html[role binding]:
+
+[source,console]
+----
+$ oc create serviceaccount couchbase-operator --namespace operator-example
+$ oc create rolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount operator-example:couchbase-operator
+----
+
+A service account is used as opposed to a traditional user for the Operator because service accounts are meant to be used for processes running in OpenShift.
+
+TIP: To set up a service account for the Operator in another OpenShift project, repeat these steps again in that project.
+
+== Create a Role for a User
+
+Since the `developer` user needs to be able to create and delete the Couchbase cluster, you need to create another cluster role with permissions to handle the management of the CouchbaseCluster resource.
+
+Run the following command to create the cluster role for `developer`:
+
+[source,console]
+----
+oc create -f https://packages.couchbase.com/kubernetes/0.9/openshift/cluster-role-user.yaml
+----
+
+Next, you need to allow `developer` to be able to manage the CouchbaseCluster resource in the `operator-example` project:
+
+[source,console]
+----
+oc create rolebinding couchbasecluster-developer --clusterrole couchbasecluster --user developer --namespace operator-example
+----
+
+Alternatively, if you want `developer` to be able to manage CouchbaseCluster objects in all projects, then you can run the following command instead:
 
 [source,console]
 ----
 oc create clusterrolebinding couchbasecluster-developer --clusterrole couchbasecluster --user developer
 ----
 
-NOTE: If you wish to create role bindings for multiple users either at the cluster or namespace level they will need to have unique names.  In the above examples if we were to create a role binding for user `alice` we'd use the name `couchbasecluster-alice` in place of `couchbasecluster-developer`.
+NOTE: If you want to create role bindings for multiple users either at the cluster or namespace level, they will need to have unique names. In the previous examples, if you were to create a role binding for user `alice`, you'd use the name `couchbasecluster-alice` in place of `couchbasecluster-developer`.
 
-== Starting the Operator
+== Create the Operator
 
-At this point you can now create the Couchbase Operator with the `developer` user in the `operator-example` project. To start the Couchbase Operator, run the following command:
+At this point you can now use the `developer` user to create the Operator in the `operator-example` project. To create and start the Operator, run the following command:
 
- $ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/openshift/operator.yaml
+[source,console]
+----
+oc create -f https://packages.couchbase.com/kubernetes/0.9/openshift/operator.yaml
+----
 
-Running this command downloads the Couchbase Operator Docker image that is specified in the `operator.yaml` file and creates a _deployment_ which manages a single instance of the Couchbase Operator. The Couchbase Operator uses a deployment so that it can restart if the pod it's running in dies.
+Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment] which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
 
-After you run the `oc create` command, it generally takes less than 1 minute for OpenShift to deploy the Operator and for the Operator to be ready to run. Using the following commands, you can check the status of the Operator and see the status of your deployment.
+After you run the `oc create` command, it generally takes less than a minute for OpenShift to deploy the Operator and for the Operator to be ready to run.
 
- $ oc get deployments -l app=couchbase-operator
+=== Check the Status of the Deployment
 
-If you run this command immediately after the operator is deployed, the output will look something like this:
+You can use the following command to check on the status of the deployment:
+
+[source,console]
+----
+oc get deployments -l app=couchbase-operator
+----
+
+If you run the previous command immediately after the Operator is deployed, the output will look something like the following:
 
 [source,console]
 ----
@@ -84,9 +122,9 @@ NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator   1         1         1            0           10s
 ----
 
-In this case, the deployment is called "couchbase-operator". The DESIRED field in the output shows that this deployment will create 1 pod running the Couchbase Operator. The CURRENT field shows that 1 Couchbase Operator pod has been created. However, the AVAILABLE field indicates that that pod is not ready yet since its value is 0 and not 1. This means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task it will be able to start managing Couchbase clusters and the status will be shown as AVAILABLE.
+In this case, the deployment is called `couchbase-operator`. The `DESIRED` field in the output shows that this deployment will create one pod running the Operator. The `CURRENT` field shows that one Operator pod has been created. However, the `AVAILABLE` field indicates that the pod is not ready yet since its value is 0 and not 1. That means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task, it will be able to start managing Couchbase Server clusters and the status will be shown as `AVAILABLE`.
 
-You should continue to poll the status of the Operator until your output looks similar to the following output:
+You should continue to poll the status of the Operator until the output looks similar to the following:
 
 [source,console]
 ----
@@ -94,14 +132,16 @@ NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator   1         1         1            1           47s
 ----
 
-You can also verify that the Couchbase Operator has come up successfully using the following command:
+=== Check the Status of the Operator
+
+You can use the following command to verify that the Operator has started successfully:
 
 [source,console]
 ----
 oc get pods -l app=couchbase-operator
 ----
 
-If the Couchbase Operator is up and running successfully, the command returns an output where the READY field shows 1/1, such as:
+If the Operator is up and running, the command returns an output where the `READY` field shows 1/1, such as:
 
 [source,console]
 ----
@@ -109,7 +149,7 @@ NAME                                  READY   STATUS   RESTARTS   AGE
 couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
 ----
 
-You can also check the logs to confirm that the Couchbase Operator is up and running. Look for the message: "starting couchbaseclusters controller".
+You can also check the logs to confirm that the Operator is up and running. Look for the message: `starting couchbaseclusters controller`
 
 [source,console]
 ----
@@ -123,30 +163,33 @@ time="2018-04-25T03:02:13Z" level=info msg="Event(v1.ObjectReference{Kind:\"Endp
 time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controller"
 ----
 
-The next step you may wish to perform is the xref:deploying-couchbase.adoc[deployment of a Couchbase cluster].
+== Next Steps
 
-== Uninstall
+Install the xref:cbopctl.adoc[cbopctl] command line tool and use it to xref:deploying-couchbase.adoc[deploy a Couchbase Server cluster].
 
-Uninstalling the Couchbase Operator is a two-step process.
+== Uninstalling the Operator
 
-. Delete the Couchbase Operator
+.Uninstalling the Operator is a two-step process:
+
+. Delete the Operator.
 +
-You can delete the Couchbase Operator as the `developer` or `system:admin` user.
+You can delete the Operator as the `developer` or `system:admin` user.
 +
 [source,console]
 ----
-$ kubectl delete deployment couchbase-operator
+kubectl delete deployment couchbase-operator
 ----
 +
-NOTE: Deleting the Couchbase Operator from a namespace will not remove or affect any Couchbase pods in your Kubernetes cluster.
+NOTE: Deleting the Operator from a namespace will not remove or affect any Couchbase pods in your Kubernetes cluster.
 
-. Delete the CRD
+. Delete the CRD.
 +
-You can only delete the CRD as the `system:admin` user.
+NOTE: You can only delete the CRD as the `system:admin` user.
 +
-Make sure the Couchbase Operator has been deleted from all other OpenShift projects in the cluster before you delete the CRD. Once the Couchbase Operator has been deleted, run the following command to delete the CRD:
+
+Make sure the Operator has been deleted from all other OpenShift projects in the cluster before you delete the CRD. Once the Operator has been deleted, run the following command to delete the CRD:
 +
 [source,console]
 ----
-$ kubectl delete crd couchbaseclusters.couchbase.database.couchbase.com
+kubectl delete crd couchbaseclusters.couchbase.database.couchbase.com
 ----
