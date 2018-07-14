@@ -3,9 +3,7 @@ package v1
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -441,25 +439,4 @@ func intPtrEquals(p1, p2 *int) bool {
 // Returns true of the values of two pointers are equal
 func boolPtrEquals(p1, p2 *bool) bool {
 	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
-}
-
-// GetPodIndex retrieves the pod generation index from the cluster
-func (c *CouchbaseCluster) GetPodIndex() (int, error) {
-	indexRaw, ok := c.Annotations[constants.PodIndexAnnotation]
-	if !ok {
-		return -1, fmt.Errorf("unable to retrieve pod index")
-	}
-	index, err := strconv.Atoi(indexRaw)
-	if err != nil {
-		return -1, fmt.Errorf("unable to parse pod index: %v", err)
-	}
-	return index, nil
-}
-
-// SetPodIndex sets the pod generation index for the cluster
-func (c *CouchbaseCluster) SetPodIndex(index int) {
-	if c.Annotations == nil {
-		c.Annotations = map[string]string{}
-	}
-	c.Annotations[constants.PodIndexAnnotation] = strconv.Itoa(index)
 }

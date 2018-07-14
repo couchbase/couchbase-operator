@@ -29,11 +29,7 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 
 // What would the next member name allocated by the cluster be?
 func (c *Cluster) nextMemberName() string {
-	index, err := c.getPodIndex()
-	if err != nil {
-		// TODO: propagate an error
-		return ""
-	}
+	index := c.getPodIndex()
 	return couchbaseutil.CreateMemberName(c.cluster.Name, index)
 }
 

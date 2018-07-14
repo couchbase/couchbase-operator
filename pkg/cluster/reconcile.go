@@ -133,13 +133,8 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	// Allocate an index to be used in the name.  Get the current index then increment
 	// and commit back to etcd.  That way we are guaranteed to never have conflicting
 	// names
-	index, err := c.getPodIndex()
-	if err != nil {
-		return nil, err
-	}
-	if err := c.incPodIndex(); err != nil {
-		return nil, err
-	}
+	index := c.getPodIndex()
+	c.incPodIndex()
 
 	// Create a new member
 	newMember := c.newMember(index, serverSpec.Name)

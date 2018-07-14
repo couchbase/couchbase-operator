@@ -93,11 +93,6 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
 	}
 
-	// Initialise the pod name index annotation before creating any pods
-	if _, err := c.getPodIndex(); err != nil {
-		c.setPodIndex(0)
-	}
-
 	// Cancel is used to abort the go routine when the operator is deleted
 	// The logger value is used by other clients who don't have access to the
 	// per cluster log
@@ -727,34 +722,26 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 }
 
 // getPodIndex returns the current pod naming index
-func (c *Cluster) getPodIndex() (int, error) {
-	return c.cluster.GetPodIndex()
+func (c *Cluster) getPodIndex() int {
+	return c.status.Members.Index
 }
 
 // setPodIndex updates the current pod naming index and commits to etcd
 func (c *Cluster) setPodIndex(index int) {
-	c.cluster.SetPodIndex(index)
+	c.status.Members.Index = index
 	if err := c.updateCRStatus(); err != nil {
 		c.logger.Warnf("failed to update custom resource pod index: %v", err)
 	}
 }
 
 // incPodIndex gets the current pod naming index and increments it
-func (c *Cluster) incPodIndex() error {
-	index, err := c.getPodIndex()
-	if err != nil {
-		return err
-	}
+func (c *Cluster) incPodIndex() {
+	index := c.status.Members.Index
 	c.setPodIndex(index + 1)
-	return nil
 }
 
 // decPodIndex gets the current pod naming index and decrements it
-func (c *Cluster) decPodIndex() error {
-	index, err := c.getPodIndex()
-	if err != nil {
-		return err
-	}
+func (c *Cluster) decPodIndex() {
+	index := c.status.Members.Index
 	c.setPodIndex(index - 1)
-	return nil
 }
