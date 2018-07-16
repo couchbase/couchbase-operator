@@ -210,7 +210,7 @@ func NewBucket(name string) map[string]string {
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
 	//kubeName := "BasicCluster"
-	kubeName := "SystemTestCluster1"
+	kubeName := "AuxillaryCluster1"
 	targetKube := f.ClusterSpec[kubeName]
 
 	// cluster configuration, 10 buckets, 4 nodes, all services
@@ -222,7 +222,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		"autoFailoverTimeout":   "120",
 	}
 	serviceConfig1 := map[string]string{
-		"size":     "2",
+		"size":     "4",
 		"name":     "test_config_1",
 		"services": "data,query,index",
 	}
@@ -376,10 +376,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	//create rbac user, required for some operation to succeed
 	rbacOp := operation{
-		name:    "create-user",
+		name:    "create-user-1",
 		image:   "sequoiatools/couchbase-cli:v5.0.1",
 		cmd:     []string{"couchbase-cli", "user-manage", "-c", "{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--set", "--rbac-username", "default_user", "--rbac-password", "password", "--roles", "admin", "--auth-domain", "local"},
 		timeout: 2,
+		wait:     true,
 	}
 	rbacOp = SupplyScope(testScope, rbacOp)
 	jobSpec := CreateJobSpec(rbacOp)
@@ -393,10 +394,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	time.Sleep(3 * time.Second)
 
 	rbacOp = operation{
-		name:    "create-user",
+		name:    "create-user-2",
 		image:   "sequoiatools/couchbase-cli:v5.0.1",
 		cmd:     []string{"couchbase-cli", "user-manage", "-c", "{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--set", "--rbac-username", "default", "--rbac-password", "password", "--roles", "admin", "--auth-domain", "local"},
 		timeout: 2,
+		wait:     true,
 	}
 	rbacOp = SupplyScope(testScope, rbacOp)
 	jobSpec = CreateJobSpec(rbacOp)
@@ -471,7 +473,6 @@ outerLoop:
 
 		cycles = cycles + 1
 		time.Sleep(1 * time.Second)
-		break outerLoop
 	}
 }
 
@@ -489,17 +490,18 @@ func TestFeaturesAll(t *testing.T) {
 				name:    "pillowfight-cluster1-1",
 				image:   "sequoiatools/pillowfight:v5.0.1",
 				cmd:     []string{"cbc-pillowfight", "-U", "couchbase://{{FIRST_NODE_CLUSTER1}}/default?select_bucket=true", "-I", "10000", "-B", "1000", "-c", "10", "-t", "1", "-u", "default_user", "-P", "password"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
 				name:     "pillowfight-htp-cluster1-1",
 				image:    "sequoiatools/pillowfight:v5.0.1",
 				cmd:      []string{"cbc-pillowfight", "-U", "couchbase://{{FIRST_NODE_CLUSTER1}}/default?select_bucket=true", "-I", "1000", "-B", "100", "-c", "100", "-t", "4", "-u", "default_user", "-P", "password"},
-				wait:     true,
-				timeout:  10,
-				duration: 11,
+				wait:     false,
+				timeout:  2,
+				duration: 1,
 			},
 			// create index cluster 1
 			{
@@ -508,7 +510,7 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='create index default_rating on `default`(rating)'"},
 				wait:     true,
-				timeout:  10,
+				timeout:  2,
 				duration: 1,
 			},
 
@@ -518,7 +520,7 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='create primary index on default'"},
 				wait:     true,
-				timeout:  10,
+				timeout:  2,
 				duration: 1,
 			},
 
@@ -547,8 +549,8 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"python tpcc.py --warehouses 1 --client 3 --no-execute n1ql --query-url {{FIRST_NODE_NO_PORT_CLUSTER1}}:8093"},
 				wait:     true,
-				timeout:  30,
-				duration: 31,
+				timeout:  31,
+				duration: 30,
 			},
 
 			{
@@ -567,7 +569,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     true,
+				wait:     false,
 				duration: 10,
 				timeout:  11,
 			},
@@ -577,7 +579,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     true,
+				wait:     false,
 				duration: 10,
 				timeout:  11,
 			},
@@ -587,7 +589,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'delete from default where rating > 0 limit 100'"},
-				wait:     true,
+				wait:     false,
 				duration: 5,
 				timeout:  7,
 			},
@@ -597,7 +599,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default where rating > 100 limit 100 offset 50'"},
-				wait:     true,
+				wait:     false,
 				duration: 5,
 				timeout:  7,
 			},
@@ -605,7 +607,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "attack-query-cluster1-3",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
+				args:     []string{"./cbdozer -method POST -duration 15 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
 				wait:     true,
 				duration: 20,
 				timeout:  21,
@@ -617,8 +619,8 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"couchbase-cli", "rebalance", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "--server-remove", "{{SECOND_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password"},
 				wait:     true,
-				timeout:  30,
-				duration: 31,
+				timeout:  120,
+				duration: 121,
 			},
 
 			// continuous load
@@ -627,9 +629,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     true,
-				duration: 10,
+				wait:     false,
 				timeout:  11,
+				duration: 10,
 			},
 
 			{
@@ -637,9 +639,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     true,
-				duration: 10,
+				wait:     false,
 				timeout:  11,
+				duration: 10,
 			},
 			// continuous delete
 			{
@@ -647,9 +649,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'delete from default where rating > 0 limit 100'"},
-				wait:     true,
-				duration: 5,
-				timeout:  7,
+				wait:     false,
+				timeout:  11,
+				duration: 10,
 			},
 			// continuous query
 			{
@@ -657,18 +659,18 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default where rating > 100 limit 100 offset 50'"},
-				wait:     true,
-				duration: 5,
-				timeout:  7,
+				wait:     false,
+				timeout:  11,
+				duration: 10,
 			},
 			{
 				name:     "attack-query-cluster1-6",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
+				args:     []string{"./cbdozer -method POST -duration 15 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
 				wait:     true,
-				duration: 20,
-				timeout:  21,
+				timeout:  16,
+				duration: 15,
 			},
 
 			// add back node to cluster 1
@@ -677,8 +679,8 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"couchbase-cli", "server-add", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "--server-add", "{{SECOND_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--server-add-username", "Administrator", "--server-add-password", "password", "--services", "data,index,query,fts"},
 				wait:     true,
-				timeout:  30,
-				duration: 31,
+				timeout:  120,
+				duration: 121,
 			},
 
 			{
@@ -686,8 +688,8 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"couchbase-cli", "rebalance", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password"},
 				wait:     true,
-				timeout:  30,
-				duration: 31,
+				timeout:  120,
+				duration: 121,
 			},
 
 			// continuous load
@@ -696,7 +698,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     true,
+				wait:     false,
 				duration: 10,
 				timeout:  11,
 			},
@@ -706,7 +708,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     true,
+				wait:     false,
 				duration: 10,
 				timeout:  11,
 			},
@@ -716,7 +718,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'delete from default where rating > 0 limit 100'"},
-				wait:     true,
+				wait:     false,
 				duration: 5,
 				timeout:  7,
 			},
@@ -726,19 +728,19 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default where rating > 100 limit 100 offset 50'"},
-				wait:     true,
-				duration: 5,
-				timeout:  7,
+				wait:     false,
+				duration: 10,
+				timeout:  11,
 			},
 			// continuous query
 			{
 				name:     "attack-query-cluster1-9",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
+				args:     []string{"./cbdozer -method POST -duration 15 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
 				wait:     true,
-				duration: 20,
-				timeout:  21,
+				duration: 15,
+				timeout:  16,
 			},
 
 			// setup xdcr
@@ -747,17 +749,17 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"couchbase-cli", "xdcr-setup", "-c", "{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--create", "--xdcr-cluster-name", "RemoteCluster", "--xdcr-hostname", "{{FIRST_NODE_CLUSTER2}}", "--xdcr-username", "Administrator", "--xdcr-password", "password"},
 				wait:     true,
-				timeout:  10,
-				duration: 11,
+				timeout:  2,
+				duration: 1,
 			},
 
 			{
 				name:     "xdcr-replicate-cluster1-1",
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
-				cmd:      []string{"couchbase-cli", "xdcr-replicate", "-c", "{{FIRST_NODE_CLUSTER2}}", "-u", "Administrator", "-p", "password", "--xdcr-cluster-name", "RemoteCluster", "--xdcr-from-bucket", "default", "--xdcr-to-bucket", "default"},
+				cmd:      []string{"couchbase-cli", "xdcr-replicate", "-c", "{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--create", "--xdcr-cluster-name", "RemoteCluster", "--xdcr-from-bucket", "default", "--xdcr-to-bucket", "default"},
 				wait:     true,
-				timeout:  10,
-				duration: 11,
+				timeout:  2,
+				duration: 1,
 			},
 
 			// create indexes in remote cluster
@@ -768,7 +770,8 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='create index default_rating on `default`(rating)'"},
 				wait:    true,
-				timeout: 10,
+				timeout: 2,
+				duration: 1,
 			},
 			{
 				name:    "cbq-create-index-cluster2-2",
@@ -776,7 +779,8 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='create primary index on default'"},
 				wait:    true,
-				timeout: 10,
+				timeout: 2,
+				duration: 1,
 			},
 
 			// continuous load
@@ -785,7 +789,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     true,
+				wait:     false,
 				duration: 10,
 				timeout:  11,
 			},
@@ -795,7 +799,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     true,
+				wait:     false,
 				duration: 10,
 				timeout:  11,
 			},
@@ -805,9 +809,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'delete from default where rating > 0 limit 100'"},
-				wait:     true,
-				duration: 5,
-				timeout:  7,
+				wait:     false,
+				duration: 10,
+				timeout:  11,
 			},
 			// continuous query
 			{
@@ -815,19 +819,19 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default where rating > 100 limit 100 offset 50'"},
-				wait:     true,
-				duration: 5,
-				timeout:  7,
+				wait:     false,
+				duration: 10,
+				timeout:  11,
 			},
 			// continuous query
 			{
 				name:     "attack-query-cluster1-12",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
-				wait:     true,
-				duration: 20,
-				timeout:  21,
+				args:     []string{"./cbdozer -method POST -duration 15 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
+				wait:     false,
+				duration: 15,
+				timeout:  16,
 			},
 
 			// continuous delete
@@ -836,9 +840,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093/query/service -body 'delete from default where rating > 0 limit 100'"},
-				wait:     true,
-				duration: 5,
-				timeout:  7,
+				wait:     false,
+				duration: 10,
+				timeout:  11,
 			},
 			// continuous query
 			{
@@ -846,30 +850,39 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093/query/service -body 'select * from default where rating > 100 limit 100 offset 50'"},
-				wait:     true,
-				duration: 5,
-				timeout:  7,
+				wait:     false,
+				duration: 10,
+				timeout:  11,
 			},
 			// continuous query
 			{
 				name:     "attack-query-cluster2-2",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:     []string{"./cbdozer -method POST -duration 10 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
+				args:     []string{"./cbdozer -method POST -duration 20 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
 				wait:     true,
 				duration: 20,
 				timeout:  21,
 			},
 
 			// stop xdcr
+			{
+				name:     "xdcr-replicate-cluster1-1",
+				image:    "sequoiatools/couchbase-cli:v5.0.1",
+				cmd:	[]string{"/bin/bash", "-c", "--"},
+				args:      []string{"couchbase-cli xdcr-replicate -c {{FIRST_NODE_CLUSTER1}} -u Administrator -p password --delete --xdcr-cluster-name RemoteCluster --xdcr-from-bucket default --xdcr-to-bucket default --xdcr-replicator $(couchbase-cli xdcr-replicate -c {{FIRST_NODE_CLUSTER1}} -u Administrator -p password --list | sed -n 's/stream id: \\(.*\\)/\\1/p')"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
 
 			{
 				name:     "xdcr-setup-cluster1-2",
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"couchbase-cli", "xdcr-setup", "-c", "{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--delete", "--xdcr-cluster-name", "RemoteCluster"},
 				wait:     true,
-				timeout:  10,
-				duration: 11,
+				timeout:  2,
+				duration: 1,
 			},
 
 			// delete phase
@@ -879,8 +892,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where rating <= 300'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -888,8 +902,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where rating >= 700'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -897,8 +912,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where rating >= 300 and rating <= 700'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -906,9 +922,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbq",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where 1=1'"},
-				wait:     true,
-				timeout:  10,
-				duration: 11,
+				wait:     false,
+				timeout:  2,
+				duration: 1,
 			},
 
 			{
@@ -916,8 +932,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='drop primary index on default'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -925,8 +942,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='drop index default.default_rating'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 			// delete cluster 2
 			{
@@ -934,8 +952,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='delete from default where rating <= 300'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -943,8 +962,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='delete from default where rating >= 700'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -952,8 +972,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='delete from default where rating >= 300 and rating <= 700'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -961,9 +982,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbq",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='delete from default where 1=1'"},
-				wait:     true,
-				timeout:  10,
-				duration: 11,
+				wait:     false,
+				timeout:  2,
+				duration: 1,
 			},
 
 			{
@@ -971,8 +992,9 @@ func TestFeaturesAll(t *testing.T) {
 				image:   "sequoiatools/cbq",
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='drop primary index on default'"},
-				wait:    true,
-				timeout: 10,
+				wait:    false,
+				timeout: 2,
+				duration: 1,
 			},
 
 			{
@@ -981,7 +1003,8 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:     []string{"/bin/bash", "-c", "--"},
 				args:    []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='drop index default.default_rating'"},
 				wait:    true,
-				timeout: 10,
+				timeout: 2,
+				duration: 1,
 			},
 		},
 	}
