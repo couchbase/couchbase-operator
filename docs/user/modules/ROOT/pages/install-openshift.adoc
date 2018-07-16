@@ -1,13 +1,13 @@
 = Installing on OpenShift
 
-This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator in a Red Hat OpenShift project.
+This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on a Red Hat OpenShift project.
 
 .This guide assumes the following:
 
 * You have a working knowledge of OpenShift and Kubernetes
 * You are installing on a new OpenShift cluster
 * You have access to an OpenShift user that has cluster-admin privileges (`system:admin` in this guide)
-* You have access to a standard OpenShift user without cluster-admin privileges (`developer` in this guide).
+* You have access to a standard OpenShift user without cluster-admin privileges (`developer` in this guide)
 
 If you have an OpenShift environment that already has a custom setup (non-default), you should be able to modify a few of the parameters in the various commands and configuration files mentioned in this guide in order to fit your requirements.
 
@@ -20,7 +20,9 @@ The first thing that you need to do is use a standard OpenShift user to create a
 [source,console]
 ----
 $ oc login -u developer
+
 $ oc new-project operator-example
+
 $ oc logout
 ----
 
@@ -35,6 +37,7 @@ To install the CRD, log in as an OpenShift user that has cluster-admin privilege
 [source,console]
 ----
 $ oc login -u system:admin
+
 $ oc create -f https://packages.couchbase.com/kubernetes/0.9/openshift/crd.yaml
 ----
 
@@ -58,6 +61,7 @@ After the cluster role is created, you need to create a service account in the p
 [source,console]
 ----
 $ oc create serviceaccount couchbase-operator --namespace operator-example
+
 $ oc create rolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount operator-example:couchbase-operator
 ----
 
@@ -101,7 +105,7 @@ At this point you can now use the `developer` user to create the Operator in the
 oc create -f https://packages.couchbase.com/kubernetes/0.9/openshift/operator.yaml
 ----
 
-Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment] which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
+Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
 
 After you run the `oc create` command, it generally takes less than a minute for OpenShift to deploy the Operator and for the Operator to be ready to run.
 
@@ -141,7 +145,7 @@ You can use the following command to verify that the Operator has started succes
 oc get pods -l app=couchbase-operator
 ----
 
-If the Operator is up and running, the command returns an output where the `READY` field shows 1/1, such as:
+If the Operator is up and running, the command returns an output where the `READY` field shows `1/1`, such as:
 
 [source,console]
 ----
