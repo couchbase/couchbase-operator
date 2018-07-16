@@ -1,0 +1,10 @@
+apiVersion: authorization.openshift.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: couchbase-operator
+roleRef:
+  name: couchbase-operator
+subjects:
+  - kind: ServiceAccount
+    name: couchbase-operator
+    namespace: default
