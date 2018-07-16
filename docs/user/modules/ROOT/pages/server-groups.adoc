@@ -1,57 +1,57 @@
-= Server Groups
+= About Using Couchbase Server Groups With the Operator
 
-Couchbase server groups, also known as rack/zone awareness is a way of logically partitioning a cluster to be fault tolerant across failure domains.  The Operator is capable of automatically scheduling pod creation across failure domains and ensuring they are added to the correct server groups.
+Couchbase server groups, which enable Server Group Awareness, are a way of logically partitioning a cluster to be fault tolerant across failure domains. The Operator is capable of automatically scheduling pod creation across failure domains and ensuring that they are added to the correct server groups.
 
-By default buckets are logically partitioned into vBuckets which are distributed across all Couchbase server instances providing automated load distribution.  Bucket replicas are similarly distributed so that the failure of a node - or multiple if more than one replica is requested - does not result in data loss and a replica can assume control of the affected vBuckets.
+By default, buckets are logically partitioned into vBuckets, which are distributed across all Couchbase Server nodes, providing automated load distribution. Bucket replicas are similarly distributed so that the failure of a node - or multiple nodes if more than one replica is requested - does not result in data loss, and a replica can assume control of the affected vBuckets.
 
-Server groups allow the user to logically group Couchbase server instances which may represent physical racks or even entire data centers in the case of a cloud deployment spanning multiple availability zones.  This allows vBucket replicas to be scheduled in a completely separate server group guaranteeing that the cluster is tolerant of a rack issue e.g. switch failure, or entire data center outage.
+Server groups allow you to logically group Couchbase Server nodes so that they can represent physical racks, data centers, or in the case of a cloud deployment, availability zones. This allows vBucket replicas to be scheduled in a completely separate server group, guaranteeing that the Couchbase Server cluster is tolerant of larger infrastructure failures, such as switch failure and availability zone outage.
 
 == Operator Server Group Scheduling
 
-Before discussing how to configure server groups we should first understand how the Operator will schedule pods and manage server groups.
+Before discussing how to configure server groups, it's best to understand how the Operator schedules pods and manages server groups.
 
 image::ServerGroupsScheduling.png[Server Group Scheduling Overview]
 
-The diagram depicts a cluster with two server classes which directly map to server configurations defined in the specification in the property _spec.servers_.  For example _Server Class 1_ may be a multi-dimensional scaling group of nodes running the data server, and _Server Class 2_ running a query service.  Critically server classes are independantly scheduled which simplifies algorithm complexity and ensures that all pods in server class 2 do not all end up in the same server group, and thus protects against a potential service outage.
+The diagram depicts a cluster with two server classes that directly map to server configurations that are defined in the specification in the property `spec.servers`.  For example, _Server Class 1_ may be a multi-dimensional scaling group of nodes running the data service, and _Server Class 2_ is running a query service. Critically, server classes are independently scheduled, which simplifies algorithm complexity and ensures that all pods in _Server Class 2_ do not all end up in the same server group, and thus protects against a potential service outage.
 
 === Scheduling Couchbase Node Addition
 
-Given a set of server groups to schedule the Operator will poll the current system state, mapping server groups to pods.  From this the operator will schedule a new pod to a server group which contains the fewest existing pods.
+When given a set of server groups to schedule, the Operator will poll the current system state and map server groups to pods. From there, the Operator will schedule a new pod to the server group that contains the fewest existing pods.
 
 === Scheduling Couchbase Node Deletion
 
-Like addition the Operator will build a map of server groups to pods.  The operator will delete an existing pod from the server group which contains the greatest number of existing pods.
+Like addition, the Operator will build a map of server groups to pods.  The Operator will delete an existing pod from the server group that contains the greatest number of existing pods.
 
-TIP: The Operator pod scheduler attempts to keep the number of pods from each server class evenly distributed across all server groups.  As such the number of pods allocated to each server group should be a most one different from each of the others.  It is good practice to keep each server group equally populated.  Given the example above we would recommend that server class 1 contained 9 pods with 3 scheduled per server group.  This keeps data and index replicas equally balanced across the server groups avoiding some replicas being scheuled in the same server group to maintain a balanced load across each server instance.
+TIP: The Operator pod scheduler attempts to keep the number of pods from each server class evenly distributed across all server groups. As such, the number of pods that are allocated to each server group should be at most one different from each of the others. It's good practice to keep each server group equally populated. In the example above, it is recommended that _Server Class 1_ contains 9 pods with 3 scheduled per server group. This keeps data and index replicas equally balanced across the server groups, avoiding some replicas being scheduled in the same server group to maintain a balanced load across each server instance.
 
 == Configuring Kubernetes Node Topology
 
-The Operator does not have any prior knowledge of which Kubernetes node resides where.  While some cloud operators may provide labels to describe physical location, not all environments will and certainly not bare metal installs.  As such we leave configuration up to the end user which provides generic availability of the feature and flexibility.
+The Operator does not have any prior knowledge of which Kubernetes node resides where. While some cloud operators may provide labels to describe physical location, not all environments will, and certainly not bare metal installs. As such, the configuration is left up to the end user, which provides generic availability of the feature and flexibility.
 
-Kubernetes nodes must be labelled by the end user in order to describe phyiscal location.  This can be done with the following example command:
+Kubernetes nodes must be labelled by the end user in order to describe physical location. This can be done with the following example command:
 
 [source,console]
 ----
 kubectl label nodes ip-172-16-0-10 server-group.couchbase.com/zone=us-east-1a
 ----
 
-The label value defined here will map directly to the Couchbase cluster configuration defined in the next section.
+The label value defined here will map directly to the Couchbase Server cluster configuration that is defined in the next section.
 
-== Configuring The Couchbase Cluster
+== Configuring the Couchbase Cluster
 
-When configuring the cluster you must specify the set of server groups, configured in the last section, which the Operator is allowed to schedule pods across.
+When configuring the cluster, you must specify the set of server groups that the Operator is allowed to schedule pods across.
 
-TIP: By decoupling Kubernetes node configuration from Cluster configuration you are able to label Kubernetes nodes as running in availability zones 1, 2, 3, 4, then have a Couchbase cluster running in server groups 1 and 2, and another in 3 and 4.  This facilitates a simple way of physically separating two distinct clusters.
+TIP: By decoupling Kubernetes node configuration from cluster configuration, you are able to label Kubernetes nodes as running in availability zones 1, 2, 3, 4, then have a Couchbase Server cluster running in server groups 1 and 2, and another in 3 and 4. This facilitates a simple way of physically separating two distinct clusters.
 
-At the top level _spec.serverGroups_ defines global defaults.  All server classes will use this set to schedule their respective pods across.
+At the top level, `spec.serverGroups` defines global defaults. All server classes will use this set to schedule their respective pods across.
 
-We also allow this default to be overridden at the server class level via the _spec.servers.serverGroups_ property.  If specified this will take precedence over the global default by the Operator scheduler.
+This default can also be overridden at the server class level via the `spec.servers.serverGroups` property. If specified, this will take precedence over the global default by the Operator scheduler.
 
-WARNING: In version 1.0.0+ pod scheduling is enabled if any of the server classes have _serverGroups_ set or the default is enabled.  It is invalid configuration for scheduling to be enabled and a server class not to have an explicit set of server groups or an inherited global default.
+WARNING: Pod scheduling is enabled if any of the server classes have `serverGroups` set, or the default is enabled. It is considered an invalid configuration when scheduling is enabled and a server class doesn't have an explicit set of server groups or an inherited global default.
 
-IMPORTANT: In version 1.0.0+ server groups are immutable and cannot be changed once defined or added to an existing cluster.
+IMPORTANT: Server groups are immutable and cannot be changed once defined or added to an existing cluster.
 
-Referring back to the example illustrated earlier, could define the specification as follows:
+Referring back to the example illustrated earlier, you could define the specification as follows:
 
 [source,yaml]
 ----

@@ -1,40 +1,40 @@
-= Kubernetes Couchbase Cluster Best Practices
+= Couchbase Server Deployment Best Practices
 
-While deployment of a Couchbase cluster via the Operator is incredibly simple there are some external influences and configurations which may cause issues.  This section documents best practices for a deployment to avoid common pitfalls.
+The Couchbase Autonomous Operator makes deploying Couchbase Server incredibly simple. However, there are some external influences and configurations that can cause issues. This topic outlines some of the deployment best practices that can help you avoid some of the most common pitfalls.
 
 == Pod Scheduling
 
-Pod scheduling details how to deploy your clusters to minimize disruption in the case of failure and maintain high performance.
+Pod scheduling details how to deploy your Couchbase Server clusters to consistently maintain high performance, and also minimize disruption in the case of failure.
 
 === Noisy Neighbors
 
-The noisy neighbor problem occurs when multiple virtualized instances are running on the same hypervisor and one adversely affects the other.  This may result in any of the following conditions:
+The https://en.wikipedia.org/wiki/Cloud_computing_issues#Performance_interference_and_noisy_neighbors[noisy neighbor] problem occurs when multiple VMs are running on the same hypervisor, and one virtual machine (VM) adversely affects the other. This effect may result in any of the following conditions:
 
 CPU Starvation::
-A highly CPU intensive neighbor consumes more than its fair share of CPU resources, resulting in fewer cycles allocated to the affected pod, higher latencies when processing data and network traffic, increased cache latencies as the noisy neighbor flushes your entries to slower storage.
+A highly CPU-intensive neighbor consumes more than its fair share of CPU resources, which results in fewer cycles allocated to the affected pod, higher latencies when processing data and network traffic, and increased cache latencies as the noisy neighbor flushes your entries to slower storage.
 
 Memory Starvation::
-There are two common scenarios when considering memory starvation.  In the cloud your hypervisor virtual machines will typically run without swap space to page out less used memory pages.  The result is that when memory is starved the operating system has no other choice but to choose a process using too much memory and terminate it.  Where the hypervisor is on physical hardware with a swap file, performance will suffer as memory pages are transferred to and from a storage device resulting in slower computation as memory accesses page fault and the memory is swapped back in, higher latencies, and degraded IO performance.
+There are two common scenarios when considering memory starvation. In the cloud, a hypervisor VM will typically run without swap space to page out less-used memory pages. The result is that when memory is starved, the operating system has no other choice but to choose a process that is using too much memory and terminate it. When the hypervisor is on physical hardware with a swap file, performance will suffer as memory pages are transferred to and from a storage device, resulting in slower computation as memory accesses page-fault and the memory is swapped back in, higher latencies, and degraded I/O performance.
 
-Disk IO Starvation::
-A storage device has a finite number of input or output operations it can perform per second.  Typically for a spinning disk this is in the order of 100 IOPs, for solid state storage this is far higher in the order of 10,000s of IOPs.  If a noisy neighbor is utilizing a high proportion of that capacity then your application will see slower reads and writes from and to the file system.  In a cloud architecture where a storage volume may be attached via a network protocol e.g. iSCSI, you also generate increased network load.
+Disk I/O Starvation::
+A storage device has a finite number of input or output operations it can perform per second. Typically for a spinning disk this is in the order of 100 IOPs. For solid state storage, this is far higher — in the order of 10,000s of IOPs. If a noisy neighbor is utilizing a high proportion of that capacity, then an application will see slower reads and writes to and from the file system. In a cloud architecture, where a storage volume may be attached via a network protocol (e.g. iSCSI), you also generate increased network load.
 
 Network Starvation::
-Like disk IO the network only has a limited capacity.  Modern data center network interface cards will typically handle 10Gbps of bandwidth.  The problem is however not limited to just the local machine as top-of-rack leaf switches are often over-subscribed by a ratio of 6:1 or higher so a network intensive process may be affected by a process on a completely separate hypervisor.
+Like disk I/O, the network only has a limited capacity. Modern data center network interface cards will typically handle 10 Gbps of bandwidth. The problem is however not limited to just the local machine, as top-of-rack leaf switches are often over-subscribed by a ratio of 6:1 (or higher), so a network-intensive process may be affected by a process on a completely separate hypervisor.
 
-To mitigate as many of these factors as is possible we recommend deploying your cluster on a set of nodes separate from other processes.  The Kubernetes cluster administrator should be responsible for labeling nodes as belonging to a specific application type.  Developers may then use the `spec.servers.pod.nodeSelector` configuration property to control which nodes Couchbase pods are scheduled on to.  Care must be taken to ensure other pods e.g. stateless web applications, are not scheduled on those nodes allocated for use by Couchbase.
+To mitigate as many of these factors as is possible, it is recommended that you deploy a Couchbase Server cluster on a set of Kubernetes nodes that are separate from other processes. The Kubernetes cluster administrator should be responsible for labeling nodes as belonging to a specific application type. Developers may then use the `spec.servers.pod.nodeSelector` configuration property to control which nodes Couchbase pods are scheduled onto. Take care to ensure that other pods (e.g. stateless web applications) are not scheduled on those nodes that are allocated for use by Couchbase.
 
-Likewise we also recommend deploying your clusters with anti-affinity enabled so cluster pods are not scheduled on the same nodes.  This can be achieved with the `spec.antiAffinity` configuration property.
+Likewise, it is recommended that you deploy Couchbase Server clusters with anti-affinity enabled so that cluster pods are not scheduled on the same nodes. This can be achieved with the `spec.antiAffinity` configuration property.
 
-WARNING: Anti-affinity is only scoped to a specific cluster.  In order to prevent pods from one cluster interfering with another you should use a separate node label per Couchbase cluster.
+WARNING: Anti-affinity is only scoped to a specific cluster. In order to prevent pods from one cluster interfering with another, you should use a separate node label per Couchbase cluster.
 
 === Server Group Configuration
 
-The server group feature of the Couchbase data platform allows the user to provide guidance that data or index replicas should be distributed over failure domains larger that that of a single server e.g. rack or data center.  vBucket mapping is done on a best-effort basis when using server groups while ensuring each instance is under an equal load.  As such it is possible for multiple replicas to be collocated in the same server group.
+The server group feature of the Couchbase data platform allows you group Couchbase Server nodes in such a way that data or index replicas are distributed over failure domains that are larger than that of a single server (e.g. rack, data center, availability zone, etc). When server groups are defined, the Server Group Awareness feature distributes vBuckets on a best-effort basis, while ensuring each instance is under an equal load. As such, under certain circumstances, it's possible for multiple replicas to be co-located in the same server group.
 
-We recommend that server groups should have an equal number of pods per server class to make it simpler to maintain server group constraints.  We also recommend having more server groups than replicas for the same reason.
+It is recommended that server groups should have an equal number of pods per server class to make it simpler to maintain server group constraints. It is also recommended that you have more server groups than replicas for the same reason.
 
-NOTE: Full documentation on server groups is linked xref:server-groups.adoc[here].
+For more information, refer to xref:server-groups.adoc[About Using Couchbase Server Groups With the Operator].
 
 == Storage
 
@@ -42,49 +42,49 @@ Storage options may have both beneficial and detrimental impacts on your cluster
 
 === Persistent Volumes
 
-We recommend the use of persistent volumes for production deployments.  This allows us to recover a failed pod quickly by warming up from existing data and allowing quicker back-filling via delta-recovery rather than a full re-balance.  By having some of the pod's file system persisted we can also extract logging data from failed pods where this would normally be lost with a fully ephemeral file systems.  It also aids in data recovery situations which cannot be rectified by the Operator.
+Persistent volumes are recommended for production deployments. This allows for the quick recovery of a failed pod by warming up from existing data and allowing quicker back-filling via delta-recovery, rather than a full re-balance. By having some of the pod's file system persisted, logging data can be extracted from failed pods where this would normally be lost with a fully ephemeral file system. It also aids in data recovery situations which cannot be rectified by the Operator.
 
-We also highly recommend that in cloud deployments storage be located in the same data center as pods running in that server group.  If a data center were to suffer an outage with storage randomly distributed across a virtual private cloud, not only would you lose all the pods resident in the availability zone, but any pods with backing storage provided by the availability zone.
+It is also highly recommended that in cloud deployments, storage be located in the same data center as the pods that are running in that server group. If a data center were to suffer an outage with storage randomly distributed across a virtual private cloud, not only would you lose all the pods that are resident in the availability zone, but also any pods with backing storage provided by the availability zone.
 
-NOTE: There will be a slight reduction in performance and latency when using an network based storage back-end.  Local persistent storage, which would mitigate this performance penalty is not yet tested in Operator version 1.0.0+
+NOTE: There will be a slight reduction in performance and latency when using a network-based storage backend.
 
 == Security
 
-Keeping your data safe is of paramount importance, this covers some topics for consideration.
+Keeping your data safe is of paramount importance. This section contains some best practices that you should follow to keep your deployment secure.
 
 === Cluster Scope
 
-When you deploy a cluster you do so in a name space.  The Operator needs to be given a fairly broad set of permissions in order to dynamically created pods, services etc.  It is recommended that the Operator and clusters managed by it be segregated in its own name space.  This limits the set of resources that the Operator can affect and that xref:cbopinfo.adoc[support tools] can collect, aiding in security compliance situations where confidential information may be leaked via the Kubernetes API operations.
+When you deploy a cluster, you do so in a https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace]. The Operator needs to be given a fairly broad set of permissions in order to dynamically create pods, services, etc. It is recommended that the Operator, and the clusters that it manages, be segregated in their own name space. This limits the set of resources that the Operator can affect, and that xref:cbopinfo.adoc[support tools] can collect data about, which aids in security compliance situations where confidential information may be leaked via the Kubernetes API operations.
 
 == Node Configuration
 
-How your Kubernetes nodes are configured may also have a detrimental impact on your ability to deploy a Couchbase cluster.  These are not officially supported but recommended for cluster administrators.
+How your Kubernetes nodes are configured may also have a detrimental impact on your ability to deploy a Couchbase Server cluster. These are not officially supported but recommended for cluster administrators.
 
 === Node Services
 
-We recommend the following services be running on all Kubernetes nodes.
+It is recommended that the following services be running on all Kubernetes nodes.
 
 NTP::
-Like all distributed systems Couchbase server needs to have synchronized time in order to resolve conflicts.  Newer systems should have NTP enabled via default if running systemd _timesyncd_.  Older systems should run _ntpd_ or similar and can be automated via an orchestration tool such as Puppet or Ansible.
+Like all distributed systems, Couchbase Server needs to have synchronized time in order to resolve conflicts. Newer systems should have NTP enabled by default if running `systemd-timesyncd`. Older systems should run `ntpd` or similar and can be automated via an orchestration tool such as Puppet or Ansible.
 
 === Kernel Parameters
 
-Couchbase server has some recommended kernel parameters which should be set.  These can be done via an orchestration solution or a Kubernetes `DaemonSet` resource.
+Couchbase server has some recommended kernel parameters which should be set. These can be done via an orchestration solution or a Kubernetes `DaemonSet` resource.
 
 vm.swappiness::
-For systems with a swap file this controls how aggressively the kernel will transfer unused application memory pages from physical RAM onto disk.  We highly recommend this value be set to `0` to improve the data service performance, and by extension dependent services.
+For systems with a swap file, this controls how aggressively the kernel will transfer unused application memory pages from physical RAM onto disk. It is highly recommended that this value be set to `0` to improve the data service performance, and by extension dependent services.
 
 mm.transparent_hugepage.enabled::
-Transparent huge pages attempt to allocate large areas of contiguous memory so that applications which process data sequentially or with high data locality without causing a high number of kernel page faults.  For a database such as Couchbase this actually has a detrimental affect as our access patterns are typically highly random.  We highly recommend this parameter be set to `never`.
+Transparent huge pages (THP) attempt to allocate large areas of contiguous memory so that applications which process data sequentially, or that have high data locality, do so without causing a high number of kernel page faults. For a database such as Couchbase, this actually has a detrimental effect, since its access patterns are typically highly random. It is highly recommended that this parameter be set to `never`.
 
 mm.transparent_hugepage.defrag::
-Related to `mm.transparent_hugepage.enabled` we highly recommend this parameter be set to `never` also.
+Related to `mm.transparent_hugepage.enabled`, it is highly recommended that this parameter be set to `never`.
 
-For example you could run something similar to the following:
+For example, you could run something similar to the following:
 
 [source,yaml]
 ----
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: couchbase-sysctls
