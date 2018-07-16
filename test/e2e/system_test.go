@@ -856,7 +856,7 @@ func TestFeaturesAll(t *testing.T) {
 			},
 			// continuous query
 			{
-				name:     "attack-query-cluster2-2",
+				name:     "attack-query-cluster2-3",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 20 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
@@ -867,7 +867,7 @@ func TestFeaturesAll(t *testing.T) {
 
 			// stop xdcr
 			{
-				name:     "xdcr-replicate-cluster1-1",
+				name:     "xdcr-replicate-cluster1-2",
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"couchbase-cli xdcr-replicate -c {{FIRST_NODE_CLUSTER1}} -u Administrator -p password --delete --xdcr-cluster-name RemoteCluster --xdcr-from-bucket default --xdcr-to-bucket default --xdcr-replicator $(couchbase-cli xdcr-replicate -c {{FIRST_NODE_CLUSTER1}} -u Administrator -p password --list | sed -n 's/stream id: \\(.*\\)/\\1/p')"},
