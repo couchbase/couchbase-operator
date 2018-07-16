@@ -42,7 +42,7 @@ type Event struct {
 type Controller struct {
 	Config
 	logger   *logrus.Entry
-	clusters map[string]*cluster.Cluster
+	clusters *ManagedClusters
 }
 
 type Config struct {
@@ -61,7 +61,7 @@ func New(cfg Config) *Controller {
 	return &Controller{
 		Config:   cfg,
 		logger:   logrus.WithField("module", "controller"),
-		clusters: make(map[string]*cluster.Cluster),
+		clusters: CreateManagedClusters(),
 	}
 }
 
@@ -101,7 +101,7 @@ func (c *Controller) Handle(ctx types.Context, event types.Event) error {
 		if event.Deleted {
 			ev.Type = kwatch.Deleted
 		} else {
-			if _, ok := c.clusters[ev.Object.Name]; ok { // re-watch or restart could give ADD event
+			if _, ok := c.clusters.Load(ev.Object.Name); ok { // re-watch or restart could give ADD event
 				ev.Type = kwatch.Modified
 			}
 		}
@@ -142,7 +142,7 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 
 	if clus.Status.IsFailed() {
 		if event.Type == kwatch.Deleted {
-			delete(c.clusters, clus.Name)
+			c.clusters.Delete(clus.Name)
 			return nil
 		}
 		return fmt.Errorf("ignore failed cluster (%s). Please delete its CR", clus.Name)
@@ -150,7 +150,7 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 
 	switch event.Type {
 	case kwatch.Added:
-		if _, ok := c.clusters[clus.Name]; ok {
+		if _, ok := c.clusters.Load(clus.Name); ok {
 			return fmt.Errorf("unsafe state. cluster (%s) was created before but we received event (%s)", clus.Name, event.Type)
 		}
 
@@ -160,20 +160,22 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 				return fmt.Errorf("Cluster create failed, Please delete its CR: %s, %v", clus.Name, err)
 			}
 		}
-		c.clusters[clus.Name] = cluster.New(c.makeClusterConfig(), clus)
+		c.clusters.Store(clus.Name, cluster.New(c.makeClusterConfig(), clus))
 
 	case kwatch.Modified:
-		if _, ok := c.clusters[clus.Name]; !ok {
+		clusterContext, ok := c.clusters.Load(clus.Name)
+		if !ok {
 			return fmt.Errorf("unsafe state. cluster (%s) was never created but we received event (%s)", clus.Name, event.Type)
 		}
-		c.clusters[clus.Name].Update(clus)
+		clusterContext.Update(clus)
 
 	case kwatch.Deleted:
-		if _, ok := c.clusters[clus.Name]; !ok {
+		clusterContext, ok := c.clusters.Load(clus.Name)
+		if !ok {
 			return fmt.Errorf("unsafe state. cluster (%s) was never created but we received event (%s)", clus.Name, event.Type)
 		}
-		c.clusters[clus.Name].Delete()
-		delete(c.clusters, clus.Name)
+		clusterContext.Delete()
+		c.clusters.Delete(clus.Name)
 	}
 	return nil
 }
