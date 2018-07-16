@@ -15,6 +15,7 @@
  ** xref:cluster-status-guide.adoc[Displaying Information About a Couchbase Cluster]
  ** xref:list-and-describe.adoc[Viewing the Pods/Services Created by a Couchbase Cluster]
  ** xref:persisted-volumes-guide.adoc[Using Persistent Volumes]
+ ** xref:persisted-volumes-zoning-guide.adoc[Persistent Volume Zoning Guide]
 * xref:cbopctl.adoc[Ensuring Valid CouchbaseCluster Configurations With cbopctl]
 * xref:accessing-couchbase.adoc[Accessing Couchbase]
  ** xref:admin-console-access.adoc[Using the Couchbase Web Console]

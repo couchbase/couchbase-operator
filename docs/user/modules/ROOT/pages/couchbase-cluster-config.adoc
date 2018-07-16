@@ -1,7 +1,10 @@
-= CouchbaseCluster Configuration
+= About the CouchbaseCluster Configuration File
+
 :toc: macro
 
-The following sample CouchbaseCluster configuration file lists all of the configuration parameters:
+To use the Couchbase Autonomous Operator to deploy a Couchbase Server cluster, you need to create a CouchbaseCluster configuration file that describes how the cluster should be configured and maintained by the Operator. Like all Kubernetes configurations, Couchbase Server clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes.
+
+.The following sample CouchbaseCluster configuration file lists all of the available configuration parameters:
 
 [source,yaml]
 ----
@@ -12,7 +15,7 @@ metadata:
   namespace: default
 spec:
   baseImage: couchbase/server
-  version: enterprise-5.0.1
+  version: enterprise-5.5.0-Mar
   paused: false
   antiAffinity: true
   tls:
@@ -71,7 +74,7 @@ spec:
       serverGroups:
         - us-east-1a
       pod:
-        couchabseEnv:
+        couchbaseEnv:
           - name: ENV1
             value: value
         resources:
@@ -127,7 +130,7 @@ metadata:
 
 === apiversion
 
-This field specifies the API Version for our integration. As our integration changes over time, you can change the API Version whenever new features are added. For any given release, the API Versions that are supported by that Operator will be specified in our documentation. We also always recommend that you upgrade to the latest API Version when possible.
+This field specifies the API version for the Couchbase integration. As the integration changes over time, you can change the API version whenever new features are added. For any given release, the API versions that are supported by that Operator will be specified in the documentation. It is recommended that you upgrade to the latest API version whenever possible.
 
 ____
 _Field rules:_ This field is required and must be set to a valid API Version. The value of this field cannot be changed after the cluster is created.
@@ -196,7 +199,7 @@ ____
 This field specifies the version number of Couchbase Server to install. This should match an available version number in the Couchbase Docker repository. It may never be changed to a lower version number than the version that is currently running.
 
 ____
-_Field rules:_ The `version` field is required and should be set to the version of Couchbase Server that should be used to build the cluster. At the time of this writing, the Couchbase Operator has only been tested with enterprise-5.0.1. The value of this field cannot be changed after the cluster is created.
+_Field rules:_ The `version` field is required and should be set to the version of Couchbase Server that should be used to build the cluster. The value of this field cannot be changed after the cluster is created.
 ____
 
 === paused
@@ -217,7 +220,7 @@ ____
 
 === tls
 
-This field is optional and controls whether the Operator uses TLS for communication with the cluster.  It also sets the TLS certificates used by clients and XDCR.  This is xref:tls.adoc[documented on a separate page].
+This field is optional and controls whether the Operator uses TLS for communication with the cluster. It also sets the TLS certificates that are used by Couchbase clients and XDCR. Refer to the xref:tls.adoc[TLS documentation] for more information.
 
 === authSecret
 
@@ -237,14 +240,14 @@ ____
 
 === adminConsoleServices
 
-When the Couchbase Server Web Console is exposed with the <<exposeAdminConsole>> property, by default opening a browser session to the admin console will be automatically load balanced across all pods in the cluster to provide high-availability.  The web console however will display different features based on the services running on the particular pod it is connected to.
+When the Couchbase Server Web Console is exposed with the <<exposeAdminConsole>> property, by default, opening a browser session to the Web Console will be automatically load balanced across all pods in the cluster to provide high availability. However, the Web Console will display different features based on the services that are running on the particular pod that it's connected to.
 
-This property allows the UI service to be constrained to pods running one or more specific services.  The services you specify are subtractive in nature, they will only identify pods running all of those services, so care must be used.  For example, if your cluster is deployed with multi-dimensional scaling, the data service on one set of pods and the analytics service on another mutually exclusive set, then specifying _data_ and _analytics_ as your admin console services list would result in the UI being inaccessible; no pods match all the constraints i.e. are running _both_ the data and analytics services.
+This property allows the UI service to be constrained to pods running one or more specific services. The services that you specify are subtractive in nature — they will only identify pods running all of those services — so care must be used. For example, if the cluster is deployed with multi-dimensional scaling, the data service on one set of pods, and the analytics service on another mutually exclusive set, then specifying `data` and `analytics` as your Web Console services list would result in the Web Console not being accessible — no pods match all the constraints, i.e. no pods are running both the data and analytics services.
 
-If you require access to a specific pod running a specific service this can also be acheived by using the _admin_ option of the <<exposedFeatures>> property.  This will allow access via a node port.  You must connect directly to the IP address of the node the pod is running on.  The assigned node port is available via the cluster status structure returned by `kubectl describe` or via the output of `kubectl get services`.  See the xref:services.adoc[services documentation] for more information.
+If you require access to a specific pod running a specific service, this can also be achieved by using the `admin` option of the <<exposedFeatures>> property.  This will allow access via a node port. You must connect directly to the IP address of the node that the pod is running on. The assigned node port is available via the cluster status structure returned by `kubectl describe`, or via the output of `kubectl get services`. Refer to the xref:services.adoc[services documentation] for more information.
 
 ____
-_Field rules:_ The `adminConsoleServices` list is not required and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing` or `analytics`, and must be unique.  An empty list means any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
+_Field rules:_ The `adminConsoleServices` list is not required and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing`, and `analytics`, and must be unique. An empty list means that any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
 ____
 
 === exposedFeatures
@@ -252,6 +255,7 @@ ____
 This field specified a list of per-pod features to expose on the cluster network (as opposed to the pod network).  These define sets of ports which are required to support the specified features.  The supported values are as follows:
 
 admin::
+
 Exposes the admin API and UI
 
 xdcr::
@@ -294,18 +298,20 @@ ____
 
 === securityContext
 
-This field is a Kubernetes PodSecurityContext which is attached to all pods created by the Operator.  If unspecified this will default to the `couchbase` user, mount attached volumes as that user, and ensures that the containers are running as non-root.  You may override the default behavior if using a custom container image or for testing purposes.
+This field is a Kubernetes PodSecurityContext object which is attached to all pods that are created by the Operator. If unspecified, this will default to the `couchbase` user, mount attached volumes as that user, and ensure that the containers are running as non-root. You may override the default behavior if using a custom container image or for testing purposes.
 
 ____
-_Field rules:_ The `securityContext` field is optional.  If set this will be attached to all new pods created.  This field should not be modified during the cluster life-cycle.
+_Field rules:_ The `securityContext` field is optional. If set, this will be attached to all new pods that are created by the Operator. This field should not be modified during the cluster lifecycle.
 ____
 
 === disableBucketManagement
 
-This field specifies whether to ignore bucket configuration.  If bucket management is enabled the operator will be responsible for creation of buckets in the specification and deletion of buckets that are not.  If disabled then it is up to the end user to manage buckets either via the Couchbase APIs or the UI.
+This field specifies whether to ignore the bucket configuration. When `disableBucketManagement` is set to `false` (the default), the Operator will have sole control over creating the buckets that are specified in the configuration (and deleting the buckets that are not).
+
+If set to `true`, the creation and deletion of buckets must be done manually using the the Couchbase Server Web Console, CLI, REST API, or SDK. Even if buckets are specified in the configuration, as long as `disableBucketManagement` is set to `false`, the Operator will not create or delete any buckets.
 
 ____
-_Field rules:_ The `disableBucketManagement` field is optional and defaults to false.
+_Field rules:_ The `disableBucketManagement` field is optional and defaults to `false`.
 ____
 
 == spec.cluster
@@ -541,7 +547,7 @@ spec:
     serverGroups:
       - us-east-1a
     pod:
-      couchabseEnv:
+      couchbaseEnv:
         - name: CB_ENV_VAR
           value: value
       resources:
@@ -603,7 +609,7 @@ The pod policy defines settings that apply to all pods deployed with this node c
 spec:
   servers:
   - pod:
-      couchabseEnv:
+      couchbaseEnv:
         - name: CB_ENV_VAR
           value: value
       resources:
@@ -635,7 +641,7 @@ spec:
 
 === couchbaseEnv
 
-This field specifies the environment variables (as key-values pairs) that should be set when the pod is started.  This section is optional.
+This field specifies the environment variables (as key-values pairs) that should be set when the pod is started. This section is optional.
 
 ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
@@ -665,7 +671,7 @@ This field lets you reserve resources on a specific node. It defines the maximum
 requests::
 This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU, memory, and storage the pods created in this node specification will reserve.
 
-TIP: In general CPU limits are specified as the number of threads required on hardware or VCPUs if in the cloud, memory is specified in bytes.  See the Kubernetes documentation for further information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
+TIP: In general, CPU limits are specified as the number of threads required on physical hardware (vCPUs if in the cloud), and memory is specified in bytes. Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
 
 === labels
 
@@ -720,26 +726,27 @@ spec:
           - couchbase
 ----
 
-VolumeMounts specifies the claims to use for storage used by the couchbase cluster
+The `VolumeMounts` configuration specifies the claims to use for the storage that is used by the Couchbase Server cluster.
 
 === default
 
-This field is required when using persistent volumes.  The value specifies name of the volumeClaimTemplate used to create a persisted volume for the `default` path.  This is always `/opt/couchbase/var/lib/couchbase`. The claim must match the name of a volumeClaimTemplate within the spec.
+This field is required when using persistent volumes. The value specifies the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `default` path. This is always `/opt/couchbase/var/lib/couchbase`. The claim must match the name of a `volumeClaimTemplate` within the spec.
 
 === data
 
-Name of the volumeClaimTemplate used to create a persisted volume for the `data` path.  When specified the data path will be `/mnt/data`. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
+This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `data` path. When specified, the data path will be `/mnt/data`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
 === index
 
-Name of the volumeClaimTemplate used to create a persisted volume for the `index` path. When specified the index path will be `/mnt/index`. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
+This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `index` path. When specified, the index path will be `/mnt/index`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
 === analytics
 
-Name of the volumeClaimTemplate used to create a persisted volume for the `analytics` paths. When specified the analytics paths will `/mnt/analytics-00` where `00` denotes the first path, with all subsequent paths having incrementing values. The claim must match the name of a volumeClaimTemplate within the spec.  If this field is not specified then a volume will not be created and the data directory will be part of the "default" volume claim.
+This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `analytics` paths. When specified, the analytics paths will be `/mnt/analytics-00` (where `00` denotes the first path), with all subsequent paths having incrementing values. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
 == spec.volumeClaimTemplates
 
+[source,yaml]
 ----
 spec:
   volumeClaimTemplates:
@@ -752,22 +759,22 @@ spec:
             storage: 1Gi
 ----
 
-Defines a template of a persistent volume claim.  At runtime, the operator will create a persistent volume from this template for each pod.  Claims can request volumes from various types of storage systems as indentified by the storage class name.
+Defines a template of a persistent volume claim. At runtime, the Operator will create a persistent volume from this template for each pod. Claims can request volumes from various types of storage systems as identified by the storage class name.
 
 == spec.volumeClaimTemplates.metadata
 
 === name
 
-The metadata name identifies the claim template.  This name is used by the volumeMounts to reference which template to fulfill the mount request.
+The metadata name identifies the claim template. This name is used by the `volumeMounts` to reference which template to fulfill the mount request.
 
 == spec.volumeClaimTemplates.spec
 
 === storageClassName
 
-The StorageClass required by the claim. A StorageClass provides a way for administrators to describe the classes of storage they offer. If no StorageClass is specified, then the default StorageClass will be used.
+The `storageClassName` is required by the claim. A `storageClassName` provides a way for administrators to describe the classes of storage they offer. If no `storageClassName` is specified, then the default storage class is used.
 
-TIP: See kubernetes documentation for more information about https://kubernetes.io/docs/concepts/storage/storage-classes/[Storage Classes].
+Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/storage/storage-classes/[storage classes].
 
 === resources
 
-The minimum resources the volume should have.  Only the storage requests are valid in this context.
+The minimum resources the volume should have. Only the storage requests are valid in this context.

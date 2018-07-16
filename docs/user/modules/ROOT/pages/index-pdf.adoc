@@ -56,6 +56,8 @@ include::list-and-describe.adoc[]
 
 include::persisted-volumes-guide.adoc[]
 
+include::persisted-volumes-zoning-guide.adoc[]
+
 :leveloffset: -1
 
 include::cbopctl.adoc[]
@@ -109,7 +111,5 @@ include::cbopinfo.adoc[]
 :leveloffset: -1
 
 include::demo.adoc[]
-
-include::release-notes.adoc[]
 
 // ======================================================================================
