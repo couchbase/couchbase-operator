@@ -266,7 +266,7 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 		t.Fatal(err)
 	}
 
-	xdcr2KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
+	xdcr2KubeHost, err := f.GetKubeHostname(xdcr2KubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	xdcrKube := f.ClusterSpec[xdcrKubeName]
 
 	// Cluster 1
-	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithBucket, e2eutil.AdminExposed)
+	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, e2eutil.Size5, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,9 +319,8 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 
 	expectedXdcrCluster1Events := e2eutil.EventList{}
 	expectedXdcrCluster1Events.AddAdminConsoleSvcCreateEvent(xdcrCluster1)
-	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
-		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
-		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 1)
+	for nodeIndex := 0; nodeIndex < e2eutil.Size5; nodeIndex++ {
+		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, nodeIndex)
 	}
 	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
@@ -340,7 +339,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, defKube.KubeClient, defKube.CRClient, f.Namespace, f.LogDir)
+	defer e2eutil.CleanUpCluster(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedXdcrCluster2Events := e2eutil.EventList{}
 	expectedXdcrCluster2Events.AddAdminConsoleSvcCreateEvent(xdcrCluster2)
@@ -377,13 +376,20 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	errChan := make(chan error)
 	nodeDownFunc := func(nodeIndex int) {
 		// Kill first Pod of cluster-1
-		memberName := couchbaseutil.CreateMemberName(xdcrCluster1.Name, nodeIndex)
-		_, err := f.ExecShellInPod(defKubeName, memberName, "mv /etc/service/couchbase-server /tmp/")
-		errChan <- err
+		if err := e2eutil.KillPodForMember(defKube.KubeClient, xdcrCluster1, nodeIndex); err != nil {
+			errChan <- err
+		}
+		expectedXdcrCluster1Events.AddMemberDownEvent(xdcrCluster1, nodeIndex)
+		event := e2eutil.NewMemberFailedOverEvent(xdcrCluster1, nodeIndex)
+		if err := e2eutil.WaitForClusterEvent(defKube.KubeClient, xdcrCluster1, event, 90); err != nil {
+			errChan <- err
+		}
+		expectedXdcrCluster1Events.AddMemberFailedOverEvent(xdcrCluster1, nodeIndex)
+		errChan <- nil
 	}
 
 	if triggerDuring == "duringXdcrSetup" {
-		go nodeDownFunc(0)
+		go nodeDownFunc(1)
 	}
 
 	if _, err = e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
@@ -399,7 +405,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	}
 
 	if triggerDuring == "afterXdcrSetup" {
-		go nodeDownFunc(0)
+		go nodeDownFunc(1)
 	}
 
 	err = <-errChan
@@ -542,7 +548,7 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		t.Fatal(err)
 	}
 
-	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries30); err != nil {
 		t.Fatal(err)
 	}
 
@@ -706,13 +712,13 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	defKube := f.ClusterSpec[kubeName1]
 	xdcrKube := f.ClusterSpec[kubeName2]
 
-	// Create secrets in both the clusters
-	RandomNameSuffix = e2eutil.RandomSuffix()
-	decoratorObj := &TlsDecorator{}
-	decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
-	decoratorObj.CreateCaRootCert(t)
-
+	// Create secrets in all k8s clusters
 	for _, kubeName := range []string{kubeName1, kubeName2} {
+		decoratorObj := &TlsDecorator{}
+		RandomNameSuffix = e2eutil.RandomSuffix()
+		decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
+		decoratorObj.CreateCaRootCert(t)
+
 		targetKube := f.ClusterSpec[kubeName]
 		operatorSecret := decoratorObj.CreateOperatorSecret(t, f, kubeName)
 		defer e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, operatorSecret.Name, &metav1.DeleteOptions{})
@@ -826,11 +832,8 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-
 	f := framework.Global
-	kubeNameList := []string{"BasicCluster", "ExternalVMs"}
-
-	defKubeName := kubeNameList[0]
+	defKubeName := "BasicCluster"
 	defKube := f.ClusterSpec[defKubeName]
 
 	// Cluster 1
@@ -857,20 +860,23 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	externalVmClusterData, err := f.GetHostNameFromUrl(kubeNameList[1])
-	if err != nil {
-		t.Fatal(err)
-	}
 
+	// Deploy a stand alone cluster using the same host where K8S is running
 	hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
-	destUrl := externalVmClusterData + ":8091"
+	destUrl := defKubeHost + ":8091"
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"
 	cbUsername := "Administrator"
 	cbPassword := "password"
-	externalCbClusterName := kubeNameList[1]
+	externalCbClusterName := "externalCluster"
 
+	if responseData, err := e2eutil.FlushBucket(destUrl, destBucketName, cbUsername, cbPassword); err != nil {
+		t.Logf("Response from http call: %v", string(responseData))
+		t.Fatal(err)
+	}
+
+	// Enable replication from K8S CB cluster -> External CB cluster
 	uuid, err := e2eutil.GetRemoteUuid(destUrl, cbUsername, cbPassword)
 	if err != nil {
 		t.Fatal(err)
@@ -884,6 +890,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Validate bucket replication from K8S -> external cluster
 	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 100, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -891,6 +898,41 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 100, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
+
+	/*
+		// Enable replication from External CB cluster -> K8S CB cluster
+		xdcrRefList, err := e2eutil.GetXdcrClusterReferences(destUrl, cbUsername, cbPassword)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, xdcrRef := range xdcrRefList {
+			if err := e2eutil.DeleteXdcrClusterReferences(destUrl, cbUsername, cbPassword, xdcrRef); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		uuid, err = e2eutil.GetRemoteUuid(hostUrl, cbUsername, cbPassword)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = e2eutil.CreateDestClusterReference(destUrl, cbUsername, cbPassword, uuid, xdcrCluster1.Name, hostUrl, cbUsername, cbPassword); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err = e2eutil.CreateXdcrBucketReplication(destUrl, cbUsername, cbPassword, xdcrCluster1.Name, destBucketName, srcBucketName, versionType); err != nil {
+			t.Fatal(err)
+		}
+
+		// Validate bucket replication from external -> K8S cluster
+		if _, err = e2eutil.PopulateBucket(destUrl, destBucketName, cbUsername, cbPassword, 100, 101); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := e2eutil.VerifyDocCountInBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 200, e2eutil.Retries10); err != nil {
+			t.Fatal(err)
+		}
+	*/
 
 	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
 }

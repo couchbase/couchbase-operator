@@ -63,12 +63,17 @@ func TestEditServiceConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 1)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+		t.Fatalf("Failed to add new member %d: %v", 1, err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
+
 	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSize, e2eutil.NumNodesVerifier)
 	if err != nil {
 		t.Fatalf("failed to change service size: %v", err)
 	}
 
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 

@@ -1367,13 +1367,19 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	if err != nil {
 		t.Fatalf("add service failed: %v", err)
 	}
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
-	if err != nil {
+
+	for memeberId := 3; memeberId <= 4; memeberId++ {
+		event := e2eutil.NewMemberAddEvent(testCouchbase, memeberId)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+			t.Fatalf("Failed to add new member %d: %v", 1, err)
+		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, memeberId)
+	}
+
+	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
@@ -1414,7 +1420,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 2,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries20, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to scale test_config_4--, test_config_3++: %v", err)
 	}
@@ -1445,7 +1451,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
+	err = e2eutil.VerifyServices(t, client, e2eutil.Retries20, serviceMap, e2eutil.NodeServicesVerifier)
 	if err != nil {
 		t.Fatalf("failed to scale test_config_3--, test_config_2++: %v", err)
 	}

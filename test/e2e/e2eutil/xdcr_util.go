@@ -27,6 +27,13 @@ type cbBucketInfo struct {
 	} `json:"basicStats"`
 }
 
+type xdcrRemoteClusterReference struct {
+	Name     string `json:"name"`
+	Uri      string `json:"uri"`
+	Hostname string `json:"hostname"`
+	Username string `json:"username"`
+}
+
 func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string, reqParams *strings.Reader) ([]byte, error) {
 	var request *http.Request
 	var err error
@@ -68,9 +75,16 @@ func GetBucketInfo(hostUrl, bucketName, hostUsername, hostPassword string) (cbBu
 	return bucketInfo, err
 }
 
+func FlushBucket(hostUrl, bucketName, hostUsername, hostPassword string) ([]byte, error) {
+	//curl -X POST -u [admin]:[password] [localhost]:8091/pools/default/buckets/[bucket-name]/controller/doFlush
+	hostUrl = "http://" + hostUrl + "/pools/default/buckets/" + bucketName + "/controller/doFlush"
+	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
+}
+
 func PopulateBucket(hostUrl, bucketName, hostUsername, hostPassword string, numOfItems, docStartIndex int) ([]byte, error) {
 	//curl 'http://172.23.121.211:8091/pools/default/buckets/sample/docs/1' --data 'flags=24&value={"city":"chennai"}'  -u Administrator:password
 	hostUrl = "http://" + hostUrl + "/pools/default/buckets/" + bucketName + "/docs/"
+	numOfItems += docStartIndex - 1
 	for docIndex := docStartIndex; docIndex <= numOfItems; docIndex++ {
 		currReqUrl := hostUrl + strconv.Itoa(docIndex)
 		flagStr := "flags=24"
@@ -137,10 +151,26 @@ func CreateDestClusterReference(hostUrl, hostUsername, hostPassword, destCluster
 	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, reqParams)
 }
 
-func DeleteDestClusterReference(hostUrl, hostUsername, hostPassword, remoteClusterName string) ([]byte, error) {
-	// curl -v -X DELETE -u Administrator:password1 http://10.4.2.4:8091/pools/default/remoteClusters/remote1
-	hostUrl = "http://" + hostUrl + "pools/default/remoteClusters" + "/" + remoteClusterName
-	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
+func GetXdcrClusterReferences(hostUrl, hostUsername, hostPassword string) (xdcrClusterRefList []xdcrRemoteClusterReference, err error) {
+	// Get all XDCR cluster reference
+	hostUrl = "http://" + hostUrl + "/pools/default/remoteClusters"
+	responseData, err := GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
+	if err != nil {
+		return xdcrClusterRefList, err
+	}
+	json.Unmarshal(responseData, &xdcrClusterRefList)
+	return xdcrClusterRefList, err
+}
+
+func DeleteXdcrClusterReferences(hostUrl, hostUsername, hostPassword string, xdcrClusterRef xdcrRemoteClusterReference) error {
+	// Stop replication of default bucket
+	hostUrl = "http://" + xdcrClusterRef.Hostname + "/controller/cancelXDCR/" + xdcrClusterRef.Uri + "%2Fdeafult%2Fdefault"
+	GenerateHttpRequest("DELETE", hostUrl, hostUsername, hostPassword, nil)
+
+	// Delete XDCR reference
+	hostUrl = "http://" + xdcrClusterRef.Hostname + xdcrClusterRef.Uri
+	_, err := GenerateHttpRequest("DELETE", hostUrl, hostUsername, hostPassword, nil)
+	return err
 }
 
 func CreateXdcrBucketReplication(hostUrl, hostUsername, hostPassword, remoteClusterName, fromBucketName, destBucketName, versionType string) ([]byte, error) {

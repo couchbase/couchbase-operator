@@ -112,7 +112,6 @@ func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets 
 		return err
 	}
 	return nil
-
 }
 
 func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
@@ -207,7 +206,6 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 	if err != nil {
 		return fmt.Errorf("fail to wait for cluster status to be healthy: %v \n", err)
 	}
-
 	return nil
 }
 
@@ -225,7 +223,6 @@ func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api
 			printContainerStatus(buf, p.Status.ContainerStatuses)
 			t.Logf("pod (%s) status.phase is (%s): %v", p.Name, p.Status.Phase, buf.String())
 		}
-
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
 
@@ -263,7 +260,6 @@ func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName strin
 
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
-
 	return nil
 }
 
@@ -284,7 +280,6 @@ func WaitUntilPodDeleted(t *testing.T, kubeClient kubernetes.Interface, namespac
 
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
-
 	return nil
 }
 
@@ -392,7 +387,6 @@ func CreateAndWaitPod(kubecli kubernetes.Interface, ns string, pod *v1.Pod, time
 		}
 		return nil, fmt.Errorf("failed to wait pod running: %v", err)
 	}
-
 	return retPod, nil
 }
 
