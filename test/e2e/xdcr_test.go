@@ -137,9 +137,9 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "admin")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
 
 	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
 	if err != nil {
@@ -257,9 +257,9 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
 	expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "admin")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
 
 	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
 	if err != nil {
@@ -347,9 +347,9 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "admin")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
 
 	defKubeHost, err := f.GetKubeHostname(defKubeName)
 	if err != nil {
@@ -473,9 +473,9 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "admin")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
 
 	errChan := make(chan error)
 	resizeFunction := func() {
@@ -604,9 +604,9 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "admin")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
 
 	errChan := make(chan error)
 	serviceKillFunc := func() {
@@ -769,9 +769,9 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "admin")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "data")
-	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, "view")
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
+	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
 
 	defKubeHost, err := f.GetKubeHostname(kubeName1)
 	if err != nil {
