@@ -442,6 +442,27 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
+	if true {
+		// To debug mapping issue
+		couchbasePodList, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		deployedRzaGroupsMap := map[string]int{}
+		for _, cbPod := range couchbasePodList.Items {
+			currRzaGroup := cbPod.Spec.NodeSelector["server-group.couchbase.com/zone"]
+			t.Log("Name: '" + cbPod.Name + "'")
+			t.Log("Curr group: '" + currRzaGroup + "'")
+			if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {
+				deployedRzaGroupsMap[currRzaGroup]++
+			} else {
+				deployedRzaGroupsMap[currRzaGroup] = 1
+			}
+			t.Log(deployedRzaGroupsMap)
+		}
+	}
+
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
 	if err != nil {
@@ -517,6 +538,27 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+
+	if true {
+		// To debug mapping issue
+		couchbasePodList, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		deployedRzaGroupsMap := map[string]int{}
+		for _, cbPod := range couchbasePodList.Items {
+			currRzaGroup := cbPod.Spec.NodeSelector["server-group.couchbase.com/zone"]
+			t.Log("Name: '" + cbPod.Name + "'")
+			t.Log("Curr group: '" + currRzaGroup + "'")
+			if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {
+				deployedRzaGroupsMap[currRzaGroup]++
+			} else {
+				deployedRzaGroupsMap[currRzaGroup] = 1
+			}
+			t.Log(deployedRzaGroupsMap)
+		}
+	}
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)

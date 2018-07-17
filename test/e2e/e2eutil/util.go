@@ -61,6 +61,7 @@ var (
 	Retries10  = 10
 	Retries20  = 20
 	Retries30  = 30
+	Retries60  = 60
 	Retries120 = 120
 )
 
@@ -239,7 +240,7 @@ func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient 
 		time.Sleep(10 * time.Second)
 
 		retries := &ClusterReadyRetries{
-			Size:    Retries30,
+			Size:    Retries60,
 			Bucket:  Retries20,
 			Service: Retries20,
 		}
