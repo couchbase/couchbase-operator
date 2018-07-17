@@ -68,6 +68,7 @@ func New(cfg Config) *Controller {
 	}
 
 	http.HandleFunc("/v1/settings/logging", controller.SettingsLoggingHandler)
+	http.HandleFunc("/v1/stats/cluster", controller.StatsClusterHandler)
 	return controller
 }
 
@@ -259,6 +260,36 @@ func (c *Controller) SettingsLoggingHandler(w http.ResponseWriter, r *http.Reque
 		})
 
 		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (c *Controller) StatsClusterHandler(w http.ResponseWriter, r *http.Request) {
+
+	type Stats struct {
+		Clusters map[string]*cluster.ClusterStats `json:"clusters"`
+	}
+
+	if r.Method == http.MethodGet {
+		response := &Stats{
+			Clusters: make(map[string]*cluster.ClusterStats),
+		}
+
+		c.clusters.Range(func(key string, value *cluster.Cluster) bool {
+			response.Clusters[key] = value.Stats()
+			return true
+		})
+
+		data, err := json.Marshal(response)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.Write(data)
 	} else {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

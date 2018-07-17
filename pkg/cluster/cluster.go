@@ -60,24 +60,37 @@ type Config struct {
 	EnableUpgrades bool
 }
 
+type ClusterStats struct {
+	LastReconcileStartTime    time.Time `json:"last_reconcile_loop_start_time,omitempty"`
+	LastReconcileEndTime      time.Time `json:"last_reconcile_loop_end_time,omitempty"`
+	LastCompletedLoopDuration float64   `json:"last_completed_loop_duration_sec,omitempty"`
+	ReconcileLoopStatus       string    `json:"reconcile_loop_status,omitempty"`
+	ReconcileLoopSleepTime    int       `json:"reconcile_loop_sleep_time,omitempty"`
+	ClusterPhase              string    `json:"clusterPhase"`
+	ControlPaused             bool      `json:"controlPaused"`
+}
+
 type Cluster struct {
-	logger    *logrus.Entry
-	config    Config
-	cluster   *api.CouchbaseCluster
-	status    api.ClusterStatus
-	eventCh   chan *clusterEvent
-	stopCh    chan struct{}
-	members   couchbaseutil.MemberSet
-	tlsConfig *tls.Config
-	eventsCli corev1.EventInterface
-	username  string
-	password  string
-	client    *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
-	ctx       context.Context                // Context used to cancel long running operations
-	cancel    context.CancelFunc             // Closure on the context to indicate cancellation
-	lastEvent time.Time                      // When we raised the last event (see raiseEvent)
-	recorder  record.EventRecorder           // Buffers and aggegates events
-	scheduler scheduler.Scheduler            // Pod placement scheduler
+	logger     *logrus.Entry
+	config     Config
+	cluster    *api.CouchbaseCluster
+	status     api.ClusterStatus
+	eventCh    chan *clusterEvent
+	stopCh     chan struct{}
+	members    couchbaseutil.MemberSet
+	tlsConfig  *tls.Config
+	eventsCli  corev1.EventInterface
+	username   string
+	password   string
+	client     *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
+	ctx        context.Context                // Context used to cancel long running operations
+	cancel     context.CancelFunc             // Closure on the context to indicate cancellation
+	lastEvent  time.Time                      // When we raised the last event (see raiseEvent)
+	recorder   record.EventRecorder           // Buffers and aggegates events
+	scheduler  scheduler.Scheduler            // Pod placement scheduler
+	lastLoopSt time.Time
+	lastLoopEn time.Time
+	loopStatus string
 }
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
@@ -291,12 +304,15 @@ func (c *Cluster) run() {
 			}
 
 		case <-time.After(reconcileInterval):
+			st := time.Now()
+			c.loopStatus = "running"
 			if c.cluster.Spec.Paused {
 				c.status.PauseControl()
 				if err := c.updateCRStatus(); err != nil {
 					c.logger.Warningf("periodic update CR status failed: %v", err)
 				}
 				c.logger.Infof("control is paused, skipping reconciliation")
+				c.setLastLoopTimes(st)
 				continue
 			} else {
 				c.status.Control()
@@ -305,6 +321,7 @@ func (c *Cluster) run() {
 			running, pending, err := c.pollPods()
 			if err != nil {
 				c.logger.Errorf("fail to poll pods: %v", err)
+				c.setLastLoopTimes(st)
 				continue
 			}
 
@@ -313,6 +330,7 @@ func (c *Cluster) run() {
 				// deterministically become running or succeeded/failed later.
 				c.logger.Infof("skip reconciliation: running (%v), pending (%v)",
 					k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
+				c.setLastLoopTimes(st)
 				continue
 			}
 
@@ -336,10 +354,15 @@ func (c *Cluster) run() {
 			if err := c.updateCRStatus(); err != nil {
 				c.logger.Warningf("periodic update CR status failed: %v", err)
 			}
-
+			c.setLastLoopTimes(st)
 		}
-
 	}
+}
+
+func (c *Cluster) setLastLoopTimes(st time.Time) {
+	c.lastLoopSt = st
+	c.lastLoopEn = time.Now()
+	c.loopStatus = "sleeping"
 }
 
 func (c *Cluster) handleUpdateEvent(event *clusterEvent) {
@@ -765,4 +788,16 @@ func (c *Cluster) decPodIndex() {
 
 func (c *Cluster) SetLoggingLevel(level logrus.Level) {
 	c.logger.Logger.SetLevel(level)
+}
+
+func (c *Cluster) Stats() *ClusterStats {
+	return &ClusterStats{
+		LastReconcileStartTime:    c.lastLoopSt,
+		LastReconcileEndTime:      c.lastLoopEn,
+		LastCompletedLoopDuration: c.lastLoopEn.Sub(c.lastLoopSt).Seconds(),
+		ReconcileLoopStatus:       c.loopStatus,
+		ReconcileLoopSleepTime:    int(reconcileInterval.Seconds()),
+		ControlPaused:             c.status.ControlPaused,
+		ClusterPhase:              string(c.status.Phase),
+	}
 }
