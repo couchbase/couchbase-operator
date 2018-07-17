@@ -178,6 +178,9 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
 		crd.Spec.ExposeAdminConsole = true
+		crd.Spec.AdminConsoleServices = api.ServiceList{
+			api.DataService,
+		}
 	}
 	return crd
 }
@@ -212,6 +215,9 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
 		crd.Spec.ExposeAdminConsole = true
+		crd.Spec.AdminConsoleServices = api.ServiceList{
+			api.DataService,
+		}
 	}
 	return crd
 }
@@ -399,6 +405,9 @@ func CreateClusterCRD(genName string, adminConsoleExposed bool, spec api.Cluster
 	crd := NewClusterCRD(genName, spec)
 	if adminConsoleExposed {
 		crd.Spec.ExposeAdminConsole = true
+		crd.Spec.AdminConsoleServices = api.ServiceList{
+			api.DataService,
+		}
 	}
 	return crd
 }

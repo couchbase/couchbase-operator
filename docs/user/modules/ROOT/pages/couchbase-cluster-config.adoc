@@ -235,7 +235,7 @@ ____
 This field specifies whether or not the Couchbase Server Web Console should be exposed externally. Exposing the web console is done using a NodePort service and the port for the service can be found in the describe output when describing this cluster. This parameter may be changed while the cluster is running and the Operator will create/destroy the NodePort service as appropriate.
 
 ____
-_Field rules:_ The `exposeAdminConsole` field is not required and defaults to `false` if not specified.
+_Field rules:_ The `exposeAdminConsole` field is not required and defaults to `false` if not specified.  If set to `true` the specification must also have the <<adminConsoleServices>> property defined.
 ____
 
 === adminConsoleServices

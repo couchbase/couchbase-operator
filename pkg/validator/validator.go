@@ -151,6 +151,11 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	// Custom validation
 	errs := []error{}
 
+	// Ensure one service is specified when the admin console is exposed
+	if customResource.Spec.ExposeAdminConsole && len(customResource.Spec.AdminConsoleServices) == 0 {
+		errs = append(errs, errors.Required("spec.adminConsoleServices", "body"))
+	}
+
 	// Uniqueness, although in the schema types, the API denies it.
 	if !uniqueString(customResource.Spec.AdminConsoleServices.StringSlice()) {
 		errs = append(errs, errors.DuplicateItems("spec.adminConsoleServices", "body"))

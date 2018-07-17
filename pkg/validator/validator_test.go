@@ -606,6 +606,14 @@ var testDefs = []testDef{
 		path:        "tests/0071.yaml",
 		description: "Tests pod environment values are strings",
 	},
+	{
+		name:        "TestMissingAdminConsoleServices",
+		path:        "tests/0072.yaml",
+		description: "Tests exposing the admin console without services is illegal",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required("spec.adminConsoleServices", "body"),
+		),
+	},
 }
 
 func TestValiation(t *testing.T) {
