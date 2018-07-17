@@ -6,14 +6,14 @@ import (
 )
 
 var (
-	basicSecretData = map[string][]byte{
+	BasicSecretData = map[string][]byte{
 		"username": []byte("Administrator"),
 		"password": []byte("password"),
 	}
 )
 
 func NewDefaultSecret(namespace string) *v1.Secret {
-	return NewSecret(namespace, "basic-test-secret", basicSecretData)
+	return NewSecret(namespace, "basic-test-secret", BasicSecretData)
 }
 
 func NewSecret(namespace, name string, data map[string][]byte) *v1.Secret {

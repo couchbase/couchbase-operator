@@ -1,6 +1,11 @@
 package e2eutil
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io/ioutil"
+	"net/http"
 	"reflect"
 	"strconv"
 	"testing"
@@ -9,6 +14,7 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/client-go/kubernetes"
@@ -87,6 +93,38 @@ func GetBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 		}
 	}
 	return nil, NewErrGetClusterBucket(bucketName)
+}
+
+// Inserts Json docs into couchbase bucket
+func InsertJsonDocsIntoBucket(client *cbmgr.Couchbase, bucketName string, docStartIndex, numOfDocs int) error {
+	numOfDocs += docStartIndex
+	for docIndex := docStartIndex; docIndex < numOfDocs; docIndex++ {
+		docKey := "doc" + strconv.Itoa(docIndex)
+		docMap := map[string]string{}
+		docMap["key1"] = "dummyVal 1"
+		docMap["key2"] = "dummyVal 2"
+		docMap["key3"] = "dummyVal 3"
+		docMap["key4"] = "dummyVal 4"
+
+		// Convert map data to byte array
+		docData, err := json.Marshal(docMap)
+		if err != nil {
+			return errors.New("Failed to unmarshal map into bytes: " + err.Error())
+		}
+		docData = append([]byte("value="), docData...)
+
+		// Get bucket Obj
+		bucketObj, err := client.GetBucket(bucketName)
+		if err != nil {
+			return errors.New("Failed to retrieve couchbase bucket " + bucketName + ": " + err.Error())
+		}
+
+		// Inserts document using client
+		if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
+			return errors.New("Failed to insert doc " + docKey + ": " + err.Error())
+		}
+	}
+	return nil
 }
 
 // Add a node to the cluster
@@ -524,4 +562,35 @@ func IndexSettingVerifier(t *testing.T, is *cbmgr.IndexSettings, value string) b
 	indexSetting := string(is.StorageMode) == value
 	t.Logf("index setting: %v", is.StorageMode)
 	return indexSetting
+}
+
+func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string) (responseData []byte, err error) {
+	hostUrl := "http://" + hostIp + ":" + hostPort + "/analytics/service"
+	username := string(e2espec.BasicSecretData["username"])
+	password := string(e2espec.BasicSecretData["password"])
+	data := []byte(queryStr)
+
+	request, err := http.NewRequest("POST", hostUrl, bytes.NewReader(data))
+	if err != nil {
+		err = errors.New("Failed to create http request: " + err.Error())
+		return
+	}
+
+	request.SetBasicAuth(username, password)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		err = errors.New("Http POST failed: " + err.Error())
+		return
+	}
+	defer response.Body.Close()
+
+	responseBody := response.Body
+	responseData, _ = ioutil.ReadAll(responseBody)
+
+	if response.StatusCode != http.StatusOK {
+		err = errors.New("Remote call failed with response: " + response.Status)
+	}
+	return
 }

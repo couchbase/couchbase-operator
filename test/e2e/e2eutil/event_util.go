@@ -114,6 +114,10 @@ func (e *EventList) AddMemberRecoveredEvent(cl *api.CouchbaseCluster, memberId i
 	*e = append(*e, *k8sutil.MemberRecoveredEvent(name, cl))
 }
 
+func (e *EventList) AddNodeServiceCreateEvent(cl *api.CouchbaseCluster, serviceName api.Service) {
+	*e = append(*e, *k8sutil.NodeServiceCreateEvent(serviceName, cl))
+}
+
 func (e EventList) String() string {
 	s := ""
 	for _, c := range e {

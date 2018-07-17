@@ -124,3 +124,10 @@ tcGroups:
           - rzaNodeLabeller
       - name: TestMultiNodeAutoFailover
       - name: TestDiskFailureAutoFailover
+
+  - name: AnalyticsTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestAnalyticsCreateDataSet
+      - name: TestAnalyticsResizeCluster

@@ -116,3 +116,10 @@ tcGroups:
       - name: TestRzaUpdateK8SNodeLabelAndCrd
         decorators:
           - rzaNodeLabeller
+
+  - name: AnalyticsTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestAnalyticsKillPods
+      - name: TestAnalyticsKillPodsWithPVC

@@ -19,7 +19,7 @@ imports:
   - man
   - pwd
 - name: github.com/couchbase/gocbmgr
-  version: 73b9fdf259a4d4c731ef6fafa325976dfc3a4f17
+  version: 5df1debfb3cdd68c82885e7452a905987a0378ee
   subpackages:
   - urlencoding
 - name: github.com/davecgh/go-spew

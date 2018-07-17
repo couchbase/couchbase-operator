@@ -138,10 +138,10 @@ var (
 		//"TestEventingOnK8sBasic": TestEventingOnK8sBasic,
 
 		// 5.5 feature - Analytics cases
-		//"TestAnalyticsCreateDataSet":   TestAnalyticsCreateDataSet,
-		//"TestAnalyticsResizeCluster":   TestAnalyticsResizeCluster,
-		//"TestAnalyticsKillPods":        TestAnalyticsKillPods,
-		//"TestAnalyticsKillPodsWithPVC": TestAnalyticsKillPodsWithPVC,
+		"TestAnalyticsCreateDataSet":   TestAnalyticsCreateDataSet,
+		"TestAnalyticsResizeCluster":   TestAnalyticsResizeCluster,
+		"TestAnalyticsKillPods":        TestAnalyticsKillPods,
+		"TestAnalyticsKillPodsWithPVC": TestAnalyticsKillPodsWithPVC,
 
 		// 5.5 feature - Node Failover cases
 		"TestServerGroupAutoFailover":                         TestServerGroupAutoFailover,
