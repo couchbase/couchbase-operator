@@ -31,7 +31,10 @@ $(BINARY): $(SOURCE)
 	build/bin/crdgen -outfile example/crd.yaml
 
 container: build
-	docker build -t couchbase/couchbase-operator:v1 .
+	docker build -f Dockerfile -t couchbase/couchbase-operator:v1 .
+
+container-rhel:
+	docker build -f Dockerfile.rhel -t couchbase/couchbase-operator-rhel:v1 .
 
 prod: container
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopctl ./cmd/cbopctl/

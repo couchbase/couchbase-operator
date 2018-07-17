@@ -1,0 +1,2 @@
+FROM registry.access.redhat.com/rhel7
+ADD build/bin/couchbase-operator /usr/local/bin/couchbase-operator
