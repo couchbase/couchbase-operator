@@ -1,50 +1,50 @@
-= Kubernetes Role Based Access Control
+= About Kubernetes Role-Based Access Control and the Operator
 
-Kubernetes supports role based access control [RBAC] which allows containers to be bound to roles which give them permissions to operate on various resources.  This page aims to give a general overview of RBAC in the context of deploying the Operator and managing Couchbase clusters.
+Kubernetes supports role-based access control (RBAC), which allows containers to be bound to roles which give them permissions to operate on various resources. This topic aims to give a general overview of RBAC in the context of deploying the Operator and managing Couchbase Server clusters.
 
-RBAC is enabled by default on all Kubernetes cluster running 1.10+ so will need to be taken into consideration when planning your deployment.  The system is flexible enough to meet the challenges of most use cases, but as a side effect it does lead to some confusion.
+RBAC is enabled by default in Kubernetes 1.10+, so you will need to take RBAC into consideration when planning a deployment. The system is flexible enough to meet the challenges of most use-cases, but that flexibility can sometimes create confusion.
 
-NOTE: For a full explanation of RBAC and all topics discussed here, please consult the https://kubernetes.io/docs/reference/access-authn-authz/authorization/[official documentation].
+For a full explanation of how RBAC works in Kubernetes, refer to the https://kubernetes.io/docs/reference/access-authn-authz/authorization/[official Kubernetes documentation].
 
 == Roles
 
-A role essentially maps a name to a set of permissions that a user or service is allowed to perform on the cluster.  Roles can be scoped to the entire cluster via the `ClusterRole` resource type, or to a specifc name space via the `Role` resource type.
+A role essentially maps a name to a set of permissions that a user or service is allowed to perform on the cluster. Roles can be scoped to the entire cluster with the `ClusterRole` resource type, or to a specific namespace with the `Role` resource type.
 
-The key distinction here is that cluster scoped roles can be specified once and used in any name space, whereas name space scoped roles have to be defined in each name space they are used in.  Another consideration is that you will need cluster administration privileges to install cluster roles, namespace scoped roles can be created by a user with sufficient privileges.
+The key distinction is that cluster-scoped roles can be specified once and used in any name space, whereas namespace-scoped roles have to be defined in each name space they are used in. Another consideration is that you need cluster administration privileges to install cluster roles, while namespace-scoped roles can be created by a user with sufficient privileges.
 
 === Operator Role Requirements
 
-The Operator is currently scoped to a name space and needs access to various resources within that name space in order to function correctly.  The resources required by the Operator are:
+The Couchbase Autonomous Operator is currently scoped to a namespace and needs access to various resources within that namespace in order to function correctly. The resources required by the Operator are:
 
 customresourcedefinitions::
-The Operator has the ability to automatically install the custom resource definition (defining the `CouchbaseCluster` resource type).  This is a cluster level operation so optional.  For further information please read the xref:operator-config.adoc[operator configuration documentation].
+The Operator has the ability to automatically install the custom resource definition (CRD) (defining the `CouchbaseCluster` resource type).  This is a cluster-level operation. For more information, refer to the xref:operator-config.adoc[Operator configuration documentation].
 
 couchbaseclusters::
-The Operator watches for changes to cluster resources and preforms the necessary steps to create a cluster in the configuration specified in the cluster spec.
+The Operator watches for changes to cluster resources and preforms the necessary steps to create a cluster according to the configuration that is defined in the cluster specification.
 
 pods::
-The Operator needs to be able to create and delete pods to create and scale the cluster and auto-heal.
+The Operator needs to be able to create and delete pods to deploy and scale the Couchbase Server cluster, as well as perform auto-healing activities.
 
 services::
-The Operator needs to create services in order to generate DNS names used to address pods and also create SRV records for service discovery.
+The Operator needs to create services in order to generate DNS names that are used to address pods, as well as create SRV records for service discovery.
 
 endpoints::
 The Operator creates an endpoint resource in order to ensure that no more than one instance is managing clusters at any one time.
 
 events::
-The Operator will raise events associated with a `CouchbaseCluster` resource which can be used to synchronize external operations or raise alerts.  These are documented xref:conditions-and-events.adoc[here].
+The Operator will raise xref:conditions-and-events.adoc[events] that are associated with a `CouchbaseCluster` resource, which can be used to synchronize external operations or raise alerts.
 
 secrets::
-The Operator consumes cluster passwords and private keys from secrets.  Secrets can be securely managed by a separate user from that which is controlling the cluster giving isolation for security compliance purposes.
+The Operator consumes cluster passwords and private keys from secrets.  Secrets can be securely managed by a separate user from that which is controlling the cluster, giving isolation for security compliance purposes.
 
 persistentvolumeclaims::
 The Operator needs to be able to claim persistent volumes when server pods are using the persistent storage option.
 
 persistentvolumes::
-The Operator needs to be able to monitor the status of a persistent volume comain.
+The Operator needs to be able to monitor the status of a persistent volume claim.
 
 storageclasses::
-The Operator needs to verify the requested storage class exists before claiming a persistent volume.
+The Operator needs to verify that the requested storage class exists before claiming a persistent volume.
 
 [source,yaml]
 ----
@@ -85,25 +85,25 @@ rules:
   - "get"
 ----
 
-TIP: You may improve security and resilience by running the Operator and Couchbase clusters in an isolated name space.  This will restrict the resources the Operator potentially has access to to only those defined in that name space.  The `NetworkPolicy` resource can also be used to restict access to the clusters at the network level.
+TIP: You may improve security and resilience by running the Operator and the Couchbase Server clusters in an isolated namespace. This will restrict the resources that the Operator potentially has access to to only those that are defined in that namespace. The `NetworkPolicy` resource can also be used to restrict access to the clusters at the network level.
 
 === User Role Requirements
 
-An end user also needs a separate set of permissions in order to create the Operator and clusters.  These are:
+An end user also needs a separate set of permissions in order to create the Operator and Couchbase Server clusters. These are:
 
 deployments::
-The user needs to be able to create a deployment containing the Operator container.  This also allows monitoring via the logs.
+The user needs to be able to create a deployment that contains the Operator container. This also allows access to logs for monitoring the deployment.
 
 couchbaseclusters::
-The user needs to be able to create, modify and delete couchbase cluster objects which are consumed by the Operator.  This also gives access to the cluster description which contains current state and event information.
+The user needs to be able to create, modify, and delete the Couchbase Server cluster objects that are consumed by the Operator. This also gives access to the cluster description, which contains current state and event information.
 
 == Users and Service Accounts
 
-These are essentially the same and basically identify a person or service respectively.  The Operator should run under a service account.  When defining the Operator deployment manifest, the named service account you have created for the Operator must be defined in the pod specification template as documented xref:operator-config.adoc[here].
+These are essentially the same and identify a person and service, respectively. The Operator should run under a service account. When defining the Operator deployment manifest, the named service account you have created for the Operator must be defined in the xref:operator-config.adoc[pod specification template].
 
 == Role Bindings
 
-Role bindings act as the glue between roles and accounts.  There are two variants with different scoping rules.  The `RoleBinding` resource type may reference either a `ClusterRole` or a plain `Role` and grants those permissions to a user, service account or group in a specific namespace.  A `ClusterRoleBinding` resource grants permissions to an entity at the cluster level; it is unscoped meaning that those permissions apply to any name space.
+Role bindings act as the glue between roles and accounts. There are two variants with different scoping rules. The `RoleBinding` resource type may reference either a `ClusterRole` or a plain `Role`, and grants those permissions to a user, service account, or group in a specific namespace. A `ClusterRoleBinding` resource grants permissions to an entity at the cluster level; it is unscoped, meaning that those permissions apply to any namespace.
 
 [source,yaml]
 ----
@@ -121,4 +121,4 @@ subjects:
   namespace: my-namespace
 ----
 
-TIP: It is recommended that a `RoleBinding` be used to grant permissions to the Operator on a per-name space basis in order to restrict access to the minimum number of resources necessary, improving security, resillience and performance
+TIP: It is recommended that a `RoleBinding` be used to grant permissions to the Operator on a per-namespace basis in order to restrict access to the minimum number of resources necessary, which helps improve security, resilience, and performance.
