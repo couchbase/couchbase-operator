@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -137,21 +138,24 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 	for {
 		select {
 		case <-to:
+			fmt.Printf("timeout %v\n", jobName)
 			jobInfo["status"] = "timeout after " + opTimeout.String() + " seconds"
 			results <- jobInfo
 			return
 		case <-dur:
+			fmt.Printf("duration up %v\n", jobName)
 			jobInfo["status"] = "success: " + jobName
 			results <- jobInfo
 			return
 		default:
+			fmt.Printf("default %v\n", jobName)
 			checkJob, err := kubeClient.BatchV1().Jobs(namespace).Get(jobName, metav1.GetOptions{})
 			if err != nil {
 				jobInfo["status"] = "error: failed to get job status: " + err.Error()
 				results <- jobInfo
 				return
 			}
-
+			fmt.Printf("bbb %v\n", checkJob.Status.Succeeded)
 			if checkJob.Status.Succeeded == 1 {
 				jobInfo["status"] = "success: " + jobName
 				results <- jobInfo
@@ -176,9 +180,17 @@ func CheckJob(t *testing.T, jobStatus map[string]string) {
 
 func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, result map[string]string) {
 	targetKube := f.ClusterSpec[kubeName]
+	fmt.Printf("deleting %v\n", result["jobName"])
 	err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(result["jobName"], metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("failed to delete job %v \n", err)
+	}
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "job=" + result["jobName"]})
+	if err != nil {
+		t.Fatalf("failed to list pods for cluster: " + err.Error())
+	}
+	for _, pod := range pods.Items {
+		targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}
 }
 
@@ -420,7 +432,7 @@ outerLoop:
 		results := make(chan map[string]string, len(testDef.ops))
 		jobList := map[string]*batchv1.Job{}
 		i := 0
-		t.Logf("Starting cycle %v\n", cycles)
+		fmt.Printf("Starting cycle %v\n", cycles)
 	innerLoop:
 		for {
 			select {
@@ -429,7 +441,7 @@ outerLoop:
 				break outerLoop
 			// receive message from MonitorJob goroutines
 			case result := <-results:
-				t.Logf("got results from %v \n", result["jobName"])
+				fmt.Printf("got results from %v \n", result["jobName"])
 				CheckJob(t, result)
 				DeleteJob(t, f, kubeName, result)
 				delete(jobList, result["jobName"])
@@ -443,7 +455,7 @@ outerLoop:
 					op := testDef.ops[i]
 					jobSpec := CreateJobSpec(op)
 					job := CreateJob(t, f, kubeName, jobSpec)
-					t.Logf("launched job %v::%v::%v \n", job.Name, cycles, i)
+					fmt.Printf("launched job %v::%v::%v \n", job.Name, cycles, i)
 					// if wait, wait for success before launching next job
 					if op.wait {
 						singleResults := make(chan map[string]string, 1)
@@ -486,6 +498,7 @@ func TestFeaturesAll(t *testing.T) {
 		days: f.Duration,
 		ops: []operation{
 			// load data to default cluster 1
+
 			{
 				name:     "pillowfight-cluster1-1",
 				image:    "sequoiatools/pillowfight:v5.0.1",
@@ -563,25 +576,26 @@ func TestFeaturesAll(t *testing.T) {
 				duration: 16,
 			},
 
+
 			// continuous load cluster 1
 			{
 				name:     "gideon-cluster1-1",
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
-				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     false,
-				duration: 10,
-				timeout:  11,
+				args:     []string{"kv --ops 100 --create 10 --get 70 --expire 20 --ttl 15 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
+				wait:     true,
+				duration: 5,
+				timeout:  7,
 			},
 
 			{
 				name:     "gideon-cluster1-2",
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
-				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     false,
-				duration: 10,
-				timeout:  11,
+				args:     []string{"kv --ops 100 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default"},
+				wait:     true,
+				duration: 5,
+				timeout:  7,
 			},
 			// continuous delete cluster 1
 			{
@@ -629,7 +643,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     false,
+				wait:     true,
 				timeout:  11,
 				duration: 10,
 			},
@@ -639,7 +653,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     false,
+				wait:     true,
 				timeout:  11,
 				duration: 10,
 			},
@@ -698,7 +712,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     false,
+				wait:     true,
 				duration: 10,
 				timeout:  11,
 			},
@@ -708,7 +722,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     false,
+				wait:     true,
 				duration: 10,
 				timeout:  11,
 			},
@@ -789,7 +803,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 100 --create 10 --get 90 --expire 100 --ttl 660 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 16000"},
-				wait:     false,
+				wait:     true,
 				duration: 10,
 				timeout:  11,
 			},
@@ -799,7 +813,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/gideon",
 				cmd:      []string{},
 				args:     []string{"kv --ops 2000 --create 15 --get 80 --delete 5 --hosts {{FIRST_NODE_CLUSTER1}} --bucket default --sizes 512 128 1024 2048"},
-				wait:     false,
+				wait:     true,
 				duration: 10,
 				timeout:  11,
 			},
