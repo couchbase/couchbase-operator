@@ -409,7 +409,8 @@ func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
 func filterAllowedPorts(nodeName string, members couchbaseutil.MemberSet, cluster *cbapi.CouchbaseCluster, ports []v1.ServicePort) ([]v1.ServicePort, error) {
 	member, ok := members[nodeName]
 	if !ok {
-		return nil, fmt.Errorf("Node %s is not a known member", nodeName)
+		// Node doesn't exist so we're most likely about to delete the service
+		return []v1.ServicePort{}, nil
 	}
 	config := cluster.Spec.GetServerConfigByName(member.ServerConfig)
 	if config == nil {
@@ -481,7 +482,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 		}
 
 		// Node no longer exists or no ports are defined so delete the service
-		if len(allowedPorts) == 0 || !status.Members.Ready.Contains(nodeName) {
+		if len(allowedPorts) == 0 {
 			if err := DeleteService(kubecli, cluster.Namespace, service.Name, nil); err != nil {
 				return nil, err
 			}
