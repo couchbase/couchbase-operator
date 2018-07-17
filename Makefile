@@ -36,10 +36,12 @@ container: build
 container-rhel:
 	docker build -f Dockerfile.rhel -t couchbase/couchbase-operator-rhel:v1 .
 
-prod: container
+tools:
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopctl ./cmd/cbopctl/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopctl ./cmd/cbopctl/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopctl ./cmd/cbopctl/
+
+artifacts:
 	mkdir -p $(ARTIFACTS)
 	cp -r build/darwin $(ARTIFACTS)
 	cp -r build/linux $(ARTIFACTS)
@@ -53,6 +55,10 @@ prod: container
 	tar -czf $(ARTIFACTS)/rbac.zip example/rbac
 	cd build && tar -czf artifacts.zip artifacts && cd ..
 	rm -r $(ARTIFACTS)
+
+prod: container tools artifacts
+
+prod-rhel: container-rhel tools artifacts
 
 test-operator:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race -timeout 240m
