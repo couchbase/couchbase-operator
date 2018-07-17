@@ -31,7 +31,6 @@ Once your Kubernetes environment is set up, you can move on to installing the Op
 * xref:install-kubernetes.adoc[Installing on Kubernetes]
 * xref:install-kubernetes-no-rbac.adoc[Installing on Kubernetes (without RBAC)]
 * xref:install-openshift.adoc[Installing on OpenShift]
-** xref:bootstrap-openshift.adoc[Bootstrapping OpenShift]
 +
 _Bootstrap automation should only be used in development clusters since it involves granting privileges to the Operator that aren't ideal in a production OpenShift cluster._
 
