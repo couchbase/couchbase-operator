@@ -1,0 +1,108 @@
+= Setting up Persistent Volumes
+
+The following steps outline the setup of kubernetes for https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/[dynamic provisioning] of Persistent Volumes.
+
+== Create Storage Class
+
+https://kubernetes.io/docs/concepts/storage/storage-classes/[Storage Classes] define how physical volumes are created through the provided storage backend.  For instance, the aws Storage Class is used to create volumes through the `aws-ebs` provisioner:
+[source,yaml]
+----
+kind: StorageClass
+...
+provisioner: kubernetes.io/aws-ebs
+----
+
+Many cloud providers integrate storage-classes with their installation. To check if your environment already has a default Storage Class, run the following command:
+[source,console]
+----
+kubectl get storageclass
+----
+You should also run the `kubernetes describe` command on any of the returned Storage Classes to ensure that it's provisioner matches the storage system that you want to use for creating volumes.
+
+If you do not see your Storage Class listed in the above command then you will need to add it to kubernetes.  Different providers offer different ways of configuring their provisioners.  Refer to the following docs for information about how to configure a Storage Class for one of our supported providers:
+
+* AWS
+** https://kubernetes.io/docs/concepts/storage/storage-classes/#aws[Storage Class]
+** https://docs.aws.amazon.com/eks/latest/userguide/storage-classes.html[Documentation]
+* GCE
+** https://kubernetes.io/docs/concepts/storage/storage-classes/#gce[Storage Class]
+** https://cloud.google.com/kubernetes-engine/docs/concepts/persistent-volumes[Documentation]
+* GlusterFS
+** https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[Storage Class]
+** https://github.com/gluster/gluster-kubernetes/blob/master/docs/examples/hello_world/README.md[Example Setup]
+* Azure Disk
+** https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Storage class]
+** https://github.com/MicrosoftDocs/azure-docs/blob/master/articles/aks/azure-disks-dynamic-pv.md[Documentation]
+* Ceph RBD
+** https://docs.openshift.com/container-platform/3.5/install_config/storage_examples/ceph_rbd_dynamic_example.html[Example Setup]
+* Portworx
+** https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Storage class]
+** https://docs.portworx.com/scheduler/kubernetes/install.html[Documentation]
+
+
+== Verify Storage Class
+
+Once you've created a Storage Class, you can verify its ability to provide volumes by creating a Persistent Volume Claim.  The following example creates a Claim that will use your Storage Class to provide persistent volumes:
+[source,yaml]
+----
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my_test_claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: <MY-STORAGE-CLASS>
+  resources:
+    requests:
+      storage: 1Gi
+----
+*_Replace `<MY-STORAGE-CLASS>` with the name of your Storage Class._*
+
+
+Save the spec for this PersistentVolumeClaim to a file and create the Claim using kubectl:
+[source,console]
+----
+kubectl create -f pvc.yaml
+----
+
+After creation, verify that a Persistent Volume is created for the Claim:
+[source,console]
+----
+kubectl get persistentvolumes
+----
+
+If no Persistent Volume is created, it's very likely that the Storage Class' provisioner was unable to create the requested volume.  In this case you will need to debug further by checking the status of the Claim and referring to the documentation of the associated provider:
+[source,console]
+----
+kubectl describe pvc my_test_claim
+----
+
+
+=== Add Storage Class to Couchbase Cluster Configuration
+
+Once kubernetes is setup to provide Perisistent volumes, the final step to add the Storage Class to your Couchbase Cluster spec.  This involves adding volumeMounts which specify the paths within the Pods you want to persist along with the Storage Class they should use for creating volumes.  The following is a snippet of a 3 node cluster configured to use Persistent Volumes for its data services:
+[source,yaml]
+----
+---
+spec:
+  servers:
+    - size: 3
+      services:
+        - data
+      pod:
+        volumeMounts:
+          default: couchbase
+          data:  couchbase
+  volumeClaimTemplates:
+    - metadata:
+        name: couchbase
+      spec:
+        storageClassName: "my-storage-class"
+        resources:
+          requests:
+            storage: 1Gi
+----
+Notice that the Pods Volume Mounts specified within `servers.pod.volumeMounts` (couchbase) matches the name of a volumeClaimTemplate also named couchbase, and that this template refers to the Storage Class we created `spec.volumeClaimTemplates.spec.storageClassName`  (my-storage-class).
+
+See xref:couchbase-cluster-config.adoc[CouchbaseCluster Configuration] Guide to further understand how to define a cluster with Persistent Volumes.
