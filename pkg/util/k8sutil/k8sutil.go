@@ -415,8 +415,10 @@ func filterAllowedPorts(nodeName string, members couchbaseutil.MemberSet, cluste
 	if config == nil {
 		return nil, fmt.Errorf("Node config %s not found", member.ServerConfig)
 	}
+	// Admin is not explicitly enabled, it is always there
+	allowedServices := append(config.Services, cbapi.AdminService)
 	allowedPorts := []v1.ServicePort{}
-	for _, serviceName := range config.Services {
+	for _, serviceName := range allowedServices {
 		allowedPorts = append(allowedPorts, servicePorts[serviceName]...)
 	}
 	return intersectPorts(ports, allowedPorts), nil
