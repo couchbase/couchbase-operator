@@ -41,19 +41,20 @@ func Parse() Configuration {
 	c := Configuration{}
 
 	// Parse command line flags into our configuration
-	flag.StringVar(&c.Namespace, "namespace", "default", "namespace to search for couchbase clusters")
-	flag.StringVar(&c.KubeConfig, "kubeconfig", "~/.kube/config", "kubernetes cluster configuration file")
-	flag.BoolVar(&c.All, "all", false, "collect all resources from the namespace")
-	flag.BoolVar(&c.System, "system", false, "collect kube-system resources and logs")
-	flag.BoolVar(&c.CollectInfo, "collectinfo", false, "collect couchbase server logs")
-	flag.BoolVar(&c.Help, "help", false, "print this message and exit")
-	flag.BoolVar(&c.Version, "version", false, "print the version string and exit")
-	flag.Parse()
+	flagSet := flag.NewFlagSet("cbopinfo", flag.ExitOnError)
+	flagSet.StringVar(&c.Namespace, "namespace", "default", "namespace to search for couchbase clusters")
+	flagSet.StringVar(&c.KubeConfig, "kubeconfig", "~/.kube/config", "kubernetes cluster configuration file")
+	flagSet.BoolVar(&c.All, "all", false, "collect all resources from the namespace")
+	flagSet.BoolVar(&c.System, "system", false, "collect kube-system resources and logs")
+	flagSet.BoolVar(&c.CollectInfo, "collectinfo", false, "collect couchbase server logs")
+	flagSet.BoolVar(&c.Help, "help", false, "print this message and exit")
+	flagSet.BoolVar(&c.Version, "version", false, "print the version string and exit")
+	flagSet.Parse(os.Args[1:])
 
 	// Echo out help if we need it
 	if c.Help {
 		fmt.Println(help)
-		flag.PrintDefaults()
+		flagSet.PrintDefaults()
 		os.Exit(0)
 	}
 
@@ -64,7 +65,7 @@ func Parse() Configuration {
 	}
 
 	// Process non-flag arguments
-	c.Clusters = flag.Args()
+	c.Clusters = flagSet.Args()
 
 	return c
 }
