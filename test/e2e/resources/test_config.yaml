@@ -1,15 +1,15 @@
 ---
-operator-image: couchbase/couchbase-operator:v1               # Operator image to use for testing
+operator-image: couchbase/couchbase-operator-internal:1.0.0-292               # Operator image to use for testing
 namespace: default                                            # Cluster namespace to run the tests
 deployment-spec: resources/test_deployment.yaml                # Deployment yaml file path
 cluster-config: resources/cluster_conf.yaml                    # cluster config file path
 
 kube-config:                    # List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
-  - name: BasicCluster
-    config: /root/.kube/config
+  #- name: AuxillaryCluster1
+  #  config: /Users/korrigan.clark/go/src/github.com/couchbase/couchbase-operator/test/e2e/resources/ansible/kubernetes/config_AuxillaryCluster1
 duration: 7                     # In days. Used for system tests
-skip-tear-down: false           # Leaves the operator running after tests
-suite: TestCustom               # Test suite to run. Same named yaml file should exists in resources/suites path
+skip-tear-down: true           # Leaves the operator running after tests
+suite: TestNone             # Test suite to run. Same named yaml file should exists in resources/suites path
 kube-type: kubernetes           # Cluster type kubernetes | aws-openshift
 kube-version: 1.10.5-0           # KUBE version to install
 

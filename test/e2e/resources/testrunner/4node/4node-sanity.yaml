@@ -1,0 +1,14 @@
+batch/v1
+kind: Job
+metadata:
+  name: testrunner-4node-sanity
+spec:
+  template:
+    metadata:
+      labels:
+        name: testrunner-4node-sanity
+    spec:
+      containers:
+      - name: testrunner-4node-sanity
+        image: ashwin2002/testrunner-cloud:4node
+      restartPolicy: Never

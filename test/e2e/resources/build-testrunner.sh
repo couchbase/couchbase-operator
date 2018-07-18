@@ -1,0 +1,19 @@
+#!/bin/bash
+
+imageType=$1
+testRunnerDockerImageName=$2
+
+if [ "$imageType" == "" ]; then
+    echo "Exiting: Number of nodes missing"
+    exit 1
+fi
+
+if [ "$testRunnerDockerImageName" == "" ]; then
+    echo "Exiting: Docker image name missing"
+    exit 1
+fi
+
+if [ "$imageType" == "1node" ]; then
+    cp ./testrunner/Dockerfile.1node ./testrunner/Dockerfile
+    docker build . -t $testRunnerDockerImageName
+fi

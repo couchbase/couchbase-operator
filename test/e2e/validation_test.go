@@ -70,7 +70,7 @@ func ClusterToYAML(cluster *api.CouchbaseCluster, yamlPath string) error {
 
 func RunCBOPCTL(cmd string) ([]byte, error) {
 	cmdName := os.Getenv("TESTDIR") + "/build/bin/cbopctl"
-	cmdArgs := []string{cmd, "-f", os.Getenv("TESTDIR") + "/test/e2e/resources/temp.yaml"}
+	cmdArgs := []string{cmd, "-f", os.Getenv("TESTDIR") + "/test/e2e/resources/validation/temp.yaml"}
 	return exec.Command(cmdName, cmdArgs...).Output()
 }
 
@@ -210,7 +210,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 	for _, test := range testDefs {
 		t.Logf("Running test: %s", test.name)
 
-		testCouchbase, err := YAMLToCluster("./resources/validation.yaml")
+		testCouchbase, err := YAMLToCluster("./resources/validation/validation.yaml")
 		if err != nil {
 			t.Logf("error: %v", err)
 			failures = append(failures, failure{testName: test.name, testError: err})
@@ -227,7 +227,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		}
 
 		if command == "apply" || command == "delete" {
-			err = ClusterToYAML(testCouchbase, "./resources/temp.yaml")
+			err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures = append(failures, failure{testName: test.name, testError: err})
@@ -253,7 +253,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 				}
 			}
 
-			testCouchbase, err = YAMLToCluster("./resources/temp.yaml")
+			testCouchbase, err = YAMLToCluster("./resources/validation/temp.yaml")
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures = append(failures, failure{testName: test.name, testError: err})
@@ -273,7 +273,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			}
 		}
 
-		err = ClusterToYAML(testCouchbase, "./resources/temp.yaml")
+		err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
 		if err != nil {
 			t.Logf("error: %v", err)
 			failures = append(failures, failure{testName: test.name, testError: err})
