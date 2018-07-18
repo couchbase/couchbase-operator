@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"math/rand"
@@ -8,7 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -575,7 +575,6 @@ func TestFeaturesAll(t *testing.T) {
 				timeout:  15,
 				duration: 16,
 			},
-
 
 			// continuous load cluster 1
 			{
