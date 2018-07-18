@@ -5,14 +5,14 @@ targetCluster="kubernetes"
 KUBENAMESPACE="default"
 testRunnerBranch="vulcan"
 numNodes=1
-cloudClusterIpList="172.23.96.39 172.23.96.42 172.23.96.50 172.23.96.86"
+cloudClusterNodeIpList="172.23.96.39 172.23.96.42 172.23.96.50 172.23.96.86"
 cloudClusterMasterNodeIp="172.23.96.39"
 dockerHub="ashwin2002"
 
 #show variables
 echo "Using cloud space from '$targetCluster', namespace '$KUBENAMESPACE'"
 echo "Cloud node IPs '$cloudClusterIpList'"
-echo "Couchbase-server version '$cbVersion'"
+echo "Couchbase-server version '$cbServerVersionsToRun'"
 echo "Couchbase-opeartor version '$cbOperatorVersion'"
 echo "Using testrunner branch '$testRunnerBranch' for testing '$numOfNodes' node cluster"
 echo "Using docker hub account '$dockerHub'"
