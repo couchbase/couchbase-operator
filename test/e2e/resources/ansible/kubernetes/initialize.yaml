@@ -13,7 +13,11 @@
       ignore_errors: yes
 
     - name: Deleteing docker containers
-      shell: docker rm -f $(docker ps -a -q)
+      shell: y | docker system prune -a && docker rm -f $(docker ps -a -q)
+      ignore_errors: yes
+
+    - name: Clear /opt
+      shell: rm -rf /opt/
       ignore_errors: yes
 
     - name: Adding Kubernetes repo

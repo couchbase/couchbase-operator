@@ -3,7 +3,6 @@
 function exitOnError() {
     if [ $1 -ne 0 ] ; then
         echo "Exiting: $2"
-        cleanupFiles
         exit $1
     fi
 }
@@ -50,7 +49,7 @@ testRunnerYamlFileName="./testrunner/1node/1node-sanity.yaml"
 clusterName=$(grep "name:" $cbClusterFile | head -1 | xargs | cut -d' ' -f 2)
 
 cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$cbOperatorVersion"
-cbServerDockerImageName="${dockerHub}/couchbase-server:custom"
+cbServerDockerImageName="${dockerHub}/couchbase-server:custom-5.5.0"
 testRunnerDockerImageName="${dockerHub}/testrunner-cloud:1node"
 
 # Build required images #
@@ -91,9 +90,11 @@ do
 
     echo "Loading docker image from tar: '$cbServerTarFileName'"
     sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp docker load -i /root/$cbServerTarFileName
+    echo "Deleting docker image tar: '$cbServerTarFileName'"
     sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp rm -f /root/$cbServerTarFileName
     echo "Loading docker image from tar: '$testrunnerTarFileName'"
     sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp docker load -i /root/$testrunnerTarFileName
+    echo "Deleting docker image tar: '$testrunnerTarFileName'"
     sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp rm -f /root/$testrunnerTarFileName
 done
 
@@ -104,10 +105,12 @@ rm -f $testrunnerTarFileName
 
 echo "Creating secret"
 showFileContent $secretFile
+kubectl delete -f $secretFile
 kubectl create -f $secretFile
 exitOnError $? "Unable to create secret"
 echo "Creating Couchbase Cluster"
 showFileContent $cbClusterFile
+kubectl delete -f $cbClusterFile
 kubectl create -f $cbClusterFile
 exitOnError $? "Unable to create cb cluster"
 
