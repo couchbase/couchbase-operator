@@ -512,7 +512,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 
 	// Add any services to nodes which aren't already defined
 	if servicesDefined {
-		for _, nodeName := range status.Members.Ready.Names() {
+		for _, nodeName := range members.Names() {
 			// Define the new service name
 			exposedServiceName := GetExposedServiceName(nodeName)
 
@@ -569,6 +569,94 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 	status.ExposedPorts = portStatus
 
 	return ret, nil
+}
+
+// TEMPORARY HACK
+// Does exactly the same as above but tells us if we need to do anything
+func WouldUpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.MemberSet, cluster *cbapi.CouchbaseCluster) (bool, error) {
+	// For each feature set accumulate a unique set of services to expose
+	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.ExposedFeatures)
+	if err != nil {
+		return false, err
+	}
+	servicesDefined := len(serviceNames) != 0
+
+	// Create the list of ports each node should have
+	ports := []v1.ServicePort{}
+	for _, serviceName := range serviceNames {
+		ports = append(ports, servicePorts[serviceName]...)
+	}
+
+	// Get a list of all cluster services that belong to a specific nodes
+	clusterRequirement, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{cluster.Name})
+	if err != nil {
+		return false, err
+	}
+	nodeRequirement, err := labels.NewRequirement(constants.LabelNode, selection.Exists, []string{})
+	if err != nil {
+		return false, err
+	}
+	selector := labels.NewSelector()
+	selector = selector.Add(*clusterRequirement, *nodeRequirement)
+	services, err := kubecli.CoreV1().Services(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return false, err
+	}
+
+	// Remove any node services that shouldn't be defined or perform any updates
+	for _, service := range services.Items {
+		// Extract metadata from the service
+		nodeName := service.Labels[constants.LabelNode]
+
+		// Remove any ports related to services not exposed on the node
+		allowedPorts, err := filterAllowedPorts(nodeName, members, cluster, ports)
+		if err != nil {
+			return false, err
+		}
+
+		// Node no longer exists or no ports are defined so delete the service
+		if len(allowedPorts) == 0 {
+			return true, nil
+		}
+
+		// Get pre-existing requested ports (with associated node ports), and requested ports that
+		// aren't defined
+		existingPorts := intersectPorts(service.Spec.Ports, allowedPorts)
+		newPorts := subtractPorts(allowedPorts, existingPorts)
+
+		// Perform an update if ports have been deleted or added
+		if len(existingPorts) != len(service.Spec.Ports) || len(newPorts) != 0 {
+			return true, nil
+		}
+	}
+
+	// Add any services to nodes which aren't already defined
+	if servicesDefined {
+		for _, nodeName := range members.Names() {
+			// Define the new service name
+			exposedServiceName := GetExposedServiceName(nodeName)
+
+			// Service already exists, ignore
+			if serviceExists(services, exposedServiceName) {
+				continue
+			}
+
+			// Remove any ports related to services not exposed on the node
+			allowedPorts, err := filterAllowedPorts(nodeName, members, cluster, ports)
+			if err != nil {
+				return false, err
+			}
+
+			// Nothing to add, on to the next node
+			if len(allowedPorts) == 0 {
+				continue
+			}
+
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func GetPod(kubecli kubernetes.Interface, ns, name string) (*v1.Pod, error) {

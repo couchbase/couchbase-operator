@@ -87,14 +87,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	c.reconcileAdminService()
 
-	if err := c.reconcileExposedFeatures(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileMemberAlternateAddresses(); err != nil {
-		return err
-	}
-
 	c.status.ClearCondition(api.ClusterConditionScaling)
 	c.status.SetReadyCondition()
 
@@ -722,6 +714,61 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	return true, c.client.UpdateServerGroups(c.members, existingGroups.GetRevision(), &newGroups)
 }
 
+// TEMPORARY HACK
+// Does exactly the same as above but tells us if we need to do anything
+func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
+	// Cluster not server group aware
+	if !c.cluster.Spec.ServerGroupsEnabled() {
+		return false, nil
+	}
+
+	// Poll the server for exising information
+	existingGroups, err := c.client.GetServerGroups(c.members)
+	if err != nil {
+		return false, err
+	}
+
+	// Create any server groups which need defining
+	existingGroups, err = c.createServerGroups(existingGroups)
+	if err != nil {
+		return false, err
+	}
+
+	// Look at each node in each existing group building up the update
+	// structure and also checking to see whether we need to dispatch this
+	// change to Couchbase server
+	for _, existingGroup := range existingGroups.Groups {
+		for _, existingMember := range existingGroup.Nodes {
+			// Extract the scheduled server group for the node
+			podName := strings.Split(existingMember.HostName, ".")[0]
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, podName)
+
+			// A status error from the API probably means a 404, just reuse the old
+			// server group location
+			if err != nil {
+				switch err.(type) {
+				case *errors.StatusError:
+					scheduledServerGroup = existingGroup.Name
+				default:
+					return false, err
+				}
+			}
+
+			// TODO: should we flag this as a warning and leave it where it is?
+			if scheduledServerGroup == "" {
+				return false, fmt.Errorf("server group unset for pod %s", podName)
+			}
+
+			// If the node is in the wrong server group schedule an update
+			if scheduledServerGroup != existingGroup.Name {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate
 // ports into the requested member.  Clients may use these addresses/ports to
 // connect to the cluster if there is no direct L3 connectivity into the pod
@@ -734,7 +781,9 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// Grab the current configuration
 		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
 		if err != nil {
-			return err
+			// If we cannot make contact then just continue, it may have been deleted
+			c.logger.Warnf("unable to poll external addresses for pod %s", member.Name)
+			return nil
 		}
 
 		// Calculate what the current state of the node's alternate addresses
@@ -806,6 +855,84 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		}
 	}
 	return nil
+}
+
+// TEMPORARY HACK
+// Does exactly the same as above but tells us if we need to do anything
+func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
+	// Examine each member in turn as they will have different node
+	// addresses (i.e. you must be using anti affinity or kubernetes
+	// has no way of addressing individual cluster nodes).
+	for memberName, member := range c.members {
+		// Grab the current configuration
+		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
+		if err != nil {
+			// If we cannot make contact then just continue, it may have been deleted
+			return false, nil
+		}
+
+		// Calculate what the current state of the node's alternate addresses
+		// should be.
+		//
+		// Unfortunately clients outside of the pod network are not able to access
+		// all services, so we need to moderate what we set as externally available.
+		//
+		// See the following for guidance:
+		// https://github.com/couchbase/ns_server/blob/6071474b0bd8d625955b60e0ee94802d66e47cfc/src/menelaus_web_node.erl#L281
+		hostname, err := k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
+		if err != nil {
+			return false, err
+		}
+
+		// Marshal status data into manager library format taking note if any
+		// ports are actually set
+		addresses := &cbmgr.AlternateAddressesExternal{}
+		anyPortSet := false
+		if ports, ok := c.status.ExposedPorts[memberName]; ok {
+			addresses = &cbmgr.AlternateAddressesExternal{
+				Hostname: hostname,
+				Ports: cbmgr.AlternateAddressesExternalPorts{
+					AdminServicePort:    ports.AdminServicePort,
+					AdminServicePortTLS: ports.AdminServicePortTLS,
+					// TODO: rename the library for consistency
+					ViewServicePort:    ports.IndexServicePort,
+					ViewServicePortTLS: ports.IndexServicePortTLS,
+					//QueryServicePort:        ports.QueryServicePort,
+					//QueryServicePortTLS:     ports.QueryServicePortTLS,
+					//FtsServicePort:          ports.SearchServicePort,
+					//FtsServicePortTLS:       ports.SearchServicePortTLS,
+					//AnalyticsServicePort:    ports.AnalyticsServicePort,
+					//AnalyticsServicePortTLS: ports.AnalyticsServicePortTLS,
+					DataServicePort: ports.DataServicePort,
+					//DataServicePortTLS:      ports.DataServicePortTLS,
+				},
+			}
+			ports := reflect.ValueOf(addresses.Ports)
+			for i := 0; i < ports.NumField(); i++ {
+				value := ports.Field(i)
+				if value.Int() != 0 {
+					anyPortSet = true
+					break
+				}
+			}
+		}
+
+		// If no ports are set, but the server reports the hostname is set we have
+		// existing configuration which needs to be deleted.  If the hostname is
+		// not set then there is no configuration to worry about
+		if !anyPortSet {
+			if existingAddresses.Hostname != "" {
+				return true, nil
+			}
+			continue
+		}
+
+		// Check to see if we need to perform any updates, ignoring if not
+		if !reflect.DeepEqual(addresses, existingAddresses) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *Cluster) reconcileClusterSettings() error {

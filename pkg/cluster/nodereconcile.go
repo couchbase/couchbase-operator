@@ -26,6 +26,7 @@ const (
 	ReconcileRemoveUnmanaged
 	ReconcileAddNodes
 	ReconcileServerGroups
+	ReconcileNodeServices
 	ReconcileRebalance
 	ReconcileDeadMembers
 	ReconcileFinished
@@ -64,6 +65,7 @@ var (
 		ReconcileRemoveUnmanaged:  handleUnmanagedNodes,
 		ReconcileAddNodes:         handleAddNode,
 		ReconcileServerGroups:     handleServerGroups,
+		ReconcileNodeServices:     handleNodeServices,
 		ReconcileRebalance:        handleRebalance,
 		ReconcileDeadMembers:      handleDeadMembers,
 	}
@@ -150,6 +152,26 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 			needsReconcile = true
 		}
 	}
+
+	// TEMPORARY HACK
+	if updated, err := k8sutil.WouldUpdateExposedFeatures(c.config.KubeCli, c.members, c.cluster); err != nil {
+		return err
+	} else if updated {
+		needsReconcile = true
+	}
+
+	if updated, err := c.wouldReconcileMemberAlternateAddresses(); err != nil {
+		return err
+	} else if updated {
+		needsReconcile = true
+	}
+
+	if updated, err := c.wouldReconcileServerGroups(); err != nil {
+		return err
+	} else if updated {
+		needsReconcile = true
+	}
+	// TEMPORARY HACK END
 
 	if !needsReconcile {
 		c.status.SetBalancedCondition()
@@ -473,13 +495,30 @@ func handleAddNode(r *ReconcileMachine, c *Cluster) error {
 	return nil
 }
 
+// handleServerGroups moves nodes from their current server group into the one
+// the pod is labelled as by the scheduler.  It occurs after node addition and
+// balance in as alterations would trigger an additional rebalance otherwise.
 func handleServerGroups(r *ReconcileMachine, c *Cluster) error {
 	if updated, err := c.reconcileServerGroups(); err != nil {
 		return err
 	} else if updated {
 		r.couchbase.NeedsRebalance = true
 	}
+	r.transitionState(ReconcileNodeServices)
+	return nil
+}
 
+// handleNodeServices creates any services required to provide external connectivity
+// before the node is balanaced in and starts serving bucket shards.  This is for the
+// benefit of external clients such as xdcr which would not function until the
+// balance in has completed otherwise.
+func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
+	if err := c.reconcileExposedFeatures(); err != nil {
+		return err
+	}
+	if err := c.reconcileMemberAlternateAddresses(); err != nil {
+		return err
+	}
 	r.transitionState(ReconcileRebalance)
 	return nil
 }

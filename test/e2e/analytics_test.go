@@ -54,15 +54,15 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	for memberId := 0; memberId < clusterSize; memberId++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "analytics")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "data")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "eventing")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
@@ -151,15 +151,15 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	for memberId := 0; memberId < clusterSize; memberId++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "analytics")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "data")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "eventing")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
@@ -369,15 +369,15 @@ func TestAnalyticsKillPods(t *testing.T) {
 	for memberId := 0; memberId < clusterSize; memberId++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "analytics")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "data")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "eventing")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
@@ -613,15 +613,15 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	for memberId := 0; memberId < clusterSize; memberId++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "analytics")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "data")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "eventing")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))

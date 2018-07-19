@@ -111,12 +111,12 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	for nodeIndex := 0; nodeIndex < e2eutil.Size3; nodeIndex++ {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 	}
-	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
+	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
 	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -135,12 +135,12 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
-	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
-	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
+	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
+	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
 	if err != nil {
@@ -234,12 +234,12 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	for nodeIndex := 0; nodeIndex < e2eutil.Size3; nodeIndex++ {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, nodeIndex)
 	}
-	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
+	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
 	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -258,12 +258,12 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	for nodeIndex := 0; nodeIndex < e2eutil.Size3; nodeIndex++ {
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, nodeIndex)
 	}
-	expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
-	expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
-	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
+	expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
+	expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
+	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
 	if err != nil {
@@ -326,12 +326,12 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	for nodeIndex := 0; nodeIndex < e2eutil.Size5; nodeIndex++ {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, nodeIndex)
 	}
-	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
+	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -350,10 +350,10 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
-	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
+	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	defKubeHost, err := f.GetKubeHostname(defKubeName)
 	if err != nil {
@@ -457,10 +457,10 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 	}
-	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
+	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -479,10 +479,10 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
-	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
+	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	errChan := make(chan error)
 	resizeFunction := func() {
@@ -591,10 +591,10 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 	}
-	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
+	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -613,10 +613,10 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
-	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
+	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	errChan := make(chan error)
 	serviceKillFunc := func() {
@@ -756,10 +756,10 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 	}
-	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
+	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
 	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -778,10 +778,10 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
 		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
 	}
-	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
+	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	defKubeHost, err := f.GetKubeHostname(kubeName1)
 	if err != nil {
@@ -859,12 +859,12 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
 		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 1)
 	}
-	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
+	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
+	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
 	defKubeHost, err := f.GetKubeHostname(defKubeName)
 	if err != nil {
