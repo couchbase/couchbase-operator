@@ -3,6 +3,8 @@
 imageType=$1
 testRunnerDockerImageName=$2
 
+cd ./testrunner/
+
 if [ "$imageType" == "" ]; then
     echo "Exiting: Number of nodes missing"
     exit 1
@@ -14,6 +16,6 @@ if [ "$testRunnerDockerImageName" == "" ]; then
 fi
 
 if [ "$imageType" == "1node" ]; then
-    cp ./testrunner/Dockerfile.1node ./testrunner/Dockerfile
+    cp ./Dockerfile.1node ./Dockerfile
     docker build . -t $testRunnerDockerImageName
 fi

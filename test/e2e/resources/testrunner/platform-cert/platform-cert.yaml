@@ -1,0 +1,14 @@
+batch/v1
+kind: Job
+metadata:
+  name: testrunner-platform-cert
+spec:
+  template:
+    metadata:
+      labels:
+        name: testrunner-platform-cert
+    spec:
+      containers:
+      - name: testrunner-platform-cert
+        image: ashwin2002/testrunner-cloud:platform-cert
+      restartPolicy: Never
