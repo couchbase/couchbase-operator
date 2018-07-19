@@ -49,7 +49,7 @@ testRunnerYamlFileName="./testrunner/1node/1node-sanity.yaml"
 clusterName=$(grep "name:" $cbClusterFile | head -1 | xargs | cut -d' ' -f 2)
 
 cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$cbOperatorVersion"
-cbServerDockerImageName="${dockerHub}/couchbase-server:custom-5.5.0"
+cbServerDockerImageName="couchbase/server:5.5.0-custom"
 testRunnerDockerImageName="${dockerHub}/testrunner-cloud:1node"
 
 # Build required images #

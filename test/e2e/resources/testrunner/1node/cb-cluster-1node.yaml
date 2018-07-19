@@ -3,8 +3,8 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  baseImage: ashwin2002/couchbase-server
-  version: custom
+  baseImage: couchbase/server
+  version: 5.5.0-custom
   authSecret: cb-example-auth
   exposeAdminConsole: true
   exposedFeatures:
