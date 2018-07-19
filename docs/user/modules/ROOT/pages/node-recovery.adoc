@@ -10,7 +10,7 @@ In both cases, the Operator removes the faulty node from the cluster and adds a 
 
 
 [discrete]
-=== What if multiple nodes fail?
+== Multiple Node Failure
 
 Currently, the Couchbase Operator can only failover one node at a time in the cluster during auto-failover. This means that if multiple nodes fail, persistent volumes are required to recover data. In this case, the Operator will begin recovery of failed nodes after a duration of 30 seconds plus the `autoFailoverTimeout`. The Operator will add recovered nodes back to the cluster one at a time.
 

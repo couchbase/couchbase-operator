@@ -24,18 +24,29 @@ Until Kubernetes provides full native validation, the Couchbase Operator needs t
 
 OS X:
 
- $ curl -O https://packages.couchbase.com/kubernetes/0.8.1-beta2/darwin/cbopctl
- $ chmod +x cbopctl
+[source,console]
+----
+$ curl -O https://packages.couchbase.com/kubernetes/0.9.0-beta3/darwin/cbopctl
+
+$ chmod +x cbopctl
+----
 
 Linux:
 
- $ curl -O https://packages.couchbase.com/kubernetes/0.8.1-beta2/linux/cbopctl
- $ chmod +x cbopctl
+[source,console]
+----
+$ curl -O https://packages.couchbase.com/kubernetes/0.9.0-beta3/linux/cbopctl
+
+$ chmod +x cbopctl
+----
 
 Windows:
 
- $ curl -O https://packages.couchbase.com/kubernetes/0.8.1-beta2/windows/cbopctl
- $ chmod +x cbopctl
+[source,console]
+----
+$ curl -O https://packages.couchbase.com/kubernetes/0.9.0-beta3/windows/cbopctl
+$ chmod +x cbopctl
+----
 
 [discrete]
 === cbopctl commands

@@ -13,13 +13,13 @@ The tutorial also requires the following artifacts that are bundled with the Cou
 * `create-user.yaml` spec to create secrets for the Couchbase RBAC user.
 * `pillowfight-data-loader.yaml` job to load data into your cluster.
 
-== 1. Create a Couchbase Cluster
+== Create a Couchbase Cluster
 
 On Kubernetes:
 
 [source,console]
 ----
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ----
 
@@ -27,13 +27,13 @@ On OpenShift:
 
 [source,console]
 ----
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ----
 
 NOTE: `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See xref:cbopctl.adoc[Ensuring Valid CouchbaseCluster Configurations With cbopctl] for download instructions.
 
-== 2. Create a Couchbase RBAC User
+== Create a Couchbase RBAC User
 
 NOTE: This tutorial will be loading data into Couchbase and hence requires a Couchbase RBAC user to be created. RBAC users can be created by directly using the CLI, or as a job within the Kubernetes cluster. See xref:couchbase-cli-guide.adoc[Accessing the Couchbase CLI] for details.
 
@@ -99,7 +99,7 @@ On Kubernetes:
 
 [source,console]
 ----
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-create-user.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ kubectl get job
@@ -111,7 +111,7 @@ On OpenShift:
 
 [source,console]
 ----
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-create-user.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ oc get job
@@ -137,7 +137,7 @@ The name of the secret and its keys are very important as the sample `create-use
 
 [source,yaml]
 ----
-https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-create-user.yaml
+https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-create-user.yaml
 ---
 apiVersion: batch/v1
 kind: Job
@@ -154,7 +154,7 @@ spec:
             secretName: cb-user-auth
 ----
 
-== 3. Loading data
+== Loading data
 
 Use the sample `pillowfight` job to load items into your cluster. The following spec loads 10k items into the Couchbase cluster:
 
@@ -195,7 +195,7 @@ On Kubernetes:
 
 [source,console]
 ----
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/pillowfight-data-loader.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/pillowfight-data-loader.yaml
 job "pillowfight" created
 ----
 
@@ -203,7 +203,7 @@ On OpenShift:
 
 [source,console]
 ----
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/pillowfight-data-loader-openshift.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/pillowfight-data-loader-openshift.yaml
 job "pillowfight" created
 ----
 

@@ -2,11 +2,17 @@
 
 == Prerequisites
 
-Before proceeding to deploy a Couchbase cluster, ensure that the xref:prerequisite-and-setup.adoc[prerequisites] are met and the Couchbase Operator is up and running.
+Before you attempt to deploy a Couchbase Server cluster with the Couchbase Autonomous Operator, ensure that you have done the following:
+
+* Met the xref:prerequisite-and-setup.adoc[prerequisites] and the Operator is up and running
+* You have installed xref:cbopctl.adoc[cbopctl]
++
+NOTE: `cbopctl` is a command line tool similar to `kubectl` or `oc`. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration.
+
 
 == Deploying a Cluster
 
-Deploying a Couchbase cluster requires creating a configuration file that describes what the cluster should look like. Like all Kubernetes configurations, Couchbase clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes. Below is a sample configuration file for a Couchbase cluster.
+Deploying a Couchbase cluster requires creating a xref:couchbase-cluster-config.adoc[configuration file] that describes what the cluster should look like. Like all Kubernetes configurations, Couchbase clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes. Below is a sample configuration file for a Couchbase cluster.
 
 [source,yaml]
 ----
@@ -16,7 +22,7 @@ metadata:
   name: cb-example
 spec:
   baseImage: couchbase/server
-  version: enterprise-5.0.1
+  version: enterprise-5.5.0-Mar
   authSecret: cb-example-auth
   exposeAdminConsole: true
   cluster:
@@ -49,39 +55,45 @@ spec:
         - search
 ----
 
-By taking a quick look at this configuration file you can see that it defines a cluster by specifying the following:
+By taking a quick look at this configuration file, you can see that it defines a cluster by specifying the following:
 
 * Cluster name: cb-example (metadata.name)
-* Couchbase version: 5.0.1 (spec.version)
+* Couchbase version: 5.5.0-Mar (spec.version)
 * Buckets: 1 bucket named default (spec.buckets)
 * Size: 3 node cluster with all services on each node (spec.servers)
 * Auth secret: cb-example-auth
 
-One thing that's important to note is the `authSecret` field. The Couchbase Operator uses Kubernetes Secrets to create and manage the Couchbase super-user credentials. As a result, the `authSecret` field must refer to secret that contains both a user name and a password field. For convenience, we provide a sample secret that can be pushed into your Kubernetes cluster. The secret sets the user name to `Administrator` and the password to `password`. To load this secret into your Kubernetes cluster, run the following command:
+One thing that's important to note is the `authSecret` field. The Operator uses Kubernetes Secrets to create and manage the Couchbase super-user credentials. As a result, the `authSecret` field must refer to secret that contains both a user name and a password field. For convenience, we provide a sample secret that can be pushed into your Kubernetes cluster. The secret sets the user name to `Administrator` and the password to `password`. To load this secret into your Kubernetes cluster, run the following command:
 
 On Kubernetes:
 
- $ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/secret.yaml
- secret "cb-example-auth" created
+[source,console]
+----
+kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/secret.yaml
+----
 
 On OpenShift:
 
- $ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/secret.yaml
- secret "cb-example-auth" created
+[source,console]
+----
+oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/secret.yaml
+----
 
-The Couchbase Operator configuration is now ready to be pushed to Kubernetes. To push the Couchbase Operator configuration, run the following command:
+The Couchbase configuration is now ready to be pushed to Kubernetes. To push the configuration, run the following command:
 
 On Kubernetes:
 
- $ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
- couchbasecluster "cb-example" created
+[source,console]
+----
+cbopctl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
+----
 
 On OpenShift:
 
- $ cbopctl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cluster.yaml
- couchbasecluster "cb-example" created
-
-NOTE: `cbopctl` is a command line tool similar to kubectl or oc. It allows users to validate that the CouchbaseCluster configuration being sent to Kubernetes is a valid configuration. See xref:cbopctl.adoc[Ensuring Valid CouchbaseCluster Configurations With cbopctl] for download instructions.
+[source,console]
+----
+cbopctl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
+----
 
 The Couchbase Operator automatically begins creating the cluster. Depending on the configuration, creating a cluster can take some time. You can track the progress of cluster creation using the `kubectl describe` command. For details on how to use this command and an explanation of the output, see xref:cluster-status-guide.adoc[Displaying Information about a Couchbase Cluster].
 
@@ -99,7 +111,10 @@ On Kubernetes:
 
 On OpenShift, run the following command:
 
- $ oc get pods
+[source,console]
+----
+oc get pods
+----
 
 A CouchbaseCluster object is also created for the cluster and can be used to get health and status information about the cluster. For details on how to inspect these objects, see xref:list-and-describe.adoc[Listing and Describing Pods, Services, and CouchbaseClusters]
 

@@ -22,7 +22,12 @@ The goal of the Operator is to fully manage one or more Couchbase deployments so
 * Cluster provisioning
 * Ad-hoc scalability
 * Auto recovery
-* Logging
+* Configuration Validation
+* Persistent Volume Support
+* XDCR
+* Server Groups
+* TLS
+* Certified for OpenShift and Kubernetes
 
 == Get Started
 

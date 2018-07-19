@@ -43,7 +43,7 @@ The most secure way to use the couchbase-cli with your Kubernetes cluster is to 
 
 [source,console]
 ----
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-collect-logs.yaml
 job "collect-info" created
 
 # check status
@@ -56,5 +56,5 @@ On OpenShift, use the following command:
 
 [source,console]
 ----
-$ oc create -f https://packages.couchbase.com/kubernetes/0.8.1-beta2/couchbase-cli-collect-logs.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-collect-logs.yaml
 ----

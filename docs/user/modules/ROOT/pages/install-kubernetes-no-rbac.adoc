@@ -10,7 +10,7 @@ Run the following command to install the Operator:
 
 [source,console]
 ----
-kubectl create -f https://packages.couchbase.com/kubernetes/0.9/k8s/operator.yaml
+kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/k8s/operator.yaml
 ----
 
 Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
