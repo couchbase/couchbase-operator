@@ -1,17 +1,31 @@
 #!/bin/sh
 
+function exitOnError() {
+    if [ $1 -ne 0 ] ; then
+        echo "Exiting: $2"
+        cleanupFiles
+        exit $1
+    fi
+}
+
+function showFileContent() {
+    echo "-File contents of $1-"
+    cat $1
+    echo "-End of $1 file-"
+}
+
 #set variables
 targetCluster="kubernetes"
 KUBENAMESPACE="default"
 testRunnerBranch="vulcan"
 numNodes=1
-cloudClusterNodeIpList="172.23.96.39 172.23.96.42 172.23.96.50 172.23.96.86"
-cloudClusterMasterNodeIp="172.23.96.39"
+cloudClusterNodeIpList=$1
+cloudClusterMasterNodeIp=$2
 dockerHub="ashwin2002"
 
 #show variables
 echo "Using cloud space from '$targetCluster', namespace '$KUBENAMESPACE'"
-echo "Cloud node IPs '$cloudClusterIpList'"
+echo "Cloud node IPs '$cloudClusterNodeIpList'"
 echo "Couchbase-server version '$cbServerVersionsToRun'"
 echo "Couchbase-opeartor version '$cbOperatorVersion'"
 echo "Using testrunner branch '$testRunnerBranch' for testing '$numOfNodes' node cluster"
@@ -27,10 +41,7 @@ echo "targetCluster=$targetCluster" >> ${WORKSPACE}/test.properties
 echo "testRunnerBranch=$testRunnerBranch" >> ${WORKSPACE}/test.properties
 echo "cloudClusterMasterNodeIp=$cloudClusterMasterNodeIp" >> ${WORKSPACE}/test.properties
 echo "cloudClusterNodeIpList=$cloudClusterNodeIpList" >> ${WORKSPACE}/test.properties
-file="${WORKSPACE}/test.properties"
-echo "-File contents of $file-"
-cat $file
-echo "-End of $file file-"
+showFileContent "${WORKSPACE}/test.properties"
 
 deploymentFile="./testrunner/deployment.yaml"
 secretFile="./testrunner/secret.yaml"
@@ -44,7 +55,9 @@ testRunnerDockerImageName="${dockerHub}/testrunner-cloud:1node"
 
 # Build required images #
 sh ./build-cb-server.sh "5.5.0" "2958" "vulcan" "${cbServerDockerImageName}"
+exitOnError $? "Unable to build cb server docker file"
 sh ./build-testrunner.sh "1node" "${testRunnerDockerImageName}"
+exitOnError $? "Unable to build testrunner 1node docker file"
 
 #ship the docker images to the nodes
 
@@ -54,6 +67,7 @@ cbServerTarFileName="cbServerDockerImage.tar"
 rm -f $cbServerTarFileName
 echo "Creating docker image tar file '$cbServerTarFileName'"
 docker save -o $cbServerTarFileName $cbServerDockerImageName
+exitOnError $? "Unable to create tar of cb server docker image"
 
 testrunnerImageName=$(echo $testRunnerDockerImageName | cut -d':' -f 1)
 testrunnerTagName=$(echo $testRunnerDockerImageName | cut -d':' -f 2)
@@ -61,6 +75,7 @@ testrunnerTarFileName="testrunnerDockerImage.tar"
 rm -f $testrunnerTarFileName
 echo "Creating docker image tar file '$testrunnerTarFileName'"
 docker save -o $testrunnerTarFileName $testRunnerDockerImageName
+exitOnError $? "Unable to create tar of testrunner 1node docker image"
 
 for nodeIp in $cloudClusterNodeIpList
 do
@@ -87,20 +102,29 @@ rm -f $cbServerTarFileName
 echo "Deleting the tar file '$testrunnerTarFileName'"
 rm -f $testrunnerTarFileName
 
+echo "Creating secret"
+showFileContent $secretFile
 kubectl create -f $secretFile
+exitOnError $? "Unable to create secret"
+echo "Creating Couchbase Cluster"
+showFileContent $cbClusterFile
 kubectl create -f $cbClusterFile
+exitOnError $? "Unable to create cb cluster"
 
 sleep 180
 
 echo "Pausing couchbase operator.."
 sed -i "s/paused: false/paused: true/g" $cbClusterFile
 exitOnError $? "Unable to replace string in cbcluster yaml"
+showFileContent $cbClusterFile
 kubectl --namespace=$KUBENAMESPACE apply -f $cbClusterFile
 exitOnError $? "Unable to pause the cbcluster"
 
 sleep 10
 
+showFileContent $testRunnerYamlFileName
 kubectl --namespace=$KUBENAMESPACE create -f $testRunnerYamlFileName
+exitOnError $? "Unable to create testrunner"
 
 echo "############################## Using couchbase-server '$cbServerVersionsToRun' ##############################"
 

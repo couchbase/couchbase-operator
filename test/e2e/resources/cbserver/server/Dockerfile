@@ -26,7 +26,7 @@ ARG BASE_URL=http://172.23.120.24/builds/latestbuilds/couchbase-server/$FLAVOR/$
 ARG BUILD_URL=$BASE_URL/$BUILD_PKG
 
 RUN echo ${BUILD_URL}
-RUN wget -N $BUILD_URL
+RUN wget -N $BUILD_URL &>/dev/null
 
 # Install couchbase
 RUN rpm --install $BUILD_PKG
