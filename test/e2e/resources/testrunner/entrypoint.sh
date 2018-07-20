@@ -11,10 +11,10 @@ if [ "$numOfNodes" == "" ]; then
 fi
 
 # Install Python libraries for Kubernetes #
-git clone --recursive https://github.com/kubernetes-client/python.git
-cd python
-python setup.py install
-cd ..
+#git clone --recursive https://github.com/kubernetes-client/python.git
+#cd python
+#python setup.py install
+#cd ..
 
 # Manipulate IPs in node.ini file #
 index=0

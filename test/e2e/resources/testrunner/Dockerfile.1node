@@ -10,6 +10,10 @@ RUN git clone git://github.com/couchbase/libcouchbase.git && mkdir libcouchbase/
 WORKDIR libcouchbase/build
 RUN ../cmake/configure --prefix=/usr && make && make install
 WORKDIR /
+RUN git clone --recursive https://github.com/kubernetes-client/python.git
+WORKDIR /python
+RUN python setup.py install
+WORKDIR /
 RUN git clone git://github.com/couchbase/testrunner.git --branch master
 WORKDIR testrunner
 COPY ./1node/1node.ini 1node.ini
