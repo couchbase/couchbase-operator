@@ -4,9 +4,10 @@ metadata:
   name: cb-example
 spec:
   baseImage: couchbase/server
-  version: 5.5.0-beta
+  version: 5.5.0-test
   authSecret: cb-example-auth
   exposeAdminConsole: true
+  paused: false
   exposedFeatures:
     - xdcr
   cluster:

@@ -1,0 +1,14 @@
+batch/v1
+kind: Job
+metadata:
+  name: testrunner-tpcc
+spec:
+  template:
+    metadata:
+      labels:
+        name: testrunner-tpcc
+    spec:
+      containers:
+      - name: testrunner-tpcc
+        image: ashwin2002/testrunner-cloud:tpcc
+      restartPolicy: Never
