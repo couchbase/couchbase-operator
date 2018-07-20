@@ -162,6 +162,13 @@ var (
 		"TestPersistentVolumeWithSingleNodeService":  TestPersistentVolumeWithSingleNodeService,
 		"TestPersistentVolumeResizeCluster":          TestPersistentVolumeResizeCluster,
 		"TestNegPersistentVolumeCreateCluster":       TestNegPersistentVolumeCreateCluster,
+
+		// Supportability cases
+		"TestLogCollectValidateArguments":            TestLogCollectValidateArguments,
+		"TestNegLogCollectValidateArgs":              TestNegLogCollectValidateArgs,
+		"TestLogCollectUsingClusterNameAndNamespace": TestLogCollectUsingClusterNameAndNamespace,
+		"TestLogCollectRbacPermission":               TestLogCollectRbacPermission,
+		"TestLogCollectClusterWithPVC":               TestLogCollectClusterWithPVC,
 	}
 	DecoratorFuncMap = framework.DecoratorMap{
 		"rsaDecorator":     rsaDecorator,

@@ -228,7 +228,7 @@ func CreateK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) e
 	return err
 }
 
-func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) error {
+func RemoveClusterRole(kubeClient kubernetes.Interface, roleName string) error {
 	clusterRoleList, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -242,6 +242,49 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 			}
 			break
 		}
+	}
+	return nil
+}
+
+func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAccountName string) error {
+	svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, svcAcc := range svcAccList.Items {
+		if svcAcc.GetName() == serviceAccountName {
+			kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{})
+			err = WaitForServiceAccountDeleted(kubeClient, serviceAccountName, namespace, 30)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return nil
+}
+
+func RemoveClusterRoleBinding(kubeClient kubernetes.Interface, namespace, clusterRoleBindingName string) error {
+	clusterRoleBindingList, err := kubeClient.RbacV1beta1().ClusterRoleBindings().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, clusterRoleBinding := range clusterRoleBindingList.Items {
+		if clusterRoleBinding.GetName() == clusterRoleBindingName {
+			kubeClient.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, &metav1.DeleteOptions{})
+			err = WaitForClusterRoleBindingDeleted(kubeClient, clusterRoleBindingName, 30)
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) error {
+	if err := RemoveClusterRole(kubeClient, roleName); err != nil {
+		return nil
 	}
 
 	policyRule1 := rbacv1.PolicyRule{
@@ -279,7 +322,7 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 		ObjectMeta: metav1.ObjectMeta{Name: roleName},
 		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3, policyRule4, policyRule5},
 	}
-	_, err = kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
+	_, err := kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
 	return err
 }
 
@@ -288,49 +331,24 @@ func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceA
 		return nil
 	}
 
-	// Delete service accounts apart from default one
-	svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
-	if err != nil {
+	if err := RemoveServiceAccount(kubeClient, namespace, serviceAccountName); err != nil {
 		return err
-	}
-	for _, svcAcc := range svcAccList.Items {
-		if svcAcc.GetName() == "default" {
-			continue
-		}
-		if svcAcc.GetName() == serviceAccountName {
-			kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{})
-			err = WaitForServiceAccountDeleted(kubeClient, serviceAccountName, namespace, 30)
-			if err != nil {
-				return err
-			}
-		}
-
 	}
 
 	// Create service account given by the name
 	serviceAccountSpec := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName, Namespace: namespace},
 	}
-	_, err = kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccountSpec)
+	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccountSpec)
 	return err
 }
 
 func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
 	clusterRoleBindingName := clusterRoleName + "-" + namespace
-	clusterRoleBindingList, err := kubeClient.RbacV1beta1().ClusterRoleBindings().List(metav1.ListOptions{})
-	if err != nil {
+	if err := RemoveClusterRoleBinding(kubeClient, namespace, clusterRoleBindingName); err != nil {
 		return err
 	}
-	for _, clusterRoleBinding := range clusterRoleBindingList.Items {
-		if clusterRoleBinding.GetName() == clusterRoleBindingName {
-			kubeClient.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, &metav1.DeleteOptions{})
-			err = WaitForClusterRoleBindingDeleted(kubeClient, clusterRoleBindingName, 30)
-			if err != nil {
-				return err
-			}
-			break
-		}
-	}
+
 	clusterRoleBindingSubjects := []rbacv1.Subject{
 		rbacv1.Subject{
 			Kind:      "ServiceAccount",
@@ -344,7 +362,7 @@ func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clu
 		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: clusterRoleName},
 		Subjects:   clusterRoleBindingSubjects,
 	}
-	_, err = kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
 	return err
 }
 

@@ -131,3 +131,11 @@ tcGroups:
     testcases:
       - name: TestAnalyticsCreateDataSet
       - name: TestAnalyticsResizeCluster
+
+  - name: SupportabilityTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestLogCollectValidateArguments
+      - name: TestNegLogCollectValidateArgs
+      - name: TestLogCollectUsingClusterNameAndNamespace

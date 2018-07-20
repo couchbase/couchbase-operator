@@ -123,3 +123,10 @@ tcGroups:
     testcases:
       - name: TestAnalyticsKillPods
       - name: TestAnalyticsKillPodsWithPVC
+
+  - name: SupportabilityTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestLogCollectRbacPermission
+      - name: TestLogCollectClusterWithPVC
