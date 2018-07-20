@@ -42,6 +42,7 @@ var (
 	// Define all cluster scoped resource types
 	clusterResourceInitializers = []resource.ResourceInitializer{
 		resource.NewNodeResource,
+		resource.NewPersistentVolumeResource,
 	}
 )
 
