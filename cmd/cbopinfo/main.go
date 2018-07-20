@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/collector"
 	"github.com/couchbase/couchbase-operator/pkg/info/config"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -49,11 +52,11 @@ func harvestSub(context *context.Context, backend backend.Backend, references []
 		for _, ref := range references {
 			collector := initializer(context)
 			if err := collector.Fetch(ref); err != nil {
-				fmt.Printf("unable to fetch %s for type %s name %s: %v", collector.Kind(), ref.Kind(), ref.Name(), err)
+				fmt.Printf("unable to fetch %s for type %s name %s: %v\n", collector.Kind(), ref.Kind(), ref.Name(), err)
 				continue
 			}
 			if err := collector.Write(backend); err != nil {
-				fmt.Printf("unable to write %s for type %s name %s: %v", collector.Kind(), ref.Kind(), ref.Name(), err)
+				fmt.Printf("unable to write %s for type %s name %s: %v\n", collector.Kind(), ref.Kind(), ref.Name(), err)
 				continue
 			}
 		}
@@ -68,11 +71,11 @@ func harvest(context *context.Context, backend backend.Backend, initializers []r
 	for _, initializer := range initializers {
 		resource := initializer(context)
 		if err := resource.Fetch(); err != nil {
-			fmt.Printf("unable to fetch resources for type %s: %v", resource.Kind(), err)
+			fmt.Printf("unable to fetch resources for type %s: %v\n", resource.Kind(), err)
 			continue
 		}
 		if err := resource.Write(backend); err != nil {
-			fmt.Printf("unable to write resources for type %s: %v", resource.Kind(), err)
+			fmt.Printf("unable to write resources for type %s: %v\n", resource.Kind(), err)
 			continue
 		}
 		if err := harvestSub(context, backend, resource.References()); err != nil {
@@ -81,6 +84,16 @@ func harvest(context *context.Context, backend backend.Backend, initializers []r
 	}
 
 	return nil
+}
+
+// clusterExists is a helper to see if a named cluster exists in the supplied list
+func clusterExists(clusters *v1.CouchbaseClusterList, name string) bool {
+	for _, cluster := range clusters.Items {
+		if cluster.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // main is the entry point of this application
@@ -94,8 +107,40 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Before we do anything further ensure we've been correctly configured.
+	// Check basic connectivity via the discovery API.  This is plain text
+	// TODO: Use the resource list to filter the resources we gather
+	_, err := context.KubeClient.Discovery().ServerResources()
+	if err != nil {
+		fmt.Println("unable to discover cluster resources:", err)
+		os.Exit(1)
+	}
+
+	// Check we have at least access to the couchbase clusters.  This will test
+	// TLS and RBAC settings are correct
+	clusters, err := context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(context.Config.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		fmt.Println("unable to poll CouchbaseCluster resources:", err)
+		os.Exit(1)
+	}
+
+	// Check there is something to collect
+	if len(clusters.Items) == 0 {
+		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Config.Namespace)
+		os.Exit(1)
+	}
+
+	// Finally check to see if any requested CouchbaseClusters exist
+	for _, name := range context.Config.Clusters {
+		if !clusterExists(clusters, name) {
+			fmt.Println("requested cluster", name, "not found in namespace", context.Config.Namespace)
+			os.Exit(1)
+		}
+	}
+
 	// Initialize the backend file writer, defer closing so it will flush any
-	// state in the event of a critical error
+	// state in the event of a critical error. From here on any resources are
+	// collected on a best-attempt basis e.g. irrespective of RBAC failures.
 	backend, err := backend.New(&context.Config)
 	if err != nil {
 		fmt.Println("unable to initialize backend:", err)
