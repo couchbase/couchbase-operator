@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -199,6 +200,9 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
 		t.Fatal(err)
 	}
+
+	// Sleep to resume xdcr replication after cluster resize
+	time.Sleep(5 * time.Minute)
 
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
@@ -417,6 +421,9 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 		t.Fatal(err)
 	}
 
+	// Sleep to resume xdcr replication after cluster resize
+	time.Sleep(5 * time.Minute)
+
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
@@ -547,6 +554,9 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
 		t.Fatal(err)
 	}
+
+	// Sleep to resume xdcr replication after cluster resize
+	time.Sleep(5 * time.Minute)
 
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries30); err != nil {
 		t.Fatal(err)
