@@ -300,7 +300,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 		"service1": serviceConfig1,
 		"bucket1":  bucketConfig1,
 	}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}

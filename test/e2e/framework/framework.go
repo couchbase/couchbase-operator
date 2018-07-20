@@ -79,10 +79,7 @@ func ReadYamlData() (err error) {
 
 // Setup setups a test framework and points "Global" to it.
 func Setup(t *testing.T) error {
-	//var clusterSpecMap map[string]*Cluster
 	clusterSpecMap := make(ClusterMap)
-
-	//runtimeParams.KubeConfig = append(runtimeParams.KubeConfig, KubeConfData{"NewCluster", "/Users/ashwin/go/src/github.com/couchbase/couchbase-operator/test/e2e/resources/ansible/kubernetes/config_NewCluster"})
 
 	err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {

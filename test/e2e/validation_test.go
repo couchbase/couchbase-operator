@@ -37,9 +37,34 @@ type parameter struct {
 	fieldIsPointer bool
 }
 
+type failureList []failure
 type failure struct {
 	testName  string
 	testError error
+}
+
+func (failures *failureList) AppendFailure(name string, err error) {
+	newFailure := failure{
+		testName:  name,
+		testError: err,
+	}
+	*failures = append(*failures, newFailure)
+}
+
+func (failures *failureList) PrintFailures(t *testing.T) bool {
+	failureExists := false
+	for i, failure := range *failures {
+		t.Logf("Failure %d: %s \n Error: %v \n", i+1, failure.testName, failure.testError)
+		failureExists = true
+	}
+	return failureExists
+}
+
+func (failures *failureList) CheckFailures(t *testing.T) {
+	failureExists := failures.PrintFailures(t)
+	if failureExists {
+		t.Fatal("failures in test")
+	}
 }
 
 func YAMLToCluster(yamlPath string) (*api.CouchbaseCluster, error) {
@@ -204,8 +229,8 @@ func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
 	return clusterSize
 }
 
-func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef, targetKubeName, command string) []failure {
-	failures := []failure{}
+func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef, targetKubeName, command string) {
+	failures := failureList{}
 	targetKube := f.ClusterSpec[targetKubeName]
 	for _, test := range testDefs {
 		t.Logf("Running test: %s", test.name)
@@ -213,7 +238,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		testCouchbase, err := YAMLToCluster("./resources/validation/validation.yaml")
 		if err != nil {
 			t.Logf("error: %v", err)
-			failures = append(failures, failure{testName: test.name, testError: err})
+			failures.AppendFailure(test.name, err)
 			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
@@ -230,14 +255,14 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
 			if err != nil {
 				t.Logf("error: %v", err)
-				failures = append(failures, failure{testName: test.name, testError: err})
+				failures.AppendFailure(test.name, err)
 				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 			cmdOut, err := RunCBOPCTL("create")
 			t.Logf("Returned: %s", string(cmdOut))
 			if err != nil && !test.shouldFail {
-				failures = append(failures, failure{testName: test.name, testError: err})
+				failures.AppendFailure(test.name, err)
 				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
@@ -247,7 +272,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20)
 				if err != nil {
 					t.Logf("error: %v", err)
-					failures = append(failures, failure{testName: test.name, testError: err})
+					failures.AppendFailure(test.name, err)
 					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
@@ -256,7 +281,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			testCouchbase, err = YAMLToCluster("./resources/validation/temp.yaml")
 			if err != nil {
 				t.Logf("error: %v", err)
-				failures = append(failures, failure{testName: test.name, testError: err})
+				failures.AppendFailure(test.name, err)
 				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
@@ -267,7 +292,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			err = SetClusterParameter(testCouchbase, param)
 			if err != nil {
 				t.Logf("error: %v", err)
-				failures = append(failures, failure{testName: test.name, testError: err})
+				failures.AppendFailure(test.name, err)
 				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
@@ -276,7 +301,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
 		if err != nil {
 			t.Logf("error: %v", err)
-			failures = append(failures, failure{testName: test.name, testError: err})
+			failures.AppendFailure(test.name, err)
 			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
@@ -284,7 +309,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		cmdOut, err := RunCBOPCTL(command)
 		t.Logf("Returned: %s", string(cmdOut))
 		if err != nil && !test.shouldFail {
-			failures = append(failures, failure{testName: test.name, testError: err})
+			failures.AppendFailure(test.name, err)
 			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
@@ -294,7 +319,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		if test.shouldWarn {
 			if !strings.Contains(string(cmdOut), test.expectedWarn) || test.expectedWarn == "" {
 				t.Logf("expected warning: %+v \n returned message: %+v \n", test.expectedWarn, string(cmdOut))
-				failures = append(failures, failure{testName: test.name, testError: errors.New("incorrect warning")})
+				failures.AppendFailure(test.name, errors.New("incorrect warning"))
 				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
@@ -303,7 +328,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		for _, message := range test.expectedMessages {
 			if !strings.Contains(string(cmdOut), message) || message == "" {
 				t.Logf("expected message: %+v \n returned message: %+v \n", message, string(cmdOut))
-				failures = append(failures, failure{testName: test.name, testError: errors.New("incorrect message")})
+				failures.AppendFailure(test.name, errors.New("incorrect message"))
 				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
@@ -311,7 +336,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		if test.shouldFail {
 			if command == "delete" || command == "apply" {
 				if len(clusters.Items) != 1 {
-					failures = append(failures, failure{testName: test.name, testError: errors.New("cluster deletion should fail")})
+					failures.AppendFailure(test.name, errors.New("cluster deletion should fail"))
 					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
@@ -319,7 +344,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 
 			if command == "create" {
 				if len(clusters.Items) != 0 {
-					failures = append(failures, failure{testName: test.name, testError: errors.New("cluster creation should fail")})
+					failures.AppendFailure(test.name, errors.New("cluster creation should fail"))
 					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
@@ -327,20 +352,20 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		} else {
 			if command == "delete" {
 				if len(clusters.Items) != 0 {
-					failures = append(failures, failure{testName: test.name, testError: errors.New("cluster deletion should work")})
+					failures.AppendFailure(test.name, errors.New("cluster deletion should work"))
 					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				_, err = e2eutil.WaitPodsDeleted(targetKube.KubeClient, ns, e2eutil.Retries30, metav1.ListOptions{LabelSelector: "app=couchbase"})
 				if err != nil {
-					failures = append(failures, failure{testName: test.name, testError: err})
+					failures.AppendFailure(test.name, err)
 					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				t.Logf("deleted couchbase cluster: \n%+v", testCouchbase)
 			} else {
 				if len(clusters.Items) != 1 {
-					failures = append(failures, failure{testName: test.name, testError: errors.New("only one cluster should be created")})
+					failures.AppendFailure(test.name, errors.New("only one cluster should be created"))
 					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
@@ -349,7 +374,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 					t.Logf("verifying parameter: %+v", param)
 					err = VerifyClusterParameter(testCouchbase, param)
 					if err != nil {
-						failures = append(failures, failure{testName: test.name, testError: err})
+						failures.AppendFailure(test.name, err)
 						e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 						continue
 					}
@@ -359,7 +384,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
 				if err != nil {
 					t.Logf("error: %v", err)
-					failures = append(failures, failure{testName: test.name, testError: err})
+					failures.AppendFailure(test.name, err)
 					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
@@ -369,18 +394,7 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 		time.Sleep(10 * time.Second) //should add a wait for number of couchbase pods to be 0
 	}
-	return failures
-}
-
-func checkFailures(t *testing.T, failures []failure) {
-	fail := false
-	for i, failure := range failures {
-		t.Logf("Failure %d: %s \n Error: %v \n", i+1, failure.testName, failure.testError)
-		fail = true
-	}
-	if fail {
-		t.Fatal("failures in test")
-	}
+	failures.CheckFailures(t)
 }
 
 func TestValidationCreate(t *testing.T) {
@@ -398,8 +412,7 @@ func TestValidationCreate(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "create")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "create")
 }
 
 func TestNegValidationCreate(t *testing.T) {
@@ -527,8 +540,7 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "create")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "create")
 }
 
 func TestValidationDefaultCreate(t *testing.T) {
@@ -578,8 +590,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "create")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "create")
 }
 
 func TestNegValidationDefaultCreate(t *testing.T) {
@@ -609,8 +620,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "create")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "create")
 }
 
 func TestNegValidationConstraintsCreate(t *testing.T) {
@@ -732,8 +742,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "create")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "create")
 }
 
 // cbopctl apply tests
@@ -773,8 +782,7 @@ func TestValidationApply(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "apply")
 }
 
 func TestNegValidationApply(t *testing.T) {
@@ -826,8 +834,7 @@ func TestNegValidationApply(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "apply")
 }
 
 func TestValidationDefaultApply(t *testing.T) {
@@ -917,8 +924,7 @@ func TestValidationDefaultApply(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "apply")
 }
 
 func TestNegValidationDefaultApply(t *testing.T) {
@@ -942,8 +948,7 @@ func TestNegValidationDefaultApply(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "create")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "create")
 }
 
 func TestNegValidationConstraintsApply(t *testing.T) {
@@ -1043,8 +1048,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "apply")
 }
 
 func TestNegValidationImmutableApply(t *testing.T) {
@@ -1137,8 +1141,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "apply")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "apply")
 }
 
 //cbopctl delete tests
@@ -1172,8 +1175,7 @@ func TestValidationDelete(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "delete")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "delete")
 }
 
 func TestNegValidationDelete(t *testing.T) {
@@ -1197,8 +1199,7 @@ func TestNegValidationDelete(t *testing.T) {
 		},
 	}
 	kubeName := "BasicCluster"
-	failures := runValidationTest(t, f, testDefs, kubeName, "delete")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, kubeName, "delete")
 }
 
 /*******************************************************************
@@ -1231,6 +1232,5 @@ func TestRzaNegCreateCluster(t *testing.T) {
 		},
 	}
 	targetKubeName := "RzaCluster"
-	failures := runValidationTest(t, f, testDefs, targetKubeName, "create")
-	checkFailures(t, failures)
+	runValidationTest(t, f, testDefs, targetKubeName, "create")
 }
