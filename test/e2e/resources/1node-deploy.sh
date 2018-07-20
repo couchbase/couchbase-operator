@@ -44,12 +44,13 @@ showFileContent "${WORKSPACE}/test.properties"
 
 deploymentFile="./testrunner/deployment.yaml"
 secretFile="./testrunner/secret.yaml"
+roleBindingFile="./testrunner/default-cluster-role-binding.yaml"
 cbClusterFile="./testrunner/1node/cb-cluster-1node.yaml"
 testRunnerYamlFileName="./testrunner/1node/1node-sanity.yaml"
 clusterName=$(grep "name:" $cbClusterFile | head -1 | xargs | cut -d' ' -f 2)
 
 cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$cbOperatorVersion"
-cbServerDockerImageName="couchbase/server:5.5.0-custom"
+cbServerDockerImageName="couchbase/server:5.5.0-test"
 testRunnerDockerImageName="${dockerHub}/testrunner-cloud:1node"
 
 # Build required images #
@@ -105,12 +106,19 @@ rm -f $testrunnerTarFileName
 
 echo "Creating secret"
 showFileContent $secretFile
-kubectl delete -f $secretFile
+kubectl delete -f $secretFile &>/dev/null
 kubectl create -f $secretFile
 exitOnError $? "Unable to create secret"
+
+echo "Making default SA cluster admin"
+showFileContent $roleBindingFile
+kubectl delete -f $roleBindingFile &>/dev/null
+kubectl create -f $roleBindingFile
+exitOnError $? "Unable to create role binding"
+
 echo "Creating Couchbase Cluster"
 showFileContent $cbClusterFile
-kubectl delete -f $cbClusterFile
+kubectl delete -f $cbClusterFile &>/dev/null
 kubectl create -f $cbClusterFile
 exitOnError $? "Unable to create cb cluster"
 

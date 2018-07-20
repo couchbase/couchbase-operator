@@ -13,7 +13,7 @@
       ignore_errors: yes
 
     - name: Deleteing docker containers
-      shell: y | docker system prune -a && docker rm -f $(docker ps -a -q)
+      shell: 'y' | docker system prune -a && docker rm -f $(docker ps -a -q)
       ignore_errors: yes
 
     - name: Clear /opt
