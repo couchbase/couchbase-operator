@@ -222,8 +222,9 @@ func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, own
 // access the web ui
 func CreateUIService(kubecli kubernetes.Interface, clusterName, ns string, services cbapi.ServiceList, owner metav1.OwnerReference) (*v1.Service, error) {
 	ports := peerServicePorts
+	labels := LabelsForCluster(clusterName)
 	selectors := LabelsForAdminConsole(clusterName, services)
-	svc := createServiceManifest(AdminServiceName(clusterName), v1.ServiceTypeNodePort, ports, selectors, LabelsForCluster(clusterName))
+	svc := createServiceManifest(AdminServiceName(clusterName), v1.ServiceTypeNodePort, ports, labels, selectors)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	return createService(kubecli, ns, svc, owner)
 }
