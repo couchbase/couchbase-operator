@@ -6,7 +6,7 @@ testRunnerDockerImageName=$2
 cd ./testrunner/
 
 if [ "$imageType" == "" ]; then
-    echo "Exiting: Number of nodes missing"
+    echo "Exiting: image type missing"
     exit 1
 fi
 
