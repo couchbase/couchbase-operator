@@ -17,9 +17,11 @@ fi
 #cd ..
 
 # Manipulate IPs in node.ini file #
+cat ${nodeConfigName}.ini
 index=0
 for podIp in $(python getNodeIps.py $currentNamespace | grep "cb-example" | awk '{print $2}')
 do
+    echo $podIp
     if [ "$podIp" != "" ]
     then
         podIpArray+=($podIp)
@@ -63,8 +65,10 @@ sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' 
 service ssh stop
 service ssh start
 
+cat ${nodeConfigName}.ini
+
 # Start Testrunner code #
-python ./testrunner.py -i ./${nodeConfigName}.ini -c ./testcases.conf -p get-logs=true,get-cbcollect-info=true
+python ./testrunner.py -i ./${nodeConfigName}.ini -c ./testcases.conf -p get-logs=true,get-cbcollect-info=false
 
 echo "Testrunner: command completed"
 while true; do sleep 1000; done

@@ -17,7 +17,7 @@ WORKDIR /
 RUN git clone git://github.com/couchbase/testrunner.git --branch master
 WORKDIR testrunner
 COPY ./platform-cert/6node.ini 6node.ini
-COPY ./platform-cert/6node-sanity.conf testcases.conf
+COPY ./platform-cert/platform-cert.conf testcases.conf
 COPY getNodeIps.py getNodeIps.py
 COPY entrypoint.sh entrypoint.sh
 RUN chmod +x ./entrypoint.sh

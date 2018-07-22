@@ -17,7 +17,7 @@ function showFileContent() {
 targetCluster="kubernetes"
 KUBENAMESPACE="default"
 testRunnerBranch="vulcan"
-numNodes=4
+numNodes=6
 cloudClusterNodeIpList=$1
 cloudClusterMasterNodeIp=$2
 dockerHub="ashwin2002"
@@ -122,7 +122,7 @@ kubectl delete -f $cbClusterFile &>/dev/null
 kubectl create -f $cbClusterFile
 exitOnError $? "Unable to create cb cluster"
 
-sleep 180
+sleep 300
 
 echo "Pausing couchbase operator.."
 sed -i "s/paused: false/paused: true/g" $cbClusterFile
