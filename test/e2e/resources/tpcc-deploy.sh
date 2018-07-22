@@ -193,7 +193,7 @@ do
         kubectl --namespace=$KUBENAMESPACE logs --follow=true $testrunnerPodName &
     fi
 
-    isJobCompleted=$(kubectl --namespace=$KUBENAMESPACE logs $testrunnerPodName --tail=10 | grep "Testrunner: command completed" | wc -l)
+    isJobCompleted=$(kubectl --namespace=$KUBENAMESPACE logs $testrunnerPodName --tail=10 | grep "Tpcc: command completed" | wc -l)
     if [ $isJobCompleted -eq 1 ] ; then
         kill %1
         break
