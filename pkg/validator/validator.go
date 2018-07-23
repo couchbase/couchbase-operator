@@ -456,6 +456,9 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 	// volume mounts cannot be added/removed nor can they specify different claim templates
 	for _, cur := range current.Spec.ServerSettings {
 		for _, up := range updated.Spec.ServerSettings {
+			if up.Name != cur.Name {
+				continue
+			}
 			curPersisted := cur.Pod != nil && cur.Pod.VolumeMounts != nil
 			upPersisted := up.Pod != nil && up.Pod.VolumeMounts != nil
 			if curPersisted != upPersisted {
