@@ -135,7 +135,9 @@ var (
 		"TestRzaRemoveK8SNodeLabel":                TestRzaRemoveK8SNodeLabel,
 
 		// 5.5 feature - Eventing cases
-		//"TestEventingOnK8sBasic": TestEventingOnK8sBasic,
+		"TestEventingCreateEventingCluster": TestEventingCreateEventingCluster,
+		"TestEventingResizeCluster":         TestEventingResizeCluster,
+		"TestEventingKillEventingPods":      TestEventingKillEventingPods,
 
 		// 5.5 feature - Analytics cases
 		"TestAnalyticsCreateDataSet":   TestAnalyticsCreateDataSet,

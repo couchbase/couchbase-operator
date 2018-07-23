@@ -380,7 +380,7 @@ func UpdateServiceSpec(service int, field string, value string, crClient version
 	updateFunc := func(cl *api.CouchbaseCluster) {}
 	switch {
 	case field == "Size":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[0].Size = ConvertToInt(value) }
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Size = ConvertToInt(value) }
 	case field == "Name":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Name = value }
 	case field == "Services":

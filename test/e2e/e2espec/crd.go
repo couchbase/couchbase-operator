@@ -229,6 +229,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 	serverConfig := []api.ServerConfig{}
 	exposedFeatures := api.ExposedFeatureList{}
 	serverGroups := []string{}
+	adminConsoleServices := api.ServiceList{}
 	baseImageName := baseImage
 	versionNum := version
 	antiAffinity := ""
@@ -364,6 +365,10 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 			serverConfig = append(serverConfig, serverSettings)
 		case key == "exposedFeatures":
 			exposedFeatures = strings.Split(config[key]["featureNames"], ",")
+		case key == "adminConsoleServices":
+			for _, serviceName := range strings.Split(config[key]["services"], ",") {
+				adminConsoleServices = append(adminConsoleServices, api.Service(serviceName))
+			}
 		case key == "serverGroups":
 			serverGroups = strings.Split(config[key]["groupNames"], ",")
 		case strings.Contains(key, "other"):
@@ -381,14 +386,15 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 	}
 
 	spec := api.ClusterSpec{
-		BaseImage:       baseImageName,
-		Version:         versionNum,
-		AuthSecret:      secretName,
-		ClusterSettings: clusterSettings,
-		BucketSettings:  bucketConfig,
-		ServerSettings:  serverConfig,
-		ExposedFeatures: exposedFeatures,
-		ServerGroups:    serverGroups,
+		BaseImage:            baseImageName,
+		Version:              versionNum,
+		AuthSecret:           secretName,
+		ClusterSettings:      clusterSettings,
+		BucketSettings:       bucketConfig,
+		ServerSettings:       serverConfig,
+		AdminConsoleServices: adminConsoleServices,
+		ExposedFeatures:      exposedFeatures,
+		ServerGroups:         serverGroups,
 	}
 
 	switch {

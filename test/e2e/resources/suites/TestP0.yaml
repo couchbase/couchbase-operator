@@ -132,6 +132,12 @@ tcGroups:
       - name: TestAnalyticsCreateDataSet
       - name: TestAnalyticsResizeCluster
 
+  - name: EventingTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestEventingCreateEventingCluster
+
   - name: SupportabilityTests
     clusters:
       - BasicCluster

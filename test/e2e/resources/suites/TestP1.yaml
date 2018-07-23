@@ -124,6 +124,13 @@ tcGroups:
       - name: TestAnalyticsKillPods
       - name: TestAnalyticsKillPodsWithPVC
 
+  - name: EventingTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestEventingResizeCluster
+      - name: TestEventingKillEventingPods
+
   - name: SupportabilityTests
     clusters:
       - BasicCluster

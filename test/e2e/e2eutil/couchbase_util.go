@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -562,6 +563,44 @@ func IndexSettingVerifier(t *testing.T, is *cbmgr.IndexSettings, value string) b
 	indexSetting := string(is.StorageMode) == value
 	t.Logf("index setting: %v", is.StorageMode)
 	return indexSetting
+}
+
+func DeployEventingFunction(hostUrl, eventingPort, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) ([]byte, error) {
+	hostUrl = "http://" + hostUrl + ":" + eventingPort + "/api/v1/functions?name=" + eventingFuncName
+	requestType := "POST"
+	hostUsername := "Administrator"
+	hostPassword := "password"
+	var responseData []byte
+
+	eventingJsonFunc := `[{` +
+		`"appname": "` + eventingFuncName + `",` +
+		`"id": 0,` +
+		`"depcfg":{"buckets":[{"alias":"dst_bucket","bucket_name":"` + dstBucketName + `"}],"metadata_bucket":"` + metaBucketName + `","source_bucket":"` + srcBucketName + `"},` +
+		`"version":"", "handleruuid":0,` +
+		`"settings": {"dcp_stream_boundary":"everything","deadline_timeout":62,"deployment_status":true,"description":"","execution_timeout":60,"log_level":"INFO","processing_status":true,"user_prefix":"eventing","worker_count":3},` +
+		`"using_doc_timer": false,` +
+		`"appcode": "` + jsFunc + `"` +
+		`}]`
+
+	request, err := http.NewRequest(requestType, hostUrl, strings.NewReader(eventingJsonFunc))
+	if err != nil {
+		return responseData, errors.New("Http request failed: " + err.Error())
+	}
+
+	request.SetBasicAuth(hostUsername, hostPassword)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return responseData, errors.New("Failed to " + err.Error())
+	}
+	defer response.Body.Close()
+
+	responseData, _ = ioutil.ReadAll(response.Body)
+	if response.StatusCode != http.StatusOK {
+		return responseData, errors.New("Remote call failed with response: " + response.Status + ", " + string(responseData))
+	}
+	return responseData, nil
 }
 
 func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string) (responseData []byte, err error) {
