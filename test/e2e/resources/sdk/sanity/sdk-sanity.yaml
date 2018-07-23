@@ -20,7 +20,7 @@ spec:
             value: "cb-example-0002.cb-example.default.svc"
           - name: NODE4
             value: "cb-example-0003.cb-example.default.svc"
-        args: ["-I", "watson-basic2.ini", "--install-skip=true", "--bucket-password=password",
+        args: ["-I", "k8s-basic.ini", "--install-skip=true", "--bucket-password=password",
                "--basic-wait=600", "--testsuite-variants=HYBRID", "--testsuite-test=passthrough",
                "-d", "all:debug", "-A", "S3Creds_tmp", "-C", "share/rexec",
                "--rexec_path=/root/sdkd-java/run-sdkd-java", "--rexec-port", "8050"]

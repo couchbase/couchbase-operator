@@ -1,9 +1,12 @@
 #!/bin/bash
 
-# requires insecure registry:
+# requires insecure registry: /etc/docker/daemon.json
 #{
 #    "insecure-registries" : [ "sdk-s435.sc.couchbase.com" ]
 #}
+#sudo systemctl daemon-reload
+#sudo systemctl restart docker
+
 
 imageType=$1
 testRunnerDockerImageName=$2
