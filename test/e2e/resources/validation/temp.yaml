@@ -73,7 +73,7 @@ spec:
     - data
     size: 1
   softwareUpdateNotifications: false
-  version: 5.5.0-beta
+  version: enterprise-5.5.0
 status:
   buckets: null
   clusterId: ""

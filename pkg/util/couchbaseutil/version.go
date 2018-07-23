@@ -13,7 +13,7 @@ import (
 
 // A Couchbase version.  This type is immutable
 type Version struct {
-	// Full name e.g. "enterprise-5.0.1"
+	// Full name e.g. "enterprise-5.5.0"
 	version string
 	// Prefix (release edition) e.g. "enterprise"
 	prefix string
@@ -29,7 +29,7 @@ func NewVersion(version string) (*Version, error) {
 
 	// Gather semver and optional edition with expected format
 	// "<edition>-<semver>" or "<semver>-<edition>", ie:
-	//			"5.0.1" and "enterprise-5.0.1" and "5.5.0-beta"
+	//			"5.5.0" and "enterprise-5.5.0" and "5.5.0-beta"
 	re := regexp.MustCompile(`^(?:(\w+)-)?(\d+)\.(\d+)\.(\d+)(?:-(\w+))?`)
 	matches := re.FindStringSubmatch(version)
 	if len(matches) == 0 {

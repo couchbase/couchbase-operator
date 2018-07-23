@@ -16,7 +16,7 @@ import (
 // other settings
 var (
 	baseImage = "couchbase/server"
-	version   = "5.5.0-beta"
+	version   = "enterprise-5.5.0"
 )
 
 // cluster settings
