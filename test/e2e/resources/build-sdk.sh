@@ -23,7 +23,7 @@ if [ "$testRunnerDockerImageName" == "" ]; then
     exit 1
 fi
 
-git clone https://github.com/couchbaselabs/sdkqe-resource.git
+git clone ssh://git@github.com/couchbaselabs/sdkqe-resource.git
 
 if [ "$imageType" == "sanity" ]; then
     cd sdkqe-resource/dockerfiles/sdkqe/situational/sdkd-java-client

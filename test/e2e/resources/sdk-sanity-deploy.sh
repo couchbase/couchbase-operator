@@ -169,7 +169,7 @@ kubectl --namespace=$KUBENAMESPACE logs --follow=true $testrunnerPodName &
  # Wait for testrunner job to complete
 while true
 do
-    currTestrunnerPod=$(kubectl --namespace=$KUBENAMESPACE get -l job-name=sdk-sanity-test pods | tail -1 | awk '{print $1}')
+    currTestrunnerPod=$(kubectl --namespace=$KUBENAMESPACE get -l job-name=sdk-sanity pods | tail -1 | awk '{print $1}')
     if [ "$currTestrunnerPod" != "$testrunnerPodName" ] ; then
         echo "@@@@ Testrunner pod '$testrunnerPodName' replaced with new pod '$currTestrunnerPod' @@@@"
         kill %1
