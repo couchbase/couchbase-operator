@@ -1,0 +1,117 @@
+= Couchbase Autonomous Operator v0.9.0 User Guide
+EARLY ACCESS - DO NOT DISTRIBUTE
+0.9.0-beta3 - Copyright 2018 COUCHBASE, INC. ALL RIGHTS RESERVED.
+:doctype: book
+:toc:
+:toclevels: 2
+:includedir: modules/ROOT/pages
+:imagesdir: modules/ROOT/assets/images
+:source-highlighter: highlight.js
+:numbered:
+:icons: font
+:hide-uri-scheme:
+// ======================================================================================
+
+:leveloffset: +1
+
+include::{includedir}/overview.adoc[]
+
+:leveloffset: -1
+
+= Getting Started With the Operator
+
+:leveloffset: +1
+
+include::{includedir}/prerequisite-and-setup.adoc[]
+
+include::{includedir}/install-kubernetes.adoc[]
+
+include::{includedir}/install-kubernetes-no-rbac.adoc[]
+
+include::{includedir}/install-openshift.adoc[]
+
+include::{includedir}/operator-config.adoc[]
+
+:leveloffset: -1
+
+= Configuring Your Couchbase Deployment
+
+:leveloffset: +1
+
+include::{includedir}/couchbase-cluster-config.adoc[]
+
+include::{includedir}/best-practices.adoc[]
+
+include::{includedir}/networking.adoc[]
+
+include::{includedir}/tls.adoc[]
+
+include::{includedir}/kubernetes-rbac.adoc[]
+
+include::{includedir}/server-groups.adoc[]
+
+include::{includedir}/persisted-volumes-guide.adoc[]
+
+include::{includedir}/persisted-volumes-setup.adoc[]
+
+include::{includedir}/persisted-volumes-zoning-guide.adoc[]
+
+:leveloffset: -1
+
+= Deploying and Managing Couchbase
+
+:leveloffset: +1
+
+include::{includedir}/deploying-couchbase.adoc[]
+
+include::{includedir}/cbopctl.adoc[]
+
+include::{includedir}/cluster-status-guide.adoc[]
+
+include::{includedir}/list-and-describe.adoc[]
+
+include::{includedir}/accessing-couchbase.adoc[]
+
+include::{includedir}/admin-console-access.adoc[]
+
+include::{includedir}/couchbase-cli-guide.adoc[]
+
+include::{includedir}/couchbase-clients.adoc[]
+
+include::{includedir}/running-couchbase.adoc[]
+
+include::{includedir}/scaling-couchbase.adoc[]
+
+include::{includedir}/node-recovery.adoc[]
+
+include::{includedir}/updating-couchbase.adoc[]
+
+include::{includedir}/upgrading-couchbase.adoc[]
+
+include::{includedir}/delete-couchbase-cluster.adoc[]
+
+:leveloffset: -1
+
+= Troubleshooting
+
+:leveloffset: +1
+
+include::{includedir}/logs-troubleshooting.adoc[]
+
+include::{includedir}/conditions-and-events.adoc[]
+
+include::{includedir}/services.adoc[]
+
+include::{includedir}/cbopinfo.adoc[]
+
+:leveloffset: -1
+
+= Tutorial
+
+:leveloffset: +1
+
+include::{includedir}/demo.adoc[]
+
+:leveloffset: -1
+
+// ======================================================================================
