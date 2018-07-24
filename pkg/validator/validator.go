@@ -455,42 +455,37 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 
 	// volume mounts cannot be added/removed nor can they specify different claim templates
 	for _, cur := range current.Spec.ServerSettings {
-		for _, up := range updated.Spec.ServerSettings {
-			if up.Name != cur.Name {
-				continue
-			}
-			curPersisted := cur.Pod != nil && cur.Pod.VolumeMounts != nil
-			upPersisted := up.Pod != nil && up.Pod.VolumeMounts != nil
-			if curPersisted != upPersisted {
-				err := &UpdateError{"spec.servers[*].Pod.VolumeMounts", "body"}
-				errs = append(errs, err)
-			}
-			if curPersisted && upPersisted {
-				if cur.Pod.VolumeMounts.DefaultClaim != up.Pod.VolumeMounts.DefaultClaim {
-					err := &UpdateError{"default", "spec.servers[*].Pod.VolumeMounts"}
-					errs = append(errs, err)
-				}
-				if cur.Pod.VolumeMounts.DataClaim != up.Pod.VolumeMounts.DataClaim {
-					err := &UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"}
-					errs = append(errs, err)
-				}
-				if cur.Pod.VolumeMounts.IndexClaim != up.Pod.VolumeMounts.IndexClaim {
-					err := &UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"}
-					errs = append(errs, err)
-				}
-				if len(cur.Pod.VolumeMounts.AnalyticsClaims) != len(up.Pod.VolumeMounts.AnalyticsClaims) {
-					err := &UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"}
-					errs = append(errs, err)
-				} else {
-					for i, _ := range cur.Pod.VolumeMounts.AnalyticsClaims {
-						if cur.Pod.VolumeMounts.AnalyticsClaims[i] != up.Pod.VolumeMounts.AnalyticsClaims[i] {
-							err := &UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"}
-							errs = append(errs, err)
-							break
-						}
-					}
-				}
-			}
+		// If the current isn't in the updated it's being deleted, ignore
+		up := updated.Spec.GetServerConfigByName(cur.Name)
+		if up == nil {
+			continue
+		}
+
+		// If neither have volume mounts specified, ignore
+		curPersisted := cur.Pod != nil && cur.Pod.VolumeMounts != nil
+		upPersisted := up.Pod != nil && up.Pod.VolumeMounts != nil
+		if !curPersisted && !upPersisted {
+			continue
+		}
+
+		// If one does and the other doesn't raise an error
+		if curPersisted != upPersisted {
+			errs = append(errs, &UpdateError{"spec.servers[*].Pod.VolumeMounts", "body"})
+			continue
+		}
+
+		// Check the claims are the same
+		if cur.Pod.VolumeMounts.DefaultClaim != up.Pod.VolumeMounts.DefaultClaim {
+			errs = append(errs, &UpdateError{"default", "spec.servers[*].Pod.VolumeMounts"})
+		}
+		if cur.Pod.VolumeMounts.DataClaim != up.Pod.VolumeMounts.DataClaim {
+			errs = append(errs, &UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"})
+		}
+		if cur.Pod.VolumeMounts.IndexClaim != up.Pod.VolumeMounts.IndexClaim {
+			errs = append(errs, &UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"})
+		}
+		if !stringArrayCompareOrdered(cur.Pod.VolumeMounts.AnalyticsClaims, up.Pod.VolumeMounts.AnalyticsClaims) {
+			errs = append(errs, &UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"})
 		}
 	}
 
@@ -541,6 +536,21 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 	return nil, warns
 }
 
+// stringArrayCompareOrdered compares two arrays and ensure the elements are the same
+func stringArrayCompareOrdered(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, _ := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// stringArrayCompare compares two arrays and ensure the elements are the same
+// but unordered
 func stringArrayCompare(a1, a2 []string) bool {
 	m := make(map[string]int)
 	for _, val := range a1 {
