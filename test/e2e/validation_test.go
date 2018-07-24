@@ -1498,6 +1498,32 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets[0].conflictResolution in body cannot be updated"},
 		},
+		{
+			name: "Update spec.buckets.ioPriority value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "IoPriority"},
+					fieldType:  "string",
+					fieldValue: "low",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.buckets[0].ioPriority in body cannot be updated"},
+		},
+		{
+			name: "Update spec.buckets.evictionPolicy value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "valueOnly",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.buckets[0].evictionPolicy in body cannot be updated"},
+		},
 
 		// ServerSettings service update
 		{
