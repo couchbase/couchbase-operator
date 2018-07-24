@@ -760,3 +760,7 @@ func (c *Cluster) decPodIndex() {
 	index := c.status.Members.Index
 	c.setPodIndex(index - 1)
 }
+
+func (c *Cluster) SetLoggingLevel(level logrus.Level) {
+	c.logger.Logger.SetLevel(level)
+}

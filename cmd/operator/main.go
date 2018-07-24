@@ -14,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/controller"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/logutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
@@ -64,7 +65,7 @@ func main() {
 	if level, err := logrus.ParseLevel(logLevel); err != nil {
 		mainLogger.Fatalf("Invalid log level: %s", logLevel)
 	} else {
-		logrus.SetLevel(level)
+		logutil.SetLogLevel(level)
 	}
 
 	namespace = os.Getenv("MY_POD_NAMESPACE")
@@ -144,8 +145,6 @@ func newControllerConfig() controller.Config {
 		mainLogger.Fatalf("Fail to get my pod's service account: %v", err)
 	}
 
-	level, _ := logrus.ParseLevel(logLevel)
-
 	cfg := controller.Config{
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
@@ -154,7 +153,6 @@ func newControllerConfig() controller.Config {
 		CreateCrd:      createCrd,
 		VerifyVersion:  verifyVersion,
 		EnableUpgrades: enableUpgrades,
-		LogLevel:       level,
 	}
 
 	return cfg

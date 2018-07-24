@@ -2,7 +2,10 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"time"
 
 	sdk "github.com/coreos/operator-sdk/pkg/sdk"
@@ -15,6 +18,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/logutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 
 	"github.com/sirupsen/logrus"
@@ -53,16 +57,18 @@ type Config struct {
 	EnableUpgrades bool
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
-	LogLevel       logrus.Level
 	VerifyVersion  bool
 }
 
 func New(cfg Config) *Controller {
-	return &Controller{
+	controller := &Controller{
 		Config:   cfg,
 		logger:   logrus.WithField("module", "controller"),
 		clusters: CreateManagedClusters(),
 	}
+
+	http.HandleFunc("/v1/settings/logging", controller.SettingsLoggingHandler)
+	return controller
 }
 
 func (c *Controller) Start() {
@@ -160,7 +166,16 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 				return fmt.Errorf("Cluster create failed, Please delete its CR: %s, %v", clus.Name, err)
 			}
 		}
-		c.clusters.Store(clus.Name, cluster.New(c.makeClusterConfig(), clus))
+
+		// We need to explicitly obtain the lock here and not call the Store() function
+		// because we need to ensure that the cluster is created and inserted into the
+		// cluster map before releasing the lock. This is because config updates to
+		// clusters (like changing the log level) only apply to clusters in the map. By
+		// obtaining the lock to create a cluster and insert it into the map we can
+		// ensure that the cluster is in the map when the config updates are applied.
+		c.clusters.Lock.Lock()
+		c.clusters.Values[clus.Name] = cluster.New(c.makeClusterConfig(), clus)
+		c.clusters.Lock.Unlock()
 
 	case kwatch.Modified:
 		clusterContext, ok := c.clusters.Load(clus.Name)
@@ -185,7 +200,64 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 		ServiceAccount: c.Config.ServiceAccount,
 		KubeCli:        c.Config.KubeCli,
 		CouchbaseCRCli: c.Config.CouchbaseCRCli,
-		LogLevel:       c.Config.LogLevel,
+		LogLevel:       logutil.LogLevel(),
 		EnableUpgrades: c.Config.EnableUpgrades,
+	}
+}
+
+func (c *Controller) SettingsLoggingHandler(w http.ResponseWriter, r *http.Request) {
+	type LoggerSettings struct {
+		LogLevel string `json:"logLevel"`
+	}
+
+	if r.Method == http.MethodGet {
+		var response LoggerSettings
+		response.LogLevel = logutil.LogLevel().String()
+
+		data, err := json.Marshal(response)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.Write(data)
+	} else if r.Method == http.MethodPost {
+		if r.Header.Get("Content-Type") != "application/json" {
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			w.Write([]byte("Content-Type must be application/json"))
+			return
+		}
+
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		var request LoggerSettings
+		err = json.Unmarshal(body, &request)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		level, err := logrus.ParseLevel(request.LogLevel)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		logutil.SetLogLevel(level)
+		c.clusters.Range(func(key string, value *cluster.Cluster) bool {
+			value.SetLoggingLevel(level)
+			return true
+		})
+
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
