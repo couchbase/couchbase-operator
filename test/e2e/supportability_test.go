@@ -342,6 +342,11 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
 	errMsgList := failureList{}
 
+	// If cluster specific file doesn't exists, point to default file
+	if _, err := os.Stat(kubeConfPath); os.IsNotExist(err) {
+		kubeConfPath = os.Getenv("HOME") + "/.kube/config"
+	}
+
 	// Validate args which won't produce output file
 	for _, arg := range []string{"-help", "-version"} {
 		_, err := runCbopinfoCmd([]string{arg})
