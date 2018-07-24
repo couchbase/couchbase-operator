@@ -174,7 +174,9 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 		// obtaining the lock to create a cluster and insert it into the map we can
 		// ensure that the cluster is in the map when the config updates are applied.
 		c.clusters.Lock.Lock()
-		c.clusters.Values[clus.Name] = cluster.New(c.makeClusterConfig(), clus)
+		if toAdd := cluster.New(c.makeClusterConfig(), clus); toAdd != nil {
+			c.clusters.Values[clus.Name] = toAdd
+		}
 		c.clusters.Lock.Unlock()
 
 	case kwatch.Modified:

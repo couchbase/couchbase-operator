@@ -105,6 +105,7 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 	// Set up our event logger.  Note that this will cache and aggregate
 	// events over a 10 minute window.
 	if err := api.AddToScheme(scheme.Scheme); err != nil {
+		c.logger.Errorf("Error adding scheme to client-go for event broadcasting: %s", err.Error())
 		return nil
 	}
 	broadcaster := record.NewBroadcaster()
@@ -116,6 +117,7 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 	// Initialize the scheduler for the initial pod
 	var err error
 	if c.scheduler, err = scheduler.New(c.config.KubeCli, c.cluster); err != nil {
+		c.logger.Errorf("Error initializing pod scheduler: %s", err.Error())
 		return nil
 	}
 
