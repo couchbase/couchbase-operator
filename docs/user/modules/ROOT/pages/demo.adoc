@@ -19,7 +19,7 @@ On Kubernetes:
 
 [source,console]
 ----
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ----
 
@@ -27,7 +27,7 @@ On OpenShift:
 
 [source,console]
 ----
-$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
+$ cbopctl apply -f  https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cluster.yaml
 couchbasecluster "cb-example" created
 ----
 
@@ -99,7 +99,7 @@ On Kubernetes:
 
 [source,console]
 ----
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-create-user.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ kubectl get job
@@ -111,7 +111,7 @@ On OpenShift:
 
 [source,console]
 ----
-$ oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-create-user.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cli-create-user.yaml
 job "create-user" created
 
 $ oc get job
@@ -137,7 +137,7 @@ The name of the secret and its keys are very important as the sample `create-use
 
 [source,yaml]
 ----
-https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cli-create-user.yaml
+https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cli-create-user.yaml
 ---
 apiVersion: batch/v1
 kind: Job
@@ -195,7 +195,7 @@ On Kubernetes:
 
 [source,console]
 ----
-$ kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/pillowfight-data-loader.yaml
+$ kubectl create -f https://packages.couchbase.com/kubernetes/1.0.0/pillowfight-data-loader.yaml
 job "pillowfight" created
 ----
 
@@ -203,7 +203,7 @@ On OpenShift:
 
 [source,console]
 ----
-$ oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/pillowfight-data-loader-openshift.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/1.0.0/pillowfight-data-loader-openshift.yaml
 job "pillowfight" created
 ----
 

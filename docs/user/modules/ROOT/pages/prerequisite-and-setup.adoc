@@ -9,9 +9,9 @@ See the following table for platform compatibility information:
 
 |===
 
-|                | *Open Source Kubernetes* | *Red Hat OpenShift* | *Couchbase Server*
+|                  | *Open Source Kubernetes* | *Red Hat OpenShift* | *Couchbase Server*
 
-| *Operator 0.9* | 1.9+                     | 3.9+                | 5.5
+| *Operator 1.0.0* | 1.9+                     | 3.9+                | 5.5
 
 |===
 

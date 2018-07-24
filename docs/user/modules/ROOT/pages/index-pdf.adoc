@@ -1,6 +1,5 @@
-= Couchbase Autonomous Operator v0.9 User Guide
-EARLY ACCESS - DO NOT DISTRIBUTE
-0.9.0-beta3 - Copyright 2018 COUCHBASE, INC. ALL RIGHTS RESERVED.
+= Couchbase Autonomous Operator v1.0.0 User Guide
+1.0.0 - Copyright 2018 COUCHBASE, INC. ALL RIGHTS RESERVED.
 :doctype: book
 :toc:
 :toclevels: 2

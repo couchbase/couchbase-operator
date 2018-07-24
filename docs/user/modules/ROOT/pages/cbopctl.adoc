@@ -26,7 +26,7 @@ OS X:
 
 [source,console]
 ----
-$ curl -O https://packages.couchbase.com/kubernetes/0.9.0-beta3/darwin/cbopctl
+$ curl -O https://packages.couchbase.com/kubernetes/1.0.0/darwin/cbopctl
 
 $ chmod +x cbopctl
 ----
@@ -35,7 +35,7 @@ Linux:
 
 [source,console]
 ----
-$ curl -O https://packages.couchbase.com/kubernetes/0.9.0-beta3/linux/cbopctl
+$ curl -O https://packages.couchbase.com/kubernetes/1.0.0/linux/cbopctl
 
 $ chmod +x cbopctl
 ----
@@ -44,7 +44,7 @@ Windows:
 
 [source,console]
 ----
-$ curl -O https://packages.couchbase.com/kubernetes/0.9.0-beta3/windows/cbopctl
+$ curl -O https://packages.couchbase.com/kubernetes/1.0.0/windows/cbopctl
 $ chmod +x cbopctl
 ----
 

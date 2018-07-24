@@ -38,7 +38,7 @@ To install the CRD, log in as an OpenShift user that has cluster-admin privilege
 ----
 $ oc login -u system:admin
 
-$ oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/openshift/crd.yaml
+$ oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/crd.yaml
 ----
 
 NOTE: You only need to install the CRD once. After that, you can create the Operator in any OpenShift project.
@@ -51,7 +51,7 @@ To create the cluster role for the Operator, run the following command as the `s
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/openshift/cluster-role-sa.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-sa.yaml
 ----
 
 NOTE: You only need to create the cluster role once.
@@ -77,7 +77,7 @@ Run the following command to create the cluster role for `developer`:
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/openshift/cluster-role-user.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-user.yaml
 ----
 
 Next, you need to allow `developer` to be able to manage the CouchbaseCluster resource in the `operator-example` project:
@@ -102,7 +102,7 @@ At this point you can now use the `developer` user to create the Operator in the
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/openshift/operator.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/operator.yaml
 ----
 
 Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.

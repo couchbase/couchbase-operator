@@ -69,14 +69,14 @@ On Kubernetes:
 
 [source,console]
 ----
-kubectl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/secret.yaml
+kubectl create -f https://packages.couchbase.com/kubernetes/1.0.0/secret.yaml
 ----
 
 On OpenShift:
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/secret.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/secret.yaml
 ----
 
 The Couchbase configuration is now ready to be pushed to Kubernetes. To push the configuration, run the following command:
@@ -85,14 +85,14 @@ On Kubernetes:
 
 [source,console]
 ----
-cbopctl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
+cbopctl create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cluster.yaml
 ----
 
 On OpenShift:
 
 [source,console]
 ----
-cbopctl create -f https://packages.couchbase.com/kubernetes/0.9.0-beta3/couchbase-cluster.yaml
+cbopctl create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cluster.yaml
 ----
 
 The Couchbase Operator automatically begins creating the cluster. Depending on the configuration, creating a cluster can take some time. You can track the progress of cluster creation using the `kubectl describe` command. For details on how to use this command and an explanation of the output, see xref:cluster-status-guide.adoc[Displaying Information about a Couchbase Cluster].
