@@ -6,6 +6,8 @@ import (
 	"reflect"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+
+	"k8s.io/api/core/v1"
 )
 
 var (
@@ -56,6 +58,33 @@ type ErrCreatingPersistentVolume struct {
 	Reason string
 }
 
+// Errors for volume health checking
+type ErrNoVolumeMounts struct{}
+
+type ErrVolumeClaimPending struct {
+	Path  string
+	Phase v1.PersistentVolumeClaimPhase
+}
+
+type ErrVolumeClaimLost struct {
+	Path  string
+	Phase v1.PersistentVolumeClaimPhase
+}
+
+type ErrVolumeClaimUnknownPhase struct {
+	Path  string
+	Phase v1.PersistentVolumeClaimPhase
+}
+
+type ErrVolumeClaimMissing struct {
+	Path string
+}
+
+type ErrVolumeUnexpectedPhase struct {
+	Path  string
+	Phase v1.PersistentVolumePhase
+}
+
 func (e ErrSecretMissingUsername) Error() string {
 	return fmt.Sprintf("secret is missing username key: %s", e.Reason)
 }
@@ -104,6 +133,30 @@ func (e ErrCreatingPersistentVolumeClaim) Error() string {
 
 func (e ErrCreatingPersistentVolume) Error() string {
 	return fmt.Sprintf("failed to create persistent volume: %s", e.Reason)
+}
+
+func (e ErrNoVolumeMounts) Error() string {
+	return fmt.Sprintf("No volume mounts defined")
+}
+
+func (e ErrVolumeClaimLost) Error() string {
+	return fmt.Sprintf("PersistentVolumeClaim for path %s has lost it's underlying PersistentVolume, Phase=`%s`", e.Path, e.Phase)
+}
+
+func (e ErrVolumeClaimPending) Error() string {
+	return fmt.Sprintf("PersistentVolumeClaim for path %s is not yet bound to an underlying PersistentVolume, Phase=`%s`", e.Path, e.Phase)
+}
+
+func (e ErrVolumeClaimUnknownPhase) Error() string {
+	return fmt.Sprintf("PersistentVolumeClaim for path %s is in an unkown phase `%s`", e.Path, e.Phase)
+}
+
+func (e ErrVolumeClaimMissing) Error() string {
+	return fmt.Sprintf("Missing PersistentVolumeClaim for path %s", e.Path)
+}
+
+func (e ErrVolumeUnexpectedPhase) Error() string {
+	return fmt.Sprintf("PersistentVolume for path %s is in an unexpected Phase: `%s`, expected `Bound`", e.Path, e.Phase)
 }
 
 func hasValue(v interface{}) bool {

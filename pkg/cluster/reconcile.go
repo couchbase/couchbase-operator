@@ -85,6 +85,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	if err := c.verifyClusterVolumes(); err != nil {
+		return err
+	}
+
 	c.reconcileAdminService()
 
 	c.status.ClearCondition(api.ClusterConditionScaling)
@@ -1076,6 +1080,40 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 	}
 
+	return nil
+}
+
+// Verify that volumes are healthy for every
+// member configured for persistence.
+func (c *Cluster) verifyClusterVolumes() error {
+	for _, memberName := range c.members.Names() {
+		err := c.verifyMemberVolumes(c.members[memberName])
+		if err != nil {
+
+			// Raise an event detailing reason why volumes are unhealthy
+			ev := k8sutil.MemberVolumeUnhealthyEvent(memberName, err.Error(), c.cluster)
+			c.raiseEventCached(ev)
+			return fmt.Errorf("%s", ev.Message)
+		}
+	}
+	return nil
+}
+
+// Verify volumes of a single member
+func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
+	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+	if config == nil {
+		return fmt.Errorf("config for member `%s` does not exist: %s", m.Name, m.ServerConfig)
+	}
+
+	err := k8sutil.IsPodRecoverable(c.config.KubeCli, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
+	if err != nil {
+		if _, ok := err.(cberrors.ErrNoVolumeMounts); ok {
+			// Pod is not configured for volumes
+			return nil
+		}
+		return err
+	}
 	return nil
 }
 

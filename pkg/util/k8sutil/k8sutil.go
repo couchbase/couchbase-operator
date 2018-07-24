@@ -1119,6 +1119,10 @@ func WaitForPersistentVolume(ctx context.Context, kubeCli kubernetes.Interface, 
 	return nil
 }
 
+func GetPersistentVolume(kubeCli kubernetes.Interface, name string) (*v1.PersistentVolume, error) {
+	return kubeCli.CoreV1().PersistentVolumes().Get(name, metav1.GetOptions{})
+}
+
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
 	version, err := kubeCli.Discovery().ServerVersion()
 	if err != nil {

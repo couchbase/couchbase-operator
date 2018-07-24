@@ -92,6 +92,14 @@ func FailedAddNodeEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
 	return event
 }
 
+func FailedAddBackNodeEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "FailedAddBackNode"
+	event.Message = fmt.Sprintf("Existing member `%s` could not be added back to the cluster", memberName)
+	return event
+}
+
 func BucketCreateEvent(bucketName string, cl *api.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
@@ -169,6 +177,14 @@ func ClusterSettingsEditedEvent(settingName string, cl *api.CouchbaseCluster) *v
 	event.Type = v1.EventTypeNormal
 	event.Reason = "ClusterSettingsEdited"
 	event.Message = fmt.Sprintf("Setting for `%s` was edited", settingName)
+	return event
+}
+
+func MemberVolumeUnhealthyEvent(memberName string, reason string, cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = "VolumeUnhealthy"
+	event.Message = fmt.Sprintf("Member %s volumes are unhealthy.  Failover is recommended: %s", memberName, reason)
 	return event
 }
 

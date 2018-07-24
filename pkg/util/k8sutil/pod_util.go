@@ -7,6 +7,7 @@ import (
 	"time"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
@@ -728,13 +729,22 @@ func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namesp
 	for _, pvc := range pvcList.Items {
 		if pvcPath, ok := pvc.Annotations["path"]; ok {
 			if pvcPath == path {
-				if pvc.Status.Phase == v1.ClaimBound {
+				phase := pvc.Status.Phase
+				switch phase {
+				case v1.ClaimBound:
 					return &pvc, nil
+				case v1.ClaimPending:
+					return nil, cberrors.ErrVolumeClaimPending{Path: path, Phase: phase}
+				case v1.ClaimLost:
+					return nil, cberrors.ErrVolumeClaimLost{Path: path, Phase: phase}
+				default:
+					return nil, cberrors.ErrVolumeClaimUnknownPhase{Path: path, Phase: phase}
 				}
 			}
 		}
 	}
-	return nil, fmt.Errorf("Member `%s` does not have a healty volume for path: %s", memberName, path)
+
+	return nil, cberrors.ErrVolumeClaimMissing{Path: path}
 }
 
 // Recreate list of members from persistent volumes
@@ -776,9 +786,10 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 // pod is recoverable if it has volume mounts with existing
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
+// to an underlying PersistentVolume
 func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, podName, clusterName, namespace string) error {
 	if mounts := config.GetVolumeMounts(); mounts == nil {
-		return fmt.Errorf("no volume mounts defined")
+		return cberrors.ErrNoVolumeMounts{}
 	} else {
 		// default volume claim is required for recovery
 		defaultClaim := mounts.DefaultClaim
@@ -789,9 +800,18 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 		mountPaths := getPathsToPersist(mounts)
 		for mountName, _ := range mountPaths {
 			mountPath := pathForVolumeMountName(mountName)
-			_, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
+			pvc, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
 			if err != nil {
 				return err
+			}
+			// Volume belonging to the claim must also be healthy
+			volume, err := GetPersistentVolume(kubeCli, pvc.Spec.VolumeName)
+			if err != nil {
+				return err
+			}
+			volumePhase := volume.Status.Phase
+			if volumePhase != v1.VolumeBound {
+				return cberrors.ErrVolumeUnexpectedPhase{Path: mountPath, Phase: volumePhase}
 			}
 		}
 	}

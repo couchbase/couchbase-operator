@@ -325,6 +325,15 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 	for _, m := range r.couchbase.AddBackNodes {
 
+		err := c.verifyMemberVolumes(m)
+		if err != nil {
+			c.logger.Warnf("Failed over node `%s` cannot be added back since it has unhealthy volumes: %v, removing, ", m.Name, err)
+			r.ejectNodes.Add(m)
+			r.runningPods.Remove(m.Name)
+			c.raiseEvent(k8sutil.FailedAddBackNodeEvent(m.Name, c.cluster))
+			break
+		}
+
 		// Set recovery type as delta for data nodes
 		if sc := c.cluster.Spec.GetServerConfigByName(m.ServerConfig); sc != nil {
 			deltaRecovery := false
