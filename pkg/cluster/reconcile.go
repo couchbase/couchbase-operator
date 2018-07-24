@@ -121,7 +121,7 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
 }
 
 // Create a new Couchbase cluster member
-func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
+func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Member, err error) {
 	// Allocate an index to be used in the name.  Get the current index then increment
 	// and commit back to etcd.  That way we are guaranteed to never have conflicting
 	// names
@@ -130,8 +130,17 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 
 	// Create a new member
 	newMember := c.newMember(index, serverSpec.Name)
+
+	// Prepare to delete member Pod if any errors
+	// occur during creation or configuration
+	defer func() {
+		if err != nil {
+			c.decPodIndex()
+			c.removePod(newMember.Name)
+		}
+	}()
+
 	if err := c.createPod(newMember, serverSpec); err != nil {
-		c.decPodIndex()
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
 
@@ -140,8 +149,6 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	defer cancel()
 	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
-		c.removePod(newMember.Name)
-		c.decPodIndex()
 		return nil, err
 	}
 
@@ -154,8 +161,6 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (*couchbaseutil.Memb
 	// Enable TLS if requested
 	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
-		c.removePod(newMember.Name)
-		c.decPodIndex()
 		return nil, err
 	}
 
