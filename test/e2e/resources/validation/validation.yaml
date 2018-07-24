@@ -4,6 +4,7 @@ metadata:
   name: cb-example
   namespace: default
 spec:
+  antiAffinity: false
   baseImage: couchbase/server
   version: enterprise-5.5.0
   authSecret: basic-test-secret
@@ -14,6 +15,10 @@ spec:
       - query
       - search
   paused: false
+  serverGroups:
+    - us-east-1a
+    - us-east-1b
+    - us-east-1c
   cluster:
     dataServiceMemoryQuota: 600
     indexServiceMemoryQuota: 256
@@ -83,6 +88,15 @@ spec:
           analytics:
             - couchbase
             - couchbase
+    - size: 1
+      name: server_groups
+      services:
+        - data
+        - index
+        - query
+      serverGroups:
+        - us-east-1a
+        - us-east-1b
   volumeClaimTemplates:
     - metadata:
         name: couchbase
@@ -91,3 +105,5 @@ spec:
         resources:
           requests:
             storage: 2Gi
+          limits:
+            storage: 5Gi

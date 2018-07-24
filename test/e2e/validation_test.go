@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"io/ioutil"
+
+	corev1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -113,15 +115,15 @@ func SetClusterParameter(cluster *api.CouchbaseCluster, param parameter) error {
 	}
 
 	if v.IsValid() {
-		if param.fieldType == "string" {
+		switch param.fieldType {
+		case "string":
 			if param.fieldIsPointer {
-				v.Set(reflect.ValueOf(&param.fieldValue))
+				v.Set(reflect.ValueOf(param.fieldValue))
 			} else {
 				v.SetString(param.fieldValue)
 			}
-		}
 
-		if param.fieldType == "int" {
+		case "int":
 			val, err := strconv.Atoi(param.fieldValue)
 			if err != nil {
 				return err
@@ -151,18 +153,16 @@ func SetClusterParameter(cluster *api.CouchbaseCluster, param parameter) error {
 					v.SetUint(setVal)
 				}
 			}
-		}
 
-		if param.fieldType == "array" {
+		case "array":
 			var newArray []string
 			err := json.Unmarshal([]byte(param.fieldValue), &newArray)
 			if err != nil {
 				return err
 			}
 			v.Set(reflect.ValueOf(newArray))
-		}
 
-		if param.fieldType == "bool" {
+		case "bool":
 			b, err := strconv.ParseBool("true")
 			if err != nil {
 				return err
@@ -172,6 +172,28 @@ func SetClusterParameter(cluster *api.CouchbaseCluster, param parameter) error {
 			} else {
 				v.Set(reflect.ValueOf(b))
 			}
+
+		case "v1.ServiceList":
+			var serviceArray []api.Service
+			err := json.Unmarshal([]byte(param.fieldValue), &serviceArray)
+			if err != nil {
+				return err
+			}
+			v.Set(reflect.ValueOf(serviceArray))
+
+		case "apiresource.Quantity":
+			resourceQtyVal, err := strconv.Atoi(param.fieldValue)
+			if err != nil {
+				return nil
+			}
+			resourceQuantity := apiresource.NewQuantity(int64(resourceQtyVal)*1024*1024*1024, apiresource.BinarySI)
+			valToSet := map[corev1.ResourceName]apiresource.Quantity{
+				"storage": *resourceQuantity,
+			}
+			v.Set(reflect.ValueOf(valToSet))
+
+		default:
+			return errors.New("Unsupported field type: " + param.fieldType)
 		}
 	}
 	return nil
@@ -239,31 +261,26 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		if err != nil {
 			t.Logf("error: %v", err)
 			failures.AppendFailure(test.name, err)
-			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
 
 		testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
+		testCouchbase.ObjectMeta.Namespace = f.Namespace
 
-		ns := os.Getenv("KUBENAMESPACE")
-		if ns != "" {
-			t.Logf("setting namespace: %s", ns)
-			testCouchbase.ObjectMeta.Namespace = ns
-		}
+		// Removing previous deployment if any
+		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 		if command == "apply" || command == "delete" {
 			err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures.AppendFailure(test.name, err)
-				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 			cmdOut, err := RunCBOPCTL("create")
 			t.Logf("Returned: %s", string(cmdOut))
 			if err != nil && !test.shouldFail {
 				failures.AppendFailure(test.name, err)
-				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 
@@ -273,7 +290,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 				if err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 			}
@@ -282,7 +298,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures.AppendFailure(test.name, err)
-				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -293,7 +308,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			if err != nil {
 				t.Logf("error: %v", err)
 				failures.AppendFailure(test.name, err)
-				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -302,7 +316,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		if err != nil {
 			t.Logf("error: %v", err)
 			failures.AppendFailure(test.name, err)
-			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
 
@@ -310,7 +323,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 		t.Logf("Returned: %s", string(cmdOut))
 		if err != nil && !test.shouldFail {
 			failures.AppendFailure(test.name, err)
-			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 			continue
 		}
 
@@ -320,7 +332,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			if !strings.Contains(string(cmdOut), test.expectedWarn) || test.expectedWarn == "" {
 				t.Logf("expected warning: %+v \n returned message: %+v \n", test.expectedWarn, string(cmdOut))
 				failures.AppendFailure(test.name, errors.New("incorrect warning"))
-				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -329,7 +340,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			if !strings.Contains(string(cmdOut), message) || message == "" {
 				t.Logf("expected message: %+v \n returned message: %+v \n", message, string(cmdOut))
 				failures.AppendFailure(test.name, errors.New("incorrect message"))
-				e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 				continue
 			}
 		}
@@ -337,7 +347,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			if command == "delete" || command == "apply" {
 				if len(clusters.Items) != 1 {
 					failures.AppendFailure(test.name, errors.New("cluster deletion should fail"))
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 			}
@@ -345,7 +354,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			if command == "create" {
 				if len(clusters.Items) != 0 {
 					failures.AppendFailure(test.name, errors.New("cluster creation should fail"))
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 			}
@@ -353,20 +361,17 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			if command == "delete" {
 				if len(clusters.Items) != 0 {
 					failures.AppendFailure(test.name, errors.New("cluster deletion should work"))
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
-				_, err = e2eutil.WaitPodsDeleted(targetKube.KubeClient, ns, e2eutil.Retries30, metav1.ListOptions{LabelSelector: "app=couchbase"})
+				_, err = e2eutil.WaitPodsDeleted(targetKube.KubeClient, f.Namespace, e2eutil.Retries30, metav1.ListOptions{LabelSelector: "app=couchbase"})
 				if err != nil {
 					failures.AppendFailure(test.name, err)
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				t.Logf("deleted couchbase cluster: \n%+v", testCouchbase)
 			} else {
 				if len(clusters.Items) != 1 {
 					failures.AppendFailure(test.name, errors.New("only one cluster should be created"))
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				testCouchbase = &clusters.Items[0]
@@ -375,7 +380,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 					err = VerifyClusterParameter(testCouchbase, param)
 					if err != nil {
 						failures.AppendFailure(test.name, err)
-						e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 						continue
 					}
 				}
@@ -385,15 +389,14 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 				if err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					continue
 				}
 				t.Logf("created couchbase cluster: \n%+v", testCouchbase)
 			}
 		}
-		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
-		time.Sleep(10 * time.Second) //should add a wait for number of couchbase pods to be 0
 	}
+	// Removing deployment if any
+	e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 	failures.CheckFailures(t)
 }
 
@@ -421,6 +424,35 @@ func TestNegValidationCreate(t *testing.T) {
 	}
 	f := framework.Global
 	testDefs := []testDef{
+		// Spec.ExposedFeatures list validation
+		{
+			name: "Validate spec.exposedFeatures field values",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ExposedFeatures"},
+					fieldType:  "array",
+					fieldValue: "[\"admin\", \"cleint\", \"xdcr\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.exposedFeatures in body should be one of [admin xdcr client]"},
+		},
+		{
+			name: "Validate spec.exposedFeatures fields uniqueness",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ExposedFeatures"},
+					fieldType:  "array",
+					fieldValue: "[\"admin\", \"client\", \"xdcr\", \"admin\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.exposedFeatures in body shouldn't contain duplicates"},
+		},
+
+		// Bucket validation test
 		{
 			name: "create invalid bucket name",
 			paramsIn: []parameter{
@@ -434,35 +466,6 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets.name in body should match '^[a-zA-Z0-9._\\-%]*$'"},
 		},
-
-		{
-			name: "Validate server-settings services fields",
-			paramsIn: []parameter{
-				{
-					field:      []string{"Spec", "ServerSettings", "0", "Services"},
-					fieldType:  "array",
-					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
-				},
-			},
-			paramsOut:        []parameter{},
-			shouldFail:       true,
-			expectedMessages: []string{"spec.servers.services in body should be one of [data index query search eventing analytics]"},
-		},
-
-		{
-			name: "Validate AdminConsoleService fields",
-			paramsIn: []parameter{
-				{
-					field:      []string{"Spec", "AdminConsoleServices"},
-					fieldType:  "array",
-					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
-				},
-			},
-			paramsOut:        []parameter{},
-			shouldFail:       true,
-			expectedMessages: []string{"validation failure list:\nspec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
-		},
-
 		{
 			name: "create invalid bucket type",
 			paramsIn: []parameter{
@@ -476,7 +479,6 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets.type in body should be one of [couchbase ephemeral memcached]"},
 		},
-
 		{
 			name: "create invalid bucket name and bucket type",
 			paramsIn: []parameter{
@@ -496,7 +498,258 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets.type in body should be one of [couchbase ephemeral memcached]", "spec.buckets.name in body should match '^[a-zA-Z0-9._\\-%]*$'"},
 		},
+		{
+			name: "Validate spec.bucket.enableIndexReplica with memcached bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "2", "EnableIndexReplica"},
+					fieldType:  "bool",
+					fieldValue: "true",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"enableReplicaIndex in spec.buckets[2] must be of type nil: \"Bucket type is memcached\""},
+		},
+		{
+			name: "Validate spec.bucket.enableIndexReplica with ephemeral bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "3", "EnableIndexReplica"},
+					fieldType:  "bool",
+					fieldValue: "true",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"enableReplicaIndex in spec.buckets[3] must be of type nil: \"Bucket type is ephemeral\""},
+		},
+		{
+			name: "Validate spec.bucket.bucketReplicas with memcached bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "2", "BucketReplicas"},
+					fieldType:  "int",
+					fieldValue: "1",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"bucketReplicas in spec.buckets[2] must be of type nil: \"Bucket type is memcached\""},
+		},
+		{
+			name: "Validate spec.bucket.conflictResolution with memcached bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "2", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "seqno",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"conflictResolution in spec.buckets[2] must be of type nil: \"Bucket type is memcached\""},
+		},
+		{
+			name: "Validate spec.bucket.evictionPolicy with memcached bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "2", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "valueOnly",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"evictionPolicy in spec.buckets[2] must be of type nil: \"Bucket type is memcached\""},
+		},
+		{
+			name: "Validate spec.bucket.ioPriority with memcached bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "2", "IoPriority"},
+					fieldType:  "string",
+					fieldValue: "low",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"ioPriority in spec.buckets[2] must be of type nil: \"Bucket type is memcached\""},
+		},
+		{
+			name: "Validate spec.bucket.conflictResolution with couchbase bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"conflictResolution in spec.buckets[0] is required"},
+		},
+		{
+			name: "Validate spec.bucket.evictionPolicy with couchbase bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "",
+				},
+			},
+			paramsOut:  []parameter{},
+			shouldFail: true,
+			expectedMessages: []string{"evictionPolicy in spec.buckets[0] is required",
+				"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
+		},
+		{
+			name: "Validate spec.bucket.ioPriority with couchbase bucket",
+			paramsIn: []parameter{
 
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "IoPriority"},
+					fieldType:  "string",
+					fieldValue: "",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"ioPriority in spec.buckets[0] is required"},
+		},
+		{
+			name: "Validate spec.bucket.conflictResolution with ephemeral bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "3", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"conflictResolution in spec.buckets[3] is required"},
+		},
+		{
+			name: "Validate spec.bucket.evictionPolicy with ephemeral bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "3", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "",
+				},
+			},
+			paramsOut:  []parameter{},
+			shouldFail: true,
+			expectedMessages: []string{"evictionPolicy in spec.buckets[3] is required",
+				"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
+		},
+		{
+			name: "Validate spec.bucket.ioPriority with ephemeral bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "3", "IoPriority"},
+					fieldType:  "string",
+					fieldValue: "",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"ioPriority in spec.buckets[3] is required"},
+		},
+		{
+			name: "Validate spec.buckets.evictionPolicy as valueOnly for ephemeral bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "3", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "valueOnly",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
+		},
+		{
+			name: "Validate spec.buckets.evictionPolicy as fullEviction for ephemeral bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "3", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "fullEviction",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
+		},
+		{
+			name: "Validate spec.buckets.evictionPolicy as noEviction for couchbase bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "noEviction",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
+		},
+		{
+			name: "Validate spec.buckets.evictionPolicy as nruEviction for couchbase bucket",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "EvictionPolicy"},
+					fieldType:  "string",
+					fieldValue: "nruEviction",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
+		},
+		{
+			name: "Validate spec.buckets.name for duplicate values",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "BucketName"},
+					fieldType:  "string",
+					fieldValue: "default3",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.buckets.name in body shouldn't contain duplicates"},
+		},
+		{
+			name: "Validate spec.buckets.quota with more than declared",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "BucketMemoryQuota"},
+					fieldType:  "int",
+					fieldValue: "601",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 600"},
+		},
+
+		// Server settings validation
+		{
+			name: "Validate server-settings services fields",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers.services in body should be one of [data index query search eventing analytics]"},
+		},
 		{
 			name: "create invalid server name",
 			paramsIn: []parameter{
@@ -510,8 +763,91 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.servers.name in body shouldn't contain duplicates"},
 		},
+		{
+			name: "Validate spec.adminConsoleServices fields uniqueness",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "AdminConsoleServices"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"data\", \"index\", \"index\", \"search\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
+		},
+		{
+			name: "Validate spec.serverSettings.services fields for uniqueness",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"data\", \"index\", \"data\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[0].services in body shouldn't contain duplicates"},
+		},
+
+		// ServerGroups list validation
+		{
+			name: "Validate spec.serverGroups uniqueness",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerGroups"},
+					fieldType:  "array",
+					fieldValue: "[\"NewGroupUpdate-1\", \"NewGroupUpdate-1\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.serverGroups in body shouldn't contain duplicates"},
+		},
+		{
+			name: "Validate spec.servers.serverGroups list uniqueness",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "2", "ServerGroups"},
+					fieldType:  "array",
+					fieldValue: "[\"us-east-1a\", \"us-east-1b\", \"us-east-1a\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[2].serverGroups in body shouldn't contain duplicates"},
+		},
+
+		// Admin console services field validation
+		{
+			name: "Validate AdminConsoleService fields",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "AdminConsoleServices"},
+					fieldType:  "array",
+					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"validation failure list:\nspec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
+		},
 
 		// Persistent volume claim cases
+		{
+			name: "Validate spec.volumeClaimTemplates.Spec.storageClassName to be defined",
+			paramsIn: []parameter{
+				{
+					field:          []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "StorageClassName"},
+					fieldType:      "string",
+					fieldValue:     "unavailableStorageClass",
+					fieldIsPointer: true,
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.volumeClaimTemplates[0].Spec.storageClassName in body should be unique"},
+		},
 		{
 			name: "Create PVC cluster with unavailable default volume claim in pod spec",
 			paramsIn: []parameter{
@@ -537,6 +873,45 @@ func TestNegValidationCreate(t *testing.T) {
 			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{"\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required"},
+		},
+		{
+			name: "Validate spec.servers.pod.volumeMounts.properties.data values to be defined",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DataClaim"},
+					fieldType:  "string",
+					fieldValue: "invalidClaim",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"\"invalidClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
+		},
+		{
+			name: "Validate spec.servers.pod.volumeMounts.properties.default values to be defined",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DefaultClaim"},
+					fieldType:  "string",
+					fieldValue: "invalidClaim",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"\"invalidClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
+		},
+		{
+			name: "Validate spec.servers.pod.volumeMounts.properties.index values to be defined",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "IndexClaim"},
+					fieldType:  "string",
+					fieldValue: "invalidClaim",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"\"invalidClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
 		},
 	}
 	kubeName := "BasicCluster"
@@ -1057,6 +1432,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 	}
 	f := framework.Global
 	testDefs := []testDef{
+		// Bucket spec updation
 		{
 			name: "ephemeral bucket with seqno conflict resolution",
 			paramsIn: []parameter{
@@ -1070,7 +1446,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets[4].conflictResolution in body cannot be updated"},
 		},
-
 		{
 			name: "memcached bucket with seqno conflict resolution",
 			paramsIn: []parameter{
@@ -1084,7 +1459,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets[2].conflictResolution in body cannot be updated"},
 		},
-
 		{
 			name: "couchbase bucket with invalid conflict resolution",
 			paramsIn: []parameter{
@@ -1097,6 +1471,101 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets[0].conflictResolution in body cannot be updated"},
+		},
+		{
+			name: "Update spec.buckets.type value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "Type"},
+					fieldType:  "string",
+					fieldValue: "memcached",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.buckets[0].type in body cannot be updated"},
+		},
+		{
+			name: "Update spec.buckets.conflictResolution value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "BucketSettings", "0", "ConflictResolution"},
+					fieldType:  "string",
+					fieldValue: "lww",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.buckets[0].conflictResolution in body cannot be updated"},
+		},
+
+		// ServerSettings service update
+		{
+			name: "Update spec.servers.services list",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"data\", \"index\", \"search\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[0].services in body cannot be updated"},
+		},
+		{
+			name: "Update spec.serverSettings.services values for uniqueness",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"data\", \"data\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[0].services in body cannot be updated"},
+		},
+
+		// Cluster spec updation
+		{
+			name: "Update server version string",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "Version"},
+					fieldType:  "string",
+					fieldValue: "6.0.0-beta",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.version in body cannot be updated"},
+		},
+		{
+			name: "Update AntiAffinity settings",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "AntiAffinity"},
+					fieldType:  "bool",
+					fieldValue: "true",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.antiAffinity in body cannot be updated"},
+		},
+		{
+			name: "Update AuthSecret value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "AuthSecret"},
+					fieldType:  "string",
+					fieldValue: "auth-secret-update",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.authSecret in body cannot be updated"},
 		},
 		{
 			name: "change index storage mode",
@@ -1112,9 +1581,76 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			expectedMessages: []string{"spec.cluster.indexStorageSetting in body cannot be updated"},
 		},
 
-		// Persistent volume claim cases
+		// Server groups updation
 		{
-			name:     "Apply: Persistent volume mounts spec",
+			name: "Update server groups value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerGroups"},
+					fieldType:  "array",
+					fieldValue: "[\"NewGroupUpdate-1\", \"NewGroupUpdate-2\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.serverGroups in body cannot be updated"},
+		},
+		{
+			name: "Update spec.servers.serverGroups list",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "2", "ServerGroups"},
+					fieldType:  "array",
+					fieldValue: "[\"us-east-1a\", \"us-east-1b\", \"us-east-1c\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[2].serverGroups in body cannot be updated"},
+		},
+
+		// Persistent volume spec updation
+		{
+			name: "Update spec.servers.pod.volumeMounts.properties.data value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "Data"},
+					fieldType:  "string",
+					fieldValue: "newVolumeMount",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[1].pod.volumeMounts.properties.data in body cannot be updated"},
+		},
+		{
+			name: "Update spec.servers.pod.volumeMounts.properties.default value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "Default"},
+					fieldType:  "string",
+					fieldValue: "newVolumeMount",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[1].pod.volumeMounts.properties.default in body cannot be updated"},
+		},
+		{
+			name: "Update spec.servers.pod.volumeMounts.properties.index value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "Index"},
+					fieldType:  "string",
+					fieldValue: "newVolumeMount",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[1].pod.volumeMounts.properties.index in body cannot be updated"},
+		},
+		{
+			name:     "Update persistent volume mounts spec",
 			paramsIn: []parameter{},
 			paramsOut: []parameter{
 				{
@@ -1139,13 +1675,38 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.servers[*].Pod.VolumeMounts in body cannot be updated\nspec.servers[*].Pod.VolumeMounts in body cannot be updated"},
 		},
+		{
+			name: "Update spec.volumeClaimTemplates.spec.resources.requests.storage value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "Resources", "Requests"},
+					fieldType:  "apiresource.Quantity",
+					fieldValue: "10",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"\"storage\" in spec.volumeClaimTemplates[*].resources.requests cannot be updated"},
+		},
+		{
+			name: "Update spec.volumeClaimTemplates.spec.resources.limits.storage value",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "Resources", "Limits"},
+					fieldType:  "apiresource.Quantity",
+					fieldValue: "6",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"\"storage\" in spec.volumeClaimTemplates[*].resources.limits cannot be updated"},
+		},
 	}
 	kubeName := "BasicCluster"
 	runValidationTest(t, f, testDefs, kubeName, "apply")
 }
 
 //cbopctl delete tests
-
 func TestValidationDelete(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
