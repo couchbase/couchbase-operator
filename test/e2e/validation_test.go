@@ -1644,53 +1644,53 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name: "Update spec.servers.pod.volumeMounts.properties.data value",
 			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "Data"},
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DataClaim"},
 					fieldType:  "string",
 					fieldValue: "newVolumeMount",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.servers[1].pod.volumeMounts.properties.data in body cannot be updated"},
+			expectedMessages: []string{"data in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
 			name: "Update spec.servers.pod.volumeMounts.properties.default value",
 			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "Default"},
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DefaultClaim"},
 					fieldType:  "string",
 					fieldValue: "newVolumeMount",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.servers[1].pod.volumeMounts.properties.default in body cannot be updated"},
+			expectedMessages: []string{"default in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
 			name: "Update spec.servers.pod.volumeMounts.properties.index value",
 			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "Index"},
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "IndexClaim"},
 					fieldType:  "string",
 					fieldValue: "newVolumeMount",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.servers[1].pod.volumeMounts.properties.index in body cannot be updated"},
+			expectedMessages: []string{"index in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:     "Update persistent volume mounts spec",
-			paramsIn: []parameter{},
-			paramsOut: []parameter{
+			name: "Update spec.servers.pod.volumeMounts.properties.analytics value",
+			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DefaultClaim"},
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "AnalyticsClaims", "0"},
 					fieldType:  "string",
-					fieldValue: "newValue",
+					fieldValue: "newVolumeMount",
 				},
 			},
+			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.servers[*].Pod.VolumeMounts in body cannot be updated"},
+			expectedMessages: []string{"analytics in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
 			name:     "Apply: Remove default volume claim template name",
