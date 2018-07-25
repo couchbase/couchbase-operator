@@ -74,8 +74,8 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 	podDir := namespaceDir + "/pod"
 	secretDir := namespaceDir + "/secret"
 	serviceDir := namespaceDir + "/service"
-	pvDir := namespaceDir + "/persistentvolumes"
-	pvcDir := namespaceDir + "/persistentvolumeclaims"
+	pvDir := cbopinfoLogDir + "/persistentvolume"
+	pvcDir := namespaceDir + "/persistentvolumeclaim"
 
 	// clusterrole dir contents
 	clusterRoles, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
