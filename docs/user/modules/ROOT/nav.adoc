@@ -30,6 +30,7 @@
 * xref:updating-couchbase.adoc[Updating a Couchbase Deployment]
 * xref:upgrading-couchbase.adoc[Upgrading Couchbase Deployment]
 * xref:delete-couchbase-cluster.adoc[Deleting a Couchbase Deployment]
+* xref:backup-and-restore.adoc[Backing up and Restoring a Couchbase Deployment]
 * Troubleshooting
  ** xref:logs-troubleshooting.adoc[Logs]
  ** xref:conditions-and-events.adoc[Conditions and Events]
