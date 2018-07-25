@@ -23,6 +23,16 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// Returns KubeConfig file path to use for testing
+func getKubeConfigToUse(kubeName string) string {
+	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	// If cluster specific file doesn't exists, point to default file
+	if _, err := os.Stat(kubeConfPath); os.IsNotExist(err) {
+		kubeConfPath = os.Getenv("HOME") + "/.kube/config"
+	}
+	return kubeConfPath
+}
+
 // Function to cross check log dir contents against populated file list
 func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *failureList) error {
 	for _, reqFile := range reqFileList {
@@ -339,18 +349,13 @@ func createClusterRoles(kubeClient kubernetes.Interface, roleName string) error 
 func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
-	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	targetKube := f.ClusterSpec[kubeName]
+	kubeConfPath := getKubeConfigToUse(kubeName)
 	errMsgList := failureList{}
-
-	// If cluster specific file doesn't exists, point to default file
-	if _, err := os.Stat(kubeConfPath); os.IsNotExist(err) {
-		kubeConfPath = os.Getenv("HOME") + "/.kube/config"
-	}
 
 	// Validate args which won't produce output file
 	for _, arg := range []string{"-help", "-version"} {
-		_, err := runCbopinfoCmd([]string{arg})
-		if err != nil {
+		if _, err := runCbopinfoCmd([]string{arg}); err != nil {
 			errMsgList.AppendFailure("Failed while providing arg "+arg, err)
 		}
 	}
@@ -386,9 +391,53 @@ func TestLogCollectValidateArguments(t *testing.T) {
 		},
 	}
 
+	// Following should fail since no cb cluster exists
 	for _, arg := range validArgumentList {
 		t.Log(arg.Name)
-		cmdArgs := []string{arg.Arg}
+		cmdArgs := []string{}
+
+		// If arg is '-namespace', verify with namespace arg only
+		if arg.Arg == "-namespace" {
+			cmdArgs = []string{arg.Arg}
+		} else {
+			cmdArgs = []string{"-namespace", f.Namespace, arg.Arg}
+		}
+		if arg.ArgValue != "" {
+			cmdArgs = append(cmdArgs, arg.ArgValue)
+		}
+
+		execOut, err := runCbopinfoCmd(cmdArgs)
+		if err == nil {
+			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Command executed without error without cb cluster"))
+		} else {
+			execOutStr := strings.TrimSpace(string(execOut))
+			if execOutStr != "no CouchbaseCluster resources discovered in name space "+f.Namespace {
+				errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Invalid error message"))
+			}
+
+		}
+		if logFileName := getLogFileNameFromExecOutput(execOut); logFileName != "" {
+			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Logs generated without cb cluster deployed"))
+			defer os.Remove(logFileName)
+		}
+	}
+
+	// Deploy cb server for cbopinfo validation
+	if _, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden); err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+
+	for _, arg := range validArgumentList {
+		t.Log(arg.Name)
+		cmdArgs := []string{}
+
+		// If arg is '-namespace', verify with namespace arg only
+		if arg.Arg == "-namespace" {
+			cmdArgs = []string{arg.Arg}
+		} else {
+			cmdArgs = []string{"-namespace", f.Namespace, arg.Arg}
+		}
 		if arg.ArgValue != "" {
 			cmdArgs = append(cmdArgs, arg.ArgValue)
 		}
@@ -432,8 +481,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 // Negative test scenarios with command argument
 func TestNegLogCollectValidateArgs(t *testing.T) {
-	invalidKubeConfPath := os.Getenv("HOME") + "/.kube/config_k8s_reclustered"
-	unreachableKubeConfPath := os.Getenv("HOME") + "/.kube/config_k8s_unreachable"
+	invalidKubeConfPath := getKubeConfigToUse("k8s_reclustered")
+	unreachableKubeConfPath := getKubeConfigToUse("k8s_unreachable")
 	errMsgList := failureList{}
 
 	validArgumentList := []cbopinfoArg{
@@ -513,7 +562,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	kubeConfPath := getKubeConfigToUse(kubeName)
 
 	/////////////////////////////////////////////////////
 	// Log collection using '-namespace' & cluster arg //
@@ -722,7 +771,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 	svcAccName := "rbac-test"
-	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	kubeConfPath := getKubeConfigToUse(kubeName)
 
 	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
@@ -805,7 +854,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	kubeConfPath := getKubeConfigToUse(kubeName)
 
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
