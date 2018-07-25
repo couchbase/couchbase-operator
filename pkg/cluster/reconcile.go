@@ -256,23 +256,10 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 		return err
 	}
 
-	// If something stopped a rebalance we must return an error condition to
-	// prevent the reconcile loop/upgrade from deleting any managed nodes or
-	// this will result in data loss or a terminal cluster condition
-	for name, _ := range managed {
-		if !status.NodeInState(name, couchbaseutil.NodeStateUnclustered) {
-			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-			return fmt.Errorf("node %s is still in the cluster", name)
-		}
-	}
-
-	// Conversely check that everything is in that should be.  This ensures we
-	// don't report a balanced state if a node died before it was balanced in
-	for name, _ := range c.members.Diff(managed) {
-		if !status.NodeInState(name, couchbaseutil.NodeStateActive) {
-			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-			return fmt.Errorf("node %s is not in the cluster", name)
-		}
+	// Check that Couchbase server is happy with the state
+	if status.NeedsRebalance {
+		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
+		return fmt.Errorf("cluster reports rebalance incomplete")
 	}
 
 	// Notify if we've removed some nodes (deterministically sorted)

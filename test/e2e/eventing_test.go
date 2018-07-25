@@ -72,15 +72,15 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucket1["bucketName"])
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "analytics")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "data")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "eventing")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, bucket1["bucketName"])
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucket2["bucketName"])
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucket3["bucketName"])
 
@@ -148,17 +148,17 @@ func TestEventingResizeCluster(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket1"]["bucketName"])
-	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket2"]["bucketName"])
-	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket3"]["bucketName"])
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "analytics")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "data")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "eventing")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket1"]["bucketName"])
+	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket2"]["bucketName"])
+	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket3"]["bucketName"])
 
 	// Creates the client with exposed admin port
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
@@ -189,24 +189,36 @@ func TestEventingResizeCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Cross check number of docs inserted reflected in eventing
+	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
+	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
+	}
+
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan bool)
+	dataInsertionError := make(chan error)
 	dataInsertionFunc := func(t *testing.T) {
+		// Return an error here, don't call Fatal() as this will trigger a race condition
+		var err error
+	OuterLoop:
 		for {
 			select {
 			case <-stopDataInsertion:
-				break
+				break OuterLoop
 			default:
 				numOfDocs++
-				if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err != nil {
-					t.Fatal(err)
+				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err != nil {
+					break OuterLoop
 				}
 			}
 		}
+		dataInsertionError <- err
 	}
 	go dataInsertionFunc(t)
 
-	eventingClusterSizes := []int{2, 7, 4}
+	// Don't scale this too high or it will pwn your laptop and the cluster will go unresponsive
+	eventingClusterSizes := []int{2, 4, 3}
 	prevClusterSize := clusterSize
 	memberToBeAdded := clusterSize
 	for _, eventingNodes = range eventingClusterSizes {
@@ -227,7 +239,7 @@ func TestEventingResizeCluster(t *testing.T) {
 
 		// Resize cluster and wait for healthy cluster
 		service := 1
-		if err := e2eutil.ResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+		if err := e2eutil.ResizeClusterNoWait(t, service, eventingNodes, targetKube.CRClient, testCouchbase); err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
@@ -264,10 +276,14 @@ func TestEventingResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+
+	// Stop the insertion and wait for it to exit, checking for any errors encountered
 	stopDataInsertion <- true
+	if err = <-dataInsertionError; err != nil {
+		t.Fatal(err)
+	}
 
 	// Cross check number of docs inserted reflected in eventing
-	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
@@ -302,17 +318,17 @@ func TestEventingKillEventingPods(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket1"]["bucketName"])
-	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket2"]["bucketName"])
-	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket3"]["bucketName"])
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "analytics")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "data")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "eventing")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket1"]["bucketName"])
+	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket2"]["bucketName"])
+	expectedEvents.AddBucketCreateEvent(testCouchbase, configMap["bucket3"]["bucketName"])
 
 	// Creates the client with exposed admin port
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
