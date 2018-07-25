@@ -83,6 +83,6 @@ func GetClusterCRD(crClient versioned.Interface, cl *api.CouchbaseCluster) (*api
 }
 
 // NameLabelSelector returns a label selector of the form name=<name>
-func NameLabelSelector(name string) map[string]string {
-	return map[string]string{"name": name}
+func NameLabelSelector(label, name string) map[string]string {
+	return map[string]string{label: name}
 }

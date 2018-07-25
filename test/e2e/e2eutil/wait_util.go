@@ -317,7 +317,7 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int
 func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string) error {
 	var podName string
 	lo := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(NameLabelSelector(name)).String(),
+		LabelSelector: labels.SelectorFromSet(NameLabelSelector("app", name)).String(),
 	}
 	err := retryutil.Retry(Context, time.Second, 180, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
@@ -340,7 +340,7 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string
 
 func WaitUntilOperatorDeleted(kubecli kubernetes.Interface, namespace, name string) error {
 	lo := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(NameLabelSelector(name)).String(),
+		LabelSelector: labels.SelectorFromSet(NameLabelSelector("app", name)).String(),
 	}
 	err := retryutil.Retry(Context, 10*time.Second, 6, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
