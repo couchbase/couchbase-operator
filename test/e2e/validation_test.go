@@ -326,8 +326,6 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 			continue
 		}
 
-		clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
-
 		if test.shouldWarn {
 			if !strings.Contains(string(cmdOut), test.expectedWarn) || test.expectedWarn == "" {
 				t.Logf("expected warning: %+v \n returned message: %+v \n", test.expectedWarn, string(cmdOut))
@@ -343,6 +341,8 @@ func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef,
 				continue
 			}
 		}
+
+		clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 		if test.shouldFail {
 			if command == "delete" || command == "apply" {
 				if len(clusters.Items) != 1 {
@@ -1508,8 +1508,10 @@ func TestNegValidationImmutableApply(t *testing.T) {
 				},
 			},
 			paramsOut:        []parameter{},
-			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets[0].ioPriority in body cannot be updated"},
+			shouldFail:       false,
+			shouldWarn:       true,
+			expectedWarn:     "Warning: Changing the IO Priority will cause the bucket default1 to be temporarily unavailable",
+			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
 		},
 		{
 			name: "Update spec.buckets.evictionPolicy value",
@@ -1521,8 +1523,10 @@ func TestNegValidationImmutableApply(t *testing.T) {
 				},
 			},
 			paramsOut:        []parameter{},
-			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets[0].evictionPolicy in body cannot be updated"},
+			shouldFail:       false,
+			shouldWarn:       true,
+			expectedWarn:     "Warning: Changing the Eviction Policy will cause the bucket default1 to be temporarily unavailable",
+			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
 		},
 
 		// ServerSettings service update
