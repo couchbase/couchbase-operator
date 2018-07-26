@@ -166,31 +166,15 @@ done
 echo "----------- Logs from testrunner pod '$testrunnerPodName' -----------"
 kubectl --namespace=$KUBENAMESPACE logs --follow=true $testrunnerPodName &
 
- # Wait for testrunner job to complete
+# Wait for testrunner job to complete
 while true
 do
     currTestrunnerPod=$(kubectl --namespace=$KUBENAMESPACE get -l job-name=sdk-sanity pods | tail -1 | awk '{print $1}')
     if [ "$currTestrunnerPod" != "$testrunnerPodName" ] ; then
-        echo "@@@@ Testrunner pod '$testrunnerPodName' replaced with new pod '$currTestrunnerPod' @@@@"
+        echo "job pod failed"
         kill %1
-        kubectl --namespace=$KUBENAMESPACE delete pod $testrunnerPodName
-        testrunnerPodName=$currTestrunnerPod
-        echo "Initializing pod '$testrunnerPodName'"
-        for i in {1..300}
-        do
-            podRunning=$(kubectl --namespace=$KUBENAMESPACE describe pod $testrunnerPodName | grep "State:" | grep "Running" | wc -l | xargs )
-            if [ $podRunning -eq 1 ] ; then
-                break
-            fi
-            sleep 1
-        done
-
-        if [ $podRunning -ne 1 ] ; then
-            exitOnError 1 "Pod '$1' not started running even after 5mins"
-        fi
-        unset podRunning
-        echo "----------- Logs from new sdk pod '$testrunnerPodName' -----------"
-        kubectl --namespace=$KUBENAMESPACE logs --follow=true $testrunnerPodName &
+        kubectl delete job --all --namespace=$KUBENAMESPACE
+        break
     fi
 
     isJobCompleted=$(kubectl --namespace=$KUBENAMESPACE logs $testrunnerPodName --tail=10 | grep "sdk: command completed" | wc -l)
@@ -199,7 +183,7 @@ do
         break
     fi
     sleep 10
-done
+
 
 echo "################################# End of test using '$cbServerVersionsToRun' ################################"
 echo ""

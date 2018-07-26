@@ -75,7 +75,7 @@ testrunnerTarFileName="testrunnerDockerImage.tar"
 rm -f $testrunnerTarFileName
 echo "Creating docker image tar file '$testrunnerTarFileName'"
 docker save -o $testrunnerTarFileName $testRunnerDockerImageName
-exitOnError $? "Unable to create tar of testrunner 4node docker image"
+exitOnError $? "Unable to create tar of testrunner node docker image"
 
 for nodeIp in $cloudClusterNodeIpList
 do
@@ -171,26 +171,10 @@ while true
 do
     currTestrunnerPod=$(kubectl --namespace=$KUBENAMESPACE get -l job-name=testrunner-4node-sanity pods | tail -1 | awk '{print $1}')
     if [ "$currTestrunnerPod" != "$testrunnerPodName" ] ; then
-        echo "@@@@ Testrunner pod '$testrunnerPodName' replaced with new pod '$currTestrunnerPod' @@@@"
+        echo "job pod failed"
         kill %1
-        kubectl --namespace=$KUBENAMESPACE delete pod $testrunnerPodName
-        testrunnerPodName=$currTestrunnerPod
-        echo "Initializing pod '$testrunnerPodName'"
-        for i in {1..300}
-        do
-            podRunning=$(kubectl --namespace=$KUBENAMESPACE describe pod $testrunnerPodName | grep "State:" | grep "Running" | wc -l | xargs )
-            if [ $podRunning -eq 1 ] ; then
-                break
-            fi
-            sleep 1
-        done
-
-        if [ $podRunning -ne 1 ] ; then
-            exitOnError 1 "Pod '$1' not started running even after 5mins"
-        fi
-        unset podRunning
-        echo "----------- Logs from new testrunner pod '$testrunnerPodName' -----------"
-        kubectl --namespace=$KUBENAMESPACE logs --follow=true $testrunnerPodName &
+        kubectl delete job --all --namespace=$KUBENAMESPACE
+        break
     fi
 
     isJobCompleted=$(kubectl --namespace=$KUBENAMESPACE logs $testrunnerPodName --tail=10 | grep "Testrunner: command completed" | wc -l)
