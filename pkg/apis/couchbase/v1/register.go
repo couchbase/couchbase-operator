@@ -11,15 +11,15 @@ import (
 const (
 	CRDResourceKind   = "CouchbaseCluster"
 	CRDResourcePlural = "couchbaseclusters"
-	groupName         = "couchbase.com"
+	GroupName         = "couchbase.com"
 )
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
 
-	SchemeGroupVersion = schema.GroupVersion{Group: groupName, Version: "v1"}
-	CRDName            = CRDResourcePlural + "." + groupName
+	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
+	CRDName            = CRDResourcePlural + "." + GroupName
 )
 
 func init() {
@@ -38,7 +38,7 @@ func addKnownTypes(s *runtime.Scheme) error {
 
 func Resource(resource string) schema.GroupResource {
 	return schema.GroupResource{
-		Group:    groupName,
+		Group:    GroupName,
 		Resource: CRDResourceKind,
 	}
 }

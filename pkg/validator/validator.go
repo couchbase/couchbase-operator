@@ -56,9 +56,9 @@ func BoundedErrorUint(name, in string, value, min, max uint64) error {
 }
 
 func Create(resource *api.CouchbaseCluster) error {
-	applyDefaults(resource)
+	ApplyDefaults(resource)
 
-	if err := checkConstraints(resource); err != nil {
+	if err := CheckConstraints(resource); err != nil {
 		return err
 	}
 
@@ -66,14 +66,14 @@ func Create(resource *api.CouchbaseCluster) error {
 }
 
 func Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
-	applyDefaults(updated)
+	ApplyDefaults(updated)
 
-	err, warn := checkImmutableFields(current, updated)
+	err, warn := CheckImmutableFields(current, updated)
 	if err != nil {
 		return err, warn
 	}
 
-	if err := checkConstraints(updated); err != nil {
+	if err := CheckConstraints(updated); err != nil {
 		return err, warn
 	}
 
@@ -81,7 +81,7 @@ func Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
 	return nil, warn
 }
 
-func applyDefaults(customResource *api.CouchbaseCluster) {
+func ApplyDefaults(customResource *api.CouchbaseCluster) {
 	if customResource.Spec.BaseImage == "" {
 		customResource.Spec.BaseImage = DefaultBaseImage
 	}
@@ -139,7 +139,7 @@ func uniqueString(strList []string) bool {
 	return len(set) == len(strList)
 }
 
-func checkConstraints(customResource *api.CouchbaseCluster) error {
+func CheckConstraints(customResource *api.CouchbaseCluster) error {
 	// Custom validation
 	errs := []error{}
 
@@ -438,7 +438,7 @@ func (e *UpdateError) Error() string {
 	return fmt.Sprintf("%s in %s cannot be updated", e.field, e.in)
 }
 
-func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warning) {
+func CheckImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warning) {
 	warns := []Warning{}
 	errs := []error{}
 

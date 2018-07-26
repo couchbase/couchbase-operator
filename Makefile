@@ -27,6 +27,7 @@ $(BINARY): $(SOURCE)
 	./scripts/codegen/revision
 	./scripts/codegen/update-generated.sh
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator-admission ./cmd/admission
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopctl ./cmd/cbopctl/
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/crdgen ./cmd/crdgen/
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopinfo ./cmd/cbopinfo
@@ -40,6 +41,7 @@ $(BINARY): $(SOURCE)
 # can't be here anyway.
 container: build
 	docker build -f Dockerfile -t couchbase/couchbase-operator:v1 .
+	docker build -f Dockerfile.admission -t couchbase/couchbase-operator-admission:v1 .
 
 # NOTE: This target is only for local development. While we use this Dockerfile
 # (for now), the actual "docker build" command is located in the Jenkins job
