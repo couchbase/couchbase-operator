@@ -1,6 +1,162 @@
-= Accessing Couchbase
+= Accessing the Couchbase Server User Interfaces
 
-After deploying Couchbase Server on Kubernetes or OpenShift, you can use the Kubernetes or OpenShift console or CLI to verify that the pods are all deployed and running. However, to develop, administer, or configure Couchbase, you need to access it using one of the following:
+When you deploy Couchbase Server with the Couchbase Autonomous Operator, you will use the Kubernetes or OpenShift interfaces to verify that the pods are all deployed and running. However, you will need to access the traditional Couchbase Server user interfaces in order to develop, administer, and configure Couchbase itself.
 
-* xref:admin-console-access.adoc[Couchbase Server Web Console]
-* xref:couchbase-cli-guide.adoc[Couchbase CLI]
+IMPORTANT: The Couchbase Server cluster is managed by the Operator according to the CouchbaseCluster configuration. Certain administration tasks, such as adding or removing nodes and buckets, will be reverted by the Operator.
+
+
+== Accessing the Couchbase Server Web Console
+
+To access the Couchbase Server Web Console, you must first enable it in the CouchbaseCluster configuration file. Do this by setting the `exposeAdminConsole` parameter to `true`:
+
+[source,yaml]
+----
+...
+kind: "CouchbaseCluster"
+...
+spec:
+  ...
+  exposeAdminConsole: true
+...
+----
+
+When this parameter is set to `true`, the Operator creates a Kubernetes `NodePort` service that exposes the Web Console on each of the nodes. To get the port that the service is exposing to the nodes, use the following command:
+
+On Kubernetes
+
+----
+kubectl describe cbc
+----
+
+On OpenShift
+
+----
+oc describe cbc
+----
+
+Output:
+
+[source,console]
+----
+...
+Status:
+  Admin Console Port:		30239
+  Admin Console Port SSL:	31628
+...
+----
+
+In this example, the Web Console is now available across all of the nodes in the cluster at `<node_ip>:30239`, where `<node_ip>` is the IP address of a Kubernetes node.
+
+The username and password for Couchbase Server on port 8091 are set in the `secret.yaml` file.
+
+NOTE: If at any time you want to remove access to the Web Console, set the `exposeAdminConsole` parameter to `false` in the CouchbaseCluster configuration file, or remove the parameter altogether.
+
+=== Accessing Specific Couchbase Services
+
+By default, the exposed port will forward to any of the pods in the cluster. To access the Web Console of a pod that is running a specific service, such as the search or query service, you need to specify which services to expose by using the `adminConsoleServices` parameter. For example, to expose only pods running the query service:
+
+[source,yaml]
+----
+...
+kind: "CouchbaseCluster"
+spec:
+  ...
+  exposeAdminConsole: true
+  adminConsoleServices:
+    - query
+...
+----
+
+=== Accessing Specific Couchbase Pods
+
+To directly access the Web Console of a specific pod, run the following command on the pod that you want to expose:
+
+On Kubernetes
+
+----
+kubectl port-forward cb-example-0000 8091:8091
+----
+
+On OpenShift
+
+----
+oc port-forward cb-example-0000 8091:8091
+----
+
+In this example, the Web Console that is running on the pod `cb-example-0000` is now available at `127.0.0.1:8091`. Note that you will not be able to access other nodes in the cluster as this command will only proxy through to the specified node.
+
+The username and password for Couchbase Server on port 8091 are set in the `secret.yaml` file.
+
+== Accessing the Couchbase CLI
+
+The Couchbase Server command-line tool, `couchbase-cli`, can be used to perform one-off administration tasks such as creating RBAC users and initiating `cbcollect_info` tasks.
+
+If the Web Console is exposed, you can use the CLI tool from any computer that can access the IP address of the Kubernetes cluster. Alternatively, `couchbase-cli` can be run as a Kubernetes job within the Kubernetes cluster.
+
+=== Using the Web Console Port
+
+Prerequisites:
+
+* Expose the Web Console using the CouchbaseCluster configuration file.
+* Download the couchbase-cli to your client machine:  https://github.com/couchbase/couchbase-cli
+
+Use the following command to retrieve the Web Console port:
+
+On Kubernetes
+
+[source,console]
+----
+kubectl describe cbc cb-example |  grep "Admin Console Port:"
+----
+
+On OpenShift
+
+[source,console]
+----
+oc describe cbc cb-example |  grep "Admin Console Port:"
+----
+
+Output:
+
+[source,console]
+----
+Admin Console Port:  32486
+----
+
+You can now use `couchbase-cli` to administer the cluster. For example, adding an RBAC user:
+
+[source,console]
+----
+./couchbase-cli user-manage -c 192.168.99.100:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
+----
+
+
+=== Using a Kubernetes Job
+
+The most secure way to use `couchbase-cli` in Kubernetes is to run it as a Kubernetes https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/[job]. This option allows you to hide the user name and password of the cluster by leveraging Kubernetes Secrets.
+
+A Couchbase `collect-logs-start` job has been provided as an example. After pushing it to Kubernetes, it creates a job called `collect-info` that uses the same secret that is provided in the CouchbaseCluster configuration.
+
+To create the `collect-info` job on Kubernetes:
+
+[source,console]
+----
+kubectl create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cli-collect-logs.yaml
+----
+
+To check the status on Kubernetes:
+----
+kubectl get job collect-info
+----
+
+To create the `collect-info` job on OpenShift:
+
+[source,console]
+----
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cli-collect-logs.yaml
+----
+
+To check the status on Kubernetes:
+----
+oc get job collect-info
+----

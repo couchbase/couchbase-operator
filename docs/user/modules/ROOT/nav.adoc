@@ -21,8 +21,6 @@
  ** xref:cluster-status-guide.adoc[Displaying Information About a Couchbase Cluster]
  ** xref:list-and-describe.adoc[Viewing the Pods/Services Created by a Couchbase Cluster]
 * xref:accessing-couchbase.adoc[Accessing Couchbase]
- ** xref:admin-console-access.adoc[Using the Couchbase Web Console]
- ** xref:couchbase-cli-guide.adoc[Using couchbase-cli]
  ** xref:couchbase-clients.adoc[Using Couchbase clients]
 * xref:running-couchbase.adoc[Running Couchbase on Kubernetes or OpenShift]
  ** xref:scaling-couchbase.adoc[Ad-hoc scale-up and scale-down]
