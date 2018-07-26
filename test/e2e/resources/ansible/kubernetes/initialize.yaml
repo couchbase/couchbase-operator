@@ -20,6 +20,10 @@
       shell: "'y' | docker system prune -a"
       ignore_errors: yes
 
+    - name: Wipe portworx from nodes
+      script: wipe-portworx.sh
+      ignore_errors: yes
+
     - name: Clear /opt
       shell: rm -rf /opt/
       ignore_errors: yes
