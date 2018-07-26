@@ -28,4 +28,4 @@ To create a Couchbase Cluster with Persistent Volumes, volumeMounts need to be a
 ** Portworx Volume
 ** Refer to documentation about https://kubernetes.io/docs/concepts/storage/storage-classes/#provisioner[Storage Provisioners] for more information about storage classes.
 * Configure storage classes based on service needs. For example, the AWS provisioner can produce EBS volumes of type 'io1' which are faster than 'gp2', so you may want to use faster storage for data service if write throughput will be high.
-* For deployments in clouds with multiple availability zones see xref:persistent-volume-zoning-guide.adoc[Persistent Volume Zoning Guide].
+* For deployments in clouds with multiple availability zones see xref:persisted-volumes-zoning-guide.adoc[Persistent Volume Zoning Guide].
