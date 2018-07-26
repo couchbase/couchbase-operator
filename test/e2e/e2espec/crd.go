@@ -62,6 +62,10 @@ var (
 	}
 )
 
+func GetCouchbaseDockerImgName() string {
+	return baseImage + ":" + version
+}
+
 func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 	generatedSettings := []api.BucketConfig{}
 	for _, bucketType := range bucketTypes {

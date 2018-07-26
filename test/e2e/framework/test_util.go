@@ -1,10 +1,8 @@
 package framework
 
 import (
-	"bytes"
 	"errors"
 	"io/ioutil"
-	"os/exec"
 	"strconv"
 	"testing"
 	"time"
@@ -16,6 +14,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"runtime/debug"
+)
+
+// Const Ansible setting string
+var (
+	ansibleLoginSectionData = map[string]string{
+		"ansible_connection":      "ssh",
+		"ansible_ssh_user":        "root",
+		"ansible_ssh_pass":        "couchbase",
+		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+	}
 )
 
 // TestFunc defines the test function type
@@ -66,6 +74,7 @@ type TestRunParam struct {
 	TestDuration       string         `yaml:"duration"`
 	SkipTearDown       bool           `yaml:"skip-tear-down"`
 	ClusterConfFile    string         `yaml:"cluster-config"`
+	PullDockerImages   bool           `yaml:"pullDockerImages"`
 }
 
 // To decode cluster yaml file
@@ -366,17 +375,38 @@ func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clu
 	return err
 }
 
-// Execute shell command and returns the stderr and stdout buffers
-func runExecCommand(t *testing.T, command *exec.Cmd) error {
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
+// Create ansibleHost file for the list of host provided
+func createAnsibleHostFileFromHosts(filePathToSave string, hostList []string) error {
+	loadOptions := ini.LoadOptions{}
+	loadOptions.Loose = true
 
-	if err := command.Run(); err != nil {
-		t.Log(stdout.String())
-		return errors.New("Error during ansible execution: " + stderr.String() + "\n" + err.Error())
+	newClusterConfig, err := ini.LoadSources(loadOptions, "")
+	if err != nil {
+		return errors.New("Unable to initialize cluster file: " + err.Error())
 	}
-	t.Log(stdout.String())
+
+	loginSectionForCluster, err := newClusterConfig.NewSection("all:vars")
+	if err != nil {
+		return errors.New("Error while creating new section 'all'")
+	}
+
+	nodesSection, err := newClusterConfig.NewSection("nodes")
+	if err != nil {
+		return errors.New("Error while creating new section 'nodes'")
+	}
+
+	for key, value := range ansibleLoginSectionData {
+		loginSectionForCluster.NewKey(key, value)
+	}
+
+	for _, host := range hostList {
+		nodesSection.NewKey(host, "")
+	}
+
+	err = newClusterConfig.SaveTo(filePathToSave)
+	if err != nil {
+		return errors.New("Unable to save playbook file: " + err.Error())
+	}
 	return nil
 }
 
@@ -386,12 +416,6 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 	loadOptions.UnparseableSections = []string{"master_node", "worker_node"}
 	loadOptions.Loose = true
 
-	loginSectionData := map[string]string{
-		"ansible_connection":      "ssh",
-		"ansible_ssh_user":        "root",
-		"ansible_ssh_pass":        "couchbase",
-		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
-	}
 	masterSectionData := ""
 	workerSectionData := ""
 
@@ -405,7 +429,7 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 		return errors.New("Error while creating new section 'all'")
 	}
 
-	for key, value := range loginSectionData {
+	for key, value := range ansibleLoginSectionData {
 		loginSectionForCluster.NewKey(key, value)
 	}
 
@@ -444,7 +468,6 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 	clusterHostFile := ymlFilePath + "/" + kubeClusterSpec.ClusterName
 	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yaml"
 	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yaml"
-	pullDockerImageFile := ymlFilePath + "/generic/pullDockerImage.yaml"
 
 	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
 	if err != nil {
@@ -456,19 +479,13 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 		t.Logf("Running ansible script for %s", kubeClusterSpec.ClusterName)
 
 		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
-		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam)
+		ansibleCmd := []string{"ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam}
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}
 
 		ansibleExtraVarParam = "kubeConfPathToSave=config_" + kubeClusterSpec.ClusterName
-		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "--extra-vars", ansibleExtraVarParam)
-		if err := runExecCommand(t, ansibleCmd); err != nil {
-			return err
-		}
-
-		ansibleExtraVarParam = "dockerImgName=" + reqOpImage
-		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, pullDockerImageFile, "--extra-vars", ansibleExtraVarParam)
+		ansibleCmd = []string{"ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "--extra-vars", ansibleExtraVarParam}
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}

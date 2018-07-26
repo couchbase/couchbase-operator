@@ -11,4 +11,5 @@
         dest: /root/.docker/config.json
 
     - name: Pull docker image
-      shell: "docker pull {{ dockerImgName }}"
+      shell: "docker pull {{ item }}"
+      with_items: "{{ dockerImgName.split(',') }}"

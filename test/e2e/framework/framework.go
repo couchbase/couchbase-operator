@@ -1,13 +1,16 @@
 package framework
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"io/ioutil"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,6 +55,7 @@ type Framework struct {
 	Duration        int
 	SuiteYmlData    SuiteData
 	ClusterConfFile string
+	PullDockerImage bool
 	//S3Cli         *s3.S3
 	//S3Bucket      string
 }
@@ -150,6 +154,7 @@ func Setup(t *testing.T) error {
 		ClusterSpec:     clusterSpecMap,
 		SuiteYmlData:    suiteData,
 		ClusterConfFile: runtimeParams.ClusterConfFile,
+		PullDockerImage: runtimeParams.PullDockerImages,
 	}
 	for kubeName, _ := range Global.ClusterSpec {
 		if err = Global.SetupFramework(kubeName); err != nil {
@@ -277,12 +282,12 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 	}
 
-	logrus.Info("deleteing jobs")
+	logrus.Info("deleting jobs")
 	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
 	for _, job := range jobs.Items {
 		targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
 	}
-	logrus.Info("deleteing deployments")
+	logrus.Info("deleting deployments")
 	deployments, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.New("Failed to list deployments: " + err.Error())
@@ -296,7 +301,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 	logrus.Info("deployments after delete: " + string(len(deployments.Items)))
 
-	logrus.Info("deleteing clusters")
+	logrus.Info("deleting clusters")
 	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 	for _, cluster := range clusters.Items {
 		targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
@@ -310,17 +315,17 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 		e2eutil.KillMembers(targetKube.KubeClient, Global.Namespace, cluster.Name, killPods...)
 	}
-	logrus.Info("deleteing services")
+	logrus.Info("deleting services")
 	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	for _, service := range services.Items {
 		targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
-	logrus.Info("deleteing orphaned pods")
+	logrus.Info("deleting orphaned pods")
 	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	for _, pod := range pods.Items {
 		targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}
-	logrus.Info("deleteing secrets")
+	logrus.Info("deleting secrets")
 	e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
 	// Creating required namespaces and cluster roles before deploying the operator
@@ -344,12 +349,55 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	if err = f.CreateSecretInKubeCluster(kubeName); err != nil {
 		return err
 	}
+
+	if Global.PullDockerImage {
+		dockerImgList := []string{f.opImage, e2espec.GetCouchbaseDockerImgName()}
+		if err = f.PullDockerImages(targetKube.KubeClient, kubeName, dockerImgList); err != nil {
+			return err
+		}
+	}
+
 	logrus.Info("setting up operator")
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
 		return errors.New("Failed to setup couchbase operator: " + err.Error())
 	}
 	logrus.Info("couchbase operator created successfully")
 	logrus.Info("e2e setup successfully")
+	return nil
+}
+
+func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName string, dockerImages []string) error {
+	yamlFilePath := "./resources/ansible"
+	pullDockerImageFile := yamlFilePath + "/generic/pullDockerImage.yaml"
+	inventoryFile := yamlFilePath + "DockerHosts"
+
+	logrus.Infof("Pulling docker images for %s", kubeName)
+	k8sNodes, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return errors.New("Failed to list K8S nodes for cluster " + kubeName + ": " + err.Error())
+	}
+	ansibleIpList := []string{}
+	for _, node := range k8sNodes.Items {
+		ansibleIpList = append(ansibleIpList, node.Status.Addresses[0].Address)
+	}
+
+	if err := createAnsibleHostFileFromHosts(inventoryFile, ansibleIpList); err != nil {
+		return err
+	}
+
+	ansibleExtraVarParam := "dockerImgName="
+	for _, imgName := range dockerImages {
+		ansibleExtraVarParam += imgName + ","
+	}
+	ansibleExtraVarParam = strings.TrimRight(ansibleExtraVarParam, ",")
+	ansibleCmd := exec.Command("ansible-playbook", "-i", inventoryFile, pullDockerImageFile, "--extra-vars", ansibleExtraVarParam)
+	var stdout bytes.Buffer
+	ansibleCmd.Stdout = &stdout
+
+	if err := ansibleCmd.Run(); err != nil {
+		logrus.Info(stdout.String())
+		return errors.New("Error during ansible execution: " + err.Error())
+	}
 	return nil
 }
 
@@ -429,6 +477,24 @@ func GenerateLogDir() (string, error) {
 	t := time.Now()
 	ts := t.Format(time.RFC3339)
 	return filepath.Join(cwd, "logs", ts), nil
+}
+
+// Execute shell command and returns the stderr and stdout buffers
+func runExecCommand(t *testing.T, command []string) error {
+	var stdout, stderr bytes.Buffer
+	cmdToRun := exec.Cmd{
+		Path:   command[0],
+		Args:   command[1:],
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	if err := cmdToRun.Run(); err != nil {
+		t.Log(stdout.String())
+		return errors.New("Error during ansible execution: " + stderr.String() + "\n" + err.Error())
+	}
+	t.Log(stdout.String())
+	return nil
 }
 
 /*
