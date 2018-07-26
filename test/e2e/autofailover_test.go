@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -82,45 +83,30 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	}
 
 	podMembersToKill := []int{2, 5, 8}
-	var podEventErrChan [3]chan error
-	for index := range podEventErrChan {
-		podEventErrChan[index] = make(chan error)
-	}
 
-	waitForMemberDownAndFailoverEvents := func(index, memberId int) {
-		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-			podEventErrChan[index] <- err
-			return
-		}
-
-		event = e2eutil.NewMemberFailedOverEvent(testCouchbase, memberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-			podEventErrChan[index] <- err
-			return
-		}
-		podEventErrChan[index] <- nil
-	}
+	memberDownEvents := []*corev1.Event{}
+	memberFailedOverEvents := []*corev1.Event{}
 
 	// Loop to kill the nodes
-	for memberIndex, podMemberToKill := range podMembersToKill {
+	for _, podMemberToKill := range podMembersToKill {
 		err = e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podMemberToKill)
 		if err != nil {
 			t.Fatal(err)
 		}
-		go waitForMemberDownAndFailoverEvents(memberIndex, podMemberToKill)
+		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberToKill)
+		memberDownEvents = append(memberDownEvents, e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
+		memberFailedOverEvents = append(memberFailedOverEvents, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
 	}
 
-	// Wait for failover to happen for all killed pods
-	for memberIndex, memberId := range podMembersToKill {
-		if err := <-podEventErrChan[memberIndex]; err != nil {
-			t.Fatal(err)
-		}
-		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
+	if err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30); err != nil {
+		t.Fatal(err)
 	}
 
-	for _, memberId := range podMembersToKill {
-		expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberId)
+	if err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60); err != nil {
+		t.Fatal(err)
+	}
+	for _, podMemberToKill := range podMembersToKill {
+		expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberToKill)
 	}
 
 	// Event check for new member add

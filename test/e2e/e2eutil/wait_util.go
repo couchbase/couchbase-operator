@@ -426,6 +426,26 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
+func WaitForClusterEventsInParallel(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, expectedEvents []*v1.Event, seconds int) error {
+	errs := make(chan error)
+	for _, event := range expectedEvents {
+		// Creates go routines for each event
+		go func(event *v1.Event) {
+			errs <- WaitForClusterEvent(kubeClient, cl, event, seconds)
+		}(event)
+	}
+
+	// Wait for events to complete
+	var eventErr error
+	for _, _ = range expectedEvents {
+		if err := <-errs; err != nil {
+			eventErr = err
+			break
+		}
+	}
+	return eventErr
+}
+
 func WaitForManagedConfigCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, status v1.ConditionStatus, wait int) error {
 	return WaitForClusterCondition(t, crClient, api.ClusterConditionBalanced, status, cl, time.Now(), wait)
 }
