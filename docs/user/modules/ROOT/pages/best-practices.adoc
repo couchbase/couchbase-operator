@@ -119,3 +119,57 @@ spec:
             sleep 60
           done
 ----
+
+
+== Ulimits
+
+These ulimit settings are necessary when running under heavy load. If you are just doing light testing and development, you can omit these settings, and everything will still work.
+
+The Couchbase Pod ulimits are inherited from the default ulimits set on the docker daemon running on each kubernetes node.  Configuration of this daemon varies according to the distributions service management system.
+
+=== Systemd
+
+Systemd compatible hosts can configure ulimits for the daemon by editing its service configuration file.  Run the following command to detect the location of the location of the configuration file:
+[source,console]
+----
+$ sudo systemctl cat docker
+# /lib/systemd/system/docker.service
+----
+
+Add the following values to the service file:
+[source,bash]
+----
+LimitNOFILE=40960
+LimitCORE=infinity
+LimitMEMLOCK=infinity
+----
+
+Reload the new configuration and restart the docker daemon:
+[source,console]
+----
+$ sudo systemctl daemon-reload
+$ sudo systemctl restart docker
+----
+
+
+=== Upstart
+
+Upstart compatible hosts can configure ulimits for the docker daemon by editing the `docker.conf` file:
+[source,console]
+----
+$ vi /etc/init/docker.conf
+----
+
+And the following values to the service configuration:
+[source,bash]
+----
+limit nofile 40960
+limit core unlimited unlimited
+limit memlock unlimited unlimited
+----
+
+Restart the docker service to apply ulimits to the daemon:
+[source,console]
+----
+$ sudo /etc/init.d/docker restart
+----
