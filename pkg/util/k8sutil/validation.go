@@ -129,8 +129,11 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 								"dataServiceMemoryQuota",
 								"indexServiceMemoryQuota",
 								"searchServiceMemoryQuota",
+								"eventingServiceMemoryQuota",
+								"analyticsServiceMemoryQuota",
 								"indexStorageSetting",
 								"autoFailoverTimeout",
+								"autoFailoverMaxCount",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"clusterName": apiextensionsv1beta1.JSONSchemaProps{

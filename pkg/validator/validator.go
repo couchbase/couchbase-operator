@@ -175,6 +175,14 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		}
 	}
 
+	// Check optional parameters
+	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssues && customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
+		// If we want to auto failover on disk issues, we must specify a time period.  CRD validation
+		// will catch where it is specified and out of bounds. We can catch the fact it is unspecified
+		// by checking for the zero value
+		errs = append(errs, errors.Required("spec.cluster.aautoFailoverOnDataDiskIssuesTimePeriod", "body"))
+	}
+
 	// Ensure buckets are named uniquely
 	bucketNames := []string{}
 	for _, bucket := range customResource.Spec.BucketSettings {
