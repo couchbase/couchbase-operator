@@ -480,16 +480,12 @@ func GenerateLogDir() (string, error) {
 }
 
 // Execute shell command and returns the stderr and stdout buffers
-func runExecCommand(t *testing.T, command []string) error {
+func runExecCommand(t *testing.T, command *exec.Cmd) error {
 	var stdout, stderr bytes.Buffer
-	cmdToRun := exec.Cmd{
-		Path:   command[0],
-		Args:   command[1:],
-		Stdout: &stdout,
-		Stderr: &stderr,
-	}
+	command.Stdout = &stdout
+	command.Stderr = &stderr
 
-	if err := cmdToRun.Run(); err != nil {
+	if err := command.Run(); err != nil {
 		t.Log(stdout.String())
 		return errors.New("Error during ansible execution: " + stderr.String() + "\n" + err.Error())
 	}
