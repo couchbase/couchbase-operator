@@ -8,7 +8,7 @@ kube-config:                    # List of Cluster KUBECONFIG to be used during t
   #- name: AuxillaryCluster1
   #  config: ~/.kube/config
 duration: 7                     # In days. Used for system tests
-pullDockerImages: true          # If true, operator and server images will be pulled to all k8s nodes
+pullDockerImages: false         # If true, operator and server images will be pulled to all k8s nodes
 skip-tear-down: true            # Leaves the operator running after tests
 suite: TestNone                 # Test suite to run. Same named yaml file should exists in resources/suites path
 kube-type: kubernetes           # Cluster type kubernetes | aws-openshift

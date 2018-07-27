@@ -111,6 +111,14 @@ tcGroups:
         decorators:
           - rzaNodeLabeller
 
+  - name: PersistentVolumeTests
+    clusters:
+      - BasicCluster
+    testcases:
+        - name: TestPersistentVolumeCreateCluster
+        - name: TestPersistentVolumeAutoFailover
+        - name: TestPersistentVolumeNodeFailover
+
   - name: FailoverTests
     clusters:
       - BasicCluster

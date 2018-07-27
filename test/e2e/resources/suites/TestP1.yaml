@@ -64,9 +64,17 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestTlsRemoveOperatorCertificateAndAddBack
+        decorators:
+          - rsaDecorator
       - name: TestTlsRemoveClusterCertificateAndAddBack
+        decorators:
+          - rsaDecorator
       - name: TestTlsRemoveOperatorCertificateAndResizeCluster
+        decorators:
+          - rsaDecorator
       - name: TestTlsRemoveClusterCertificateAndResizeCluster
+        decorators:
+          - rsaDecorator
       - name: TestTlsNegRSACertificateDnsName
       - name: TestTlsCertificateExpiry
       - name: TestTlsNegCertificateExpiredBeforeDeployment
@@ -113,9 +121,19 @@ tcGroups:
       - name: TestRzaUpdateK8SNodeLabelAndCrd
         decorators:
           - rzaNodeLabeller
-      - name: TestRzaUpdateK8SNodeLabelAndCrd
-        decorators:
-          - rzaNodeLabeller
+
+  - name: PersistentVolumeTests
+    clusters:
+      - BasicCluster
+    testcases:
+        - name: TestPersistentVolumeKillAllPods
+        - name: TestPersistestVolumeRemoveVolume
+        - name: TestPersistentVolumeKillPodAndOperator
+        - name: TestPersistentVolumeKillAllPodsAndOperator
+        - name: TestPersistentVolumeRzaNodesKilled
+        - name: TestPersistentVolumeRzaFailover
+        - name: TestPersistentVolumeWithSingleNodeService
+        - name: TestPersistentVolumeResizeCluster
 
   - name: AnalyticsTests
     clusters:
