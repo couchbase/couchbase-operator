@@ -230,14 +230,7 @@ func TestTlsCreateCluster(t *testing.T) {
 			t.Fatal("TLS verification failed:", err)
 		}
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v\n", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests scenario where a third node is being added to a cluster, and a separate
@@ -297,15 +290,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Create Couchbase cluster using certificates
@@ -363,15 +348,7 @@ func TestTlsResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
-
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Remove Operator certificate after cluster deployment
@@ -419,14 +396,23 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60)
+	event := e2eutil.NewMemberDownEvent(testCouchbase, podToKillMemberId)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 30); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
+
+	event = e2eutil.NewMemberFailedOverEvent(testCouchbase, podToKillMemberId)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 40); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
+
+	event = e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
+	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
 
 	// Recreating the operator certificate with old data
@@ -436,24 +422,22 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
+
 	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates
@@ -541,14 +525,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates
@@ -623,14 +600,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates
@@ -677,17 +647,9 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 360); err != nil {
 		t.Fatal("Failed to observe member fail addition")
 	}
-
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
 
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using invalid DNS name value in the certificate

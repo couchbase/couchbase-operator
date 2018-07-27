@@ -339,7 +339,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	targetKubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[targetKubeName]
 
-	clusterSizeWoAnalytics := 1
+	clusterSizeWoAnalytics := 3
 	clusterSizeOfAnalytics := 3
 	clusterSize := clusterSizeWoAnalytics + clusterSizeOfAnalytics + 1
 	numOfDocs := 50
@@ -486,14 +486,8 @@ func TestAnalyticsKillPods(t *testing.T) {
 			t.Fatalf("Mismatch in unhealthy nodes count: %v", err)
 		}
 
-		// Manual failover to recover the pod
-		member := &couchbaseutil.Member{
-			Name:         podMemberName,
-			Namespace:    f.Namespace,
-			ServerConfig: testCouchbase.Spec.ServerSettings[1].Name,
-			SecureClient: false,
-		}
-		if err := e2eutil.FailoverNode(t, client, e2eutil.Retries5, member.HostURL()); err != nil {
+		event = e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberId)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 40); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberId)

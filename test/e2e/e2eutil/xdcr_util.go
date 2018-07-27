@@ -112,7 +112,7 @@ func VerifyDocCountInBucket(url, bucketName, userName, password string, reqNumOf
 			docMatched = true
 			break
 		}
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 	}
 	if !docMatched {
 		return errors.New("Replication count did not match. Item count is " + strconv.Itoa(currDocCount) + " expecting " + strconv.Itoa(reqNumOfDocs))
