@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -132,7 +133,7 @@ func GetDeployedRzaMap(kubeClient kubernetes.Interface, namespace string) (map[s
 
 	deployedRzaGroupsMap := map[string]int{}
 	for _, cbPod := range couchbasePodList.Items {
-		currRzaGroup := cbPod.Spec.NodeSelector["server-group.couchbase.com/zone"]
+		currRzaGroup := cbPod.Spec.NodeSelector[constants.ServerGroupLabel]
 		if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {
 			deployedRzaGroupsMap[currRzaGroup]++
 		} else {
@@ -152,7 +153,7 @@ func GetDeployedRzaPodMap(kubeClient kubernetes.Interface, namespace string) (ma
 
 	deployedRzaGroupsMap := map[string]string{}
 	for _, cbPod := range couchbasePodList.Items {
-		deployedRzaGroupsMap[cbPod.Name] = cbPod.Spec.NodeSelector["server-group.couchbase.com/zone"]
+		deployedRzaGroupsMap[cbPod.Name] = cbPod.Spec.NodeSelector[constants.ServerGroupLabel]
 	}
 	return deployedRzaGroupsMap, err
 }
@@ -197,14 +198,14 @@ func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) 
 		for retryCount := 0; retryCount < 3; retryCount++ {
 			t.Logf("Retry node label update: %d", retryCount)
 			// Label K8S nodes based on the labels present in the cluster conf yaml file
-			if err = K8SNodesAddLabel("server-group.couchbase.com/zone", targetKube.KubeClient, k8sNodesData[0]); err == nil {
+			if err = K8SNodesAddLabel(constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0]); err == nil {
 				break
 			}
 		}
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer K8SNodesRemoveLabel("server-group.couchbase.com/zone", targetKube.KubeClient)
+		defer K8SNodesRemoveLabel(constants.ServerGroupLabel, targetKube.KubeClient)
 
 		testFunc(t)
 	}
@@ -365,7 +366,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	k8sNodeLabelUpdateFunc := func() {
 		// Rename node labels for particular server-group
 		// Node label get updated in both update / remove scenario
-		nodeUpdateErrChan <- UpdateServerGroupLabel("server-group.couchbase.com/zone", availableServerGroupList[0], "NewRzaGroup-1", targetKube.KubeClient)
+		nodeUpdateErrChan <- UpdateServerGroupLabel(constants.ServerGroupLabel, availableServerGroupList[0], "NewRzaGroup-1", targetKube.KubeClient)
 	}
 
 	if strings.Contains(editType, "InParallel") {
@@ -451,7 +452,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 
 		deployedRzaGroupsMap := map[string]int{}
 		for _, cbPod := range couchbasePodList.Items {
-			currRzaGroup := cbPod.Spec.NodeSelector["server-group.couchbase.com/zone"]
+			currRzaGroup := cbPod.Spec.NodeSelector[constants.ServerGroupLabel]
 			t.Log("Name: '" + cbPod.Name + "'")
 			t.Log("Curr group: '" + currRzaGroup + "'")
 			if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {
@@ -548,7 +549,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 
 		deployedRzaGroupsMap := map[string]int{}
 		for _, cbPod := range couchbasePodList.Items {
-			currRzaGroup := cbPod.Spec.NodeSelector["server-group.couchbase.com/zone"]
+			currRzaGroup := cbPod.Spec.NodeSelector[constants.ServerGroupLabel]
 			t.Log("Name: '" + cbPod.Name + "'")
 			t.Log("Curr group: '" + currRzaGroup + "'")
 			if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {

@@ -60,7 +60,7 @@ const (
 	LabelNode     = "couchbase_node"
 	LabelNodeConf = "couchbase_node_conf"
 
-	ServerGroupLabel = "server-group.couchbase.com/zone"
+	ServerGroupLabel = "failure-domain.beta.kubernetes.io/zone"
 )
 
 // Represents the Kubernetes version by its major and minor parts. The first

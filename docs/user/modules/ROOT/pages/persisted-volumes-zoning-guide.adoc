@@ -12,11 +12,11 @@ The following steps are required when deploying on a cloud spanning multiple ava
 [[nodelabels]]
 == Label Nodes
 
-Kubernetes nodes must be labeled according to the zones they are physically located so that we can be sure Persistent Volumes are also provisioned into the same zone as the node.  The key `server-group.couchbase.com/zone` must be used when creating the label.  For example, to label a node in ec2 within zone 'us-east-1a':
+Kubernetes nodes must be labeled according to the zones they are physically located so that we can be sure Persistent Volumes are also provisioned into the same zone as the node.  The key `failure-domain.beta.kubernetes.io/zone` must be used when creating the label.  For example, to label a node in ec2 within zone 'us-east-1a':
 
 [source,console]
 ----
-kubectl label nodes ip-172-16-0-10 server-group.couchbase.com/zone=us-east-1a
+kubectl label nodes ip-172-16-0-10 failure-domain.beta.kubernetes.io/zone=us-east-1a
 ----
 
 For more information about Labeling nodes, see xref:server-groups.adoc[Server Groups] Guide.
