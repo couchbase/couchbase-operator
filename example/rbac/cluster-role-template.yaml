@@ -28,11 +28,17 @@ rules:
   - services
   - endpoints
   - persistentvolumeclaims
-  - persistentvolumes
   - events
   - secrets
   verbs:
   - "*"
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - "get"
+  - "watch"
 - apiGroups:
   - apps
   resources:
