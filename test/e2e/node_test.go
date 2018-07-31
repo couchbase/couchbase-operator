@@ -294,10 +294,11 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
+	clusterSize := e2eutil.Size1
 	podToKillMemberId := 1
 
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,22 +308,23 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
+	clusterSize = e2eutil.Size3
+
 	// async scale up to 3 node cluster
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, e2eutil.Size3, targetKube.CRClient, testCouchbase)
+		echan <- e2eutil.ResizeCluster(t, 0, clusterSize, targetKube.CRClient, testCouchbase)
 	}()
 
-	// wait for add member event
-	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
-		t.Fatal(err)
+	for memberId := 1; memberId < clusterSize; memberId++ {
+		// wait for add member event
+		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
-	for nodeIndex := 1; nodeIndex < e2eutil.Size3; nodeIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
-	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
@@ -340,7 +342,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	}
 
 	// wait for add member event
-	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
+	event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
 	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
 	if err != nil {
 		t.Fatal(err)
@@ -583,7 +585,6 @@ func TestRemoveForeignNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
@@ -628,8 +629,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 	defer e2eutil.KillMember(targetKube.KubeClient, f.Namespace, testCouchbase.Name, foreignNodeName)
 
-	err = e2eutil.AddNode(t, client, serverConfig.Services, username, password, m.ClientURLPlaintext())
-	if err != nil {
+	if err := e2eutil.AddNode(t, client, serverConfig.Services, username, password, m.ClientURLPlaintext()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -654,15 +654,10 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	// resize to 2 member cluster
-	err = e2eutil.ResizeCluster(t, 0, e2eutil.Size2, targetKube.CRClient, testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	// wait rebalance event
-	event := k8sutil.RebalanceStartedEvent(testCouchbase)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := e2eutil.ResizeCluster(t, 0, e2eutil.Size2, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 
 	// check that actual cluster size is only 2 nodes
 	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries20); err != nil {
@@ -684,15 +679,7 @@ func TestRemoveForeignNode(t *testing.T) {
 			t.Fatalf("node %s is not healthy, status: %s", node.HostName, node.Status)
 		}
 	}
-
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests one node failing in a cluster with no buckets

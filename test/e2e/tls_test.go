@@ -648,7 +648,6 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 		t.Fatal("Failed to observe member fail addition")
 	}
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
-
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -717,6 +716,13 @@ func TestTlsCertificateExpiry(t *testing.T) {
 		}
 		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
+		expectedEvents := e2eutil.EventList{}
+		for memberId := 0; memberId < e2eutil.Size3; memberId++ {
+			expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+		}
+		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
 		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 		if err != nil {
 			t.Fatal(err)
@@ -737,20 +743,23 @@ func TestTlsCertificateExpiry(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 
-		service := 0
-		err = e2eutil.ResizeCluster(t, service, e2eutil.Size4, targetKube.CRClient, testCouchbase)
-		if err != nil {
-			t.Fatalf("Resize cluster failed: %v\n", err)
-		}
+		go func() {
+			service := 0
+			if err := e2eutil.ResizeCluster(t, service, e2eutil.Size4, targetKube.CRClient, testCouchbase); err == nil {
+				t.Fatalf("Resize cluster successful with expired certificates")
+			}
+		}()
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size4, e2eutil.Retries5)
-		if err == nil {
-			t.Fatal("Cluster scaled with expired certificates")
+		event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+			t.Fatal(err)
 		}
+		expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+		ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 	}
 
 	// Setting Certificate expiry time of 2mins from current time
-	decoratorObj.certValidTo = decoratorObj.certValidFrom.Add(time.Second * 120)
+	decoratorObj.certValidTo = decoratorObj.certValidFrom.Add(time.Second * 240)
 	decoratorObj.test = TestToRun
 	execFunc := CreateWrapperFunc(kubeName, decoratorObj, e2eutil.KeyTypeRSA)
 	execFunc(t)
@@ -842,7 +851,7 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	}
 
 	// Setting Certificate validaity after 3mins from current time
-	decoratorObj.certValidFrom = decoratorObj.certValidFrom.Add(time.Second * 180)
+	decoratorObj.certValidFrom = decoratorObj.certValidFrom.Add(time.Second * 60)
 	decoratorObj.certValidTo = decoratorObj.certValidFrom.AddDate(10, 0, 0)
 	decoratorObj.test = TestToRun
 	execFunc := CreateWrapperFunc(kubeName, decoratorObj, e2eutil.KeyTypeRSA)
