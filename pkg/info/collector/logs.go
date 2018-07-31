@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -44,8 +45,8 @@ func (r *logCollector) getPod(resource resource.ResourceReference) (*v1.Pod, err
 		return r.context.KubeClient.CoreV1().Pods(r.context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
 
 	case "Deployment":
-		// Deployments will set a "name" label to that of the deployment
-		nameLabelRequirement, err := labels.NewRequirement("name", selection.Equals, []string{resource.Name()})
+		// Deployments will set a "app" label to that of the deployment
+		nameLabelRequirement, err := labels.NewRequirement("app", selection.Equals, []string{resource.Name()})
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +59,7 @@ func (r *logCollector) getPod(resource resource.ResourceReference) (*v1.Pod, err
 
 		// Select just one instance
 		if len(pods.Items) == 0 {
-			return nil, nil
+			return nil, fmt.Errorf("No pods delected for Deployment %s", resource.Name())
 		}
 		return &pods.Items[0], nil
 	}
