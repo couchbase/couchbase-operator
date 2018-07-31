@@ -31,7 +31,17 @@ If specified this selects which namespace to collect resources and logs from.  I
 --system::
 If specified this will additionally collect all resources from the _kube-system_ namespace which may be useful in diagnosing problems with cluster level roles, custom resource defintions or system services.
 
-== Example
+== Examples
+
+To perform a basic collection of all Couchbase clusters and their associated resources within a name space:
+
+[source,shell]
+----
+$ cbopinfo
+Wrote cluster information to cbopinfo-20180629T123256+0100.tar.gz
+----
+
+To collect all Couchbase clusters, their associated resources within a name space, Couchbase server logs and Kubernetes system logs:
 
 [source,shell]
 ----
