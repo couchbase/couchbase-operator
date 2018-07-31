@@ -4,8 +4,8 @@ EARLY ACCESS - DO NOT DISTRIBUTE
 :doctype: book
 :toc:
 :toclevels: 2
-:includedir: modules/ROOT/pages
-:imagesdir: modules/ROOT/assets/images
+:includedir: pages
+:imagesdir: assets/images
 :source-highlighter: highlight.js
 :numbered:
 :icons: font
@@ -71,10 +71,6 @@ include::{includedir}/cluster-status-guide.adoc[]
 include::{includedir}/list-and-describe.adoc[]
 
 include::{includedir}/accessing-couchbase.adoc[]
-
-include::{includedir}/admin-console-access.adoc[]
-
-include::{includedir}/couchbase-cli-guide.adoc[]
 
 include::{includedir}/couchbase-clients.adoc[]
 
