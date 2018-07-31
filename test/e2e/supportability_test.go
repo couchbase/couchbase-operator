@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -281,8 +282,7 @@ func runCbopinfoCmd(cmdArgs []string) ([]byte, error) {
 	return exec.Command(cmdName, cmdArgs...).CombinedOutput()
 }
 
-func getLogFileNameFromExecOutput(output []byte) string {
-	outputStr := strings.TrimSpace(string(output))
+func getLogFileNameFromExecOutput(outputStr string) string {
 	startIndex := strings.LastIndex(outputStr, "Wrote cluster information to ")
 	if startIndex == -1 {
 		return ""
@@ -396,28 +396,28 @@ func TestLogCollectValidateArguments(t *testing.T) {
 		t.Log(arg.Name)
 		cmdArgs := []string{}
 
-		// If arg is '-namespace', verify with namespace arg only
+		// If arg is 'namespace' or 'kubeconfig', verify with namespace arg only
 		if arg.Arg == "-namespace" {
-			cmdArgs = []string{arg.Arg}
+			cmdArgs = []string{"-kubeconfig", kubeConfPath, arg.Arg}
 		} else {
-			cmdArgs = []string{"-namespace", f.Namespace, arg.Arg}
+			cmdArgs = []string{"-namespace", f.Namespace, "-kubeconfig", kubeConfPath, arg.Arg}
 		}
 		if arg.ArgValue != "" {
 			cmdArgs = append(cmdArgs, arg.ArgValue)
 		}
 
 		execOut, err := runCbopinfoCmd(cmdArgs)
+		execOutStr := strings.TrimSpace(string(execOut))
+		t.Logf("Returned: %s\n", execOutStr)
 		if err == nil {
-			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Command executed without error without cb cluster"))
+			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Command executed successfully without cb cluster"))
 		} else {
-			execOutStr := strings.TrimSpace(string(execOut))
 			if execOutStr != "no CouchbaseCluster resources discovered in name space "+f.Namespace {
 				errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Invalid error message"))
 			}
-
 		}
-		if logFileName := getLogFileNameFromExecOutput(execOut); logFileName != "" {
-			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Logs generated without cb cluster deployed"))
+		if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
+			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Logs generated without cb cluster"))
 			defer os.Remove(logFileName)
 		}
 	}
@@ -434,19 +434,21 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 		// If arg is '-namespace', verify with namespace arg only
 		if arg.Arg == "-namespace" {
-			cmdArgs = []string{arg.Arg}
+			cmdArgs = []string{"-kubeconfig", kubeConfPath, arg.Arg}
 		} else {
-			cmdArgs = []string{"-namespace", f.Namespace, arg.Arg}
+			cmdArgs = []string{"-namespace", f.Namespace, "-kubeconfig", kubeConfPath, arg.Arg}
 		}
 		if arg.ArgValue != "" {
 			cmdArgs = append(cmdArgs, arg.ArgValue)
 		}
 
 		execOut, err := runCbopinfoCmd(cmdArgs)
+		execOutStr := strings.TrimSpace(string(execOut))
+		t.Logf("Returned: %s\n", execOutStr)
 		if err != nil {
 			errMsgList.AppendFailure("Failed while providing arg "+arg.Arg, err)
 		}
-		logFileName := getLogFileNameFromExecOutput(execOut)
+		logFileName := getLogFileNameFromExecOutput(execOutStr)
 		defer os.Remove(logFileName)
 
 		logFileDir := strings.Split(logFileName, ".")[0]
@@ -459,18 +461,19 @@ func TestLogCollectValidateArguments(t *testing.T) {
 		if arg.ArgValue != "" {
 			cmdArgs := []string{arg.Arg}
 			execOut, err := runCbopinfoCmd(cmdArgs)
+			execOutStr := strings.TrimSpace(string(execOut))
+			t.Logf("Returned: %s\n", execOutStr)
 			if err == nil {
 				errMsgList.AppendFailure("Command executed successfully without providing value for "+arg.Arg, nil)
 			}
 
 			// Verify valid error message
-			execOutStr := string(execOut)
 			if !strings.Contains(execOutStr, arg.ExpectedErr) {
 				errMsgList.AppendFailure("Invalid error for missing arg value "+arg.Arg+", \nExpected: "+arg.ExpectedErr+"\nReceived: "+execOutStr, nil)
 			}
 
 			// Check no output file is generated
-			if logFileName := getLogFileNameFromExecOutput(execOut); logFileName != "" {
+			if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
 				errMsgList.AppendFailure("File created with missing argument for "+arg.Arg, nil)
 				os.Remove(logFileName)
 			}
@@ -491,14 +494,14 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 			Arg:         "-kubeconfig",
 			ArgValue:    invalidKubeConfPath,
 			WillFail:    true,
-			ExpectedErr: "unable to initialize context",
+			ExpectedErr: "unable to discover cluster resources",
 		},
 		{
 			Name:        "Unreachable '-kubeconfig' file",
 			Arg:         "-kubeconfig",
 			ArgValue:    unreachableKubeConfPath,
 			WillFail:    true,
-			ExpectedErr: "unable to initialize context",
+			ExpectedErr: "unable to discover cluster resources",
 		},
 		{
 			Name:        "Validating invalid '-kubeconfig' file missing",
@@ -515,10 +518,11 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 		cmdArgs = append(cmdArgs, arg.ArgValue)
 
 		execOut, err := runCbopinfoCmd(cmdArgs)
+		execOutStr := strings.TrimSpace(string(execOut))
+		t.Logf("Returned: %s\n", execOutStr)
 		if err == nil {
 			errMsgList.AppendFailure(arg.Name, errors.New("Command executed successfully"))
 		}
-		execOutStr := strings.TrimSpace(string(execOut))
 
 		// Verify valid error message
 		if !strings.Contains(execOutStr, arg.ExpectedErr) {
@@ -526,7 +530,7 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 		}
 
 		// Check no output file is generated
-		if logFileName := getLogFileNameFromExecOutput(execOut); logFileName != "" {
+		if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
 			errMsgList.AppendFailure(arg.Name, errors.New("Log file created"))
 			os.Remove(logFileName)
 		}
@@ -545,21 +549,36 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	clusterSize := e2eutil.Size3
-	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithoutBucket, e2eutil.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
-	cluster2, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithoutBucket, e2eutil.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cluster1Size := e2eutil.Size3
+	cluster2Size := e2eutil.Size3
+	cluster3Size := e2eutil.Size1
+	var cluster1, cluster2, cluster3 *api.CouchbaseCluster
+	var err error
+	cluster1Err := make(chan error)
+	cluster2Err := make(chan error)
+	cluster3Err := make(chan error)
 
-	cluster3, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
+	go func() {
+		cluster1, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster1Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster1Err <- err
+	}()
+
+	go func() {
+		cluster2, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster2Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster2Err <- err
+	}()
+
+	go func() {
+		cluster3, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster3Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster3Err <- err
+	}()
+
+	for _, errChan := range []chan error{cluster1Err, cluster2Err, cluster3Err} {
+		if err := <-errChan; err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	kubeConfPath := getKubeConfigToUse(kubeName)
@@ -570,10 +589,12 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs from single cluster")
 	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
 	execOut, err := runCbopinfoCmd(cmdArgs)
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName := getLogFileNameFromExecOutput(execOut)
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	logFileDir := strings.Split(logFileName, ".")[0]
@@ -596,10 +617,12 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs from cluster1 and cluster3")
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name, cluster3.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
+	execOutStr = strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName = getLogFileNameFromExecOutput(execOut)
+	logFileName = getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster3.Name, &reqFileList); err != nil {
@@ -616,12 +639,13 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	// collect logs from all clusters in the given namespace
 	t.Log("Collecting logs from all available cluster")
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
-
 	execOut, err = runCbopinfoCmd(cmdArgs)
+	execOutStr = strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName = getLogFileNameFromExecOutput(execOut)
+	logFileName = getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster2.Name, &reqFileList); err != nil {
@@ -646,10 +670,12 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	reqFileList = []string{}
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-system", cluster2.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
+	execOutStr = strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName = getLogFileNameFromExecOutput(execOut)
+	logFileName = getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	logFileDir = strings.Split(logFileName, ".")[0]
@@ -672,10 +698,12 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	reqFileList = []string{}
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-system", cluster1.Name, cluster3.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
+	execOutStr = strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName = getLogFileNameFromExecOutput(execOut)
+	logFileName = getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	logFileDir = strings.Split(logFileName, ".")[0]
@@ -700,10 +728,12 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	reqFileList = []string{}
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-system"}
 	execOut, err = runCbopinfoCmd(cmdArgs)
+	execOutStr = strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName = getLogFileNameFromExecOutput(execOut)
+	logFileName = getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	logFileDir = strings.Split(logFileName, ".")[0]
@@ -729,10 +759,12 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	///////////////////////////////////////////////////
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", cluster1.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
+	execOutStr = strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName = getLogFileNameFromExecOutput(execOut)
+	logFileName = getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	logFileDir = strings.Split(logFileName, ".")[0]
@@ -816,10 +848,12 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	// Collect logs
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName := getLogFileNameFromExecOutput(execOut)
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
 	//defer os.Remove(logFileName)
 
 	logFileDir := strings.Split(logFileName, ".")[0]
@@ -884,10 +918,12 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	// Collect logs
 	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cbCluster.Name}
 	execOut, err := runCbopinfoCmd(cmdArgs)
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logFileName := getLogFileNameFromExecOutput(execOut)
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	logFileDir := strings.Split(logFileName, ".")[0]

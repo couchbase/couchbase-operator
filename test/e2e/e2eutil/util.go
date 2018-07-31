@@ -709,7 +709,7 @@ func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) err
 }
 
 func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, error) {
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": "couchbase-operator"}))
+	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("app", "couchbase-operator")))
 	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return "couchbase-operator", err
@@ -725,7 +725,7 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 }
 
 func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error) {
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": "couchbase-operator"}))
+	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("name", "couchbase-operator")))
 	pods, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return "couchbase-operator", err

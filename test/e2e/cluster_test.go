@@ -682,9 +682,10 @@ func TestNodeUnschedulable(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
+	clusterSize := e2eutil.Size1
 
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithBucket, e2eutil.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -708,51 +709,49 @@ func TestNodeUnschedulable(t *testing.T) {
 	nodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 
 	//first node wont change request and last node should be unschedulable and minus out the master node
-	newSize := len(nodeList.Items) + 1
+	clusterSize = len(nodeList.Items) + 1
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, newSize, targetKube.CRClient, testCouchbase)
+		serviceId := 0
+		if err := e2eutil.ResizeClusterNoWait(t, serviceId, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+			echan <- err
+		}
+		t.Logf("Waiting For Cluster Size To Be: %d\n", clusterSize)
+		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, e2eutil.Retries60, testCouchbase)
+		if err == nil {
+			t.Logf("Resize Success: %v\n", names)
+		}
+		echan <- err
 	}()
 
 	// expect unbalanced condition
-	err = e2eutil.WaitForClusterUnBalancedCondition(t, targetKube.CRClient, testCouchbase, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterUnBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
 		t.Fatal(err)
 	}
 
 	// drop limits so that pod can be scheduled
-	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
+	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, e2eutil.Retries5, func(cl *api.CouchbaseCluster) {
 		cl.Spec.ServerSettings[0].Pod = nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for i := 1; i < newSize; i++ {
+	for i := 1; i < clusterSize; i++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, i)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// verify result from cluster resize ok
-	err = <-echan
-	if err != nil {
+	if err = <-echan; err != nil {
 		t.Fatal(err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, newSize, 18)
-	if err != nil {
+	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 18); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
-
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Cluster recovers after node service goes down
