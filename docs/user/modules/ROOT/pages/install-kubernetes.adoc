@@ -31,9 +31,9 @@ After the cluster role is created, you need to create a service account in the n
 
 [source,console]
 ----
-$ kubectl create serviceaccount couchbase-operator --namespace default
+kubectl create serviceaccount couchbase-operator --namespace default
 
-$ kubectl create clusterrolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount default:couchbase-operator
+kubectl create clusterrolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount default:couchbase-operator
 ----
 
 NOTE: If you would prefer to use a _role binding_ instead of a cluster role binding, then the CRD needs to be installed separately from the Operator. This can be accomplished by removing the `-create-crd` argument from the `operator.yaml` file and uploading the CRD separately.
@@ -99,7 +99,13 @@ You can also check the logs to confirm that the Operator is up and running. Look
 
 [source,console]
 ----
-$ kubectl logs couchbase-operator-1917615544-t5mhp
+kubectl logs couchbase-operator-1917615544-t5mhp
+----
+
+You should see output similar to the following:
+
+[source,console]
+----
 time="2018-04-25T03:01:56Z" level=info msg="Obtaining resource lock" module=main
 time="2018-04-25T03:01:56Z" level=info msg="Starting event recorder" module=main
 time="2018-04-25T03:01:56Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main

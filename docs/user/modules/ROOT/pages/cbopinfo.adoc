@@ -41,6 +41,25 @@ $ cbopinfo
 Wrote cluster information to cbopinfo-20180629T123256+0100.tar.gz
 ----
 
+To collect basic logs on openshift from a specific name space:
+
+[source,shell]
+----
+$ oc login -u developer
+Authentication required for https://192.168.99.100:8443 (openshift)
+Username: developer
+Password:
+Login successful.
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+    myproject
+
+Using project "myproject".
+$ cbopinfo --namespace myproject
+Wrote cluster information to cbopinfo-20180801T141838+0100.tar.gz
+----
+
 To collect all Couchbase clusters, their associated resources within a name space, Couchbase server logs and Kubernetes system logs:
 
 [source,shell]

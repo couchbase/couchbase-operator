@@ -13,20 +13,91 @@ If you have an OpenShift environment that already has a custom setup (non-defaul
 
 IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your OpenShift environment. Refer to the  xref:kubernetes-rbac.adoc[RBAC doumentation] before you install the Operator, as your OpenShift environment may differ from the environment upon which this guide is based.
 
+== Quick Start
+
+The script below has been parameterized for clarity and relies on a set of environment variables that may be tailored to the individual OpenShift environment being deployed in.  These variables correspond to the resources being created and used in order to deploy the Operator.  These are explained below:
+
+NAMESPACE::
+The Kubernetes name space/OpenShift project to run the Operator in.  This can be changed to any project you have access to.
+
+ADMIN_ACCOUNT::
+The administrator account which has the ability to install custom resource defintions and create role bindings which grant privilege escalation.
+
+OPERATOR_SERVICE_ACCOUNT::
+The service account the Operator should run as.  This can be changed to any valid Kubernetes name, however is scoped to the name space it is deployed in so must be unique in that context.  This value is also used when creating the Operator deployment, see the xref:operator-config.adoc[documentation for the `serviceAccountName` parameter].
+
+OPERATOR_CLUSTER_ROLE::
+The role for the Operator to inherit that grants access to create and deleted required resources.  This name is hard coded in the resource YAML file used in this example.
+
+OPERATOR_CLUSTER_ROLE_BINDING::
+The name for the rule which binds the operator role and service account to a name space.  This can be changed to any unique name in the namespace.
+
+USER_ACCOUNT::
+The user account used to create and manage CouchbaseCluster resources.  This can be changed to any valid user name.
+
+USER_CLUSTER_ROLE::
+The role for the user to inherit that grants access to create and deleted required resources.  This name is hard coded in the resource YAML file used in this example.
+
+USER_CLUSTER_ROLE_BINDING::
+The name for the rule which binds the user role and account to a name space.  This can be changed to any unique name in the name
+space.
+
+All steps listed here are fully explained below.  If they fail please consult the relevant documentation.
+
+[source,bash]
+----
+# Evnvironment specific variables
+ADMIN_ACCOUNT=system:admin
+USER_ACCOUNT=developer
+NAMESPACE=operator-example-namespace
+
+# Namespace specific variables, you may need to change these to avoid
+# name space collisions
+OPERATOR_SERVICE_ACCOUNT=couchbase-operator
+OPERATOR_CLUSTER_ROLE_BINDING=couchbase-operator-rolebinding
+USER_CLUSTER_ROLE_BINDING=couchbasecluster-developer-rolebinding
+
+# Constant variables (defined in web based resources)
+OPERATOR_CLUSTER_ROLE=couchbase-operator
+USER_CLUSTER_ROLE=couchbasecluster
+
+# As an unprivileged user create a project to run the Operator in and a
+# service account to run the Operator as
+oc login -u ${USER_ACCOUNT}
+oc new-project ${NAMESPACE}
+oc create serviceaccount ${OPERATOR_SERVICE_ACCOUNT} --namespace ${NAMESPACE}
+oc logout
+
+# As a privileged user create the custom resource definition, roles and bind
+# them to the service and user accounts
+oc login -u ${ADMIN_ACCOUNT}
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/crd.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-sa.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-user.yaml
+oc create rolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_CLUSTER_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}
+oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
+oc logout
+
+# Deploy the Operator as an unprivileged user
+oc login -u ${USER_ACCOUNT}
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/operator.yaml -n ${NAMESPACE}
+oc logout
+----
+
 == Create an OpenShift Project
 
 The first thing that you need to do is use a standard OpenShift user to create a https://docs.openshift.com/container-platform/3.9/architecture/core_concepts/projects_and_users.html#projects[project] where the Operator will reside:
 
 [source,console]
 ----
-$ oc login -u developer
+oc login -u developer
 
-$ oc new-project operator-example
+oc new-project operator-example-namespace
 
-$ oc logout
+oc logout
 ----
 
-In this example, the standard user is `developer`, and the project is `operator-example`. Later in this guide you will give `developer` the ability to manage the Operator and the Couchbase Server clusters in `operator-example`.
+In this example, the standard user is `developer`, and the project is `operator-example-namespace`. Later in this guide you will give `developer` the ability to manage the Operator and the Couchbase Server clusters in `operator-example-namespace`.
 
 == Install the Custom Resource Definition
 
@@ -36,9 +107,9 @@ To install the CRD, log in as an OpenShift user that has cluster-admin privilege
 
 [source,console]
 ----
-$ oc login -u system:admin
+oc login -u system:admin
 
-$ oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/crd.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/crd.yaml
 ----
 
 NOTE: You only need to install the CRD once. After that, you can create the Operator in any OpenShift project.
@@ -60,9 +131,9 @@ After the cluster role is created, you need to create a service account in the p
 
 [source,console]
 ----
-$ oc create serviceaccount couchbase-operator --namespace operator-example
+oc create serviceaccount couchbase-operator --namespace operator-example-namespace
 
-$ oc create rolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount operator-example:couchbase-operator
+oc create rolebinding couchbase-operator-rolebinding --clusterrole couchbase-operator --serviceaccount operator-example-namespace:couchbase-operator
 ----
 
 A service account is used as opposed to a traditional user for the Operator because service accounts are meant to be used for processes running in OpenShift.
@@ -80,29 +151,29 @@ Run the following command to create the cluster role for `developer`:
 oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-user.yaml
 ----
 
-Next, you need to allow `developer` to be able to manage the CouchbaseCluster resource in the `operator-example` project:
+Next, you need to allow `developer` to be able to manage the CouchbaseCluster resource in the `operator-example-namespace` project:
 
 [source,console]
 ----
-oc create rolebinding couchbasecluster-developer --clusterrole couchbasecluster --user developer --namespace operator-example
+oc create rolebinding couchbasecluster-developer-rolebinding --clusterrole couchbasecluster --user developer --namespace operator-example-namespace
 ----
 
 Alternatively, if you want `developer` to be able to manage CouchbaseCluster objects in all projects, then you can run the following command instead:
 
 [source,console]
 ----
-oc create clusterrolebinding couchbasecluster-developer --clusterrole couchbasecluster --user developer
+oc create clusterrolebinding couchbasecluster-developer-rolebinding --clusterrole couchbasecluster --user developer
 ----
 
 NOTE: If you want to create role bindings for multiple users either at the cluster or namespace level, they will need to have unique names. In the previous examples, if you were to create a role binding for user `alice`, you'd use the name `couchbasecluster-alice` in place of `couchbasecluster-developer`.
 
 == Create the Operator
 
-At this point you can now use the `developer` user to create the Operator in the `operator-example` project. To create and start the Operator, run the following command:
+At this point you can now use the `developer` user to create the Operator in the `operator-example-namespace` project. To create and start the Operator, run the following command:
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/operator.yaml
+oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/operator.yaml -n operator-example-namespace
 ----
 
 Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
@@ -157,7 +228,13 @@ You can also check the logs to confirm that the Operator is up and running. Look
 
 [source,console]
 ----
-$ oc logs couchbase-operator-1917615544-t5mhp
+oc logs couchbase-operator-1917615544-t5mhp
+----
+
+You should see output similar to the following:
+
+[source,console]
+----
 time="2018-04-25T03:01:56Z" level=info msg="Obtaining resource lock" module=main
 time="2018-04-25T03:01:56Z" level=info msg="Starting event recorder" module=main
 time="2018-04-25T03:01:56Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
