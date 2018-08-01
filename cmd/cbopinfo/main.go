@@ -125,10 +125,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Check there is something to collect
+	// Check there is something to collect, warn if not but continue so we get
+	// debug information about the operator itself
 	if len(clusters.Items) == 0 {
 		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Config.Namespace)
-		os.Exit(1)
 	}
 
 	// Finally check to see if any requested CouchbaseClusters exist
