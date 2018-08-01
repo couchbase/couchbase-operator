@@ -24,9 +24,12 @@
       script: wipe-portworx.sh
       ignore_errors: yes
 
-    - name: Clear /opt
-      shell: rm -rf /opt/
-      ignore_errors: yes
+    - name: Cleaning up /opt path
+      file:
+        state: absent
+        path: "{{ item }}/"
+      with_items:
+        - "/opt/cni"
 
     - name: Adding Kubernetes repo
       yum_repository:

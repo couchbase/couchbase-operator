@@ -278,9 +278,9 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 9
-	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 2, true)
+	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 10, 3, true)
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
+	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", e2eutil.Mem256Mb, e2eutil.Size3, e2eutil.BucketFlushEnabled, e2eutil.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
@@ -293,11 +293,13 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
 	if err != nil {
@@ -305,24 +307,52 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	}
 
 	podMembersToKill := []int{2, 3, 4}
+	podMembersToKillLen := len(podMembersToKill)
 	for _, podMemberToKill := range podMembersToKill {
-		err = e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podMemberToKill)
-		if err != nil {
+		if err := e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podMemberToKill); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberToKill)
+		time.Sleep(time.Second * 15)
+	}
+
+	for _, podMemberToKill := range podMembersToKill {
+		expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberToKill)
 	}
 
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
 	}
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries10, len(podMembersToKill)); err != nil {
+	if err := e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries10, podMembersToKillLen); err != nil {
 		t.Fatal(err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-	if err != nil {
+	for memberId := clusterSize; memberId < clusterSize+podMembersToKillLen; memberId++ {
+		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+	}
+
+	event := e2eutil.RebalanceStartedEvent(testCouchbase)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+		t.Fatalf("Rebalance not started after failover: %v", err)
+	}
+
+	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+		t.Fatalf("Rebalance failed after failover: %v", err)
+	}
+
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	for _, podMemberToKill := range podMembersToKill {
+		expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberToKill)
+	}
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
