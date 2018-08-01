@@ -123,14 +123,11 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 	}
 
 	// endpoints dir content
-	endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{})
+	endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
 	if err != nil {
 		return errors.New("Failed to list endpoints: " + err.Error())
 	}
 	for _, endpoint := range endpoints.Items {
-		if endpoint.Name == "couchbase-operator" {
-			continue
-		}
 		*reqFileList = append(*reqFileList, endpointsDir+"/"+endpoint.Name+"/"+endpoint.Name+".yaml")
 	}
 
@@ -193,6 +190,7 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 
 	cbClusterDir := namespaceDir + "/couchbasecluster"
 	podDir := namespaceDir + "/pod"
+	endpointsDir := namespaceDir + "/endpoints"
 	serviceDir := namespaceDir + "/service"
 
 	// Cluster dependent file - couchbasecluster, endpoints, pods, secrets
@@ -217,6 +215,14 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/couchbase-server.log")
 			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/events.yaml")
 			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
+		}
+
+		endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase, couchbase_cluster=" + cbCluster.Name})
+		if err != nil {
+			return errors.New("Failed to list endpoints: " + err.Error())
+		}
+		for _, endpoint := range endpoints.Items {
+			*reqFileList = append(*reqFileList, endpointsDir+"/"+endpoint.Name+"/"+endpoint.Name+".yaml")
 		}
 
 		// service dir contents
@@ -551,26 +557,29 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
+	failureExists := false
 	cluster1Size := e2eutil.Size3
 	cluster2Size := e2eutil.Size3
 	cluster3Size := e2eutil.Size1
 	var cluster1, cluster2, cluster3 *api.CouchbaseCluster
-	var err error
 	cluster1Err := make(chan error)
 	cluster2Err := make(chan error)
 	cluster3Err := make(chan error)
 
 	go func() {
+		var err error
 		cluster1, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster1Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 		cluster1Err <- err
 	}()
 
 	go func() {
+		var err error
 		cluster2, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster2Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 		cluster2Err <- err
 	}()
 
 	go func() {
+		var err error
 		cluster3, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster3Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 		cluster3Err <- err
 	}()
@@ -611,7 +620,9 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
+	errMsgList = failureList{}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists = failureExists || errMsgList.PrintFailures(t)
 
 	// collect logs from multi clusters by specifying cluster names in command line
 	t.Log("Collecting logs from cluster1 and cluster3")
@@ -634,7 +645,9 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	if err := untarGzFile(logFileName); err != nil {
 		t.Fatal(err)
 	}
+	errMsgList = failureList{}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists = failureExists || errMsgList.PrintFailures(t)
 
 	// collect logs from all clusters in the given namespace
 	t.Log("Collecting logs from all available cluster")
@@ -657,8 +670,9 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	if err := untarGzFile(logFileName); err != nil {
 		t.Fatal(err)
 	}
+	errMsgList = failureList{}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
-	failureExists := errMsgList.PrintFailures(t)
+	failureExists = failureExists || errMsgList.PrintFailures(t)
 
 	///////////////////////////////////////////////
 	/////// Log collection using '-system' ////////
@@ -692,7 +706,9 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster2.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
+	errMsgList = failureList{}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists = failureExists || errMsgList.PrintFailures(t)
 
 	// Verify kube-system logs with multiple couchbase cluster logs
 	reqFileList = []string{}
@@ -722,7 +738,9 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	errMsgList = failureList{}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists = failureExists || errMsgList.PrintFailures(t)
 
 	// Verify kube-system logs with all other cb cluster logs
 	reqFileList = []string{}
@@ -752,7 +770,9 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	errMsgList = failureList{}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists = failureExists || errMsgList.PrintFailures(t)
 
 	///////////////////////////////////////////////////
 	/////// Log collection using '-collectinfo' ///////
@@ -780,13 +800,14 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
+	errMsgList = failureList{}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists = failureExists || errMsgList.PrintFailures(t)
 
 	if err := checkCollectInfoLogs(execOut, targetKube.KubeClient, f.Namespace, cluster1.Name, logFileDir, &errMsgList); err != nil {
 		t.Fatal(err)
 	}
 
-	failureExists = failureExists || errMsgList.PrintFailures(t)
 	if failureExists {
 		t.Fatal("Test failed")
 	}
@@ -854,7 +875,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	//defer os.Remove(logFileName)
+	defer os.Remove(logFileName)
 
 	logFileDir := strings.Split(logFileName, ".")[0]
 	defer os.RemoveAll(logFileDir)
