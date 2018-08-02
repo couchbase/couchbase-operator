@@ -245,7 +245,8 @@ func podVolumeSpecForClaim(configName, claimName string) v1.Volume {
 }
 
 // Delete pod and any associated persisted volumes
-func DeleteCouchbasePod(kubeCli kubernetes.Interface, namespace, clusterName, name string, opts *metav1.DeleteOptions) error {
+// when removeVolumes is 'true'
+func DeleteCouchbasePod(kubeCli kubernetes.Interface, namespace, clusterName, name string, opts *metav1.DeleteOptions, removeVolumes bool) error {
 
 	var errs []string
 
@@ -253,8 +254,10 @@ func DeleteCouchbasePod(kubeCli kubernetes.Interface, namespace, clusterName, na
 		errs = append(errs, err.Error())
 	}
 
-	if err := deletePodVolumes(kubeCli, namespace, clusterName, name); err != nil {
-		errs = append(errs, err.Error())
+	if removeVolumes {
+		if err := deletePodVolumes(kubeCli, namespace, clusterName, name); err != nil {
+			errs = append(errs, err.Error())
+		}
 	}
 
 	if len(errs) > 0 {

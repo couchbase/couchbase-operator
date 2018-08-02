@@ -546,8 +546,11 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName str
 	return nil
 }
 
+// Kill member deletes Pod and checks for any associated Volume to delete
+// TODO: removePod is set to 'true' which maintains current behavior, but
+//       in the future we will be able to override this in the Spec
 func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string) error {
-	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0))
+	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0), true)
 }
 
 func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberId int) error {

@@ -457,11 +457,23 @@ func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig
 
 func (c *Cluster) removePod(name string) error {
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-	err := k8sutil.DeleteCouchbasePod(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, name, opts)
+
+	// Remove Pod volumes associated with the Pod, if any
+	// TODO: allow overriding for usecase to keep volumes
+	//       currently the default is to always delete
+	removeVolumes := false
+	if m, ok := c.members[name]; ok {
+		config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+		if config.GetVolumeMounts() != nil {
+			removeVolumes = true
+		}
+	}
+	err := k8sutil.DeleteCouchbasePod(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, name, opts, removeVolumes)
 	if err != nil {
 		c.logger.Errorf("error occurred during pod deletion (%s)", err)
 		return err
 	}
+
 	c.logger.Infof("deleted pod (%s)", name)
 	return nil
 }
