@@ -527,7 +527,7 @@ func runExecCommand(t *testing.T, command *exec.Cmd) error {
 	command.Stderr = &stderr
 
 	if err := command.Run(); err != nil {
-		return errors.New("Error during execution: " + err.Error() + "\n\n stdout: " +  stdout.String() + "\n\n stderr: " + stderr.String())
+		return errors.New("Error during execution: " + err.Error() + "\n\n stdout: " + stdout.String() + "\n\n stderr: " + stderr.String())
 	}
 	return nil
 }
