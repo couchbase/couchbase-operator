@@ -122,68 +122,62 @@ kubectl delete -f $cbClusterFile &>/dev/null
 kubectl create -f $cbClusterFile
 exitOnError $? "Unable to create cb cluster"
 
-sleep 180
+# wait for cb cluster
+while true
+    do
+        numReady=$(kubectl get pods | grep "cb-example" | grep "1/1" | wc -l)
+        if [ $numReady -eq 4 ] ; then
+                    echo "cb cluster ready"
+                    break
+        fi
+        sleep 10
+done
 
 echo "Pausing couchbase operator.."
 sed -i "s/paused: false/paused: true/g" $cbClusterFile
 exitOnError $? "Unable to replace string in cbcluster yaml"
+
 showFileContent $cbClusterFile
 kubectl --namespace=$KUBENAMESPACE apply -f $cbClusterFile
 exitOnError $? "Unable to pause the cbcluster"
 
-sleep 10
-
 showFileContent $testRunnerYamlFileName
 kubectl --namespace=$KUBENAMESPACE create -f $testRunnerYamlFileName
-exitOnError $? "Unable to create testrunner"
+exitOnError $? "Unable to create sdk job"
 
-echo "############################## Using couchbase-server '$cbServerVersionsToRun' ##############################"
-
-# wait for testrunner pod to be running
+# wait for sdk job to be running
 while true
     do
-        testrunnerPodName=$(kubectl --namespace=$KUBENAMESPACE get -l job-name=sdk-sanity pods | tail -1 | awk '{print $1}')
-        if [ "$testrunnerPodName" != "" ] ; then
-            echo "Initializing pod '$testrunnerPodName'"
-            for i in {1..300}
-            do
-                podRunning=$(kubectl --namespace=$KUBENAMESPACE describe pod $testrunnerPodName | grep "State:" | grep "Running" | wc -l | xargs )
-                if [ $podRunning -eq 1 ] ; then
-                    break
-                fi
-                sleep 1
-            done
-
-            if [ $podRunning -ne 1 ] ; then
-                exitOnError 1 "Pod '$testrunnerPodName' not started running even after 5mins"
-            fi
-            unset podRunning
-            break
+        jobStatus=$(kubectl describe job sdk-sanity | grep "Pods Statuses")
+        jobRunning=$(echo $jobStatus | awk '{print $3}')
+        jobFailed=$(echo $jobStatus | awk '{print $9}')
+        if [ $jobFailed -eq 1 ] ; then
+                    exitOnError 1 "sdk job failed"
         fi
+        if [ $jobRunning -eq 1 ] ; then
+                    echo "job started"
+                    break
+        fi
+        sleep 5
 done
 
 # Redirect logs from testrunner pod
-echo "----------- Logs from testrunner pod '$testrunnerPodName' -----------"
-kubectl --namespace=$KUBENAMESPACE logs --follow=true $testrunnerPodName &
+echo "begin job logs -----------------------"
+jobPod=$(kubectl get pods | grep "sdk-sanity" | awk '{print $1}')
+kubectl --namespace=$KUBENAMESPACE logs --follow=true $jobPod &
 
-# Wait for testrunner job to complete
+# wait for sdk job to complete
 while true
-do
-    currTestrunnerPod=$(kubectl --namespace=$KUBENAMESPACE get -l job-name=sdk-sanity pods | tail -1 | awk '{print $1}')
-    if [ "$currTestrunnerPod" != "$testrunnerPodName" ] ; then
-        echo "job pod failed"
-        kill %1
-        kubectl delete job --all --namespace=$KUBENAMESPACE
-        break
-    fi
-
-    isJobCompleted=$(kubectl --namespace=$KUBENAMESPACE logs $testrunnerPodName --tail=10 | grep "sdk: command completed" | wc -l)
-    if [ $isJobCompleted -eq 1 ] ; then
-        kill %1
-        break
-    fi
-    sleep 10
-
-
-echo "################################# End of test using '$cbServerVersionsToRun' ################################"
-echo ""
+    do
+        jobStatus=$(kubectl describe job sdk-sanity | grep "Pods Statuses")
+        jobSucceeded=$(echo $jobStatus | awk '{print $6}')
+        jobFailed=$(echo $jobStatus | awk '{print $9}')
+        if [ $jobFailed -eq 1 ] ; then
+                    exitOnError 1 "sdk job failed"
+        fi
+        if [ $jobSucceeded -eq 1 ] ; then
+                    echo "job finished"
+                    break
+        fi
+        sleep 10
+done
