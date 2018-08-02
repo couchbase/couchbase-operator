@@ -491,7 +491,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for nodeIndex := 1; nodeIndex <= newPodMemberId; nodeIndex++ {
+		for nodeIndex := 1; nodeIndex < clusterSize; nodeIndex++ {
 			expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 		}
 
@@ -506,6 +506,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		if err := e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, newPodMemberId); err != nil {
 			t.Fatal(err)
 		}
+		expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 		thirdPodKilled <- true
 	}()
 
@@ -515,25 +516,28 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		<-thirdPodKilled
 		newPodMemberId := clusterSize
 		event := e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
 			t.Fatal(err)
 		}
+		expectedEvents.AddFailedAddNodeEvent(testCouchbase, clusterSize-1)
 		expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
-
-		// wait rebalance event
-		event = k8sutil.RebalanceStartedEvent(testCouchbase)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-			t.Fatal(err)
-		}
-		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
 		if err := e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, newPodMemberId); err != nil {
 			t.Fatal(err)
 		}
+		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+		expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
+		expectedEvents.AddFailedAddNodeEvent(testCouchbase, newPodMemberId)
 
 		if err := client.ResetFailoverCounter(); err != nil {
 			t.Fatal(err)
 		}
+
+		event = e2eutil.NewMemberAddEvent(testCouchbase, clusterSize+1)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize+1)
 		fourthPodKilled <- true
 	}()
 
@@ -546,19 +550,12 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	if err := <-errChan; err != nil {
 		t.Fatal(err)
 	}
-	event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize+1)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
-	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize+1)
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy and balanced: %v", err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
