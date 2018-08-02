@@ -18,55 +18,93 @@ import (
 
 // Generic function to run rebalance out test case
 // Rebalance out xdcrCluster nodes one by one for the provided clustersize
-func rebalanceOutXdcrNodes(t *testing.T, xdcrCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
+func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string, expectedEvents e2eutil.EventList) error {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]
+	nextNodeToBeAdded := clusterSize
+
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, cbCluster)
+	if err != nil {
+		return errors.New("Failed to create cluster client: " + err.Error())
+	}
+
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		// Create node client
-		clusterNodeName := couchbaseutil.CreateMemberName(xdcrCluster.Name, memberIndex)
+		clusterNodeName := couchbaseutil.CreateMemberName(cbCluster.Name, memberIndex)
 		t.Logf("Rebalance-out %s", clusterNodeName)
 
-		nodePortService := e2espec.NewNodePortService(f.Namespace)
-		nodePortService.Spec.Selector["couchbase_node"] = clusterNodeName
-		service, err := e2eutil.CreateService(t, targetKube.KubeClient, f.Namespace, nodePortService)
-		if err != nil {
-			return errors.New("Failed to create service: %s" + err.Error())
+		if err = e2eutil.RebalanceOutMember(t, client, cbCluster.Name, f.Namespace, memberIndex, true); err != nil {
+			return errors.New("Rebalance-out failed: " + err.Error())
 		}
+		expectedEvents.AddMemberRemoveEvent(cbCluster, memberIndex)
 
-		serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(kubeName), service)
-		if err != nil {
-			return errors.New("failed to get cluster url: %s" + err.Error())
+		event := e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded)
+		if err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 120); err != nil {
+			return errors.New("Failed to add new member add: " + err.Error())
 		}
+		expectedEvents.AddMemberAddEvent(cbCluster, nextNodeToBeAdded)
 
-		client, err := e2eutil.NewClient(t, targetKube.KubeClient, xdcrCluster, []string{serviceUrl})
-		if err != nil {
-			return errors.New("failed to create cluster client %s" + err.Error())
+		event = e2eutil.RebalanceStartedEvent(cbCluster)
+		if err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
+			return errors.New("Failed to start rebalance: " + err.Error())
 		}
+		expectedEvents.AddRebalanceStartedEvent(cbCluster)
 
-		if err = e2eutil.RebalanceOutMember(t, client, xdcrCluster.Name, f.Namespace, memberIndex, true); err != nil {
-			return errors.New("Rebalance-out failed: %s" + err.Error())
+		event = e2eutil.RebalanceCompletedEvent(cbCluster)
+		if err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
+			return errors.New("Failed to rebalance: " + err.Error())
 		}
+		expectedEvents.AddRebalanceCompletedEvent(cbCluster)
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, xdcrCluster.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
-		if err != nil {
-			return errors.New(err.Error())
+		if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
+			return errors.New("Cluster unhealthy: " + err.Error())
 		}
+		nextNodeToBeAdded++
 	}
 	return nil
 }
 
 // Generic function to kill xdcrCluster nodes
 // Will kill all the nodes one by one for the given clusterSize number and wait for the new pod to get replaced
-func killXdcrNodes(t *testing.T, xdcrCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
+func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string, expectedEvents e2eutil.EventList) error {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]
+	nextNodeToBeAdded := clusterSize
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		memberName := couchbaseutil.CreateMemberName(xdcrCluster.Name, memberIndex)
+		memberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberIndex)
 		if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
 			return err
 		}
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, xdcrCluster.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10); err != nil {
+		event := e2eutil.NewMemberDownEvent(cbCluster, memberIndex)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
+			return err
+		}
+
+		event = e2eutil.NewMemberFailedOverEvent(cbCluster, memberIndex)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 90); err != nil {
+			return err
+		}
+
+		event = e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 120); err != nil {
+			return err
+		}
+
+		event = e2eutil.RebalanceStartedEvent(cbCluster)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
+			return errors.New("Failed to start rebalance: " + err.Error())
+		}
+		expectedEvents.AddRebalanceStartedEvent(cbCluster)
+
+		event = e2eutil.RebalanceCompletedEvent(cbCluster)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
+			return errors.New("Failed to rebalance: " + err.Error())
+		}
+		expectedEvents.AddMemberRemoveEvent(cbCluster, memberIndex)
+		expectedEvents.AddRebalanceCompletedEvent(cbCluster)
+
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
 			return err
 		}
 	}
@@ -74,15 +112,15 @@ func killXdcrNodes(t *testing.T, xdcrCluster *api.CouchbaseCluster, clusterSize 
 }
 
 // Generic function to resize the xdcrCluster to the given clusterSize value and wait for healthy cluster
-func resizeXdcrCluster(t *testing.T, xdcrCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
+func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
 	f := framework.Global
 	service := 0
 	targetKube := f.ClusterSpec[kubeName]
-	if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, xdcrCluster); err != nil {
+	if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, cbCluster); err != nil {
 		return err
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, xdcrCluster.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 		return err
 	}
 	return nil
@@ -100,7 +138,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	xdcr2Kube := f.ClusterSpec[xdcr2KubeName]
 
 	// Cluster 1
-	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, xdcr1Kube.KubeClient, xdcr1Kube.CRClient, f.Namespace, xdcr1Kube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminExposed)
+	clusterSize := e2eutil.Size3
+	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, xdcr1Kube.KubeClient, xdcr1Kube.CRClient, f.Namespace, xdcr1Kube.DefaultSecret.Name, clusterSize, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,8 +147,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 
 	expectedXdcrCluster1Events := e2eutil.EventList{}
 	expectedXdcrCluster1Events.AddAdminConsoleSvcCreateEvent(xdcrCluster1)
-	for nodeIndex := 0; nodeIndex < e2eutil.Size3; nodeIndex++ {
-		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 0)
+	for nodeIndex := 0; nodeIndex < clusterSize; nodeIndex++ {
+		expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, nodeIndex)
 	}
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.AdminService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
@@ -118,13 +157,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
-	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcr2Kube.KubeClient, xdcr2Kube.CRClient, f.Namespace, xdcr2Kube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminExposed)
+	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcr2Kube.KubeClient, xdcr2Kube.CRClient, f.Namespace, xdcr2Kube.DefaultSecret.Name, clusterSize, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,14 +166,14 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 
 	expectedXdcrCluster2Events := e2eutil.EventList{}
 	expectedXdcrCluster2Events.AddAdminConsoleSvcCreateEvent(xdcrCluster2)
-	for nodeIndex := 0; nodeIndex < e2eutil.Size1; nodeIndex++ {
-		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
+	for nodeIndex := 0; nodeIndex < clusterSize; nodeIndex++ {
+		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, nodeIndex)
 	}
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
-	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
-	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
+	expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
+	expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
@@ -177,21 +211,41 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	switch operationType {
 	case "rebalanceOutNodes":
 		if targetClusterNodes == "source" {
-			rebalanceOutXdcrNodes(t, xdcrCluster1, e2eutil.Size3, xdcr1KubeName)
+			if err := rebalanceOutXdcrNodes(t, xdcrCluster1, clusterSize, xdcr1KubeName, expectedXdcrCluster1Events); err != nil {
+				t.Fatal(err)
+			}
 		} else {
-			rebalanceOutXdcrNodes(t, xdcrCluster2, e2eutil.Size3, xdcr2KubeName)
+			if err := rebalanceOutXdcrNodes(t, xdcrCluster2, clusterSize, xdcr2KubeName, expectedXdcrCluster2Events); err != nil {
+				t.Fatal(err)
+			}
 		}
 	case "killNodes":
 		if targetClusterNodes == "source" {
-			killXdcrNodes(t, xdcrCluster1, e2eutil.Size3, xdcr1KubeName)
+			if err := killXdcrNodes(t, xdcrCluster1, clusterSize, xdcr1KubeName, expectedXdcrCluster1Events); err != nil {
+				t.Fatal(err)
+			}
 		} else {
-			killXdcrNodes(t, xdcrCluster2, e2eutil.Size3, xdcr2KubeName)
+			if err := killXdcrNodes(t, xdcrCluster2, clusterSize, xdcr2KubeName, expectedXdcrCluster2Events); err != nil {
+				t.Fatal(err)
+			}
 		}
 	case "resizeOut":
 		if targetClusterNodes == "source" {
-			resizeXdcrCluster(t, xdcrCluster1, e2eutil.Size1, xdcr1KubeName)
+			if err := resizeXdcrCluster(t, xdcrCluster1, e2eutil.Size1, xdcr1KubeName); err != nil {
+				t.Fatal(err)
+			}
+			expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
+			expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 1)
+			expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 2)
+			expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 		} else {
-			resizeXdcrCluster(t, xdcrCluster2, e2eutil.Size1, xdcr2KubeName)
+			if err := resizeXdcrCluster(t, xdcrCluster2, e2eutil.Size1, xdcr2KubeName); err != nil {
+				t.Fatal(err)
+			}
+			expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
+			expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 1)
+			expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 2)
+			expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
 		}
 	default:
 		t.Fatalf("Unsupported operation: %s", operationType)
@@ -204,10 +258,9 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	// Sleep to resume xdcr replication after cluster resize
 	time.Sleep(5 * time.Minute)
 
-	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries20); err != nil {
 		t.Fatal(err)
 	}
-
 	ValidateClusterEvents(t, xdcr1Kube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
 	ValidateClusterEvents(t, xdcr2Kube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
@@ -240,11 +293,6 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-
-	_, err = xdcr1Kube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Cluster 2
 	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcr2Kube.KubeClient, xdcr2Kube.CRClient, f.Namespace, xdcr2Kube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminExposed)
@@ -333,10 +381,6 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
-	if _, err := defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
 	// Cluster 2
 	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
@@ -352,8 +396,8 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.IndexService)
-	expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster2)
-	expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster2)
+	expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
+	expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
 	expectedXdcrCluster2Events.AddBucketCreateEvent(xdcrCluster2, "default")
 
 	defKubeHost, err := f.GetKubeHostname(defKubeName)
@@ -471,11 +515,6 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-
-	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Cluster 2
 	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
@@ -605,11 +644,6 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.DataService)
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
-
-	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Cluster 2
 	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
@@ -771,11 +805,6 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	expectedXdcrCluster1Events.NodeServiceCreateEvent(xdcrCluster1, api.IndexService)
 	expectedXdcrCluster1Events.AddBucketCreateEvent(xdcrCluster1, "default")
 
-	_, err = defKube.KubeClient.CoreV1().Events(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Cluster 2
 	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
@@ -841,7 +870,6 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 			}
 		}
 	}
-
 	ValidateClusterEvents(t, defKube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
 	ValidateClusterEvents(t, xdcrKube.KubeClient, xdcrCluster2.Name, f.Namespace, expectedXdcrCluster2Events)
 }
@@ -1031,8 +1059,8 @@ func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "BasicCluster"}
-	XdcrClusterRemoveNode(t, kubeNameList, "source", "rebalanceOutXdcrNodes")
+	kubeNameList := []string{"BasicCluster", "NewCluster1"}
+	XdcrClusterRemoveNode(t, kubeNameList, "source", "rebalanceOutNodes")
 }
 
 // Create two clusters and while trying to configure XDCR
@@ -1044,7 +1072,7 @@ func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 	}
 
 	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	XdcrClusterRemoveNode(t, kubeNameList, "remote", "rebalanceOutXdcrNodes")
+	XdcrClusterRemoveNode(t, kubeNameList, "remote", "rebalanceOutNodes")
 }
 
 // Create two clusters and while trying to configure XDCR

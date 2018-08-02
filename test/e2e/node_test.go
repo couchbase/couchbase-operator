@@ -1168,13 +1168,10 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
-
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
+	for memberId := 0; memberId < e2eutil.Size5; memberId++ {
+		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
@@ -1230,23 +1227,14 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries5); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {

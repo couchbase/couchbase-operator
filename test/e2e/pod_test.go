@@ -48,18 +48,10 @@ func TestPodResourcesBasic(t *testing.T) {
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestNegPodResourcesBasic(t *testing.T) {
@@ -178,14 +170,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	}
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, scaleNum)
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
@@ -226,7 +211,6 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {
 		t.Fatalf("cluster failed to enter failed state")
 	}
-
 	t.Logf("Cluster failed, pod not scheduled")
 }
 
@@ -271,18 +255,10 @@ func TestAntiAffinityOn(t *testing.T) {
 
 	t.Logf("cluster created")
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, numNodes, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, numNodes, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
@@ -382,35 +358,26 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	}
 
 	t.Logf("Attempting to add a node")
-	if err = e2eutil.ResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase); err == nil {
-		t.Fatalf("cluster scaled to %d pods on %d nodes, fail: %v", numNodes+1, numNodes, err)
+	if err = e2eutil.ResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase); err != nil {
+		t.Fatal(err)
 	}
 
 	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, numNodes)
 	t.Logf("Node not added")
 
 	t.Logf("Reverting add")
-	err = e2eutil.ResizeCluster(t, 0, numNodes, targetKube.CRClient, testCouchbase)
-	if err != nil {
+	if err := e2eutil.ResizeCluster(t, 0, numNodes, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatalf("cluster failed to revert, fail: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, numNodes, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, numNodes, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestAntiAffinityOff(t *testing.T) {
@@ -456,8 +423,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("Attempting to add a node")
-	err = e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube.CRClient, testCouchbase)
-	if err != nil {
+	if err := e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatalf("cluster failed to scale to 5 nodes: %v", err)
 	}
 	t.Logf("Node added")
@@ -466,16 +432,8 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, scaleToNum+1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, scaleToNum+1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
