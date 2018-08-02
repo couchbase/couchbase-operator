@@ -173,9 +173,10 @@ var (
 		"TestLogCollectClusterWithPVC":               TestLogCollectClusterWithPVC,
 	}
 	DecoratorFuncMap = framework.DecoratorMap{
-		"rsaDecorator":     rsaDecorator,
-		"rzaNodeLabeller":  rzaNodeLabeller,
-		"recoverDecorator": framework.RecoverDecorator,
+		"rsaDecorator":        rsaDecorator,
+		"rzaNodeLabeller":     rzaNodeLabeller,
+		"recoverDecorator":    framework.RecoverDecorator,
+		"portworxProvisioner": portworxProvisioner,
 	}
 )
 

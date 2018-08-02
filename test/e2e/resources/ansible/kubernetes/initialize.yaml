@@ -13,7 +13,7 @@
       ignore_errors: yes
 
     - name: Deleteing docker containers
-      shell: docker rm -f $(docker ps -a -q)
+      shell: docker rm $(docker ps -a -q) -f
       ignore_errors: yes
 
     - name: Deleteing docker images

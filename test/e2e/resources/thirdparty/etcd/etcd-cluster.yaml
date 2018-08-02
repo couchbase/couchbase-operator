@@ -8,4 +8,11 @@ metadata:
   #   etcd.database.coreos.com/scope: clusterwide
 spec:
   size: 3
-  version: "3.2.13"
+  pod:
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi

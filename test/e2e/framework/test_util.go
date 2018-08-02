@@ -3,16 +3,20 @@ package framework
 import (
 	"errors"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"runtime/debug"
 )
@@ -585,4 +589,517 @@ func RecoverDecorator(test TestFunc, args DecoratorArgs) TestFunc {
 		test(t)
 	}
 	return wrapperFunc
+}
+
+func RecreateClusterRolesEtcd(kubeClient kubernetes.Interface) error {
+	if err := RemoveClusterRole(kubeClient, "etcd-operator"); err != nil {
+		return err
+	}
+
+	policyRule1 := rbacv1.PolicyRule{
+		APIGroups: []string{"etcd.database.coreos.com"},
+		Resources: []string{"etcdclusters", "etcdbackups", "etcdrestores"},
+		Verbs:     []string{"*"},
+	}
+
+	policyRule2 := rbacv1.PolicyRule{
+		APIGroups: []string{"apiextensions.k8s.io"},
+		Resources: []string{"customresourcedefinitions"},
+		Verbs:     []string{"*"},
+	}
+
+	policyRule3 := rbacv1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"pods", "services", "endpoints", "persistentvolumeclaims", "events"},
+		Verbs:     []string{"*"},
+	}
+
+	policyRule4 := rbacv1.PolicyRule{
+		APIGroups: []string{"apps"},
+		Resources: []string{"deployments"},
+		Verbs:     []string{"*"},
+	}
+
+	policyRule5 := rbacv1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"secrets"},
+		Verbs:     []string{"get"},
+	}
+
+	clusterRoleSpec := &rbacv1.ClusterRole{
+		TypeMeta:   metav1.TypeMeta{Kind: "ClusterRole", APIVersion: "rbac.authorization.k8s.io/v1beta1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-operator"},
+		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3, policyRule4, policyRule5},
+	}
+	_, err := kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
+	return err
+}
+
+func RecreateClusterRoleBindingsEtcd(kubeClient kubernetes.Interface) error {
+	clusterRoleBindingName := "etcd-operator"
+	clusterRoleName := "etcd-operator"
+	if err := RemoveClusterRoleBinding(kubeClient, "default", clusterRoleBindingName); err != nil {
+		return err
+	}
+
+	clusterRoleBindingSubjects := []rbacv1.Subject{
+		rbacv1.Subject{
+			Kind:      "ServiceAccount",
+			Name:      "default",
+			Namespace: "default",
+		},
+	}
+
+	clusterRoleBindingSpec := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     clusterRoleName},
+		Subjects: clusterRoleBindingSubjects,
+	}
+	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	return err
+}
+
+func RecreateClusterRolesPortworx(kubeClient kubernetes.Interface) error {
+	if err := RemoveClusterRole(kubeClient, "node-get-put-list-role"); err != nil {
+		return err
+	}
+
+	policyRule1 := rbacv1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"nodes"},
+		Verbs:     []string{"watch", "get", "update", "list"},
+	}
+
+	policyRule2 := rbacv1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+		Verbs:     []string{"delete", "get", "list"},
+	}
+
+	policyRule3 := rbacv1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"persistentvolumeclaims", "persistentvolumes"},
+		Verbs:     []string{"get", "list"},
+	}
+
+	clusterRoleSpec := &rbacv1.ClusterRole{
+		TypeMeta:   metav1.TypeMeta{Kind: "ClusterRole", APIVersion: "rbac.authorization.k8s.io/v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "node-get-put-list-role"},
+		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3},
+	}
+	_, err := kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
+	return err
+}
+
+func RecreateClusterRoleBindingsPortworx(kubeClient kubernetes.Interface) error {
+	clusterRoleBindingName := "node-role-binding"
+	clusterRoleName := "node-get-put-list-role"
+	if err := RemoveClusterRoleBinding(kubeClient, "kube-system", clusterRoleBindingName); err != nil {
+		return err
+	}
+
+	clusterRoleBindingSubjects := []rbacv1.Subject{
+		rbacv1.Subject{
+			Kind:      "ServiceAccount",
+			Name:      "px-account",
+			Namespace: "kube-system",
+		},
+	}
+
+	clusterRoleBindingSpec := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     clusterRoleName},
+		Subjects: clusterRoleBindingSubjects,
+	}
+	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	return err
+}
+
+func RecreateServiceAccountPortworx(kubeClient kubernetes.Interface) error {
+	serviceAccountName := "px-account"
+	namespace := "kube-system"
+
+	if err := RemoveServiceAccount(kubeClient, namespace, serviceAccountName); err != nil {
+		return err
+	}
+
+	// Create service account given by the name
+	serviceAccountSpec := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName, Namespace: namespace},
+	}
+	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccountSpec)
+	return err
+}
+
+func WaitForServiceDeleted(kubeClient kubernetes.Interface, serviceName string, namespace string, waitTimeInSec int) error {
+	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return errors.New("Timed out waiting for service account to be delete: " + serviceName)
+
+		case <-tickChan:
+			svcList, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			for _, svc := range svcList.Items {
+				if svc.GetName() == "default" {
+					break
+				}
+				if svc.GetName() == serviceName {
+					break
+				}
+
+			}
+			return nil
+		}
+	}
+}
+
+func RemoveService(kubeClient kubernetes.Interface, namespace, serviceName string) error {
+	svcList, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList.Items {
+		if svc.GetName() == serviceName {
+			kubeClient.CoreV1().Services(namespace).Delete(svc.GetName(), &metav1.DeleteOptions{})
+			err = WaitForServiceDeleted(kubeClient, serviceName, namespace, 30)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return nil
+}
+
+func RecreateServicePortworx(kubeClient kubernetes.Interface) error {
+	serviceName := "portworx-service"
+	namespace := "kube-system"
+
+	if err := RemoveService(kubeClient, namespace, serviceName); err != nil {
+		return err
+	}
+	labels := make(map[string]string)
+	labels["name"] = "portworx"
+	ports := []v1.ServicePort{{
+		Name:       "px-api",
+		Port:       9001,
+		TargetPort: intstr.FromInt(9001),
+		Protocol:   v1.ProtocolTCP,
+	}}
+
+	serviceSpec := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: v1.ServiceSpec{
+			Ports:    ports,
+			Selector: labels,
+		},
+	}
+	_, err := kubeClient.CoreV1().Services(namespace).Create(serviceSpec)
+	return err
+}
+
+func WaitForStorageClassDeleted(kubeClient kubernetes.Interface, storageClassName string, waitTimeInSec int) error {
+	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return errors.New("Timed out waiting for storage class to be delete: " + storageClassName)
+
+		case <-tickChan:
+			scList, err := kubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			for _, sc := range scList.Items {
+				if sc.GetName() == storageClassName {
+					break
+				}
+			}
+			return nil
+		}
+	}
+}
+
+func RemoveStorageClass(kubeClient kubernetes.Interface, storageClassName string) error {
+	scList, err := kubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, sc := range scList.Items {
+		if sc.GetName() == storageClassName {
+			kubeClient.StorageV1().StorageClasses().Delete(sc.GetName(), &metav1.DeleteOptions{})
+			err = WaitForStorageClassDeleted(kubeClient, storageClassName, 30)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return nil
+}
+
+func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
+	storageClassName := "standard"
+
+	if err := RemoveStorageClass(kubeClient, storageClassName); err != nil {
+		return err
+	}
+	parameters := make(map[string]string)
+	parameters["repl"] = "1"
+	parameters["snap_interval"] = "70"
+	parameters["io_priority"] = "high"
+
+	storageClassSpec := &storagev1.StorageClass{
+		TypeMeta:    metav1.TypeMeta{Kind: "StorageClass", APIVersion: "storage.k8s.io/v1beta1"},
+		ObjectMeta:  metav1.ObjectMeta{Name: storageClassName},
+		Provisioner: "kubernetes.io/portworx-volume",
+		Parameters:  parameters,
+	}
+	_, err := kubeClient.StorageV1().StorageClasses().Create(storageClassSpec)
+	return err
+}
+
+func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, kubeName string) error {
+	t.Logf("deleting etcd deployment")
+	DeleteOperatorCompletely(kubeClient, "etcd-operator", "default")
+
+	t.Log("deleting ectd-operator pods")
+	err := e2eutil.DeletePodsWithLabel(t, kubeClient, "name=etcd-operator", "default")
+	if err != nil {
+		return err
+	}
+
+	// delete etcd services
+	t.Logf("deleting etcd services")
+	services, err := kubeClient.CoreV1().Services("default").List(metav1.ListOptions{LabelSelector: "app=etcd"})
+	if err != nil {
+		return err
+	}
+	for _, service := range services.Items {
+		t.Logf("deleting etcd service: %+v\n", service.Name)
+		err = kubeClient.CoreV1().Services("default").Delete(service.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			return err
+		}
+	}
+
+	// delete etcd endpoints
+	t.Logf("deleting etcd endpoints")
+	endpoints, err := kubeClient.CoreV1().Endpoints("default").List(metav1.ListOptions{LabelSelector: "app=etcd"})
+	if err != nil {
+		return err
+	}
+	for _, endpoint := range endpoints.Items {
+		t.Logf("deleting etcd endpoints: %+v\n", endpoint.Name)
+		err = kubeClient.CoreV1().Endpoints("default").Delete(endpoint.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			return err
+		}
+	}
+	err = kubeClient.CoreV1().Endpoints("default").Delete("etcd-operator", metav1.NewDeleteOptions(0))
+	if err != nil {
+		t.Logf("etcd-operator endpoint already deleted")
+	}
+
+	// delete etcd pods
+	t.Log("deleting etcd pods")
+	err = e2eutil.DeletePodsWithLabel(t, kubeClient, "app=etcd", "default")
+	if err != nil {
+		return err
+	}
+
+	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	wipePortworxCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
+	if err := runExecCommand(t, wipePortworxCmd); err != nil {
+		t.Logf("error deleteing etcd operator crd: " + err.Error())
+	}
+
+	return nil
+}
+
+func CreateEtcdCluster(t *testing.T, kubeName string) error {
+	t.Logf("deploying etcd")
+	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	createEtcCLusterdCmd := exec.Command("bash", "./resources/thirdparty/etcd/deploy-etcd-automation.sh", kubeConfigPath)
+	if err := runExecCommand(t, createEtcCLusterdCmd); err != nil {
+		return errors.New("error creating etcd cluster: " + err.Error())
+	}
+	t.Logf("etcd deployed")
+	return nil
+}
+
+func GetEtcdServiceEndpoint(kubeClient kubernetes.Interface) (string, error) {
+	services, err := kubeClient.CoreV1().Services("default").List(metav1.ListOptions{LabelSelector: "app=etcd"})
+	if err != nil {
+		return "", err
+	}
+	for _, service := range services.Items {
+		if service.Spec.ClusterIP != "" && service.Spec.ClusterIP != "None" {
+			return service.Spec.ClusterIP, nil
+		}
+	}
+	return "", errors.New("etcd client service not found")
+}
+
+func CreateEtcd(t *testing.T, kubeClient kubernetes.Interface, kubeName string) error {
+	t.Log("creating etcd cluster role")
+	err := RecreateClusterRolesEtcd(kubeClient)
+	if err != nil {
+		return err
+	}
+	t.Log("creating etcd cluster role binding")
+	err = RecreateClusterRoleBindingsEtcd(kubeClient)
+	if err != nil {
+		return err
+	}
+
+	t.Log("creating etcd cluster")
+	err = CreateEtcdCluster(t, kubeName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName string) error {
+	t.Log("creating portworx service account")
+	err := RecreateServiceAccountPortworx(kubeClient)
+	if err != nil {
+		return err
+	}
+
+	t.Log("creating portworx cluster role")
+	err = RecreateClusterRolesPortworx(kubeClient)
+	if err != nil {
+		return err
+	}
+
+	t.Log("creating portworx cluster role binding")
+	err = RecreateClusterRoleBindingsPortworx(kubeClient)
+	if err != nil {
+		return err
+	}
+
+	t.Log("creating portworx service")
+	err = RecreateServicePortworx(kubeClient)
+	if err != nil {
+		return err
+	}
+
+	t.Log("creating portworx storage class")
+	err = RecreateStorageClassPortworx(kubeClient)
+	if err != nil {
+		return err
+	}
+
+	t.Log("grabbing etcd endpoint ip")
+	etcdEndpointIP, err := GetEtcdServiceEndpoint(kubeClient)
+	if err != nil {
+		return err
+	}
+
+	err = e2eutil.AddLabelToNodes(t, kubeClient, "px/enabled", "false")
+	if err != nil {
+		return err
+	}
+
+	t.Log("deploying portworx service")
+	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	deployPortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/deploy-portworx-automation.sh", etcdEndpointIP, "portworx-test", kubeConfigPath)
+	if err := runExecCommand(t, deployPortworxCmd); err != nil {
+		return errors.New("error running submit-portworx-automation.sh: " + err.Error())
+	}
+
+	t.Log("scaling up portworx pods")
+	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	numNodes := len(k8sNodeList.Items)
+	for i := 0; i < numNodes; i++ {
+		//remove label from node i
+		for retryCount := 0; retryCount < 3; retryCount++ {
+			time.Sleep(5 * time.Second)
+			k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+			if err != nil {
+				if retryCount == 2 {
+					return err
+				} else {
+					continue
+				}
+			}
+			node := k8sNodeList.Items[i]
+			err = e2eutil.AddLabelToNode(t, kubeClient, node, "px/enabled", "true")
+			if err != nil {
+				if retryCount == 2 {
+					return err
+				} else {
+					continue
+				}
+			}
+			break
+		}
+		time.Sleep(5 * time.Second)
+		err = e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 240, "name=portworx", "kube-system")
+		if err != nil {
+			return err
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return nil
+}
+
+func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName string) error {
+	t.Log("deleting portworx daemonset")
+	err := e2eutil.DeleteDaemonSetsWithLabel(t, kubeClient, "name=portworx", "kube-system")
+	if err != nil {
+		return err
+	}
+
+	t.Log("deleting portworx pods")
+	err = e2eutil.DeletePodsWithLabel(t, kubeClient, "name=portworx", "kube-system")
+	if err != nil {
+		return err
+	}
+
+	t.Log("deleting talisman job")
+	jobs, err := kubeClient.BatchV1().Jobs("kube-system").List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, job := range jobs.Items {
+		kubeClient.BatchV1().Jobs("kube-system").Delete(job.Name, metav1.NewDeleteOptions(0))
+	}
+
+	t.Log("deleting talisman pods")
+	err = e2eutil.DeletePodsWithLabel(t, kubeClient, "name=talisman", "kube-system")
+	if err != nil {
+		return err
+	}
+
+	t.Log("running delete-portworx-automation.sh")
+	err = RecreateServicePortworx(kubeClient)
+	if err != nil {
+		return err
+	}
+	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
+	if err := runExecCommand(t, deletePortworxCmd); err != nil {
+		return errors.New("error running delete-portworx-automation.sh: " + err.Error())
+	}
+	return nil
 }

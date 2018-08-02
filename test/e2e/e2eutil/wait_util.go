@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	"k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -24,11 +25,42 @@ var retryInterval = 10 * time.Second
 
 type acceptFunc func(*api.CouchbaseCluster) bool
 type filterFunc func(*v1.Pod) bool
+type filterFuncDaemonSet func(*v1beta1.DaemonSet) bool
 
 func WaitUntilPodSizeReached(t *testing.T, kubeClient kubernetes.Interface, size, retries int, cl *api.CouchbaseCluster) ([]string, error) {
 	var names []string
 	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
 		podList, err := kubeClient.Core().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
+		if err != nil {
+			return false, err
+		}
+		names = nil
+		var nodeNames []string
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+
+			if pod.Status.Phase != v1.PodRunning {
+				continue
+			}
+			names = append(names, pod.Name)
+			nodeNames = append(nodeNames, pod.Spec.NodeName)
+		}
+		LogfWithTimestamp(t, "waiting size (%d), couchbase pods: names (%v), nodes (%v)", size, names, nodeNames)
+		if len(names) != size {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+func WaitUntilPodSizeReachedEtcd(t *testing.T, kubeClient kubernetes.Interface, size, retries int) ([]string, error) {
+	var names []string
+	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
+		podList, err := kubeClient.Core().Pods("default").List(metav1.ListOptions{LabelSelector: "app=etcd"})
 		if err != nil {
 			return false, err
 		}
@@ -42,7 +74,7 @@ func WaitUntilPodSizeReached(t *testing.T, kubeClient kubernetes.Interface, size
 			names = append(names, pod.Name)
 			nodeNames = append(nodeNames, pod.Spec.NodeName)
 		}
-		LogfWithTimestamp(t, "waiting size (%d), couchbase pods: names (%v), nodes (%v)", size, names, nodeNames)
+		LogfWithTimestamp(t, "waiting size (%d), etcd pods: names (%v), nodes (%v)", size, names, nodeNames)
 		if len(names) != size {
 			return false, nil
 		}
@@ -626,4 +658,65 @@ func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, wa
 			}
 		}
 	}
+}
+
+func WaitForPodsReadyWithLabel(t *testing.T, kubeClient kubernetes.Interface, waitTimeInSec int, label string, namespace string) error {
+	t.Logf("waiting for pods to be ready in namesapce %v with label %v", namespace, label)
+	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return errors.New("Timed out waiting for pods to enter ready state")
+
+		case <-tickChan:
+			portworxReady := true
+			podList, _ := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
+			for _, pod := range podList.Items {
+				if pod.Status.Phase != v1.PodRunning {
+					portworxReady = false
+					break
+				}
+				for _, condition := range pod.Status.Conditions {
+					if condition.Type == "Ready" && condition.Status != v1.ConditionTrue {
+						portworxReady = false
+					}
+				}
+			}
+			if portworxReady {
+				t.Logf("portworx pods ready \n")
+				return nil
+			}
+		}
+	}
+}
+
+func WaitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions) ([]*v1beta1.DaemonSet, error) {
+	f := func(ds *v1beta1.DaemonSet) bool { return ds.DeletionTimestamp != nil }
+	return waitDaemonSetsDeleted(kubecli, namespace, retries, lo, f)
+}
+
+func waitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions, filters ...filterFuncDaemonSet) ([]*v1beta1.DaemonSet, error) {
+	var dss []*v1beta1.DaemonSet
+	err := retryutil.Retry(Context, retryInterval, retries, func() (bool, error) {
+		dsList, err := kubecli.ExtensionsV1beta1().DaemonSets(namespace).List(lo)
+		if err != nil {
+			return false, err
+		}
+		dss = nil
+		for i := range dsList.Items {
+			ds := &dsList.Items[i]
+			filtered := false
+			for _, filter := range filters {
+				if filter(ds) {
+					filtered = true
+				}
+			}
+			if !filtered {
+				dss = append(dss, ds)
+			}
+		}
+		return len(dss) == 0, nil
+	})
+	return dss, err
 }

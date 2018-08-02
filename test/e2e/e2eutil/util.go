@@ -129,6 +129,14 @@ type ClusterReadyRetries struct {
 	Service int
 }
 
+var (
+	defaultRetries = &ClusterReadyRetries{
+		Size:    Retries60,
+		Bucket:  Retries20,
+		Service: Retries20,
+	}
+)
+
 // randomSuffix generates a 5 character random suffix to be appended to
 // k8s resources to avoid namespace collisions (especially events)
 func RandomSuffix() string {
@@ -234,16 +242,10 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 
 // newClusterFromSpec creates a cluster and waits for various ready conditions.
 // Performs retries and garbage collection in the event of transient failure
-func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, clusterSpec *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, clusterSpec *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
 	var err error
 	for i := 0; i < 1; i++ {
 		time.Sleep(10 * time.Second)
-
-		retries := &ClusterReadyRetries{
-			Size:    Retries60,
-			Bucket:  Retries20,
-			Service: Retries20,
-		}
 
 		// Ensure we set the err variable in the main scope
 		var cluster *api.CouchbaseCluster
@@ -270,7 +272,7 @@ func CreateClusterSpec(secretName string, config map[string]map[string]string) a
 // Creates Couchbase cluster object and returns it
 func CreateClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(ClusterNamePrefix, adminConsoleExposed, spec)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, defaultRetries)
 }
 
 // Creates Couchbase cluster object and returns it
@@ -297,14 +299,14 @@ func NewClusterMultiQuick(t *testing.T, crClient versioned.Interface, namespace,
 // performing garbage collection
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
 }
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewXdcrClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
 }
 
 func NewClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
@@ -316,14 +318,14 @@ func NewClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClie
 // error is encountered and performing garbage collection
 func NewStatefulCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewStatefulCluster(ClusterNamePrefix, secretName, size, withBucket, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
 }
 
 // NewClusterMulti creates a multi cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster(ClusterNamePrefix, secretName, config, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
 }
 
 // NewClusterMultiNoWait creates a multi cluster, but doesn't wait for any events.
@@ -855,6 +857,86 @@ func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *
 		if err != nil {
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}
+	}
+	return nil
+}
+
+func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label string, namespace string) error {
+	t.Logf("deleting pods with label: %v", label)
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods.Items {
+		err := DeletePod(t, kubeClient, pod.Name, namespace)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = WaitPodsDeleted(kubeClient, namespace, Retries30, metav1.ListOptions{LabelSelector: label})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeletePod(t *testing.T, kubeClient kubernetes.Interface, podName string, namespace string) error {
+	t.Logf("deleting pod: %v", podName)
+	err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label string, namespace string) error {
+	t.Logf("deleting pods with label: %v", label)
+	dsList, err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).List(metav1.ListOptions{LabelSelector: label})
+	if err != nil {
+		return err
+	}
+	for _, ds := range dsList.Items {
+		err := DeleteDaemonSet(t, kubeClient, ds.Name, namespace)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, Retries30, metav1.ListOptions{LabelSelector: label})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteDaemonSet(t *testing.T, kubeClient kubernetes.Interface, dsName string, namespace string) error {
+	t.Logf("deleting daemonset: %v", dsName)
+	err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).Delete(dsName, metav1.NewDeleteOptions(0))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func AddLabelToNodes(t *testing.T, kubeClient kubernetes.Interface, labelKey string, labelValue string) error {
+	t.Logf("adding label %v:%v to all nodes", labelKey, labelValue)
+	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, node := range k8sNodeList.Items {
+		if err := AddLabelToNode(t, kubeClient, node, labelKey, labelValue); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node, labelKey string, labelValue string) error {
+	t.Logf("adding label %v:%v to node %v", labelKey, labelValue, node.Name)
+	currentLables := node.ObjectMeta.Labels
+	currentLables[labelKey] = labelValue
+	if _, err := kubeClient.CoreV1().Nodes().Update(&node); err != nil {
+		return err
 	}
 	return nil
 }

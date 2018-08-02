@@ -193,7 +193,7 @@ func cleanUpNamespace() (err error) {
 			return errors.New("Failed to list deployments: " + err.Error())
 		}
 		for _, deployment := range deployments.Items {
-			Global.DeleteCouchbaseOperatorCompletely(targetKube, deployment.GetName())
+			DeleteOperatorCompletely(targetKube.KubeClient, deployment.GetName(), Global.Namespace)
 		}
 
 		// Clear couchbase pods
@@ -269,7 +269,9 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 
 func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
+
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
+
 	logrus.Info("Marking all nodes as schedulable")
 	nodeTaintList := []v1.Taint{}
 	k8sNodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -282,29 +284,27 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 	}
 
-	logrus.Info("deleting jobs")
-	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
-	for _, job := range jobs.Items {
-		targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
-	}
 	logrus.Info("deleting deployments")
 	deployments, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.New("Failed to list deployments: " + err.Error())
 	}
 	for _, deployment := range deployments.Items {
-		Global.DeleteCouchbaseOperatorCompletely(targetKube, deployment.GetName())
+		err = DeleteOperatorCompletely(targetKube.KubeClient, deployment.GetName(), f.Namespace)
+		if err != nil {
+			return err
+		}
+		logrus.Infof("deployment deleted: %v", deployment.GetName())
 	}
-	deployments, err = targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list deployments: " + err.Error())
-	}
-	logrus.Info("deployments after delete: " + string(len(deployments.Items)))
 
 	logrus.Info("deleting clusters")
 	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 	for _, cluster := range clusters.Items {
-		targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+		err = targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			return err
+		}
+		logrus.Infof("cluster deleted: %v", cluster.Name)
 		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
 		if err != nil {
 			return errors.New("failed to list pods for cluster: " + err.Error())
@@ -315,18 +315,60 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 		e2eutil.KillMembers(targetKube.KubeClient, Global.Namespace, cluster.Name, killPods...)
 	}
+
+	logrus.Info("deleting jobs")
+	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
+	for _, job := range jobs.Items {
+		err = targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			return err
+		}
+		logrus.Infof("jobs deleted: %v", job.Name)
+	}
+
 	logrus.Info("deleting services")
-	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{})
 	for _, service := range services.Items {
-		targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+		err = targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			return err
+		}
+		logrus.Infof("service deleted: %v", service.Name)
 	}
 	logrus.Info("deleting orphaned pods")
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{})
 	for _, pod := range pods.Items {
-		targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		err = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			return err
+		}
+		logrus.Infof("pod deleted: %v", pod.Name)
 	}
+
+	endpoints, err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, endpoint := range endpoints.Items {
+		err = targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			return err
+		}
+		logrus.Infof("endpoint deleted: %v", endpoint.Name)
+	}
+
 	logrus.Info("deleting secrets")
-	e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
+	err = e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
+	if err == nil {
+		logrus.Infof("secret deleted: %v", "basic-test-secret")
+	}
+
+	logrus.Info("deleting crds")
+	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	clearCrdCmd := exec.Command("kubectl", "delete", "crd", "--all", "--kubeconfig", kubeConfigPath)
+	if err := runExecCmd(clearCrdCmd); err != nil {
+		return errors.New("error clearing out crds: " + err.Error())
+	}
 
 	// Creating required namespaces and cluster roles before deploying the operator
 	logrus.Info("creating namespace")
@@ -393,7 +435,6 @@ func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName s
 	ansibleCmd := exec.Command("ansible-playbook", "-i", inventoryFile, pullDockerImageFile, "--extra-vars", ansibleExtraVarParam)
 	var stdout bytes.Buffer
 	ansibleCmd.Stdout = &stdout
-
 	if err := ansibleCmd.Run(); err != nil {
 		logrus.Info(stdout.String())
 		return errors.New("Error during ansible execution: " + err.Error())
@@ -410,15 +451,15 @@ func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
 	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, "couchbase-operator")
 }
 
-func (f *Framework) DeleteCouchbaseOperatorCompletely(targetKube *Cluster, deploymentName string) error {
-	err := f.deleteCouchbaseOperator(targetKube, deploymentName)
+func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName string, namespace string) error {
+	err := deleteOperator(kubeClient, deploymentName, namespace)
 	if err != nil {
 		return err
 	}
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
 	err = retryutil.Retry(e2eutil.Context, 5*time.Second, 24, func() (bool, error) {
-		_, err = targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Get("couchbase-operator", metav1.GetOptions{})
+		_, err = kubeClient.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return false, err
 		}
@@ -433,11 +474,11 @@ func (f *Framework) DeleteCouchbaseOperatorCompletely(targetKube *Cluster, deplo
 	return nil
 }
 
-func (f *Framework) deleteCouchbaseOperator(targetKube *Cluster, deploymentName string) error {
+func deleteOperator(kubeClient kubernetes.Interface, deploymentName string, namespace string) error {
 	deletePropagation := metav1.DeletePropagationForeground
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
-	return targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Delete(deploymentName, deleteOpts)
+	return kubeClient.ExtensionsV1beta1().Deployments(namespace).Delete(deploymentName, deleteOpts)
 }
 
 func (f *Framework) ApiServerHost(kubeName string) string {
@@ -486,27 +527,18 @@ func runExecCommand(t *testing.T, command *exec.Cmd) error {
 	command.Stderr = &stderr
 
 	if err := command.Run(); err != nil {
-		t.Log(stdout.String())
-		return errors.New("Error during ansible execution: " + stderr.String() + "\n" + err.Error())
+		return errors.New("Error during execution: " + stderr.String() + "\n" + err.Error())
 	}
-	t.Log(stdout.String())
 	return nil
 }
 
-/*
-func (f *Framework) setupAWS() error {
-	if err := os.Setenv("AWS_SHARED_CREDENTIALS_FILE", os.Getenv("AWS_CREDENTIAL")); err != nil {
-		return err
+func runExecCmd(command *exec.Cmd) error {
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+
+	if err := command.Run(); err != nil {
+		return errors.New("Error during execution: " + stderr.String() + "\n" + err.Error())
 	}
-	if err := os.Setenv("AWS_CONFIG_FILE", os.Getenv("AWS_CONFIG")); err != nil {
-		return err
-	}
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
-	if err != nil {
-		return err
-	}
-	f.S3Cli = s3.New(sess)
 	return nil
-}*/
+}
