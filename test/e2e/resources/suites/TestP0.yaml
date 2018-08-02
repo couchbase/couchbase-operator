@@ -115,9 +115,15 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-        - name: TestPersistentVolumeCreateCluster
-        - name: TestPersistentVolumeAutoFailover
-        - name: TestPersistentVolumeNodeFailover
+      - name: TestPersistentVolumeCreateCluster
+        decorators:
+          - portworxProvisioner
+      - name: TestPersistentVolumeAutoFailover
+        decorators:
+          - portworxProvisioner
+      - name: TestPersistentVolumeNodeFailover
+        decorators:
+          - portworxProvisioner
 
   - name: FailoverTests
     clusters:
