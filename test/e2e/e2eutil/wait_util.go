@@ -361,7 +361,7 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label strin
 		return false, nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for pods with label=(%v) to become ready: %v", podName, err)
+		return fmt.Errorf("failed to wait for pods with label=(%v) to become ready: %v", label, err)
 	}
 	return nil
 }

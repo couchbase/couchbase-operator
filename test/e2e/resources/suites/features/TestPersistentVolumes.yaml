@@ -1,5 +1,5 @@
 ---
-suite: TestP0
+suite: TestPersistentVolumes
 tcGroups:
   - name: PersistentVolumeTests
     clusters:
