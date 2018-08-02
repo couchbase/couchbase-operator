@@ -62,19 +62,24 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 			}
 
 			t.Log("creating etcd cluster")
+			if !f.SkipTeardown {
+				defer framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
+			}
+
 			err = framework.CreateEtcd(t, targetKube.KubeClient, targetKubeName)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			defer framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
-
 			t.Log("creating portworx cluster")
+			if !f.SkipTeardown {
+				defer framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
+			}
 			err = framework.CreatePortworx(t, targetKube.KubeClient, targetKubeName)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
+
 		}
 
 		testFunc(t)

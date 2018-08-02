@@ -924,6 +924,7 @@ func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, kubeName string) 
 		return err
 	}
 
+	t.Log("running delete-etcd-automation.sh")
 	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
 	wipePortworxCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
 	if err := runExecCommand(t, wipePortworxCmd); err != nil {
@@ -1054,7 +1055,7 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName stri
 			break
 		}
 		time.Sleep(5 * time.Second)
-		err = e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 240, "name=portworx", "kube-system")
+		err = e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 300, "name=portworx", "kube-system")
 		if err != nil {
 			return err
 		}

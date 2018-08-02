@@ -17,7 +17,6 @@ import (
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -346,13 +345,10 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int
 }
 
 // WaitUntilOperatorReady will wait until the first pod selected for the label name=couchbase-operator is ready.
-func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string) error {
+func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label string) error {
 	var podName string
-	lo := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(NameLabelSelector("app", name)).String(),
-	}
 	err := retryutil.Retry(Context, time.Second, 180, func() (bool, error) {
-		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
+		podList, err := kubecli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 		if err != nil {
 			return false, err
 		}
@@ -365,17 +361,14 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, name string
 		return false, nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for pod (%v) to become ready: %v", podName, err)
+		return fmt.Errorf("failed to wait for pods with label=(%v) to become ready: %v", podName, err)
 	}
 	return nil
 }
 
-func WaitUntilOperatorDeleted(kubecli kubernetes.Interface, namespace, name string) error {
-	lo := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(NameLabelSelector("app", name)).String(),
-	}
+func WaitUntilOperatorDeleted(kubecli kubernetes.Interface, namespace, label string) error {
 	err := retryutil.Retry(Context, 10*time.Second, 6, func() (bool, error) {
-		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
+		podList, err := kubecli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 		if err != nil {
 			return false, err
 		}
@@ -385,7 +378,7 @@ func WaitUntilOperatorDeleted(kubecli kubernetes.Interface, namespace, name stri
 		return false, nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for pods with label=(%v) to be deleted: %v", name, err)
+		return fmt.Errorf("failed to wait for pods with label=(%v) to be deleted: %v", label, err)
 	}
 	return nil
 }
