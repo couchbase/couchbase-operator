@@ -194,12 +194,11 @@ func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v
 // (sans load balancing middleware) which allows the operator to resolve
 // addresses of individual pods instead of a proxy
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
-	ports := peerServicePorts
 	labels := LabelsForCluster(clusterName)
 
 	// Create a service which defines A records for all pods, we use this internally
 	// to address nodes via stable names (IPs are not fixed)
-	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, ports, labels, labels)
+	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, peerServicePorts, labels, labels)
 	svc.Spec.ClusterIP = v1.ClusterIPNone
 	if _, err := createService(kubecli, ns, svc, owner); err != nil {
 		return err
@@ -209,7 +208,7 @@ func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, own
 	// using SRV records will connect, meaning they will only ever bootstrap via memcached
 	selectors := LabelsForCluster(clusterName)
 	selectors["couchbase_service_data"] = "enabled"
-	svc = createServiceManifest(clusterName+"-srv", v1.ServiceTypeClusterIP, ports, labels, selectors)
+	svc = createServiceManifest(clusterName+"-srv", v1.ServiceTypeClusterIP, srvServicePorts, labels, selectors)
 	svc.Spec.ClusterIP = v1.ClusterIPNone
 	if _, err := createService(kubecli, ns, svc, owner); err != nil {
 		return err
@@ -754,6 +753,19 @@ var peerServicePorts = []v1.ServicePort{
 	{
 		Name:     couchbaseSRVNameTLS,
 		Port:     adminServicePortTLS,
+		Protocol: v1.ProtocolTCP,
+	},
+}
+
+var srvServicePorts = []v1.ServicePort{
+	{
+		Name:     couchbaseSRVName,
+		Port:     dataServicePort,
+		Protocol: v1.ProtocolTCP,
+	},
+	{
+		Name:     couchbaseSRVNameTLS,
+		Port:     dataServicePortTLS,
 		Protocol: v1.ProtocolTCP,
 	},
 }
