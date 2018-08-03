@@ -28,6 +28,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -267,6 +268,18 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 	return err
 }
 
+func (f *Framework) DeleteCRDs(config *rest.Config) error {
+	logrus.Info("Removing CRDs")
+	clientSet, err := clientset.NewForConfig(config)
+	if err != nil {
+		return errors.New("Failed to create clientset object: " + err.Error())
+	}
+	if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+		return errors.New("Failed to delete CRDs: " + err.Error())
+	}
+	return nil
+}
+
 func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
 
@@ -358,16 +371,12 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	logrus.Info("deleting secrets")
-	err = e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
-	if err == nil {
+	if err := e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
 		logrus.Infof("secret deleted: %v", "basic-test-secret")
 	}
 
-	logrus.Info("deleting crds")
-	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
-	clearCrdCmd := exec.Command("kubectl", "delete", "crd", "--all", "--kubeconfig", kubeConfigPath)
-	if err := runExecCmd(clearCrdCmd); err != nil {
-		return errors.New("error clearing out crds: " + err.Error())
+	if err := f.DeleteCRDs(targetKube.Config); err != nil {
+		return err
 	}
 
 	// Creating required namespaces and cluster roles before deploying the operator

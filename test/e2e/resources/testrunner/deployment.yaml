@@ -7,7 +7,7 @@ spec:
   template:
     metadata:
       labels:
-        name: couchbase-operator
+        app: couchbase-operator
     spec:
       containers:
       - name: couchbase-operator

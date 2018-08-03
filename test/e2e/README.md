@@ -20,7 +20,7 @@ The test configuration is defined in `./resources/test_config.yaml`. The default
 ```
 operator-image: couchbase/couchbase-operator:v1
 namespace: default
-deployment-spec: resources/test_deployment.yaml
+deployment-spec: ../../example/deployment.yaml
 cluster-config: resources/cluster_conf.yaml
 kube-config:
   - name: BasicCluster
