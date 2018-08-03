@@ -448,7 +448,7 @@ func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
 		return err
 	}
 
-	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, "name=couchbase-operator")
+	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, "app=couchbase-operator")
 }
 
 func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName string, namespace string) error {

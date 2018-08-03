@@ -4,7 +4,7 @@ types:
     clusters:
       - name: BasicCluster
         master:
-          - ip: 172.23.96.39
+          - ip: 172.23.104.68
         worker:
           - ip: 172.23.96.42
           - ip: 172.23.96.50
@@ -35,7 +35,7 @@ types:
           - ip: 172.23.96.142
           - ip: 172.23.96.144
 
-  - type: aws_openshift
+  - type: openshift_aws
     clusters:
       - name: BasicCluster
         master:
@@ -44,3 +44,15 @@ types:
           - ip: ec2-13-56-163-123.us-west-1.compute.amazonaws.com
           - ip: ec2-18-144-39-28.us-west-1.compute.amazonaws.com
           - ip: ec2-13-56-212-142.us-west-1.compute.amazonaws.com
+
+      - name: NewCluster1
+        master:
+          - ip: 10.0.1.87
+            label: RzaGroup-2
+        worker:
+          - ip: 10.0.1.224
+            label: RzaGroup-1
+          - ip: 10.0.1.154
+            label: RzaGroup-2
+          - ip: 10.0.1.48
+            label: RzaGroup-3

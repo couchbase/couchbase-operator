@@ -569,7 +569,7 @@ func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, cl
 }
 
 func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {
-	options := metav1.ListOptions{LabelSelector: "name=couchbase-operator"}
+	options := metav1.ListOptions{LabelSelector: "app=couchbase-operator"}
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(options)
 	if err != nil {
 		return err

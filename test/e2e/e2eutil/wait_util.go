@@ -344,7 +344,7 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int
 	return pods, err
 }
 
-// WaitUntilOperatorReady will wait until the first pod selected for the label name=couchbase-operator is ready.
+// WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
 func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label string) error {
 	err := retryutil.Retry(Context, time.Second, 180, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
