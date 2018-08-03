@@ -111,19 +111,19 @@ tcGroups:
         decorators:
           - rzaNodeLabeller
 
-  - name: PersistentVolumeTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestPersistentVolumeCreateCluster
-        decorators:
-          - portworxProvisioner
-      - name: TestPersistentVolumeAutoFailover
-        decorators:
-          - portworxProvisioner
-      - name: TestPersistentVolumeNodeFailover
-        decorators:
-          - portworxProvisioner
+  #- name: PersistentVolumeTests
+  #  clusters:
+  #    - BasicCluster
+  #  testcases:
+  #    - name: TestPersistentVolumeCreateCluster
+  #      decorators:
+  #        - portworxProvisioner
+  #    - name: TestPersistentVolumeAutoFailover
+  #      decorators:
+  #        - portworxProvisioner
+  #    - name: TestPersistentVolumeNodeFailover
+  #      decorators:
+  #        - portworxProvisioner
 
   - name: FailoverTests
     clusters:

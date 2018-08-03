@@ -122,34 +122,34 @@ tcGroups:
         decorators:
           - rzaNodeLabeller
 
-  - name: PersistentVolumeTests
-    clusters:
-      - BasicCluster
-    testcases:
-        - name: TestPersistentVolumeKillAllPods
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistestVolumeRemoveVolume
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeKillPodAndOperator
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeKillAllPodsAndOperator
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeRzaNodesKilled
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeRzaFailover
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeWithSingleNodeService
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeResizeCluster
-          decorators:
-            - portworxProvisioner
+  #- name: PersistentVolumeTests
+  #  clusters:
+  #    - BasicCluster
+  #  testcases:
+  #      - name: TestPersistentVolumeKillAllPods
+  #        decorators:
+  #          - portworxProvisioner
+  #      - name: TestPersistestVolumeRemoveVolume
+  #        decorators:
+  #          - portworxProvisioner
+  #      - name: TestPersistentVolumeKillPodAndOperator
+  #        decorators:
+  #          - portworxProvisioner
+  #      - name: TestPersistentVolumeKillAllPodsAndOperator
+  #        decorators:
+  #          - portworxProvisioner
+  #      - name: TestPersistentVolumeRzaNodesKilled
+  #        decorators:
+  #          - portworxProvisioner
+  #      - name: TestPersistentVolumeRzaFailover
+  #        decorators:
+  #          - portworxProvisioner
+  #      - name: TestPersistentVolumeWithSingleNodeService
+  #        decorators:
+  #          - portworxProvisioner
+  #      - name: TestPersistentVolumeResizeCluster
+  #        decorators:
+  #          - portworxProvisioner
 
   - name: AnalyticsTests
     clusters:
