@@ -65,7 +65,6 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
@@ -141,7 +140,6 @@ func TestEventingResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
@@ -311,7 +309,6 @@ func TestEventingKillEventingPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)

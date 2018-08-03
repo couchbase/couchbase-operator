@@ -61,7 +61,6 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -191,7 +190,6 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	sort.Strings(availableServerGroupList)
 
@@ -290,7 +288,6 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
@@ -387,7 +384,6 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {

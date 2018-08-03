@@ -27,8 +27,6 @@ func TestCreateStatefulCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
-
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)

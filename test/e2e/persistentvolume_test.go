@@ -51,13 +51,11 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 		for _, targetKubeName := range args.KubeNames {
 			targetKube := f.ClusterSpec[targetKubeName]
 
-			err := framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
-			if err != nil {
+			if err := framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
 				t.Fatal(err)
 			}
 
-			err = framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
-			if err != nil {
+			if err := framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
 				t.Fatal(err)
 			}
 
@@ -66,8 +64,7 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 				defer framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
 			}
 
-			err = framework.CreateEtcd(t, targetKube.KubeClient, targetKubeName)
-			if err != nil {
+			if err := framework.CreateEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
 				t.Fatal(err)
 			}
 
@@ -75,13 +72,10 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 			if !f.SkipTeardown {
 				defer framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
 			}
-			err = framework.CreatePortworx(t, targetKube.KubeClient, targetKubeName)
-			if err != nil {
+			if err := framework.CreatePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
 				t.Fatal(err)
 			}
-
 		}
-
 		testFunc(t)
 	}
 	return wrapperFunc
@@ -122,7 +116,6 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -232,7 +225,6 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -337,7 +329,6 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	var expectedPvcMap map[string]int
@@ -500,7 +491,6 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -593,7 +583,6 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -715,7 +704,6 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -861,7 +849,6 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -981,7 +968,6 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1148,7 +1134,6 @@ func TestNegPersistentVolumeCreateCluster(t *testing.T) {
 
 	testCouchbase, err := e2eutil.CreateClusterFromSpecNoWait(t, targetKube.CRClient, f.Namespace, e2eutil.AdminHidden, clusterSpec)
 	if err == nil {
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 		t.Fatal("Cluster created successfully without default volume mount defined in pod spec")
 	}
 	if strings.Contains(err.Error(), "spec.servers.pod.volumeMounts.default in body is required") == false {
@@ -1173,7 +1158,6 @@ func TestNegPersistentVolumeCreateCluster(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	// Expect the cluster to enter a failed state
 	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Retries5); err != nil {
@@ -1225,7 +1209,6 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1292,7 +1275,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {

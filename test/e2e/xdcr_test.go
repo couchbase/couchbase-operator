@@ -87,20 +87,15 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 		}
 
 		event = e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 120); err != nil {
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 180); err != nil {
 			return err
 		}
-
-		event = e2eutil.RebalanceStartedEvent(cbCluster)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
-			return errors.New("Failed to start rebalance: " + err.Error())
-		}
-		expectedEvents.AddRebalanceStartedEvent(cbCluster)
 
 		event = e2eutil.RebalanceCompletedEvent(cbCluster)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
 			return errors.New("Failed to rebalance: " + err.Error())
 		}
+		expectedEvents.AddRebalanceStartedEvent(cbCluster)
 		expectedEvents.AddMemberRemoveEvent(cbCluster, memberIndex)
 		expectedEvents.AddRebalanceCompletedEvent(cbCluster)
 

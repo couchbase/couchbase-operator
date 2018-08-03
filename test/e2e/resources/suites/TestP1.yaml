@@ -97,9 +97,10 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-      - name: TestRzaServerGroupRemoval
-        decorators:
-          - rzaNodeLabeller
+      # K8S-393, Unsupported in 1.0
+      #- name: TestRzaServerGroupRemoval
+      #  decorators:
+      #    - rzaNodeLabeller
       - name: TestRzaServerGroupAddition
         decorators:
           - rzaNodeLabeller

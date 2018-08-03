@@ -2,6 +2,9 @@ package e2e
 
 import (
 	"os"
+	"os/exec"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -9,6 +12,50 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
+
+func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInfo, namespace, testName, logDir string) {
+	for _, kubeCluster := range kubeClustersToSetup {
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			t.Errorf("Failed to create dir %s: %v", logDir, err)
+			continue
+		}
+
+		kubeConfPath := getKubeConfigToUse(kubeCluster.ClusterName)
+		cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", namespace, "-collectinfo"}
+		execOut, err := runCbopinfoCmd(cmdArgs)
+		execOutStr := strings.TrimSpace(string(execOut))
+		if err != nil {
+			t.Logf("cbopinfo returned: %s", execOutStr)
+			t.Errorf("cbopinfo command failed: %v", err)
+		}
+
+		logFileName := getLogFileNameFromExecOutput(execOutStr)
+		if err := os.Rename(logFileName, logDir+"/"+logFileName); err != nil {
+			t.Errorf("Failed to move log file: %v", err)
+		}
+
+		collectInfoOutputPattern := regexp.MustCompile("(kubectl cp [-+:/a-zA-Z0-9 ]+\\.zip \\.)")
+		cbCollectCmdList := collectInfoOutputPattern.FindAllString(execOutStr, -1)
+		for _, cbCollectCmd := range cbCollectCmdList {
+			cmdArgs := strings.Split(cbCollectCmd, " ")
+			cmdArgs = append(cmdArgs, "--kubeconfig")
+			cmdArgs = append(cmdArgs, kubeConfPath)
+			cmdArgs = append(cmdArgs, "--namespace")
+			cmdArgs = append(cmdArgs, namespace)
+			cmdOutput, err := exec.Command(cmdArgs[0], cmdArgs[1:]...).CombinedOutput()
+			cmdOutputStr := strings.TrimSpace(string(cmdOutput))
+			if err != nil {
+				t.Logf("kubectl returned: %s", cmdOutputStr)
+				t.Errorf("Failed to fetch couchbase log: %v", err)
+			}
+			cbFileNamePath := strings.Split(cmdArgs[len(cmdArgs)-6], "/")
+			cbFileName := cbFileNamePath[len(cbFileNamePath)-1]
+			if err := os.Rename(cbFileName, logDir+"/"+cbFileName); err != nil {
+				t.Errorf("Failed to move cb log file: %v", err)
+			}
+		}
+	}
+}
 
 func runSuite(t *testing.T) {
 	f := framework.Global
@@ -82,8 +129,16 @@ func runSuite(t *testing.T) {
 			testFunc = DecoratorFuncMap["recoverDecorator"](testFunc, decoratorArgs)
 
 			if testFunc != nil {
-				testResult := t.Run(testName, testFunc)
-				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testResult})
+				testPassed := t.Run(testName, testFunc)
+				if !testPassed {
+					logDir := f.LogDir + "/" + testName
+					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
+				}
+				for _, kubeCluster := range kubeClustersToSetup {
+					targetKube := f.ClusterSpec[kubeCluster.ClusterName]
+					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+				}
+				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testPassed})
 			}
 		}
 	}

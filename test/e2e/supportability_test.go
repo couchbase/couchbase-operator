@@ -432,7 +432,6 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	if _, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden); err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	for _, arg := range validArgumentList {
 		t.Log(arg.Name)
@@ -554,8 +553,6 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	failureExists := false
 	cluster1Size := e2eutil.Size3
@@ -934,7 +931,6 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	// Collect logs
 	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cbCluster.Name}

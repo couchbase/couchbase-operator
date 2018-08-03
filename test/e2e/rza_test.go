@@ -258,7 +258,6 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for i := 0; i < clusterSize; i++ {
@@ -341,7 +340,6 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -433,7 +431,6 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -513,7 +510,6 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	// Creating expected RZA server groups pod maps
 	expectedRzaResultMap := map[string]int{
@@ -623,7 +619,6 @@ func TestRzaResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -753,7 +748,6 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -782,26 +776,20 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	}
 
 	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 1)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Failed to remove pod from removed server-group failed: %v", err)
 	}
-
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
 
 	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Failed to add new pods to replace removed server group node: %v", err)
 	}
-
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -845,7 +833,6 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -944,7 +931,6 @@ func TestRzaKillServerPods(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1057,7 +1043,6 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1142,7 +1127,6 @@ func TestRzaServerGroupDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
