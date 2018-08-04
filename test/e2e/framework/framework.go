@@ -116,7 +116,6 @@ func Setup(t *testing.T) error {
 	// set operator image from env var
 	oi := runtimeParams.OperatorImage
 	if oi != "" {
-		logrus.Info("Setting Operator image: " + oi)
 		deployment.Spec.Template.Spec.Containers[0].Image = oi
 	}
 
@@ -142,6 +141,9 @@ func Setup(t *testing.T) error {
 		}
 		clusterSpecMap[kubeConf.ClusterName] = &clusterSpec
 	}
+
+	logrus.Info("Using couchbase-operator: " + deployment.Spec.Template.Spec.Containers[0].Image)
+	logrus.Info("Logs will be stored in: " + logDir)
 
 	Global = &Framework{
 		Deployment:      deployment,
@@ -457,7 +459,7 @@ func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
 		return err
 	}
 
-	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, "app=couchbase-operator")
+	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, e2eutil.CouchbaseOperatorLabel)
 }
 
 func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName string, namespace string) error {

@@ -1,14 +1,15 @@
 package e2e
 
 import (
+	"os"
+	"testing"
+
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"os"
-	"testing"
 )
 
 // TestPauseControl tests the user can pause the operator from controlling
@@ -107,35 +108,25 @@ func TestKillOperator(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10); err != nil {
 		t.Fatalf("failed to create 3 members couchbase cluster: %v", err)
 	}
+
 	t.Logf("Killing operator...")
-	err = e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace)
-	if err != nil {
+	if err := e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace); err != nil {
 		t.Fatalf("failed to kill couchbase operator: %v", err)
 	}
-	t.Logf("Operator killed...")
+
 	t.Logf("Waiting for operator to recover...")
-	err = e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, "couchbase-operator")
-	if err != nil {
+	if err := e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, e2eutil.CouchbaseOperatorLabel); err != nil {
 		t.Fatalf("failed to recover couchbase operator: %v", err)
 	}
 	t.Logf("Operator recovered...")
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
@@ -184,14 +175,22 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 		return false
 	}
 
+	eventErrChan := make(chan error)
+	waitForBucketEditEventFunc := func() {
+		event := k8sutil.BucketEditEvent("default", testCouchbase)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
+			eventErrChan <- err
+		}
+		expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+		eventErrChan <- nil
+	}
+
 	t.Logf("Killing operator and changing bucket flush from enabled to disabled...")
-	err = e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace)
-	if err != nil {
+	if err := e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace); err != nil {
 		t.Fatalf("failed to kill couchbase operator: %v", err)
 	}
 
-	err = e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.FlushDisabledVerifier)
-	if err != nil {
+	if err := e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.FlushDisabledVerifier); err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
 	if _, allowed := err.(errors.ErrInvalidBucketParamChange); allowed {
@@ -199,34 +198,23 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	}
 
 	t.Logf("Waiting for operator to recover...")
-	err = e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, "couchbase-operator")
-	if err != nil {
+	if err := e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, e2eutil.CouchbaseOperatorLabel); err != nil {
 		t.Fatalf("failed to recover couchbase operator: %v", err)
 	}
-	t.Logf("Operator recovered...")
+
+	go waitForBucketEditEventFunc()
+
 	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, e2eutil.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to enable bucket flush %v", err)
 	}
 	t.Logf("Bucket settings reverted...")
 
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	event := k8sutil.BucketEditEvent("default", testCouchbase)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := <-eventErrChan; err != nil {
 		t.Fatal(err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -82,9 +81,9 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	}
 
 	podMembersToKill := []int{2, 5, 8}
-
-	memberDownEvents := []*corev1.Event{}
-	memberFailedOverEvents := []*corev1.Event{}
+	memberDownEvents := e2eutil.EventList{}
+	memberFailedOverEvents := e2eutil.EventList{}
+	memberRemovedEvents := e2eutil.EventList{}
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range podMembersToKill {
@@ -92,21 +91,23 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberToKill)
-		memberDownEvents = append(memberDownEvents, e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
-		memberFailedOverEvents = append(memberFailedOverEvents, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
+		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
+		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
+		memberRemovedEvents = append(memberRemovedEvents, *e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberToKill))
 	}
 
-	if err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30); err != nil {
+	memberDownEventsOrder, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60); err != nil {
+	memberFailedEventsOrder, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60)
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, podMemberToKill := range podMembersToKill {
-		expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberToKill)
-	}
+
+	expectedEvents.AppendEventList(memberDownEventsOrder)
+	expectedEvents.AppendEventList(memberFailedEventsOrder)
 
 	// Event check for new member add
 	for memberIndex := clusterSize; memberIndex < clusterSize+3; memberIndex++ {
@@ -117,22 +118,18 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
 
-	// Event check for rebalance events
-	event := e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-		t.Fatal(err)
-	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AppendEventList(memberRemovedEvents)
 
-	for _, podMemberToKill := range podMembersToKill {
-		expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberToKill)
-	}
-
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
+	event := e2eutil.RebalanceCompletedEvent(testCouchbase)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20); err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -144,7 +141,6 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
-
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 

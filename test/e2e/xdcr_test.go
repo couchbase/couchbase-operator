@@ -386,7 +386,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedXdcrCluster2Events := e2eutil.EventList{}
 	expectedXdcrCluster2Events.AddAdminConsoleSvcCreateEvent(xdcrCluster2)
 	for nodeIndex := 0; nodeIndex < e2eutil.Size2; nodeIndex++ {
-		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 0)
+		expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, nodeIndex)
 	}
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.AdminService)
 	expectedXdcrCluster2Events.NodeServiceCreateEvent(xdcrCluster2, api.DataService)
@@ -442,11 +442,11 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 		go nodeDownFunc(1)
 	}
 
-	if _, err = e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
+	if _, err := e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -458,12 +458,11 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 		go nodeDownFunc(1)
 	}
 
-	err = <-errChan
-	if err != nil {
+	if err := <-errChan; err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
 		t.Fatal(err)
 	}
 
@@ -570,15 +569,15 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err := e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
+	if _, err := e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -590,12 +589,11 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		go resizeFunction()
 	}
 
-	err = <-errChan
-	if err != nil {
+	if err := <-errChan; err != nil {
 		t.Fatalf("Failed to resize cluster: %s", err.Error())
 	}
 
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
 		t.Fatal(err)
 	}
 
@@ -695,15 +693,15 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err := e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
+	if _, err := e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -715,12 +713,11 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		go serviceKillFunc()
 	}
 
-	err = <-errChan
-	if err != nil {
+	if err := <-errChan; err != nil {
 		t.Fatalf("Failed to remove Xdcr services: %s", err.Error())
 	}
 
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 11); err != nil {
 		t.Fatal(err)
 	}
 
@@ -833,15 +830,15 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err := e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, xdcrCluster2.Status.ClusterID, xdcrCluster2.Name, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
+	if _, err := e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 10, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -925,16 +922,16 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, uuid, externalCbClusterName, destUrl, cbUsername, cbPassword); err != nil {
+	if _, err := e2eutil.CreateDestClusterReference(hostUrl, cbUsername, cbPassword, uuid, externalCbClusterName, destUrl, cbUsername, cbPassword); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, externalCbClusterName, srcBucketName, destBucketName, versionType); err != nil {
+	if _, err := e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, externalCbClusterName, srcBucketName, destBucketName, versionType); err != nil {
 		t.Fatal(err)
 	}
 
 	// Validate bucket replication from K8S -> external cluster
-	if _, err = e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 100, 1); err != nil {
+	if _, err := e2eutil.PopulateBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 100, 1); err != nil {
 		t.Fatal(err)
 	}
 

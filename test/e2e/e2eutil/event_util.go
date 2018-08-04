@@ -42,6 +42,12 @@ func (e *EventList) AddEvent(add v1.Event) {
 	*e = append(*e, add)
 }
 
+func (e *EventList) AppendEventList(eventsList EventList) {
+	for _, event := range eventsList {
+		*e = append(*e, event)
+	}
+}
+
 func (e *EventList) AddMemberCreationFailedEvent(cl *api.CouchbaseCluster, memberId int) {
 	event := NewMemberCreationFailedEvent(cl, memberId)
 	*e = append(*e, *event)

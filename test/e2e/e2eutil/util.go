@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	ClusterNamePrefix = "test-couchbase-"
+	ClusterNamePrefix      = "test-couchbase-"
+	CouchbaseOperatorLabel = "app=couchbase-operator"
 )
 
 var (
@@ -217,11 +218,26 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 		t.Logf("failed to create cluster")
 		return nil, err
 	}
-	// Wait for the cluster to reach the correct size
-	if _, err := WaitUntilSizeReached(t, crClient, cluster.Spec.TotalSize(), retries.Size, cluster); err != nil {
+
+	errChan := make(chan error)
+	go func() {
+		// Expect the cluster to enter a failed state
+		if err := WaitClusterPhaseFailed(t, crClient, cluster.Name, namespace, Retries10); err == nil {
+			errChan <- errors.New("Cluster entered failed state")
+		}
+	}()
+
+	go func() {
+		// Wait for the cluster to reach the correct size
+		_, err := WaitUntilSizeReached(t, crClient, cluster.Spec.TotalSize(), retries.Size, cluster)
+		errChan <- err
+	}()
+
+	if err := <-errChan; err != nil {
 		t.Logf("failed to wait until size reached")
 		return cluster, err
 	}
+
 	// If any buckets are specified wait for these to become active
 	buckets := cluster.Spec.BucketNames()
 	if len(buckets) > 0 {
@@ -569,7 +585,7 @@ func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, cl
 }
 
 func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {
-	options := metav1.ListOptions{LabelSelector: "app=couchbase-operator"}
+	options := metav1.ListOptions{LabelSelector: CouchbaseOperatorLabel}
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(options)
 	if err != nil {
 		return err

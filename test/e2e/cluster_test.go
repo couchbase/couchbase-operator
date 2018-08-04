@@ -37,18 +37,14 @@ func TestResizeCluster(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	clusterSizes := []int{2, 3, 2, 1}
-
 	prevClusterSize := e2eutil.Size1
-
 	for _, clusterSize := range clusterSizes {
 		service := 0
-		err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-		if err != nil {
+		if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
 			t.Fatal(err)
 		}
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-		if err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 			t.Fatal(err.Error())
 		}
 
@@ -66,19 +62,10 @@ func TestResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
-
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Test scaling a cluster with no buckets up and down
@@ -108,13 +95,11 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	prevClusterSize := e2eutil.Size1
 	for _, clusterSize := range clusterSizes {
 		service := 0
-		err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-		if err != nil {
+		if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
 			t.Fatal(err)
 		}
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-		if err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 			t.Fatal(err.Error())
 		}
 
@@ -131,18 +116,10 @@ func TestResizeClusterWithBucket(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests editing of cluster settings
@@ -559,6 +536,8 @@ func TestInvalidBaseImage(t *testing.T) {
 		"Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\"",
 		"rpc error: code = 2 desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
 		"rpc error: code = Unknown desc = repository docker.io/" + couchbaseBaseImage + " not found: does not exist or no pull access",
+		// For openshift v3.9.33, kubernetes v1.9.1+a0ce1bc657
+		"rpc error: code = Unknown desc = Tag enterprise-9.9.9 not found in repository docker.io/" + couchbaseBaseImage,
 	}
 
 	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
@@ -828,74 +807,56 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	// create 5 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size5, e2eutil.WithBucket, e2eutil.AdminExposed)
+	clusterSize := e2eutil.Size5
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for nodeIndex := 0; nodeIndex < e2eutil.Size5; nodeIndex++ {
+	for nodeIndex := 0; nodeIndex < clusterSize; nodeIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	// scale down to 4 node cluster
-	echan := make(chan error)
-	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, e2eutil.Size4, targetKube.CRClient, testCouchbase)
-	}()
+	clusterSize--
+	// scale down to a node in cluster
+	if err := e2eutil.ResizeClusterNoWait(t, 0, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+		t.Fatal(err)
+	}
 
 	// when cluster starts scaling kill couchbase service on pod 0
-	err = e2eutil.WaitForClusterScalingCondition(t, targetKube.CRClient, testCouchbase, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterScalingCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
 		t.Fatal(err)
 	}
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	_, err = f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
 		t.Fatal(err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+
 	// expect down node to be removed from cluster
 	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
 		t.Logf("status: %+v", testCouchbase.Status)
 		t.Fatal(err)
 	}
-
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	// resize cluster should complete ok
-	err = <-echan
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// healthy 4 node cluster
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size4, 50)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 50); err != nil {
 		t.Logf("status: %+v", testCouchbase.Status)
 		t.Fatal(err)
 	}
-
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Test that a node is added back when operator is resumed
@@ -1058,8 +1019,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("add service failed: %v", err)
 	}
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
@@ -1073,8 +1033,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to add query service: %v", err)
 	}
 
@@ -1089,8 +1048,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("add service failed: %v", err)
 	}
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
@@ -1104,8 +1062,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to add index service: %v", err)
 	}
 
@@ -1120,8 +1077,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("add service failed: %v", err)
 	}
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
@@ -1135,8 +1091,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to add search service: %v", err)
 	}
 
@@ -1147,11 +1102,10 @@ func TestBasicMDSScaling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remove service failed: %v", err)
 	}
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
-	if err != nil {
+
+	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
-
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
@@ -1162,8 +1116,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to remove search service: %v", err)
 	}
 
@@ -1174,8 +1127,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remove service failed: %v", err)
 	}
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
@@ -1189,8 +1141,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to remove index service: %v", err)
 	}
 
@@ -1201,8 +1152,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remove service failed: %v", err)
 	}
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, testCouchbase.Spec.TotalSize(), e2eutil.Retries10, testCouchbase); err != nil {
 		t.Fatalf("cluster resize failed: %v", err)
 	}
 
@@ -1216,23 +1166,14 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to remove query service: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests swapping nodes between services
@@ -1472,23 +1413,14 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries10, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests creating a cluster without data service
@@ -1569,23 +1501,14 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestRemoveLastDataService(t *testing.T) {
@@ -1650,23 +1573,14 @@ func TestRemoveLastDataService(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyServices(t, client, e2eutil.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
 		t.Fatalf("failed to remove data service: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestManageMultipleClusters(t *testing.T) {
@@ -1774,16 +1688,13 @@ func TestManageMultipleClusters(t *testing.T) {
 	}
 
 	t.Logf("Waiting For Bucket To Be Created \n")
-	err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{bucketSetting1.BucketName}, e2eutil.Retries10, testCouchbase1)
-	if err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{bucketSetting1.BucketName}, e2eutil.Retries10, testCouchbase1); err != nil {
 		t.Fatalf("failed to create bucket %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client1, e2eutil.Retries5, "default1", "BucketMemoryQuota", "256", e2eutil.BucketInfoVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyBucketInfo(t, client1, e2eutil.Retries5, "default1", "BucketMemoryQuota", "256", e2eutil.BucketInfoVerifier); err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
-
 	expectedEvents1.AddBucketCreateEvent(testCouchbase1, "default1")
 
 	// add bucket to cluster 2
@@ -1808,16 +1719,13 @@ func TestManageMultipleClusters(t *testing.T) {
 	}
 
 	t.Logf("Waiting For Bucket To Be Created \n")
-	err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{bucketSetting2.BucketName}, e2eutil.Retries10, testCouchbase2)
-	if err != nil {
+	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{bucketSetting2.BucketName}, e2eutil.Retries10, testCouchbase2); err != nil {
 		t.Fatalf("failed to create bucket %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client2, e2eutil.Retries5, "default2", "BucketMemoryQuota", "256", e2eutil.BucketInfoVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyBucketInfo(t, client2, e2eutil.Retries5, "default2", "BucketMemoryQuota", "256", e2eutil.BucketInfoVerifier); err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
-
 	expectedEvents2.AddBucketCreateEvent(testCouchbase2, "default2")
 
 	// add bucket to cluster 3
@@ -1854,40 +1762,18 @@ func TestManageMultipleClusters(t *testing.T) {
 
 	expectedEvents3.AddBucketCreateEvent(testCouchbase3, "default3")
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase3.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase3.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events1, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase1.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	events2, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase2.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	events3, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase3.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents1.Compare(events1) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents1, events1))
-	}
-	if !expectedEvents2.Compare(events2) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents2, events2))
-	}
-	if !expectedEvents3.Compare(events3) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents3, events3))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase1.Name, f.Namespace, expectedEvents1)
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase2.Name, f.Namespace, expectedEvents2)
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase3.Name, f.Namespace, expectedEvents3)
 }
