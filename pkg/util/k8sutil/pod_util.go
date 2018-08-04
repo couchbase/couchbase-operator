@@ -66,7 +66,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, version string, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
 
 	var err error
-	volumes := []v1.Volume{}
+	volumes := pod.Spec.Volumes
 	mounts := []v1.VolumeMount{}
 	mountPaths := getPathsToPersist(config.Pod.VolumeMounts)
 
@@ -158,7 +158,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 		return pod, err
 	}
 
-	container.VolumeMounts = mounts
+	container.VolumeMounts = append(container.VolumeMounts, mounts...)
 	return pod, nil
 }
 
@@ -324,14 +324,11 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 			Annotations: map[string]string{},
 		},
 		Spec: v1.PodSpec{
-			Containers:    []v1.Container{container},
-			RestartPolicy: v1.RestartPolicyNever,
-			Hostname:      m.Name,
-			Subdomain:     clusterName,
-			Volumes: []v1.Volume{
-				{Name: couchbaseVolumeName,
-					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
-			},
+			Containers:      []v1.Container{container},
+			RestartPolicy:   v1.RestartPolicyNever,
+			Hostname:        m.Name,
+			Subdomain:       clusterName,
+			Volumes:         []v1.Volume{},
 			NodeSelector:    map[string]string{},
 			SecurityContext: cs.SecurityContext,
 		},
@@ -341,6 +338,16 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 	}
 
 	applyPodPolicy(clusterName, pod, ns.Pod)
+
+	if ns.GetDefaultVolumeClaim() == "" {
+		// supply emptydir as volume mount when
+		// persistent volumes aren't requsted
+		pod.Spec.Volumes = []v1.Volume{
+			{Name: couchbaseVolumeName,
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+		}
+		container.VolumeMounts = couchbaseVolumeMounts()
+	}
 
 	if err := applyPodTlsConfiguration(cs, pod); err != nil {
 		return nil, err
@@ -563,7 +570,7 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
-		VolumeMounts: couchbaseVolumeMounts(),
+		VolumeMounts: []v1.VolumeMount{},
 	}
 
 	return c
