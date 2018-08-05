@@ -1150,33 +1150,55 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
+	// Code to wait for multiple pod down / autofailover in parallel
+	failoverCompleteChan := make(chan error)
+	memberDownEvents := e2eutil.EventList{}
+	memberFailedOverEvents := e2eutil.EventList{}
+	memberRemovedEvents := e2eutil.EventList{}
+	for _, podMemberToKill := range []int{0, 1} {
+		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
+		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
+		memberRemovedEvents = append(memberRemovedEvents, *e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberToKill))
+	}
+
+	go func() {
+		memberDownEventsOrder, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30)
+		if err != nil {
+			failoverCompleteChan <- err
+			return
+		}
+
+		memberFailedEventsOrder, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60)
+		if err != nil {
+			failoverCompleteChan <- err
+			return
+		}
+		expectedEvents.AppendEventList(memberDownEventsOrder)
+		expectedEvents.AppendEventList(memberFailedEventsOrder)
+		failoverCompleteChan <- nil
+	}()
+
 	t.Logf("killing 2 pods...")
 	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 2)
 	if err != nil {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	// Wait for the nodes to be reported as down before failing over, so we deterministically
-	// see the down events
-	downEvent := e2eutil.NewMemberDownEvent(testCouchbase, 0)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, downEvent, 300)
-	if err != nil {
-		t.Fatalf("failed to wait for down node: %v", err)
-	}
-
 	// Manually failover nodes
 	e2eutil.FailoverNodes(t, client, 5, 2)
 
-	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
-	expectedEvents.AddMemberDownEvent(testCouchbase, 1)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	if err := <-failoverCompleteChan; err != nil {
+		t.Fatal(err)
+	}
+
+	// event capture for new pod creation
+	for _, memberId := range []int{5, 6} {
+		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+	}
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
@@ -1185,6 +1207,10 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries5); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
+
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AppendEventList(memberRemovedEvents)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 

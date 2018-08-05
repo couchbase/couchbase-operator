@@ -169,11 +169,9 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier); err != nil {
 		t.Fatalf("failed to change cluster data service mem quota: %v", err)
 	}
-
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
 
 	// edit cluster indexServiceMemQuota
@@ -183,11 +181,9 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier); err != nil {
 		t.Fatalf("failed to change cluster index service mem quota: %v", err)
 	}
-
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
 
 	// edit cluster searchServiceMemQuota
@@ -197,11 +193,9 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier); err != nil {
 		t.Fatalf("failed to change cluster search service mem quota: %v", err)
 	}
-
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
 
 	// edit cluster autoFailoverTimeout
@@ -211,11 +205,9 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier); err != nil {
 		t.Fatalf("failed to change cluster autofailover timeout: %v", err)
 	}
-
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "autofailover")
 
 	// edit cluster indexStorageSetting
@@ -225,25 +217,15 @@ func TestEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyIndexSettingInfo(t, client, e2eutil.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyIndexSettingInfo(t, client, e2eutil.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier); err != nil {
 		t.Fatalf("failed to change cluster indexer storage setting: %v", err)
 	}
-
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "index service")
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests invalid editing of cluster settings (setting changes should not take hold)
@@ -290,42 +272,36 @@ func TestNegEditClusterSettings(t *testing.T) {
 	// edit cluster dataServiceMemQuota
 	newDataServiceMemQuota := "0"
 	t.Log("Changing cluster data service mem quota")
-	_, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err == nil {
+	if _, err := e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 	if !strings.Contains(err.Error(), "spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256") {
 		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier)
-	if err == nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier); err == nil {
 		t.Fatalf("failed to reject change for cluster data service mem quota: %v", err)
 	}
 
 	// revert edit cluster dataServiceMemQuota
 	newDataServiceMemQuota = "256"
 	t.Log("Changing cluster data service mem quota")
-	_, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
+	if _, err := e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier); err != nil {
 		t.Fatalf("failed to revert change for cluster data service mem quota: %v", err)
 	}
 
 	// edit cluster indexServiceMemQuota
 	newIndexServiceMemQuota := "0"
 	t.Log("Changing cluster index service mem quota")
-	_, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err == nil {
+	if _, err := e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 	if !strings.Contains(err.Error(), "spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256") {
 		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier)
-	if err == nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier); err == nil {
 		t.Fatalf("failed to reject change for cluster index service mem quota: %v", err)
 	}
 
@@ -336,107 +312,87 @@ func TestNegEditClusterSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier); err != nil {
 		t.Fatalf("failed to revert change for cluster index service mem quota: %v", err)
 	}
 
 	// edit cluster searchServiceMemQuota
 	newSearchServiceMemQuota := "0"
 	t.Log("Changing cluster search service mem quota")
-	_, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err == nil {
+	if _, err := e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 	if !strings.Contains(err.Error(), "spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256") {
 		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier)
-	if err == nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier); err == nil {
 		t.Fatalf("failed to reject change cluster for search service mem quota: %v", err)
 	}
 
 	// revert edit cluster searchServiceMemQuota
 	newSearchServiceMemQuota = "256"
 	t.Log("Changing cluster search service mem quota")
-	_, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
+	if _, err := e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier); err != nil {
 		t.Fatalf("failed to revert change cluster for search service mem quota: %v", err)
 	}
 
 	// edit cluster autoFailoverTimeout
 	newAutoFailoverTimeout := "0"
 	t.Log("Changing cluster autofailover timeout")
-	_, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err == nil {
+	if _, err := e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 	if !strings.Contains(err.Error(), "spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5") {
 		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
-	err = e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier)
-	if err == nil {
+	if err := e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier); err == nil {
 		t.Fatalf("failed to reject change for cluster autofailover timeout: %v", err)
 	}
 
 	// revert edit cluster autoFailoverTimeout
 	newAutoFailoverTimeout = "10"
 	t.Log("Changing cluster autofailover timeout")
-	_, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
+	if _, err := e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier)
-	if err != nil {
+
+	if err := e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier); err != nil {
 		t.Fatalf("failed to revert change for cluster autofailover timeout: %v", err)
 	}
 
 	// edit cluster indexStorageSetting
 	newIndexStorageSetting := "plasma"
 	t.Log("Changing cluster index storage setting")
-	_, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
+	if _, err := e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyIndexSettingInfo(t, client, e2eutil.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier)
-	if err == nil {
+
+	if err := e2eutil.VerifyIndexSettingInfo(t, client, e2eutil.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier); err == nil {
 		t.Fatalf("failed to reject change for cluster indexer storage setting: %v", err)
 	}
 
 	message := "storageMode - Changing the optimization mode of global indexes is not supported when index service nodes are present in the cluster"
-	err = e2eutil.WaitForConditionMessage(t, targetKube.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, message)
-	if err != nil {
+	if err := e2eutil.WaitForConditionMessage(t, targetKube.CRClient, e2eutil.Retries10, testCouchbase, api.ClusterConditionManageConfig, message); err != nil {
 		t.Fatalf("failed to verify condition: %v", err)
 	}
 
 	// revert edit cluster indexStorageSetting
 	newIndexStorageSetting = "memory_optimized"
 	t.Log("Changing cluster index storage setting")
-	_, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err != nil {
+	if _, err := e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err != nil {
 		t.Fatal(err)
 	}
-	err = e2eutil.VerifyIndexSettingInfo(t, client, e2eutil.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyIndexSettingInfo(t, client, e2eutil.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier); err != nil {
 		t.Fatalf("failed to revert change for cluster indexer storage setting: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests if specs with invalid auth secrets will create a cluster (they should not)
@@ -473,16 +429,7 @@ func TestInvalidAuthSecret(t *testing.T) {
 	if len(pods.Items) != 0 {
 		t.Fatalf("more than zero pods: %+v", pods.Items)
 	}
-
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
-
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests if specs with invalid base image will create a cluster (they should not)
@@ -552,15 +499,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	if !correctMsg {
 		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
-
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests if specs with invalid version will create a cluster (they should not)
@@ -628,15 +567,7 @@ func TestInvalidVersion(t *testing.T) {
 	if !correctMsg {
 		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
-
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // 1. create 1 node cluster
@@ -675,24 +606,17 @@ func TestNodeUnschedulable(t *testing.T) {
 	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
 		cl.Spec.ServerSettings[0].Pod = e2espec.CreateMemoryPodPolicy(allocatableMemory*7/10, allocatableMemory)
 	})
-	// async start resize cluster
 	nodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	//first node wont change request and last node should be unschedulable and minus out the master node
 	clusterSize = len(nodeList.Items) + 1
-	echan := make(chan error)
-	go func() {
-		serviceId := 0
-		if err := e2eutil.ResizeClusterNoWait(t, serviceId, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
-			echan <- err
-		}
-		t.Logf("Waiting For Cluster Size To Be: %d\n", clusterSize)
-		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, e2eutil.Retries60, testCouchbase)
-		if err == nil {
-			t.Logf("Resize Success: %v\n", names)
-		}
-		echan <- err
-	}()
+	serviceId := 0
+	if err := e2eutil.ResizeClusterNoWait(t, serviceId, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+		t.Fatal(err)
+	}
 
 	// expect unbalanced condition
 	if err := e2eutil.WaitForClusterUnBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
@@ -714,11 +638,14 @@ func TestNodeUnschedulable(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// verify result from cluster resize ok
-	if err = <-echan; err != nil {
+	t.Logf("Waiting For Cluster Size To Be: %d\n", clusterSize)
+	names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, e2eutil.Retries60, testCouchbase)
+	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("Resize Success: %v\n", names)
 
-	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 18); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 18); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -764,8 +691,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 
 	// expect down node to be removed from cluster
 	event := e2eutil.NewMemberRemoveEvent(testCouchbase, removePodMemberId)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatal(err)
 	}
 
@@ -775,18 +701,10 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// healthy 3 node cluster
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries30)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries30); err != nil {
 		t.Fatal(err.Error())
 	}
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Node service goes down while scaling down cluster
@@ -920,8 +838,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	}
 
 	// remove node
-	err = e2eutil.RebalanceOutMember(t, client, testCouchbase.Name, testCouchbase.Namespace, removePodMemberId, true)
-	if err != nil {
+	if err := e2eutil.RebalanceOutMember(t, client, testCouchbase.Name, testCouchbase.Namespace, removePodMemberId, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -935,16 +852,14 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 
 	// expect an add member event to occur
 	event := e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
 	expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
 
 	// cluster should also be balanced
-	err = e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -956,15 +871,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	if numNodes != 2 {
 		t.Fatalf("expected 2 nodes, found: %d", numNodes)
 	}
-
-	// Event checking
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get couchbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests basic MDS Scaling

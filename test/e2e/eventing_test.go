@@ -247,8 +247,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-		if err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 			t.Fatal(err.Error())
 		}
 
@@ -270,14 +269,13 @@ func TestEventingResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
 	// Stop the insertion and wait for it to exit, checking for any errors encountered
 	stopDataInsertion <- true
-	if err = <-dataInsertionError; err != nil {
+	if err := <-dataInsertionError; err != nil {
 		t.Fatal(err)
 	}
 
@@ -356,13 +354,21 @@ func TestEventingKillEventingPods(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Cross check number of docs inserted reflected in eventing
+	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
+	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
+	}
+
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan bool)
+	dataInsertionStopped := make(chan bool)
 	dataInsertionFunc := func(t *testing.T) {
 		for {
 			select {
 			case <-stopDataInsertion:
-				break
+				dataInsertionStopped <- true
+				return
 			default:
 				numOfDocs++
 				if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err != nil {
@@ -411,9 +417,9 @@ func TestEventingKillEventingPods(t *testing.T) {
 		newMemberToBeAdded++
 	}
 	stopDataInsertion <- true
+	_ = <-dataInsertionStopped
 
 	// Cross check number of docs inserted reflected in eventing
-	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}

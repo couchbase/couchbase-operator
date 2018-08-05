@@ -204,7 +204,6 @@ func TestTlsCreateCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal("Create cluster failed:", err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -251,7 +250,6 @@ func TestTlsKillClusterNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -309,7 +307,6 @@ func TestTlsResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -368,7 +365,6 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -457,7 +453,6 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -545,7 +540,6 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -619,7 +613,6 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -667,7 +660,6 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 		if err != nil {
 			t.Fatal("Cluster creation failed:", err)
 		}
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 		// Expect the cluster to enter a failed state
 		if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {
@@ -714,7 +706,6 @@ func TestTlsCertificateExpiry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 		expectedEvents := e2eutil.EventList{}
 		for memberId := 0; memberId < e2eutil.Size3; memberId++ {
@@ -781,7 +772,6 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Cluster creation failed: %v\n", err)
 		}
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 		// Expect the cluster to enter a failed state
 		if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {
@@ -824,7 +814,6 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 			_, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 			createClusterErrChan <- err
 		}()
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 		time.Sleep(time.Second)
 
 		t.Log("Retrying to deploy operator on valid TLS time-slot")
@@ -875,7 +864,6 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error while creating cluster: %v\n", err)
 		}
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 		// Expect the cluster to enter a failed state
 		if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 10); err != nil {
@@ -911,7 +899,6 @@ func TestTlsGenerateWrongCertType(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Cluster creation failed: %v\n", err)
 		}
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 
 		// Expect the cluster to enter a failed state
 		if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {

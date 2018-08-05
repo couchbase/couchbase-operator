@@ -5,20 +5,16 @@ import (
 	"os"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-type queryResult struct {
-	Results []map[string]int
-}
 
 // Create cluster with Analytics service enabled
 // Deploy analytics bucket and verify for bucket creation and data replication
@@ -96,21 +92,9 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 		}
 	}
 
-	// Time to populate data to analytics bucket
-	time.Sleep(time.Second * 30)
-
-	query := "select count(*) as count from " + analyticsDataset
-	t.Log(query)
-	response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-
-	queryRes := queryResult{}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfDocs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
+	// Verify data set doc count
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, analyticsDataset, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
@@ -199,49 +183,53 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	}
 
 	// Function to insert data with two types of valueType varaibles
-	dataInsertionStopChan := make(chan bool)
-	stopDataInsertion := false
+	dataInsertionErrChan := make(chan error)
+	stopDataInsertionChan := make(chan bool)
 	numOfType1Docs := 0
 	numOfType2Docs := 0
 	docInsertFunc := func() {
-		docIndex := numOfDocs
 		// Get bucket Obj
 		bucketObj, err := client.GetBucket(bucketName)
 		if err != nil {
 			t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
 		}
 
+		var docInsertErr error
+	OuterLoop:
 		for {
-			if stopDataInsertion {
-				break
-			}
-			docIndex++
-			docKey := "doc" + strconv.Itoa(docIndex)
-			docMap := map[string]string{}
-			docMap["name"] = "docName " + strconv.Itoa(docIndex)
-			docMap["value"] = "dummy Value " + strconv.Itoa(docIndex)
-			if docIndex%2 == 0 {
-				docMap["valueType"] = "type1"
-				numOfType1Docs++
-			} else {
-				docMap["valueType"] = "type2"
-				numOfType2Docs++
-			}
+			select {
+			case <-stopDataInsertionChan:
+				break OuterLoop
+			default:
+				numOfDocs++
+				docKey := "doc" + strconv.Itoa(numOfDocs)
+				docMap := map[string]string{}
+				docMap["name"] = "docName " + strconv.Itoa(numOfDocs)
+				docMap["value"] = "dummy Value " + strconv.Itoa(numOfDocs)
+				if numOfDocs%2 == 0 {
+					docMap["valueType"] = "type1"
+					numOfType1Docs++
+				} else {
+					docMap["valueType"] = "type2"
+					numOfType2Docs++
+				}
 
-			// Convert map data to byte array
-			docData, err := json.Marshal(docMap)
-			if err != nil {
-				t.Fatalf("Failed to marshal map into bytes: %v", err)
-			}
-			docData = append([]byte("value="), docData...)
+				// Convert map data to byte array
+				docData, err := json.Marshal(docMap)
+				if err != nil {
+					docInsertErr = err
+					break OuterLoop
+				}
+				docData = append([]byte("value="), docData...)
 
-			// Inserts document using client
-			if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
-				t.Fatalf("Failed to insert doc %s: %v", docKey, err)
+				// Inserts document using client
+				if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
+					docInsertErr = err
+					break OuterLoop
+				}
 			}
 		}
-		numOfDocs = docIndex
-		dataInsertionStopChan <- true
+		dataInsertionErrChan <- docInsertErr
 	}
 
 	//Run doc populator in backgroud while cluster resize is happening
@@ -281,49 +269,19 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	}
 
 	// To stop background data insertion and wait for function to complete
-	stopDataInsertion = true
-	_ = <-dataInsertionStopChan
-
-	// Verify total docs in data set - 1
-	query := "select count(*) as count from " + analyticsDataset1
-	t.Log(query)
-	response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-	queryRes := queryResult{}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfDocs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
+	stopDataInsertionChan <- true
+	if err := <-dataInsertionErrChan; err != nil {
+		t.Fatal(err)
 	}
 
-	// Verify total docs in data set - 2
-	query = "select count(*) as count from " + analyticsDataset2
-	t.Log(query)
-	response, err = e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
+	// Verify total docs in data sets
+	datasetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
+	dataSetDocCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
+	for index, datasetName := range datasetNames {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, datasetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries10); err != nil {
+			t.Fatal(err)
+		}
 	}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfType1Docs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
-	}
-
-	// Verify total docs in data set - 3
-	query = "select count(*) as count from " + analyticsDataset3
-	t.Log(query)
-	response, err = e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfType2Docs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
-	}
-
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -415,50 +373,59 @@ func TestAnalyticsKillPods(t *testing.T) {
 		}
 	}
 
+	// Wait until analytics service is fully functional
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
+	}
+
 	// Function to insert data with two types of valueType varaibles
-	dataInsertionStopChan := make(chan bool)
-	stopDataInsertion := false
+	dataInsertionErrChan := make(chan error)
+	stopDataInsertionChan := make(chan bool)
 	numOfType1Docs := 0
 	numOfType2Docs := 0
 	docInsertFunc := func() {
-		docIndex := numOfDocs
 		// Get bucket Obj
 		bucketObj, err := client.GetBucket(bucketName)
 		if err != nil {
 			t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
 		}
 
+		var docInsertErr error
+	OuterLoop:
 		for {
-			if stopDataInsertion {
-				break
-			}
-			docIndex++
-			docKey := "doc" + strconv.Itoa(docIndex)
-			docMap := map[string]string{}
-			docMap["name"] = "docName " + strconv.Itoa(docIndex)
-			docMap["value"] = "dummy Value " + strconv.Itoa(docIndex)
-			if docIndex%2 == 0 {
-				docMap["valueType"] = "type1"
-				numOfType1Docs++
-			} else {
-				docMap["valueType"] = "type2"
-				numOfType2Docs++
-			}
+			select {
+			case <-stopDataInsertionChan:
+				break OuterLoop
+			default:
+				numOfDocs++
+				docKey := "doc" + strconv.Itoa(numOfDocs)
+				docMap := map[string]string{}
+				docMap["name"] = "docName " + strconv.Itoa(numOfDocs)
+				docMap["value"] = "dummy Value " + strconv.Itoa(numOfDocs)
+				if numOfDocs%2 == 0 {
+					docMap["valueType"] = "type1"
+					numOfType1Docs++
+				} else {
+					docMap["valueType"] = "type2"
+					numOfType2Docs++
+				}
 
-			// Convert map data to byte array
-			docData, err := json.Marshal(docMap)
-			if err != nil {
-				t.Fatalf("Failed to marshal map into bytes: %v", err)
-			}
-			docData = append([]byte("value="), docData...)
+				// Convert map data to byte array
+				docData, err := json.Marshal(docMap)
+				if err != nil {
+					docInsertErr = err
+					break OuterLoop
+				}
+				docData = append([]byte("value="), docData...)
 
-			// Inserts document using client
-			if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
-				t.Fatalf("Failed to insert doc %s: %v", docKey, err)
+				// Inserts document using client
+				if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
+					docInsertErr = err
+					break OuterLoop
+				}
 			}
 		}
-		numOfDocs = docIndex
-		dataInsertionStopChan <- true
+		dataInsertionErrChan <- docInsertErr
 	}
 
 	//Run doc populator in backgroud while cluster resize is happening
@@ -475,9 +442,8 @@ func TestAnalyticsKillPods(t *testing.T) {
 		event := e2eutil.NewMemberDownEvent(testCouchbase, podMemberId)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
 			t.Fatal(err)
-		} else {
-			expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
 		}
+		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
 
 		if err := e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, e2eutil.Size1); err != nil {
 			t.Fatalf("Mismatch in unhealthy nodes count: %v", err)
@@ -512,49 +478,19 @@ func TestAnalyticsKillPods(t *testing.T) {
 	}
 
 	// To stop background data insertion and wait for function to complete
-	stopDataInsertion = true
-	_ = <-dataInsertionStopChan
-
-	// Verify total docs in data set - 1
-	query := "select count(*) as count from " + analyticsDataset1
-	t.Log(query)
-	response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-	queryRes := queryResult{}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfDocs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
+	stopDataInsertionChan <- true
+	if err := <-dataInsertionErrChan; err != nil {
+		t.Fatal(err)
 	}
 
-	// Verify total docs in data set - 2
-	query = "select count(*) as count from " + analyticsDataset2
-	t.Log(query)
-	response, err = e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
+	// Verify document counts for each dataset in analytics bucket
+	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
+	dataSetCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
+	for index, dataSetName := range dataSetNames {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetCount[index], e2eutil.Retries5); err != nil {
+			t.Fatal(err)
+		}
 	}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfType1Docs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
-	}
-
-	// Verify total docs in data set - 3
-	query = "select count(*) as count from " + analyticsDataset3
-	t.Log(query)
-	response, err = e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfType2Docs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
-	}
-
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -652,6 +588,11 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		}
 	}
 
+	// Wait till anlytics service become functional
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+		t.Fatal(err)
+	}
+
 	// Loop to kill the pod containers
 	for podMemberId := 0; podMemberId < clusterSize; podMemberId++ {
 		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
@@ -703,46 +644,12 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	numOfType1Docs := 0
-	numOfType2Docs := 0
-	// Verify total docs in data set - 1
-	query := "select count(*) as count from " + analyticsDataset1
-	t.Log(query)
-	response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-	queryRes := queryResult{}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfDocs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
-	}
-
-	// Verify total docs in data set - 2
-	query = "select count(*) as count from " + analyticsDataset2
-	t.Log(query)
-	response, err = e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfType1Docs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
-	}
-
-	// Verify total docs in data set - 3
-	query = "select count(*) as count from " + analyticsDataset3
-	t.Log(query)
-	response, err = e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query)
-	if err != nil {
-		t.Fatal(err.Error() + "-" + string(response))
-	}
-	json.Unmarshal(response, &queryRes)
-
-	if queryRes.Results[0]["count"] != numOfType2Docs {
-		t.Fatalf("Mismatch in number of docs. Expected %d, got %d", numOfDocs, queryRes.Results[0]["count"])
+	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
+	dataSetDocCount := []int{numOfDocs, 0, 0}
+	for index, dataSetName := range dataSetNames {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries5); err != nil {
+			t.Fatal(err)
+		}
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }

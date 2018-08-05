@@ -633,3 +633,28 @@ func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string) (responseData []by
 	}
 	return
 }
+
+func VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName, password string, reqNumOfDocs, maxRetries int) error {
+	currDocCount := 0
+	query := "select count(*) as count from " + datasetName
+
+	type queryResult struct {
+		Results []map[string]int
+	}
+
+	for retryCount := 0; retryCount < maxRetries; retryCount++ {
+		response, err := ExecuteAnalyticsQuery(hostName, hostPort, query)
+		if err != nil {
+			return errors.New(err.Error() + "-" + string(response))
+		}
+		queryRes := queryResult{}
+		json.Unmarshal(response, &queryRes)
+		currDocCount = queryRes.Results[0]["count"]
+
+		if currDocCount == reqNumOfDocs {
+			return nil
+		}
+		time.Sleep(time.Second * 10)
+	}
+	return errors.New("Mismatch in doc " + datasetName + " count. Current docs " + strconv.Itoa(currDocCount) + ", expecting " + strconv.Itoa(reqNumOfDocs))
+}
