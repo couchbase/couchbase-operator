@@ -6,5 +6,6 @@ tcGroups:
       - AuxillaryCluster1
     testcases:
       - name: TestFeaturesAll
-        #decorators:
-        #  - rsaDecorator
+        decorators:
+          - rsaDecorator
+          - portworxProvisioner

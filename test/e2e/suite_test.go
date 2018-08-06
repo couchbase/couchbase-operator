@@ -134,9 +134,11 @@ func runSuite(t *testing.T) {
 					logDir := f.LogDir + "/" + testName
 					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
 				}
-				for _, kubeCluster := range kubeClustersToSetup {
-					targetKube := f.ClusterSpec[kubeCluster.ClusterName]
-					e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+				if !f.SkipTeardown {
+					for _, kubeCluster := range kubeClustersToSetup {
+						targetKube := f.ClusterSpec[kubeCluster.ClusterName]
+						e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+					}
 				}
 				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testPassed})
 			}

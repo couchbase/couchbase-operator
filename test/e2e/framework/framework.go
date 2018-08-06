@@ -286,9 +286,9 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
 	kubeConfigPath := GetKubeConfigToUse(kubeName)
 
-	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
+	logrus.Info("cleaning up namespace before deployment for " + kubeName)
 
-	logrus.Info("Marking all nodes as schedulable")
+	logrus.Info("marking all nodes as schedulable")
 	nodeTaintList := []v1.Taint{}
 	k8sNodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
@@ -300,7 +300,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 	}
 
-	logrus.Info("Deleting portworx")
+	logrus.Info("deleting portworx")
 	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
 	runExecCmd(deletePortworxCmd)
 
-	logrus.Info("Deleting etcd")
+	logrus.Info("deleting etcd")
 	deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
 	runExecCmd(deleteEtcdCmd)
 

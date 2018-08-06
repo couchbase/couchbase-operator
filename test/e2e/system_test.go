@@ -155,14 +155,15 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 				results <- jobInfo
 				return
 			}
-			fmt.Printf("bbb %v\n", checkJob.Status.Succeeded)
 			if checkJob.Status.Succeeded == 1 {
+				fmt.Printf("succeeded %v\n", jobName)
 				jobInfo["status"] = "success: " + jobName
 				results <- jobInfo
 				return
 			}
 
 			if checkJob.Status.Failed >= 3 {
+				fmt.Printf("failed %v\n", jobName)
 				jobInfo["status"] = "error: job failed: " + jobName
 				results <- jobInfo
 				return
@@ -178,14 +179,14 @@ func CheckJob(t *testing.T, jobStatus map[string]string) {
 	}
 }
 
-func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, result map[string]string) {
+func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName string) {
 	targetKube := f.ClusterSpec[kubeName]
-	fmt.Printf("deleting %v\n", result["jobName"])
-	err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(result["jobName"], metav1.NewDeleteOptions(0))
+	fmt.Printf("deleting %v\n", jobName)
+	err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(jobName, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("failed to delete job %v \n", err)
 	}
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "job=" + result["jobName"]})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "job=" + jobName})
 	if err != nil {
 		t.Fatalf("failed to list pods for cluster: " + err.Error())
 	}
@@ -200,6 +201,7 @@ func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *b
 	if err != nil {
 		t.Fatalf("failed to create job %v", err)
 	}
+	fmt.Printf("created %v\n", job.Name)
 	t.Logf("Created Job: %s\n", job.Name)
 	return job
 }
@@ -221,11 +223,14 @@ func NewBucket(name string) map[string]string {
 // runs a system test based on a sysTestDef
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
-	//kubeName := "BasicCluster"
 	kubeName := "AuxillaryCluster1"
 	targetKube := f.ClusterSpec[kubeName]
 
 	// cluster configuration, 10 buckets, 4 nodes, all services
+	withPvc := true
+	withTls := true
+	leaveJobsRunning := false
+
 	clusterConfig := map[string]string{
 		"dataServiceMemQuota":   "2000",
 		"indexServiceMemQuota":  "800",
@@ -233,16 +238,28 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		"indexStorageSetting":   "plasma",
 		"autoFailoverTimeout":   "120",
 	}
+
 	serviceConfig1 := map[string]string{
 		"size":     "4",
 		"name":     "test_config_1",
-		"services": "data,query,index",
+		"services": "data,query,index,search,eventing,analytics",
 	}
+	pvcName := "couchbase"
+	if withPvc {
+		serviceConfig1["defaultVolMnt"] = pvcName
+		serviceConfig1["dataVolMnt"] = pvcName
+		serviceConfig1["indexVolMnt"] = pvcName
+		serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
+	}
+
 	otherConfig1 := map[string]string{
 		"antiAffinity": "off",
 	}
 	exposedFeaturesConfig := map[string]string{
 		"featureNames": "xdcr",
+	}
+	adminConsoleServices := map[string]string{
+		"services": "data",
 	}
 
 	bucketConfig1 := NewBucket("default")
@@ -270,30 +287,34 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		"bucket10":        bucketConfig10,
 		"other1":          otherConfig1,
 		"exposedFeatures": exposedFeaturesConfig,
+		"adminConsoleServices": adminConsoleServices,
+	}
+	clusterSpec1 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
+	clusterSpec2 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
+	if withPvc {
+		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec("standard", pvcName, 1))
+		clusterSpec1.SecurityContext = createPodSecurityContext(1000)
+		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec("standard", pvcName, 1))
+		clusterSpec2.SecurityContext = createPodSecurityContext(1000)
 	}
 
-	// create cluster
-	testCouchbase1, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	testCouchbase1, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec1)
 	if err != nil {
-		t.Logf("cluster: %+v", testCouchbase1)
-		t.Fatalf("failed to create cluster %+v", err)
+		t.Fatal(err)
 	}
 
-	testCouchbase2, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	testCouchbase2, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec2)
 	if err != nil {
-		t.Logf("cluster: %+v", testCouchbase2)
-		t.Fatalf("failed to create cluster %+v", err)
-	}
-
-	if !f.SkipTeardown {
-		defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+		t.Fatal(err)
 	}
 
 	// check tls
-	//err = e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace)
-	//if err != nil {
-	//	t.Fatal("TLS check for cluster failed: ", err)
-	//}
+	if withTls {
+		err = e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace)
+		if err != nil {
+			t.Fatal("TLS check for cluster failed: ", err)
+		}
+	}
 
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
@@ -402,7 +423,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
 	jobStatus := <-singleResults
 	CheckJob(t, jobStatus)
-	DeleteJob(t, f, kubeName, jobStatus)
+	DeleteJob(t, f, kubeName, jobStatus["jobName"])
 	time.Sleep(3 * time.Second)
 
 	rbacOp = operation{
@@ -420,12 +441,13 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
 	jobStatus = <-singleResults
 	CheckJob(t, jobStatus)
-	DeleteJob(t, f, kubeName, jobStatus)
+	DeleteJob(t, f, kubeName, jobStatus["jobName"])
 	time.Sleep(3 * time.Second)
 
 	// run the system test
 	to := time.After(time.Duration(testDef.days*24*60*60) * time.Second)
 	cycles := 1
+
 outerLoop:
 	for {
 		// timeout after duration, otherwise run all the jobs
@@ -433,6 +455,7 @@ outerLoop:
 		jobList := map[string]*batchv1.Job{}
 		i := 0
 		fmt.Printf("Starting cycle %v\n", cycles)
+		t.Logf("Starting cycle %v\n", cycles)
 	innerLoop:
 		for {
 			select {
@@ -441,9 +464,11 @@ outerLoop:
 				break outerLoop
 			// receive message from MonitorJob goroutines
 			case result := <-results:
-				fmt.Printf("got results from %v \n", result["jobName"])
+				fmt.Printf("results from %v \n", result["jobName"])
 				CheckJob(t, result)
-				DeleteJob(t, f, kubeName, result)
+				if !leaveJobsRunning {
+					DeleteJob(t, f, kubeName, result["jobName"])
+				}
 				delete(jobList, result["jobName"])
 				time.Sleep(3 * time.Second)
 			//launch next job if any left
@@ -455,14 +480,16 @@ outerLoop:
 					op := testDef.ops[i]
 					jobSpec := CreateJobSpec(op)
 					job := CreateJob(t, f, kubeName, jobSpec)
-					fmt.Printf("launched job %v::%v::%v \n", job.Name, cycles, i)
+					fmt.Printf("launched: job=%v cycle=%v index:%v lastIndex:%v \n", job.Name, cycles, i, len(testDef.ops))
 					// if wait, wait for success before launching next job
 					if op.wait {
 						singleResults := make(chan map[string]string, 1)
 						go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, op.duration, op.timeout, singleResults)
 						jobStatus := <-singleResults
 						CheckJob(t, jobStatus)
-						DeleteJob(t, f, kubeName, jobStatus)
+						if !leaveJobsRunning {
+							DeleteJob(t, f, kubeName, jobStatus["jobName"])
+						}
 					} else {
 						go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, op.duration, op.timeout, results)
 						jobList[job.Name] = job
@@ -485,6 +512,7 @@ outerLoop:
 
 		cycles = cycles + 1
 		time.Sleep(1 * time.Second)
+
 	}
 }
 
@@ -498,11 +526,11 @@ func TestFeaturesAll(t *testing.T) {
 		days: f.Duration,
 		ops: []operation{
 			// load data to default cluster 1
-
 			{
 				name:     "pillowfight-cluster1-1",
 				image:    "sequoiatools/pillowfight:v5.0.1",
-				cmd:      []string{"cbc-pillowfight", "-U", "couchbase://{{FIRST_NODE_CLUSTER1}}/default?select_bucket=true", "-I", "10000", "-B", "1000", "-c", "10", "-t", "1", "-u", "default_user", "-P", "password"},
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"cbc-pillowfight -U couchbase://{{FIRST_NODE_NO_PORT_CLUSTER1}}/default?select_bucket=true -I 10000 -B 1000 -c 10 -t 1 -u default_user -P password"},
 				wait:     false,
 				timeout:  2,
 				duration: 1,
@@ -511,7 +539,8 @@ func TestFeaturesAll(t *testing.T) {
 			{
 				name:     "pillowfight-htp-cluster1-1",
 				image:    "sequoiatools/pillowfight:v5.0.1",
-				cmd:      []string{"cbc-pillowfight", "-U", "couchbase://{{FIRST_NODE_CLUSTER1}}/default?select_bucket=true", "-I", "1000", "-B", "100", "-c", "100", "-t", "4", "-u", "default_user", "-P", "password"},
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"cbc-pillowfight -U couchbase://{{FIRST_NODE_NO_PORT_CLUSTER1}}/default?select_bucket=true -I 1000 -B 100 -c 100 -t 4 -u default_user -P password"},
 				wait:     false,
 				timeout:  2,
 				duration: 1,
@@ -538,14 +567,15 @@ func TestFeaturesAll(t *testing.T) {
 			},
 
 			// rebalance cluster 1
-			//{
-			//	name: "rebalance-cluster1-1",
-			//	image: "sequoiatools/couchbase-cli:v5.0.1",
-			//	cmd: []string{"couchbase-cli", "rebalance", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password"},
-			//	wait: true,
-			//	timeout: 10,
-			//	duration: 11,
-			//},
+			{
+				name: "rebalance-cluster1-1",
+				image: "sequoiatools/couchbase-cli:v5.0.1",
+				cmd: []string{"couchbase-cli", "rebalance", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password"},
+				wait: true,
+				timeout: 10,
+				duration: 11,
+			},
+
 			// tpcc workload cluster 1
 			{
 				name:     "tpcc-indexing-cluster1-1",
@@ -574,6 +604,16 @@ func TestFeaturesAll(t *testing.T) {
 				wait:     true,
 				timeout:  15,
 				duration: 16,
+			},
+			// deploy eventing function
+			{
+				name:     "eventing-deploy-cluster1-1",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER1}} 8091 bucket_op_function_integration.json Administrator password create_and_deploy"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
 			},
 
 			// continuous load cluster 1
@@ -622,8 +662,29 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./cbdozer -method POST -duration 15 -rate 5 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093/query/service -body 'select * from default limit 100 offset 50'"},
 				wait:     true,
-				duration: 20,
-				timeout:  21,
+				duration: 5,
+				timeout:  7,
+			},
+
+			// FTS indexes
+			{
+				name:     "fts-index-cluster1-1",
+				image:    "appropriate/curl",
+				cmd:      []string{"/bin/sh", "-c", "--"},
+				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_scorch_1 -d '{\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"scorch\"}}}'"},
+				wait:     true,
+				duration: 1,
+				timeout:  2,
+			},
+			// FTS query
+			{
+				name:     "fts-query-cluster1-1",
+				image:    "sequoiatools/cbdozer",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_scorch_1/query -query 5F"},
+				wait:     true,
+				duration: 5,
+				timeout:  7,
 			},
 
 			// rebalance out node from cluster 1
@@ -686,11 +747,53 @@ func TestFeaturesAll(t *testing.T) {
 				duration: 15,
 			},
 
+			// undeploy eventing function
+			{
+				name:     "eventing-undeploy-cluster1-1",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER1}} 8096 bucket_op_function_integration.json Administrator password undeploy true"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+			// redeploy eventing function
+			{
+				name:     "eventing-deploy-cluster1-2",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER1}} 8091 bucket_op_function_integration.json Administrator password create_and_deploy"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+
+			// FTS indexes
+			{
+				name:     "fts-index-cluster1-2",
+				image:    "appropriate/curl",
+				cmd:      []string{"/bin/sh", "-c", "--"},
+				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"upside_down\"}}})'"},
+				wait:     true,
+				duration: 1,
+				timeout:  2,
+			},
+			// FTS query
+			{
+				name:     "fts-query-cluster1-2",
+				image:    "sequoiatools/cbdozer",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				wait:     true,
+				duration: 1,
+				timeout:  2,
+			},
+
 			// add back node to cluster 1
 			{
 				name:     "add-node-cluster1-1",
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
-				cmd:      []string{"couchbase-cli", "server-add", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "--server-add", "{{SECOND_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--server-add-username", "Administrator", "--server-add-password", "password", "--services", "data,index,query,fts"},
+				cmd:      []string{"couchbase-cli", "server-add", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "--server-add", "{{SECOND_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--server-add-username", "Administrator", "--server-add-password", "password", "--services", "data,index,query,fts,eventing,analytics"},
 				wait:     true,
 				timeout:  120,
 				duration: 121,
@@ -755,6 +858,48 @@ func TestFeaturesAll(t *testing.T) {
 				duration: 15,
 				timeout:  16,
 			},
+			// FTS query
+			{
+				name:     "fts-query-cluster1-3",
+				image:    "sequoiatools/cbdozer",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				wait:     true,
+				duration: 10,
+				timeout:  11,
+			},
+
+			// undeploy eventing function
+			{
+				name:     "eventing-undeploy-cluster1-2",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER1}} 8096 bucket_op_function_integration.json Administrator password undeploy true"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+			// redeploy eventing function
+			{
+				name:     "eventing-deploy-cluster1-3",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER1}} 8091 bucket_op_function_integration.json Administrator password create_and_deploy"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+
+			// FTS query
+			{
+				name:     "fts-query-cluster1-4",
+				image:    "sequoiatools/cbdozer",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				wait:     true,
+				duration: 10,
+				timeout:  11,
+			},
 
 			// setup xdcr
 			{
@@ -791,6 +936,56 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/cbq",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='create primary index on default'"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+			{
+				name:     "fts-index-cluster2-1",
+				image:    "appropriate/curl",
+				cmd:      []string{"/bin/sh", "-c", "--"},
+				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_scorch_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"scorch\"}}})'"},
+				wait:     true,
+				duration: 1,
+				timeout:  2,
+			},
+			// FTS indexes
+			{
+				name:     "fts-index-cluster2-2",
+				image:    "appropriate/curl",
+				cmd:      []string{"/bin/sh", "-c", "--"},
+				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"upside_down\"}}})'"},
+				wait:     true,
+				duration: 1,
+				timeout:  2,
+			},
+			// FTS query
+			{
+				name:     "fts-query-cluster2-1",
+				image:    "sequoiatools/cbdozer",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				wait:     false,
+				duration: 10,
+				timeout:  11,
+			},
+			// FTS query
+			{
+				name:     "fts-query-cluster2-2",
+				image:    "sequoiatools/cbdozer",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				wait:     false,
+				duration: 10,
+				timeout:  11,
+			},
+
+			// deploy eventing function
+			{
+				name:     "eventing-deploy-cluster2-1",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER2}} 8091 bucket_op_function_integration.json Administrator password create_and_deploy"},
 				wait:     true,
 				timeout:  2,
 				duration: 1,
@@ -897,9 +1092,31 @@ func TestFeaturesAll(t *testing.T) {
 				timeout:  2,
 				duration: 1,
 			},
-
 			// delete phase
 			// delete cluster 1
+
+			// undeploy eventing function
+			{
+				name:     "eventing-undeploy-cluster1-3",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER1}} 8096 bucket_op_function_integration.json Administrator password undeploy true"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+
+			// delete eventing function
+			{
+				name:     "eventing-delete-cluster1-1",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER1}} 8091 bucket_op_function_integration.json Administrator password delete"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+
 			{
 				name:     "cbq-delete-cluster1-1",
 				image:    "sequoiatools/cbq",
@@ -960,6 +1177,29 @@ func TestFeaturesAll(t *testing.T) {
 				duration: 1,
 			},
 			// delete cluster 2
+
+			// undeploy eventing function
+			{
+				name:     "eventing-undeploy-cluster2-1",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER2}} 8096 bucket_op_function_integration.json Administrator password undeploy true"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+
+			// delete eventing function
+			{
+				name:     "eventing-delete-cluster2-1",
+				image:    "sequoiatools/eventing",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"/eventing.py {{FIRST_NODE_NO_PORT_CLUSTER2}} 8091 bucket_op_function_integration.json Administrator password delete"},
+				wait:     true,
+				timeout:  2,
+				duration: 1,
+			},
+
 			{
 				name:     "cbq-delete-cluster2-1",
 				image:    "sequoiatools/cbq",
