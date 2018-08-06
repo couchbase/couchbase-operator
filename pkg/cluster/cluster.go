@@ -464,7 +464,7 @@ func (c *Cluster) removePod(name string) error {
 	removeVolumes := false
 	if m, ok := c.members[name]; ok {
 		config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
-		if config.GetVolumeMounts() != nil {
+		if config != nil && config.GetVolumeMounts() != nil {
 			removeVolumes = true
 		}
 	}

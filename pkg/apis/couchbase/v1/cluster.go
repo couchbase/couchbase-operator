@@ -387,14 +387,16 @@ func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 }
 
 func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
-	if sc.Pod != nil {
+	if sc != nil && sc.Pod != nil {
 		return sc.Pod.VolumeMounts
 	}
 	return nil
 }
 func (sc *ServerConfig) GetDefaultVolumeClaim() string {
-	if mounts := sc.GetVolumeMounts(); mounts != nil {
-		return mounts.DefaultClaim
+	if sc != nil {
+		if mounts := sc.GetVolumeMounts(); mounts != nil {
+			return mounts.DefaultClaim
+		}
 	}
 	return ""
 }
