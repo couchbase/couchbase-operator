@@ -63,7 +63,7 @@ func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnsch
 	for retryCount := 0; retryCount < 3; retryCount++ {
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
-			return err
+			continue
 		}
 		nodeToTaint := k8sNodeList.Items[nodeIndex]
 		nodeToTaint.Spec.Unschedulable = isUnschedulable

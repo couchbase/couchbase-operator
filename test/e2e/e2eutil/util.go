@@ -33,6 +33,7 @@ import (
 
 const (
 	ClusterNamePrefix      = "test-couchbase-"
+	CouchbaseLabel         = "app=couchbase"
 	CouchbaseOperatorLabel = "app=couchbase-operator"
 )
 

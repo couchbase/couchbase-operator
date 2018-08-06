@@ -47,10 +47,10 @@
     - add_host:
         name: myVars
         kubeAdmToken: "{{ shellOutput.stdout }}"
-        masterNodeIp: "{{ inventory_hostname }}"        
+        masterNodeIp: "{{ inventory_hostname }}"
 
     - name: Initializing master node
-      shell: "kubeadm init --token {{ kubeAdmToken }} --pod-network-cidr=192.168.0.0/16"
+      shell: "kubeadm init --token {{ kubeAdmToken }} --pod-network-cidr=192.168.0.0/16 --kubernetes-version={{ kubeVersion }}"
 
     - name: Creating kube config dir
       file:
@@ -67,7 +67,7 @@
       shell: "chown $(id -u):$(id -g) {{ kubeConfigDir }}/config"
 
     - name: Fetching kube config
-      fetch: 
+      fetch:
         src: /etc/kubernetes/admin.conf
         dest: "~/.kube/{{ kubeConfPathToSave }}"
         flat: yes

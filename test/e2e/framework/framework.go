@@ -299,6 +299,19 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 	}
 
+	logrus.Info("Deleting portworx")
+	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
+		return err
+	}
+	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
+	runExecCmd(deletePortworxCmd)
+
+	logrus.Info("Deleting etcd")
+	kubeConfigPath = os.Getenv("HOME") + "/.kube/config_" + kubeName
+	deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
+	runExecCmd(deleteEtcdCmd)
+
 	logrus.Info("deleting deployments")
 	deployments, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -340,18 +353,19 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 		logrus.Infof("jobs deleted: %v", job.Name)
 	}
+	time.Sleep(2 * time.Second)
 
 	logrus.Info("deleting services")
-	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{})
+	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
 	for _, service := range services.Items {
-		err = targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
-		if err != nil {
+		if err := targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 		logrus.Infof("service deleted: %v", service.Name)
 	}
+
 	logrus.Info("deleting orphaned pods")
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
 	for _, pod := range pods.Items {
 		err = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 		if err != nil {
@@ -549,7 +563,7 @@ func runExecCmd(command *exec.Cmd) error {
 	command.Stderr = &stderr
 
 	if err := command.Run(); err != nil {
-		return errors.New("Error during execution: " + stderr.String() + "\n" + err.Error())
+		return errors.New("Error during execution: " + err.Error() + "\n\n stdout: " + stdout.String() + "\n\n stderr: " + stderr.String())
 	}
 	return nil
 }
