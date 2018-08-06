@@ -24,16 +24,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// Returns KubeConfig file path to use for testing
-func getKubeConfigToUse(kubeName string) string {
-	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
-	// If cluster specific file doesn't exists, point to default file
-	if _, err := os.Stat(kubeConfPath); os.IsNotExist(err) {
-		kubeConfPath = os.Getenv("HOME") + "/.kube/config"
-	}
-	return kubeConfPath
-}
-
 // Function to cross check log dir contents against populated file list
 func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *failureList) error {
 	for _, reqFile := range reqFileList {
@@ -356,7 +346,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := getKubeConfigToUse(kubeName)
+	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
 	errMsgList := failureList{}
 
 	// Validate args which won't produce output file
@@ -489,8 +479,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 // Negative test scenarios with command argument
 func TestNegLogCollectValidateArgs(t *testing.T) {
-	invalidKubeConfPath := getKubeConfigToUse("k8s_reclustered")
-	unreachableKubeConfPath := getKubeConfigToUse("k8s_unreachable")
+	invalidKubeConfPath := framework.GetKubeConfigToUse("k8s_reclustered")
+	unreachableKubeConfPath := framework.GetKubeConfigToUse("k8s_unreachable")
 	errMsgList := failureList{}
 
 	validArgumentList := []cbopinfoArg{
@@ -587,7 +577,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		}
 	}
 
-	kubeConfPath := getKubeConfigToUse(kubeName)
+	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
 
 	/////////////////////////////////////////////////////
 	// Log collection using '-namespace' & cluster arg //
@@ -821,7 +811,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 	svcAccName := "rbac-test"
-	kubeConfPath := getKubeConfigToUse(kubeName)
+	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
 
 	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
@@ -906,7 +896,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := getKubeConfigToUse(kubeName)
+	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
 
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig

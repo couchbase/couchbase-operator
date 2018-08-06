@@ -284,6 +284,7 @@ func (f *Framework) DeleteCRDs(config *rest.Config) error {
 
 func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
+	kubeConfigPath := GetKubeConfigToUse(kubeName)
 
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
 
@@ -303,12 +304,11 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
 		return err
 	}
-	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
 	runExecCmd(deletePortworxCmd)
 
 	logrus.Info("Deleting etcd")
-	kubeConfigPath = os.Getenv("HOME") + "/.kube/config_" + kubeName
 	deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
 	runExecCmd(deleteEtcdCmd)
 

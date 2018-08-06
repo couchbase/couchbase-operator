@@ -223,15 +223,10 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		t.Fatalf("Failed to read cluster yaml data: %v", err)
 	}
 
-	// Get number of available nodes from K8S cluster
-	clusterSize, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
-	}
-
 	// Create cluster spec for RZA feature
 	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
+	clusterSize := len(availableServerGroupList)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
@@ -278,10 +273,10 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 			t.Fatal(err)
 		}
 		expectedEvents.AddMemberCreationFailedEvent(testCouchbase, clusterSize)
-		if err == nil {
-			t.Fatal("Cluster resized more than number of nodes with AntiAffinity On..")
+		// Revert back to original cluster size
+		if err := e2eutil.ResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+			t.Fatal(err)
 		}
-		expectedEvents.AddMemberCreationFailedEvent(testCouchbase, clusterSize)
 	} else if antiAffinity == "off" {
 		event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
@@ -296,10 +291,10 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		}
 		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	}
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
-			t.Fatal(err.Error())
-		}
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
+		t.Fatal(err.Error())
 	}
 
 	sort.Strings(availableServerGroupList)

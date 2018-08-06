@@ -226,6 +226,16 @@ func GetSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	return
 }
 
+// Returns KubeConfig file path to use for testing
+func GetKubeConfigToUse(kubeName string) string {
+	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	// If cluster specific file doesn't exists, point to default file
+	if _, err := os.Stat(kubeConfPath); os.IsNotExist(err) {
+		kubeConfPath = os.Getenv("HOME") + "/.kube/config"
+	}
+	return kubeConfPath
+}
+
 func CreateK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) error {
 	namespaceList, err := kubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
