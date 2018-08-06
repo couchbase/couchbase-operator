@@ -397,7 +397,6 @@ func TestLogCollectValidateArguments(t *testing.T) {
 		},
 	}
 
-	// Following should fail since no cb cluster exists
 	for _, arg := range validArgumentList {
 		t.Log(arg.Name)
 		cmdArgs := []string{}
@@ -414,16 +413,17 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 		execOut, err := runCbopinfoCmd(cmdArgs)
 		execOutStr := strings.TrimSpace(string(execOut))
+		errMsgForNoCbCluster := "no CouchbaseCluster resources discovered in name space " + f.Namespace
 		t.Logf("Returned: %s\n", execOutStr)
-		if err == nil {
-			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Command executed successfully without cb cluster"))
+		if err != nil {
+			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Command failed without cb cluster"))
 		} else {
-			if execOutStr != "no CouchbaseCluster resources discovered in name space "+f.Namespace {
+			if !strings.Contains(execOutStr, errMsgForNoCbCluster) {
 				errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Invalid error message"))
 			}
 		}
-		if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
-			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Logs generated without cb cluster"))
+		if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName == "" {
+			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("No logs generated without cb cluster"))
 			defer os.Remove(logFileName)
 		}
 	}
@@ -867,33 +867,33 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.database.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":rbac-test\" cannot list couchbaseclusters.couchbase.database.couchbase.com in the namespace \"" + f.Namespace + "\""
+	if err == nil {
+		logFileName := getLogFileNameFromExecOutput(execOutStr)
+		defer os.Remove(logFileName)
 
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+		logFileDir := strings.Split(logFileName, ".")[0]
+		defer os.RemoveAll(logFileDir)
+		if err := untarGzFile(logFileName); err != nil {
+			t.Fatal(err)
+		}
 
-	// Verify file list
-	errMsgList := failureList{}
-	reqFileList := []string{}
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+		// Verify file list
+		errMsgList := failureList{}
+		reqFileList := []string{}
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, &reqFileList); err != nil {
+			t.Fatal(err)
+		}
+		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
+			t.Fatal(err)
+		}
+		checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+		errMsgList.PrintFailures(t)
 
-	failureExists := errMsgList.PrintFailures(t)
-	if !failureExists {
-		t.Fatal("Log file has all required files despite of rbac constraint")
+		t.Fatal("Able to read resource without valid rbac permissions")
+	}
+	if execOutStr != expectedErrMsg {
+		t.Fatal("Invalid error message")
 	}
 }
 
@@ -933,7 +933,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	}
 
 	// Collect logs
-	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cbCluster.Name}
+	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", cbCluster.Name}
 	execOut, err := runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
@@ -959,5 +959,8 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	if err := checkCollectInfoLogs(execOut, targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, &errMsgList); err != nil {
+		t.Error(err)
+	}
 	errMsgList.CheckFailures(t)
 }

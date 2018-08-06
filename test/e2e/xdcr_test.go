@@ -240,16 +240,16 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 				t.Fatal(err)
 			}
 			expectedXdcrCluster1Events.AddRebalanceStartedEvent(xdcrCluster1)
-			expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 1)
-			expectedXdcrCluster1Events.AddMemberAddEvent(xdcrCluster1, 2)
+			expectedXdcrCluster1Events.AddMemberRemoveEvent(xdcrCluster1, 1)
+			expectedXdcrCluster1Events.AddMemberRemoveEvent(xdcrCluster1, 2)
 			expectedXdcrCluster1Events.AddRebalanceCompletedEvent(xdcrCluster1)
 		} else {
 			if err := resizeXdcrCluster(t, xdcrCluster2, e2eutil.Size1, xdcr2KubeName); err != nil {
 				t.Fatal(err)
 			}
 			expectedXdcrCluster2Events.AddRebalanceStartedEvent(xdcrCluster2)
-			expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 1)
-			expectedXdcrCluster2Events.AddMemberAddEvent(xdcrCluster2, 2)
+			expectedXdcrCluster2Events.AddMemberRemoveEvent(xdcrCluster2, 1)
+			expectedXdcrCluster2Events.AddMemberRemoveEvent(xdcrCluster2, 2)
 			expectedXdcrCluster2Events.AddRebalanceCompletedEvent(xdcrCluster2)
 		}
 	default:
@@ -815,23 +815,15 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 		defer e2espec.ResetTLS()
 	}
 
-	var xdcrCluster1 *api.CouchbaseCluster
-	errChan := make(chan error)
-
-	go func() {
-		var err error
-		// Cluster 1
-		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
-		errChan <- err
-	}()
-
-	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
+	// Cluster 1
+	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := <-errChan; err != nil {
+	// Cluster 2
+	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
+	if err != nil {
 		t.Fatal(err)
 	}
 

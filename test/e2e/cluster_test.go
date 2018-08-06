@@ -274,9 +274,10 @@ func TestNegEditClusterSettings(t *testing.T) {
 	t.Log("Changing cluster data service mem quota")
 	if _, err := e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-	if !strings.Contains(err.Error(), "spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256") {
-		t.Fatalf("failed to see expected error message: %v \n", err)
+	} else {
+		if !strings.Contains(err.Error(), "spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256") {
+			t.Fatalf("failed to see expected error message: %v \n", err)
+		}
 	}
 	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier); err == nil {
 		t.Fatalf("failed to reject change for cluster data service mem quota: %v", err)
@@ -297,9 +298,10 @@ func TestNegEditClusterSettings(t *testing.T) {
 	t.Log("Changing cluster index service mem quota")
 	if _, err := e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-	if !strings.Contains(err.Error(), "spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256") {
-		t.Fatalf("failed to see expected error message: %v \n", err)
+	} else {
+		if !strings.Contains(err.Error(), "spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256") {
+			t.Fatalf("failed to see expected error message: %v \n", err)
+		}
 	}
 	if err := e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier); err == nil {
 		t.Fatalf("failed to reject change for cluster index service mem quota: %v", err)
@@ -321,9 +323,10 @@ func TestNegEditClusterSettings(t *testing.T) {
 	t.Log("Changing cluster search service mem quota")
 	if _, err := e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-	if !strings.Contains(err.Error(), "spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256") {
-		t.Fatalf("failed to see expected error message: %v \n", err)
+	} else {
+		if !strings.Contains(err.Error(), "spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256") {
+			t.Fatalf("failed to see expected error message: %v \n", err)
+		}
 	}
 	if err := e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier); err == nil {
 		t.Fatalf("failed to reject change cluster for search service mem quota: %v", err)
@@ -344,9 +347,10 @@ func TestNegEditClusterSettings(t *testing.T) {
 	t.Log("Changing cluster autofailover timeout")
 	if _, err := e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-	if !strings.Contains(err.Error(), "spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5") {
-		t.Fatalf("failed to see expected error message: %v \n", err)
+	} else {
+		if !strings.Contains(err.Error(), "spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5") {
+			t.Fatalf("failed to see expected error message: %v \n", err)
+		}
 	}
 	if err := e2eutil.VerifyAutoFailoverInfo(t, client, e2eutil.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier); err == nil {
 		t.Fatalf("failed to reject change for cluster autofailover timeout: %v", err)
@@ -467,8 +471,6 @@ func TestInvalidBaseImage(t *testing.T) {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 
-	expectedEvents := e2eutil.EventList{}
-
 	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	if len(pods.Items) != 1 {
 		t.Fatalf("more than one pod: %v", pods.Items)
@@ -484,22 +486,22 @@ func TestInvalidBaseImage(t *testing.T) {
 		"rpc error: code = 2 desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
 		"rpc error: code = Unknown desc = repository docker.io/" + couchbaseBaseImage + " not found: does not exist or no pull access",
 		// For openshift v3.9.33, kubernetes v1.9.1+a0ce1bc657
-		"rpc error: code = Unknown desc = Tag enterprise-9.9.9 not found in repository docker.io/" + couchbaseBaseImage,
+		"rpc error: code = Unknown desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
 	}
 
 	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-
 	correctMsg := false
 	for _, acceptableMsg := range acceptableMessages {
 		if containerMsg == acceptableMsg {
 			correctMsg = true
+			break
 		}
 	}
 
 	if !correctMsg {
 		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
 }
 
 // Tests if specs with invalid version will create a cluster (they should not)
@@ -513,8 +515,8 @@ func TestInvalidVersion(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	couchbaseVerString := "enterprise-9.9.9"
 	couchbaseBaseImage := "couchbase/server"
+	couchbaseVerString := "enterprise-9.9.9"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
 	otherConfig1 := map[string]string{
@@ -537,8 +539,6 @@ func TestInvalidVersion(t *testing.T) {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 
-	expectedEvents := e2eutil.EventList{}
-
 	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	if len(pods.Items) != 1 {
 		t.Fatalf("more than one pod: %v", pods.Items)
@@ -553,21 +553,23 @@ func TestInvalidVersion(t *testing.T) {
 		"Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\"",
 		"rpc error: code = 2 desc = Tag " + couchbaseVerString + " not found in repository docker.io/",
 		"rpc error: code = Unknown desc = manifest for docker.io/" + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
+		// For openshift v3.9.33, kubernetes v1.9.1+a0ce1bc657
+		"rpc error: code = Unknown desc = Tag " + couchbaseVerString + " not found in repository docker.io/" + couchbaseBaseImage,
 	}
 
 	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-
 	correctMsg := false
 	for _, acceptableMsg := range acceptableMessages {
 		if containerMsg == acceptableMsg {
 			correctMsg = true
+			break
 		}
 	}
 
 	if !correctMsg {
 		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
 }
 
 // 1. create 1 node cluster
@@ -761,12 +763,6 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
-	// expect down node to be removed from cluster
-	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 0)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Logf("status: %+v", testCouchbase.Status)
-		t.Fatal(err)
-	}
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
