@@ -1,17 +1,22 @@
 ---
-operator-image: couchbase/couchbase-operator:v1               # Operator image to use for testing
-namespace: default                                            # Cluster namespace to run the tests
-deployment-spec: ../../example/deployment.yaml                # Deployment yaml file path
-cluster-config: resources/cluster_conf.yaml                   # cluster config file path
+operator-image: couchbase/couchbase-operator:v1  # Operator image to use for testing
+namespace: default                               # Cluster namespace to run the tests
+deployment-spec: ../../example/deployment.yaml   # Deployment yaml file path
+cluster-config: resources/cluster_conf.yaml      # cluster config file path
 
-kube-config:                    # List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
+kube-config:  # List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
   #- name: AuxillaryCluster1
   #  config: ~/.kube/config
-duration: 7                     # In days. Used for system tests
-pullDockerImages: false         # If true, operator and server images will be pulled to all k8s nodes
-skip-tear-down: true            # Leaves the operator running after tests
-suite: TestNone                 # Test suite to run. Same named yaml file should exists in resources/suites path
-kube-type: kubernetes           # Cluster type kubernetes | aws-openshift
-kube-version: 1.10.5-0          # KUBE version to install
+duration: 7              # In days. Used for system tests
+pullDockerImages: false  # If true, operator and server images will be pulled to all k8s nodes
+skip-tear-down: true     # Leaves the operator running after tests
 
-serviceAccountName: default     # Service account to use while running Tests
+suite: TestNone                         # Test suite to run. Same named yaml file should exists in resources/suites path
+cbServerBaseImage: couchbase/server     # Couchbase server docker image to use
+cbServerImageVersion: enterprise-5.5.0  # Couchbase server image docker version to use
+
+kube-type: kubernetes       # Cluster type kubernetes | aws-openshift
+kube-version: 1.10.5-0      # KUBE version to install
+StorageClassName: standard  # Storage class defined in cluster to use for PV cases
+
+serviceAccountName: default  # Service account to use while running Tests

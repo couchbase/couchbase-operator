@@ -142,7 +142,14 @@ func Setup(t *testing.T) error {
 		clusterSpecMap[kubeConf.ClusterName] = &clusterSpec
 	}
 
+	// Setting required spec values from test_config yaml
+	e2espec.SetStorageClassName(runtimeParams.StorageClassName)
+	e2espec.SetCbBaseImage(runtimeParams.CbServerBaseImage)
+	e2espec.SetCbImageVersion(runtimeParams.CbServerImgVer)
+
 	logrus.Info("Using couchbase-operator: " + deployment.Spec.Template.Spec.Containers[0].Image)
+	logrus.Info("Using couchbase-server: " + e2espec.GetCouchbaseDockerImgName())
+	logrus.Info("Using storage class: " + e2espec.StorageClassName)
 	logrus.Info("Logs will be stored in: " + logDir)
 
 	Global = &Framework{
@@ -282,25 +289,34 @@ func (f *Framework) DeleteCRDs(config *rest.Config) error {
 	return nil
 }
 
-func (f *Framework) SetupFramework(kubeName string) error {
-	targetKube := f.ClusterSpec[kubeName]
-	kubeConfigPath := GetKubeConfigToUse(kubeName)
-
-	logrus.Info("cleaning up namespace before deployment for " + kubeName)
-
-	logrus.Info("marking all nodes as schedulable")
+func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
+	logrus.Info("Marking all nodes as schedulable")
 	nodeTaintList := []v1.Taint{}
-	k8sNodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return errors.New("Failed to get node list: " + err.Error())
 	}
 	for nodeIndex, _ := range k8sNodeList.Items {
-		if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, nodeTaintList, nodeIndex); err != nil {
+		if err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex); err != nil {
 			return errors.New("Failed to update node taint: " + err.Error())
 		}
 	}
+	return nil
+}
 
-	logrus.Info("deleting portworx")
+func (f *Framework) SetupFramework(kubeName string) error {
+	targetKube := f.ClusterSpec[kubeName]
+	kubeConfigPath := GetKubeConfigToUse(kubeName)
+
+	if err := f.RemoveK8SNodeTaints(targetKube.KubeClient); err != nil {
+		return nil
+	}
+
+	if err := f.DeleteCRDs(targetKube.Config); err != nil {
+		return err
+	}
+
+	logrus.Info("Creating Portworx service")
 	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
 		return err
 	}
@@ -312,7 +328,9 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
 	runExecCmd(deleteEtcdCmd)
 
-	logrus.Info("deleting deployments")
+	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
+
+	logrus.Info("Deleting deployments")
 	deployments, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.New("Failed to list deployments: " + err.Error())
@@ -325,7 +343,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("deployment deleted: %v", deployment.GetName())
 	}
 
-	logrus.Info("deleting clusters")
+	logrus.Info("Deleting clusters")
 	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 	for _, cluster := range clusters.Items {
 		err = targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
@@ -344,7 +362,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		e2eutil.KillMembers(targetKube.KubeClient, Global.Namespace, cluster.Name, killPods...)
 	}
 
-	logrus.Info("deleting jobs")
+	logrus.Info("Deleting jobs")
 	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
 	for _, job := range jobs.Items {
 		err = targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
@@ -355,7 +373,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 	time.Sleep(2 * time.Second)
 
-	logrus.Info("deleting services")
+	logrus.Info("Deleting services")
 	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
 	for _, service := range services.Items {
 		if err := targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
@@ -364,7 +382,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("service deleted: %v", service.Name)
 	}
 
-	logrus.Info("deleting orphaned pods")
+	logrus.Info("Deleting orphaned pods")
 	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
 	for _, pod := range pods.Items {
 		err = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
@@ -386,33 +404,29 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("endpoint deleted: %v", endpoint.Name)
 	}
 
-	logrus.Info("deleting secrets")
+	logrus.Info("Deleting secrets")
 	if err := e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
 		logrus.Infof("secret deleted: %v", "basic-test-secret")
 	}
 
-	if err := f.DeleteCRDs(targetKube.Config); err != nil {
-		return err
-	}
-
 	// Creating required namespaces and cluster roles before deploying the operator
-	logrus.Info("creating namespace")
+	logrus.Info("Creating namespace")
 	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
 		return err
 	}
-	logrus.Info("recreating cluster role")
+	logrus.Info("Recreating cluster role")
 	if err := RecreateClusterRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
-	logrus.Info("recreating service account")
+	logrus.Info("Recreating service account")
 	if err := RecreateServiceAccount(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
-	logrus.Info("recreating cluster role binding")
+	logrus.Info("Recreating cluster role binding")
 	if err := RecreateClusterRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
-	logrus.Info("creating secret")
+	logrus.Info("Creating secret")
 	if err = f.CreateSecretInKubeCluster(kubeName); err != nil {
 		return err
 	}
@@ -424,7 +438,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 	}
 
-	logrus.Info("setting up operator")
+	logrus.Info("Setting up operator..")
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
 		return errors.New("Failed to setup couchbase operator: " + err.Error())
 	}

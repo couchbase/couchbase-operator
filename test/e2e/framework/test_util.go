@@ -5,12 +5,15 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
@@ -19,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
-	"runtime/debug"
 )
 
 // Const Ansible setting string
@@ -81,6 +83,9 @@ type TestRunParam struct {
 	SkipTearDown       bool           `yaml:"skip-tear-down"`
 	ClusterConfFile    string         `yaml:"cluster-config"`
 	PullDockerImages   bool           `yaml:"pullDockerImages"`
+	StorageClassName   string         `yaml:"StorageClassName"`
+	CbServerBaseImage  string         `yaml:"cbServerBaseImage"`
+	CbServerImgVer     string         `yaml:"cbServerImageVersion"`
 }
 
 // To decode cluster yaml file
@@ -871,9 +876,7 @@ func RemoveStorageClass(kubeClient kubernetes.Interface, storageClassName string
 }
 
 func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
-	storageClassName := "standard"
-
-	if err := RemoveStorageClass(kubeClient, storageClassName); err != nil {
+	if err := RemoveStorageClass(kubeClient, e2espec.StorageClassName); err != nil {
 		return err
 	}
 	parameters := make(map[string]string)
@@ -883,7 +886,7 @@ func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
 
 	storageClassSpec := &storagev1.StorageClass{
 		TypeMeta:    metav1.TypeMeta{Kind: "StorageClass", APIVersion: "storage.k8s.io/v1beta1"},
-		ObjectMeta:  metav1.ObjectMeta{Name: storageClassName},
+		ObjectMeta:  metav1.ObjectMeta{Name: e2espec.StorageClassName},
 		Provisioner: "kubernetes.io/portworx-volume",
 		Parameters:  parameters,
 	}

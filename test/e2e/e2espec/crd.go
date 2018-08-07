@@ -17,6 +17,9 @@ import (
 var (
 	baseImage = "couchbase/server"
 	version   = "enterprise-5.5.0"
+
+	// Storage class defined in K8S cluster
+	StorageClassName = "standard"
 )
 
 // cluster settings
@@ -61,6 +64,18 @@ var (
 		},
 	}
 )
+
+func SetCbBaseImage(baseImageName string) {
+	baseImage = baseImageName
+}
+
+func SetCbImageVersion(cbImgVer string) {
+	version = cbImgVer
+}
+
+func SetStorageClassName(storageClassName string) {
+	StorageClassName = storageClassName
+}
 
 func GetCouchbaseDockerImgName() string {
 	return baseImage + ":" + version
@@ -438,7 +453,6 @@ func NewStatefulCluster(genName, secretName string, size int, withBucket bool, e
 		VolumeMounts: &api.VolumeMounts{DefaultClaim: couchbase},
 	}
 
-	standardStorageClass := "standard"
 	storagePolicy := CreatePodPolicy(v1.ResourceStorage, 1, 1, "Gi")
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -446,7 +460,7 @@ func NewStatefulCluster(genName, secretName string, size int, withBucket bool, e
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			StorageClassName: &standardStorageClass,
+			StorageClassName: &StorageClassName,
 			Resources:        storagePolicy.Resources,
 		},
 	}

@@ -2,13 +2,15 @@ package e2e
 
 import (
 	"fmt"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"math/rand"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -273,28 +275,28 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	bucketConfig9 := NewBucket("ORDER_LINE")
 	bucketConfig10 := NewBucket("STOCK")
 	configMap := map[string]map[string]string{
-		"cluster":         clusterConfig,
-		"service1":        serviceConfig1,
-		"bucket1":         bucketConfig1,
-		"bucket2":         bucketConfig2,
-		"bucket3":         bucketConfig3,
-		"bucket4":         bucketConfig4,
-		"bucket5":         bucketConfig5,
-		"bucket6":         bucketConfig6,
-		"bucket7":         bucketConfig7,
-		"bucket8":         bucketConfig8,
-		"bucket9":         bucketConfig9,
-		"bucket10":        bucketConfig10,
-		"other1":          otherConfig1,
-		"exposedFeatures": exposedFeaturesConfig,
+		"cluster":              clusterConfig,
+		"service1":             serviceConfig1,
+		"bucket1":              bucketConfig1,
+		"bucket2":              bucketConfig2,
+		"bucket3":              bucketConfig3,
+		"bucket4":              bucketConfig4,
+		"bucket5":              bucketConfig5,
+		"bucket6":              bucketConfig6,
+		"bucket7":              bucketConfig7,
+		"bucket8":              bucketConfig8,
+		"bucket9":              bucketConfig9,
+		"bucket10":             bucketConfig10,
+		"other1":               otherConfig1,
+		"exposedFeatures":      exposedFeaturesConfig,
 		"adminConsoleServices": adminConsoleServices,
 	}
 	clusterSpec1 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec2 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	if withPvc {
-		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec("standard", pvcName, 1))
+		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName, 1))
 		clusterSpec1.SecurityContext = createPodSecurityContext(1000)
-		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec("standard", pvcName, 1))
+		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName, 1))
 		clusterSpec2.SecurityContext = createPodSecurityContext(1000)
 	}
 
@@ -530,7 +532,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "pillowfight-cluster1-1",
 				image:    "sequoiatools/pillowfight:v5.0.1",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"cbc-pillowfight -U couchbase://{{FIRST_NODE_NO_PORT_CLUSTER1}}/default?select_bucket=true -I 10000 -B 1000 -c 10 -t 1 -u default_user -P password"},
+				args:     []string{"cbc-pillowfight -U couchbase://{{FIRST_NODE_NO_PORT_CLUSTER1}}/default?select_bucket=true -I 10000 -B 1000 -c 10 -t 1 -u default_user -P password"},
 				wait:     false,
 				timeout:  2,
 				duration: 1,
@@ -540,7 +542,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "pillowfight-htp-cluster1-1",
 				image:    "sequoiatools/pillowfight:v5.0.1",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"cbc-pillowfight -U couchbase://{{FIRST_NODE_NO_PORT_CLUSTER1}}/default?select_bucket=true -I 1000 -B 100 -c 100 -t 4 -u default_user -P password"},
+				args:     []string{"cbc-pillowfight -U couchbase://{{FIRST_NODE_NO_PORT_CLUSTER1}}/default?select_bucket=true -I 1000 -B 100 -c 100 -t 4 -u default_user -P password"},
 				wait:     false,
 				timeout:  2,
 				duration: 1,
@@ -568,11 +570,11 @@ func TestFeaturesAll(t *testing.T) {
 
 			// rebalance cluster 1
 			{
-				name: "rebalance-cluster1-1",
-				image: "sequoiatools/couchbase-cli:v5.0.1",
-				cmd: []string{"couchbase-cli", "rebalance", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password"},
-				wait: true,
-				timeout: 10,
+				name:     "rebalance-cluster1-1",
+				image:    "sequoiatools/couchbase-cli:v5.0.1",
+				cmd:      []string{"couchbase-cli", "rebalance", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password"},
+				wait:     true,
+				timeout:  10,
 				duration: 11,
 			},
 
@@ -671,7 +673,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-index-cluster1-1",
 				image:    "appropriate/curl",
 				cmd:      []string{"/bin/sh", "-c", "--"},
-				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_scorch_1 -d '{\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"scorch\"}}}'"},
+				args:     []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_scorch_1 -d '{\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"scorch\"}}}'"},
 				wait:     true,
 				duration: 1,
 				timeout:  2,
@@ -681,7 +683,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-query-cluster1-1",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_scorch_1/query -query 5F"},
+				args:     []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_scorch_1/query -query 5F"},
 				wait:     true,
 				duration: 5,
 				timeout:  7,
@@ -773,7 +775,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-index-cluster1-2",
 				image:    "appropriate/curl",
 				cmd:      []string{"/bin/sh", "-c", "--"},
-				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"upside_down\"}}})'"},
+				args:     []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"upside_down\"}}})'"},
 				wait:     true,
 				duration: 1,
 				timeout:  2,
@@ -783,7 +785,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-query-cluster1-2",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				args:     []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
 				wait:     true,
 				duration: 1,
 				timeout:  2,
@@ -863,7 +865,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-query-cluster1-3",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				args:     []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
 				wait:     true,
 				duration: 10,
 				timeout:  11,
@@ -895,7 +897,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-query-cluster1-4",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				args:     []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER1}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
 				wait:     true,
 				duration: 10,
 				timeout:  11,
@@ -944,7 +946,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-index-cluster2-1",
 				image:    "appropriate/curl",
 				cmd:      []string{"/bin/sh", "-c", "--"},
-				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_scorch_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"scorch\"}}})'"},
+				args:     []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_scorch_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"scorch\"}}})'"},
 				wait:     true,
 				duration: 1,
 				timeout:  2,
@@ -954,7 +956,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-index-cluster2-2",
 				image:    "appropriate/curl",
 				cmd:      []string{"/bin/sh", "-c", "--"},
-				args:      []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"upside_down\"}}})'"},
+				args:     []string{"curl -X PUT -u Administrator:password -H Content-Type:application/json http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1 -d '({\"type\": \"fulltext-index\",\"sourceType\": \"couchbase\",\"sourceName\": \"default\",\"params\": {\"store\": {\"indexType\": \"upside_down\"}}})'"},
 				wait:     true,
 				duration: 1,
 				timeout:  2,
@@ -964,7 +966,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-query-cluster2-1",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				args:     []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
 				wait:     false,
 				duration: 10,
 				timeout:  11,
@@ -974,7 +976,7 @@ func TestFeaturesAll(t *testing.T) {
 				name:     "fts-query-cluster2-2",
 				image:    "sequoiatools/cbdozer",
 				cmd:      []string{"/bin/bash", "-c", "--"},
-				args:      []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
+				args:     []string{"./cbdozer fts -method POST -duration -1 -rate 10 -url http://Administrator:password@{{FIRST_NODE_NO_PORT_CLUSTER2}}:8094/api/index/st_index_upside_down_1/query -query 5F"},
 				wait:     false,
 				duration: 10,
 				timeout:  11,
