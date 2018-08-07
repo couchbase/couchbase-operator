@@ -409,12 +409,11 @@ func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
 func filterAllowedPorts(nodeName string, members couchbaseutil.MemberSet, cluster *cbapi.CouchbaseCluster, ports []v1.ServicePort) ([]v1.ServicePort, error) {
 	member, ok := members[nodeName]
 	if !ok {
-		// Node doesn't exist so we're most likely about to delete the service
-		return []v1.ServicePort{}, nil
+		return nil, cberrors.NewErrUnknownMember(nodeName)
 	}
 	config := cluster.Spec.GetServerConfigByName(member.ServerConfig)
 	if config == nil {
-		return nil, fmt.Errorf("Node config %s not found", member.ServerConfig)
+		return nil, cberrors.NewErrUnknownServerClass(member.ServerConfig)
 	}
 	// Admin is not explicitly enabled, it is always there
 	allowedServices := append(config.Services, cbapi.AdminService)
@@ -478,7 +477,20 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 		// Remove any ports related to services not exposed on the node
 		allowedPorts, err := filterAllowedPorts(nodeName, members, cluster, ports)
 		if err != nil {
-			return nil, err
+			switch {
+			case cberrors.IsErrUnknownServerClass(err):
+				// Server class has been removed, the pod will be deleted so
+				// leave the ports alone (they may still be used for client ops
+				// while being ejected)
+				continue
+			case cberrors.IsErrUnknownMember(err):
+				// Member is unknown, allowedPorts *should* be nil and the service
+				// will be deleted
+				break
+			default:
+				// Unknown error, return the error and stop processing
+				return nil, err
+			}
 		}
 
 		// Node no longer exists or no ports are defined so delete the service
@@ -610,7 +622,20 @@ func WouldUpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseu
 		// Remove any ports related to services not exposed on the node
 		allowedPorts, err := filterAllowedPorts(nodeName, members, cluster, ports)
 		if err != nil {
-			return false, err
+			switch {
+			case cberrors.IsErrUnknownServerClass(err):
+				// Server class has been removed, the pod will be deleted so
+				// leave the ports alone (they may still be used for client ops
+				// while being ejected)
+				continue
+			case cberrors.IsErrUnknownMember(err):
+				// Member is unknown, allowedPorts *should* be nil and the service
+				// will be deleted
+				break
+			default:
+				// Unknown error, return the error and stop processing
+				return false, err
+			}
 		}
 
 		// Node no longer exists or no ports are defined so delete the service

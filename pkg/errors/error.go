@@ -85,6 +85,50 @@ type ErrVolumeUnexpectedPhase struct {
 	Phase v1.PersistentVolumePhase
 }
 
+// ErrUnknownMember is used when mapping a pod to a member and the
+// member is unknown
+type ErrUnknownMember struct {
+	member string
+}
+
+// Error returns an error string
+func (e ErrUnknownMember) Error() string {
+	return fmt.Sprintf("member is unknown: %s", e.member)
+}
+
+// NewErrUnknownMember creates a new unknown member error
+func NewErrUnknownMember(member string) error {
+	return &ErrUnknownMember{member: member}
+}
+
+// IsErrUnknownMember returns whether the error is an unknown member
+func IsErrUnknownMember(err error) bool {
+	_, ok := err.(*ErrUnknownMember)
+	return ok
+}
+
+// ErrUnknownServerClass is used when mapping a class name to a server
+// configuration and the configuration does not exist
+type ErrUnknownServerClass struct {
+	serverClass string
+}
+
+// Error returns an error string
+func (e ErrUnknownServerClass) Error() string {
+	return fmt.Sprintf("server class is unknown: %s", e.serverClass)
+}
+
+// NewErrUnknownServerClass returns a new new missing
+func NewErrUnknownServerClass(serverClass string) error {
+	return &ErrUnknownServerClass{serverClass: serverClass}
+}
+
+// IsErrUnknownServerClass returns whether the error is an unknown server class
+func IsErrUnknownServerClass(err error) bool {
+	_, ok := err.(*ErrUnknownServerClass)
+	return ok
+}
+
 func (e ErrSecretMissingUsername) Error() string {
 	return fmt.Sprintf("secret is missing username key: %s", e.Reason)
 }
