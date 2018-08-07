@@ -490,6 +490,18 @@ func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
 	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, e2eutil.CouchbaseOperatorLabel)
 }
 
+func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, namespace string) int32 {
+	operatorPodName, err := e2eutil.GetOperatorName(kubeClient, namespace)
+	if err != nil {
+		return -1
+	}
+	operatorPod, err := kubeClient.CoreV1().Pods(namespace).Get(operatorPodName, metav1.GetOptions{})
+	if err != nil {
+		return -1
+	}
+	return operatorPod.Status.ContainerStatuses[0].RestartCount
+}
+
 func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName string, namespace string) error {
 	err := deleteOperator(kubeClient, deploymentName, namespace)
 	if err != nil {

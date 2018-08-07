@@ -61,6 +61,7 @@ func runSuite(t *testing.T) {
 	f := framework.Global
 	reqOpImage := f.Deployment.Spec.Template.Spec.Containers[0].Image
 	ymlFilePath := "./resources/ansible"
+	var operatorRestartCount int32 = 0
 	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
 
 	for _, testGroup := range f.SuiteYmlData.TestCaseGroup {
@@ -130,10 +131,24 @@ func runSuite(t *testing.T) {
 
 			if testFunc != nil {
 				testPassed := t.Run(testName, testFunc)
+
+				// Detect couchbase-operator crash / restart event
+				for _, kubeCluster := range kubeClustersToSetup {
+					targetKube := f.ClusterSpec[kubeCluster.ClusterName]
+					if currRestartCount := f.GetOperatorRestartCount(targetKube.KubeClient, f.Namespace); currRestartCount != operatorRestartCount {
+						testPassed = false
+						operatorRestartCount = currRestartCount
+						t.Logf("Operator pod restart count is %d", operatorRestartCount)
+					}
+				}
+
+				// Collect logs if test fails
 				if !testPassed {
 					logDir := f.LogDir + "/" + testName
 					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
 				}
+
+				// Clean up all known clusters if SkipTeardown is disabled
 				if !f.SkipTeardown {
 					for _, kubeCluster := range kubeClustersToSetup {
 						targetKube := f.ClusterSpec[kubeCluster.ClusterName]

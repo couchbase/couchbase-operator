@@ -129,11 +129,9 @@ func AnalyzeResults(t *testing.T) {
 	for i, result := range Results {
 		if result.Result {
 			t.Logf("%d: %s...PASS", i+1, result.Name)
-		}
-		if !result.Result {
+		} else {
 			t.Logf("%d: %s...FAIL", i+1, result.Name)
 			failures = append(failures, result.Name)
-
 		}
 	}
 
