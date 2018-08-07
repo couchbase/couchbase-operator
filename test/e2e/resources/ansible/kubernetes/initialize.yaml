@@ -101,6 +101,7 @@
         - kubectl
         - kubeadm
         - kubelet
+        - cri-tools
 
     - name: Installing kubelet package
       yum:
