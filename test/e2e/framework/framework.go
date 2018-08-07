@@ -392,7 +392,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("pod deleted: %v", pod.Name)
 	}
 
-	endpoints, err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).List(metav1.ListOptions{})
+	endpoints, err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
 	if err != nil {
 		return err
 	}

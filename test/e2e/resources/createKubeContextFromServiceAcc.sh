@@ -29,7 +29,7 @@ secret=$(kubectl get serviceaccount $serviceaccount -n $namespace -o json | jq -
 kubectl get secret $secret -n $namespace -o json | jq -r '.data["ca.crt"]' | base64 --decode > ca.crt
 
 # Get service account token from secret
-user_token=$(kubectl get secret $secret -n $namespace -o json | jq -r '.data["token"]' | base64 -D)
+user_token=$(kubectl get secret $secret -n $namespace -o json | jq -r '.data["token"]' | base64 --decode)
 
 # Get information from your kubectl config, this will use current context. Your kubeconfig file may have multiple context.
 context=`kubectl config current-context`
