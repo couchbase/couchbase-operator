@@ -1027,7 +1027,8 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName stri
 
 	t.Log("deploying portworx service")
 	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
-	deployPortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/deploy-portworx-automation.sh", etcdEndpointIP, "portworx-test", kubeConfigPath)
+	portworxClusterName := "test-portworx-" + e2eutil.RandomSuffix()
+	deployPortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/deploy-portworx-automation.sh", etcdEndpointIP, portworxClusterName, kubeConfigPath)
 	if err := runExecCommand(t, deployPortworxCmd); err != nil {
 		return errors.New("error running submit-portworx-automation.sh: " + err.Error())
 	}

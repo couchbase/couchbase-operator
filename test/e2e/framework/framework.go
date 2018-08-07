@@ -316,7 +316,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	logrus.Info("Creating Portworx service")
+	logrus.Info("Deleting portworx")
 	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
 	runExecCmd(deletePortworxCmd)
 
-	logrus.Info("deleting etcd")
+	logrus.Info("Deleting etcd")
 	deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
 	runExecCmd(deleteEtcdCmd)
 
