@@ -61,7 +61,4 @@ test-operator:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race -timeout 240m
 
 test-unit:
-	go test -v github.com/couchbase/couchbase-operator/pkg/validator
-	go test -v github.com/couchbase/couchbase-operator/pkg/util/scheduler
-	go test -v github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil
-	go test -v github.com/couchbase/couchbase-operator/pkg/util/k8sutil
+	go test -v ./pkg/...
