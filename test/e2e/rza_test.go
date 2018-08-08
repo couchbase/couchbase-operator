@@ -193,19 +193,33 @@ func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) 
 		if err != nil {
 			t.Fatalf("Failed to read cluster yaml data: %v", err)
 		}
+		t.Logf("k8 nodes to label: %+v \n", k8sNodesData)
 
 		// Adding retry loop because sometimes node label update is failing. On retry, it will succeed
+		if !f.SkipTeardown {
+			defer K8SNodesRemoveLabel(constants.ServerGroupLabel, targetKube.KubeClient)
+		}
 		for retryCount := 0; retryCount < 3; retryCount++ {
 			t.Logf("Retry node label update: %d", retryCount)
 			// Label K8S nodes based on the labels present in the cluster conf yaml file
-			if err = K8SNodesAddLabel(constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0]); err == nil {
+			err = K8SNodesAddLabel(constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0])
+			if err == nil {
 				break
 			}
+			if err != nil && retryCount == 2 {
+				t.Fatal(err)
+			}
 		}
+
+		k8sNodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
-			t.Fatal(err)
+			t.Fatal("Failed to get k8s nodes " + err.Error())
 		}
-		defer K8SNodesRemoveLabel(constants.ServerGroupLabel, targetKube.KubeClient)
+		for _, k8sNode := range k8sNodeList.Items {
+			nodeName := k8sNode.Name
+			nodeLabels := k8sNode.GetLabels()
+			t.Logf("Labels for node (%v): %v \n", nodeName, nodeLabels)
+		}
 
 		testFunc(t)
 	}

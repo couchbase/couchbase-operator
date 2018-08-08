@@ -347,7 +347,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
 	errMsgList := failureList{}
 
 	// Validate args which won't produce output file
@@ -480,8 +480,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 // Negative test scenarios with command argument
 func TestNegLogCollectValidateArgs(t *testing.T) {
-	invalidKubeConfPath := framework.GetKubeConfigToUse("k8s_reclustered")
-	unreachableKubeConfPath := framework.GetKubeConfigToUse("k8s_unreachable")
+	invalidKubeConfPath := e2eutil.GetKubeConfigToUse("k8s_reclustered")
+	unreachableKubeConfPath := e2eutil.GetKubeConfigToUse("k8s_unreachable")
 	errMsgList := failureList{}
 
 	validArgumentList := []cbopinfoArg{
@@ -578,7 +578,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		}
 	}
 
-	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
 
 	/////////////////////////////////////////////////////
 	// Log collection using '-namespace' & cluster arg //
@@ -812,7 +812,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 	svcAccName := "rbac-test"
-	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
 
 	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
@@ -897,7 +897,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := framework.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
 
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"os"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -959,4 +960,14 @@ func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node,
 		return err
 	}
 	return nil
+}
+
+// Returns KubeConfig file path to use for testing
+func GetKubeConfigToUse(kubeName string) string {
+	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	// If cluster specific file doesn't exists, point to default file
+	if _, err := os.Stat(kubeConfPath); os.IsNotExist(err) {
+		kubeConfPath = os.Getenv("HOME") + "/.kube/config"
+	}
+	return kubeConfPath
 }

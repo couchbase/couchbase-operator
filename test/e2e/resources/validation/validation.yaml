@@ -16,9 +16,9 @@ spec:
       - search
   paused: false
   serverGroups:
-    - us-east-1a
-    - us-east-1b
-    - us-east-1c
+    - RzaGroup-1
+    - RzaGroup-2
+    - RzaGroup-3
   cluster:
     dataServiceMemoryQuota: 600
     indexServiceMemoryQuota: 256
@@ -95,8 +95,8 @@ spec:
         - index
         - query
       serverGroups:
-        - us-east-1a
-        - us-east-1b
+        - RzaGroup-1
+        - RzaGroup-2
   volumeClaimTemplates:
     - metadata:
         name: couchbase
@@ -104,6 +104,6 @@ spec:
         storageClassName: standard
         resources:
           requests:
-            storage: 2Gi
+            storage: 1Gi
           limits:
-            storage: 5Gi
+            storage: 2Gi

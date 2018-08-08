@@ -306,7 +306,7 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 
 func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfigPath := GetKubeConfigToUse(kubeName)
+	kubeConfigPath := e2eutil.GetKubeConfigToUse(kubeName)
 
 	if err := f.RemoveK8SNodeTaints(targetKube.KubeClient); err != nil {
 		return nil
