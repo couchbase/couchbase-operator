@@ -8,12 +8,12 @@ import (
 	"io/ioutil"
 	"math"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-	"os"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
