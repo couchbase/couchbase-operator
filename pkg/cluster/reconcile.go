@@ -74,6 +74,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	if err := c.reconcileClusterSettings(); err != nil {
+		c.logger.Warnf("%s", err.Error())
 		return err
 	}
 
@@ -956,6 +957,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// Get the existing settings
 	failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
 	if err != nil {
+		c.logger.Warnf("Failed to get auto-failover settings during reconcile: `%v` Will retry...", err)
 		return err
 	}
 
@@ -990,9 +992,12 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
 		err = c.client.SetAutoFailoverSettings(c.readyMembers(), specFailoverSettings)
 		if err != nil {
-			message := fmt.Sprintf("Unable to set autofailover settings: %v", err)
+			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)
+			c.logger.Warnf(message + " Will retry...")
 			c.status.SetConfigRejectedCondition(message)
 			return err
+		} else {
+			c.logger.Info("Updated autofailover settings")
 		}
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("autofailover", c.cluster))
 	}
@@ -1004,6 +1009,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	info, err := c.client.GetClusterInfo(c.readyMembers())
 	if err != nil {
+		c.logger.Warnf("Failed to get memory quotas/cluster name settings during reconcile: `%v` Will retry...", err)
 		return err
 	}
 
@@ -1021,9 +1027,12 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 
 	if !reflect.DeepEqual(current, requested) {
 		if err := c.client.SetPoolsDefault(c.readyMembers(), requested); err != nil {
-			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: %s", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
+			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
+			c.logger.Warnf(message + " Will retry...")
 			c.status.SetConfigRejectedCondition(message)
 			return err
+		} else {
+			c.logger.Info("Updated memory quota settings or cluster name")
 		}
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memory quota", c.cluster))
 	}
@@ -1036,13 +1045,19 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 	actual, err := c.client.GetUpdatesEnabled(c.readyMembers())
 	if err != nil {
+		c.logger.Warnf("Failed to get software notification settings during reconcile: `%v` Will retry...", err)
 		return err
 	}
 
 	requested := c.cluster.Spec.SoftwareUpdateNotifications
 	if actual != requested {
 		if err := c.client.SetUpdatesEnabled(c.readyMembers(), requested); err != nil {
+			message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
+			c.logger.Warnf(message + " Will retry...")
+			c.status.SetConfigRejectedCondition(message)
 			return err
+		} else {
+			c.logger.Info("Updated software notification settings")
 		}
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
 	}
@@ -1054,15 +1069,19 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 func (c *Cluster) reconcileIndexStorageSettings() error {
 	settings, err := c.client.GetIndexSettings(c.readyMembers(), c.username, c.password)
 	if err != nil {
+		c.logger.Warnf("Failed to get index settings during reconcile: `%v` Will retry...", err)
 		return err
 	}
 
 	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
 	if specStorageMode != string(settings.StorageMode) {
 		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, specStorageMode, settings); err != nil {
-			emsg := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
-			c.status.SetConfigRejectedCondition(emsg)
+			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
+			c.logger.Warnf(message + " Will retry...")
+			c.status.SetConfigRejectedCondition(message)
 			return err
+		} else {
+			c.logger.Info("Updated index settings")
 		}
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 	}
