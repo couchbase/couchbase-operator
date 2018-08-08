@@ -22,8 +22,8 @@ import (
 )
 
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
-	c.logger.Infoln("Start reconciling")
-	defer c.logger.Infoln("Finish reconciling")
+	c.logger.Debug("Start reconciling")
+	defer c.logger.Debug("Finish reconciling")
 
 	// Initialize the scheduler each time around, this saves us having to update
 	// internal state in all the cases when a pod fails to be created, deleted,
