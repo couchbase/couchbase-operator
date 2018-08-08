@@ -60,6 +60,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
 
 	// Creates the client with exposed admin port
@@ -87,7 +88,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 	for _, query := range queryMap {
 		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query); err != nil {
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
 		}
 	}
@@ -144,6 +145,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
 
 	// Creates the client with exposed admin port
@@ -177,7 +179,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	// Load default data set into couchbase bucket
 	for _, query := range queryMap {
 		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query); err != nil {
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
 		}
 	}
@@ -335,6 +337,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
 
 	// Creates the client with exposed admin port
@@ -368,7 +371,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 
 	for _, query := range queryMap {
 		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query); err != nil {
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
 		}
 	}
@@ -550,6 +553,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
 	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
 
 	// Creates the client with exposed admin port
@@ -583,7 +587,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	// Load default data set into couchbase bucket
 	for _, query := range queryMap {
 		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(k8sMasterIp, analyticsNodePortStr, query); err != nil {
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
 		}
 	}

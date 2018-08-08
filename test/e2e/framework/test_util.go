@@ -1104,3 +1104,11 @@ func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName stri
 	}
 	return nil
 }
+
+func GetNodeIpForPod(kubeClient kubernetes.Interface, namespace, podName string) string {
+	pod, err := kubeClient.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return ""
+	}
+	return pod.Status.HostIP
+}

@@ -42,7 +42,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	targetKubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[targetKubeName]
 
-	clusterSize := 1
+	clusterSize := 3
 	numOfDocs := 10
 	clusterConfig := e2eutil.BasicClusterConfig2
 	clusterConfig["autoFailoverMaxCount"] = "3"
@@ -98,6 +98,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	eventingHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, eventingNodeName)
 	eventingPortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[eventingNodeName].EventingServicePort))
 
 	eventingFuncName := "eventingFunc"
@@ -106,7 +107,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	eventingDstBucketName := "eventingDst"
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
-	responseData, err := e2eutil.DeployEventingFunction(k8sMasterIp, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
+	responseData, err := e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
 	if err != nil {
 		t.Log(string(responseData))
 		t.Fatal(err)
@@ -173,6 +174,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 2)
+	eventingHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, eventingNodeName)
 	eventingPortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[eventingNodeName].EventingServicePort))
 
 	eventingFuncName := "eventingFunc"
@@ -181,7 +183,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	eventingDstBucketName := "eventingDst"
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
-	responseData, err := e2eutil.DeployEventingFunction(k8sMasterIp, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
+	responseData, err := e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
 	if err != nil {
 		t.Log(string(responseData))
 		t.Fatal(err)
@@ -340,6 +342,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 2)
+	eventingHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, eventingNodeName)
 	eventingPortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[eventingNodeName].EventingServicePort))
 
 	eventingFuncName := "eventingFunc"
@@ -348,7 +351,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	eventingDstBucketName := "eventingDst"
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
-	responseData, err := e2eutil.DeployEventingFunction(k8sMasterIp, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
+	responseData, err := e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
 	if err != nil {
 		t.Log(string(responseData))
 		t.Fatal(err)
