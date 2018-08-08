@@ -1233,7 +1233,7 @@ func TestFeaturesAll(t *testing.T) {
 			},
 
 			{
-				name:     "cbq-delete-cluster2-1",
+				name:     "cbq-delete-cluster2-4",
 				image:    "sequoiatools/cbq",
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='delete from default where 1=1'"},
