@@ -664,21 +664,21 @@ func WaitForPodsReadyWithLabel(t *testing.T, kubeClient kubernetes.Interface, wa
 			return errors.New("Timed out waiting for pods to enter ready state")
 
 		case <-tickChan:
-			portworxReady := true
+			podReady := true
 			podList, _ := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 			for _, pod := range podList.Items {
 				if pod.Status.Phase != v1.PodRunning {
-					portworxReady = false
+					podReady = false
 					break
 				}
 				for _, condition := range pod.Status.Conditions {
 					if condition.Type == "Ready" && condition.Status != v1.ConditionTrue {
-						portworxReady = false
+						podReady = false
 					}
 				}
 			}
-			if portworxReady {
-				t.Logf("portworx pods ready \n")
+			if podReady {
+				t.Logf("pods with label %v ready \n", label)
 				return nil
 			}
 		}

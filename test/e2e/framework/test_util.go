@@ -900,9 +900,6 @@ func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, kubeName string) 
 		t.Logf("error deleteing etcd operator crd: " + err.Error())
 	}
 
-	t.Logf("deleting etcd deployment")
-	DeleteOperatorCompletely(kubeClient, "etcd-operator", "default")
-
 	t.Log("deleting ectd-operator pods")
 	if err := e2eutil.DeletePodsWithLabel(t, kubeClient, "name=etcd-operator", "default"); err != nil {
 		return err
@@ -942,6 +939,10 @@ func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, kubeName string) 
 	if err := e2eutil.DeletePodsWithLabel(t, kubeClient, "app=etcd", "default"); err != nil {
 		return err
 	}
+
+	t.Logf("deleting etcd deployment")
+	DeleteOperatorCompletely(kubeClient, "etcd-operator", "default")
+
 	return nil
 }
 

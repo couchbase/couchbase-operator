@@ -5,6 +5,7 @@ kubeConfig=$1
 etcdpath=$(pwd)/resources/thirdparty/etcd
 param="--kubeconfig=$kubeConfig"
 
+kubectl $param delete etcdcluster example-etcd-cluster
 kubectl $param delete -f $etcdpath/etcd-cluster.yaml
 kubectl $param delete -f $etcdpath/etcd-deployment.yaml
 kubectl $param delete endpoints etcd-operator

@@ -312,10 +312,6 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return nil
 	}
 
-	if err := f.DeleteCRDs(targetKube.Config); err != nil {
-		return err
-	}
-
 	logrus.Info("Deleting portworx")
 	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
 		return err
@@ -340,7 +336,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		if err != nil {
 			return err
 		}
-		logrus.Infof("deployment deleted: %v", deployment.GetName())
+		logrus.Infof("Deployment deleted: %v", deployment.GetName())
 	}
 
 	logrus.Info("Deleting clusters")
@@ -350,7 +346,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		if err != nil {
 			return err
 		}
-		logrus.Infof("cluster deleted: %v", cluster.Name)
+		logrus.Infof("Cluster deleted: %v", cluster.Name)
 		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
 		if err != nil {
 			return errors.New("failed to list pods for cluster: " + err.Error())
@@ -369,7 +365,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		if err != nil {
 			return err
 		}
-		logrus.Infof("jobs deleted: %v", job.Name)
+		logrus.Infof("Job deleted: %v", job.Name)
 	}
 	time.Sleep(2 * time.Second)
 
@@ -379,7 +375,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		if err := targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
-		logrus.Infof("service deleted: %v", service.Name)
+		logrus.Infof("Service deleted: %v", service.Name)
 	}
 
 	logrus.Info("Deleting orphaned pods")
@@ -389,7 +385,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		if err != nil {
 			return err
 		}
-		logrus.Infof("pod deleted: %v", pod.Name)
+		logrus.Infof("Pod deleted: %v", pod.Name)
 	}
 
 	endpoints, err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
@@ -401,12 +397,16 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		if err != nil {
 			return err
 		}
-		logrus.Infof("endpoint deleted: %v", endpoint.Name)
+		logrus.Infof("Endpoint deleted: %v", endpoint.Name)
 	}
 
 	logrus.Info("Deleting secrets")
 	if err := e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
-		logrus.Infof("secret deleted: %v", "basic-test-secret")
+		logrus.Infof("Secret deleted: %v", "basic-test-secret")
+	}
+
+	if err := f.DeleteCRDs(targetKube.Config); err != nil {
+		return err
 	}
 
 	// Creating required namespaces and cluster roles before deploying the operator
@@ -438,12 +438,12 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		}
 	}
 
-	logrus.Info("Setting up operator..")
+	logrus.Info("Setting up operator")
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
 		return errors.New("Failed to setup couchbase operator: " + err.Error())
 	}
-	logrus.Info("couchbase operator created successfully")
-	logrus.Info("e2e setup successfully")
+	logrus.Info("Couchbase operator created successfully")
+	logrus.Info("E2E setup successfully")
 	return nil
 }
 
