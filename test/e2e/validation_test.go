@@ -838,20 +838,21 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 
 		// Persistent volume claim cases
-		{
-			name: "Validate spec.volumeClaimTemplates.Spec.storageClassName to be defined",
-			paramsIn: []parameter{
-				{
-					field:          []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "StorageClassName"},
-					fieldType:      "string",
-					fieldValue:     "unavailableStorageClass",
-					fieldIsPointer: true,
-				},
-			},
-			paramsOut:        []parameter{},
-			shouldFail:       true,
-			expectedMessages: []string{"spec.volumeClaimTemplates[0].Spec.storageClassName in body should be unique"},
-		},
+		// this test is not valid for 1.0.0
+		//{
+		//	name: "Validate spec.volumeClaimTemplates.Spec.storageClassName to be defined",
+		//	paramsIn: []parameter{
+		//		{
+		//			field:          []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "StorageClassName"},
+		//			fieldType:      "string",
+		//			fieldValue:     "unavailableStorageClass",
+		//			fieldIsPointer: true,
+		//		},
+		//	},
+		//	paramsOut:        []parameter{},
+		//	shouldFail:       true,
+		//	expectedMessages: []string{"spec.volumeClaimTemplates[0].Spec.storageClassName in body should be unique"},
+		//},
 		{
 			name: "Create PVC cluster with unavailable default volume claim in pod spec",
 			paramsIn: []parameter{
@@ -1697,17 +1698,18 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			expectedMessages: []string{"analytics in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:     "Apply: Remove default volume claim template name",
-			paramsIn: []parameter{},
-			paramsOut: []parameter{
+			name: "Apply: Remove default volume claim template name",
+			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "VolumeClaimTemplates", "0", "ObjectMeta", "Name"},
-					fieldType:  "string",
-					fieldValue: "couchbase",
+					field:          []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "StorageClassName"},
+					fieldType:      "string",
+					fieldValue:     "unavailableStorageClass",
+					fieldIsPointer: true,
 				},
 			},
+			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.servers[*].Pod.VolumeMounts in body cannot be updated\nspec.servers[*].Pod.VolumeMounts in body cannot be updated"},
+			expectedMessages: []string{"\"storageClassName\" in spec.volumeClaimTemplates[*] cannot be updated"},
 		},
 		{
 			name: "Update spec.volumeClaimTemplates.spec.resources.requests.storage value",

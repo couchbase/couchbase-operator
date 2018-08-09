@@ -349,14 +349,12 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 }
 
 func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAccountName string) error {
-	if serviceAccountName == "default" {
-		return nil
-	}
-
 	if err := RemoveServiceAccount(kubeClient, namespace, serviceAccountName); err != nil {
 		return err
 	}
-
+	if serviceAccountName == "default" {
+		return nil
+	}
 	// Create service account given by the name
 	serviceAccountSpec := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName, Namespace: namespace},
