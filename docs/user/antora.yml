@@ -1,6 +1,6 @@
 name: operator
-title: Couchbase Autonomous Operator
-version: '0.9'
+title: Autonomous Operator
+version: '1.0'
 start_page: ROOT:overview.adoc
 nav:
 - modules/ROOT/nav.adoc
