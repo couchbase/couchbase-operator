@@ -1109,7 +1109,8 @@ func (c *Cluster) verifyClusterVolumes() error {
 func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
 	if config == nil {
-		return fmt.Errorf("config for member `%s` does not exist: %s", m.Name, m.ServerConfig)
+		// Server class configuration has been deleted, and the member will too
+		return nil
 	}
 
 	err := k8sutil.IsPodRecoverable(c.config.KubeCli, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
