@@ -444,7 +444,6 @@ func NewMultiCluster(genName, secretName string, config map[string]map[string]st
 
 // Stateful 3 node cluster with a single volume.
 // Spec will request 1Gb of storage (minikube default is 5gb).
-// Also uses 'standard' storage class which is default in kubernetes
 func NewStatefulCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 
 	crd := NewBasicCluster(genName, secretName, size, withBucket, exposed)

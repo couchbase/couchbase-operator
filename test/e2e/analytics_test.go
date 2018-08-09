@@ -69,11 +69,6 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(targetKubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +89,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 
 	// Verify data set doc count
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, analyticsDataset, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -140,8 +135,6 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "index")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "query")
 	expectedEvents.AddNodeServiceCreateEvent(testCouchbase, "search")
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -152,11 +145,6 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
-	}
-
-	k8sMasterIp, err := f.GetKubeHostname(targetKubeName)
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
@@ -280,7 +268,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	datasetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
 	for index, datasetName := range datasetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, datasetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries10); err != nil {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, datasetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries10); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -346,11 +334,6 @@ func TestAnalyticsKillPods(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(targetKubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Load default data set into couchbase bucket
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
@@ -377,7 +360,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	}
 
 	// Wait until analytics service is fully functional
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -490,7 +473,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
 	for index, dataSetName := range dataSetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetCount[index], e2eutil.Retries5); err != nil {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetCount[index], e2eutil.Retries5); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -562,11 +545,6 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(targetKubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
@@ -593,7 +571,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	}
 
 	// Wait till anlytics service become functional
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -651,7 +629,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, 0, 0}
 	for index, dataSetName := range dataSetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(k8sMasterIp, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries5); err != nil {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries5); err != nil {
 			t.Fatal(err)
 		}
 	}
