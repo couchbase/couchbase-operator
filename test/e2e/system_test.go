@@ -1125,8 +1125,8 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where rating <= 300'"},
 				wait:     false,
-				timeout:  2,
-				duration: 1,
+				timeout:  11,
+				duration: 10,
 			},
 
 			{
@@ -1135,8 +1135,8 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where rating >= 700'"},
 				wait:     false,
-				timeout:  2,
-				duration: 1,
+				timeout:  11,
+				duration: 10,
 			},
 
 			{
@@ -1145,8 +1145,8 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where rating >= 300 and rating <= 700'"},
 				wait:     false,
-				timeout:  2,
-				duration: 1,
+				timeout:  11,
+				duration: 10,
 			},
 
 			{
@@ -1155,8 +1155,28 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER1}}:8093 -u=Administrator -p=password -script='delete from default where 1=1'"},
 				wait:     false,
-				timeout:  2,
-				duration: 1,
+				timeout:  31,
+				duration: 30,
+			},
+
+			{
+				name:     "flush-bucket-cluster1-1",
+				image:    "sequoiatools/couchbase-cli:v5.0.1",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"yes | couchbase-cli bucket-flush -c couchbase://{{FIRST_NODE_CLUSTER1}} -u Administrator -p password --bucket NEW_ORDER"},
+				wait:     true,
+				timeout:  11,
+				duration: 10,
+			},
+
+			{
+				name:     "flush-bucket-cluster1-2",
+				image:    "sequoiatools/couchbase-cli:v5.0.1",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"yes | couchbase-cli bucket-flush -c couchbase://{{FIRST_NODE_CLUSTER1}} -u Administrator -p password --bucket DISTRICT"},
+				wait:     true,
+				timeout:  11,
+				duration: 10,
 			},
 
 			{
@@ -1238,8 +1258,28 @@ func TestFeaturesAll(t *testing.T) {
 				cmd:      []string{"/bin/bash", "-c", "--"},
 				args:     []string{"./shell/cbq/cbq -e=http://{{FIRST_NODE_NO_PORT_CLUSTER2}}:8093 -u=Administrator -p=password -script='delete from default where 1=1'"},
 				wait:     false,
-				timeout:  2,
-				duration: 1,
+				timeout:  31,
+				duration: 30,
+			},
+
+			{
+				name:     "flush-bucket-cluster2-1",
+				image:    "sequoiatools/couchbase-cli:v5.0.1",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"yes | couchbase-cli bucket-flush -c couchbase://{{FIRST_NODE_CLUSTER2}} -u Administrator -p password --bucket NEW_ORDER"},
+				wait:     true,
+				timeout:  11,
+				duration: 10,
+			},
+
+			{
+				name:     "flush-bucket-cluster2-2",
+				image:    "sequoiatools/couchbase-cli:v5.0.1",
+				cmd:      []string{"/bin/bash", "-c", "--"},
+				args:     []string{"yes | couchbase-cli bucket-flush -c couchbase://{{FIRST_NODE_CLUSTER2}} -u Administrator -p password --bucket DISTRICT"},
+				wait:     true,
+				timeout:  11,
+				duration: 10,
 			},
 
 			{
