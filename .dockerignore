@@ -1,3 +1,5 @@
 # Ignore everything, with the exception of the operator binary
 *
 !build/bin/couchbase-operator
+!docs/License.txt
+!docs/README.txt

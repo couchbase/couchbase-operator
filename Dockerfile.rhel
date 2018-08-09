@@ -1,2 +1,5 @@
 FROM registry.access.redhat.com/rhel7
+
+ADD docs/License.txt /License.txt
+ADD docs/README.txt /README.txt
 ADD build/bin/couchbase-operator /usr/local/bin/couchbase-operator
