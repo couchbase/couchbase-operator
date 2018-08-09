@@ -1050,7 +1050,9 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName stri
 			break
 		}
 		time.Sleep(5 * time.Second)
-		if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 300, "name=portworx", "kube-system"); err != nil {
+		if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 120, "name=portworx", "kube-system"); err != nil {
+			e2eutil.AddLabelToNodes(t, kubeClient, "px/enabled", "true")
+			time.Sleep(60 * time.Second)
 			return err
 		}
 		time.Sleep(5 * time.Second)

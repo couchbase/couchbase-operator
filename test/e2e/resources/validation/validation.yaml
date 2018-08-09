@@ -97,6 +97,8 @@ spec:
       serverGroups:
         - RzaGroup-1
         - RzaGroup-2
+  securityContext:
+    fsGroup: 1000
   volumeClaimTemplates:
     - metadata:
         name: couchbase

@@ -3,18 +3,57 @@ suite: TestCRDValidation
 tcGroups:
   - name: Group1
     clusters:
-      - BasicCluster
+      - NewCluster1
     testcases:
       - name: TestValidationCreate
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationCreate
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestValidationDefaultCreate
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationDefaultCreate
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationConstraintsCreate
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestValidationApply
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationApply
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestValidationDefaultApply
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationDefaultApply
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationConstraintsApply
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationImmutableApply
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestValidationDelete
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner
       - name: TestNegValidationDelete
+        decorators:
+          - rzaNodeLabeller
+          - portworxProvisioner

@@ -73,8 +73,17 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 			if !f.SkipTeardown {
 				defer framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
 			}
-			if err := framework.CreatePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
-				t.Fatal(err)
+			for retryCount := 0; retryCount < 3; retryCount++ {
+				if err := framework.CreatePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
+					t.Logf("error creating portworx: %v \n", err)
+					if retryCount == 2 {
+						t.Fatal(err)
+					}
+					framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
+					continue
+				}
+				break
+
 			}
 		}
 		testFunc(t)
