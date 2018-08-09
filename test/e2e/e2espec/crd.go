@@ -66,15 +66,21 @@ var (
 )
 
 func SetCbBaseImage(baseImageName string) {
-	baseImage = baseImageName
+	if baseImageName = strings.TrimSpace(baseImageName); baseImageName != "" {
+		baseImage = baseImageName
+	}
 }
 
 func SetCbImageVersion(cbImgVer string) {
-	version = cbImgVer
+	if cbImgVer = strings.TrimSpace(cbImgVer); cbImgVer != "" {
+		version = cbImgVer
+	}
 }
 
 func SetStorageClassName(storageClassName string) {
-	StorageClassName = storageClassName
+	if storageClassName = strings.TrimSpace(storageClassName); storageClassName != "" {
+		StorageClassName = storageClassName
+	}
 }
 
 func GetCouchbaseDockerImgName() string {
