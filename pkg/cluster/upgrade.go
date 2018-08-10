@@ -190,8 +190,7 @@ func (c *Cluster) checkAndFixUpgradeState(status *couchbaseutil.ClusterStatus) e
 	}
 
 	// All other nodes except the upgrading and upgraded nodes should be active
-	csm := status.NewClusterStateMap()
-	if !csm.Exclude(upgradingNodeName, upgradedNodeName).AllActive() {
+	if !status.NodeStateMap.Exclude(upgradingNodeName, upgradedNodeName).AllActive() {
 		return fmt.Errorf("cluster in unexpected state")
 	}
 
@@ -229,8 +228,7 @@ func (c *Cluster) checkUpgradeState(status *couchbaseutil.ClusterStatus, upgradi
 		return fmt.Errorf("upgraded node in unexpected state")
 	}
 
-	csm := status.NewClusterStateMap()
-	if !csm.Exclude(upgradingNodeName, upgradedNodeName).AllActive() {
+	if !status.NodeStateMap.Exclude(upgradingNodeName, upgradedNodeName).AllActive() {
 		return fmt.Errorf("cluster in unexpected state")
 	}
 
@@ -268,7 +266,7 @@ func (c *Cluster) upgrade(status *couchbaseutil.ClusterStatus) error {
 	// fixes we deem safe and update it.  This call may change the upgrade
 	// status in the CRD.
 	if err := c.checkAndFixUpgradeState(status); err != nil {
-		status.LogStatus(c.logger)
+		c.logStatus(status)
 		return err
 	}
 
@@ -303,7 +301,7 @@ func (c *Cluster) upgrade(status *couchbaseutil.ClusterStatus) error {
 			// the upgraded node is now pending add, and the rest of the cluster
 			// is still active
 			if err := c.checkUpgradeState(status, couchbaseutil.NodeStateActive, couchbaseutil.NodeStatePendingAdd); err != nil {
-				status.LogStatus(c.logger)
+				c.logStatus(status)
 				return err
 			}
 		}

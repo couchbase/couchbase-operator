@@ -1,6 +1,8 @@
 package scheduler
 
 import (
+	"io"
+
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -17,6 +19,9 @@ type Scheduler interface {
 
 	// Delete selects a server name to delete from a specific server class.
 	Delete(class string) (string, error)
+
+	// LogStatus writes out the status to a writer.
+	LogStatus(io.Writer) error
 }
 
 // New is a factory method to return the correct scheduler type for

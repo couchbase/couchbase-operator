@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	"io"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -79,4 +80,9 @@ func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	}
 
 	return server, nil
+}
+
+// LogStatus returns nothing
+func (sched *nullSchedulerImpl) LogStatus(w io.Writer) error {
+	return nil
 }

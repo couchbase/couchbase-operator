@@ -69,6 +69,11 @@ func (m *Member) clientPort() int {
 	return adminPort
 }
 
+func (ms MemberSet) Contains(name string) bool {
+	_, ok := ms[name]
+	return ok
+}
+
 func (ms MemberSet) Copy() MemberSet {
 	clone := MemberSet{}
 	for k, v := range ms {

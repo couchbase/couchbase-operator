@@ -195,10 +195,8 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 		}
 	}
 
-	c.logger.Infof("running members: %s", r.runningPods)
-	c.logger.Infof("cluster membership: %s", c.members)
-
-	r.couchbase.LogStatus(c.logger)
+	// We are performing an action log the cluster status
+	c.logStatus(r.couchbase)
 
 	r.knownNodes.Append(r.couchbase.ActiveNodes)
 	r.knownNodes.Append(r.couchbase.PendingAddNodes)

@@ -4,13 +4,16 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/gocbmgr"
@@ -30,14 +33,48 @@ const (
 	NodeStateFailed
 	NodeStateAddBack
 	NodeStateUnclustered
+	NodeStateInvalid
 )
 
+// String converts a node state into a string representation
+func (s NodeState) String() string {
+	stateStrings := map[NodeState]string{
+		NodeStateWarmup:      "warmup",
+		NodeStateActive:      "active",
+		NodeStatePendingAdd:  "pending_add",
+		NodeStateAddBack:     "add_back",
+		NodeStateDown:        "down",
+		NodeStateFailedAdd:   "failed_add",
+		NodeStateFailed:      "failed",
+		NodeStateUnclustered: "unclustered",
+	}
+	if str, ok := stateStrings[s]; ok {
+		return str
+	}
+	return "invalid"
+}
+
+// NodeStateMap maps a managed node (pod) name to its current state
+type NodeStateMap map[string]NodeState
+
 type ClusterStatus struct {
+	// Cached /pools/default output.  From this we can derive the state of
+	// foreign nodes added by an external party to provide better dubugging.
+	info *cbmgr.ClusterInfo
+	// NodeStateMap maps a known member to it's current state.  This is an
+	// optimisation to avoid scanning the main sets below it determine the
+	// state of a member.
+	NodeStateMap NodeStateMap
+	// managedNodes is a set of all known nodes.  This is used to iterate
+	// over the set of all nodes.  This is analogous to the cluster members
+	// set.
+	managedNodes MemberSet
+
 	ActiveNodes      MemberSet // status=healthy,   clusterMembership=active
 	PendingAddNodes  MemberSet // status=healthy,   clusterMembership=inactiveAdded
-	AddBackNodes     MemberSet // status=healthy, clusterMembership=inactiveFailed
+	AddBackNodes     MemberSet // status=healthy,   clusterMembership=inactiveFailed
 	FailedAddNodes   MemberSet // status=unhealthy, clusterMembership=inactiveAdded
-	WarmupNodes      MemberSet // status=warmup, clusterMembership=inactiveAdded
+	WarmupNodes      MemberSet // status=warmup,    clusterMembership=inactiveAdded
 	DownNodes        MemberSet // status=unhealthy, clusterMembership=active
 	FailedNodes      MemberSet // status=unhealthy, clusterMembership=inactiveFailed
 	UnclusteredNodes MemberSet // Managed by Kubernetes, but not part of the cluster
@@ -57,6 +94,8 @@ func NewClusterStatus() *ClusterStatus {
 // Reset replaces all sets in the cluster status with empty versions
 // and returns scalars to the zero state
 func (c *ClusterStatus) Reset() {
+	c.NodeStateMap = NodeStateMap{}
+	c.managedNodes = NewMemberSet()
 	c.ActiveNodes = NewMemberSet()
 	c.PendingAddNodes = NewMemberSet()
 	c.AddBackNodes = NewMemberSet()
@@ -74,8 +113,6 @@ const (
 	RetryCount         = 5
 	ExtendedRetryCount = 36
 )
-
-type ClusterStateMap map[string]NodeState
 
 // CouchbaseClient encapsulates Couchbase API operations.
 type CouchbaseClient struct {
@@ -130,48 +167,213 @@ func (c *CouchbaseClient) SetUUID(uuid string) {
 	c.client.SetUUID(uuid)
 }
 
+// nodeStatus is an intermediate data structured used to log node status information.
+type nodeStatus struct {
+	name  string
+	class string
+	state string
+}
+
+// GetNode looks up node based on Couchbase hostname.
+func (cs *ClusterStatus) getNode(hostname string) (*cbmgr.NodeInfo, error) {
+	for _, node := range cs.info.Nodes {
+		if node.HostName == hostname {
+			return &node, nil
+		}
+	}
+	return nil, fmt.Errorf("node %s does not exist in cluster", hostname)
+}
+
+// getNodeState looks up node status based on Couchbase hostname.
+func getNodeState(node *cbmgr.NodeInfo) (state NodeState, err error) {
+	// Set default return values
+	state = NodeStateInvalid
+
+	// Select and return the correct status type
+	switch node.Status {
+	case "warmup":
+		state = NodeStateWarmup
+	case "healthy":
+		switch node.Membership {
+		case "active":
+			state = NodeStateActive
+		case "inactiveAdded":
+			state = NodeStatePendingAdd
+		case "inactiveFailed":
+			state = NodeStateAddBack
+		default:
+			err = fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
+		}
+	case "unhealthy":
+		switch node.Membership {
+		case "active":
+			state = NodeStateDown
+		case "inactiveAdded":
+			state = NodeStateFailedAdd
+		case "inactiveFailed":
+			state = NodeStateFailed
+		default:
+			err = fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
+		}
+	default:
+		err = fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
+	}
+
+	return
+}
+
+// addMemberToStateSet adds the member to the correct set based on state.
+func (cs *ClusterStatus) addMemberToStateSet(state NodeState, member *Member) error {
+	switch state {
+	case NodeStateActive:
+		cs.ActiveNodes.Add(member)
+	case NodeStatePendingAdd:
+		cs.PendingAddNodes.Add(member)
+	case NodeStateFailedAdd:
+		cs.FailedAddNodes.Add(member)
+	case NodeStateWarmup:
+		cs.WarmupNodes.Add(member)
+	case NodeStateDown:
+		cs.DownNodes.Add(member)
+	case NodeStateFailed:
+		cs.FailedNodes.Add(member)
+	case NodeStateAddBack:
+		cs.AddBackNodes.Add(member)
+	case NodeStateUnclustered:
+		cs.UnclusteredNodes.Add(member)
+	default:
+		return fmt.Errorf("unhandled node state %v", state)
+	}
+	return nil
+}
+
+// logClusterStatus logs the overal cluster status e.g. balanced condition
+func (cs *ClusterStatus) logClusterStatus(w io.Writer) error {
+	states := []string{}
+
+	// A cluster is either balanced or not
+	if cs.NeedsRebalance {
+		states = append(states, "unbalanced")
+	} else {
+		states = append(states, "balanced")
+	}
+
+	// A cluster may be rebalancing
+	if cs.IsRebalancing {
+		states = append(states, "rebalancing")
+	}
+
+	_, err := w.Write([]byte(fmt.Sprintf("Cluster status: %s\n", strings.Join(states, "+"))))
+	return err
+}
+
+// logClusterNodeStatus logs the individual node statuses
+func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
+	if _, err := w.Write([]byte("Node status:\n")); err != nil {
+		return err
+	}
+
+	// Sort the names so it's easier to grok
+	names := []string{}
+	for name, _ := range cs.managedNodes {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	// Collect all the node statuses, as we process check the string lengths for
+	// pretty tabulation
+	statuses := []nodeStatus{}
+	maxName := 0
+	maxClass := 0
+
+	for _, name := range names {
+		// All members are managed
+		states := []string{"managed"}
+
+		// And they will exist in one state
+		state := cs.NodeStateMap[name]
+		states = append(states, state.String())
+
+		// Buffer up the status entry
+		class := cs.managedNodes[name].ServerConfig
+
+		status := nodeStatus{
+			name:  name,
+			class: class,
+			state: strings.Join(states, "+"),
+		}
+		statuses = append(statuses, status)
+
+		// Update the book keeping
+		if len(name) > maxName {
+			maxName = len(name)
+		}
+		if len(class) > maxClass {
+			maxClass = len(class)
+		}
+	}
+
+	// Sort the names so it's easier to grok
+	names = []string{}
+	for _, name := range cs.UnmanagedNodes {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		states := []string{"unmanaged"}
+
+		// Ignore the error, if we've added the unmanaged node it has to exist in the node info.
+		node, _ := cs.getNode(name)
+
+		// Report the current state the unmanaged node is in, again ignore the error here as
+		// it will return invalid if an error occurs.
+		state, _ := getNodeState(node)
+		states = append(states, state.String())
+
+		// Buffer up the status entry
+		status := nodeStatus{
+			name:  name,
+			state: strings.Join(states, "+"),
+		}
+
+		statuses = append(statuses, status)
+
+		// Update the book keeping
+		if len(name) > maxName {
+			maxName = len(name)
+		}
+	}
+
+	// Format our table
+	table := prettytable.Table{
+		Header: prettytable.Row{"Server", "Class", "Status"},
+	}
+	for _, status := range statuses {
+		table.Rows = append(table.Rows, prettytable.Row{status.name, status.class, status.state})
+	}
+	return table.Write(w)
+}
+
 // Logs the cluster status
-func (cs *ClusterStatus) LogStatus(logger *logrus.Entry) {
-	if !cs.ActiveNodes.Empty() {
-		logger.Infof("active nodes: %s", cs.ActiveNodes)
+func (cs *ClusterStatus) LogStatus(w io.Writer) error {
+	if err := cs.logClusterStatus(w); err != nil {
+		return err
 	}
-	if !cs.PendingAddNodes.Empty() {
-		logger.Infof("pending add nodes: %s", cs.PendingAddNodes)
+	if err := cs.logClusterNodeStatus(w); err != nil {
+		return err
 	}
-	if !cs.FailedAddNodes.Empty() {
-		logger.Infof("failed add nodes: %s", cs.FailedAddNodes)
-	}
-	if !cs.WarmupNodes.Empty() {
-		logger.Infof("warmup nodes: %s", cs.WarmupNodes)
-	}
-	if !cs.DownNodes.Empty() {
-		logger.Infof("down nodes: %s", cs.DownNodes)
-	}
-	if !cs.FailedNodes.Empty() {
-		logger.Infof("failed nodes: %s", cs.FailedNodes)
-	}
-	if !cs.AddBackNodes.Empty() {
-		logger.Infof("add back: %s", cs.AddBackNodes)
-	}
-	if !cs.UnclusteredNodes.Empty() {
-		logger.Infof("unclustered nodes: %s", cs.UnclusteredNodes)
-	}
-	if len(cs.UnmanagedNodes) != 0 {
-		logger.Infof("unmanaged nodes: %s", strings.Join(cs.UnmanagedNodes, ","))
-	}
-	logger.Infof("is rebalancing: %t", cs.IsRebalancing)
-	logger.Infof("needs rebalance: %t", cs.NeedsRebalance)
+	return nil
 }
 
 // Are all managed nodes healthy? e.g. in the active state
 func (cs *ClusterStatus) AllManagedNodesHealthy() bool {
-	return cs.PendingAddNodes.Empty() &&
-		cs.FailedAddNodes.Empty() &&
-		cs.WarmupNodes.Empty() &&
-		cs.DownNodes.Empty() &&
-		cs.FailedNodes.Empty() &&
-		cs.AddBackNodes.Empty() &&
-		cs.UnclusteredNodes.Empty()
+	for _, member := range cs.managedNodes {
+		if cs.NodeStateMap[member.Name] != NodeStateActive {
+			return false
+		}
+	}
+	return true
 }
 
 // Do any nodes exist that we aren't managing
@@ -189,27 +391,15 @@ func (cs *ClusterStatus) ClusterHealthy() bool {
 
 // Is the named node in any of the states set in the bitmap
 func (cs *ClusterStatus) NodeInState(name string, states ...NodeState) bool {
+	// Doesn't exist, so not in that state
+	s, ok := cs.NodeStateMap[name]
+	if !ok {
+		return false
+	}
+
+	// Iterate through the requested states and return true if any match
 	for _, state := range states {
-		ok := false
-		switch state {
-		case NodeStateActive:
-			_, ok = cs.ActiveNodes[name]
-		case NodeStatePendingAdd:
-			_, ok = cs.PendingAddNodes[name]
-		case NodeStateFailedAdd:
-			_, ok = cs.FailedAddNodes[name]
-		case NodeStateWarmup:
-			_, ok = cs.WarmupNodes[name]
-		case NodeStateDown:
-			_, ok = cs.DownNodes[name]
-		case NodeStateFailed:
-			_, ok = cs.FailedNodes[name]
-		case NodeStateAddBack:
-			_, ok = cs.AddBackNodes[name]
-		case NodeStateUnclustered:
-			_, ok = cs.UnclusteredNodes[name]
-		}
-		if ok {
+		if s == state {
 			return true
 		}
 	}
@@ -218,41 +408,13 @@ func (cs *ClusterStatus) NodeInState(name string, states ...NodeState) bool {
 
 // Does the named node exist anywhere?
 func (cs *ClusterStatus) ContainsNode(name string) bool {
-	return cs.NodeInState(name,
-		NodeStateActive,
-		NodeStatePendingAdd,
-		NodeStateFailedAdd,
-		NodeStateDown,
-		NodeStateFailed,
-		NodeStateAddBack,
-		NodeStateUnclustered)
-}
-
-// Convert a ClusterStatus object into a simple Name -> State mapping
-func (cs *ClusterStatus) NewClusterStateMap() ClusterStateMap {
-	stateCollectionMap := map[NodeState]MemberSet{
-		NodeStateActive:     cs.ActiveNodes,
-		NodeStatePendingAdd: cs.PendingAddNodes,
-		NodeStateFailedAdd:  cs.FailedAddNodes,
-		NodeStateDown:       cs.DownNodes,
-		NodeStateFailed:     cs.FailedNodes,
-		NodeStateAddBack:    cs.AddBackNodes,
-		NodeStateWarmup:     cs.WarmupNodes,
-	}
-
-	states := ClusterStateMap{}
-	for state, collection := range stateCollectionMap {
-		for name, _ := range collection {
-			states[name] = state
-		}
-	}
-	return states
+	return cs.managedNodes.Contains(name)
 }
 
 // Filter named nodes from a cluster status map
-func (csm ClusterStateMap) Exclude(excludes ...string) ClusterStateMap {
-	states := ClusterStateMap{}
-	for name, state := range csm {
+func (nsm NodeStateMap) Exclude(excludes ...string) NodeStateMap {
+	states := NodeStateMap{}
+	for name, state := range nsm {
 		found := false
 		for _, exclude := range excludes {
 			if name == exclude {
@@ -268,8 +430,8 @@ func (csm ClusterStateMap) Exclude(excludes ...string) ClusterStateMap {
 }
 
 // Are all cluster statuses active?
-func (csm ClusterStateMap) AllActive() bool {
-	for _, state := range csm {
+func (nsm NodeStateMap) AllActive() bool {
+	for _, state := range nsm {
 		if state != NodeStateActive {
 			return false
 		}
@@ -341,50 +503,54 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	status.Reset()
 
 	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster status", c.clusterName, func() error {
-		info, err := c.client.ClusterInfo()
+		// Get the cluster information from Couchbase server
+		var err error
+		status.info, err = c.client.ClusterInfo()
 		if err != nil {
 			return err
 		}
 
-		managed := NewMemberSet()
-		for _, node := range info.Nodes {
+		// Cache the managed nodes in the status
+		status.managedNodes.Append(ms)
+
+		// Collect the node known to Couchbase server as we iterate through the cluster map
+		knownNodes := NewMemberSet()
+
+		// Iterate over all of the nodes known to Couchbase server
+		for _, node := range status.info.Nodes {
+			// The node name should be in the form cb-pod.cb-cluster.namespace.svc:8091.
+			// By extracting the first field we can derive the pod name.  If it is not
+			// know to the operator we flag it as unmanaged.
 			member := ms[strings.Split(node.HostName, ".")[0]]
 			if member == nil {
 				status.UnmanagedNodes = append(status.UnmanagedNodes, node.HostName)
 				continue
 			}
 
-			managed.Add(member)
-			if node.Status == "healthy" {
-				if node.Membership == "active" {
-					status.ActiveNodes.Add(member)
-				} else if node.Membership == "inactiveAdded" {
-					status.PendingAddNodes.Add(member)
-				} else if node.Membership == "inactiveFailed" {
-					status.AddBackNodes.Add(member) // Caused by manual failover
-				} else {
-					return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
-				}
-			} else if node.Status == "warmup" {
-				status.WarmupNodes.Add(member)
-			} else if node.Status == "unhealthy" {
-				if node.Membership == "active" {
-					status.DownNodes.Add(member)
-				} else if node.Membership == "inactiveAdded" {
-					status.FailedAddNodes.Add(member)
-				} else if node.Membership == "inactiveFailed" {
-					status.FailedNodes.Add(member)
-				} else {
-					return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
-				}
-			} else {
-				return fmt.Errorf("cluster status: status=%s membership=%s", node.Status, node.Membership)
+			// Add to the list of nodes known to Couchbase
+			knownNodes.Add(member)
+
+			// Attempt to get the internal state of the node from the cluster info
+			state, err := getNodeState(&node)
+			if err != nil {
+				return err
 			}
+
+			// Map the member to its state
+			status.NodeStateMap[member.Name] = state
+
+			// Add the member to the relevant state based set
+			status.addMemberToStateSet(state, member)
 		}
 
-		status.UnclusteredNodes = ms.Diff(managed)
-		status.IsRebalancing = (info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
-		status.NeedsRebalance = !info.Balanced && len(info.Nodes) > 1
+		// Any managed nodes not known to the cluster are unclustered (have been ejected).
+		status.UnclusteredNodes = ms.Diff(knownNodes)
+		for _, member := range status.UnclusteredNodes {
+			status.NodeStateMap[member.Name] = NodeStateUnclustered
+		}
+
+		status.IsRebalancing = (status.info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
+		status.NeedsRebalance = !status.info.Balanced && len(status.info.Nodes) > 1
 		return nil
 	})
 
