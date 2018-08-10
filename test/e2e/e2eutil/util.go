@@ -134,7 +134,7 @@ type ClusterReadyRetries struct {
 
 var (
 	defaultRetries = &ClusterReadyRetries{
-		Size:    Retries60,
+		Size:    Retries120,
 		Bucket:  Retries30,
 		Service: Retries20,
 	}
@@ -224,7 +224,7 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 	errChan := make(chan error)
 	go func() {
 		// Expect the cluster to enter a failed state
-		if err := WaitClusterPhaseFailed(t, crClient, cluster.Name, namespace, Retries10); err == nil {
+		if err := WaitClusterPhaseFailed(t, crClient, cluster.Name, namespace, Retries20); err == nil {
 			errChan <- errors.New("Cluster entered failed state")
 		}
 	}()

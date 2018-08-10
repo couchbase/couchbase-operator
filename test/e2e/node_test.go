@@ -1145,10 +1145,10 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 
 	// Code to wait for multiple pod down / autofailover in parallel
 	failoverCompleteChan := make(chan error)
@@ -1211,7 +1211,6 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AppendEventList(memberRemovedEvents)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {

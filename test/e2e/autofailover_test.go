@@ -69,6 +69,8 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
 	if err != nil {
@@ -141,7 +143,6 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Create 8 node couchbase server with default services over 3 server groups
