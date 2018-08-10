@@ -1,12 +1,17 @@
 package k8s
 
 import (
+	"fmt"
+
 	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
+	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -51,4 +56,40 @@ func InitContext(context *context.Context) error {
 	}
 
 	return nil
+}
+
+// GetPod takes a resource reference and returns a pod from which we are able to collect logs,
+// For collections such as deployments it simply picks one.
+func GetPod(context *context.Context, resource resource.ResourceReference) (*corev1.Pod, error) {
+	// Inspect the resource kind and perform type specific processing
+	switch resource.Kind() {
+	case "Pod":
+		return context.KubeClient.CoreV1().Pods(context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
+
+	case "Deployment":
+		// Grab the deployment
+		deployment, err := context.KubeClient.AppsV1().Deployments(context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		// Use the deployment's label selector as the pod selector
+		selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+		if err != nil {
+			return nil, err
+		}
+
+		pods, err := context.KubeClient.CoreV1().Pods(context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return nil, err
+		}
+
+		// Select just one instance
+		if len(pods.Items) == 0 {
+			return nil, fmt.Errorf("No pods delected for Deployment %s", resource.Name())
+		}
+		return &pods.Items[0], nil
+	}
+
+	return nil, nil
 }

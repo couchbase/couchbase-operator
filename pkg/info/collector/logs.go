@@ -2,16 +2,15 @@ package collector
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
+	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // logCollector represents a collection of logs
@@ -34,46 +33,10 @@ func (r *logCollector) Kind() string {
 	return "Logs"
 }
 
-// getPod takes a resource reference and returns a pod from which we are able to collect logs,
-// For collections such as deployments it simply picks one.
-func (r *logCollector) getPod(resource resource.ResourceReference) (*v1.Pod, error) {
-	// Inspect the resource kind and perform type specific processing
-	switch resource.Kind() {
-	case "Pod":
-		return r.context.KubeClient.CoreV1().Pods(r.context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
-
-	case "Deployment":
-		// Grab the deployment
-		deployment, err := r.context.KubeClient.AppsV1().Deployments(r.context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		// Use the deployment's label selector as the pod selector
-		selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-		if err != nil {
-			return nil, err
-		}
-
-		pods, err := r.context.KubeClient.CoreV1().Pods(r.context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
-		if err != nil {
-			return nil, err
-		}
-
-		// Select just one instance
-		if len(pods.Items) == 0 {
-			return nil, fmt.Errorf("No pods delected for Deployment %s", resource.Name())
-		}
-		return &pods.Items[0], nil
-	}
-
-	return nil, nil
-}
-
 // Fetch collects all logs as defined for the resource
 func (r *logCollector) Fetch(resource resource.ResourceReference) error {
 	// Get a pod from the resource kind
-	pod, err := r.getPod(resource)
+	pod, err := k8s.GetPod(r.context, resource)
 	if err != nil {
 		return err
 	}

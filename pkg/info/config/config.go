@@ -33,6 +33,10 @@ type Configuration struct {
 	Help bool
 	// Version determines whether to print out the version string and exit
 	Version bool
+	// OperatorImage defines what the operator image is called
+	OperatorImage string
+	// OperatorRestPort defines what port the operator is listening on for HTTP requests
+	OperatorRestPort string
 }
 
 // Parse parses configuration from the command line and returns an initialized
@@ -44,6 +48,8 @@ func Parse() Configuration {
 	flagSet := flag.NewFlagSet("cbopinfo", flag.ExitOnError)
 	flagSet.StringVar(&c.Namespace, "namespace", "default", "namespace to search for couchbase clusters")
 	flagSet.StringVar(&c.KubeConfig, "kubeconfig", "~/.kube/config", "kubernetes cluster configuration file")
+	flagSet.StringVar(&c.OperatorImage, "operator-image", "couchbase/operator:1.0.0", "operator image name")
+	flagSet.StringVar(&c.OperatorRestPort, "operator-rest-port", "8080", "operator rest port")
 	flagSet.BoolVar(&c.All, "all", false, "collect all resources from the namespace")
 	flagSet.BoolVar(&c.System, "system", false, "collect kube-system resources and logs")
 	flagSet.BoolVar(&c.CollectInfo, "collectinfo", false, "collect couchbase server logs")

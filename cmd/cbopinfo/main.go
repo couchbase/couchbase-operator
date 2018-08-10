@@ -37,6 +37,7 @@ var (
 		collector.NewCouchbaseLogCollector,
 		collector.NewEventCollector,
 		collector.NewLogCollector,
+		collector.NewOperatorCollector,
 	}
 
 	// Define all cluster scoped resource types

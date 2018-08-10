@@ -96,6 +96,12 @@ If specified, this points to a Kubernetes configuration file used to locate and 
 --namespace <namespace>::
 If specified, this selects which namespace to collect resources and logs from. If not set, it will default to `default`.
 
+--operator-image::
+If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to _couchbase/operator:1.0.0_.
+
+--operator-rest-port::
+If specified this sets the Operator rest port.  It is used for collection of runtime information.  If not set it will default to _8080_.
+
 --system::
 If specified, this flag will additionally collect all resources from the `kube-system` namespace, which may be useful in diagnosing problems with cluster-level roles, custom resource definitions, or system services.
 
