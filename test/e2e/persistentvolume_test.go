@@ -105,7 +105,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverMaxCount"] = "3"
-	clusterConfig["autoFailoverTimeout"] = "30"
+	clusterConfig["autoFailoverTimeout"] = "10"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	serviceConfig1["defaultVolMnt"] = pvcName
 	serviceConfig1["dataVolMnt"] = pvcName
@@ -146,26 +146,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	// Kill couchbase server pods in cluster and test auto failover
 	for _, podMemberId := range podMembersToKill {
 		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberName, &metav1.DeleteOptions{}); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	time.Sleep(timeToSleep)
-
-	for _, podMemberId := range podMembersToKill {
-		event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-			t.Fatal(err)
-		}
-		expectedEvents.AddMemberRecoveredEvent(testCouchbase, podMemberId)
-	}
-
-	// Kill couchbase server process in target pods
-	for _, podMemberId := range podMembersToKill {
-		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		_, err = f.ExecShellInPod(targetKubeName, memberName, "mv /etc/service/couchbase-server /tmp/")
-		if err != nil {
+		if err := e2eutil.DeletePod(t, targetKube.KubeClient, podMemberName, f.Namespace); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
@@ -174,10 +155,12 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	time.Sleep(timeToSleep)
 
 	for _, podMemberId := range podMembersToKill {
-		event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-			t.Fatal(err)
-		}
+		/*
+			event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId)
+			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
+				t.Fatal(err)
+			}
+		*/
 		expectedEvents.AddMemberRecoveredEvent(testCouchbase, podMemberId)
 	}
 
@@ -191,6 +174,37 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		t.Fatal(err)
 	}
 
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	// Kill couchbase server process in target pods
+	for _, podMemberId := range podMembersToKill {
+		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
+		if _, err := f.ExecShellInPod(targetKubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
+			t.Fatal(err)
+		}
+		//expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
+	}
+
+	time.Sleep(timeToSleep + 60)
+
+	/*
+		for _, podMemberId := range podMembersToKill {
+			event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId)
+			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
+				t.Fatal(err)
+			}
+			expectedEvents.AddMemberRecoveredEvent(testCouchbase, podMemberId)
+		}
+	*/
+	event = e2eutil.RebalanceStartedEvent(testCouchbase)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+		t.Fatal(err)
+	}
+
+	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+		t.Fatal(err)
+	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
@@ -637,8 +651,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	// Kill couchbase server process in target pods
 	for _, podMemberId := range podMembersToKill {
 		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		_, err = f.ExecShellInPod(targetKubeName, memberName, "mv /etc/service/couchbase-server /tmp/")
-		if err != nil {
+		if _, err := f.ExecShellInPod(targetKubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
@@ -899,7 +912,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
 	}
 
-	if err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, len(memberIdsToKill)); err != nil {
+	if err := e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, len(memberIdsToKill)); err != nil {
 		t.Fatalf("Mismatch in expected unhealthy nodes. expected %d: %v", len(memberIdsToKill), err)
 	}
 
@@ -921,7 +934,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 
@@ -1012,7 +1025,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
 	}
 
-	if err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, len(memberIdsToKill)); err != nil {
+	if err := e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, len(memberIdsToKill)); err != nil {
 		t.Fatalf("Mismatch in expected unhealthy nodes. expected %d: %v", len(memberIdsToKill), err)
 	}
 
@@ -1029,7 +1042,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 
@@ -1299,13 +1312,11 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	resizeClusterSizes := []int{2, 5, 1, 3}
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
-		err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-		if err != nil {
+		if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
 			t.Fatal(err)
 		}
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-		if err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 			t.Fatal(err.Error())
 		}
 
@@ -1347,10 +1358,8 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
-
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }

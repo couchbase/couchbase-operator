@@ -903,8 +903,7 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label st
 
 func DeletePod(t *testing.T, kubeClient kubernetes.Interface, podName string, namespace string) error {
 	t.Logf("deleting pod: %v", podName)
-	err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0))
-	if err != nil {
+	if err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
 		return err
 	}
 	return nil
