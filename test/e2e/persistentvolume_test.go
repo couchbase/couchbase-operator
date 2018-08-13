@@ -405,6 +405,8 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// Should be same after recovering the pod with PVC intact
 	for memberName, pvcCount := range expectedPvcMap {
@@ -1331,7 +1333,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 
 		case 1:
 			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			for memberId := 1; memberId <= 5; memberId++ {
+			for _, memberId := range []int{1, 3, 4, 5} {
 				expectedEvents.AddMemberRemoveEvent(testCouchbase, memberId)
 			}
 
