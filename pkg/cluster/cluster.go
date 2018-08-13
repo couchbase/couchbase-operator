@@ -534,14 +534,15 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 }
 
 // Checks if a timestamp has elapsed recommended duration for cluster recovery
-func (c *Cluster) elapsedRecoveryDuration(ts time.Time) bool {
+// along with time remaining until reaching the required duration
+func (c *Cluster) elapsedRecoveryDuration(ts time.Time) (bool, time.Duration) {
 
 	// get duration since timestamp
 	elapsedDuration := time.Now().Sub(ts)
 
 	// require a duration of 30s after autofailover timeout
 	requiredDuration := time.Duration(c.cluster.Spec.ClusterSettings.AutoFailoverTimeout+30) * time.Second
-	return elapsedDuration > requiredDuration
+	return elapsedDuration > requiredDuration, (requiredDuration - elapsedDuration).Truncate(time.Second)
 }
 
 // Selects any member that can be recovered and attempts to restart it

@@ -246,6 +246,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
 			if _, ok := r.runningPods[m.Name]; ok {
 				// node is not actually down, may have just been restarted
+				c.logger.Warnf("Down node `%s` is not being recovered since it's Pod is still running.  Manual failover is recommended.")
 				continue
 			}
 			if c.status.Members.Unready.Contains(m.Name) {
@@ -253,19 +254,26 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 					ts := c.status.Members.Unready.GetMember(m.Name).Ts()
 
 					// Recover node if it has been down longer than auto-failover time
-					if c.elapsedRecoveryDuration(ts) {
+					elapsed, remainingTs := c.elapsedRecoveryDuration(ts)
+					if elapsed {
 						if err := c.recreatePod(m); err != nil {
-							c.logger.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
+							c.logger.Errorf("Node %s could not be recovered: %s", m.ClientURL(), err.Error())
 						} else {
 							c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-							return fmt.Errorf("recovering node %s", m.ClientURL())
+							return fmt.Errorf("Recovering node %s", m.ClientURL())
 						}
+					} else {
+						c.logger.Errorf("Waiting for auto-failover of down node `%s`.  Automated recovery will begin after (%s) if auto-failover cannot be performed", m.Name, remainingTs)
 					}
+				} else {
+					c.logger.Warnf("Waiting for auto-failover of down node `%s`", m.Name)
 				}
+			} else {
+				c.logger.Errorf("Waiting for status of down node `%s` to become unready")
 			}
 		}
 
-		return fmt.Errorf("Unable to reconcile nodes, waiting for auto-failover to take place")
+		return fmt.Errorf("Unable to reconcile cluster because some nodes are down")
 	}
 
 	c.status.SetReadyCondition()
