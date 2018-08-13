@@ -12,8 +12,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 )
 
 // logCollector represents a collection of logs
@@ -45,13 +43,18 @@ func (r *logCollector) getPod(resource resource.ResourceReference) (*v1.Pod, err
 		return r.context.KubeClient.CoreV1().Pods(r.context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
 
 	case "Deployment":
-		// Deployments will set a "app" label to that of the deployment
-		nameLabelRequirement, err := labels.NewRequirement("app", selection.Equals, []string{resource.Name()})
+		// Grab the deployment
+		deployment, err := r.context.KubeClient.AppsV1().Deployments(r.context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
-		selector := labels.NewSelector()
-		selector = selector.Add(*nameLabelRequirement)
+
+		// Use the deployment's label selector as the pod selector
+		selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+		if err != nil {
+			return nil, err
+		}
+
 		pods, err := r.context.KubeClient.CoreV1().Pods(r.context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
