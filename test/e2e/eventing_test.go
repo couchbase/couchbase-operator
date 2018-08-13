@@ -365,20 +365,22 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan bool)
-	dataInsertionStopped := make(chan bool)
+	dataInsertionErr := make(chan error)
 	dataInsertionFunc := func(t *testing.T) {
+		var err error
+	OuterLoop:
 		for {
 			select {
 			case <-stopDataInsertion:
-				dataInsertionStopped <- true
-				return
+				break OuterLoop
 			default:
 				numOfDocs++
-				if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err != nil {
-					t.Fatal(err)
+				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err != nil {
+					break OuterLoop
 				}
 			}
 		}
+		dataInsertionErr <- err
 	}
 	go dataInsertionFunc(t)
 
@@ -410,7 +412,9 @@ func TestEventingKillEventingPods(t *testing.T) {
 		newMemberToBeAdded++
 	}
 	stopDataInsertion <- true
-	_ = <-dataInsertionStopped
+	if err := <-dataInsertionErr; err != nil {
+		t.Fatal(err)
+	}
 
 	// Cross check number of docs inserted reflected in eventing
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
