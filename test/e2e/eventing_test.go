@@ -388,27 +388,17 @@ func TestEventingKillEventingPods(t *testing.T) {
 			t.Fatal(err)
 		}
 		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 20); err != nil {
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 30); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
-
-		event = e2eutil.NewMemberFailedOverEvent(testCouchbase, memberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 40); err != nil {
-			t.Fatal(err)
-		}
 		expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberId)
 
 		event = e2eutil.NewMemberAddEvent(testCouchbase, newMemberToBeAdded)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 150); err != nil {
 			t.Fatal(err)
 		}
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
-
-		event = e2eutil.RebalanceStartedEvent(testCouchbase)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-			t.Fatal(err)
-		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, newMemberToBeAdded)
 
 		event = e2eutil.RebalanceCompletedEvent(testCouchbase)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {

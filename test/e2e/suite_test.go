@@ -133,8 +133,7 @@ func runSuite(t *testing.T) {
 				testPassed := t.Run(testName, testFunc)
 
 				// Detect couchbase-operator crash / restart event
-				for _, kubeCluster := range kubeClustersToSetup {
-					targetKube := f.ClusterSpec[kubeCluster.ClusterName]
+				for _, targetKube := range f.ClusterSpec {
 					if currRestartCount := f.GetOperatorRestartCount(targetKube.KubeClient, f.Namespace); currRestartCount != operatorRestartCount {
 						testPassed = false
 						operatorRestartCount = currRestartCount
@@ -150,8 +149,7 @@ func runSuite(t *testing.T) {
 
 				// Clean up all known clusters if SkipTeardown is disabled
 				if !f.SkipTeardown {
-					for _, kubeCluster := range kubeClustersToSetup {
-						targetKube := f.ClusterSpec[kubeCluster.ClusterName]
+					for _, targetKube := range f.ClusterSpec {
 						e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
 					}
 				}

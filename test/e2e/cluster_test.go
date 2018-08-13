@@ -605,7 +605,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	}
 
 	t.Logf("Allocatable Memory: %d", allocatableMemory)
-	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, 5, func(cl *api.CouchbaseCluster) {
+	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, e2eutil.Retries5, func(cl *api.CouchbaseCluster) {
 		cl.Spec.ServerSettings[0].Pod = e2espec.CreateMemoryPodPolicy(allocatableMemory*7/10, allocatableMemory)
 	})
 	nodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -620,10 +620,20 @@ func TestNodeUnschedulable(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Wait for each member add event
+	for memberId := 1; memberId < clusterSize-1; memberId++ {
+		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+	}
+
 	// expect unbalanced condition
 	if err := e2eutil.WaitForClusterUnBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, clusterSize-1)
 
 	// drop limits so that pod can be scheduled
 	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, e2eutil.Retries5, func(cl *api.CouchbaseCluster) {
@@ -633,23 +643,18 @@ func TestNodeUnschedulable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 1; i < clusterSize; i++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, i)
+	event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+
+	// Wait for cluster balanced condition
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20); err != nil {
+		t.Fatal(err.Error())
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	// verify result from cluster resize ok
-	t.Logf("Waiting For Cluster Size To Be: %d\n", clusterSize)
-	names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, e2eutil.Retries60, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("Resize Success: %v\n", names)
-
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 18); err != nil {
-		t.Fatal(err.Error())
-	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 

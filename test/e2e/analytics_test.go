@@ -288,7 +288,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	clusterSizeWoAnalytics := 3
 	clusterSizeOfAnalytics := 3
 	clusterSize := clusterSizeWoAnalytics + clusterSizeOfAnalytics + 1
-	numOfDocs := 50
+	numOfDocs := 10
 	bucketName := "defBucket"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "analytics"})

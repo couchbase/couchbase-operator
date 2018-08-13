@@ -425,7 +425,6 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberNameToKill, &metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	expectedEvents.AddMemberDownEvent(testCouchbase, podMemberIdToKill)
 
 	// Sleep for autofailover to occur
 	time.Sleep(time.Second*time.Duration(autofailoverTimeout) + 120)
@@ -1308,7 +1307,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
 	expectedPvcMap := map[string]int{}
-	prevClusterSize := clusterSize
 	resizeClusterSizes := []int{2, 5, 1, 3}
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
@@ -1320,17 +1318,29 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 
-		switch {
-		case clusterSize-prevClusterSize > 0:
-			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
+		switch clusterSize {
+		case 2:
 			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+			expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
 
-		case clusterSize-prevClusterSize < 0:
+		case 5:
+			for memberId := 3; memberId <= clusterSize; memberId++ {
+				expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+			}
 			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
-			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+
+		case 1:
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+			for memberId := 1; memberId <= 5; memberId++ {
+				expectedEvents.AddMemberRemoveEvent(testCouchbase, memberId)
+			}
+
+		case 3:
+			expectedEvents.AddMemberAddEvent(testCouchbase, 6)
+			expectedEvents.AddMemberAddEvent(testCouchbase, 7)
+			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 		}
+		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 		// Populate the expectedPvcMap for maximum available nodes everytime
 		for memberId := 0; memberId < 9; memberId++ {
@@ -1355,7 +1365,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 				t.Fatalf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
 			}
 		}
-		prevClusterSize = clusterSize
 	}
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
