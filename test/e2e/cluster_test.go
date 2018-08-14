@@ -598,8 +598,8 @@ func TestNodeUnschedulable(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	// request 70% of allocatable memory
-	allocatableMemory, err := e2eutil.GetK8SAllocatableMemory(targetKube.KubeClient, f.Namespace, nil)
+	// Get max from k8s cluster allocatable memory
+	allocatableMemory, err := e2eutil.GetK8SMaxAllocatableMemory(targetKube.KubeClient)
 	if err != nil {
 		t.Fatal(err)
 	}

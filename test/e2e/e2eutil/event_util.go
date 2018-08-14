@@ -27,6 +27,15 @@ func (e EventList) Compare(other EventList) bool {
 	return true
 }
 
+func EventExistsInEventList(event *v1.Event, eventList EventList) bool {
+	for _, temEvent := range eventList {
+		if EqualEvent(event, &temEvent) {
+			return true
+		}
+	}
+	return false
+}
+
 func EqualEvent(e1, e2 *v1.Event) bool {
 	return (e1.Type == e2.Type && e1.Reason == e2.Reason && e1.Message == e2.Message)
 }

@@ -183,9 +183,9 @@ var (
 func ValidateClusterEvents(t *testing.T, kubeClient kubernetes.Interface, clusterName, namespace string, expectedEvents e2eutil.EventList) {
 	events, err := e2eutil.GetCouchbaseEvents(kubeClient, clusterName, namespace)
 	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
+		t.Errorf("failed to get coucbase cluster events: %v", err)
 	}
 	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
+		t.Error(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
 }

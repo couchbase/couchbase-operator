@@ -31,7 +31,6 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (E
 // returns quota for any node unless name is specified
 // quota value is in MB
 func GetK8SAllocatableMemory(kubeCli kubernetes.Interface, namespace string, name *string) (int, error) {
-
 	// list or get node
 	var node *v1.Node
 	if name == nil {
@@ -58,6 +57,22 @@ func GetK8SAllocatableMemory(kubeCli kubernetes.Interface, namespace string, nam
 	return memQuantityMB, nil
 }
 
+// Returns max allocatable memory within all K8S nodes
+func GetK8SMaxAllocatableMemory(kubeClient kubernetes.Interface) (memQuantityMb int, err error) {
+	nodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+	for _, node := range nodeList.Items {
+		nodeAllocatableMem := node.Status.Allocatable[v1.ResourceMemory]
+		nodeAllocatableMemMb := int(nodeAllocatableMem.Value() >> 20)
+		if memQuantityMb < nodeAllocatableMemMb {
+			memQuantityMb = nodeAllocatableMemMb
+		}
+	}
+	return
+}
+
 // Updates K8S nodes with given Unschedulable and Taint values
 func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnschedulable bool, podTaintList []v1.Taint, nodeIndex int) (err error) {
 	for retryCount := 0; retryCount < 3; retryCount++ {
@@ -73,4 +88,25 @@ func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnsch
 		}
 	}
 	return err
+}
+
+// Takes in pod name and returns the node index on which the pod is scheduled on
+func GetTargetNodeIndexForPod(kubeClient kubernetes.Interface, namespace, podName string) (nodeIndex int, err error) {
+	pod, err := kubeClient.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+
+	podSchedulledOnNode := pod.Status.HostIP
+	nodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+	for index, node := range nodeList.Items {
+		if node.Status.Addresses[0].Address == podSchedulledOnNode {
+			nodeIndex = index
+			return
+		}
+	}
+	return
 }

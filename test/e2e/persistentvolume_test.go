@@ -621,16 +621,32 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	timeToSleep := time.Duration(autofailoverTimeout)*time.Second + 30
 
 	// Kill couchbase server pods in cluster and test auto failover
+	allMemberDownEvents := e2eutil.EventList{}
+	allMemberRecoveryEvents := e2eutil.EventList{}
 	for _, podMemberId := range podMembersToKill {
 		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
 		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberName, &metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
+		allMemberDownEvents = append(allMemberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
+		allMemberRecoveryEvents = append(allMemberRecoveryEvents, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
 	}
+
+	createdEvents, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberDownEvents, clusterSize-1, 60)
+	if err != nil {
+		t.Error(err)
+	}
+	expectedEvents.AppendEventList(createdEvents)
 
 	for _, _ = range podMembersToKill {
 		time.Sleep(timeToSleep)
 	}
+
+	createdEvents, err = e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveryEvents, clusterSize-1, 300)
+	if err != nil {
+		t.Error(err)
+	}
+	expectedEvents.AppendEventList(createdEvents)
 
 	event := e2eutil.RebalanceStartedEvent(testCouchbase)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {

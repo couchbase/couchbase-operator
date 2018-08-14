@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -1184,8 +1185,27 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 	podTaintList := []v1.Taint{podTaint}
 
-	nodeIndex := 2
+	operatorPodName, err := e2eutil.GetOperatorName(targetKube.KubeClient, f.Namespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorNodeIndex, err := e2eutil.GetTargetNodeIndexForPod(targetKube.KubeClient, f.Namespace, operatorPodName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var nodeIndex int
 	memberIdToGoDown := 1
+	for ; memberIdToGoDown < clusterSize; memberIdToGoDown++ {
+		memberNameToGoDown := couchbaseutil.CreateMemberName(testCouchbase.Name, memberIdToGoDown)
+		nodeIndex, err = e2eutil.GetTargetNodeIndexForPod(targetKube.KubeClient, f.Namespace, memberNameToGoDown)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if nodeIndex != operatorNodeIndex {
+			break
+		}
+	}
 
 	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
 		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
@@ -1203,10 +1223,12 @@ func TestRzaServerGroupDown(t *testing.T) {
 		t.Fatalf("No unhealthy nodes in cluster: %v", err)
 	}
 
+	// Remove the taint from the node to allow pod schedulling
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
 		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)
 	}
 
+	// Wait for pod member to add back to the cluster
 	event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Failed to add pod after removing the taint: %v", err)
@@ -1214,14 +1236,19 @@ func TestRzaServerGroupDown(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
 	event = e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
 		t.Fatalf("Failed to remove unclusteres pod: %v", err)
+	}
+
+	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+		t.Fatal(err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 3, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
