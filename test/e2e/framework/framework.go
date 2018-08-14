@@ -17,6 +17,7 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -312,6 +313,10 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return nil
 	}
 
+	if err := RemoveLabels(constants.ServerGroupLabel, targetKube.KubeClient); err != nil {
+		return nil
+	}
+
 	logrus.Info("Deleting portworx")
 	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
 		return err
@@ -319,6 +324,10 @@ func (f *Framework) SetupFramework(kubeName string) error {
 
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
 	runExecCmd(deletePortworxCmd)
+
+	if err := RemoveService(targetKube.KubeClient, "kube-system", "portworx-service"); err != nil {
+		return err
+	}
 
 	logrus.Info("Deleting etcd")
 	deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
@@ -471,7 +480,7 @@ func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName s
 		ansibleExtraVarParam += imgName + ","
 	}
 	ansibleExtraVarParam = strings.TrimRight(ansibleExtraVarParam, ",")
-	ansibleCmd := exec.Command("ansible-playbook", "-i", inventoryFile, pullDockerImageFile, "--extra-vars", ansibleExtraVarParam)
+	ansibleCmd := exec.Command("ansible-playbook", "-i", inventoryFile, pullDockerImageFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
 	var stdout bytes.Buffer
 	ansibleCmd.Stdout = &stdout
 	if err := ansibleCmd.Run(); err != nil {

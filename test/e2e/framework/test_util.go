@@ -490,14 +490,14 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 		t.Logf("Running ansible script for %s", kubeClusterSpec.ClusterName)
 
 		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
-		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "--extra-vars", ansibleExtraVarParam)
+		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}
 		kubeVersionParsed := strings.Split(kubeVersion, "-")
 		kubeVersion = kubeVersionParsed[0]
 		ansibleExtraVarParam = "kubeConfPathToSave=config_" + kubeClusterSpec.ClusterName + " kubeVersion=" + kubeVersion
-		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "--extra-vars", ansibleExtraVarParam)
+		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
 		}
@@ -789,6 +789,20 @@ func RemoveService(kubeClient kubernetes.Interface, namespace, serviceName strin
 	return nil
 }
 
+func ServiceExists(kubeClient kubernetes.Interface, namespace, serviceName string) (bool, error) {
+	svcList, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, svc := range svcList.Items {
+		if svc.GetName() == serviceName {
+			return true, nil
+		}
+	}
+	return false, nil
+
+}
+
 func RecreateServicePortworx(kubeClient kubernetes.Interface) error {
 	serviceName := "portworx-service"
 	namespace := "kube-system"
@@ -1048,9 +1062,9 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName stri
 			break
 		}
 		time.Sleep(5 * time.Second)
-		if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 120, "name=portworx", "kube-system"); err != nil {
+		if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 240, "name=portworx", "kube-system"); err != nil {
 			e2eutil.AddLabelToNodes(t, kubeClient, "px/enabled", "true")
-			time.Sleep(60 * time.Second)
+			time.Sleep(120 * time.Second)
 			return err
 		}
 		time.Sleep(5 * time.Second)
@@ -1060,13 +1074,24 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName stri
 
 func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeName string) error {
 	t.Log("running delete-portworx-automation.sh")
-	if err := RecreateServicePortworx(kubeClient); err != nil {
+	exists, err := ServiceExists(kubeClient, "kube-system", "portworx-service")
+	if err != nil {
 		return err
 	}
+	if !exists {
+		if err := RecreateServicePortworx(kubeClient); err != nil {
+			return err
+		}
+	}
+
 	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
 	if err := runExecCommand(t, deletePortworxCmd); err != nil {
 		return errors.New("error running delete-portworx-automation.sh: " + err.Error())
+	}
+
+	if err = RemoveService(kubeClient, "kube-system", "portworx-service"); err != nil {
+		return err
 	}
 
 	t.Log("deleting portworx daemonset")
@@ -1101,4 +1126,21 @@ func GetNodeIpForPod(kubeClient kubernetes.Interface, namespace, podName string)
 		return ""
 	}
 	return pod.Status.HostIP
+}
+
+// Remove specified label from all k8s nodes identified by kubeName
+func RemoveLabels(nodeLabelName string, kubeClient kubernetes.Interface) error {
+	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return errors.New("Failed to get k8s nodes " + err.Error())
+	}
+	for _, k8sNode := range k8sNodeList.Items {
+		nodeLabels := k8sNode.GetLabels()
+		delete(nodeLabels, nodeLabelName)
+		k8sNode.SetLabels(nodeLabels)
+		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
+			return errors.New("Failed to delete label for node " + k8sNode.Name + ": " + err.Error())
+		}
+	}
+	return nil
 }

@@ -24,17 +24,6 @@
     kubeConfigDir: ~/.kube
 
   tasks:
-    - name: Resetting kubeadm
-      shell: kubeadm reset
-
-    - name: Cleaning up old etcd data
-      file:
-        state: absent
-        path: "{{ item }}/"
-      with_items:
-        - "{{ etcdLibPath }}"
-        - "{{ kubeConfigDir }}"
-
     - name: Generating kubeadm token
       shell: kubeadm token generate
       run_once: True
@@ -93,10 +82,7 @@
         kubeAdmToken: "{{ hostvars['myVars']['kubeAdmToken'] }}"
         masterNodeIp: "{{ hostvars['myVars']['masterNodeIp'] }}"
 
-    - name: Resetting kubeadm
-      shell: kubeadm reset
-
     - name: Joining worker nodes
-      shell: "kubeadm join --token {{ kubeAdmToken }} {{ masterNodeIp }}:6443 --discovery-token-unsafe-skip-ca-verification"
+      shell: "kubeadm join --token {{ kubeAdmToken }} {{ masterNodeIp }}:6443 --discovery-token-unsafe-skip-ca-verification --ignore-preflight-errors cri"
 
 
