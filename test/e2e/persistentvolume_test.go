@@ -885,12 +885,13 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	clusterSpec.SecurityContext = createPodSecurityContext(1000)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
@@ -907,55 +908,58 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get deployed Rza map: %v", err)
 	}
-
-	memberIdsToKill := []int{1, 3, 8}
-
-	// Remove PVC for a particular node
-	if err := e2eutil.RemovePersistentVolumesOfPod(targetKube.KubeClient, f.Namespace, testCouchbase.Name, memberIdsToKill[0]); err != nil {
-		t.Fatal(err)
+	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
+		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	// Kill a node in server groups
+	memberIdsToKill := []int{1, 3, 8}
+	receivedEvents := e2eutil.EventList{}
+	eventChan := make(chan corev1.Event)
+	errChan := make(chan error)
 	for _, memberId := range memberIdsToKill {
 		podNameToKill := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
+		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
+		go func(event corev1.Event) {
+			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 300)
+			eventChan <- event
+			errChan <- err
+		}(*event)
 		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, &metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to kill pod %s: %v", podNameToKill, err)
 		}
-		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
+	}
+	for _, _ = range memberIdsToKill {
+		receivedEvents = append(receivedEvents, <-eventChan)
+		if err = <-errChan; err != nil {
+			t.Fatalf("failed to wait for event %v", err)
+		}
 	}
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("Unable to get Client for cluster: %v", err)
+	for _, recEvent := range receivedEvents {
+		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, len(memberIdsToKill)); err != nil {
-		t.Fatalf("Mismatch in expected unhealthy nodes. expected %d: %v", len(memberIdsToKill), err)
+	eventsExpected := e2eutil.EventList{}
+	for _, podMemberId := range memberIdsToKill {
+		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
 	}
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
+	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600)
 
-	event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-		t.Fatalf("New node not added to replace PVC failed node: %v", err)
+	for _, recEvent := range receivedEvents {
+		expectedEvents = append(expectedEvents, recEvent)
 	}
-
-	event = e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatal(err)
-	}
-
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 
 	// Cross check rza deployment matches the expected values
+	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
+	if err != nil {
+		t.Logf("Failed to get deployed Rza map: %v", err)
+	}
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
@@ -1004,12 +1008,13 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	clusterSpec.SecurityContext = createPodSecurityContext(1000)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedEvents := e2eutil.EventList{}
+	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
 	}
@@ -1026,44 +1031,60 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get deployed Rza map: %v", err)
 	}
+	// Cross check rza deployment matches the expected values
+	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
+		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
+	}
 
 	// Kill nodes in 3rd server groups
 	memberIdsToKill := []int{2, 5, 8}
+	receivedEvents := e2eutil.EventList{}
+	eventChan := make(chan corev1.Event)
+	errChan := make(chan error)
 	for _, memberId := range memberIdsToKill {
 		podNameToKill := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
+		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
+		go func(event corev1.Event) {
+			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 300)
+			eventChan <- event
+			errChan <- err
+		}(*event)
 		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, &metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to kill pod %s: %v", podNameToKill, err)
 		}
-		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
+	}
+	for _, _ = range memberIdsToKill {
+		receivedEvents = append(receivedEvents, <-eventChan)
+		if err = <-errChan; err != nil {
+			t.Fatalf("failed to wait for event %v", err)
+		}
 	}
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("Unable to get Client for cluster: %v", err)
+	for _, recEvent := range receivedEvents {
+		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, len(memberIdsToKill)); err != nil {
-		t.Fatalf("Mismatch in expected unhealthy nodes. expected %d: %v", len(memberIdsToKill), err)
+	eventsExpected := e2eutil.EventList{}
+	for _, podMemberId := range memberIdsToKill {
+		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
 	}
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
+	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600)
 
-	event := e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatal(err)
+	for _, recEvent := range receivedEvents {
+		expectedEvents = append(expectedEvents, recEvent)
 	}
-
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 
 	// Cross check rza deployment matches the expected values
+	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to get deployed Rza map: %v", err)
+	}
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}

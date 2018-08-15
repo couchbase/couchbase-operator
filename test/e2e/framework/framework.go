@@ -293,13 +293,16 @@ func (f *Framework) DeleteCRDs(config *rest.Config) error {
 func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	logrus.Info("Marking all nodes as schedulable")
 	nodeTaintList := []v1.Taint{}
-	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to get node list: " + err.Error())
-	}
-	for nodeIndex, _ := range k8sNodeList.Items {
-		if err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex); err != nil {
-			return errors.New("Failed to update node taint: " + err.Error())
+	for i := 0; i < 3; i++ {
+		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil && i == 2 {
+			return errors.New("Failed to get node list: " + err.Error())
+		}
+		for nodeIndex, _ := range k8sNodeList.Items {
+			err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex)
+			if err != nil && i == 2 {
+				return errors.New("Failed to update node taint: " + err.Error())
+			}
 		}
 	}
 	return nil

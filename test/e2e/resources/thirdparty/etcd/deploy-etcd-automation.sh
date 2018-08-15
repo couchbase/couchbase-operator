@@ -1,11 +1,11 @@
 #!/bin/sh
-
+set -e
 kubeConfig=$1
 
 etcdpath=$(pwd)/resources/thirdparty/etcd
 param="--kubeconfig=$kubeConfig"
 
-sh $etcdpath/etcd-create-role.sh
+#sh $etcdpath/etcd-create-role.sh
 kubectl $param create -f $etcdpath/etcd-deployment.yaml
 
 # wait for etcd operator pod to be running

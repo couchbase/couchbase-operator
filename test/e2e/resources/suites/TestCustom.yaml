@@ -3,6 +3,13 @@ suite: TestCustom
 tcGroups:
   - name: Group1
     clusters:
-      - BasicCluster
+      - NewCluster1
     testcases:
-      - name: TestCreateCluster
+        - name: TestPersistentVolumeRzaNodesKilled
+          decorators:
+            - portworxProvisioner
+            - rzaNodeLabeller
+        - name: TestPersistentVolumeRzaFailover
+          decorators:
+            - portworxProvisioner
+            - rzaNodeLabeller
