@@ -100,7 +100,6 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	targetKubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[targetKubeName]
 
-	autofailoverTimeout := 30
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -135,14 +134,6 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
 
-	// Calculate sleep time for action to be taken by operator
-	timeToSleep := time.Second
-	if autoFailoverWillOccur {
-		timeToSleep = time.Duration(autofailoverTimeout)*timeToSleep + 30
-	} else {
-		timeToSleep = time.Duration(autofailoverTimeout)*timeToSleep + 60
-	}
-
 	// Kill couchbase server pods in cluster and test auto failover
 	for _, podMemberId := range podMembersToKill {
 		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
@@ -152,61 +143,37 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
 	}
 
-	time.Sleep(timeToSleep)
-
+	eventsExpected := e2eutil.EventList{}
 	for _, podMemberId := range podMembersToKill {
-		/*
-			event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId)
-			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-				t.Fatal(err)
-			}
-		*/
-		expectedEvents.AddMemberRecoveredEvent(testCouchbase, podMemberId)
+		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
+	}
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
+	receivedEvents, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600)
+
+	for _, recEvent := range receivedEvents {
+		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	event := e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatal(err)
-	}
-
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	// Kill couchbase server process in target pods
 	for _, podMemberId := range podMembersToKill {
 		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
 		if _, err := f.ExecShellInPod(targetKubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
 			t.Fatal(err)
 		}
-		//expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
 	}
 
-	time.Sleep(timeToSleep + 60)
-
-	/*
-		for _, podMemberId := range podMembersToKill {
-			event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId)
-			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-				t.Fatal(err)
-			}
-			expectedEvents.AddMemberRecoveredEvent(testCouchbase, podMemberId)
-		}
-	*/
-	event = e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatal(err)
+	eventsExpected = e2eutil.EventList{}
+	for _, podMemberId := range podMembersToKill {
+		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
 	}
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
+	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
+	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600)
 
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
+	for _, recEvent := range receivedEvents {
+		expectedEvents = append(expectedEvents, recEvent)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }

@@ -17,30 +17,18 @@ function showFileContent() {
 targetCluster="kubernetes"
 KUBENAMESPACE="default"
 testRunnerBranch="vulcan"
+dockerHub="ashwin2002"
 numNodes=4
 cloudClusterNodeIpList=$1
 cloudClusterMasterNodeIp=$2
-dockerHub="ashwin2002"
+operatorVersion=$3
 
 #show variables
 echo "Using cloud space from '$targetCluster', namespace '$KUBENAMESPACE'"
 echo "Cloud node IPs '$cloudClusterNodeIpList'"
-echo "Couchbase-server version '$cbServerVersionsToRun'"
-echo "Couchbase-opeartor version '$cbOperatorVersion'"
+echo "Couchbase-operator version '$operatorVersion'"
 echo "Using testrunner branch '$testRunnerBranch' for testing '$numOfNodes' node cluster"
 echo "Using docker hub account '$dockerHub'"
-
-# Create test.properties file contents
-echo "KUBENAMESPACE=$KUBENAMESPACE" > ${WORKSPACE}/test.properties
-echo "cbServerVersionsToRun=$cbServerVersionsToRun" >> ${WORKSPACE}/test.properties
-echo "cbOperatorVersion=$cbOperatorVersion" >> ${WORKSPACE}/test.properties
-echo "cbOperatorBranch=$cbOperatorBranch" >> ${WORKSPACE}/test.properties
-echo "dockerHub=$dockerHub" >> ${WORKSPACE}/test.properties
-echo "targetCluster=$targetCluster" >> ${WORKSPACE}/test.properties
-echo "testRunnerBranch=$testRunnerBranch" >> ${WORKSPACE}/test.properties
-echo "cloudClusterMasterNodeIp=$cloudClusterMasterNodeIp" >> ${WORKSPACE}/test.properties
-echo "cloudClusterNodeIpList=$cloudClusterNodeIpList" >> ${WORKSPACE}/test.properties
-showFileContent "${WORKSPACE}/test.properties"
 
 deploymentFile="./testrunner/deployment.yaml"
 secretFile="./testrunner/secret.yaml"
@@ -49,7 +37,7 @@ cbClusterFile="./testrunner/tpcc/cb-cluster-4node.yaml"
 testRunnerYamlFileName="./testrunner/tpcc/tpcc.yaml"
 clusterName=$(grep "name:" $cbClusterFile | head -1 | xargs | cut -d' ' -f 2)
 
-cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$cbOperatorVersion"
+cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$operatorVersion"
 cbServerDockerImageName="couchbase/server:5.5.0-test"
 testRunnerDockerImageName="${dockerHub}/testrunner-cloud:tpcc"
 
@@ -137,7 +125,7 @@ showFileContent $testRunnerYamlFileName
 kubectl --namespace=$KUBENAMESPACE create -f $testRunnerYamlFileName
 exitOnError $? "Unable to create testrunner"
 
-echo "############################## Using couchbase-server '$cbServerVersionsToRun' ##############################"
+echo "############################## Begin Test ##############################"
 
 # wait for testrunner pod to be running
 while true
@@ -207,5 +195,5 @@ sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$targetWorkerIp "
 sshpass -p "couchbase" scp -o StrictHostKeyChecking=no -r root@$targetWorkerIp:/root/testrunnerLogs ${WORKSPACE}/logs
 sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$targetWorkerIp "rm -rf /root/testrunnerLogs"
 
-echo "################################# End of test using '$cbServerVersionsToRun' ################################"
+echo "################################# End Test ################################"
 echo ""

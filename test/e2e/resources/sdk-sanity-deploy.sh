@@ -17,30 +17,18 @@ function showFileContent() {
 targetCluster="kubernetes"
 KUBENAMESPACE="default"
 testRunnerBranch="vulcan"
+dockerHub="ashwin2002"
 numNodes=4
 cloudClusterNodeIpList=$1
 cloudClusterMasterNodeIp=$2
-dockerHub="ashwin2002"
+operatorVersion=$3
 
 #show variables
 echo "Using cloud space from '$targetCluster', namespace '$KUBENAMESPACE'"
 echo "Cloud node IPs '$cloudClusterNodeIpList'"
-echo "Couchbase-server version '$cbServerVersionsToRun'"
-echo "Couchbase-opeartor version '$cbOperatorVersion'"
+echo "Couchbase-operator version '$operatorVersion'"
 echo "Using testrunner branch '$testRunnerBranch' for testing '$numOfNodes' node cluster"
 echo "Using docker hub account '$dockerHub'"
-
-# Create test.properties file contents
-echo "KUBENAMESPACE=$KUBENAMESPACE" > ${WORKSPACE}/test.properties
-echo "cbServerVersionsToRun=$cbServerVersionsToRun" >> ${WORKSPACE}/test.properties
-echo "cbOperatorVersion=$cbOperatorVersion" >> ${WORKSPACE}/test.properties
-echo "cbOperatorBranch=$cbOperatorBranch" >> ${WORKSPACE}/test.properties
-echo "dockerHub=$dockerHub" >> ${WORKSPACE}/test.properties
-echo "targetCluster=$targetCluster" >> ${WORKSPACE}/test.properties
-echo "testRunnerBranch=$testRunnerBranch" >> ${WORKSPACE}/test.properties
-echo "cloudClusterMasterNodeIp=$cloudClusterMasterNodeIp" >> ${WORKSPACE}/test.properties
-echo "cloudClusterNodeIpList=$cloudClusterNodeIpList" >> ${WORKSPACE}/test.properties
-showFileContent "${WORKSPACE}/test.properties"
 
 deploymentFile="./testrunner/deployment.yaml"
 secretFile="./testrunner/secret.yaml"
@@ -49,7 +37,7 @@ cbClusterFile="./sdk/sanity/cb-cluster-4node.yaml"
 testRunnerYamlFileName="./sdk/sanity/sdk-sanity.yaml"
 clusterName=$(grep "name:" $cbClusterFile | head -1 | xargs | cut -d' ' -f 2)
 
-cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$cbOperatorVersion"
+cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$operatorVersion"
 cbServerDockerImageName="couchbase/server:5.5.0-test"
 testRunnerDockerImageName="sdk-s435.sc.couchbase.com/sdkd-java-client:test"
 
