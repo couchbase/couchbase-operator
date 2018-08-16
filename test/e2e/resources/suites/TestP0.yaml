@@ -127,7 +127,6 @@ tcGroups:
 
   - name: FailoverTests
     clusters:
-      - BasicCluster
       - NewCluster1
     testcases:
       - name: TestServerGroupAutoFailover

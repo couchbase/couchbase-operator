@@ -143,6 +143,9 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
+
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+
 }
 
 // Create 8 node couchbase server with default services over 3 server groups
@@ -269,7 +272,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 9
@@ -330,23 +333,13 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
-	event := e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatalf("Rebalance not started after failover: %v", err)
-	}
-
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatalf("Rebalance failed after failover: %v", err)
-	}
-
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	for _, podMemberToKill := range podMembersToKill {
 		expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberToKill)
 	}
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries60); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -360,7 +353,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 6
@@ -424,6 +417,8 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	}
 
 	deleteBucketDirErrChan := make(chan error)
+
+	// this function doesnt work
 	deleteBucketDirGoRoutine := func() {
 		podCmdStr := "rm -vf /opt/couchbase/var/lib/couchbase/data/" + bucketName + "/*"
 

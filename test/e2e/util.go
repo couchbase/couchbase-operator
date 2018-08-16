@@ -163,8 +163,6 @@ var (
 		"TestPersistentVolumeRzaFailover":            TestPersistentVolumeRzaFailover,
 		"TestPersistentVolumeWithSingleNodeService":  TestPersistentVolumeWithSingleNodeService,
 		"TestPersistentVolumeResizeCluster":          TestPersistentVolumeResizeCluster,
-		"TestNegPersistentVolumeCreateCluster":       TestNegPersistentVolumeCreateCluster,
-
 		// Supportability cases
 		"TestLogCollectValidateArguments":            TestLogCollectValidateArguments,
 		"TestNegLogCollectValidateArgs":              TestNegLogCollectValidateArgs,

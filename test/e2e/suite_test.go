@@ -133,9 +133,9 @@ func runSuite(t *testing.T) {
 			if testFunc != nil {
 				testPassed := t.Run(testName, testFunc)
 				if testPassed {
-					fmt.Printf("Pass")
+					fmt.Printf("Pass \n")
 				} else {
-					fmt.Printf("Fail")
+					fmt.Printf("Fail \n")
 				}
 
 				// Detect couchbase-operator crash / restart event
@@ -146,9 +146,9 @@ func runSuite(t *testing.T) {
 						t.Logf("Operator pod restart count is %d", operatorRestartCount)
 					}
 				}
-
+				collectLogs := false
 				// Collect logs if test fails
-				if !testPassed {
+				if !testPassed && collectLogs {
 					logDir := f.LogDir + "/" + testName
 					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
 				}

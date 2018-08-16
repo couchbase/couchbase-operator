@@ -439,7 +439,7 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 			// Watch() returns every event since the dawn of time, so ensure we
 			// only return things after we started the wait.  This avoids matching
 			// events that may have already occurred
-			if crdEvent.FirstTimestamp.Before(&now) {
+			if crdEvent.LastTimestamp.Before(&now) {
 				continue
 			}
 			if EqualEvent(event, crdEvent) {
