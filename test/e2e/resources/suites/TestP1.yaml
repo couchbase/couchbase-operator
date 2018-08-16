@@ -130,9 +130,6 @@ tcGroups:
         - name: TestPersistentVolumeKillAllPods
           decorators:
             - portworxProvisioner
-        - name: TestPersistestVolumeRemoveVolume
-          decorators:
-            - portworxProvisioner
         - name: TestPersistentVolumeKillPodAndOperator
           decorators:
             - portworxProvisioner

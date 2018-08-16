@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
@@ -131,6 +132,11 @@ func runSuite(t *testing.T) {
 
 			if testFunc != nil {
 				testPassed := t.Run(testName, testFunc)
+				if testPassed {
+					fmt.Printf("Pass")
+				} else {
+					fmt.Printf("Fail")
+				}
 
 				// Detect couchbase-operator crash / restart event
 				for _, targetKube := range f.ClusterSpec {

@@ -52,11 +52,11 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 		for _, targetKubeName := range args.KubeNames {
 			targetKube := f.ClusterSpec[targetKubeName]
 
-			if err := framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
+			if err := framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
+			if err := framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
 				t.Fatal(err)
 			}
 
@@ -65,8 +65,17 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 				defer framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
 			}
 
-			if err := framework.CreateEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
-				t.Fatal(err)
+			for retryCount := 0; retryCount < 3; retryCount++ {
+				if err := framework.CreateEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
+					t.Logf("error creating portworx: %v \n", err)
+					if retryCount == 2 {
+						t.Fatal(err)
+					}
+					framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
+					continue
+				}
+				break
+
 			}
 
 			t.Log("creating portworx cluster")
@@ -97,7 +106,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	bucketName := "PVBucket"
@@ -185,7 +194,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	autofailoverTimeout := 30
@@ -282,7 +291,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSizeWithOutPvc, _ := strconv.Atoi(serviceConfig1["size"])
@@ -449,7 +458,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 5
@@ -543,7 +552,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 4
@@ -676,7 +685,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 5
@@ -1131,7 +1140,7 @@ func TestNegPersistentVolumeCreateCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	bucketName := "PVBucket"
@@ -1202,7 +1211,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 5
@@ -1275,7 +1284,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
+	targetKubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 3

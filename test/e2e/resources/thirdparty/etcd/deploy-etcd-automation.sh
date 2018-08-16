@@ -1,5 +1,11 @@
 #!/bin/sh
 set -e
+function exitOnError() {
+    if [ $1 -ne 0 ] ; then
+        echo "Exiting: $2"
+        exit $1
+    fi
+}
 kubeConfig=$1
 
 etcdpath=$(pwd)/resources/thirdparty/etcd
