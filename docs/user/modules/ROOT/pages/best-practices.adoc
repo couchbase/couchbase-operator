@@ -90,15 +90,17 @@ metadata:
   name: couchbase-sysctls
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      name: couchbase-sysctls
   template:
-    # Apply only to Couchbase nodes
-    selector:
-      labels:
-        name: couchbase-cluster
     metadata:
       labels:
-        app: couchbase-sysctls
+        name: couchbase-sysctls
     spec:
+      # Apply to nodes marked as belonging to a couchbase cluster only
+      nodeSelector:
+        app: couchbase-cluster
       containers:
       - name: couchbase-sysctls
         image: busybox:latest
