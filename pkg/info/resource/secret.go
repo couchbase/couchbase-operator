@@ -46,6 +46,8 @@ func (r *secretResource) Fetch() error {
 		for key, _ := range secret.StringData {
 			r.secrets.Items[index].StringData[key] = ""
 		}
+		// Plug a gaping hole that 'kubectl apply' creates for us
+		delete(r.secrets.Items[index].Annotations, "kubectl.kubernetes.io/last-applied-configuration")
 	}
 	return nil
 }
