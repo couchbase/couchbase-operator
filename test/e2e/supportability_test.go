@@ -55,7 +55,7 @@ func checkCollectInfoLogs(execOut []byte, kubeClient kubernetes.Interface, names
 }
 
 // Function to get kube-system specific log file names
-func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versioned.Interface, config *rest.Config, namespace, cbopinfoLogDir string, reqFileList *[]string) error {
+func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versioned.Interface, config *rest.Config, namespace, cbopinfoLogDir string, allFlag bool, reqFileList *[]string) error {
 	namespaceDir := cbopinfoLogDir + "/" + namespace
 
 	clusterroleDir := namespaceDir + "/clusterrole"
@@ -108,18 +108,28 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 	for _, deployment := range deployments.Items {
 		*reqFileList = append(*reqFileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".yaml")
 		if namespace != "kube-system" {
-			*reqFileList = append(*reqFileList, deploymentDir+"/"+deployment.Name+"/events.yaml")
 			*reqFileList = append(*reqFileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".log")
 		}
 	}
 
-	// endpoints dir content
-	endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
-	if err != nil {
-		return errors.New("Failed to list endpoints: " + err.Error())
-	}
-	for _, endpoint := range endpoints.Items {
-		*reqFileList = append(*reqFileList, endpointsDir+"/"+endpoint.Name+"/"+endpoint.Name+".yaml")
+	if allFlag {
+		// endpoints dir content
+		endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
+		if err != nil {
+			return errors.New("Failed to list endpoints: " + err.Error())
+		}
+		for _, endpoint := range endpoints.Items {
+			*reqFileList = append(*reqFileList, endpointsDir+"/"+endpoint.Name+"/"+endpoint.Name+".yaml")
+		}
+
+		// service dir contents
+		services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
+		if err != nil {
+			return errors.New("Failed to list services: " + err.Error())
+		}
+		for _, service := range services.Items {
+			*reqFileList = append(*reqFileList, serviceDir+"/"+service.Name+"/"+service.Name+".yaml")
+		}
 	}
 
 	// pod dir contents
@@ -132,9 +142,6 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 			continue
 		}
 		*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
-		if namespace != "kube-system" {
-			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/events.yaml")
-		}
 	}
 
 	// secret dir contents
@@ -144,15 +151,6 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 	}
 	for _, secret := range secrets.Items {
 		*reqFileList = append(*reqFileList, secretDir+"/"+secret.Name+"/"+secret.Name+".yaml")
-	}
-
-	// service dir contents
-	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
-	if err != nil {
-		return errors.New("Failed to list services: " + err.Error())
-	}
-	for _, service := range services.Items {
-		*reqFileList = append(*reqFileList, serviceDir+"/"+service.Name+"/"+service.Name+".yaml")
 	}
 
 	// persistentvolumes dir contents
@@ -176,7 +174,7 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 }
 
 // Function to get couchbase cluster specific log file names
-func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, cbopinfoLogDir string, cbClusterName string, reqFileList *[]string) error {
+func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, cbopinfoLogDir, cbClusterName string, reqFileList *[]string) error {
 	namespaceDir := cbopinfoLogDir + "/" + namespace
 
 	cbClusterDir := namespaceDir + "/couchbasecluster"
@@ -602,7 +600,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 
 	reqFileList := []string{}
 	errMsgList := failureList{}
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, false, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
@@ -687,7 +685,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, &reqFileList); err != nil {
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, true, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -717,7 +715,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, &reqFileList); err != nil {
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, true, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -749,7 +747,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, &reqFileList); err != nil {
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, true, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -782,7 +780,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	reqFileList = []string{}
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
@@ -872,7 +870,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		// Verify file list
 		errMsgList := failureList{}
 		reqFileList := []string{}
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, &reqFileList); err != nil {
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
@@ -943,7 +941,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	// Verify file list
 	errMsgList := failureList{}
 	reqFileList := []string{}
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
