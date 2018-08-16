@@ -15,7 +15,7 @@ metadata:
   namespace: default
 spec:
   baseImage: couchbase/server
-  version: enterprise-5.5.0
+  version: enterprise-5.5.1
   paused: false
   antiAffinity: true
   tls:
@@ -160,7 +160,7 @@ This section describes the top-level parameters related to a Couchbase cluster d
 ----
 spec:
   baseImage: couchbase/server
-  version: enterprise-5.5.0
+  version: enterprise-5.5.1
   paused: false
   antiAffinity: true
   tls:

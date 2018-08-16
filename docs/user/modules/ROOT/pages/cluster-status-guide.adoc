@@ -60,7 +60,7 @@ Status:
       Status:			True
     ...
   Control Paused:		false
-  Current Version:		enterprise-5.5.0
+  Current Version:		enterprise-5.5.1
   Members:
     Ready:
       cb-example-0000
