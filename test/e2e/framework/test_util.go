@@ -112,9 +112,11 @@ type ClusterConfig struct {
 type SuiteData struct {
 	SuiteName     string `yaml:"suite"`
 	TestCaseGroup []struct {
-		GroupName   string   `yaml:"name"`
-		ClusterName []string `yaml:"clusters"`
-		TestCase    []struct {
+		GroupName     string   `yaml:"name"`
+		GroupSetup    []string `yaml:"groupSetup"`
+		GroupTeardown []string `yaml:"groupTearDown"`
+		ClusterName   []string `yaml:"clusters"`
+		TestCase      []struct {
 			TcName     string   `yaml:"name"`
 			Decorators []string `yaml:"decorators"`
 		} `yaml:"testcases"`

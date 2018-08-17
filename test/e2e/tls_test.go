@@ -840,7 +840,7 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	}
 
 	// Setting Certificate validaity after 3mins from current time
-	decoratorObj.certValidFrom = decoratorObj.certValidFrom.Add(time.Second * 60)
+	decoratorObj.certValidFrom = decoratorObj.certValidFrom.Add(time.Second * 30)
 	decoratorObj.certValidTo = decoratorObj.certValidFrom.AddDate(10, 0, 0)
 	decoratorObj.test = TestToRun
 	execFunc := CreateWrapperFunc(kubeName, decoratorObj, e2eutil.KeyTypeRSA)

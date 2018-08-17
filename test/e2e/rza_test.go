@@ -60,23 +60,6 @@ func K8SNodesAddLabel(nodeLabelName string, kubeClient kubernetes.Interface, k8s
 	return nil
 }
 
-// Remove specified label from all k8s nodes identified by kubeName
-func K8SNodesRemoveLabel(nodeLabelName string, kubeClient kubernetes.Interface) error {
-	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to get k8s nodes " + err.Error())
-	}
-	for _, k8sNode := range k8sNodeList.Items {
-		nodeLabels := k8sNode.GetLabels()
-		delete(nodeLabels, nodeLabelName)
-		k8sNode.SetLabels(nodeLabels)
-		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-			return errors.New("Failed to delete label for node " + k8sNode.Name + ": " + err.Error())
-		}
-	}
-	return nil
-}
-
 // Updates ServerGroup labels for the nodes with matches the oldLabelVal
 // and replaces with the newLabelVal
 func UpdateServerGroupLabel(nodeLabelName, oldLabelVal, newLabelVal string, kubeClient kubernetes.Interface) error {

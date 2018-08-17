@@ -107,6 +107,16 @@ func runSuite(t *testing.T) {
 			}
 		}
 
+		// Do setup procedure for this group
+		for _, setupFunc := range testGroup.GroupSetup {
+			if _, ok := TestGroupSetupFuncMap[setupFunc]; !ok {
+				logrus.Errorf("Function %s not found", setupFunc)
+				continue
+			}
+			logrus.Infof("Running setup %s for %s", setupFunc, testGroup.GroupName)
+			//TestGroupSetupFuncMap[setupFunc](t, kubeClustersToSetup)
+		}
+
 		for _, currTestCase := range testGroup.TestCase {
 			testName := currTestCase.TcName
 
@@ -132,11 +142,7 @@ func runSuite(t *testing.T) {
 
 			if testFunc != nil {
 				testPassed := t.Run(testName, testFunc)
-				if testPassed {
-					fmt.Printf("Pass \n")
-				} else {
-					fmt.Printf("Fail \n")
-				}
+				fmt.Printf("  TestPassed: %v\n", testPassed)
 
 				// Detect couchbase-operator crash / restart event
 				for _, targetKube := range f.ClusterSpec {
@@ -146,8 +152,9 @@ func runSuite(t *testing.T) {
 						t.Logf("Operator pod restart count is %d", operatorRestartCount)
 					}
 				}
-				collectLogs := false
+
 				// Collect logs if test fails
+				collectLogs := false
 				if !testPassed && collectLogs {
 					logDir := f.LogDir + "/" + testName
 					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
@@ -161,6 +168,16 @@ func runSuite(t *testing.T) {
 				}
 				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testPassed})
 			}
+		}
+
+		// Do clean procedure for this group
+		for _, teardownFunc := range testGroup.GroupTeardown {
+			if _, ok := TestGroupSetupFuncMap[teardownFunc]; !ok {
+				logrus.Errorf("Function %s not found", teardownFunc)
+				continue
+			}
+			logrus.Infof("Running teardown %s for %s", teardownFunc, testGroup.GroupName)
+			//TestGroupSetupFuncMap[teardownFunc](t, kubeClustersToSetup)
 		}
 	}
 }

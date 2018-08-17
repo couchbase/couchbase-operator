@@ -81,7 +81,7 @@ func FlushBucket(hostUrl, bucketName, hostUsername, hostPassword string) ([]byte
 	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
 }
 
-func PopulateBucket(hostUrl, bucketName, hostUsername, hostPassword string, numOfItems, docStartIndex int) ([]byte, error) {
+func PopulateBucket(hostUrl, bucketName, hostUsername, hostPassword string, numOfItems, docStartIndex int) (responseBody []byte, err error) {
 	//curl 'http://172.23.121.211:8091/pools/default/buckets/sample/docs/1' --data 'flags=24&value={"city":"chennai"}'  -u Administrator:password
 	hostUrl = "http://" + hostUrl + "/pools/default/buckets/" + bucketName + "/docs/"
 	numOfItems += docStartIndex - 1
@@ -92,11 +92,13 @@ func PopulateBucket(hostUrl, bucketName, hostUsername, hostPassword string, numO
 		reqParamList := []string{flagStr, docData}
 		reqParams := strings.NewReader(strings.Join(reqParamList, "&"))
 
-		if responseBody, err := GenerateHttpRequest("POST", currReqUrl, hostUsername, hostPassword, reqParams); err != nil {
-			return responseBody, err
+		for retryCount := 0; retryCount < 3; retryCount++ {
+			if responseBody, err = GenerateHttpRequest("POST", currReqUrl, hostUsername, hostPassword, reqParams); err == nil {
+				break
+			}
 		}
 	}
-	return nil, nil
+	return
 }
 
 func VerifyDocCountInBucket(url, bucketName, userName, password string, reqNumOfDocs, maxRetries int) error {

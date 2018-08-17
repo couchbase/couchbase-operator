@@ -963,7 +963,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	}
 
 	// Collect logs
-	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", cbCluster.Name}
+	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all", cbCluster.Name}
 	execOut, err := runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)

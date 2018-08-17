@@ -1,13 +1,18 @@
 package e2e
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
+
+type GroupSetupFunction map[string]func(*testing.T, []framework.ClusterInfo) error
 
 // Variable to store random suffix for couchbase-server name & tls certificates
 var RandomNameSuffix string
@@ -170,11 +175,19 @@ var (
 		"TestLogCollectRbacPermission":               TestLogCollectRbacPermission,
 		"TestLogCollectClusterWithPVC":               TestLogCollectClusterWithPVC,
 	}
+
 	DecoratorFuncMap = framework.DecoratorMap{
 		"rsaDecorator":        rsaDecorator,
 		"rzaNodeLabeller":     rzaNodeLabeller,
 		"recoverDecorator":    framework.RecoverDecorator,
 		"portworxProvisioner": portworxProvisioner,
+	}
+
+	TestGroupSetupFuncMap = GroupSetupFunction{
+		"AddServerGroupLabelToNodes":      AddServerGroupLabelToNodes,
+		"RemoveServerGroupLabelFromNodes": RemoveServerGroupLabelFromNodes,
+		"CreatePortworxVolumes":           CreatePortworxVolumes,
+		"RemovePortworxVolumes":           RemovePortworxVolumes,
 	}
 )
 
@@ -186,4 +199,106 @@ func ValidateClusterEvents(t *testing.T, kubeClient kubernetes.Interface, cluste
 	if !expectedEvents.Compare(events) {
 		t.Error(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
+}
+
+// Remove specified label from all k8s nodes identified by kubeName
+func K8SNodesRemoveLabel(nodeLabelName string, kubeClient kubernetes.Interface) error {
+	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return errors.New("Failed to get k8s nodes " + err.Error())
+	}
+	for _, k8sNode := range k8sNodeList.Items {
+		nodeLabels := k8sNode.GetLabels()
+		delete(nodeLabels, nodeLabelName)
+		k8sNode.SetLabels(nodeLabels)
+		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
+			return errors.New("Failed to delete label for node " + k8sNode.Name + ": " + err.Error())
+		}
+	}
+	return nil
+}
+
+// Function to Label the K8S nodes with server group
+func AddServerGroupLabelToNodes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
+	f := framework.Global
+
+	for _, clusterInfo := range clusterInfoList {
+		kubeName := clusterInfo.ClusterName
+		targetKube := f.ClusterSpec[kubeName]
+
+		k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{kubeName})
+		if err != nil {
+			return errors.New("Failed to read cluster yaml data: " + err.Error())
+		}
+
+		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
+			t.Logf("Update node label count: %d", retryCount)
+			// Label K8S nodes based on the labels present in the cluster conf yaml file
+			if err = K8SNodesAddLabel(constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0]); err == nil {
+				break
+			}
+		}
+	}
+	return err
+}
+
+// Function to remove the server group specific labels from K8S nodes
+func RemoveServerGroupLabelFromNodes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
+	f := framework.Global
+	for _, clusterInfo := range clusterInfoList {
+		kubeName := clusterInfo.ClusterName
+		targetKube := f.ClusterSpec[kubeName]
+		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
+			t.Logf("Update node label count: %d", retryCount)
+			if err = K8SNodesRemoveLabel(constants.ServerGroupLabel, targetKube.KubeClient); err == nil {
+				break
+			}
+		}
+	}
+	return err
+}
+
+// Create Portworx volumes mount to be used for PVC testing
+func CreatePortworxVolumes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
+	f := framework.Global
+	for _, clusterInfo := range clusterInfoList {
+		kubeName := clusterInfo.ClusterName
+		targetKube := f.ClusterSpec[kubeName]
+
+		if err = framework.DeleteEtcd(t, targetKube.KubeClient, kubeName); err != nil {
+			t.Fatal(err)
+		}
+
+		if err = framework.DeletePortworx(t, targetKube.KubeClient, kubeName); err != nil {
+			t.Fatal(err)
+		}
+
+		if err = framework.CreateEtcd(t, targetKube.KubeClient, kubeName); err != nil {
+			t.Fatal(err)
+		}
+
+		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
+			if err = framework.CreatePortworx(t, targetKube.KubeClient, kubeName); err == nil {
+				break
+			}
+			t.Logf("Error creating portworx: %v \n", err)
+			framework.DeletePortworx(t, targetKube.KubeClient, kubeName)
+		}
+	}
+	return err
+}
+
+// Removes Portworx volumes created for PVC testing
+func RemovePortworxVolumes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
+	f := framework.Global
+	if !f.SkipTeardown {
+		return err
+	}
+	for _, clusterInfo := range clusterInfoList {
+		kubeName := clusterInfo.ClusterName
+		targetKube := f.ClusterSpec[kubeName]
+		defer framework.DeletePortworx(t, targetKube.KubeClient, kubeName)
+		defer framework.DeleteEtcd(t, targetKube.KubeClient, kubeName)
+	}
+	return err
 }

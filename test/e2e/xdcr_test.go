@@ -263,7 +263,7 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	// Sleep to resume xdcr replication after cluster resize
 	time.Sleep(5 * time.Minute)
 
-	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries20); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, e2eutil.Retries60); err != nil {
 		t.Fatal(err)
 	}
 	ValidateClusterEvents(t, xdcr1Kube.KubeClient, xdcrCluster1.Name, f.Namespace, expectedXdcrCluster1Events)
