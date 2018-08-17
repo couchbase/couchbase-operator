@@ -8,18 +8,18 @@ types:
         worker:
           - ip: 172.23.96.42
           - ip: 172.23.96.50
-          - ip: 172.23.96.86
+          - ip: 172.23.96.93
 
       - name: NewCluster1
         master:
-          - ip: 172.23.96.93
+          - ip: 172.23.96.74
             label: RzaGroup-2
         worker:
           - ip: 172.23.96.70
             label: RzaGroup-1
           - ip: 172.23.96.71
             label: RzaGroup-2
-          - ip: 172.23.96.74
+          - ip: 172.23.96.86
             label: RzaGroup-3
 
       - name: AuxillaryCluster1

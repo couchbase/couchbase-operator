@@ -67,11 +67,12 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 
 			for retryCount := 0; retryCount < 3; retryCount++ {
 				if err := framework.CreateEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
-					t.Logf("error creating portworx: %v \n", err)
+					t.Logf("error creating etcd: %v \n", err)
 					if retryCount == 2 {
 						t.Fatal(err)
 					}
 					framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
+					time.Sleep(time.Second * 3)
 					continue
 				}
 				break
@@ -89,6 +90,7 @@ func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorAr
 						t.Fatal(err)
 					}
 					framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
+					time.Sleep(time.Second * 3)
 					continue
 				}
 				break
@@ -277,7 +279,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	}
 
 	event := e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, totalTimeToRecover+30); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, totalTimeToRecover+60); err != nil {
 		t.Fatal(err)
 	}
 
@@ -389,8 +391,8 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
 		t.Fatal(err)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	//expectedEvents.AddRebalanceStartedEvent(testCouchbase)
+	//expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// Should be same after recovering the pod with PVC intact
 	for memberName, pvcCount := range expectedPvcMap {
@@ -1264,9 +1266,16 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	resizeClusterSizes := []int{2, 5, 1, 3}
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
-		if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+
+		if err := e2eutil.ResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
 			t.Fatal(err)
 		}
+		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
+		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, 60, testCouchbase)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("Resize Success: %v...\n", names)
 
 		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
 			t.Fatal(err.Error())
