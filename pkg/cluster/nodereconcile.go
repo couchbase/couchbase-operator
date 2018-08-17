@@ -219,7 +219,9 @@ func handleUnknownMembers(r *ReconcileMachine, c *Cluster) error {
 // before doing any cluster operations.
 func handleWarmupNodes(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.WarmupNodes.Size() > 0 && r.couchbase.DownNodes.Empty() {
-		return fmt.Errorf("Skipping reconcile loop while some nodes are warming up")
+		c.logger.Info("Skipping reconcile loop because some nodes are warming up")
+		r.transitionState(ReconcileFinished)
+		return nil
 	}
 	r.transitionState(ReconcileRebalanceCheck)
 	return nil
@@ -260,7 +262,9 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 							c.logger.Errorf("Node %s could not be recovered: %s", m.ClientURL(), err.Error())
 						} else {
 							c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-							return fmt.Errorf("Recovering node %s", m.ClientURL())
+							c.logger.Infof("Recovering node %s", m.ClientURL())
+							r.transitionState(ReconcileFinished)
+							return nil
 						}
 					} else {
 						c.logger.Errorf("Waiting for auto-failover of down node `%s`.  Automated recovery will begin after (%s) if auto-failover cannot be performed", m.Name, remainingTs)
