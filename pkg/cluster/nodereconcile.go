@@ -248,7 +248,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
 			if _, ok := r.runningPods[m.Name]; ok {
 				// node is not actually down, may have just been restarted
-				c.logger.Warnf("Down node `%s` is not being recovered since it's Pod is still running.  Manual failover is recommended.")
+				c.logger.Warnf("Down node `%s` is not being recovered since it's Pod is still running.  Manual failover is recommended.", m.Name)
 				continue
 			}
 			if c.status.Members.Unready.Contains(m.Name) {
