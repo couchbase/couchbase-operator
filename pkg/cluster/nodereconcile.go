@@ -578,16 +578,25 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 // cluster using delta recovery by changing to full recovery type
 func handleFailedAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 
-	for _, m := range r.couchbase.AddBackNodes {
-		isDelta, _ := c.client.IsRecoveryTypeDelta(m)
+	addNodes := r.couchbase.AddBackNodes.Copy()
+	addNodes.Append(r.couchbase.PendingAddNodes)
+	for _, m := range addNodes {
+		isDelta, err := c.client.IsRecoveryTypeDelta(m)
+		if err != nil {
+			c.logger.Errorf("Failed to add back node `%s` because recovery type could not be determined: %v", m.Name, err)
+			r.transitionState(ReconcileFinished)
+			return nil
+		}
 		if isDelta {
 			c.logger.Warnf("Changing recovery type from `delta` to `full` to recover node `%s`", m.Name)
 			err := c.client.SetRecoveryTypeFull(r.couchbase.ActiveNodes, m.HostURLPlaintext())
 			if err != nil {
-				c.logger.Warnf("Removing add back node %s because recovery type could not be determined: %v", m.Name, err)
+				c.logger.Warnf("Unable to set failed add back node `%s` recovery type to `full`: %v", m.Name, err)
 				c.raiseEvent(k8sutil.FailedAddBackNodeEvent(m.Name, c.cluster))
 				return err
 			}
+		} else {
+			c.logger.Warnf("Failed add back node `%s` recovery mode is already set to `full`", m.Name)
 		}
 	}
 
