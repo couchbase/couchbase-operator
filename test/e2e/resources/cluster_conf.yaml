@@ -24,9 +24,9 @@ types:
 
       - name: AuxillaryCluster1
         master:
-          - ip: 172.23.96.142
-        worker:
           - ip: 172.23.104.11
+        worker:
+          - ip: 172.23.96.142
           - ip: 172.23.96.245
           - ip: 172.23.96.98
           - ip: 172.23.96.116

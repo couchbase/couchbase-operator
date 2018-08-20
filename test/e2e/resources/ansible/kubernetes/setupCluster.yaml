@@ -38,8 +38,11 @@
         kubeAdmToken: "{{ shellOutput.stdout }}"
         masterNodeIp: "{{ inventory_hostname }}"
 
+    - name: Resetting kubeadm
+      shell: "'yes' | kubeadm reset"
+
     - name: Initializing master node
-      shell: "kubeadm init --token {{ kubeAdmToken }} --pod-network-cidr=192.168.0.0/16 --kubernetes-version={{ kubeVersion }}"
+      shell: "kubeadm init --token {{ kubeAdmToken }} --pod-network-cidr=10.0.0.0/8 --kubernetes-version={{ kubeVersion }} --ignore-preflight-errors cri"
 
     - name: Creating kube config dir
       file:
@@ -81,6 +84,9 @@
     - set_fact:
         kubeAdmToken: "{{ hostvars['myVars']['kubeAdmToken'] }}"
         masterNodeIp: "{{ hostvars['myVars']['masterNodeIp'] }}"
+
+    - name: Resetting kubeadm
+      shell: "'yes' | kubeadm reset"
 
     - name: Joining worker nodes
       shell: "kubeadm join --token {{ kubeAdmToken }} {{ masterNodeIp }}:6443 --discovery-token-unsafe-skip-ca-verification --ignore-preflight-errors cri"
