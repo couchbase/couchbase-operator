@@ -29,9 +29,9 @@
       shell: "'yes' | kubeadm reset"
       ignore_errors: no
 
-    - name: Deleteing docker images
-      shell: "'yes' | docker system prune -a"
-      ignore_errors: no
+    #- name: Deleteing docker images
+    #  shell: "'yes' | docker system prune -a"
+    #  ignore_errors: no
 
     - name: Adding Kubernetes repo
       yum_repository:

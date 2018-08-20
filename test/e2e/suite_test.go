@@ -154,7 +154,7 @@ func runSuite(t *testing.T) {
 				}
 
 				// Collect logs if test fails
-				collectLogs := false
+				collectLogs := true
 				if !testPassed && collectLogs {
 					logDir := f.LogDir + "/" + testName
 					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
