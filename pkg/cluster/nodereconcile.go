@@ -33,6 +33,8 @@ const (
 	ReconcileFinished
 )
 
+const downNodeThreshold int = 60
+
 // reconcileFunc represents a function used to reconcile the cluster state,
 // it must transition the state if necessary, or return an error
 type reconcileFunc func(*ReconcileMachine, *Cluster) error
@@ -247,9 +249,13 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		for _, m := range r.couchbase.DownNodes {
 			c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
 			if _, ok := r.runningPods[m.Name]; ok {
-				// node is not actually down, may have just been restarted
-				c.logger.Warnf("Down node `%s` is not being recovered since it's Pod is still running.  Manual failover is recommended.", m.Name)
-				continue
+				// If the pod was created in the last minute then it may be a down node
+				// that was restarted and is still coming back online. If this is the
+				// case then we may be able to delta recover it in the near future.
+				if k8sutil.GetPodUptime(c.config.KubeCli, m.Namespace, m.Name) < downNodeThreshold {
+					c.logger.Warnf("Down nodes `%s` pod was recently created, waiting to see if it rejoins the cluster, ", m.Name)
+					continue
+				}
 			}
 			if c.status.Members.Unready.Contains(m.Name) {
 				if c.isPodRecoverable(m) {

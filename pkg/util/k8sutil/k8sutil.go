@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
@@ -1204,4 +1205,12 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 
 func getStorageClass(kubeCli kubernetes.Interface, name string) (*storage.StorageClass, error) {
 	return kubeCli.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
+}
+
+func GetPodUptime(kubecli kubernetes.Interface, ns, name string) int {
+	pod, err := GetPod(kubecli, ns, name)
+	if err != nil {
+		return 0
+	}
+	return int(time.Now().Sub(pod.CreationTimestamp.Time).Seconds())
 }
