@@ -80,12 +80,12 @@ spec:
         resources:
           limits:
             cpu: 4
-            memory: 8GiB
-            storage: 100GiB
+            memory: 8Gi
+            storage: 100Gi
           requests:
             cpu: 2
-            memory: 8GiB
-            storage: 50GiB
+            memory: 8Gi
+            storage: 50Gi
         labels:
           couchbase_services: all
         nodeSelector:
@@ -327,7 +327,7 @@ spec:
     searchServiceMemoryQuota: 2048
     eventingServiceMemoryQuota: 256
     analyticsServiceMemoryQuota: 1024
-    indexStorageType: plasma
+    indexStorageSetting: plasma
     autoFailoverTimeout: 120
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
@@ -375,12 +375,12 @@ ____
 _Field rules:_ The `analyticsServiceMemoryQuota` field is required and must be set to be greater than or equal to 1024. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
 ____
 
-=== indexStorageType
+=== indexStorageSetting
 
 Specifies the backend storage type to use for the index service. If the cluster already contains a Couchbase Server instance running the index service, then this parameter cannot be changed until all Couchbase instances running the index service are removed.
 
 ____
-_Field rules:_ The `indexStorageType` is required and must be set to either `plasma` or `memory-optimized`. The value of this field can only be changed if there are no index nodes in the cluster.
+_Field rules:_ The `indexStorageSetting` is required and must be set to either `plasma` or `memory-optimized`. The value of this field can only be changed if there are no index nodes in the cluster.
 ____
 
 === autoFailoverTimeout
@@ -553,12 +553,12 @@ spec:
       resources:
         limits:
           cpu: 4
-          memory: 8GiB
-          storage: 100GiB
+          memory: 8Gi
+          storage: 100Gi
         requests:
           cpu: 2
-          memory: 8GiB
-          storage: 50GiB
+          memory: 8Gi
+          storage: 50Gi
       labels:
         couchbase_services: all
       nodeSelector:
@@ -615,12 +615,12 @@ spec:
       resources:
         limits:
           cpu: 4
-          memory: 8GiB
-          storage: 100GiB
+          memory: 8Gi
+          storage: 100Gi
         requests:
           cpu: 2
-          memory: 8GiB
-          storage: 50GiB
+          memory: 8Gi
+          storage: 50Gi
       labels:
         couchbase_services: all
       nodeSelector:
@@ -657,12 +657,12 @@ spec:
       resources:
         limits:
           cpu: 2
-          memory: 8GiB
-          storage: 100GiB
+          memory: 8Gi
+          storage: 100Gi
         requests:
           cpu: 1.5
-          memory: 8GiB
-          storage: 50GiB
+          memory: 8Gi
+          storage: 50Gi
 ----
 
 limits::
