@@ -56,7 +56,7 @@ If the pod networks are able to communicate with each other, and you are using a
 
 For all other situations, you will need to enable the XDCR exposed feature in the xref:couchbase-cluster-config.adoc[cluster specification]. TLS is currently not supported, since addressing is via IP address.
 
-=== Clusters in Different Clusters with Overlay Netowrking
+=== Clusters in Different Clusters with Overlay Networking
 
 You will need to enable XDCR under `exposedFeatures` in the xref:couchbase-cluster-config.adoc[cluster specification]. TLS is currently not supported since addressing is via IP address.
 
