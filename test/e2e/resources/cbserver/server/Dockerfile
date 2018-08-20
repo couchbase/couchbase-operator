@@ -2,7 +2,7 @@ FROM base.centos7
 
 RUN mkdir /var/run/sshd
 RUN echo 'root:couchbase' | chpasswd
-RUN sed -i 's/PermitRootLogin without-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed -i 's/PermitRootLogin .*\$/PermitRootLogin yes/' /etc/ssh/sshd_config
 
 # SSH login fix. Otherwise user is kicked off after login
 RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
@@ -38,12 +38,10 @@ RUN rpm --install $BUILD_PKG
 #clean the cache
 RUN yum clean all
 
-
 # custom startup scripts
 COPY scripts/couchbase-start /usr/local/bin/
 RUN mv /bin/systemctl /bin/systemctl.bin
 COPY scripts/systemctl /bin/systemctl
-
 
 LABEL Name=rhel7/couchbase-server
 LABEL Release=Latest
@@ -54,7 +52,6 @@ LABEL RUN="docker run -d --rm --privileged -p 8091:8091 --restart always --name 
             -v /opt/couchbase/var:/opt/couchbase/var \
             -v /opt/couchbase/var/lib/moxi:/opt/couchbase/var/lib/moxi \
             -v /opt/couchbase/var/lib/stats:/opt/couchbase/var/lib/stats "
-
 
 ENV PATH=$PATH:/opt/couchbase/bin:/opt/couchbase/bin/tools:/opt/couchbase/bin/install
 COPY start.sh /start.sh

@@ -6,9 +6,9 @@ MAINTAINER Couchbase Docker Team <docker@couchbase.com>
 RUN yum -y update; yum clean all
 
 # Install utils and dependencies
-RUN yum install -y tar \
-    && yum clean all && \
-      yum -y install openssl openssh-clients \
+RUN yum install -y tar && \
+    yum clean all && \
+    yum -y install openssl openssh-clients \
       lsof lshw net-tools numactl \
       sysstat wget screen psmisc \
       zip unzip glibc glibc-devel \

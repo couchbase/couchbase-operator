@@ -39,20 +39,24 @@ types:
     clusters:
       - name: BasicCluster
         master:
-          - ip: ec2-54-219-186-129.us-west-1.compute.amazonaws.com
+          - ip: 172.16.0.187
         worker:
-          - ip: ec2-13-56-163-123.us-west-1.compute.amazonaws.com
-          - ip: ec2-18-144-39-28.us-west-1.compute.amazonaws.com
-          - ip: ec2-13-56-212-142.us-west-1.compute.amazonaws.com
+          - ip: 172.16.0.134
+          - ip: 172.16.0.229
+          - ip: 172.16.0.239
 
       - name: NewCluster1
         master:
-          - ip: 10.0.1.87
+          - ip: 10.0.1.95
             label: RzaGroup-2
         worker:
-          - ip: 10.0.1.224
+          - ip: 10.0.1.141
             label: RzaGroup-1
-          - ip: 10.0.1.154
+          - ip: 10.0.1.151
             label: RzaGroup-2
-          - ip: 10.0.1.48
+          - ip: 10.0.1.40
             label: RzaGroup-3
+          - ip: 10.0.1.202
+          - ip: 10.0.1.40
+          - ip: 10.0.1.47
+          - ip: 10.0.1.70

@@ -97,7 +97,6 @@ echo "Using testrunner branch '$testrunnerBranch' with '$numNodes' node cluster"
 # Create test.properties file contents
 echo "cbServerVersionsToRun=$cbServerVersionsToRun" >> ${WORKSPACE}/test.properties
 echo "operatorVersion=$operatorVersion" >> ${WORKSPACE}/test.properties
-echo "cbOperatorBranch=$cbOperatorBranch" >> ${WORKSPACE}/test.properties
 echo "dockerAccount=$dockerAccount" >> ${WORKSPACE}/test.properties
 echo "targetCluster=$targetCluster" >> ${WORKSPACE}/test.properties
 echo "testrunnerBranch=$testrunnerBranch" >> ${WORKSPACE}/test.properties
@@ -117,9 +116,9 @@ cbServerDockerImageName="couchbase/server:${serverVersion}-test"
 testRunnerDockerImageName="${dockerAccount}/testrunner-cloud:${numNodes}node"
 
 # Build required images #
-sh ./build-cb-server.sh "$serverVersion" "$serverBuildNum" "$serverBranchName" "${cbServerDockerImageName}"
-exitOnError $? "Unable to build cb server docker file"
-sh ./build-testrunner.sh "${numNodes}node" "${testRunnerDockerImageName}"
+#sh ./build-cb-server.sh "$serverVersion" "$serverBuildNum" "$serverBranchName" "${cbServerDockerImageName}"
+#exitOnError $? "Unable to build cb server docker file"
+sh ./build-testrunner.sh "${numNodes}node" "${testRunnerDockerImageName} ${numNodes}"
 exitOnError $? "Unable to build testrunner ${numNodes}node docker file"
 
 #ship the docker images to the nodes

@@ -1,24 +1,14 @@
 FROM ashwin2002/testrunner-cloud:baseimage
-WORKDIR /
-RUN rm -rf testrunner libcouchbase
-# install python deps
-RUN pip2 install --upgrade packaging appdirs
-RUN pip install -U pip setuptools
-RUN pip install paramiko && pip install gevent && pip install boto && pip install httplib2 && pip install pyyaml && pip install couchbase
-# build libcouchbase
-RUN git clone git://github.com/couchbase/libcouchbase.git && mkdir libcouchbase/build
-WORKDIR libcouchbase/build
-RUN ../cmake/configure --prefix=/usr && make && make install
-WORKDIR /
-RUN git clone --recursive https://github.com/kubernetes-client/python.git
-WORKDIR /python
-RUN python setup.py install
-WORKDIR /
-RUN git clone git://github.com/couchbase/testrunner.git --branch master
-WORKDIR testrunner
-COPY ./platform-cert/6node.ini 6node.ini
+
+ARG testrunnerBranch=${testrunnerBranch:-master}
+ARG numNodes=${numNodes:-1}
+
+WORKDIR /testrunner
+RUN git checkout $testrunnerBranch
+
+COPY ./platform-cert/${numNodes}node.ini ${numNodes}node.ini
 COPY ./platform-cert/platform-cert.conf testcases.conf
 COPY getNodeIps.py getNodeIps.py
 COPY entrypoint.sh entrypoint.sh
 RUN chmod +x ./entrypoint.sh
-ENTRYPOINT ["./entrypoint.sh", "6"]
+ENTRYPOINT ["./entrypoint.sh", "$numNodes"]

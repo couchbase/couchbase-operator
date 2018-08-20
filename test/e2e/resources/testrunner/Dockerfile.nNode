@@ -6,8 +6,9 @@ ARG numNodes=${numNodes:-1}
 WORKDIR /testrunner
 RUN git checkout $testrunnerBranch
 
-COPY ./tpcc/${numNodes}node.ini ${numNodes}node.ini
+COPY ./${numNodes}node/${numNodes}node.ini ${numNodes}node.ini
+COPY ./${numNodes}node/${numNodes}node-sanity.conf testcases.conf
 COPY getNodeIps.py getNodeIps.py
-COPY tpcc-entrypoint.sh entrypoint.sh
+COPY entrypoint.sh entrypoint.sh
 RUN chmod +x ./entrypoint.sh
-ENTRYPOINT ["./entrypoint.sh", "$numNodes", "5.5.0-2958", "3600"]
+ENTRYPOINT ["./entrypoint.sh", "$numNodes"]

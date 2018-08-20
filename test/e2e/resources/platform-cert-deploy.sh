@@ -30,8 +30,8 @@ echo "Couchbase-operator version '$operatorVersion'"
 echo "Using testrunner branch '$testRunnerBranch' for testing '$numOfNodes' node cluster"
 echo "Using docker hub account '$dockerHub'"
 
-deploymentFile="./testrunner/deployment.yaml"
-secretFile="./testrunner/secret.yaml"
+deploymentFile="../../../example/deployment.yaml"
+secretFile="../../../example/secret.yaml"
 roleBindingFile="./testrunner/default-cluster-role-binding.yaml"
 cbClusterFile="./testrunner/platform-cert/cb-cluster-6node.yaml"
 testRunnerYamlFileName="./testrunner/platform-cert/platform-cert.yaml"
@@ -44,7 +44,7 @@ testRunnerDockerImageName="${dockerHub}/testrunner-cloud:platform-cert"
 # Build required images #
 sh ./build-cb-server.sh "5.5.0" "2958" "vulcan" "${cbServerDockerImageName}"
 exitOnError $? "Unable to build cb server docker file"
-sh ./build-testrunner.sh "platform-cert" "${testRunnerDockerImageName}"
+sh ./build-testrunner.sh "platform-cert" "${testRunnerDockerImageName} ${numNodes}"
 exitOnError $? "Unable to build testrunner platform-cert docker file"
 
 #ship the docker images to the nodes

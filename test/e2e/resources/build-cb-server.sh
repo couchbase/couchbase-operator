@@ -5,11 +5,7 @@ BUILD=${2:-2958}
 FLAVOR=${3:-vulcan}
 IMAGENAME=${4:-couchbase_${VERSION}-${BUILD}.centos7}
 
-cd ./cbserver/base/
-
-docker build -t base.centos7 .
-
-cd ../server/
+docker build -t base.centos7 ./cbserver/base
 
 if [ "$BUILD" = "ga" ]; then
 	docker build \
@@ -18,11 +14,11 @@ if [ "$BUILD" = "ga" ]; then
 	--build-arg FLAVOR=${FLAVOR} \
 	--build-arg BUILD_PKG=couchbase-server-enterprise-$VERSION-centos7.x86_64.rpm \
 	--build-arg BASE_URL=http://172.23.120.24/builds/releases/$VERSION/$BUILD_PKG \
-	-t couchbase_${VERSION}-${BUILD}.centos7 .
+	-t couchbase_${VERSION}-${BUILD}.centos7 ./cbserver/server
 else
 	docker build \
 	--build-arg VERSION=${VERSION} \
 	--build-arg BUILD_NO=${BUILD} \
 	--build-arg FLAVOR=${FLAVOR} \
-	-t ${IMAGENAME} .
+	-t ${IMAGENAME} ./cbserver/server
 fi

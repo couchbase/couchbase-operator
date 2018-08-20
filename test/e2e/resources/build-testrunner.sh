@@ -2,6 +2,8 @@
 
 imageType=$1
 testRunnerDockerImageName=$2
+numNodes=$3
+testrunnerBranch=master
 
 cd ./testrunner/
 
@@ -16,11 +18,11 @@ if [ "$testRunnerDockerImageName" == "" ]; then
 fi
 
 if [ "$imageType" == "1node" ]; then
-    cp ./Dockerfile.1node ./Dockerfile
+    cp ./Dockerfile.nNode ./Dockerfile
 fi
 
 if [ "$imageType" == "4node" ]; then
-    cp ./Dockerfile.4node ./Dockerfile
+    cp ./Dockerfile.nNode ./Dockerfile
 fi
 
 if [ "$imageType" == "platform-cert" ]; then
@@ -31,4 +33,5 @@ if [ "$imageType" == "tpcc" ]; then
     cp ./Dockerfile.tpcc ./Dockerfile
 fi
 
-docker build . -t $testRunnerDockerImageName
+dockerBuildArgs="--build-arg testrunnerBranch=$testrunnerBranch --build-arg numNodes=$numNodes"
+docker build . $dockerBuildArgs -t $testRunnerDockerImageName
