@@ -293,7 +293,7 @@ func (f *Framework) DeleteCRDs(config *rest.Config) error {
 func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	logrus.Info("Marking all nodes as schedulable")
 	nodeTaintList := []v1.Taint{}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < e2eutil.Retries5; i++ {
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil && i == 2 {
 			return errors.New("Failed to get node list: " + err.Error())
@@ -313,11 +313,11 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	kubeConfigPath := e2eutil.GetKubeConfigToUse(kubeName)
 
 	if err := f.RemoveK8SNodeTaints(targetKube.KubeClient); err != nil {
-		return nil
+		return err
 	}
 
 	if err := RemoveLabels(constants.ServerGroupLabel, targetKube.KubeClient); err != nil {
-		return nil
+		return err
 	}
 
 	logrus.Info("Deleting portworx")
