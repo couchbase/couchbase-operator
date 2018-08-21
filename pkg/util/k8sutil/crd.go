@@ -15,10 +15,6 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-
-	openapispec "github.com/go-openapi/spec"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/validate"
 )
 
 // CouchbaseClusterCRUpdateFunc is a function to be used when atomically
@@ -94,24 +90,18 @@ func MustNewKubeExtClient() apiextensionsclient.Interface {
 }
 
 func ValidateCRD(customResource *api.CouchbaseCluster) error {
-	crd := apiextensions.CustomResourceDefinition{}
-	err := scheme.Scheme.Convert(GetCRD(), &crd, nil)
+	validation := apiextensions.CustomResourceValidation{}
+	err := scheme.Scheme.Convert(getCustomResourceValidation(), &validation, nil)
+
+	validator, _, err := apiservervalidation.NewSchemaValidator(&validation)
 	if err != nil {
-		return fmt.Errorf("Error converting CRD: %v", err)
+		return fmt.Errorf("Error creating schema validator : %v", err)
 	}
 
-	openapiSchema := &openapispec.Schema{}
-	if err := apiservervalidation.ConvertToOpenAPITypes(&crd, openapiSchema); err != nil {
-		return fmt.Errorf("Error converting validation to Open API Type: %v", err)
-	}
+	result := validator.Validate(customResource)
 
-	if err := openapispec.ExpandSchema(openapiSchema, nil, nil); err != nil {
-		return fmt.Errorf("Error expanding schema: %v", err)
-	}
-
-	validator := validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
-	if err = apiservervalidation.ValidateCustomResource(customResource, validator); err != nil {
-		return err
+	if !result.IsValid() {
+		return result.AsError()
 	}
 
 	return nil
