@@ -135,7 +135,7 @@ type ClusterReadyRetries struct {
 var (
 	defaultRetries = &ClusterReadyRetries{
 		Size:    Retries120,
-		Bucket:  Retries30,
+		Bucket:  Retries60,
 		Service: Retries20,
 	}
 )
