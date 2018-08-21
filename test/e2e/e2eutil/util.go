@@ -138,6 +138,12 @@ var (
 		Bucket:  Retries60,
 		Service: Retries20,
 	}
+
+	systemTestRetries = &ClusterReadyRetries{
+		Size:    Retries120,
+		Bucket:  Retries120,
+		Service: Retries120,
+	}
 )
 
 // randomSuffix generates a 5 character random suffix to be appended to
@@ -291,6 +297,12 @@ func CreateClusterSpec(secretName string, config map[string]map[string]string) a
 func CreateClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(ClusterNamePrefix, adminConsoleExposed, spec)
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, defaultRetries)
+}
+
+// Creates Couchbase cluster object and returns it
+func CreateClusterFromSpecSystemTest(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+	crd := e2espec.CreateClusterCRD(ClusterNamePrefix, adminConsoleExposed, spec)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, systemTestRetries)
 }
 
 // Creates Couchbase cluster object and returns it

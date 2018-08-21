@@ -304,12 +304,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		clusterSpec2.SecurityContext = createPodSecurityContext(1000)
 	}
 
-	testCouchbase1, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec1)
+	testCouchbase1, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase2, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec2)
+	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec2)
 	if err != nil {
 		t.Fatal(err)
 	}
