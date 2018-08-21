@@ -113,7 +113,7 @@ tcGroups:
 
   - name: PersistentVolumeTests
     clusters:
-      - BasicCluster
+      - NewCluster1
     testcases:
       - name: TestPersistentVolumeCreateCluster
         decorators:
