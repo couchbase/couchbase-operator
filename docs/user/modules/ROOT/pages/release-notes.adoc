@@ -1,111 +1,65 @@
-= v0.8.1 [Beta 2] Update
-:doctype: book
+= Release Notes
 
-The v0.8.1 build of the Couchbase Operator resolves a GitVersion check issue that prevented the Operator from initializing after deployment. An error similar to the following could be seen in the Kubernetes log:
+Couchbase Autonomous Operator 1.0 is the first production-ready native integration of Couchbase Server with Kubernetes platforms.
 
-----
-Initialization failed: kubernetes version 1.0 is too old, 1.8 is minimum supported version " module=controller
-----
+The goal of the Operator is to fully manage one or more Couchbase Server deployments so that you don’t need to worry about the operational complexities of running Couchbase. The following is a list of the Couchbase features and management tasks that are currently supported:
 
-If you encountered this issue, please reinstall the Operator using the latest documentation, as the commands have been updated to reflect the latest version number.
+* Cluster configuration
 
-= v0.8.0 [Beta 2] Release Notes
+* Cluster provisioning
 
-The Couchbase Operator is a Kubernetes native integration that enables you to automate the management of common Couchbase tasks such as the configuration, creation, and scaling of Couchbase clusters.
-The Couchbase Operator 0.8.0 [Beta 2] was released in May 2018.
+* Ad-hoc scalability
 
-We consider beta releases to have some rough edges and bugs and hence are intended for development purposes only.
-Since the release is still under active development, you can have a big impact on the final version of the product and its documentation by providing feedback and observations. We encourage you to post your questions and feedback to the https://forums.couchbase.com/c/couchbase-server/Kubernetes[Couchbase Forums].
+* Auto-recovery
 
-== Limitations
+* Configuration validation
 
-The Beta 2 release has the following limitations:
+* XDCR
 
-* CRD validation is supported through cbopctl and partial CRD validation is supported though standard Kubernetes/OpenShift tools such as kubectl/oc. We recommend using cbopctl when submitting CouchbaseCluster configurations to Kubernetes/OpenShift.
-* The Couchbase Operator can only failover one node at a time in the cluster during auto-failover. This means that if multiple nodes fail, some manual intervention is needed.
-* The Couchbase Operator does not support the use of Persistent Volumes.
+* Server Groups
 
-== Known Issues
+* TLS
 
+* Persistent volume support
+
+Couchbase Autonomous Operator 1.0 was released in August 2018.
+
+== Platform Support
+
+For the latest platform support information, see xref:prerequisite-and-setup.adoc[Prerequisites and Setup].
+
+== Known Issues and Limitations
+
+[#table-known-issues-1.0.0,cols="1,3",options="header"]
 |===
-| Issue | Description
 
-| K8S-155
-| The Couchbase Operator logs show error messages while the cluster is being built. These are harmless and do not impact the cluster creation.
+|Issue
+|Description
 
-| K8S-119
-| If a cluster is scaled up beyond the available memory, rebalance fails and the cluster becomes unavailable.
+|xref:https://issues.couchbase.com/browse/K8S-493[K8S-493]
+|
 
-| K8S-112
-| A rebalance started event is posted after the actual rebalance operation is completed. And no event is posted to indicate that the operation has completed.
-
-| K8S-80
-| The Couchbase Web Console may redirect to a node even after it has been removed from the cluster.
-
-| K8S-195
-| The OpenShift bootstrap script has issues running in OpenShift clusters, but works in MiniShift. Note that we don't recommend using this bootstrap script in production clusters.
-
-| K8S-205
-| Sometimes an extra bucket event will show up in the events log if a node is manually failed over.
 |===
 
 == Fixed Issues
 
-|===
-| Issue | Description
-
-| K8S-172
-| The index storage mode cannot be changed.
-
-| K8S-169
-| There is no CRD validation, so the Couchbase configurations uploaded to Kubernetes are not validated. An incorrect configuration can cause all kinds of problems, including potentially crashing the Operator.
-
-| K8S-155
-| The Couchbase Operator logs show error messages while the cluster is being built. These are harmless and do not impact the cluster creation.
-
-| K8S-92
-| Changing the `cluster-name` field in the example/couchbase-cluster.yaml file causes the cluster get into an inconsistent state.
+[#table-fixed-issues-1.0.0,cols="1,3",options="header"]
 |===
 
-= v0.7 [Beta] Release Notes
+|Issue
+|Description
 
-The Couchbase Operator is a Kubernetes native integration that enables you to automate the management of common Couchbase tasks such as the configuration, creation, and scaling of Couchbase clusters.
-The Couchbase Operator 0.7 [Beta] was released in February 2018.
+|xref:https://issues.couchbase.com/browse/K8S-205[K8S-205]
+|
 
-We consider beta releases to have some rough edges and bugs and hence are intended for development purposes only.
-Since the release is still under active development, you can have a big impact on the final version of the product and its documentation by providing feedback and observations.
-
-== Limitations
-
-The Beta release has the following limitations:
-
-* There is no CRD validation at this time, so the Couchbase configurations uploaded to Kubernetes are not verified by the Couchbase Operator.
-* The Couchbase Operator can only failover one node at a time in the cluster during auto-failover. This means that if multiple nodes fail, some manual intervention is needed.
-* The Couchbase Operator does not support the use of Persistent Volumes.
-
-== Known Issues
-
+|xref:https://issues.couchbase.com/browse/K8S-195[K8S-195]
+|
 |===
-| Issue | Description
 
-| K8S-172
-| The index storage mode cannot be changed.
+== Feedback
 
-| K8S-169
-| There is no CRD validation, so the Couchbase configurations uploaded to Kubernetes are not validated. An incorrect configuration can cause all kinds of problems, including potentially crashing the Operator.
+You can have a big impact on future versions of the Operator (and its documentation) by providing Couchbase with your direct feedback and observations. Please feel free to post your questions and comments to the https://forums.couchbase.com/c/couchbase-server/Kubernetes[Couchbase Forums].
 
-| K8S-155
-| The Couchbase Operator logs show error messages while the cluster is being built. These are harmless and do not impact the cluster creation.
+== Licenses for Third-Party Components
 
-| K8S-119
-| If a cluster is scaled up beyond the available memory, rebalance fails and the cluster becomes unavailable.
-
-| K8S-112
-| A rebalance started event is posted after the actual rebalance operation is completed. And no event is posted to indicate that the operation has completed.
-
-| K8S-92
-| Changing the `cluster-name` field in the example/couchbase-cluster.yaml file causes the cluster get into an inconsistent state.
-
-| K8S-80
-| The Couchbase Web Console continues to display a node even after it has been removed from the cluster.
-|===
+The complete list of licenses for Couchbase products is available on the xref:https://www.couchbase.com/legal/agreements[Legal Agreements] page. Couchbase is thankful to all individuals that have created these third-party components.
