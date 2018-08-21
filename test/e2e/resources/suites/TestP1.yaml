@@ -127,41 +127,43 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-        - name: TestPersistentVolumeKillAllPods
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeKillPodAndOperator
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeKillAllPodsAndOperator
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeRzaNodesKilled
-          decorators:
-            - portworxProvisioner
-            - rzaNodeLabeller
-        - name: TestPersistentVolumeRzaFailover
-          decorators:
-            - portworxProvisioner
-            - rzaNodeLabeller
-        - name: TestPersistentVolumeWithSingleNodeService
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeResizeCluster
-          decorators:
-            - portworxProvisioner
-        - name: TestAnalyticsKillPodsWithPVC
-          decorators:
-            - portworxProvisioner
-        - name: TestLogCollectClusterWithPVC
-          decorators:
-            - portworxProvisioner
+      - name: TestPersistentVolumeKillAllPods
+        decorators:
+          - portworxProvisioner
+      - name: TestPersistentVolumeKillPodAndOperator
+        decorators:
+          - portworxProvisioner
+      - name: TestPersistentVolumeKillAllPodsAndOperator
+        decorators:
+          - portworxProvisioner
+      - name: TestPersistentVolumeRzaNodesKilled
+        decorators:
+          - portworxProvisioner
+          - rzaNodeLabeller
+      - name: TestPersistentVolumeRzaFailover
+        decorators:
+          - portworxProvisioner
+          - rzaNodeLabeller
+      - name: TestPersistentVolumeWithSingleNodeService
+        decorators:
+          - portworxProvisioner
+      - name: TestPersistentVolumeResizeCluster
+        decorators:
+          - portworxProvisioner
+      # MB-30830
+      #- name: TestAnalyticsKillPodsWithPVC
+      #  decorators:
+      #    - portworxProvisioner
+      - name: TestLogCollectClusterWithPVC
+        decorators:
+          - portworxProvisioner
 
   - name: AnalyticsTests
     clusters:
       - BasicCluster
     testcases:
-      - name: TestAnalyticsKillPods
+      # MB-30830
+      #- name: TestAnalyticsKillPods
 
   - name: EventingTests
     clusters:

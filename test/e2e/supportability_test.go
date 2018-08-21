@@ -130,18 +130,18 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 		for _, service := range services.Items {
 			*reqFileList = append(*reqFileList, serviceDir+"/"+service.Name+"/"+service.Name+".yaml")
 		}
-	}
 
-	// pod dir contents
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
-	if err != nil {
-		return errors.New("Failed to list pods: " + err.Error())
-	}
-	for _, pod := range pods.Items {
-		if strings.Contains(pod.Name, "couchbase-operator-") {
-			continue
+		// pod dir contents
+		pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
+		if err != nil {
+			return errors.New("Failed to list pods: " + err.Error())
 		}
-		*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
+		for _, pod := range pods.Items {
+			if strings.Contains(pod.Name, "couchbase-operator-") {
+				continue
+			}
+			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
+		}
 	}
 
 	// secret dir contents
@@ -897,6 +897,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	cmdArgs = []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
+	t.Log(execOutStr)
 	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":rbac-test\" cannot list couchbaseclusters.couchbase.com in the namespace \"" + f.Namespace + "\""
 	if err == nil {
 		logFileName := getLogFileNameFromExecOutput(execOutStr)

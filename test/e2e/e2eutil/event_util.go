@@ -133,6 +133,11 @@ func (e *EventList) AddNodeServiceCreateEvent(cl *api.CouchbaseCluster, serviceN
 	*e = append(*e, *k8sutil.NodeServiceCreateEvent(serviceName, cl))
 }
 
+func (e *EventList) AddMemberVolumeUnhealthyEvent(cl *api.CouchbaseCluster, memberId int, reason string) {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	*e = append(*e, *k8sutil.MemberVolumeUnhealthyEvent(name, reason, cl))
+}
+
 func (e EventList) String() string {
 	s := ""
 	for _, c := range e {
