@@ -1,19 +1,18 @@
 COUCHBASE AUTONOMOUS OPERATOR
 
 The Couchbase Autonomous Operator provides a native integration of Couchbase
-Server with open source Kubernetes or RedHat OpenShift. It enables you to
-automate the management of common Couchbase tasks such as the configuration,
-creation, scaling, and recovery of Couchbase clusters. By reducing the
-complexity of running a Couchbase cluster, it lets you focus on the desired
-configuration and not worry about the details of manual deployment and lifecycle
-management.
+Server with Kubernetes platforms. It enables you to automate the management of
+common Couchbase tasks such as the configuration, creation, scaling, and
+recovery of Couchbase clusters. By reducing the complexity of running a
+Couchbase cluster, it lets you focus on the desired configuration and not worry
+about the details of manual deployment and lifecycle management.
 
 
 INSTALLATION
 
 This package contains the command-line tools and configuration files that you
-will use to automatically download and deploy the Operator into a open source Kubernetes 
-or RedHat OpenShift environment.
+will use to automatically download and deploy the Operator into a Kubernetes
+environment.
 
 See the documentation for installation instructions:
 
@@ -49,7 +48,7 @@ http://developer.couchbase.com/documentation-archive
 
 THIRD-PARTY LICENSE INFORMATION
 
-You can find the Third Party License for all the third party products included
-with Couchbase Server at:
+You can find the licenses for all of the third-party components that are
+included in Couchbase products at:
 
 https://www.couchbase.com/legal/agreements
