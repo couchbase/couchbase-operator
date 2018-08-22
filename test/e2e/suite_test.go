@@ -62,6 +62,9 @@ func runSuite(t *testing.T) {
 	f := framework.Global
 	reqOpImage := f.Deployment.Spec.Template.Spec.Containers[0].Image
 	ymlFilePath := "./resources/ansible"
+
+	// Over riding pullImage to true since if new cluster is created, images should be pulled
+	f.PullDockerImage = true
 	var operatorRestartCount int32 = 0
 	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
 

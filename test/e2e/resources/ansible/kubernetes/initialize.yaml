@@ -18,16 +18,9 @@
     k8sConfFileContent: "net.bridge.bridge-nf-call-ip6tables = 1\nnet.bridge.bridge-nf-call-iptables = 1\n"
 
   tasks:
-
-    - name: Installing required packages
-      yum: state=present name={{ item }}
-      with_items:
-        - "yes"
-      ignore_errors: yes
-
     - name: Resetting kubeadm
       shell: "'yes' | kubeadm reset"
-      ignore_errors: no
+      ignore_errors: yes
 
     #- name: Deleteing docker images
     #  shell: "'yes' | docker system prune -a"
@@ -60,6 +53,11 @@
     - name: setenforce to 0
       shell: setenforce 0
       ignore_errors: yes
+
+    - name: Creating k8s config file
+      file:
+        path: "{{ k8sConfFile }}"
+        state: touch
 
     - name: Editing k8s config for ipv4 network bridge
       lineinfile: dest={{ k8sConfFile }} line={{ item }}
@@ -287,11 +285,6 @@
         - docker
         - kubectl-{{ kubeVersion }}.x86_64
         - kubeadm-{{ kubeVersion }}.x86_64
-
-    - name: Creating k8s config file
-      file:
-        path: "{{ k8sConfFile }}"
-        state: touch
 
     - name: Reloading systemctl deamon
       shell: systemctl daemon-reload
