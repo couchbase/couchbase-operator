@@ -18,7 +18,6 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -352,10 +351,6 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	if err := f.DeleteCRDs(targetKube.Config); err != nil {
-		return err
-	}
-
-	if err := RemoveLabels(pkg_constants.ServerGroupLabel, targetKube.KubeClient); err != nil {
 		return err
 	}
 

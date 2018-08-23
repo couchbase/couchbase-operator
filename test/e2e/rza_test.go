@@ -12,6 +12,7 @@ import (
 
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -170,8 +171,9 @@ func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) 
 		if os.Getenv(envParallelTest) == envParallelTestTrue {
 			t.Parallel()
 		}
+
 		f := framework.Global
-		targetKubeName := "NewCluster1"
+		targetKubeName := f.TestClusters[0]
 		targetKube := f.ClusterSpec[targetKubeName]
 
 		k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
@@ -211,21 +213,33 @@ func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) 
 	return wrapperFunc
 }
 
+// GetAvailabilityZones returns a sorted list of configured availability zones from the cluster.
+// These zones will be pre-provisioned by Kops etc. or added via a cluster decorator.
+func GetAvailabilityZones(t *testing.T, cluster *framework.Cluster) clustercapabilities.ZoneList {
+	capabilities := clustercapabilities.MustNewCapabilities(t, cluster.KubeClient)
+	if !capabilities.ZonesSet {
+		t.Skip("cluster availability zones unset")
+	}
+	sort.Strings(capabilities.AvailabilityZones)
+	return capabilities.AvailabilityZones
+}
+
 // Generic function to test AntiAffinity test case with values on / off
 func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
 
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
-
-	// Create cluster spec for RZA feature
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
-	clusterSize := len(availableServerGroupList)
+
+	// TODO: so while we do force removal taints at the moment, we cannot rely on
+	// this forever, perhaps the clustercapabilities can point out how many nodes
+	// are schedulable...
+	clusterSize, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
@@ -295,7 +309,6 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		t.Fatal(err.Error())
 	}
 
-	sort.Strings(availableServerGroupList)
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
@@ -315,17 +328,12 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 // Generic test cases to update K8S node's server group labels
 func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
-
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -337,8 +345,6 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
-
-	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -373,6 +379,8 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 		// Rename node labels for particular server-group
 		// Node label get updated in both update / remove scenario
 		nodeUpdateErrChan <- UpdateServerGroupLabel(pkg_constants.ServerGroupLabel, availableServerGroupList[0], "NewRzaGroup-1", targetKube.KubeClient)
+		// TODO: you MUST revert the label if you are changing it or any subsequent
+		// persistent volume tests will fail if using EBS for example.
 	}
 
 	if strings.Contains(editType, "InParallel") {
@@ -435,17 +443,12 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 // Deploy the cluster through operator and verify the server groups are balanced
 func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
-
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -457,8 +460,6 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
-
-	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -494,17 +495,12 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 // Deploy the cb cluster and verify the server groups are balanced as specified in the CRD
 func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
-
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 7
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetClassSpecificServiceConfigMap(3, "test_config_1", []string{"data", "index"}, []string{availableServerGroupList[0], availableServerGroupList[2]})
@@ -581,17 +577,12 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 // Scale up the couchbase nodes both general scalling and service based scalling
 func TestRzaResizeCluster(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
-
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -603,8 +594,6 @@ func TestRzaResizeCluster(t *testing.T) {
 		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
-
-	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -709,17 +698,12 @@ func TestRzaResizeCluster(t *testing.T) {
 // Expects pods to redistribute to available groups
 func TestRzaServerGroupRemoval(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
-
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -731,8 +715,6 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
-
-	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -792,17 +774,12 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 // Expected new pods scaled up is added to new groups to balance the pods
 func TestRzaServerGroupAddition(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
-
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 
 	serverGroupsUsed := []string{availableServerGroupList[0], availableServerGroupList[2]}
 	availableServerGroups := strings.Join(serverGroupsUsed, ",")
@@ -816,8 +793,6 @@ func TestRzaServerGroupAddition(t *testing.T) {
 		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
-
-	sort.Strings(serverGroupsUsed)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, serverGroupsUsed)
@@ -890,16 +865,11 @@ func TestRzaServerGroupAddition(t *testing.T) {
 // New pod creation should fail because of unavailable server group
 func TestRzaNegScaleupCluster(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
 
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
-
 	// Create cluster spec for RZA feature
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	clusterSize := len(availableServerGroupList)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -912,8 +882,6 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
-
-	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -994,17 +962,12 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 // Expects recration of new pods should fail due to the server group down
 func TestRzaServerGroupDown(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
-
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -1016,8 +979,6 @@ func TestRzaServerGroupDown(t *testing.T) {
 		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
-
-	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -1083,8 +1044,9 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
 
-	if err := e2eutil.WaitForClusterUnBalancedCondition(t, targetKube.CRClient, testCouchbase, 120); err != nil {
-		t.Fatal(err)
+	event := e2eutil.NewMemberDownEvent(testCouchbase, memberIdToGoDown)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
+		t.Fatalf("Requested node didn't go down as expected: %v", event)
 	}
 
 	// Remove the taint from the node to allow pod schedulling
@@ -1093,7 +1055,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 
 	// Wait for pod member to add back to the cluster
-	event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize)
+	event = e2eutil.NewMemberAddEvent(testCouchbase, clusterSize)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Failed to add pod after removing the taint: %v", err)
 	}

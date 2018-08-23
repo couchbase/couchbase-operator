@@ -83,7 +83,12 @@ func runSuite(t *testing.T) {
 			break
 		}
 
+		// Buffer up the cluster names to use for this specific invokation of the
+		// test, so as not to hard code them
+		f.TestClusters = []string{}
 		for _, kubeCluster := range kubeClustersToSetup {
+			f.TestClusters = append(f.TestClusters, kubeCluster.ClusterName)
+
 			if _, ok := f.ClusterSpec[kubeCluster.ClusterName]; ok {
 				continue
 			}

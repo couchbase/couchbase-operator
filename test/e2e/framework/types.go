@@ -38,6 +38,10 @@ type Framework struct {
 	ClusterConfFile string
 	PullDockerImage bool
 	CollectLogs     bool
+	// TestClusters is the current set of clusters to use for a test. This
+	// list is derived from the TestCaseGroup and used by individual
+	// tests to select the cluster configuration to use.
+	TestClusters []string
 	//S3Cli         *s3.S3
 	//S3Bucket      string
 }
