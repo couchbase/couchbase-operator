@@ -69,6 +69,7 @@ func runSuite(t *testing.T) {
 	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
 
 	for _, testGroup := range f.SuiteYmlData.TestCaseGroup {
+		skipCurrTestGroup := false
 		requiredClusters := []string{}
 		for _, currClusterName := range testGroup.ClusterName {
 			if !framework.ElementExistsInArr(currClusterName, requiredClusters) {
@@ -89,25 +90,43 @@ func runSuite(t *testing.T) {
 			kubeName := kubeCluster.ClusterName
 			logrus.Info("Creating K8S cluster " + kubeName + " for " + testGroup.GroupName)
 			if err := framework.SetupK8SCluster(t, f.Namespace, f.KubeType, f.KubeVersion, ymlFilePath, reqOpImage, kubeCluster); err != nil {
-				t.Fatal(err)
+				skipCurrTestGroup = true
+				t.Error(err)
+				break
 			}
 
 			kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeCluster.ClusterName
 			clusterSpec, err := framework.CreateKubeClusterObject(kubeConfigPath)
 			if err != nil {
-				t.Fatal(err)
+				skipCurrTestGroup = true
+				t.Error(err)
+				break
 			}
 
 			f.ClusterSpec[kubeName] = &clusterSpec
 
+			totalNodes := len(kubeCluster.MasterNodeList) + len(kubeCluster.WorkerNodeList)
 			logrus.Info("Waiting for Kube nodes to become available")
-			if err = e2eutil.WaitForKubeNodesToBeReady(t, f.ClusterSpec[kubeName].KubeClient, 600); err != nil {
-				t.Fatal(err)
+			if err := e2eutil.WaitForKubeNodesToBeReady(f.ClusterSpec[kubeName].KubeClient, totalNodes, 600); err != nil {
+				skipCurrTestGroup = true
+				t.Error(err)
+				// Remove the map entry and break the loop
+				delete(f.ClusterSpec, kubeName)
+				break
 			}
 
 			if err := f.SetupFramework(kubeName); err != nil {
-				t.Fatalf("Failed to setup framework: %v", err)
+				skipCurrTestGroup = true
+				t.Errorf("Failed to setup framework: %v", err)
+				// Remove the map entry and break the loop
+				delete(f.ClusterSpec, kubeName)
+				break
 			}
+		}
+
+		// Avoid executing particular test group in case of setup failure
+		if skipCurrTestGroup {
+			continue
 		}
 
 		// Do setup procedure for this group

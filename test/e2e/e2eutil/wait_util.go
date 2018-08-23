@@ -662,8 +662,25 @@ func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries
 	return nil
 }
 
-func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, waitTimeInSec int) error {
+func nodeReady(node v1.Node) bool {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == "Ready" && condition.Status == "true" {
+			return true
+		}
+	}
+	return false
+}
 
+func allNodesReady(nodes []v1.Node) bool {
+	for _, node := range nodes {
+		if !nodeReady(node) {
+			return false
+		}
+	}
+	return true
+}
+
+func WaitForKubeNodesToBeReady(kubeClient kubernetes.Interface, requiredNodesInCluster, waitTimeInSec int) error {
 	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
 	for {
@@ -672,23 +689,11 @@ func WaitForKubeNodesToBeReady(t *testing.T, kubeClient kubernetes.Interface, wa
 			return errors.New("Timed out to get K8S node to ready state")
 
 		case <-tickChan:
-			nodesList, _ := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-
-			allNodesReady := true
-			var nodeConditionReady v1.NodeCondition
-			for _, node := range nodesList.Items {
-				for _, nodeCondition := range node.Status.Conditions {
-					if nodeCondition.Type == "Ready" {
-						nodeConditionReady = nodeCondition
-						break
-					}
-				}
+			nodesList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+			if err != nil {
+				continue
 			}
-			if nodeConditionReady.Status != "True" {
-				allNodesReady = false
-				break
-			}
-			if allNodesReady {
+			if allNodesReady(nodesList.Items) && len(nodesList.Items) == requiredNodesInCluster {
 				return nil
 			}
 		}
