@@ -553,6 +553,7 @@ func (c *Cluster) recoverClusterDown() error {
 				return fmt.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
 			} else {
 				c.logger.Infof("recovering node %s", m.ClientURL())
+				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 				break
 			}
 		}
