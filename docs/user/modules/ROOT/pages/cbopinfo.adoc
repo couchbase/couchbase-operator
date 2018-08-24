@@ -1,49 +1,64 @@
-= cbopinfo
+= About cbopinfo
 
-This documents the cbopinfo tool used to collect resources and logs via the Kubernetes API in order to support the Operator and Couchbase server.
+`cbopinfo` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package]. It is used to collect resources and logs via the Kubernetes API in order to support the Operator and Couchbase Server.
 
-By default the command will collect resources for all Couchbase clusters defined in the selected namespace.  Certain resource types such as services, pods, persistent volume claims are scoped to those created by the Operator.  The scope can be further restricted to only the clusters specified on the command line.
+By default, `cbopinfo` will collect resources for all Couchbase clusters defined in the selected namespace. Certain resource types such as services, pods, and persistent volume claims are scoped to those created by the Operator. The scope can be further restricted to only the clusters specified on the command line.
 
-Other unscoped resources are collected without any filtering including roles, role bindings and service accounts as they cannot be distinguished as belonging to a particular cluster.
+Other unscoped resources are collected without any filtering, such as roles, role bindings, and service accounts, as they cannot be distinguished as belonging to a particular cluster.
 
 Any secrets that are collected have their data redacted so only the presence of a secret or a key within it are visible.
 
-The output is a compressed archive of resource YAML manifests organized by namespace, resource type and name.  Logs and events are also collected and collated with resource configuration where relevant.
+The output is a compressed archive of resource YAML manifests organized by namespace, resource type, and name. Logs and events are also collected and collated with resource configuration where relevant.
+
+== Installation
+
+. Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `kubectl` or `oc`.
++
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator_x.x.x-linux_x86_64`. The command-line tools are located in `/bin`.
+. Use the following command to make `cbopinfo` executable:
++
+[source,console]
+----
+chmod +x <unpack-directory>/bin/cbopinfo
+----
 
 == Syntax
 
- cbopinfo [options] [clusters]
+[source,console]
+----
+cbopinfo [options] [clusters]
+----
 
 === Options
 
 --all::
-If specified the _all_ flag ignores any scoping rules for a particular resource type, and collects all instances within the name space.
+If specified, this flag ignores any scoping rules for a particular resource type, and collects all instances within the namespace.
 
 --collectinfo::
-If specified the _collectinfo_ flag will trigger collection of Couchbase logs via the _cbcollect_info_ command locally on each pod belonging to a Couchbase cluster.  The logs are left in situ as they may be relatively large.  The _cbopinfo_ command will report how to extract the logs from each pod.
+If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. The logs are left in situ as they may be relatively large. The `cbopinfo` command will report how to extract the logs from each pod.
 
 --kubeconfig <config>::
-If specified this points to a Kubernetes configuration file used to locate and poll the cluster API.  If not set it will default to _~/.kube/config_.
+If specified, this points to a Kubernetes configuration file used to locate and poll the cluster API. If not set, it will default to `~/.kube/config`.
 
 --namespace <namespace>::
-If specified this selects which namespace to collect resources and logs from.  If not set it will default to _default_.
+If specified, this selects which namespace to collect resources and logs from. If not set, it will default to `default`.
 
 --system::
-If specified this will additionally collect all resources from the _kube-system_ namespace which may be useful in diagnosing problems with cluster level roles, custom resource defintions or system services.
+If specified, this flag will additionally collect all resources from the `kube-system` namespace, which may be useful in diagnosing problems with cluster-level roles, custom resource definitions, or system services.
 
 == Examples
 
 To perform a basic collection of all Couchbase clusters and their associated resources within a name space:
 
-[source,shell]
+[source,console]
 ----
 $ cbopinfo
 Wrote cluster information to cbopinfo-20180629T123256+0100.tar.gz
 ----
 
-To collect basic logs on openshift from a specific name space:
+To collect basic logs on OpenShift from a specific name space:
 
-[source,shell]
+[source,console]
 ----
 $ oc login -u developer
 Authentication required for https://192.168.99.100:8443 (openshift)
@@ -56,13 +71,14 @@ You have access to the following projects and can switch between them with 'oc p
     myproject
 
 Using project "myproject".
+
 $ cbopinfo --namespace myproject
 Wrote cluster information to cbopinfo-20180801T141838+0100.tar.gz
 ----
 
-To collect all Couchbase clusters, their associated resources within a name space, Couchbase server logs and Kubernetes system logs:
+To collect all Couchbase clusters, their associated resources within a namespace, Couchbase server logs, and Kubernetes system logs:
 
-[source,shell]
+[source,console]
 ----
 $ cbopinfo --collectinfo --system
 Server logs accessible via: kubectl cp default/cb-example-0001:/tmp/cbinfo-default-cb-example-0001-20180629T152926+0100.zip .

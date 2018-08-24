@@ -8,9 +8,8 @@ This functionality is not provided by the Operator and left to the cluster admin
 
 The Kubernetes resource definitions below illustrate a typical arrangement for backup that saves the state of the entire cluster.
 
-[code,yaml]
+[source,yaml]
 ----
----
 # Define backup storage volume
 kind: PersistentVolumeClaim
 apiVersion: v1
@@ -25,9 +24,8 @@ spec:
 
 A persistent volume is claimed in order to keep data safe in the event of an outage.  You will need to plan the claim size based on your expected data set size, the number of days data retention and whether incremental backups are used at all.
 
-[code,yaml]
+[source,yaml]
 ----
----
 # Create a backup repository
 kind: Job
 apiVersion: batch/v1
@@ -52,9 +50,8 @@ spec:
 
 A job is created to mount the persistent volume and initialize a backup repository.  The repository is named `couchbase` which will map to the cluster name in later specifications.
 
-[code,yaml]
+[source,yaml]
 ----
----
 kind: CronJob
 apiVersion: batch/v1beta1
 metadata:
@@ -87,9 +84,8 @@ TIP: By creating a custom container image it is possible to trigger the backup j
 
 NOTE: We use the cluster SRV record as the `--cluster` argument here as cluster member names and IP addresses will change during the cluster lifestyle.  By using service discovery, the connection string name remains stable and will automatically select a Couchbase server instance which is alive.
 
-[code,yaml]
+[source,yaml]
 ----
----
 kind: Job
 apiVersion: batch/v1
 metadata:
@@ -122,9 +118,8 @@ IMPORTANT: Merging backups should form part of a regular backup strategy.  By do
 
 Much like a backup we can restore data to a new Couchbase cluster with a Kubernetes Job.
 
-[code,yaml]
+[source,yaml]
 ----
----
 kind: Job
 apiVersion: batch/v1
 metadata:

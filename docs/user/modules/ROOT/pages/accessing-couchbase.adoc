@@ -135,13 +135,13 @@ You can now use `couchbase-cli` to administer the cluster. For example, adding a
 
 The most secure way to use `couchbase-cli` in Kubernetes is to run it as a Kubernetes https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/[job]. This option allows you to hide the user name and password of the cluster by leveraging Kubernetes Secrets.
 
-A Couchbase `collect-logs-start` job has been provided as an example. After pushing it to Kubernetes, it creates a job called `collect-info` that uses the same secret that is provided in the CouchbaseCluster configuration.
+A Couchbase `collect-logs-start` job has been provided in the Operator https://www.couchbase.com/downloads[package] as an example. After pushing it to Kubernetes, it creates a job called `collect-info` that uses the same secret that is provided in the CouchbaseCluster configuration.
 
 To create the `collect-info` job on Kubernetes:
 
 [source,console]
 ----
-kubectl create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cli-collect-logs.yaml
+kubectl create -f <unpack-directory>/couchbase-cli-collect-logs.yaml
 ----
 
 To check the status on Kubernetes:
@@ -153,7 +153,7 @@ To create the `collect-info` job on OpenShift:
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/couchbase-cli-collect-logs.yaml
+oc create -f <unpack-directory>/couchbase-cli-collect-logs.yaml
 ----
 
 To check the status on Kubernetes:

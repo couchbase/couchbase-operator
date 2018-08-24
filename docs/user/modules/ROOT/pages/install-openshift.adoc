@@ -13,36 +13,45 @@ If you have an OpenShift environment that already has a custom setup (non-defaul
 
 IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your OpenShift environment. Refer to the  xref:kubernetes-rbac.adoc[RBAC doumentation] before you install the Operator, as your OpenShift environment may differ from the environment upon which this guide is based.
 
+== Prerequisites
+
+Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `oc`.
+
+The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator_x.x.x-linux_x86_64`. This directory will be referred to as _<unpack-directory>_ in the various commands in this guide.
+
 == Quick Start
 
-The script below has been parameterized for clarity and relies on a set of environment variables that may be tailored to the individual OpenShift environment being deployed in.  These variables correspond to the resources being created and used in order to deploy the Operator.  These are explained below:
+The script below has been parameterized for clarity and relies on a set of environment variables that may be tailored to the individual OpenShift environment being deployed in. These variables correspond to the resources being created and used in order to deploy the Operator. These are explained below:
 
 NAMESPACE::
-The Kubernetes name space/OpenShift project to run the Operator in.  This can be changed to any project you have access to.
+The Kubernetes namespace/OpenShift project to run the Operator in. This can be changed to any project you have access to.
 
 ADMIN_ACCOUNT::
-The administrator account which has the ability to install custom resource defintions and create role bindings which grant privilege escalation.
+The administrator account which has the ability to install custom resource definitions and create role bindings which grant privilege escalation.
 
 OPERATOR_SERVICE_ACCOUNT::
-The service account the Operator should run as.  This can be changed to any valid Kubernetes name, however is scoped to the name space it is deployed in so must be unique in that context.  This value is also used when creating the Operator deployment, see the xref:operator-config.adoc[documentation for the `serviceAccountName` parameter].
+The service account the Operator should run as. This can be changed to any valid Kubernetes name, however, is scoped to the namespace it is deployed in so it must be unique in that context.
++
+This value is also used when creating the Operator deployment, see the documentation for the xref:operator-config.adoc[serviceAccountName parameter].
 
 OPERATOR_CLUSTER_ROLE::
-The role for the Operator to inherit that grants access to create and deleted required resources.  This name is hard coded in the resource YAML file used in this example.
+The role for the Operator to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
 
 OPERATOR_CLUSTER_ROLE_BINDING::
-The name for the rule which binds the operator role and service account to a name space.  This can be changed to any unique name in the namespace.
+The name for the rule which binds the operator role and service account to a namespace. This can be changed to any unique name in the namespace.
 
 USER_ACCOUNT::
-The user account used to create and manage CouchbaseCluster resources.  This can be changed to any valid user name.
+The user account that is used to create and manage CouchbaseCluster resources. This can be changed to any valid user name.
 
 USER_CLUSTER_ROLE::
-The role for the user to inherit that grants access to create and deleted required resources.  This name is hard coded in the resource YAML file used in this example.
+The role for the user to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
 
 USER_CLUSTER_ROLE_BINDING::
-The name for the rule which binds the user role and account to a name space.  This can be changed to any unique name in the name
-space.
+The name for the rule which binds the user role and account to a name space. This can be changed to any unique name in the namespace.
 
-All steps listed here are fully explained below.  If they fail please consult the relevant documentation.
+All steps listed here are fully explained below. If they fail, please consult the relevant documentation.
 
 [source,bash]
 ----
@@ -91,9 +100,15 @@ The first thing that you need to do is use a standard OpenShift user to create a
 [source,console]
 ----
 oc login -u developer
+----
 
+[source,console]
+----
 oc new-project operator-example-namespace
+----
 
+[source,console]
+----
 oc logout
 ----
 
@@ -103,13 +118,16 @@ In this example, the standard user is `developer`, and the project is `operator-
 
 The next step in setting up the Operator is to install the CouchbaseCluster custom resource definition (CRD). The Operator can do this for you automatically (xref:install-kubernetes.adoc[as it does when installing on open source Kubernetes]), but in OpenShift it's better to do it manually because installing a CRD is a cluster-level operation and requires cluster-level permissions that should not be given to typical users.
 
-To install the CRD, log in as an OpenShift user that has cluster-admin privileges (in this case `system:admin`) and run the following command:
+To install the CRD, log in as an OpenShift user that has cluster-admin privileges (in this case `system:admin`) and run the following commands:
 
 [source,console]
 ----
 oc login -u system:admin
+----
 
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/crd.yaml
+[source,console]
+----
+oc create -f <unpack-directory>/crd.yaml
 ----
 
 NOTE: You only need to install the CRD once. After that, you can create the Operator in any OpenShift project.
@@ -122,17 +140,24 @@ To create the cluster role for the Operator, run the following command as the `s
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-sa.yaml
+oc create -f <unpack-directory>/cluster-role-sa.yaml
 ----
 
 NOTE: You only need to create the cluster role once.
 
 After the cluster role is created, you need to create a service account in the project where you are installing the Operator, and then assign the cluster role to that service account using a https://docs.openshift.com/container-platform/3.9/admin_guide/manage_rbac.html[role binding]:
 
+To create the service account:
+
 [source,console]
 ----
 oc create serviceaccount couchbase-operator --namespace operator-example-namespace
+----
 
+To assign the cluster role to the service account:
+
+[source,console]
+----
 oc create rolebinding couchbase-operator-rolebinding --clusterrole couchbase-operator --serviceaccount operator-example-namespace:couchbase-operator
 ----
 
@@ -148,7 +173,7 @@ Run the following command to create the cluster role for `developer`:
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-user.yaml
+oc create -f <unpack-directory>/cluster-role-user.yaml
 ----
 
 Next, you need to allow `developer` to be able to manage the CouchbaseCluster resource in the `operator-example-namespace` project:
@@ -173,7 +198,7 @@ At this point you can now use the `developer` user to create the Operator in the
 
 [source,console]
 ----
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/operator.yaml -n operator-example-namespace
+oc create -f <unpack-directory>/operator.yaml -n operator-example-namespace
 ----
 
 Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.

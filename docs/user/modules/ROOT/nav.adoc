@@ -3,9 +3,9 @@
  ** xref:prerequisite-and-setup.adoc[System Requirements]
  ** xref:best-practices.adoc[Guidelines and Best Practices]
 * Deploying the Operator
- ** xref:operator-config.adoc[About the Operator Deployment Settings]
  ** xref:install-kubernetes.adoc[Installing on Kubernetes]
  ** xref:install-openshift.adoc[Installing on OpenShift]
+ ** xref:operator-config.adoc[About the Operator Deployment Settings]
  ** xref:kubernetes-rbac.adoc[About Kubernetes RBAC]
 * Managing the Operator
  ** xref:list-and-describe.adoc[Monitoring Kubernetes Resources]

@@ -1,8 +1,12 @@
-= Ensuring Valid CouchbaseCluster Configurations with cbopctl
+= About cbopctl
 
-`cbopctl` is a command line tool that is provided with the Couchbase Operator that implements a custom subset of the `kubectl` and `oc` commands to ensure that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes. It is important to check that a configuration is valid before uploading it, because once a configuration is uploaded to Kubernetes, the Couchbase Operator is unable to handle configuration errors.
+`cbopctl` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package]. It implements a custom subset of the `kubectl` and `oc` commands to ensure that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes.
 
-The following diagram shows the process of uploading a CouchbaseCluster configuration to Kubernetes using just `kubectl`:
+It's important to check that a configuration is valid before uploading it, because once a configuration is uploaded to Kubernetes, the Couchbase Operator is unable to handle configuration errors. Therefore, you must use `cbopctl` whenever you load or modify a CouchbaseCluster configuration.
+
+== How it Works
+
+The following diagram shows the process of uploading a CouchbaseCluster configuration to Kubernetes using _just_ `kubectl`:
 
 image::cbopctl_figure_1.jpg[Figure 1]
 
@@ -15,48 +19,27 @@ image::cbopctl_figure_1.jpg[Figure 1]
 
 Since Kubernetes can only do a partial validation, the only place to do full validation is in the API Server, because errors in the configuration must be caught before the CouchbaseCluster configuration makes it to `etcd`.
 
-Kubernetes is a constantly evolving project and the ability to validate Custom Resource Definitions is still being improved. In Kubernetes 1.8, for example, there is no ability to do validation. In Kubernetes 1.9, there is some CRD validation, but it is incomplete and doesn't allow for the defaulting of configuration parameters. In Kubernetes 1.11, defaulting will be added, but there still won't be support for more complex types of validation.
+Until Kubernetes provides full native validation, you must use `cbopctl` whenever you load or modify a CouchbaseCluster configuration. The `cbopctl` command contains all of Couchbase's validation code in one command line tool and is the only way to ensure that invalid configurations don't make it into Kubernetes.
 
-Until Kubernetes provides full native validation, the Couchbase Operator needs to provide a way to validate that configurations are correct before submitting them to Kubernetes. The `cbopctl` command contains all of Couchbase's validation code in one command line tool to ensure that invalid configurations can't make it into Kubernetes.
+== Installation
 
-[discrete]
-=== Downloading
-
-OS X:
-
+. Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `kubectl` or `oc`.
++
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator_x.x.x-linux_x86_64`. The command-line tools are located in `/bin`.
+. Use the following command to make `cbopctl` executable:
++
 [source,console]
 ----
-$ curl -O https://packages.couchbase.com/kubernetes/1.0.0/darwin/cbopctl
-
-$ chmod +x cbopctl
+chmod +x <unpack-directory>/bin/cbopctl
 ----
 
-Linux:
-
-[source,console]
-----
-$ curl -O https://packages.couchbase.com/kubernetes/1.0.0/linux/cbopctl
-
-$ chmod +x cbopctl
-----
-
-Windows:
-
-[source,console]
-----
-$ curl -O https://packages.couchbase.com/kubernetes/1.0.0/windows/cbopctl
-$ chmod +x cbopctl
-----
-
-[discrete]
-=== cbopctl commands
+== Syntax
 
 `cbopctl` implements the create, delete, and apply commands in a similar way to `kubectl` and `oc`.
 
 [source,console]
 ----
-$ cbopctl
-cbopctl [<command>] [<args>]
+cbopctl [option] [args]
 
   apply    Update a Couchbase Cluster
   create   Create a new Couchbase Cluster
@@ -68,9 +51,23 @@ Optional Flags:
   -h,--help                   Prints the help message
 ----
 
-The `create` command should be used to create new CouchbaseClusters, `delete` can be used to delete CouchbaseClusters (although no validation takes place during a delete so this command is here for completeness), and `apply` should be used when updating a cluster.
+=== Options
 
-Each subcommand has three flags - one that is required and two that are optional.
+* `create`
++
+This option should be used when pushing new CouchbaseCluster configurations to Kubernetes.
+
+* `apply`
++
+This option should be used when updating a CouchbaseCluster configuration that is already in Kubernetes.
+
+* `delete`
++
+This option can be used to delete a CouchbaseCluster. (This option is more for completeness, since no validation takes place during a delete.)
+
+==== Flags
+
+Each option has three flags — one that is required and two that are optional.
 
 [source,console]
 ----
