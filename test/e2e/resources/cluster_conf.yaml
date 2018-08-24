@@ -8,7 +8,7 @@ types:
         worker:
           - ip: 172.23.96.42
           - ip: 172.23.96.50
-          - ip: 172.23.96.93
+          - ip: 172.23.104.147
 
       - name: NewCluster1
         master:
