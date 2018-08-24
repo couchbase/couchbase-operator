@@ -664,7 +664,7 @@ func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries
 
 func nodeReady(node v1.Node) bool {
 	for _, condition := range node.Status.Conditions {
-		if condition.Type == "Ready" && condition.Status == "true" {
+		if condition.Type == "Ready" && condition.Status == "True" {
 			return true
 		}
 	}

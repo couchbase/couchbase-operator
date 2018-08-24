@@ -106,7 +106,7 @@ func runSuite(t *testing.T) {
 			f.ClusterSpec[kubeName] = &clusterSpec
 
 			totalNodes := len(kubeCluster.MasterNodeList) + len(kubeCluster.WorkerNodeList)
-			logrus.Info("Waiting for Kube nodes to become available")
+			logrus.Infof("Waiting for '%d' nodes to become available", totalNodes)
 			if err := e2eutil.WaitForKubeNodesToBeReady(f.ClusterSpec[kubeName].KubeClient, totalNodes, 600); err != nil {
 				skipCurrTestGroup = true
 				t.Error(err)
