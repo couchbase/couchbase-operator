@@ -361,7 +361,7 @@ ____
 
 === eventingServiceMemoryQuota
 
-The amount of memory to assign to the eventing service if present on a specific Couchbase node in MiB.
+The amount of memory to assign to the eventing service if present on a specific Couchbase node in Mi.
 
 ____
 _Field rules:_ The `eventingServiceMemoryQuota` field is required and must be set to be greater than or equal to 256. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
@@ -369,7 +369,7 @@ ____
 
 === analyticsServiceMemoryQuota
 
-The amount of memory to assign to the analytics service if present on a specific Couchbase node in MiB.
+The amount of memory to assign to the analytics service if present on a specific Couchbase node in Mi.
 
 ____
 _Field rules:_ The `analyticsServiceMemoryQuota` field is required and must be set to be greater than or equal to 1024. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
