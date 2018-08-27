@@ -72,7 +72,7 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 	nextNodeToBeAdded := clusterSize
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		memberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberIndex)
-		if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
+		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
 			return err
 		}
 

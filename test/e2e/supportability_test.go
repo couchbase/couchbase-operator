@@ -935,7 +935,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
+	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
 	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
 

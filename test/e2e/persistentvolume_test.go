@@ -443,14 +443,12 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 
-	event = e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-		t.Fatalf("Rebalance event not triggered after pod recovery: %v", err)
-	}
-
 	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Rebalance event not triggered after pod recovery: %v", err)
+	}
+	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
+		t.Fatal(err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -637,21 +635,11 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Error(err)
 	}
 	expectedEvents.AppendEventList(createdEvents)
-
-	event := e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-		t.Fatalf("Rebalande event not triggered after pod recovery: %v", err)
-	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatalf("Rebalande event not triggered after pod recovery: %v", err)
-	}
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// Wait for cluster balanced condition after recovering the cluster pods
-	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 10); err != nil {
+	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
 		t.Fatal(err)
 	}
 
@@ -674,13 +662,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		expectedEvents.AddMemberRecoveredEvent(testCouchbase, podMemberId)
 	}
 
-	event = e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatal(err)
-	}
-
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
