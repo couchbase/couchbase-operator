@@ -146,43 +146,37 @@ exitOnError $? "Unable to create tar of testrunner ${numNodes}node docker image"
 
 for nodeIp in $cloudClusterNodeIpList
 do
-    echo "Deleting previous cb server docker image on: '$nodeIp'"
+    echo "Deleting previous cb server, testrunner docker image on: '$nodeIp'"
     sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp docker images | grep $cbServerImageName | grep $cbServerTagName | awk '{print $3}' | xargs docker rmi -f
-    echo "Deleting previous testrunner docker image on: '$nodeIp'"
     sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp docker images | grep $testrunnerImageName | grep $testrunnerTagName | awk '{print $3}' | xargs docker rmi -f
 
-    echo "Copying '$cbServerTarFileName' to '$nodeIp:~/' path"
-    sshpass -p "$sshPassword" scp $cbServerTarFileName $sshUser@$nodeIp:~/
-    echo "Copying '$testrunnerTarFileName' to '$nodeIp:~/' path"
-    sshpass -p "$sshPassword" scp $testrunnerTarFileName $sshUser@$nodeIp:~/
+    echo "Copying '$cbServerTarFileName' & '$testrunnerTarFileName' to '$nodeIp:~/' path"
+    sshpass -p "$sshPassword" scp $sshArgs $cbServerTarFileName $testrunnerTarFileName $sshUser@$nodeIp:~/
 
-    echo "Loading docker image from tar: '$cbServerTarFileName'"
+    echo "Loading docker image from '$cbServerTarFileName' & '$testrunnerTarFileName'"
     sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp "docker load -i ~/$cbServerTarFileName ; rm -f ~/$cbServerTarFileName"
-    echo "Loading docker image from tar: '$testrunnerTarFileName'"
     sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp "docker load -i ~/$testrunnerTarFileName ; rm -f ~/$testrunnerTarFileName"
 done
 
-echo "Deleting the tar file '$cbServerTarFileName'"
-rm -f $cbServerTarFileName
-echo "Deleting the tar file '$testrunnerTarFileName'"
-rm -f $testrunnerTarFileName
+echo "Deleting files '$cbServerTarFileName' & '$testrunnerTarFileName'"
+rm -f $cbServerTarFileName $testrunnerTarFileName
 
 echo "Creating secret"
 showFileContent $secretFile
-kubectl delete -f $secretFile &>/dev/null
-kubectl create -f $secretFile
+kubectl --namespace=$namespace delete -f $secretFile &>/dev/null
+kubectl --namespace=$namespace create -f $secretFile
 exitOnError $? "Unable to create secret"
 
 echo "Making default SA cluster admin"
 showFileContent $roleBindingFile
-kubectl delete -f $roleBindingFile &>/dev/null
-kubectl create -f $roleBindingFile
+kubectl --namespace=$namespace delete -f $roleBindingFile &>/dev/null
+kubectl --namespace=$namespace create -f $roleBindingFile
 exitOnError $? "Unable to create role binding"
 
 echo "Creating Couchbase Cluster"
 showFileContent $cbClusterFile
-kubectl delete -f $cbClusterFile &>/dev/null
-kubectl create -f $cbClusterFile
+kubectl --namespace=$namespace delete -f $cbClusterFile &>/dev/null
+kubectl --namespace=$namespace create -f $cbClusterFile
 exitOnError $? "Unable to create cb cluster"
 
 sleep 180
@@ -236,7 +230,7 @@ do
     if [ "$currTestrunnerPod" != "$testrunnerPodName" ] ; then
         echo "job pod failed"
         kill %1
-        kubectl delete job --all --namespace=$namespace
+        kubectl --namespace=$namespace delete job --all
         break
     fi
 
@@ -251,8 +245,8 @@ done
 echo ""
 echo "Copying logs from testrunner pod for archiving"
 masterNodeIp=$(echo $cloudClusterNodeIpList | cut -d" " -f 1)
-testrunnerNodeIp=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$6\}\')
-workerNodeName=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$7\}\')
+testrunnerNodeIp=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl --namespace=$namespace get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$6\}\')
+workerNodeName=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl --namespace=$namespace get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$7\}\')
 workerNodeIpIndex=$(expr $(getWorkerNodeNum $workerNodeName) + 1)
 targetWorkerIp=$(echo $cloudClusterNodeIpList | cut -d" " -f $workerNodeIpIndex)
 

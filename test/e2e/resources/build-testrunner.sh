@@ -33,5 +33,6 @@ if [ "$imageType" == "tpcc" ]; then
     cp ./Dockerfile.tpcc ./Dockerfile
 fi
 
+echo "ENTRYPOINT [\"./entrypoint.sh\", \"$numNodes\"]" >> ./Dockerfile
 dockerBuildArgs="--build-arg testrunnerBranch=$testrunnerBranch --build-arg numNodes=$numNodes"
 docker build . $dockerBuildArgs -t $testRunnerDockerImageName
