@@ -42,3 +42,7 @@ spec:
         - search
         - eventing
         - analytics
+      pod:
+        resources:
+          limits:
+            memory: 4GiB
