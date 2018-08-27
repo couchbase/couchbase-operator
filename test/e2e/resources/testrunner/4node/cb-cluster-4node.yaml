@@ -45,4 +45,6 @@ spec:
       pod:
         resources:
           limits:
-            memory: 4GiB
+            memory: 4Gi
+          requests:
+            memory: 4Gi
