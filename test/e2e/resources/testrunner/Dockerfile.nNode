@@ -11,4 +11,4 @@ COPY ./${numNodes}node/${numNodes}node-sanity.conf testcases.conf
 COPY getNodeIps.py getNodeIps.py
 COPY entrypoint.sh entrypoint.sh
 RUN chmod +x ./entrypoint.sh
-ENTRYPOINT ["./entrypoint.sh", "$numNodes"]
+ENTRYPOINT ["./entrypoint.sh", ${numNodes}]

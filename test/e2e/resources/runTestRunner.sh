@@ -21,6 +21,10 @@ serverBranchName=vulcan
 numNodes=1
 cloudClusterNodeIpList=""
 cloudClusterMasterNodeIp=""
+
+sshArgs="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+sshUser=root
+sshPassword=couchbase
 dockerAccount=couchbase
 
 while [ $# -ne 0 ]
@@ -95,13 +99,14 @@ echo "Couchbase-server version '$serverVersion', build '$serverBuildNum', branch
 echo "Using testrunner branch '$testrunnerBranch' with '$numNodes' node cluster"
 
 # Create test.properties file contents
-echo "cbServerVersionsToRun=$cbServerVersionsToRun" >> ${WORKSPACE}/test.properties
 echo "operatorVersion=$operatorVersion" >> ${WORKSPACE}/test.properties
+echo "operatorBranch=$operatorBranch" >> ${WORKSPACE}/test.properties
+echo "couchbaseVersion=$couchbaseVersion" >> ${WORKSPACE}/test.properties
+echo "couchbaseBranch=$couchbaseBranch" >> ${WORKSPACE}/test.properties
+echo "platformType=$platformType" >> ${WORKSPACE}/test.properties
+echo "platformVersion=$platformVersion" >> ${WORKSPACE}/test.properties
 echo "dockerAccount=$dockerAccount" >> ${WORKSPACE}/test.properties
-echo "targetCluster=$targetCluster" >> ${WORKSPACE}/test.properties
 echo "testrunnerBranch=$testrunnerBranch" >> ${WORKSPACE}/test.properties
-echo "cloudClusterMasterNodeIp=$cloudClusterMasterNodeIp" >> ${WORKSPACE}/test.properties
-echo "cloudClusterNodeIpList=$cloudClusterNodeIpList" >> ${WORKSPACE}/test.properties
 showFileContent "${WORKSPACE}/test.properties"
 
 deploymentFile="../../../example/deployment.yaml"
@@ -118,7 +123,7 @@ testRunnerDockerImageName="${dockerAccount}/testrunner-cloud:${numNodes}node"
 # Build required images #
 #sh ./build-cb-server.sh "$serverVersion" "$serverBuildNum" "$serverBranchName" "${cbServerDockerImageName}"
 #exitOnError $? "Unable to build cb server docker file"
-sh ./build-testrunner.sh "${numNodes}node" "${testRunnerDockerImageName} ${numNodes}"
+sh ./build-testrunner.sh "${numNodes}node" "$testRunnerDockerImageName" "$numNodes"
 exitOnError $? "Unable to build testrunner ${numNodes}node docker file"
 
 #ship the docker images to the nodes
@@ -142,23 +147,19 @@ exitOnError $? "Unable to create tar of testrunner ${numNodes}node docker image"
 for nodeIp in $cloudClusterNodeIpList
 do
     echo "Deleting previous cb server docker image on: '$nodeIp'"
-    sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp docker images | grep $cbServerImageName | grep $cbServerTagName | awk '{print $3}' | xargs docker rmi -f
+    sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp docker images | grep $cbServerImageName | grep $cbServerTagName | awk '{print $3}' | xargs docker rmi -f
     echo "Deleting previous testrunner docker image on: '$nodeIp'"
-    sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp docker images | grep $testrunnerImageName | grep $testrunnerTagName | awk '{print $3}' | xargs docker rmi -f
+    sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp docker images | grep $testrunnerImageName | grep $testrunnerTagName | awk '{print $3}' | xargs docker rmi -f
 
-    echo "Copying '$cbServerTarFileName' to '$nodeIp:/root/' path"
-    sshpass -p "couchbase" scp $cbServerTarFileName root@$nodeIp:/root/
-    echo "Copying '$testrunnerTarFileName' to '$nodeIp:/root/' path"
-    sshpass -p "couchbase" scp $testrunnerTarFileName root@$nodeIp:/root/
+    echo "Copying '$cbServerTarFileName' to '$nodeIp:~/' path"
+    sshpass -p "$sshPassword" scp $cbServerTarFileName $sshUser@$nodeIp:~/
+    echo "Copying '$testrunnerTarFileName' to '$nodeIp:~/' path"
+    sshpass -p "$sshPassword" scp $testrunnerTarFileName $sshUser@$nodeIp:~/
 
     echo "Loading docker image from tar: '$cbServerTarFileName'"
-    sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp docker load -i /root/$cbServerTarFileName
-    echo "Deleting docker image tar: '$cbServerTarFileName'"
-    sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp rm -f /root/$cbServerTarFileName
+    sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp "docker load -i ~/$cbServerTarFileName ; rm -f ~/$cbServerTarFileName"
     echo "Loading docker image from tar: '$testrunnerTarFileName'"
-    sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp docker load -i /root/$testrunnerTarFileName
-    echo "Deleting docker image tar: '$testrunnerTarFileName'"
-    sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$nodeIp rm -f /root/$testrunnerTarFileName
+    sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$nodeIp "docker load -i ~/$testrunnerTarFileName ; rm -f ~/$testrunnerTarFileName"
 done
 
 echo "Deleting the tar file '$cbServerTarFileName'"
@@ -199,7 +200,7 @@ showFileContent $testRunnerYamlFileName
 kubectl --namespace=$namespace create -f $testRunnerYamlFileName
 exitOnError $? "Unable to create testrunner"
 
-echo "############################## Using couchbase-server '$cbServerVersionsToRun' ##############################"
+echo "############################## Using couchbase-server '$serverVersion' ##############################"
 
 # wait for testrunner pod to be running
 while true
@@ -250,8 +251,8 @@ done
 echo ""
 echo "Copying logs from testrunner pod for archiving"
 masterNodeIp=$(echo $cloudClusterNodeIpList | cut -d" " -f 1)
-testrunnerNodeIp=$(sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$masterNodeIp kubectl get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$6\}\')
-workerNodeName=$(sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$masterNodeIp kubectl get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$7\}\')
+testrunnerNodeIp=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$6\}\')
+workerNodeName=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$7\}\')
 workerNodeIpIndex=$(expr $(getWorkerNodeNum $workerNodeName) + 1)
 targetWorkerIp=$(echo $cloudClusterNodeIpList | cut -d" " -f $workerNodeIpIndex)
 
@@ -262,12 +263,11 @@ echo "masterNodeIp=$masterNodeIp"
 echo "targetWorkerIp=$targetWorkerIp"
 
 # Safely remove Ips from Known hosts file #
-sed -i "/$targetWorkerIp /d" ~/.ssh/known_hosts
-sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$targetWorkerIp "sed -i '/$testrunnerNodeIp /d' ~/.ssh/known_hosts"
+sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "sed -i '/$testrunnerNodeIp /d' ~/.ssh/known_hosts"
 
-sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$targetWorkerIp "sshpass -p 'couchbase' scp -o StrictHostKeyChecking=no -r root@$testrunnerNodeIp:/testrunner/logs /root/testrunnerLogs"
-sshpass -p "couchbase" scp -o StrictHostKeyChecking=no -r root@$targetWorkerIp:/root/testrunnerLogs ${WORKSPACE}/logs
-sshpass -p "couchbase" ssh -o StrictHostKeyChecking=no -t root@$targetWorkerIp "rm -rf /root/testrunnerLogs"
+sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "sshpass -p '$sshPassword' scp -o StrictHostKeyChecking=no -r $sshUser@$testrunnerNodeIp:/testrunner/logs ~/testrunnerLogs"
+sshpass -p "$sshPassword" scp $sshArgs -r $sshUser@$targetWorkerIp:~/testrunnerLogs ${WORKSPACE}/logs
+sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "rm -rf ~/testrunnerLogs"
 
-echo "################################# End of test using '$cbServerVersionsToRun' ################################"
+echo "################################# End of test using '$serverVersion' ################################"
 echo ""
