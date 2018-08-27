@@ -42,8 +42,8 @@ cbServerDockerImageName="couchbase/server:5.5.0-test"
 testRunnerDockerImageName="sdk-s435.sc.couchbase.com/sdkd-java-client:test"
 
 # Build required images #
-sh ./build-cb-server.sh "5.5.0" "2958" "vulcan" "${cbServerDockerImageName}"
-exitOnError $? "Unable to build cb server docker file"
+#sh ./build-cb-server.sh "5.5.0" "2958" "vulcan" "${cbServerDockerImageName}"
+#exitOnError $? "Unable to build cb server docker file"
 sh ./build-sdk.sh "sanity" "${testRunnerDockerImageName}"
 exitOnError $? "Unable to build sdk docker file"
 

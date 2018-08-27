@@ -42,8 +42,8 @@ cbServerDockerImageName="couchbase/server:5.5.0-test"
 testRunnerDockerImageName="${dockerHub}/testrunner-cloud:platform-cert"
 
 # Build required images #
-sh ./build-cb-server.sh "5.5.0" "2958" "vulcan" "${cbServerDockerImageName}"
-exitOnError $? "Unable to build cb server docker file"
+#sh ./build-cb-server.sh "5.5.0" "2958" "vulcan" "${cbServerDockerImageName}"
+#exitOnError $? "Unable to build cb server docker file"
 sh ./build-testrunner.sh "platform-cert" "${testRunnerDockerImageName} ${numNodes}"
 exitOnError $? "Unable to build testrunner platform-cert docker file"
 
