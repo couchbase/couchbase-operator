@@ -15,9 +15,15 @@ fi
 case "$imageType" in
     "1node"|"4node")
         srcDockerFile="./Dockerfile.nNode"
+        entryPointString="ENTRYPOINT [\"./entrypoint.sh\", \"$numNodes\"]"
         ;;
-    "platform-cert"|"tpcc")
+    "platform-cert")
         srcDockerFile="./Dockerfile.${imageType}"
+        entryPointString="ENTRYPOINT [\"./entrypoint.sh\", \"$numNodes\"]"
+        ;;
+    "tpcc")
+        srcDockerFile="./Dockerfile.${imageType}"
+        entryPointString="ENTRYPOINT [\"./entrypoint.sh\", \"$numNodes\", \"5.5.1-3511\", \"3600\"]"
         ;;
     "*")
         echo "Exiting: Invalid imageType '$imageType'"
@@ -25,6 +31,6 @@ case "$imageType" in
 esac
 
 cp $srcDockerFile ./Dockerfile
-echo "ENTRYPOINT [\"./entrypoint.sh\", \"$numNodes\"]" >> ./Dockerfile
+echo "$entryPointString" >> ./Dockerfile
 dockerBuildArgs="--build-arg testrunnerBranch=$testrunnerBranch --build-arg numNodes=$numNodes"
 docker build . $dockerBuildArgs -t $testRunnerDockerImageName

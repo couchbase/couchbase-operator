@@ -10,4 +10,3 @@ COPY ./tpcc/${numNodes}node.ini ${numNodes}node.ini
 COPY getNodeIps.py getNodeIps.py
 COPY tpcc-entrypoint.sh entrypoint.sh
 RUN chmod +x ./entrypoint.sh
-ENTRYPOINT ["./entrypoint.sh", "$numNodes", "5.5.0-2958", "3600"]
