@@ -173,6 +173,10 @@ done
 echo "Deleting files '$cbServerTarFileName' & '$testrunnerTarFileName'"
 rm -f $cbServerTarFileName $testrunnerTarFileName
 
+# Set proper couchbase server image in cb cluster yaml
+serverVer=$(echo $cbServerDockerImageName | cut -d':' -f 2)
+sed -i "s/version:.*\$/version: $serverVer/g" $cbClusterFile
+
 echo "Creating secret"
 showFileContent $secretFile
 kubectl --namespace=$namespace delete -f $secretFile &>/dev/null
