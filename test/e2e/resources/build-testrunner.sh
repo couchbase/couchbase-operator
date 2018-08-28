@@ -7,32 +7,24 @@ testrunnerBranch=master
 
 cd ./testrunner/
 
-if [ "$imageType" == "" ]; then
-    echo "Exiting: image type missing"
-    exit 1
-fi
-
 if [ "$testRunnerDockerImageName" == "" ]; then
     echo "Exiting: Docker image name missing"
     exit 1
 fi
 
-if [ "$imageType" == "1node" ]; then
-    cp ./Dockerfile.nNode ./Dockerfile
-fi
+case "$imageType" in
+    "1node"|"4node")
+        srcDockerFile="./Dockerfile.nNode"
+        ;;
+    "platform-cert"|"tpcc")
+        srcDockerFile="./Dockerfile.${imageType}"
+        ;;
+    "*")
+        echo "Exiting: Invalid imageType '$imageType'"
+        exit 1
+esac
 
-if [ "$imageType" == "4node" ]; then
-    cp ./Dockerfile.nNode ./Dockerfile
-fi
-
-if [ "$imageType" == "platform-cert" ]; then
-    cp ./Dockerfile.platform-cert ./Dockerfile
-fi
-
-if [ "$imageType" == "tpcc" ]; then
-    cp ./Dockerfile.tpcc ./Dockerfile
-fi
-
+cp $srcDockerFile ./Dockerfile
 echo "ENTRYPOINT [\"./entrypoint.sh\", \"$numNodes\"]" >> ./Dockerfile
 dockerBuildArgs="--build-arg testrunnerBranch=$testrunnerBranch --build-arg numNodes=$numNodes"
 docker build . $dockerBuildArgs -t $testRunnerDockerImageName

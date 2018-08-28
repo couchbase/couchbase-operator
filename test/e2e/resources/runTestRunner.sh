@@ -14,18 +14,19 @@ function showFileContent() {
 }
 
 #set variables
-targetCluster=kubernetes
-namespace=default
-testrunnerBranch=master
-serverBranchName=vulcan
+runType="nodeSanity"
+targetCluster="kubernetes"
+namespace="default"
+testrunnerBranch="master"
+serverBranchName="vulcan"
 numNodes=1
 cloudClusterNodeIpList=""
 cloudClusterMasterNodeIp=""
 
 sshArgs="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-sshUser=root
-sshPassword=couchbase
-dockerAccount=couchbase
+sshUser="root"
+sshPassword="couchbase"
+dockerAccount="couchbase"
 
 while [ $# -ne 0 ]
 do
@@ -42,6 +43,11 @@ do
 
     "--numNodes")
         numNodes=$2
+        shift ; shift
+        ;;
+
+    "--runType")
+        runType=$2
         shift ; shift
         ;;
 
@@ -90,41 +96,47 @@ do
     esac
 done
 
-#show variables
-echo "Using cloud space from '$targetCluster', namespace '$namespace'"
+# show variables
+echo "Using cloud space from '$targetCluster', namespace '$namespace' to run '$runType'"
 echo "Cloud node master: '$cloudClusterMasterNodeIp', workers: '$cloudClusterNodeIpList'"
 echo "Using docker hub account '$dockerAccount'"
 echo "Couchbase-operator version '$operatorVersion'"
 echo "Couchbase-server version '$serverVersion', build '$serverBuildNum', branch '$serverBranchName'"
 echo "Using testrunner branch '$testrunnerBranch' with '$numNodes' node cluster"
 
-# Create test.properties file contents
-echo "operatorVersion=$operatorVersion" >> ${WORKSPACE}/test.properties
-echo "operatorBranch=$operatorBranch" >> ${WORKSPACE}/test.properties
-echo "couchbaseVersion=$couchbaseVersion" >> ${WORKSPACE}/test.properties
-echo "couchbaseBranch=$couchbaseBranch" >> ${WORKSPACE}/test.properties
-echo "platformType=$platformType" >> ${WORKSPACE}/test.properties
-echo "platformVersion=$platformVersion" >> ${WORKSPACE}/test.properties
-echo "dockerAccount=$dockerAccount" >> ${WORKSPACE}/test.properties
-echo "testrunnerBranch=$testrunnerBranch" >> ${WORKSPACE}/test.properties
-showFileContent "${WORKSPACE}/test.properties"
+# Set target files and job name based on runType
+case "$runType" in
+    "nodeSanity")
+        cbClusterFile="./testrunner/${numNodes}node/cb-cluster-${numNodes}node.yaml"
+        testRunnerYamlFileName="./testrunner/${numNodes}node/${numNodes}node-sanity.yaml"
+        testRunnerImgTag="${numNodes}node"
+        jobName="testrunner-${numNodes}node-sanity"
+        ;;
+    "platform-cert"|"tpcc")
+        cbClusterFile="./testrunner/${runType}/cb-cluster-${numNodes}node.yaml"
+        testRunnerYamlFileName="./testrunner/${runType}/${runType}.yaml"
+        testRunnerImgTag="$runType"
+        jobName="testrunner-${runType}"
+        ;;
+    "*")
+        echo "Error: Invalid runType '$runType'"
+        exit 1
+esac
 
 deploymentFile="../../../example/deployment.yaml"
 secretFile="../../../example/secret.yaml"
 roleBindingFile="./testrunner/default-cluster-role-binding.yaml"
-cbClusterFile="./testrunner/${numNodes}node/cb-cluster-${numNodes}node.yaml"
-testRunnerYamlFileName="./testrunner/${numNodes}node/${numNodes}node-sanity.yaml"
 clusterName=$(grep "name:" $cbClusterFile | head -1 | xargs | cut -d' ' -f 2)
 
 cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$operatorVersion"
 cbServerDockerImageName="couchbase/server:${serverVersion}-test"
-testRunnerDockerImageName="${dockerAccount}/testrunner-cloud:${numNodes}node"
+testRunnerDockerImageName="${dockerAccount}/testrunner-cloud:$testRunnerImgTag"
 
 # Build required images #
 #sh ./build-cb-server.sh "$serverVersion" "$serverBuildNum" "$serverBranchName" "${cbServerDockerImageName}"
 #exitOnError $? "Unable to build cb server docker file"
-sh ./build-testrunner.sh "${numNodes}node" "$testRunnerDockerImageName" "$numNodes"
-exitOnError $? "Unable to build testrunner ${numNodes}node docker file"
+sh ./build-testrunner.sh "$testRunnerImgTag" "$testRunnerDockerImageName" "$numNodes"
+exitOnError $? "Unable to build testrunner $testRunnerImgTag docker file"
 
 #ship the docker images to the nodes
 
@@ -142,7 +154,7 @@ testrunnerTarFileName="testrunnerDockerImage.tar"
 rm -f $testrunnerTarFileName
 echo "Creating docker image tar file '$testrunnerTarFileName'"
 docker save -o $testrunnerTarFileName $testRunnerDockerImageName
-exitOnError $? "Unable to create tar of testrunner ${numNodes}node docker image"
+exitOnError $? "Unable to create tar of testrunner $testRunnerImgTag docker image"
 
 for nodeIp in $cloudClusterNodeIpList
 do
@@ -199,7 +211,7 @@ echo "############################## Using couchbase-server '$serverVersion' ###
 # wait for testrunner pod to be running
 while true
     do
-        testrunnerPodName=$(kubectl --namespace=$namespace get -l job-name=testrunner-${numNodes}node-sanity pods | tail -1 | awk '{print $1}')
+        testrunnerPodName=$(kubectl --namespace=$namespace get -l job-name=$jobName pods | tail -1 | awk '{print $1}')
         if [ "$testrunnerPodName" != "" ] ; then
             echo "Initializing pod '$testrunnerPodName'"
             for i in {1..300}
@@ -226,7 +238,7 @@ kubectl --namespace=$namespace logs --follow=true $testrunnerPodName &
 # Wait for testrunner job to complete
 while true
 do
-    currTestrunnerPod=$(kubectl --namespace=$namespace get -l job-name=testrunner-${numNodes}node-sanity pods | tail -1 | awk '{print $1}')
+    currTestrunnerPod=$(kubectl --namespace=$namespace get -l job-name=$jobName pods | tail -1 | awk '{print $1}')
     if [ "$currTestrunnerPod" != "$testrunnerPodName" ] ; then
         echo "job pod failed"
         kill %1
