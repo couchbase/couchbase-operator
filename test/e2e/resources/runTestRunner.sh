@@ -133,8 +133,8 @@ cbServerDockerImageName="couchbase/server:${serverVersion}-test"
 testRunnerDockerImageName="${dockerAccount}/testrunner-cloud:$testRunnerImgTag"
 
 # Build required images #
-#sh ./build-cb-server.sh "$serverVersion" "$serverBuildNum" "$serverBranchName" "${cbServerDockerImageName}"
-#exitOnError $? "Unable to build cb server docker file"
+sh ./build-cb-server.sh "$serverVersion" "$serverBuildNum" "$serverBranchName" "${cbServerDockerImageName}"
+exitOnError $? "Unable to build cb server docker file"
 sh ./build-testrunner.sh "$testRunnerImgTag" "$testRunnerDockerImageName" "$numNodes"
 exitOnError $? "Unable to build testrunner $testRunnerImgTag docker file"
 
