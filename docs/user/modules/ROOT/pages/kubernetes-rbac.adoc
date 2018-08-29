@@ -51,18 +51,24 @@ The Operator needs to verify that the requested storage class exists before clai
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: couchbase-operator-role
+  name: couchbase-operator
 rules:
-- apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - "*"
 - apiGroups:
   - couchbase.com
   resources:
   - couchbaseclusters
+  verbs:
+  - "*"
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - "get"
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
   verbs:
   - "*"
 - apiGroups:
@@ -72,17 +78,23 @@ rules:
   - services
   - endpoints
   - persistentvolumeclaims
-  - persistentvolumes
   - events
   - secrets
   verbs:
   - "*"
 - apiGroups:
-  - storage.k8s.io
+  - ""
   resources:
-  - storageclasses
+  - persistentvolumes
   verbs:
   - "get"
+  - "watch"
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - "*"
 ----
 
 TIP: You may improve security and resilience by running the Operator and the Couchbase Server clusters in an isolated namespace. This will restrict the resources that the Operator potentially has access to to only those that are defined in that namespace. The `NetworkPolicy` resource can also be used to restrict access to the clusters at the network level.
