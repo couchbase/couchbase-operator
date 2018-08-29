@@ -98,7 +98,7 @@ If the Web Console is exposed, you can use the CLI tool from any computer that c
 Prerequisites:
 
 * Expose the Web Console using the CouchbaseCluster configuration file.
-* Download the couchbase-cli to your client machine:  https://github.com/couchbase/couchbase-cli
+* Install Couchbase Server on your computer (so that you have `couchbase-cli` on your computer)
 
 Use the following command to retrieve the Web Console port:
 
@@ -123,7 +123,7 @@ Output:
 Admin Console Port:  32486
 ----
 
-You can now use `couchbase-cli` to administer the cluster. For example, adding an RBAC user:
+If you have Couchbase Server installed on your computer, you can now use `couchbase-cli` to administer the cluster. For example, adding an RBAC user:
 
 [source,console]
 ----
@@ -141,7 +141,7 @@ To create the `collect-info` job on Kubernetes:
 
 [source,console]
 ----
-kubectl create -f <unpack-directory>/couchbase-cli-collect-logs.yaml
+kubectl create -f couchbase-cli-collect-logs.yaml
 ----
 
 To check the status on Kubernetes:
@@ -153,7 +153,7 @@ To create the `collect-info` job on OpenShift:
 
 [source,console]
 ----
-oc create -f <unpack-directory>/couchbase-cli-collect-logs.yaml
+oc create -f couchbase-cli-collect-logs.yaml
 ----
 
 To check the status on Kubernetes:

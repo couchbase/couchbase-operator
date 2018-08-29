@@ -11,7 +11,9 @@ This tutorial walks you through the steps to deploy a three-node cluster with pr
 +
 `cbopctl` is a command line tool similar to `kubectl` or `oc`, except that it performs an extra check on the CouchbaseCluster configuration being sent to Kubernetes to ensure that it is valid.
 +
-The Operator package also contains YAML configuration files that will help you set up a Couchbase cluster. After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator_x.x.x-linux_x86_64`. This directory will be referred to as _<unpack-directory>_ in the various commands in this guide.
+The Operator package also contains YAML configuration files that will help you set up a Couchbase cluster.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
 == Create a Couchbase Cluster
 
@@ -19,14 +21,14 @@ The Operator package also contains YAML configuration files that will help you s
 +
 [source,console]
 ----
-cbopctl apply -f  <unpack-directory>/couchbase-cluster.yaml
+cbopctl apply -f  couchbase-cluster.yaml
 ----
 
 * OpenShift
 +
 [source,console]
 ----
-cbopctl apply -f  <unpack-directory>/couchbase-cluster.yaml
+cbopctl apply -f  couchbase-cluster.yaml
 ----
 
 == Create a Couchbase RBAC User
@@ -58,7 +60,7 @@ The result should be something like:
 Admin Console Port: 32486
 ----
 
-Next, create a Couchbase RBAC user by running the following command:
+If you have Couchbase Server installed on your computer, use `couchbase-cli` create a Couchbase RBAC user by running the following command:
 
 [source,console]
 ----
@@ -98,7 +100,7 @@ Now, use the RBAC user's secret to securely create a Couchbase RBAC user using a
 +
 [source,console]
 ----
-$ kubectl create -f <unpack-directory>/couchbase-cli-create-user.yaml
+$ kubectl create -f couchbase-cli-create-user.yaml
 job "create-user" created
 ----
 +
@@ -113,7 +115,7 @@ create-user   1         1            4s
 +
 [source,console]
 ----
-$ oc create -f <unpack-directory>/couchbase-cli-create-user.yaml
+$ oc create -f couchbase-cli-create-user.yaml
 job "create-user" created
 ----
 +
@@ -142,7 +144,7 @@ The name of the secret and its keys are very important as the sample `create-use
 
 [source,yaml]
 ----
-<unpack-directory>/couchbase-cli-create-user.yaml
+couchbase-cli-create-user.yaml
 ---
 apiVersion: batch/v1
 kind: Job
@@ -199,14 +201,14 @@ To deploy the `pillowfight` data loader, run the following command:
 +
 [source,console]
 ----
-$ kubectl create -f <unpack-directory>/pillowfight-data-loader.yaml
+$ kubectl create -f pillowfight-data-loader.yaml
 ----
 
 * OpenShift:
 +
 [source,console]
 ----
-$ oc create -f <unpack-directory>/pillowfight-data-loader-openshift.yaml
+$ oc create -f pillowfight-data-loader-openshift.yaml
 ----
 
 Once it completes, you should have 10k items loaded into your cluster.

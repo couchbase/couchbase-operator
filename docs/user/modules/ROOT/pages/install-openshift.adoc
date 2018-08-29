@@ -19,7 +19,7 @@ Download the Operator https://www.couchbase.com/downloads[package] and unpack it
 
 The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
 
-After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator_x.x.x-linux_x86_64`. This directory will be referred to as _<unpack-directory>_ in the various commands in this guide.
+IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-openshift.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
 == Quick Start
 
@@ -146,7 +146,7 @@ oc login -u system:admin
 
 [source,console]
 ----
-oc create -f <unpack-directory>/crd.yaml
+oc create -f crd.yaml
 ----
 
 NOTE: You only need to install the CRD once. After that, you can create the Operator in any OpenShift project.
@@ -159,7 +159,7 @@ To create the cluster role for the Operator, run the following command as the `s
 
 [source,console]
 ----
-oc create -f <unpack-directory>/cluster-role-sa.yaml
+oc create -f cluster-role-sa.yaml
 ----
 
 NOTE: You only need to create the cluster role once.
@@ -200,7 +200,7 @@ Run the following command to create the cluster role for `developer`:
 
 [source,console]
 ----
-oc create -f <unpack-directory>/cluster-role-user.yaml
+oc create -f cluster-role-user.yaml
 ----
 
 Next, you need to allow `developer` to be able to manage the CouchbaseCluster resource in the `operator-example-namespace` project:
@@ -225,7 +225,7 @@ At this point you can now use the `developer` user to create the Operator in the
 
 [source,console]
 ----
-oc create -f <unpack-directory>/operator.yaml -n operator-example-namespace
+oc create -f operator.yaml -n operator-example-namespace
 ----
 
 Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.

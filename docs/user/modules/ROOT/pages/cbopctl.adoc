@@ -30,7 +30,7 @@ After you unpack the download, the resulting directory will be titled something 
 +
 [source,console]
 ----
-chmod +x <unpack-directory>/bin/cbopctl
+chmod +x /bin/cbopctl
 ----
 
 == Syntax

@@ -19,7 +19,7 @@ Download the Operator https://www.couchbase.com/downloads[package] and unpack it
 
 The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
 
-After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator_x.x.x-linux_x86_64`. This directory will be referred to as _<unpack-directory>_ in the various commands in this guide.
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
 == Create a Cluster Role
 
@@ -29,7 +29,7 @@ To create the cluster role for the Operator, run the following command:
 
 [source,console]
 ----
-kubectl create -f <unpack-directory>/cluster-role.yaml
+kubectl create -f cluster-role.yaml
 ----
 
 NOTE: This cluster role only needs to be created once.
@@ -60,7 +60,7 @@ Now that the service account is set up with the appropriate permissions, you can
 
 [source,console]
 ----
-kubectl create -f <unpack-directory>/operator.yaml
+kubectl create -f operator.yaml
 ----
 
 Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
