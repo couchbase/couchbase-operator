@@ -10,6 +10,8 @@ spec:
   paused: false
   exposedFeatures:
     - xdcr
+    - admin
+    - client
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
