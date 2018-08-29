@@ -33,7 +33,7 @@ $(BINARY): $(SOURCE)
 container: build
 	docker build -f Dockerfile -t couchbase/couchbase-operator:v1 .
 
-container-rhel:
+container-rhel: build
 	docker build -f Dockerfile.rhel -t couchbase/couchbase-operator-rhel:v1 .
 
 tools:
