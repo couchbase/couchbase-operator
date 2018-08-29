@@ -11,7 +11,7 @@ This guide walks through the recommended procedure for installing the Couchbase 
 
 If you have an OpenShift environment that already has a custom setup (non-default), you should be able to modify a few of the parameters in the various commands and configuration files mentioned in this guide in order to fit your requirements.
 
-IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your OpenShift environment. Refer to the  xref:kubernetes-rbac.adoc[RBAC doumentation] before you install the Operator, as your OpenShift environment may differ from the environment upon which this guide is based.
+IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your OpenShift environment. Refer to the  xref:kubernetes-rbac.adoc[RBAC documentation] before you install the Operator, as your OpenShift environment may differ from the environment upon which this guide is based.
 
 == Prerequisites
 
@@ -87,6 +87,15 @@ oc create rolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_
 oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
 oc logout
 
+# To enable automatic installation of images from the Red Hat Container Catalog,
+# you will require a Red Hat account and configure a kubernetes secret with your
+# Red Hat username and password. Once you create your secret you must assign it
+# to the couchbase-operator and default service accounts.
+oc create secret docker-registry regcred --docker-server=registry.connect.redhat.com \
+  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
+oc secrets add serviceaccount/couchbase-operator secrets/rh-catalog --for=pull
+oc secrets add serviceaccount/default secrets/rh-catalog --for=pull'
+
 # Deploy the Operator as an unprivileged user
 oc login -u ${USER_ACCOUNT}
 oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/operator.yaml -n ${NAMESPACE}
@@ -113,6 +122,16 @@ oc logout
 ----
 
 In this example, the standard user is `developer`, and the project is `operator-example-namespace`. Later in this guide you will give `developer` the ability to manage the Operator and the Couchbase Server clusters in `operator-example-namespace`.
+
+== Create an imagePullSecret
+
+Red Hat recommends that all containers run in OpenShift are built with Red Hat Enterprise Linux. Couchbase provides these images to users through the Red Hat Container Catalog and using this catalog requires creating an imagePullSecret so that docker knows where to look for images. To create an imagePullSecret for the Red Hat Container Catalog run the command below.
+
+[source,console]
+----
+oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
+  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
+----
 
 == Install the Custom Resource Definition
 
@@ -152,6 +171,14 @@ To create the service account:
 [source,console]
 ----
 oc create serviceaccount couchbase-operator --namespace operator-example-namespace
+----
+
+Next we need to register our imagePullSecret with the service account that runs the operator so that it can pull images from the Red Hat Container Catalog.
+
+[source,console]
+----
+oc secrets add serviceaccount/couchbase-operator secrets/rh-catalog --for=pull
+oc secrets add serviceaccount/default secrets/rh-catalog --for=pull
 ----
 
 To assign the cluster role to the service account:
