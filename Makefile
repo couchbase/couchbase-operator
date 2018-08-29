@@ -34,7 +34,7 @@ container: build
 	docker build -f Dockerfile -t couchbase/couchbase-operator:v1 .
 
 container-rhel: build
-	docker build -f Dockerfile.rhel -t couchbase/couchbase-operator-rhel:v1 .
+	docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
 
 tools:
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopctl ./cmd/cbopctl/
