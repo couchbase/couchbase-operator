@@ -118,6 +118,10 @@ case "$runType" in
         testRunnerImgTag="$runType"
         jobName="testrunner-${runType}"
         ;;
+    "sdk-sanity")
+        cbClusterFile="./sdk/sanity/cb-cluster-${numNodes}node.yaml"
+        testRunnerYamlFileName="./sdk/sanity/sdk-sanity.yaml"
+        ;;
     "*")
         echo "Error: Invalid runType '$runType'"
         exit 1
@@ -177,6 +181,10 @@ rm -f $cbServerTarFileName $testrunnerTarFileName
 serverVer=$(echo $cbServerDockerImageName | cut -d':' -f 2)
 sed -i "s/version:.*\$/version: $serverVer/g" $cbClusterFile
 
+echo "Setting cb cluster to pause=false"
+sed -i "s/paused: .*\$/paused: false/g" $cbClusterFile
+exitOnError $? "Unable to replace string in cbcluster yaml"
+
 echo "Creating secret"
 showFileContent $secretFile
 kubectl --namespace=$namespace delete -f $secretFile &>/dev/null
@@ -195,7 +203,23 @@ kubectl --namespace=$namespace delete -f $cbClusterFile &>/dev/null
 kubectl --namespace=$namespace create -f $cbClusterFile
 exitOnError $? "Unable to create cb cluster"
 
-sleep 180
+echo "Waiting for cluster size to reach $numNodes nodes"
+for index in {1..60}
+do
+    podLen=$(kubectl --namespace=$namespace get pods -l couchbase_cluster=cb-example -o json | jq '.items|length')
+    if [ $podLen -eq $numNodes ]; then
+        # Sleep for last pod to be added into cluster and rebalanced in
+        sleep 60
+        break
+    fi
+    sleep 15
+done
+
+if [ $podLen -ne $numNodes ]; then
+    echo "Error: All cb server pods not yet initialized"
+    kubectl --namespace=$namespace get pods
+    exit 1
+fi
 
 echo "Pausing couchbase operator.."
 sed -i "s/paused: false/paused: true/g" $cbClusterFile

@@ -1,8 +1,9 @@
 import sys
 from kubernetes import client, config
 
+
 def main():
-    currNameSpace=sys.argv[1]
+    currNameSpace = sys.argv[1]
     config.load_incluster_config()
     v1 = client.CoreV1Api()
     nodeList = v1.list_pod_for_all_namespaces(watch=False)
