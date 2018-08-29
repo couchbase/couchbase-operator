@@ -1,8 +1,8 @@
 = Release Notes
 
-Couchbase Autonomous Operator 1.0 is the first production-ready native integration of Couchbase Server with Kubernetes platforms.
+Couchbase Autonomous Operator 1.0 provides the first native integration of Couchbase Server with Kubernetes platforms.
 
-The goal of the Operator is to fully manage one or more Couchbase Server deployments so that you don’t need to worry about the operational complexities of running Couchbase. The following is a list of the Couchbase features and management tasks that are currently supported:
+The goal of the Operator is to fully manage one or more Couchbase Server deployments so that you don’t need to worry about the operational complexities of running Couchbase. The following is a summary of the Couchbase features and management tasks that are currently supported:
 
 * Cluster configuration
 
@@ -16,7 +16,7 @@ The goal of the Operator is to fully manage one or more Couchbase Server deploym
 
 * XDCR
 
-* Server Groups
+* Server groups
 
 * TLS
 
@@ -26,42 +26,49 @@ Couchbase Autonomous Operator 1.0 was released in August 2018.
 
 == Platform Support
 
-For the latest platform support information, see xref:prerequisite-and-setup.adoc[Prerequisites and Setup].
+For the latest platform support information, see xref:prerequisite-and-setup.adoc[Prerequisites].
 
 == Known Issues and Limitations
 
-[#table-known-issues-1.0.0,cols="1,3",options="header"]
+[#table_knownissues_v1,cols="25,66"]
 |===
+| Issue | Description
 
-|Issue
-|Description
+| https://issues.couchbase.com/browse/K8S-504[K8S-504]
+| *Summary*: Pod volumes are deleted when pods are deleted.
+As a result, important debugging information may not be available after a failure.
 
-|xref:https://issues.couchbase.com/browse/K8S-538[K8S-538]
-|
+| https://issues.couchbase.com/browse/K8S-538[K8S-538]
+| *Summary*: `cbopinfo` does not redact potentially sensitive information from all logs.
 
-|xref:https://issues.couchbase.com/browse/K8S-327[K8S-327]
-|
+| https://issues.couchbase.com/browse/K8S-493[K8S-493]
+| *Summary*: It's not possible to attach a persistent volume to the Couchbase logs directory for deployments when Couchbase data is not written to a persistent volume.
+This means that important debugging information may be unavailable during failure situations.
 
-|xref:https://issues.couchbase.com/browse/K8S-504[K8S-504]
-|
+*Workaround*: You should always deploy Couchbase clusters in production with persistent volumes.
 
-|xref:https://issues.couchbase.com/browse/K8S-421[K8S-421]
-|
+| https://issues.couchbase.com/browse/K8S-389[K8S-389]
+| *Summary*: Kubernetes doesn't allow the setting of ulimit parameters on individual containers.
 
-|xref:https://issues.couchbase.com/browse/K8S-493[K8S-493]
-|
+*Workaround*: You can set ulimits on the physical machine that Kubernetes is running on; the ulimit parameters will be inherited by the containers.
 
-|xref:https://issues.couchbase.com/browse/K8S-389[K8S-389]
-|
+| https://issues.couchbase.com/browse/K8S-531[K8S-531]
+| *Summary*: When the same event occurs on different Couchbase nodes, the event order is not reported consistently.
+This may affect applications that rely on the event order to be consistent when checking the status of a Couchbase cluster.
 
-|xref:https://issues.couchbase.com/browse/K8S-89[K8S-89]
-|
+| https://issues.couchbase.com/browse/K8S-421[K8S-421]
+| *Summary*: If a cluster is scaling up when not enough nodes are present, the Operator will not rebalance the cluster even if some nodes can be added.
 
-|xref:https://issues.couchbase.com/browse/K8S-531[K8S-531]
-|
+*Workaround*: You should ensure that sufficient resources are present in the Kubernetes cluster before scaling a Couchbase cluster.
 
-|xref:https://issues.couchbase.com/browse/K8S-537[K8S-537]
-|
+| https://issues.couchbase.com/browse/K8S-89[K8S-89]
+| *Summary*: If you manually increase the number of replicas of a bucket, then the Operator may rebalance the cluster before reverting the bucket's changes.
+
+*Workaround*: You should always change the CouchbaseCluster configuration through the Operator.
+If you change the CouchbaseCluster configuration directly on the cluster (such as through the Couchbase Server Web Console), then the Operator will revert those changes.
+
+| https://issues.couchbase.com/browse/K8S-537[K8S-537]
+| *Summary*: In rare cases, Kubernetes can drop events that are logged by the Operator.
 
 |===
 
