@@ -47,6 +47,9 @@ This means that important debugging information may be unavailable during failur
 
 *Workaround*: You should always deploy Couchbase clusters in production with persistent volumes.
 
+| https://issues.couchbase.com/browse/K8S-556[K8S-556]
+| *Summary*: Only dynamic volume provisioning via storage classes is supported.
+
 | https://issues.couchbase.com/browse/K8S-389[K8S-389]
 | *Summary*: Kubernetes doesn't allow the setting of ulimit parameters on individual containers.
 

@@ -10,7 +10,7 @@ On Kubernetes:
 
 [source,console]
 ----
-kubectl delete -f my-cluster.yaml
+cbopctl delete -f my-cluster.yaml
 ----
 
 On OpenShift:
@@ -28,7 +28,7 @@ On Kubernetes:
 
 [source,console]
 ----
-kubectl delete couchbasecluster my-cluster
+cbopctl delete couchbasecluster my-cluster
 ----
 
 On OpenShift:

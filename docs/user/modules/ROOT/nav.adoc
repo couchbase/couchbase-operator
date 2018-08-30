@@ -13,6 +13,7 @@
 * xref:deploying-couchbase.adoc[Deploying Couchbase Server]
  ** xref:couchbase-cluster-config.adoc[Couchbase Configuration Settings]
  ** xref:networking.adoc[About Kubernetes Networking]
+  *** xref:xdcr.adoc[Using XDCR]
   *** xref:tls.adoc[Configuring TLS]
  ** xref:accessing-couchbase.adoc[Accessing the Couchbase User Interfaces]
  ** xref:persisted-volumes-guide.adoc[About Persistent Volumes]

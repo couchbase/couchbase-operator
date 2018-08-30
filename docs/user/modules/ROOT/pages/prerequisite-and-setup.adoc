@@ -62,6 +62,7 @@ Supported 3.10+
 ^| {chk}
 |===
 
+Only dynamic volume provisioning using storage classes is currently supported.
 
 == RBAC and Networking Requirements
 

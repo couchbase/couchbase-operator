@@ -1,6 +1,6 @@
 = Setting up Persistent Volumes
 
-The following steps outline the setup of kubernetes for https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/[dynamic provisioning] of Persistent Volumes.
+The following steps outline the setup of kubernetes for https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/[dynamic provisioning] of Persistent Volumes. Only dynamic volume provisioning using storage classes is currently supported.
 
 == Create Storage Class
 
