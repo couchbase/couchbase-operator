@@ -83,7 +83,7 @@ oc login -u ${ADMIN_ACCOUNT}
 oc create -f crd.yaml
 oc create -f cluster-role-sa.yaml
 oc create -f cluster-role-user.yaml
-oc create rolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_CLUSTER_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}
+oc create clusterrolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_CLUSTER_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}
 oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
 oc logout
 
@@ -185,7 +185,7 @@ To assign the cluster role to the service account:
 
 [source,console]
 ----
-oc create rolebinding couchbase-operator-rolebinding --clusterrole couchbase-operator --serviceaccount operator-example-namespace:couchbase-operator
+oc create clusterrolebinding couchbase-operator-rolebinding --clusterrole couchbase-operator --serviceaccount operator-example-namespace:couchbase-operator
 ----
 
 A service account is used as opposed to a traditional user for the Operator because service accounts are meant to be used for processes running in OpenShift.
