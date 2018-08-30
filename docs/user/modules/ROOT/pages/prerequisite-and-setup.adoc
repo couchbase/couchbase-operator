@@ -32,7 +32,7 @@ Supported 3.10+
 .Public Container Service Compatibility List
 [#table-operator-compatibility-public,cols="1,1,1,1",options="header"]
 |===
-| | Amazon EKS | Google GKE | Microsoft ACS
+| | Amazon EKS | Google GKE | Microsoft AKS
 
 | *Operator 1.0*
 ^| Developer Preview

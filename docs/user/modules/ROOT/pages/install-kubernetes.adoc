@@ -19,7 +19,7 @@ Download the Operator https://www.couchbase.com/downloads[package] and unpack it
 
 The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
 
-After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
+IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
 == Create a Cluster Role
 

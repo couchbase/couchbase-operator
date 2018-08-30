@@ -80,9 +80,9 @@ oc logout
 # As a privileged user create the custom resource definition, roles and bind
 # them to the service and user accounts
 oc login -u ${ADMIN_ACCOUNT}
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/crd.yaml
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-sa.yaml
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/cluster-role-user.yaml
+oc create -f crd.yaml
+oc create -f cluster-role-sa.yaml
+oc create -f cluster-role-user.yaml
 oc create rolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_CLUSTER_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}
 oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
 oc logout
@@ -98,7 +98,7 @@ oc secrets add serviceaccount/default secrets/rh-catalog --for=pull'
 
 # Deploy the Operator as an unprivileged user
 oc login -u ${USER_ACCOUNT}
-oc create -f https://packages.couchbase.com/kubernetes/1.0.0/openshift/operator.yaml -n ${NAMESPACE}
+oc create -f operator.yaml -n ${NAMESPACE}
 oc logout
 ----
 

@@ -5,6 +5,7 @@ This tutorial walks you through the steps to deploy a three-node cluster with pr
 .This tutorial assumes the following:
 
 * You have a working knowledge of Kubernetes
+* You have deployed the Operator and it is up and running
 * You have reviewed the xref:prerequisite-and-setup.adoc[prerequisites] and prepared your Kubernetes or OpenShift cluster to run Couchbase pods
 * You have administrative privileges for the Kubernetes or OpenShift cluster
 * You have downloaded the Operator https://www.couchbase.com/downloads[package] and installed xref:cbopctl.adoc[cbopctl]
@@ -60,11 +61,11 @@ The result should be something like:
 Admin Console Port: 32486
 ----
 
-If you have Couchbase Server installed on your computer, use `couchbase-cli` create a Couchbase RBAC user by running the following command:
+If you have Couchbase Server installed on your computer, use `couchbase-cli` to create a Couchbase RBAC user by running the following command:
 
 [source,console]
 ----
-./couchbase-cli user-manage -c 192.168.99.100:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
+./couchbase-cli user-manage -c <kubernetes-node-ip>:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
 ----
 
 (You can skip to the next step: Loading data)
@@ -127,7 +128,7 @@ create-user   1         1            4s
 ----
 
 If you are not using the default namespace, edit the `couchbase-cli-create-user.yaml` file to reflect your namespace.
-For example, if your namespace is `myproject`, edit the command field in the YAML file to replace `cb-example-0000.cb-example.default.svc` with `cb-example-0000.cb-example.myproject.svc`. The updated field will now look like the following snippet:
+For example, if your namespace is `myproject`, edit the command field in the YAML file to replace `${CLUSTER_NAME}` with `cb-example-0000.cb-example.myproject.svc`. The updated field will now look like the following snippet:
 
 [source,yaml]
 ----

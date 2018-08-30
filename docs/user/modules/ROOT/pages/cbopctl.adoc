@@ -25,12 +25,25 @@ Until Kubernetes provides full native validation, you must use `cbopctl` wheneve
 
 . Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `kubectl` or `oc`.
 +
-After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator_x.x.x-linux_x86_64`. The command-line tools are located in `/bin`.
-. Use the following command to make `cbopctl` executable:
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Go to the following directory:
 +
 [source,console]
 ----
-chmod +x /bin/cbopctl
+cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
+----
+
+. Make the `cbopctl` binary executable:
++
+[source,console]
+----
+chmod +x ./cbopctl
+----
+
+. Move the binary into your PATH.
++
+[source,console]
+----
+sudo mv ./cbopctl /usr/local/bin/cbopctl
 ----
 
 == Syntax

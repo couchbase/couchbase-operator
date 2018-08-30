@@ -14,13 +14,25 @@ The output is a compressed archive of resource YAML manifests organized by names
 
 . Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `kubectl` or `oc`.
 +
-After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
-
-Use the following command to make `cbopinfo` executable:
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Go to the following directory:
 +
 [source,console]
 ----
-chmod +x /bin/cbopinfo
+cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
+----
+
+. Make the `cbopinfo` binary executable:
++
+[source,console]
+----
+chmod +x ./cbopinfo
+----
+
+. Move the binary into your PATH.
++
+[source,console]
+----
+sudo mv ./cbopinfo /usr/local/bin/cbopinfo
 ----
 
 == Syntax
