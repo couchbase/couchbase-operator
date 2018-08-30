@@ -3,9 +3,12 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  baseImage: couchbase/server
-  version: enterprise-5.5.1
+  baseImage: registry.connect.redhat.com/couchbase/server
+  version: 5.5.1-1
   authSecret: cb-example-auth
+  exposeAdminConsole: true
+  adminCondoleServices:
+    - data
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
