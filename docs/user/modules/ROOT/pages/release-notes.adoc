@@ -30,6 +30,14 @@ For the latest platform support information, see xref:prerequisite-and-setup.ado
 
 == Known Issues and Limitations
 
+.Known Limitations
+* Upgrading Couchbase Server using the Operator is not currently supported.
+
+* The Operator manages the state of the Couchbase Server cluster. Therefore, at this time, all cluster configuration changes must be made by modifying the CouchbaseCluster configuration file and pushing it to Kubernetes. Any manual changes to the configuration that are made using the Couchbase Server Web Console, CLI, REST API, or SDK will be reverted by the Operator. This includes things like adding a node or creating a server group.
++
+The one exception is when `disableBucketManagement` is set to `true` in the CouchbaseCluster configuration (the default is `false`). If this is the case, the creation and deletion of Couchbase buckets must be done manually. Refer to the CouchbaseCluster xref:couchbase-cluster-config.adoc[documentation] for more information.
+
+.Known Issues
 [#table_knownissues_v1,cols="25,66"]
 |===
 | Issue | Description
@@ -81,7 +89,7 @@ You can have a big impact on future versions of the Operator (and its documentat
 
 == Licenses for Third-Party Components
 
-The complete list of licenses for Couchbase products is available on the xref:https://www.couchbase.com/legal/agreements[Legal Agreements] page. Couchbase is thankful to all of the individuals that have created these third-party components.
+The complete list of licenses for Couchbase products is available on the https://www.couchbase.com/legal/agreements[Legal Agreements] page. Couchbase is thankful to all of the individuals that have created these third-party components.
 
 == More Information
 

@@ -12,7 +12,7 @@ Certified:: Couchbase has performed an extensive testing and review process to m
 
 Supported:: Couchbase believes that the Operator will run well out of the box on the specified platform, but extensive testing has not been performed. Couchbase will make a best effort to investigate issues on a Supported platform version, but it is recommended that you run the Operator on a Certified platform version.
 
-Developer Preview:: Couchbase is still developing on the specified platform, and it is not yet supported.
+Developer Preview:: Couchbase is still developing functionality for the specified platform, but you are encouraged to start your own testing and provide early feedback.
 
 .Platform Compatibility List
 [#table-operator-compatibility,cols="1,1,1,1",options="header"]

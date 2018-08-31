@@ -4,12 +4,20 @@ Couchbase supports transport layer security [TLS] in order to encrypt communicat
 
 The basic requirements are:
 
-* A certificate authority [CA] certificate which will be used by all actors to validate that peer certificates have been digitally signed by a trusted CA
-* A server certificate/key pair for all nodes in the Couchbase cluster.  If using a hierarchy of intermediate CAs these must be appended to the client certificate, ending in the intermediate CA signed by the top-level CA.  Server certificates must have a subject alternative name [SAN] set so that a client can assert that the host name it is connecting to is the same as that in the certificate.  We currently support using wildcard entries only e.g. `*.cluster.domain.svc`, where _cluster_ is the name of the _couchbasecluster_ resource, and _domain_ is the namespace the cluster is running in (typically _default_).
+* A certificate authority (CA) certificate which will be used by all actors to validate that peer certificates have been digitally signed by a trusted CA.
 
-IMPORTANT: In version 1.0.0+ TLS certifcates are installed as part of the pod creation process, and cannot be enabled on an existing cluster.
+* A server certificate/key pair for all nodes in the Couchbase cluster. If you are using a hierarchy of intermediate CAs, these must be appended to the client certificate, ending in the intermediate CA that is signed by the top-level CA. Server certificates must have a subject alternative name (SAN) set so that a client can assert that the host name that it's connecting to is the same as that in the certificate.
++
+Couchbase currently supports using wildcard entries only. For example, `*.cluster.domain.svc` where _cluster_ is the name of the CouchbaseCluster resource, and _domain_ is the namespace that the cluster is running in (typically `default`).
 
-IMPORTANT: In version 1.0.0+ TLS csertificate rotation is not supported.
+[NOTE]
+====
+Limitations:
+
+* TLS certificates are installed as part of the pod creation process, and cannot be enabled on an existing cluster.
+
+* TLS certificate rotation is not supported.
+====
 
 == Configuration
 
@@ -27,15 +35,15 @@ spec:
   ...
 ----
 
-For static TLS configuration _serverSecret_ and _operatorSecret_ need to be specified.  These refer to named Kubernetes secrets which are described below.
+For a static TLS configuration, `serverSecret` and `operatorSecret` need to be specified. These refer to named Kubernetes secrets which are described below.
 
 == Creating Secrets
 
-Secrets are referred to in the _couchbasecluster_ resource, therefore may have any name you choose.  The format of individual secrets is discussed below.
+Secrets are specified in the CouchbaseCluster resource, therefore they may have any name you choose. The format of individual secrets is discussed below.
 
 === spec.tls.static.member.serverSecret
 
-Server secrets need to be mounted as a volume within the Couchbase Server pod with specific names.  The certificate chain must be named _chain.pem_ and the private key _pkey.pem_.
+Server secrets need to be mounted as a volume within the Couchbase Server pod with specific names. The certificate chain must be named `chain.pem` and the private key `pkey.pem`.
 
 [source,console]
 ----
@@ -46,7 +54,7 @@ kubectl create secret generic couchbase-server-tls \
 
 === spec.tls.static.operatorSecret
 
-The operator client secrets are read directly from the API.  We expect only a single value to be present; _ca.crt_ is the top-level CA which is used to authenticate all TLS server certificate chains.
+The Couchbase Autonomous Operator client secrets are read directly from the API. It expects only a single value to be present; `ca.crt` is the top-level CA which is used to authenticate all TLS server certificate chains.
 
 [source,console]
 ----
@@ -60,42 +68,51 @@ Creating X.509 certificates is beyond the scope of this documentation and is giv
 
 === EasyRSA
 
-EasyRSA by OpenVPN makes operating a public key infrastructure [PKI] relatively simple, and is the recommended method to get up and running quickly.
+EasyRSA by OpenVPN makes operating a public key infrastructure (PKI) relatively simple, and is the recommended method to get up and running quickly.
 
 First clone the repository:
 
 [source,console]
 ----
-$ git clone https://github.com/OpenVPN/easy-rsa
+git clone https://github.com/OpenVPN/easy-rsa
 ----
 
-Initialize and create the CA certificate/key.  You will be prompted for a private key password and the CA common name [CN], something like _Couchbase CA_ is sufficient.  The CA certificate will be available as _pki/ca.crt_.
+Initialize and create the CA certificate/key. You will be prompted for a private key password and the CA common name (CN), something like _Couchbase CA_ is sufficient. The CA certificate will be available as `pki/ca.crt`.
 
 [source,console]
 ----
-$ cd easy-rsa/easyrsa3
-
-$ ./easyrsa init-pki
-
-$ ./easyrsa build-ca
+cd easy-rsa/easyrsa3
 ----
 
-Create a server wildcard certificate and key to be used on Couchbase Server pods.  The operator/clients will access the pods via Kubernetes services for example _cb-example-0000.cb-example.default.svc_ so this needs to be in the SAN list in order for a client to verify the certificate belongs to the host being connected to.  To this end we add in a _--subject-alt-name_, this can be specified multiple times in case your client uses a different method of addressing.  The key/certificate pair can be found in _pki/private/couchbase-server.key_ and _pki/issued/coouchbase-server.crt_ and used as _pkey.pem_ and in the _chain.pem_ files respectively in the _serverSecret_.
+[source,console]
+----
+./easyrsa init-pki
+----
+
+[source,console]
+----
+./easyrsa build-ca
+----
+
+Create a server wildcard certificate and key to be used on Couchbase Server pods. The Operator/clients will access the pods via Kubernetes services (`cb-example-0000.cb-example.default.svc`, for example) so this needs to be in the SAN list in order for a client to verify the certificate belongs to the host that is being connected to. To this end, we add in a `--subject-alt-name`, this can be specified multiple times in case your client uses a different method of addressing. The key/certificate pair can be found in `pki/private/couchbase-server.key` and `pki/issued/couchbase-server.crt` and used as `pkey.pem` and `chain.pem`, respectively, in the `serverSecret`.
 
 [source,console]
 ----
 ./easyrsa --subject-alt-name=DNS:*.cb-example.default.svc build-server-full couchbase-server nopass
 ----
 
-Please note that password protected keys are supported by neither Couchbase Server nor Couchbase Operator.
+Note, password protected keys are not supported by Couchbase Server or the Operator.
 
 ==== Private Key Formatting
 
-Due to an https://issues.couchbase.com/browse/MB-24404[issue] with Couchbase server's private key handling, server keys need to be PKCS#1 formatted.  This can be achieved with the following commands:
+Due to an https://issues.couchbase.com/browse/MB-24404[issue] with Couchbase Server's private key handling, server keys need to be PKCS#1 formatted. This can be achieved with the following commands:
 
 [source,console]
 ----
-$ openssl rsa -in pkey.key -out pkey.key.der -outform DER
+openssl rsa -in pkey.key -out pkey.key.der -outform DER
+----
 
-$ openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
+[source,console]
+----
+openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
 ----
