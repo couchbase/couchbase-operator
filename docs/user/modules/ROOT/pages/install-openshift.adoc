@@ -91,10 +91,10 @@ oc logout
 # you will require a Red Hat account and configure a kubernetes secret with your
 # Red Hat username and password. Once you create your secret you must assign it
 # to the couchbase-operator and default service accounts.
-oc create secret docker-registry regcred --docker-server=registry.connect.redhat.com \
+oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
   --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
 oc secrets add serviceaccount/couchbase-operator secrets/rh-catalog --for=pull
-oc secrets add serviceaccount/default secrets/rh-catalog --for=pull'
+oc secrets add serviceaccount/default secrets/rh-catalog --for=pull
 
 # Deploy the Operator as an unprivileged user
 oc login -u ${USER_ACCOUNT}
