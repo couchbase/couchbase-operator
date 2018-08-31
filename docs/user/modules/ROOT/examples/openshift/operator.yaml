@@ -17,6 +17,8 @@ spec:
         image: registry.connect.redhat.com/couchbase/operator:1.0.0-1
         command:
         - couchbase-operator
+        args:
+        - -enable-upgrades=false # Disable experimental upgrade feature
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:
