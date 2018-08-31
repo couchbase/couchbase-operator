@@ -7,7 +7,7 @@ spec:
   version: enterprise-5.5.1
   authSecret: cb-example-auth
   exposeAdminConsole: true
-  adminCondoleServices:
+  adminConsoleServices:
     - data
   cluster:
     dataServiceMemoryQuota: 256
