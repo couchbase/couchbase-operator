@@ -116,14 +116,8 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestPersistentVolumeCreateCluster
-        decorators:
-          - portworxProvisioner
       - name: TestPersistentVolumeAutoFailover
-        decorators:
-          - portworxProvisioner
       - name: TestPersistentVolumeNodeFailover
-        decorators:
-          - portworxProvisioner
 
   - name: FailoverTests
     clusters:

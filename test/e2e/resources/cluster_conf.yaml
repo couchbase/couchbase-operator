@@ -11,6 +11,7 @@ types:
           - ip: 172.23.104.147
 
       - name: NewCluster1
+        storageClassType: portworx
         master:
           - ip: 172.23.104.120
             label: RzaGroup-2

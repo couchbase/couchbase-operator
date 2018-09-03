@@ -43,65 +43,6 @@ func createPodSecurityContext(fsGroup int) *corev1.PodSecurityContext {
 	return &sc
 }
 
-func portworxProvisioner(testFunc framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
-	wrapperFunc := func(t *testing.T) {
-		if os.Getenv(envParallelTest) == envParallelTestTrue {
-			t.Parallel()
-		}
-		f := framework.Global
-		for _, targetKubeName := range args.KubeNames {
-			targetKube := f.ClusterSpec[targetKubeName]
-
-			if err := framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
-				t.Fatal(err)
-			}
-
-			if err := framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
-				t.Fatal(err)
-			}
-
-			t.Log("creating etcd cluster")
-			if !f.SkipTeardown {
-				defer framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
-			}
-
-			for retryCount := 0; retryCount < 3; retryCount++ {
-				if err := framework.CreateEtcd(t, targetKube.KubeClient, targetKubeName); err != nil {
-					t.Logf("error creating etcd: %v \n", err)
-					if retryCount == 2 {
-						t.Fatal(err)
-					}
-					framework.DeleteEtcd(t, targetKube.KubeClient, targetKubeName)
-					time.Sleep(time.Second * 3)
-					continue
-				}
-				break
-
-			}
-
-			t.Log("creating portworx cluster")
-			if !f.SkipTeardown {
-				defer framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
-			}
-			for retryCount := 0; retryCount < 3; retryCount++ {
-				if err := framework.CreatePortworx(t, targetKube.KubeClient, targetKubeName); err != nil {
-					t.Logf("error creating portworx: %v \n", err)
-					if retryCount == 2 {
-						t.Fatal(err)
-					}
-					framework.DeletePortworx(t, targetKube.KubeClient, targetKubeName)
-					time.Sleep(time.Second * 3)
-					continue
-				}
-				break
-
-			}
-		}
-		testFunc(t)
-	}
-	return wrapperFunc
-}
-
 // Generic function to test the cb-server down and pod remove scenarios
 func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembersToKill []int, autoFailoverWillOccur bool) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {

@@ -58,6 +58,7 @@ type Framework struct {
 	SuiteYmlData    SuiteData
 	ClusterConfFile string
 	PullDockerImage bool
+	CollectLogs     bool
 	//S3Cli         *s3.S3
 	//S3Bucket      string
 }
@@ -161,6 +162,7 @@ func Setup(t *testing.T) error {
 		opImage:         runtimeParams.OperatorImage,
 		LogDir:          logDir,
 		SkipTeardown:    runtimeParams.SkipTearDown,
+		CollectLogs:     runtimeParams.CollectLogsOnFailure,
 		Duration:        duration,
 		ClusterSpec:     clusterSpecMap,
 		SuiteYmlData:    suiteData,
@@ -310,9 +312,12 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 
 func (f *Framework) SetupFramework(kubeName string) error {
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfigPath := e2eutil.GetKubeConfigToUse(kubeName)
 
 	if err := f.RemoveK8SNodeTaints(targetKube.KubeClient); err != nil {
+		return err
+	}
+
+	if err := f.DeleteCRDs(targetKube.Config); err != nil {
 		return err
 	}
 
@@ -320,21 +325,11 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	logrus.Info("Deleting portworx")
-	if err := RecreateServicePortworx(targetKube.KubeClient); err != nil {
+	// Creating required namespaces and cluster roles before deploying the operator
+	logrus.Info("Creating namespace")
+	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
 		return err
 	}
-
-	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
-	runExecCmd(deletePortworxCmd)
-
-	if err := RemoveService(targetKube.KubeClient, "kube-system", "portworx-service"); err != nil {
-		return err
-	}
-
-	logrus.Info("Deleting etcd")
-	deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", kubeConfigPath)
-	runExecCmd(deleteEtcdCmd)
 
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
 
@@ -417,15 +412,6 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("Secret deleted: %v", "basic-test-secret")
 	}
 
-	if err := f.DeleteCRDs(targetKube.Config); err != nil {
-		return err
-	}
-
-	// Creating required namespaces and cluster roles before deploying the operator
-	logrus.Info("Creating namespace")
-	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
-		return err
-	}
 	logrus.Info("Recreating cluster role")
 	if err := RecreateClusterRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
@@ -514,7 +500,7 @@ func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, nam
 	return operatorPod.Status.ContainerStatuses[0].RestartCount
 }
 
-func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName string, namespace string) error {
+func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, namespace string) error {
 	err := deleteOperator(kubeClient, deploymentName, namespace)
 	if err != nil {
 		return err
@@ -537,7 +523,7 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName st
 	return nil
 }
 
-func deleteOperator(kubeClient kubernetes.Interface, deploymentName string, namespace string) error {
+func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace string) error {
 	deletePropagation := metav1.DeletePropagationForeground
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation

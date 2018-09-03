@@ -115,6 +115,14 @@ func runSuite(t *testing.T) {
 				break
 			}
 
+			if err := framework.SetupPersistentVolume(t, f.ClusterSpec[kubeName].KubeClient, f.Namespace, kubeCluster.ClusterName, kubeCluster.StorageClassType); err != nil {
+				skipCurrTestGroup = true
+				t.Error(err)
+				// Remove the map entry and break the loop
+				delete(f.ClusterSpec, kubeName)
+				break
+			}
+
 			if err := f.SetupFramework(kubeName); err != nil {
 				skipCurrTestGroup = true
 				t.Errorf("Failed to setup framework: %v", err)
@@ -176,8 +184,7 @@ func runSuite(t *testing.T) {
 				}
 
 				// Collect logs if test fails
-				collectLogs := true
-				if !testPassed && collectLogs {
+				if !testPassed && f.CollectLogs {
 					logDir := f.LogDir + "/" + testName
 					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
 				}

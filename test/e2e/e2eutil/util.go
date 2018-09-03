@@ -873,7 +873,7 @@ func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
 // Construct expected name for the PersistentVolumeClaim which belongs to member
 // where 'index' specifies the Nth claim generated from the specs template.
 // Only specs with multiple VolumeMounts should return volumes with index > 0
-func GetMemberPVC(kubeCli kubernetes.Interface, namespace string, claimName string, memberName string, index int, mountName api.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
+func GetMemberPVC(kubeCli kubernetes.Interface, namespace, claimName, memberName string, index int, mountName api.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
 	name := k8sutil.NameForPersistentVolumeClaim(claimName, memberName, index, mountName)
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }
@@ -894,7 +894,7 @@ func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *
 	return nil
 }
 
-func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label string, namespace string) error {
+func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {
 	t.Logf("deleting pods with label: %v", label)
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 	if err != nil {
@@ -913,7 +913,7 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label st
 	return nil
 }
 
-func DeletePod(t *testing.T, kubeClient kubernetes.Interface, podName string, namespace string) error {
+func DeletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace string) error {
 	t.Logf("deleting pod: %v", podName)
 	if err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
 		return err
@@ -921,7 +921,7 @@ func DeletePod(t *testing.T, kubeClient kubernetes.Interface, podName string, na
 	return nil
 }
 
-func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label string, namespace string) error {
+func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {
 	t.Logf("deleting pods with label: %v", label)
 	dsList, err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).List(metav1.ListOptions{LabelSelector: label})
 	if err != nil {
@@ -940,7 +940,7 @@ func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, la
 	return nil
 }
 
-func DeleteDaemonSet(t *testing.T, kubeClient kubernetes.Interface, dsName string, namespace string) error {
+func DeleteDaemonSet(t *testing.T, kubeClient kubernetes.Interface, dsName, namespace string) error {
 	t.Logf("deleting daemonset: %v", dsName)
 	err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).Delete(dsName, metav1.NewDeleteOptions(0))
 	if err != nil {
@@ -949,7 +949,7 @@ func DeleteDaemonSet(t *testing.T, kubeClient kubernetes.Interface, dsName strin
 	return nil
 }
 
-func AddLabelToNodes(t *testing.T, kubeClient kubernetes.Interface, labelKey string, labelValue string) error {
+func AddLabelToNodes(t *testing.T, kubeClient kubernetes.Interface, labelKey, labelValue string) error {
 	t.Logf("adding label %v:%v to all nodes", labelKey, labelValue)
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
@@ -963,7 +963,7 @@ func AddLabelToNodes(t *testing.T, kubeClient kubernetes.Interface, labelKey str
 	return nil
 }
 
-func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node, labelKey string, labelValue string) error {
+func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node, labelKey, labelValue string) error {
 	t.Logf("adding label %v:%v to node %v", labelKey, labelValue, node.Name)
 	currentLables := node.ObjectMeta.Labels
 	currentLables[labelKey] = labelValue

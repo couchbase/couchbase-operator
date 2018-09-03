@@ -5,11 +5,14 @@ deployment-spec: ../../example/deployment.yaml   # Deployment yaml file path
 cluster-config: resources/cluster_conf.yaml      # cluster config file path
 
 kube-config:  # List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
-  #- name: AuxillaryCluster1
+  #- name: Cluster1
   #  config: ~/.kube/config
-duration: 7              # In days. Used for system tests
-pullDockerImages: false  # If true, operator and server images will be pulled to all k8s nodes
-skip-tear-down: true     # Leaves the operator running after tests
+  #- name: Cluster2
+  #  config: ~/.kube/config_new
+collectLogsOnFailure: false   # Collect cluster logs when test case fails using cbopinfo tool
+duration: 7                   # In days. Used for system tests
+pullDockerImages: false       # If true, operator and server images will be pulled to all k8s nodes
+skip-tear-down: true          # Leaves the operator running after tests
 
 suite: TestNone                         # Test suite to run. Same named yaml file should exists in resources/suites path
 cbServerBaseImage: couchbase/server     # Couchbase server docker image to use

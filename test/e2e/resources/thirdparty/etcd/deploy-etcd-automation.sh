@@ -6,10 +6,26 @@ function exitOnError() {
         exit $1
     fi
 }
-kubeConfig=$1
+
+kubeConfig=$HOME/.kube/config
+namespace=default
+
+while [ $# -ne 0 ]
+do
+    case "$1" in
+    "--kubeConfig")
+        kubeConfig=$2
+        shift ; shift
+        ;;
+    "--namespace")
+        namespace=$2
+        shift ; shift
+        ;;
+    esac
+done
 
 etcdpath=$(pwd)/resources/thirdparty/etcd
-param="--kubeconfig=$kubeConfig"
+param="--kubeconfig=$kubeConfig --namespace=$namespace"
 
 #sh $etcdpath/etcd-create-role.sh
 kubectl $param create -f $etcdpath/etcd-deployment.yaml
@@ -17,12 +33,12 @@ kubectl $param create -f $etcdpath/etcd-deployment.yaml
 # wait for etcd operator pod to be running
 while true
     do
-        etcdOperator=$(kubectl $param --namespace=default get -l name=etcd-operator pods | tail -1 | awk '{print $1}')
+        etcdOperator=$(kubectl $param --namespace=$namespace get -l name=etcd-operator pods | tail -1 | awk '{print $1}')
         if [ "$etcdOperator" != "" ] ; then
             echo "initializing etcd operator: '$etcdOperator'"
             for i in {1..300}
             do
-                podRunning=$(kubectl $param --namespace=default describe pod $etcdOperator | grep "State:" | grep "Running" | wc -l | xargs )
+                podRunning=$(kubectl $param --namespace=$namespace describe pod $etcdOperator | grep "State:" | grep "Running" | wc -l | xargs )
                 if [ $podRunning -eq 1 ] ; then
                     break
                 fi

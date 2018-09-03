@@ -176,17 +176,14 @@ var (
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{
-		"rsaDecorator":        rsaDecorator,
-		"rzaNodeLabeller":     rzaNodeLabeller,
-		"recoverDecorator":    framework.RecoverDecorator,
-		"portworxProvisioner": portworxProvisioner,
+		"rsaDecorator":     rsaDecorator,
+		"rzaNodeLabeller":  rzaNodeLabeller,
+		"recoverDecorator": framework.RecoverDecorator,
 	}
 
 	TestGroupSetupFuncMap = GroupSetupFunction{
 		"AddServerGroupLabelToNodes":      AddServerGroupLabelToNodes,
 		"RemoveServerGroupLabelFromNodes": RemoveServerGroupLabelFromNodes,
-		"CreatePortworxVolumes":           CreatePortworxVolumes,
-		"RemovePortworxVolumes":           RemovePortworxVolumes,
 	}
 )
 
@@ -263,51 +260,6 @@ func RemoveServerGroupLabelFromNodes(t *testing.T, clusterInfoList []framework.C
 				break
 			}
 		}
-	}
-	return err
-}
-
-// Create Portworx volumes mount to be used for PVC testing
-func CreatePortworxVolumes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
-	f := framework.Global
-	for _, clusterInfo := range clusterInfoList {
-		kubeName := clusterInfo.ClusterName
-		targetKube := f.ClusterSpec[kubeName]
-
-		if err = framework.DeleteEtcd(t, targetKube.KubeClient, kubeName); err != nil {
-			t.Fatal(err)
-		}
-
-		if err = framework.DeletePortworx(t, targetKube.KubeClient, kubeName); err != nil {
-			t.Fatal(err)
-		}
-
-		if err = framework.CreateEtcd(t, targetKube.KubeClient, kubeName); err != nil {
-			t.Fatal(err)
-		}
-
-		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
-			if err = framework.CreatePortworx(t, targetKube.KubeClient, kubeName); err == nil {
-				break
-			}
-			t.Logf("Error creating portworx: %v \n", err)
-			framework.DeletePortworx(t, targetKube.KubeClient, kubeName)
-		}
-	}
-	return err
-}
-
-// Removes Portworx volumes created for PVC testing
-func RemovePortworxVolumes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
-	f := framework.Global
-	if !f.SkipTeardown {
-		return err
-	}
-	for _, clusterInfo := range clusterInfoList {
-		kubeName := clusterInfo.ClusterName
-		targetKube := f.ClusterSpec[kubeName]
-		defer framework.DeletePortworx(t, targetKube.KubeClient, kubeName)
-		defer framework.DeleteEtcd(t, targetKube.KubeClient, kubeName)
 	}
 	return err
 }
