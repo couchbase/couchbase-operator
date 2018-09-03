@@ -70,8 +70,6 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestCreateCluster
-        decorators:
-          - rsaDecorator
 ```
 
 The following are descriptions of the field in `TestCustom.yaml` but are standard for all test suite descriptors:

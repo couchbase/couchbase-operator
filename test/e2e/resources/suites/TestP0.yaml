@@ -73,14 +73,8 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestTlsCreateCluster
-        decorators:
-          - rsaDecorator
       - name: TestTlsKillClusterNode
-        decorators:
-          - rsaDecorator
       - name: TestTlsResizeCluster
-        decorators:
-          - rsaDecorator
 
   - name: XdcrCases
     clusters:

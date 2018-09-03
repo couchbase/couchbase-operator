@@ -304,20 +304,40 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		clusterSpec2.SecurityContext = createPodSecurityContext(1000)
 	}
 
-	testCouchbase1, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec1)
+	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown1()
+
+	ctx2, teardown2, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown2()
+
+	if !withTls {
+		// This ensures we don't install the certifcates into the cluster
+		ctx1 = nil
+		ctx2 = nil
+	}
+
+	testCouchbase1, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec1, ctx1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec2)
+	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec2, ctx2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// check tls
 	if withTls {
-		err = e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace)
-		if err != nil {
+		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx1.ClusterName, ctx1.CA); err != nil {
+			t.Fatal("TLS check for cluster failed: ", err)
+		}
+		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx2.ClusterName, ctx2.CA); err != nil {
 			t.Fatal("TLS check for cluster failed: ", err)
 		}
 	}

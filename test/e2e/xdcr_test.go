@@ -12,7 +12,6 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -762,36 +761,29 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	defKube := f.ClusterSpec[kubeName1]
 	xdcrKube := f.ClusterSpec[kubeName2]
 
+	tlsContexts := map[string]*e2eutil.TlsContext{}
+
 	// Create secrets in all k8s clusters
+	// TODO: This test is pointless unless you are going to specify the encrytionType=full parameter in
+	// the remote cluster definition.  Additionally as the clusters are in separate kubernetes clusters
+	// then TLS will not work as you'll be connecting via IP address and not DNS.
 	for _, kubeName := range []string{kubeName1, kubeName2} {
-		decoratorObj := &TlsDecorator{}
-		RandomNameSuffix = e2eutil.RandomSuffix()
-		decoratorObj.Init(RandomNameSuffix, f.Namespace, e2eutil.KeyTypeRSA)
-		decoratorObj.CreateCaRootCert(t)
-
-		targetKube := f.ClusterSpec[kubeName]
-		operatorSecret := decoratorObj.CreateOperatorSecret(t, f, kubeName)
-		defer e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, operatorSecret.Name, &metav1.DeleteOptions{})
-
-		clusterSecret := decoratorObj.CreateClusterSecret(t, f, kubeName)
-		defer e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, clusterSecret.Name, &metav1.DeleteOptions{})
-
-		// Update cluster parameters
-		e2espec.SetClusterName(decoratorObj.clusterName)
-		defer e2espec.ResetClusterName()
-
-		decoratorObj.SetTlsForTesting(operatorSecret, clusterSecret)
-		defer e2espec.ResetTLS()
+		ctx, teardown, err := e2eutil.InitClusterTLS(f.ClusterSpec[kubeName].KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer teardown()
+		tlsContexts[kubeName] = ctx
 	}
 
 	// Cluster 1
-	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster1, err := e2eutil.NewTlsXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName1])
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster2, err := e2eutil.NewTlsXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName2])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -849,8 +841,9 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 			t.Fatal("Unable to get couchbase pods:", err)
 		}
 
+		ctx := tlsContexts[kubeName]
 		for _, pod := range pods.Items {
-			if err := e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), targetKube.Config); err != nil {
+			if err := e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), targetKube.Config, ctx.CA); err != nil {
 				t.Fatal("TLS verification failed:", err)
 			}
 		}

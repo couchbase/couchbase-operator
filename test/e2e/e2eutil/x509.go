@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -328,10 +329,10 @@ func CreateClusterCertReq(commonName string, dnsNames []string) *x509.Certificat
 	}
 }
 
-func CreateKeyPairReqData(keyType KeyType, certReq *x509.CertificateRequest) *keyPairRequest {
+func CreateKeyPairReqData(keyType KeyType, certType CertType, certReq *x509.CertificateRequest) *keyPairRequest {
 	return &keyPairRequest{
 		keyType:  keyType,
-		certType: CertTypeServer,
+		certType: certType,
 		req:      certReq,
 	}
 }
@@ -363,8 +364,136 @@ func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byt
 	}
 }
 
-// Verifies the certificate values of pos certificate and installed are same
-func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restclient.Config) error {
+var (
+	caCN       = "Couchbase CA"
+	operatorCN = "Couchbase Operator"
+	clusterCN  = "Couchbase Cluster"
+)
+
+// tlsContext is generated per test, it contains certificates to be injected into
+// the cluster and the CA used to test they have been correctly installed.
+type TlsContext struct {
+	// ClusterName is used to explicitly set the cluster name
+	ClusterName string
+	// ca is the certificate authority used to sign the certificates.
+	CA *CertificateAuthority
+	// operatorSecretName is the name of the secret created for operator certificates.
+	OperatorSecretName string
+	// clusterSecretName is the name of the secret created for cluster certificates.
+	ClusterSecretName string
+}
+
+type TlsOpts struct {
+	// keyType is the type of key to use e.g. RSA or EC.  Defaults to KeyTypeRSA.
+	KeyType *KeyType
+	// altNames is the set of DNS alternative names to use.  Defaults to the cluster wildcard and localhost.
+	AltNames []string
+	// validFrom is the valid from date for the certificate. Defaults to now.
+	ValidFrom *time.Time
+	// validTo is the valid to date for the certificate.  Defaults to 10 years from now.
+	ValidTo *time.Time
+	// caCertType sets the CA certificate type. Defaults to CertTypeCA.
+	CaCertType *CertType
+	// operatorCertType sets the operator certificate type.  Defaults to CertTypeClient.
+	OperatorCertType *CertType
+	// clusterCertType sets the cluster certificate type.  Defaults to CertTypeServer.
+	ClusterCertType *CertType
+}
+
+// InitClusterTLS accepts a key type (only RSA works for now) and returns a context
+// containing all the certificates, and a tear down function to be deferred.
+func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func(), err error) {
+	// Create the context
+	ctx = &TlsContext{}
+
+	// Generate an explicit cluster name to use
+	ctx.ClusterName = "test-couchbase-" + RandomSuffix()
+
+	// Generate alt names.  We **need** localhost in here to check the TLS is valid
+	// over a port forward from within the cluster.
+	altNames := []string{
+		fmt.Sprintf("*.%s.%s.svc", ctx.ClusterName, namespace),
+		"localhost",
+	}
+	if len(opts.AltNames) > 0 {
+		altNames = opts.AltNames
+	}
+
+	// Set the certificate parameters
+	keyType := KeyTypeRSA
+	if opts.KeyType != nil {
+		keyType = *opts.KeyType
+	}
+
+	validFrom := time.Now().In(time.UTC)
+	if opts.ValidFrom != nil {
+		validFrom = *opts.ValidFrom
+	}
+
+	validTo := validFrom.AddDate(10, 0, 0)
+	if opts.ValidTo != nil {
+		validTo = *opts.ValidTo
+	}
+
+	caCertType := CertTypeCA
+	if opts.CaCertType != nil {
+		caCertType = *opts.CaCertType
+	}
+
+	operatorCertType := CertTypeClient
+	if opts.OperatorCertType != nil {
+		operatorCertType = *opts.OperatorCertType
+	}
+
+	clusterCertType := CertTypeServer
+	if opts.ClusterCertType != nil {
+		clusterCertType = *opts.ClusterCertType
+	}
+
+	// Generate the CA
+	if ctx.CA, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
+		return
+	}
+
+	// Create the operator secret
+	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReqKeyPair := CreateKeyPairReqData(keyType, operatorCertType, operatorReq)
+	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		return
+	}
+
+	ctx.OperatorSecretName = "operator-secret-tls-" + RandomSuffix()
+	operatorSecretData := CreateOperatorSecretData(namespace, ctx.OperatorSecretName, ctx.CA.Certificate, operatorCert, operatorKey)
+	if _, err = CreateSecret(client, namespace, operatorSecretData); err != nil {
+		return
+	}
+
+	// Create the cluster secret
+	clusterReq := CreateClusterCertReq(clusterCN, altNames)
+	clusterReqKeyPair := CreateKeyPairReqData(keyType, clusterCertType, clusterReq)
+	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+		return
+	}
+
+	ctx.ClusterSecretName = "cluster-secret-tls-" + RandomSuffix()
+	clusterSecretData := CreateClusterSecretData(namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
+	if _, err = CreateSecret(client, namespace, clusterSecretData); err != nil {
+		DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+		return
+	}
+
+	teardown = func() {
+		DeleteSecret(client, namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{})
+		DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+	}
+
+	return
+}
+
+func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restclient.Config, ca *CertificateAuthority) error {
 	// Start the port forwarder
 	pf := PortForwarder{
 		Config:    kubeConfig,
@@ -378,14 +507,11 @@ func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restcli
 	defer pf.Close(t)
 
 	// Get the server certificate
-	// * Note I do not advise doing insecure verification, you aren't actually testing
-	//   that the libraries work
-	// * Instead add "localhost" to the DNS alt names when creating the certificate and
-	//   add in the signing CA
-	// * Other option is alter /etc/hosts which is more horrible :)
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
+		RootCAs: x509.NewCertPool(),
 	}
+	tlsConfig.RootCAs.AddCert(ca.certificate)
+
 	conn, err := tls.Dial("tcp", "localhost:18091", tlsConfig)
 	if err != nil {
 		return err

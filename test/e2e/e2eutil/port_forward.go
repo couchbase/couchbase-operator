@@ -1,7 +1,7 @@
 package e2eutil
 
 import (
-	"bytes"
+	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -26,8 +26,6 @@ type PortForwarder struct {
 	stopChan  chan struct{}
 	readyChan chan struct{}
 	errorChan chan error
-	out       *bytes.Buffer
-	errOut    *bytes.Buffer
 }
 
 // NodePort creates the service from pod with matching selectors to k8s cluster node
@@ -71,10 +69,8 @@ func (pf *PortForwarder) ForwardPorts() error {
 	// Finally do the actual work
 	pf.stopChan = make(chan struct{})
 	pf.readyChan = make(chan struct{})
-	pf.out = &bytes.Buffer{}
-	pf.errOut = &bytes.Buffer{}
 
-	portForwarder, err := portforward.New(dialer, []string{pf.Port}, pf.stopChan, pf.readyChan, pf.out, pf.errOut)
+	portForwarder, err := portforward.New(dialer, []string{pf.Port}, pf.stopChan, pf.readyChan, ioutil.Discard, ioutil.Discard)
 	if err != nil {
 		return err
 	}

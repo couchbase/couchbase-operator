@@ -8,5 +8,4 @@ tcGroups:
     testcases:
       - name: TestFeaturesAll
         decorators:
-          - rsaDecorator
           - portworxProvisioner

@@ -259,8 +259,19 @@ func CreateClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClie
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpecSystemTest(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpecSystemTest(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, ctx *TlsContext) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
+	if ctx != nil {
+		crd.Name = ctx.ClusterName
+		crd.Spec.TLS = &api.TLSPolicy{
+			Static: &api.StaticTLS{
+				Member: &api.MemberSecret{
+					ServerSecret: ctx.ClusterSecretName,
+				},
+				OperatorSecret: ctx.OperatorSecretName,
+			},
+		}
+	}
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, systemTestRetries)
 }
 
@@ -288,6 +299,51 @@ func NewClusterMultiQuick(t *testing.T, crClient versioned.Interface, namespace,
 // performing garbage collection
 func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+}
+
+// NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
+func NewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
+	clusterSpec.Name = ctx.ClusterName
+	clusterSpec.Spec.TLS = &api.TLSPolicy{
+		Static: &api.StaticTLS{
+			Member: &api.MemberSecret{
+				ServerSecret: ctx.ClusterSecretName,
+			},
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+	}
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+}
+
+// NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
+func NewTLSClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
+	clusterSpec.Name = ctx.ClusterName
+	clusterSpec.Spec.TLS = &api.TLSPolicy{
+		Static: &api.StaticTLS{
+			Member: &api.MemberSecret{
+				ServerSecret: ctx.ClusterSecretName,
+			},
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+	}
+	return CreateCluster(t, crClient, namespace, clusterSpec)
+}
+
+// NewTlsXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
+func NewTlsXdcrClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
+	clusterSpec.Name = ctx.ClusterName
+	clusterSpec.Spec.TLS = &api.TLSPolicy{
+		Static: &api.StaticTLS{
+			Member: &api.MemberSecret{
+				ServerSecret: ctx.ClusterSecretName,
+			},
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+	}
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
 }
 
@@ -828,7 +884,7 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace, claimName, memberName
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }
 
-func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string) error {
+func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace, clusterName string, ca *CertificateAuthority) error {
 	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return fmt.Errorf("Unable to get couchbase pods: %v", err)
@@ -836,7 +892,7 @@ func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *
 
 	// TLS handshake with pods
 	for _, pod := range pods.Items {
-		err = TlsCheckForPod(t, namespace, pod.GetName(), restConfig)
+		err = TlsCheckForPod(t, namespace, pod.GetName(), restConfig, ca)
 		if err != nil {
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}

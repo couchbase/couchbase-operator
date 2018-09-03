@@ -65,17 +65,9 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestTlsRemoveOperatorCertificateAndAddBack
-        decorators:
-          - rsaDecorator
       - name: TestTlsRemoveClusterCertificateAndAddBack
-        decorators:
-          - rsaDecorator
       - name: TestTlsRemoveOperatorCertificateAndResizeCluster
-        decorators:
-          - rsaDecorator
       - name: TestTlsRemoveClusterCertificateAndResizeCluster
-        decorators:
-          - rsaDecorator
       - name: TestTlsNegRSACertificateDnsName
       - name: TestTlsCertificateExpiry
       - name: TestTlsNegCertificateExpiredBeforeDeployment

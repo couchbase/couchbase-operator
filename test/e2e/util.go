@@ -18,8 +18,6 @@ import (
 type GroupSetupFunction map[string]func(*testing.T, []framework.ClusterInfo) error
 
 // Variable to store random suffix for couchbase-server name & tls certificates
-var RandomNameSuffix string
-
 var (
 	envParallelTest     = "PARALLEL_TEST"
 	envParallelTestTrue = "true"
@@ -179,7 +177,6 @@ var (
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{
-		"rsaDecorator":     rsaDecorator,
 		"rzaNodeLabeller":  rzaNodeLabeller,
 		"recoverDecorator": framework.RecoverDecorator,
 	}
