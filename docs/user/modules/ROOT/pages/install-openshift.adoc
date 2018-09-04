@@ -21,90 +21,9 @@ The Operator package contains YAML configuration files and command-line tools th
 
 IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-openshift.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
-== Quick Start
-
-The script below has been parameterized for clarity and relies on a set of environment variables that may be tailored to the individual OpenShift environment being deployed in. These variables correspond to the resources being created and used in order to deploy the Operator. These are explained below:
-
-NAMESPACE::
-The Kubernetes namespace/OpenShift project to run the Operator in. This can be changed to any project you have access to.
-
-ADMIN_ACCOUNT::
-The administrator account which has the ability to install custom resource definitions and create role bindings which grant privilege escalation.
-
-OPERATOR_SERVICE_ACCOUNT::
-The service account the Operator should run as. This can be changed to any valid Kubernetes name, however, is scoped to the namespace it is deployed in so it must be unique in that context.
-+
-This value is also used when creating the Operator deployment, see the documentation for the xref:operator-config.adoc[serviceAccountName parameter].
-
-OPERATOR_CLUSTER_ROLE::
-The role for the Operator to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
-
-OPERATOR_CLUSTER_ROLE_BINDING::
-The name for the rule which binds the operator role and service account to a namespace. This can be changed to any unique name in the namespace.
-
-USER_ACCOUNT::
-The user account that is used to create and manage CouchbaseCluster resources. This can be changed to any valid user name.
-
-USER_CLUSTER_ROLE::
-The role for the user to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
-
-USER_CLUSTER_ROLE_BINDING::
-The name for the rule which binds the user role and account to a name space. This can be changed to any unique name in the namespace.
-
-All steps listed here are fully explained below. If they fail, please consult the relevant documentation.
-
-[source,bash]
-----
-# Evnvironment specific variables
-ADMIN_ACCOUNT=system:admin
-USER_ACCOUNT=developer
-NAMESPACE=operator-example-namespace
-
-# Namespace specific variables, you may need to change these to avoid
-# name space collisions
-OPERATOR_SERVICE_ACCOUNT=couchbase-operator
-OPERATOR_CLUSTER_ROLE_BINDING=couchbase-operator-rolebinding
-USER_CLUSTER_ROLE_BINDING=couchbasecluster-developer-rolebinding
-
-# Constant variables (defined in web based resources)
-OPERATOR_CLUSTER_ROLE=couchbase-operator
-USER_CLUSTER_ROLE=couchbasecluster
-
-# As an unprivileged user create a project to run the Operator in and a
-# service account to run the Operator as
-oc login -u ${USER_ACCOUNT}
-oc new-project ${NAMESPACE}
-oc create serviceaccount ${OPERATOR_SERVICE_ACCOUNT} --namespace ${NAMESPACE}
-oc logout
-
-# As a privileged user create the custom resource definition, roles and bind
-# them to the service and user accounts
-oc login -u ${ADMIN_ACCOUNT}
-oc create -f crd.yaml
-oc create -f cluster-role-sa.yaml
-oc create -f cluster-role-user.yaml
-oc create clusterrolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_CLUSTER_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}
-oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
-oc logout
-
-# To enable automatic installation of images from the Red Hat Container Catalog,
-# you will require a Red Hat account and configure a kubernetes secret with your
-# Red Hat username and password. Once you create your secret you must assign it
-# to the couchbase-operator and default service accounts.
-oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
-  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
-oc secrets add serviceaccount/couchbase-operator secrets/rh-catalog --for=pull
-oc secrets add serviceaccount/default secrets/rh-catalog --for=pull
-
-# Deploy the Operator as an unprivileged user
-oc login -u ${USER_ACCOUNT}
-oc create -f operator.yaml -n ${NAMESPACE}
-oc logout
-----
-
 == Create an OpenShift Project
 
-The first thing that you need to do is use a standard OpenShift user to create a https://docs.openshift.com/container-platform/3.9/architecture/core_concepts/projects_and_users.html#projects[project] where the Operator will reside:
+The first thing that you need to do is use a standard OpenShift user to create a https://docs.openshift.com/container-platform/latest/architecture/core_concepts/projects_and_users.html#projects[project] where the Operator will reside:
 
 [source,console]
 ----
@@ -153,7 +72,7 @@ oc create secret docker-registry rh-catalog --docker-server=registry.connect.red
 
 == Create a Role and Service Account for the Operator
 
-You need to create a https://docs.openshift.com/container-platform/3.9/architecture/additional_concepts/authorization.html#roles[role] in OpenShift that allows the Operator to access the resources that it needs to run. Since the Operator might run in many different projects, it's best to create a _cluster role_ because you can assign that role to a https://docs.openshift.com/container-platform/3.9/dev_guide/service_accounts.html[service account] in any OpenShift project.
+You need to create a https://docs.openshift.com/container-platform/latest/architecture/additional_concepts/authorization.html#roles[role] in OpenShift that allows the Operator to access the resources that it needs to run. Since the Operator might run in many different projects, it's best to create a _cluster role_ because you can assign that role to a https://docs.openshift.com/container-platform/latest/dev_guide/service_accounts.html[service account] in any OpenShift project.
 
 To create the cluster role for the Operator, run the following command as the `system:admin` user:
 
@@ -164,7 +83,7 @@ oc create -f cluster-role-sa.yaml
 
 NOTE: You only need to create the cluster role once.
 
-After the cluster role is created, you need to create a service account in the project where you are installing the Operator, and then assign the cluster role to that service account using a https://docs.openshift.com/container-platform/3.9/admin_guide/manage_rbac.html[role binding]:
+After the cluster role is created, you need to create a service account in the project where you are installing the Operator, and then assign the cluster role to that service account using a https://docs.openshift.com/container-platform/latest/admin_guide/manage_rbac.html[role binding]:
 
 To create the service account:
 
@@ -301,6 +220,87 @@ time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controlle
 == Next Steps
 
 Install the xref:cbopctl.adoc[cbopctl] command line tool and use it to xref:deploying-couchbase.adoc[deploy a Couchbase Server cluster].
+
+== Quick Start
+
+The script below has been parameterized for clarity and relies on a set of environment variables that may be tailored to the individual OpenShift environment being deployed in. These variables correspond to the resources being created and used in order to deploy the Operator. These are explained below:
+
+NAMESPACE::
+The Kubernetes namespace/OpenShift project to run the Operator in. This can be changed to any project you have access to.
+
+ADMIN_ACCOUNT::
+The administrator account which has the ability to install custom resource definitions and create role bindings which grant privilege escalation.
+
+OPERATOR_SERVICE_ACCOUNT::
+The service account the Operator should run as. This can be changed to any valid Kubernetes name, however, is scoped to the namespace it is deployed in so it must be unique in that context.
++
+This value is also used when creating the Operator deployment, see the documentation for the xref:operator-config.adoc[serviceAccountName parameter].
+
+OPERATOR_CLUSTER_ROLE::
+The role for the Operator to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
+
+OPERATOR_CLUSTER_ROLE_BINDING::
+The name for the rule which binds the operator role and service account to a namespace. This can be changed to any unique name in the namespace.
+
+USER_ACCOUNT::
+The user account that is used to create and manage CouchbaseCluster resources. This can be changed to any valid user name.
+
+USER_CLUSTER_ROLE::
+The role for the user to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
+
+USER_CLUSTER_ROLE_BINDING::
+The name for the rule which binds the user role and account to a name space. This can be changed to any unique name in the namespace.
+
+All steps listed here are fully explained below. If they fail, please consult the relevant documentation.
+
+[source,bash]
+----
+# Evnvironment specific variables
+ADMIN_ACCOUNT=system:admin
+USER_ACCOUNT=developer
+NAMESPACE=operator-example-namespace
+
+# Namespace specific variables, you may need to change these to avoid
+# name space collisions
+OPERATOR_SERVICE_ACCOUNT=couchbase-operator
+OPERATOR_CLUSTER_ROLE_BINDING=couchbase-operator-rolebinding
+USER_CLUSTER_ROLE_BINDING=couchbasecluster-developer-rolebinding
+
+# Constant variables (defined in web based resources)
+OPERATOR_CLUSTER_ROLE=couchbase-operator
+USER_CLUSTER_ROLE=couchbasecluster
+
+# As an unprivileged user create a project to run the Operator in and a
+# service account to run the Operator as
+oc login -u ${USER_ACCOUNT}
+oc new-project ${NAMESPACE}
+oc create serviceaccount ${OPERATOR_SERVICE_ACCOUNT} --namespace ${NAMESPACE}
+oc logout
+
+# As a privileged user create the custom resource definition, roles and bind
+# them to the service and user accounts
+oc login -u ${ADMIN_ACCOUNT}
+oc create -f crd.yaml
+oc create -f cluster-role-sa.yaml
+oc create -f cluster-role-user.yaml
+oc create clusterrolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_CLUSTER_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}
+oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
+oc logout
+
+# To enable automatic installation of images from the Red Hat Container Catalog,
+# you will require a Red Hat account and configure a kubernetes secret with your
+# Red Hat username and password. Once you create your secret you must assign it
+# to the couchbase-operator and default service accounts.
+oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
+  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
+oc secrets add serviceaccount/couchbase-operator secrets/rh-catalog --for=pull
+oc secrets add serviceaccount/default secrets/rh-catalog --for=pull
+
+# Deploy the Operator as an unprivileged user
+oc login -u ${USER_ACCOUNT}
+oc create -f operator.yaml -n ${NAMESPACE}
+oc logout
+----
 
 == Uninstalling the Operator
 

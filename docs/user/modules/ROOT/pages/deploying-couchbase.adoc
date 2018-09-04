@@ -20,7 +20,7 @@ To deploy a Couchbase Server cluster using the Operator, all you have to do is c
 
 The Operator package contains an example CouchbaseCluster configuration file (`couchbase-cluster.yaml`), also listed here:
 
-.Example CouchbaseCluster Configuration (couchbase-cluster.yaml)
+.Example CouchbaseCluster Configuration for open source Kubernetes (couchbase-cluster.yaml)
 [source,yaml]
 ----
 apiVersion: couchbase.com/v1
