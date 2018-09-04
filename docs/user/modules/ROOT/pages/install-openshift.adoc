@@ -123,16 +123,6 @@ oc logout
 
 In this example, the standard user is `developer`, and the project is `operator-example-namespace`. Later in this guide you will give `developer` the ability to manage the Operator and the Couchbase Server clusters in `operator-example-namespace`.
 
-== Create an imagePullSecret
-
-Red Hat recommends that all containers run in OpenShift are built with Red Hat Enterprise Linux. Couchbase provides these images to users through the Red Hat Container Catalog and using this catalog requires creating an imagePullSecret so that docker knows where to look for images. To create an imagePullSecret for the Red Hat Container Catalog run the command below.
-
-[source,console]
-----
-oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
-  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
-----
-
 == Install the Custom Resource Definition
 
 The next step in setting up the Operator is to install the CouchbaseCluster custom resource definition (CRD). The Operator can do this for you automatically (xref:install-kubernetes.adoc[as it does when installing on open source Kubernetes]), but in OpenShift it's better to do it manually because installing a CRD is a cluster-level operation and requires cluster-level permissions that should not be given to typical users.
@@ -150,6 +140,16 @@ oc create -f crd.yaml
 ----
 
 NOTE: You only need to install the CRD once. After that, you can create the Operator in any OpenShift project.
+
+== Create an imagePullSecret
+
+Red Hat recommends that all containers that run in OpenShift be built with Red Hat Enterprise Linux. Couchbase provides these images to users through the Red Hat Container Catalog. Using this catalog requires creating an imagePullSecret so that Docker knows where to look for images. To create an imagePullSecret for the Red Hat Container Catalog, run the following command:
+
+[source,console]
+----
+oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
+  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
+----
 
 == Create a Role and Service Account for the Operator
 
