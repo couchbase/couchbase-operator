@@ -12,9 +12,41 @@ The output is a compressed archive of resource YAML manifests organized by names
 
 == Installation
 
-. Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `kubectl` or `oc`.
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package] and unpacked it on the same computer where you normally run `kubectl` or `oc`.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
+
+[{tabs}]
+====
+macOS::
 +
-After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Go to the following directory:
+--
+. Open a Terminal window and go to the directory where the `cbopinfo` binary is located:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
+----
+
+. Make the `cbopinfo` binary executable:
++
+[source,console]
+----
+chmod +x ./cbopinfo
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+sudo mv ./cbopinfo /usr/local/bin/cbopinfo
+----
+--
+
+Linux::
++
+--
+. Open a command prompt and go to the directory where the `cbopinfo` binary is located:
 +
 [source,console]
 ----
@@ -28,19 +60,27 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
 chmod +x ./cbopinfo
 ----
 
-. Move the binary into your PATH.
+. Move the binary into your PATH:
 +
 [source,console]
 ----
 sudo mv ./cbopinfo /usr/local/bin/cbopinfo
 ----
+--
 
-== Syntax
-
+Windows::
++
+--
+. Open a command prompt and go to the directory where the `cbopinfo` binary is located:
++
 [source,console]
 ----
-cbopinfo [options] [clusters]
+cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 ----
+
+. Add the `cbopinfo` binary into your PATH.
+--
+====
 
 === Options
 

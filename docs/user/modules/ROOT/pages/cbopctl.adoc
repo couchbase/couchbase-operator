@@ -1,31 +1,47 @@
 = About cbopctl
+:tabs:
 
 `cbopctl` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package]. It implements a custom subset of the `kubectl` and `oc` commands to ensure that CouchbaseCluster objects are valid configurations before they are uploaded to Kubernetes.
 
 It's important to check that a configuration is valid before uploading it, because once a configuration is uploaded to Kubernetes, the Couchbase Operator is unable to handle configuration errors. Therefore, you must use `cbopctl` whenever you load or modify a CouchbaseCluster configuration.
 
-== How it Works
-
-The following diagram shows the process of uploading a CouchbaseCluster configuration to Kubernetes using _just_ `kubectl`:
-
-image::cbopctl_figure_1.jpg[Figure 1]
-
-. The `kubectl` command is run and the CouchbaseCluster configuration is sent to the Kubernetes API Server.
-. The CouchbaseCluster configuration undergoes partial validation by Kubernetes.
-. If the CouchbaseCluster configuration is found to be valid by Kubernetes, it is inserted into `etcd`. If it is not valid, an error is returned to `kubectl`.
-. `etcd` acknowledges to the API Server that the CouchbaseCluster object was persisted.
-. A success message is returned to `kubectl`.
-. The CouchbaseCluster object is sent to the Couchbase Operator.
-
-Since Kubernetes can only do a partial validation, the only place to do full validation is in the API Server, because errors in the configuration must be caught before the CouchbaseCluster configuration makes it to `etcd`.
-
-Until Kubernetes provides full native validation, you must use `cbopctl` whenever you load or modify a CouchbaseCluster configuration. The `cbopctl` command contains all of Couchbase's validation code in one command line tool and is the only way to ensure that invalid configurations don't make it into Kubernetes.
-
 == Installation
 
-. Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `kubectl` or `oc`.
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package] and unpacked it on the same computer where you normally run `kubectl` or `oc`.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
+
+[{tabs}]
+====
+macOS::
 +
-After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Go to the following directory:
+--
+. Open a Terminal window and go to the directory where the `cbopctl` binary is located:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
+----
+
+. Make the `cbopctl` binary executable:
++
+[source,console]
+----
+chmod +x ./cbopctl
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+sudo mv ./cbopctl /usr/local/bin/cbopctl
+----
+--
+
+Linux::
++
+--
+. Open a command prompt and go to the directory where the `cbopctl` binary is located:
 +
 [source,console]
 ----
@@ -39,12 +55,27 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
 chmod +x ./cbopctl
 ----
 
-. Move the binary into your PATH.
+. Move the binary into your PATH:
 +
 [source,console]
 ----
 sudo mv ./cbopctl /usr/local/bin/cbopctl
 ----
+--
+
+Windows::
++
+--
+. Open a command prompt and go to the directory where the `cbopctl` binary is located:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
+----
+
+. Add the `cbopctl` binary into your PATH.
+--
+====
 
 == Syntax
 
@@ -97,3 +128,25 @@ Optional Flags:
 ----
 
 Specifying the filename of a CouchbaseCluster configuration is required for all commands. The `dry-run` flag can be used to run validation on the specified configuration file without uploading it to Kubernetes. This is particularly useful if you want to use features in `kubectl` that are not in `cbopctl`, but you still want to validate the configuration before pushing it to Kubernetes. The `kubeconfig` flag is also available in case the configuration to your Kubernetes cluster is located on a non-default path.
+
+== How it Works
+
+The following diagram shows the process of uploading a CouchbaseCluster configuration to Kubernetes using _just_ `kubectl`:
+
+image::cbopctl_figure_1.jpg[Figure 1]
+
+. The `kubectl` command is run and the CouchbaseCluster configuration is sent to the Kubernetes API Server.
+
+. The CouchbaseCluster configuration undergoes partial validation by Kubernetes.
+
+. If the CouchbaseCluster configuration is found to be valid by Kubernetes, it is inserted into `etcd`. If it is not valid, an error is returned to `kubectl`.
+
+. `etcd` acknowledges to the API Server that the CouchbaseCluster object was persisted.
+
+. A success message is returned to `kubectl`.
+
+. The CouchbaseCluster object is sent to the Couchbase Operator.
+
+Since Kubernetes can only do a partial validation, the only place to do full validation is in the API Server, because errors in the configuration must be caught before the CouchbaseCluster configuration makes it to `etcd`.
+
+Until Kubernetes provides full native validation, you must use `cbopctl` whenever you load or modify a CouchbaseCluster configuration. The `cbopctl` command contains all of Couchbase's validation code in one command line tool and is the only way to ensure that invalid configurations don't make it into Kubernetes.
