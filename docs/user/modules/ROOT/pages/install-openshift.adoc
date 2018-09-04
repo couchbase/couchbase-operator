@@ -221,7 +221,7 @@ time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controlle
 
 Install the xref:cbopctl.adoc[cbopctl] command line tool and use it to xref:deploying-couchbase.adoc[deploy a Couchbase Server cluster].
 
-== Quick Start
+== Quick Start Script
 
 The script below has been parameterized for clarity and relies on a set of environment variables that may be tailored to the individual OpenShift environment being deployed in. These variables correspond to the resources being created and used in order to deploy the Operator. These are explained below:
 
