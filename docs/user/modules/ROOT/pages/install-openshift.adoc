@@ -225,6 +225,8 @@ At this point you can now use the `developer` user to create the Operator in the
 
 [source,console]
 ----
+oc logout
+oc login -u developer
 oc create -f operator.yaml -n operator-example-namespace
 ----
 
