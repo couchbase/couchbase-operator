@@ -72,12 +72,12 @@ spec:
       resources:
         limits:
           cpu: 4
-          memory: 8GiB
-          storage: 100GiB
+          memory: 8Gi
+          storage: 100Gi
         requests:
           cpu: 2
-          memory: 8GiB
-          storage: 50GiB
+          memory: 8Gi
+          storage: 50Gi
       labels:
         couchbase_services: all
       nodeSelector:
