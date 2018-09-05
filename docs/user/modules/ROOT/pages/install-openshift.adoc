@@ -326,6 +326,5 @@ Make sure the Operator has been deleted from all other OpenShift projects in the
 +
 [source,console]
 ----
-<<<<<<< HEAD
-$ kubectl delete crd couchbaseclusters.couchbase.com
+kubectl delete crd couchbaseclusters.couchbase.com
 ----
