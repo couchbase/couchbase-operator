@@ -1,58 +1,86 @@
 = Cluster Deployment Tutorial
+:tabs:
 
 This tutorial walks you through the steps to deploy a three-node cluster with pre-loaded data.
 
 .This tutorial assumes the following:
 
 * You have a working knowledge of Kubernetes
-* You have deployed the Operator and it is up and running
+* You have xref:install-kubernetes.adoc[deployed the Operator] and it is up and running
 * You have reviewed the xref:prerequisite-and-setup.adoc[prerequisites] and prepared your Kubernetes or OpenShift cluster to run Couchbase pods
 * You have administrative privileges for the Kubernetes or OpenShift cluster
 * You have downloaded the Operator https://www.couchbase.com/downloads[package] and installed xref:cbopctl.adoc[cbopctl]
 +
 `cbopctl` is a command line tool similar to `kubectl` or `oc`, except that it performs an extra check on the CouchbaseCluster configuration being sent to Kubernetes to ensure that it is valid.
 +
-The Operator package also contains YAML configuration files that will help you set up a Couchbase cluster.
-
+The Operator package also contains YAML configuration files that you will use in this guide.
++
 After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
+
+[TIP]
+====
+Ensure that your Kubernetes environment has the xref:server:install:sizing-general.adoc[appropriate resources] for the Couchbase cluster that you're trying to deploy.
+
+In the case of Minikube and Minishift, the default memory allocation is 2 GB. This is not sufficient for running a three-node Couchbase cluster like the one in the example configuration used in this guide. If you're using the example configuration for demo purposes, you should set the memory allocation to 4 GB at a minimum (8 GB recommended). You should also increase the CPU allocation if you experience poor performance.
+
+You can set the recommended memory and CPU allocation when you start Minikube or Minishift:
+
+  minikube start --cpus 2 --memory 8192
+
+  minishift start --cpus 2 --memory 8192
+====
 
 == Create a Couchbase Cluster
 
-* Kubernetes
+[{tabs}]
+====
+Kubernetes::
 +
+--
 [source,console]
 ----
 cbopctl apply -f  couchbase-cluster.yaml
 ----
+--
 
-* OpenShift
+OpenShift::
 +
+--
 [source,console]
 ----
 cbopctl apply -f  couchbase-cluster.yaml
 ----
+--
+====
 
 == Create a Couchbase RBAC User
 
-This tutorial will be loading data into Couchbase and hence requires a Couchbase RBAC user to be created. RBAC users can be created by directly using the Couchbase CLI, or as a job within the Kubernetes cluster. See the xref:accessing-couchbase.adoc[documentation] for details.
+As part of this tutorial, you will be loading data into Couchbase, and therefore need to create a Couchbase RBAC user. RBAC users can be created by directly using the Couchbase CLI, or as a job within the Kubernetes cluster. (For more details, see the documentation about xref:accessing-couchbase.adoc[accessing the Couchbase Server user interfaces].
 
 === Option 1: Create a Default User With the Couchbase CLI
 
-Use the `describe` command to get the Couchbase Server Web Console port:
+Get the Couchbase Server Web Console port:
 
-* Kubernetes
+[{tabs}]
+====
+Kubernetes::
 +
+--
 [source,console]
 ----
 kubectl describe cbc cb-example |  grep "Admin Console Port:"
 ----
+--
 
-* OpenShift
+OpenShift::
 +
+--
 [source,console]
 ----
 oc describe cbc cb-example |  grep "Admin Console Port:"
 ----
+--
+====
 
 The result should be something like:
 
@@ -68,7 +96,7 @@ If you have Couchbase Server installed on your computer, use `couchbase-cli` to 
 ./couchbase-cli user-manage -c <kubernetes-node-ip>:32486 -u Administrator -p password --rbac-username default --rbac-password password --roles admin --auth-domain local --set
 ----
 
-(You can skip to the next step: Loading data)
+You can now go to the next step: <<loading-data>>
 
 === Option 2: Create a Default User With a Kubernetes Job
 
@@ -97,37 +125,44 @@ secret "cb-user-auth" created
 
 Now, use the RBAC user's secret to securely create a Couchbase RBAC user using a Kubernetes or OpenShift job:
 
-* Kubernetes:
+[{tabs}]
+====
+Kubernetes::
 +
+--
 [source,console]
 ----
 $ kubectl create -f couchbase-cli-create-user.yaml
 job "create-user" created
 ----
-+
+
 [source,console]
 ----
 $ kubectl get job
 NAME          DESIRED   SUCCESSFUL   AGE
 create-user   1         1            4s
 ----
+--
 
-* OpenShift
+OpenShift::
 +
+--
 [source,console]
 ----
 $ oc create -f couchbase-cli-create-user.yaml
 job "create-user" created
 ----
-+
+
 [source,console]
 ----
 $ oc get job
 NAME          DESIRED   SUCCESSFUL   AGE
 create-user   1         1            4s
 ----
+--
+====
 
-If you are not using the default namespace, edit the `couchbase-cli-create-user.yaml` file to reflect your namespace.
+If you're not using the default namespace, edit the `couchbase-cli-create-user.yaml` file to reflect your namespace.
 For example, if your namespace is `myproject`, edit the command field in the YAML file to replace `${CLUSTER_NAME}` with `cb-example-0000.cb-example.myproject.svc`. The updated field will now look like the following snippet:
 
 [source,yaml]
@@ -162,6 +197,7 @@ spec:
             secretName: cb-user-auth
 ----
 
+[#loading-data]
 == Loading data
 
 Use the sample `pillowfight` job to load items into your cluster. The following spec loads 10k items into the Couchbase cluster:
@@ -186,7 +222,7 @@ spec:
       restartPolicy: Never
 ----
 
-If you are not using the default namespace, you must download and update the `pillowfight-data-loader.yaml` file to reflect your namespace. For example, if your namespace is `myproject`, edit the command field in the YAML file to replace `cb-example-0000.cb-example.default.svc` with `cb-example-0000.cb-example.myproject.svc`. The updated field will now look like the following snippet:
+If you're not using the default namespace, you must update the `pillowfight-data-loader.yaml` file to reflect your namespace. For example, if your namespace is `myproject`, edit the command field in the YAML file to replace `cb-example-0000.cb-example.default.svc` with `cb-example-0000.cb-example.myproject.svc`. The updated field will now look like the following snippet:
 
 [source,yaml]
 ----
@@ -198,22 +234,25 @@ command: ["cbc-pillowfight",
 
 To deploy the `pillowfight` data loader, run the following command:
 
-* Kubernetes
+[{tabs}]
+====
+Kubernetes::
 +
+--
 [source,console]
 ----
-$ kubectl create -f pillowfight-data-loader.yaml
+kubectl create -f pillowfight-data-loader.yaml
 ----
+--
 
-* OpenShift:
+OpenShift::
 +
+--
 [source,console]
 ----
-$ oc create -f pillowfight-data-loader-openshift.yaml
+oc create -f pillowfight-data-loader-openshift.yaml
 ----
+--
+====
 
 Once it completes, you should have 10k items loaded into your cluster.
-
-== Next Steps
-
-xref:accessing-couchbase.adoc[Access the Couchbase Server User Interfaces]
