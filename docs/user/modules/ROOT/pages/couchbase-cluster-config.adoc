@@ -574,7 +574,7 @@ _Specification rules:_ The `servers` portion of the specification is required an
 
 === size
 
-This field specifies the number of nodes of this type that should be in the cluster. This allows the user to scale up different parts of the cluster as necessary. If this parameter is changed at runtime, the Operator will automatically scale the cluster.
+This field specifies the number of nodes of this type that should be in the cluster. This allows the user to scale up different parts of the cluster as necessary. If this parameter is changed at runtime, the Operator will xref:scaling-couchbase.adoc[automatically scale the cluster].
 
 ____
 _Field rules:_ The `size` is required and can be set to greater than or equal to 1.
