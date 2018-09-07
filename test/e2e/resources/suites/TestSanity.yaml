@@ -1,17 +1,74 @@
 ---
 suite: TestSanity
-timeout: 240m
+timeout: 4h
 tcGroups:
-  - name: Group1
+  - name: ClusterTests
     clusters:
       - BasicCluster
     testcases:
       - name: TestCreateCluster
       - name: TestCreateBucketCluster
-      - name: TestBucketAddRemoveBasic
-      - name: TestEditBucket
       - name: TestResizeCluster
       - name: TestEditClusterSettings
+
+  - name: BucketTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestBucketAddRemoveBasic
+      - name: TestEditBucket
+
+  - name: RecoveryTests
+    clusters:
+      - BasicCluster
+    testcases:
       - name: TestRecoveryAfterOnePodFailureNoBucket
+
+  - name: PodTests
+    clusters:
+      - BasicCluster
+    testcases:
       - name: TestAntiAffinityOn
       - name: TestPodResourcesBasic
+
+  - name: TlsTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestTlsCreateCluster
+        decorators:
+          - rsaDecorator
+
+  - name: XdcrTests
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestXdcrCreateCluster
+
+  - name: ServerGroupTests
+      - name: TestRzaCreateClusterWithStaticConfig
+        decorators:
+          - rzaNodeLabeller
+      - name: TestRzaCreateClusterWithClassBasedConfig
+        decorators:
+          - rzaNodeLabeller
+
+  - name: PersistentVolumeTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestPersistentVolumeCreateCluster
+
+  - name: SupportabilityTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestLogCollectValidateArguments
+
+  - name: CouchbaseServerServiceTests
+    cluster:
+      - BasicCluster
+    testcases:
+      - name: TestAnalyticsCreateDataSet
+      - name: TestEventingCreateEventingCluster
