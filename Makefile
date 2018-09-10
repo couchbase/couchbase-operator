@@ -8,6 +8,7 @@ kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
 namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
 deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
+productVersion = $(if $(VERSION),$(VERSION),1.1.0)
 testname = $(E2E_TEST)
 
 .PHONY: all dep build container test test-indv
@@ -45,19 +46,12 @@ tools:
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo ./cmd/cbopinfo/
 
 artifacts:
-	mkdir -p $(ARTIFACTS)
-	cp -r build/darwin $(ARTIFACTS)
-	cp -r build/linux $(ARTIFACTS)
-	cp -r build/windows $(ARTIFACTS)
-	cp example/crd.yaml $(ARTIFACTS)/crd.yaml
-	cp example/couchbase-cluster.yaml $(ARTIFACTS)/couchbase-cluster.yaml
-	cp example/deployment.yaml $(ARTIFACTS)/operator.yaml
-	cp example/tools/couchbase-cli-create-user.yaml $(ARTIFACTS)/couchbase-cli-create-user.yaml
-	cp example/tools/pillowfight-data-loader.yaml $(ARTIFACTS)/pillowfight.yaml
-	cp example/tools/pillowfight-data-loader-openshift.yaml $(ARTIFACTS)/pillowfight-openshift.yaml
-	tar -czf $(ARTIFACTS)/rbac.zip example/rbac
-	cd build && tar -czf artifacts.zip artifacts && cd ..
-	rm -r $(ARTIFACTS)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(productVersion)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --version $(productVersion)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --version $(productVersion)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --version $(productVersion)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --version $(productVersion)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(productVersion)
 
 prod: container tools artifacts
 
