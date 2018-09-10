@@ -47,6 +47,9 @@ tcGroups:
       - name: TestXdcrCreateCluster
 
   - name: ServerGroupTests
+    clusters:
+      - NewCluster1
+    testcases:
       - name: TestRzaCreateClusterWithStaticConfig
         decorators:
           - rzaNodeLabeller
