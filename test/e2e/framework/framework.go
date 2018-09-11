@@ -332,25 +332,16 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
-
-	logrus.Info("Deleting deployments")
-	deployments, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list deployments: " + err.Error())
+	logrus.Infof("Deleting deployment: %s", Global.Deployment.Name)
+	if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, f.Namespace); err != nil {
+		return err
 	}
-	for _, deployment := range deployments.Items {
-		err = DeleteOperatorCompletely(targetKube.KubeClient, deployment.GetName(), f.Namespace)
-		if err != nil {
-			return err
-		}
-		logrus.Infof("Deployment deleted: %v", deployment.GetName())
-	}
+	logrus.Infof("Deployment deleted: %v", Global.Deployment.Name)
 
 	logrus.Info("Deleting clusters")
 	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
 	for _, cluster := range clusters.Items {
-		err = targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
-		if err != nil {
+		if err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 		logrus.Infof("Cluster deleted: %v", cluster.Name)
