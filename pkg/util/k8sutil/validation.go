@@ -395,9 +395,6 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 												},
 												"volumeMounts": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "object",
-													Required: []string{
-														"default",
-													},
 													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 														"default": apiextensionsv1beta1.JSONSchemaProps{
 															Type: "string",
@@ -415,6 +412,9 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 																	Type: "string",
 																},
 															},
+														},
+														"logs": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
 														},
 													},
 												},

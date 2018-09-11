@@ -350,6 +350,7 @@ const (
 	DataVolumeMount                      = "data"
 	IndexVolumeMount                     = "index"
 	AnalyticsVolumeMount                 = "analytics"
+	LogsVolumeMount                      = "logs"
 )
 
 type VolumeMounts struct {
@@ -361,6 +362,8 @@ type VolumeMounts struct {
 	DataClaim string `json:"data,omitempty"`
 	// Name of claims to use for analytics paths
 	AnalyticsClaims []string `json:"analytics,omitempty"`
+	// Name of claim to use for logs path
+	LogsClaim string `json:"logs,omitempty"`
 }
 
 // Get all of the volume mounts to be used for analytics service
@@ -386,12 +389,18 @@ func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	return paths
 }
 
+// LogsOnly returns true if logs will be the only mounts applied to cluster
+func (v *VolumeMounts) LogsOnly() bool {
+	return v.LogsClaim != ""
+}
+
 func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
 	if sc != nil && sc.Pod != nil {
 		return sc.Pod.VolumeMounts
 	}
 	return nil
 }
+
 func (sc *ServerConfig) GetDefaultVolumeClaim() string {
 	if sc != nil {
 		if mounts := sc.GetVolumeMounts(); mounts != nil {

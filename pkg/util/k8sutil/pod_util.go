@@ -25,6 +25,7 @@ const (
 	couchbaseTlsVolumeMountDir      = "/opt/couchbase/var/lib/couchbase/inbox"
 	couchbaseVolumeName             = "couchbase-data"
 	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
+	CouchbaseVolumeMountLogsDir     = "/opt/couchbase/var/lib/couchbase/logs"
 	couchbaseVolumeDefaultEtcDir    = "/opt/couchbase/etc"
 	CouchbaseVolumeMountDataDir     = "/mnt/data"
 	CouchbaseVolumeMountIndexDir    = "/mnt/index"
@@ -47,7 +48,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 		return nil, err
 	}
 
-	if config.GetDefaultVolumeClaim() != "" {
+	if config.GetVolumeMounts() != nil {
 		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, version, cluster.AsOwner(), ctx)
 		if err != nil {
 			return nil, err
@@ -66,10 +67,12 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 // Volumes that already exist are reused
 func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, version string, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
 
-	var err error
 	volumes := pod.Spec.Volumes
 	mounts := []v1.VolumeMount{}
-	mountPaths := getPathsToPersist(config.Pod.VolumeMounts)
+	mountPaths, err := getPathsToPersist(config.Pod.VolumeMounts)
+	if err != nil {
+		return nil, err
+	}
 
 	// Keep track of volumes generated from the same claim
 	claimUsageCnt := make(map[string]int)
@@ -164,23 +167,43 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 }
 
 // Get all paths to that should be persisted within pod
-func getPathsToPersist(mounts *cbapi.VolumeMounts) map[cbapi.VolumeMountName]string {
+func getPathsToPersist(mounts *cbapi.VolumeMounts) (map[cbapi.VolumeMountName]string, error) {
 	mountPaths := make(map[cbapi.VolumeMountName]string)
-	if defaultClaim := mounts.DefaultClaim; defaultClaim != "" {
-		mountPaths[cbapi.DefaultVolumeMount] = defaultClaim
-	}
-	if dataClaim := mounts.DataClaim; dataClaim != "" {
-		mountPaths[cbapi.DataVolumeMount] = dataClaim
-	}
-	if indexClaim := mounts.IndexClaim; indexClaim != "" {
-		mountPaths[cbapi.IndexVolumeMount] = indexClaim
-	}
-	if analyticsClaims := mounts.AnalyticsClaims; analyticsClaims != nil {
-		for mount, claim := range mounts.GetAnalyticsMountClaims() {
-			mountPaths[cbapi.VolumeMountName(mount)] = claim
+	defaultClaim := mounts.DefaultClaim
+	dataClaim := mounts.DataClaim
+	indexClaim := mounts.IndexClaim
+	analyticsClaims := mounts.AnalyticsClaims
+
+	// var to test existence of non default/logs mounts
+	hasSecondaryMounts := dataClaim != "" || indexClaim != "" || analyticsClaims != nil
+
+	if logsClaim := mounts.LogsClaim; logsClaim != "" {
+		// When logsClaim is specified no other mounts are allowed.
+		// Return error if validation didn't prevent this from occurring.
+		if defaultClaim != "" || hasSecondaryMounts {
+			return mountPaths, fmt.Errorf("other mounts cannot be used in with `logs` mount")
 		}
+		mountPaths[cbapi.LogsVolumeMount] = logsClaim
+		return mountPaths, nil
 	}
-	return mountPaths
+	if defaultClaim != "" {
+		mountPaths[cbapi.DefaultVolumeMount] = defaultClaim
+		if dataClaim != "" {
+			mountPaths[cbapi.DataVolumeMount] = dataClaim
+		}
+		if indexClaim != "" {
+			mountPaths[cbapi.IndexVolumeMount] = indexClaim
+		}
+		if analyticsClaims != nil {
+			for mount, claim := range mounts.GetAnalyticsMountClaims() {
+				mountPaths[cbapi.VolumeMountName(mount)] = claim
+			}
+		}
+	} else if hasSecondaryMounts {
+		// Reutrn error if other mount paths are specified without default volume
+		return mountPaths, fmt.Errorf("other mounts cannot be used in without `default` mount")
+	}
+	return mountPaths, nil
 }
 
 func pathForVolumeMountName(id cbapi.VolumeMountName) string {
@@ -192,6 +215,8 @@ func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 		path = CouchbaseVolumeMountDataDir
 	case cbapi.IndexVolumeMount:
 		path = CouchbaseVolumeMountIndexDir
+	case cbapi.LogsVolumeMount:
+		path = CouchbaseVolumeMountLogsDir
 	default:
 		if strings.Contains(string(id), string(cbapi.AnalyticsVolumeMount)) {
 			// path resolves to /mnt/analytics-00 when matching on analytics volume
@@ -787,6 +812,14 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 			continue
 		}
 
+		if path, ok := pvc.Annotations["path"]; ok {
+			if path != defaultSubPathName {
+				// members can only be recovered from
+				// claims representing default volume
+				continue
+			}
+		}
+
 		m := couchbaseutil.Member{}
 		if config, ok := pvc.Annotations["serverConfig"]; ok {
 			m.ServerConfig = config
@@ -810,7 +843,8 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume
 func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, podName, clusterName, namespace string) error {
-	if mounts := config.GetVolumeMounts(); mounts == nil {
+	mounts := config.GetVolumeMounts()
+	if mounts == nil || mounts.LogsOnly() {
 		return cberrors.ErrNoVolumeMounts{}
 	} else {
 		// default volume claim is required for recovery
@@ -819,7 +853,10 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 			return fmt.Errorf("no claim defined for default volume")
 		}
 		// all volume mounts must be healthy
-		mountPaths := getPathsToPersist(mounts)
+		mountPaths, err := getPathsToPersist(mounts)
+		if err != nil {
+			return err
+		}
 		for mountName, _ := range mountPaths {
 			mountPath := pathForVolumeMountName(mountName)
 			pvc, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)

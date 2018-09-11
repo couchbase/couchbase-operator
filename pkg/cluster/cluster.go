@@ -461,19 +461,11 @@ func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig
 	return err
 }
 
-func (c *Cluster) removePod(name string) error {
-	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
+// Remove Pod and any volumes associated with pod if requested
+// ore volumes are associated with default claim
+func (c *Cluster) removePod(name string, removeVolumes bool) error {
 
-	// Remove Pod volumes associated with the Pod, if any
-	// TODO: allow overriding for usecase to keep volumes
-	//       currently the default is to always delete
-	removeVolumes := false
-	if m, ok := c.members[name]; ok {
-		config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
-		if config != nil && config.GetVolumeMounts() != nil {
-			removeVolumes = true
-		}
-	}
+	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
 	err := k8sutil.DeleteCouchbasePod(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, name, opts, removeVolumes)
 	if err != nil {
 		c.logger.Errorf("error occurred during pod deletion (%s)", err)
@@ -779,6 +771,19 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 		members = c.members
 	}
 	return members
+}
+
+// Check if volume only has log volumes mounted
+func (c *Cluster) memberHasLogVolumes(name string) bool {
+	if m, ok := c.members[name]; ok {
+		config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+		if config != nil {
+			if mounts := config.GetVolumeMounts(); mounts != nil {
+				return mounts.LogsOnly()
+			}
+		}
+	}
+	return false
 }
 
 // getPodIndex returns the current pod naming index

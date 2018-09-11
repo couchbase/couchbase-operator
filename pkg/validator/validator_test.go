@@ -418,14 +418,6 @@ var testDefs = []testDef{
 		expectedErr: nil,
 	},
 	{
-		name:        "TestMissingDefaultMount",
-		path:        "tests/0051.yaml",
-		description: "Tests that default volume mount is specified",
-		expectedErr: errors.CompositeValidationError(
-			errors.Required("spec.servers.pod.volumeMounts.default", "body"),
-		),
-	},
-	{
 		name:        "TestMissingClaimTemplate",
 		path:        "tests/0052.yaml",
 		description: "Tests that template for volume mount is specified",
@@ -612,6 +604,30 @@ var testDefs = []testDef{
 		description: "Tests exposing the admin console without services is illegal",
 		expectedErr: errors.CompositeValidationError(
 			errors.Required("spec.adminConsoleServices", "body"),
+		),
+	},
+	{
+		name:        "TestLogsDefaultExclusive",
+		path:        "tests/0073.yaml",
+		description: "Tests that default and logs claim are mutually exclusive",
+		expectedErr: errors.CompositeValidationError(
+			errors.AdditionalItemsNotAllowed("default|data|index|analytics", "spec.volumeMounts.logs"),
+		),
+	},
+	{
+		name:        "TestLogsWithDataMountNotAllowed",
+		path:        "tests/0074.yaml",
+		description: "Tests that logs claim with data mount not allowed",
+		expectedErr: errors.CompositeValidationError(
+			errors.AdditionalItemsNotAllowed("default|data|index|analytics", "spec.volumeMounts.logs"),
+		),
+	},
+	{
+		name:        "TestOnlyDataMountNotAllowed",
+		path:        "tests/0075.yaml",
+		description: "Tests specifying only data mount is not allowed",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required("default", "spec.volumeMounts"),
 		),
 	},
 }

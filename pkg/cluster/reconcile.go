@@ -66,11 +66,12 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	state := &ReconcileMachine{
-		runningPods: podsToMemberSet(pods, c.isSecureClient()),
-		knownNodes:  couchbaseutil.NewMemberSet(),
-		ejectNodes:  couchbaseutil.NewMemberSet(),
-		couchbase:   status,
-		state:       ReconcileInit,
+		runningPods:   podsToMemberSet(pods, c.isSecureClient()),
+		knownNodes:    couchbaseutil.NewMemberSet(),
+		ejectNodes:    couchbaseutil.NewMemberSet(),
+		couchbase:     status,
+		state:         ReconcileInit,
+		removeVolumes: make(map[string]bool),
 	}
 
 	if err := c.reconcileClusterSettings(); err != nil {
@@ -141,7 +142,9 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 	defer func() {
 		if err != nil {
 			c.decPodIndex()
-			c.removePod(newMember.Name)
+			// Deleting volumes, even log volumes
+			// if node doesn't get to start
+			c.removePod(newMember.Name, true)
 		}
 	}()
 
@@ -208,8 +211,8 @@ func (c *Cluster) addMember(serverSpec api.ServerConfig) (*couchbaseutil.Member,
 }
 
 // Destroys a Couchbase cluster member
-func (c *Cluster) destroyMember(name string) error {
-	if err := c.removePod(name); err != nil {
+func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
+	if err := c.removePod(name, removeVolumes); err != nil {
 		return err
 	}
 
@@ -477,15 +480,6 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 
 	// set default volume paths and allow for override of via spec
 	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
-	if mounts := serverSpec.GetVolumeMounts(); mounts != nil {
-		if mounts.DataClaim != "" {
-			dataPath = k8sutil.CouchbaseVolumeMountDataDir
-		}
-		if mounts.IndexClaim != "" {
-			indexPath = k8sutil.CouchbaseVolumeMountIndexDir
-		}
-	}
-
 	if err := c.client.InitializeCluster(m, c.username, c.password, defaults,
 		serverSpec.Services, dataPath, indexPath, analyticsPaths, settings.IndexStorageSetting); err != nil {
 		return err
@@ -1137,7 +1131,7 @@ func getServiceDataPaths(mounts *api.VolumeMounts) (string, string, []string) {
 	dataPath := constants.DefaultDataPath
 	indexPath := constants.DefaultDataPath
 	analyticsPaths := []string{}
-	if mounts != nil {
+	if mounts != nil && mounts.LogsOnly() == false {
 		if mounts.DataClaim != "" {
 			dataPath = k8sutil.CouchbaseVolumeMountDataDir
 		}

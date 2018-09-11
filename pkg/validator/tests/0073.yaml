@@ -1,0 +1,41 @@
+# A configuration to check volume mounts 
+apiVersion: couchbase.com/v1
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  version: enterprise-5.5.0
+  authSecret: cb-example-auth
+  cluster:
+    dataServiceMemoryQuota: 256
+    indexStorageSetting: plasma
+  buckets:
+    - name: default
+      type: couchbase
+      memoryQuota: 128
+      replicas: 3
+      ioPriority: low
+      evictionPolicy: valueOnly
+      conflictResolution: seqno
+      enableFlush: false
+      enableIndexReplica: true
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+      pod:
+        volumeMounts:
+          default: couchbase
+          logs: couchbase
+  volumeClaimTemplates:
+    - metadata:
+        name: couchbase
+      spec:
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 1Gi

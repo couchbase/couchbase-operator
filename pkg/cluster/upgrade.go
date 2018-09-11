@@ -173,7 +173,7 @@ func (c *Cluster) checkAndFixUpgradeState(status *couchbaseutil.ClusterStatus) e
 		}
 
 		if status.NodeInState(upgradedNodeName, couchbaseutil.NodeStateUnclustered) {
-			if err := c.destroyMember(upgradedNodeName); err != nil {
+			if err := c.destroyMember(upgradedNodeName, true); err != nil {
 				return err
 			}
 			if err := c.client.UpdateClusterStatus(c.members, status); err != nil {
@@ -318,7 +318,7 @@ func (c *Cluster) upgrade(status *couchbaseutil.ClusterStatus) error {
 
 		// Finally delete the upgrading node now the upgraded node is added,
 		// the cluster rebalanced and the upgrading node ejected
-		if err := c.destroyMember(upgradingNodeName); err != nil {
+		if err := c.destroyMember(upgradingNodeName, true); err != nil {
 			return err
 		}
 	}

@@ -308,33 +308,50 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	// validate persistent volume spec such that when volumeMounts are specified, claim for
-	// `default` must be provided, and all mounts much pair to associated persistentVolumeClaims
+	// `default` must be provided, and all mounts much pair to associated persistentVolumeClaims.
+	// `logs` claim cannot be used in conjunction with `default` claim.
 	for _, config := range customResource.Spec.ServerSettings {
 		if config.Pod != nil && config.Pod.VolumeMounts != nil {
 			mounts := config.Pod.VolumeMounts
-			if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
-				err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DefaultClaim), "spec.volumeClaimTemplates[*].metadata.name")
-				errs = append(errs, err)
-			}
-			if mounts.DataClaim != "" {
-				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DataClaim); template == nil {
-					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DataClaim), "spec.volumeClaimTemplates[*].metadata.name")
+			hasSecondaryMounts := mounts.DataClaim != "" || mounts.IndexClaim != "" || mounts.AnalyticsClaims != nil
+
+			if mounts.LogsOnly() {
+				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.LogsClaim); template == nil {
+					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.LogsClaim), "spec.volumeClaimTemplates[*].metadata.name")
 					errs = append(errs, err)
 				}
-			}
-			if mounts.IndexClaim != "" {
-				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.IndexClaim); template == nil {
-					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.IndexClaim), "spec.volumeClaimTemplates[*].metadata.name")
+				if mounts.DefaultClaim != "" || hasSecondaryMounts {
+					err := errors.AdditionalItemsNotAllowed("default|data|index|analytics", "spec.volumeMounts.logs")
 					errs = append(errs, err)
 				}
-			}
-			if len(mounts.AnalyticsClaims) > 0 {
-				for _, claim := range mounts.AnalyticsClaims {
-					if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
-						err := errors.Required(fmt.Sprintf(`"%s"`, claim), "spec.volumeClaimTemplates[*].metadata.name")
+			} else if mounts.DefaultClaim != "" {
+				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
+					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DefaultClaim), "spec.volumeClaimTemplates[*].metadata.name")
+					errs = append(errs, err)
+				}
+				if mounts.DataClaim != "" {
+					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DataClaim); template == nil {
+						err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DataClaim), "spec.volumeClaimTemplates[*].metadata.name")
 						errs = append(errs, err)
 					}
 				}
+				if mounts.IndexClaim != "" {
+					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.IndexClaim); template == nil {
+						err := errors.Required(fmt.Sprintf(`"%s"`, mounts.IndexClaim), "spec.volumeClaimTemplates[*].metadata.name")
+						errs = append(errs, err)
+					}
+				}
+				if len(mounts.AnalyticsClaims) > 0 {
+					for _, claim := range mounts.AnalyticsClaims {
+						if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
+							err := errors.Required(fmt.Sprintf(`"%s"`, claim), "spec.volumeClaimTemplates[*].metadata.name")
+							errs = append(errs, err)
+						}
+					}
+				}
+			} else if hasSecondaryMounts {
+				err := errors.Required("default", "spec.volumeMounts")
+				errs = append(errs, err)
 			}
 		}
 	}
@@ -491,6 +508,9 @@ func checkImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 		}
 		if cur.Pod.VolumeMounts.IndexClaim != up.Pod.VolumeMounts.IndexClaim {
 			errs = append(errs, &UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"})
+		}
+		if cur.Pod.VolumeMounts.LogsClaim != up.Pod.VolumeMounts.LogsClaim {
+			errs = append(errs, &UpdateError{"logs", "spec.servers[*].Pod.VolumeMounts"})
 		}
 		if !stringArrayCompareOrdered(cur.Pod.VolumeMounts.AnalyticsClaims, up.Pod.VolumeMounts.AnalyticsClaims) {
 			errs = append(errs, &UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"})

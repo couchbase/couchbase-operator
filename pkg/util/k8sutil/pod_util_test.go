@@ -16,7 +16,11 @@ func TestPathsToPersist(t *testing.T) {
 		IndexClaim:   claimName,
 	}
 
-	paths := getPathsToPersist(mounts)
+	paths, err := getPathsToPersist(mounts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	defaultClaim, ok := paths[cbapi.DefaultVolumeMount]
 	if !ok {
 		t.Fatalf("missing default claim")

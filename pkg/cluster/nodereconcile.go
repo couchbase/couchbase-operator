@@ -78,12 +78,13 @@ var (
 )
 
 type ReconcileMachine struct {
-	runningPods  couchbaseutil.MemberSet
-	knownNodes   couchbaseutil.MemberSet
-	ejectNodes   couchbaseutil.MemberSet
-	unknownNodes couchbaseutil.MemberSet
-	couchbase    *couchbaseutil.ClusterStatus
-	state        ReconcileState
+	runningPods   couchbaseutil.MemberSet
+	knownNodes    couchbaseutil.MemberSet
+	ejectNodes    couchbaseutil.MemberSet
+	unknownNodes  couchbaseutil.MemberSet
+	couchbase     *couchbaseutil.ClusterStatus
+	state         ReconcileState
+	removeVolumes map[string]bool // map of nodes with volumes to remove if deleted
 }
 
 func (r *ReconcileMachine) transitionState(to ReconcileState) {
@@ -153,10 +154,15 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 				found = true
 			}
 		}
-
 		if !found {
 			needsReconcile = true
 		}
+	}
+
+	// When nodes are being removed, the default behavior is to remove volumes
+	// unless user is initiating the removal and only logs are mounted
+	for _, m := range c.members {
+		r.removeVolumes[m.Name] = !c.memberHasLogVolumes(m.Name)
 	}
 
 	// TEMPORARY HACK
@@ -308,7 +314,8 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 
 func handleUnclusteredNodes(r *ReconcileMachine, c *Cluster) error {
 	for name, _ := range r.couchbase.UnclusteredNodes {
-		if err := c.destroyMember(name); err != nil {
+		removeVolumes := shouldRemoveVolumes(r, c, name)
+		if err := c.destroyMember(name, removeVolumes); err != nil {
 			return fmt.Errorf("Unable to remove unclustered node: %s", err.Error())
 		}
 
@@ -467,6 +474,7 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 		// Check to see if we need to remove anything
 		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
 		nodesToRemove := nodes.Size() - serverSpec.Size
+
 		if nodesToRemove <= 0 {
 			continue
 		}
@@ -483,6 +491,11 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 			}
 			r.knownNodes.Remove(server)
 			r.ejectNodes.Add(c.members[server])
+
+			if c.memberHasLogVolumes(server) {
+				// Remove log volumes when user initiated scale down
+				r.removeVolumes[server] = true
+			}
 		}
 
 	}
@@ -623,14 +636,17 @@ func handleFailedAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 // corresponding running pod.
 func handleDeadMembers(r *ReconcileMachine, c *Cluster) error {
 	dead := c.members.Diff(r.runningPods)
+
 	for name, _ := range dead {
-		if err := c.destroyMember(name); err != nil {
+		removeVolumes := shouldRemoveVolumes(r, c, name)
+		if err := c.destroyMember(name, removeVolumes); err != nil {
 			return fmt.Errorf("Failed to remove dead members: %s", err.Error())
 		}
 	}
 
 	for name, _ := range r.unknownNodes {
-		if err := c.removePod(name); err != nil {
+		removeVolumes := shouldRemoveVolumes(r, c, name)
+		if err := c.removePod(name, removeVolumes); err != nil {
 			return fmt.Errorf("Failed to remove unknown member: %s", err.Error())
 		}
 	}
@@ -643,4 +659,15 @@ func handleNotifyFinished(r *ReconcileMachine, c *Cluster) error {
 	c.logger.Info("reconcile finished")
 	r.transitionState(ReconcileFinished)
 	return nil
+}
+
+// Check if volumes should be removed with Pod based on reconcile status
+func shouldRemoveVolumes(r *ReconcileMachine, c *Cluster, server string) bool {
+	removeVolumes, ok := r.removeVolumes[server]
+	if !ok {
+		// If descision to remove volume is unset then only
+		// remove if it's not a log volume
+		return !c.memberHasLogVolumes(server)
+	}
+	return removeVolumes
 }
