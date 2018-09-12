@@ -333,10 +333,9 @@ func (f *Framework) SetupFramework(kubeName string) error {
 
 	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
 	logrus.Infof("Deleting deployment: %s", Global.Deployment.Name)
-	if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, f.Namespace); err != nil {
-		return err
+	if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, f.Namespace); err == nil {
+		logrus.Infof("Deployment deleted: %v", Global.Deployment.Name)
 	}
-	logrus.Infof("Deployment deleted: %v", Global.Deployment.Name)
 
 	logrus.Info("Deleting clusters")
 	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
