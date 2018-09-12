@@ -115,17 +115,17 @@ func runSuite(t *testing.T) {
 				break
 			}
 
-			if err := framework.SetupPersistentVolume(t, f.ClusterSpec[kubeName].KubeClient, f.Namespace, kubeCluster.ClusterName, kubeCluster.StorageClassType); err != nil {
+			if err := f.SetupFramework(kubeName); err != nil {
 				skipCurrTestGroup = true
-				t.Error(err)
+				t.Errorf("Failed to setup framework: %v", err)
 				// Remove the map entry and break the loop
 				delete(f.ClusterSpec, kubeName)
 				break
 			}
 
-			if err := f.SetupFramework(kubeName); err != nil {
+			if err := framework.SetupPersistentVolume(t, f.ClusterSpec[kubeName].KubeClient, f.Namespace, kubeCluster.ClusterName, kubeCluster.StorageClassType); err != nil {
 				skipCurrTestGroup = true
-				t.Errorf("Failed to setup framework: %v", err)
+				t.Error(err)
 				// Remove the map entry and break the loop
 				delete(f.ClusterSpec, kubeName)
 				break

@@ -493,7 +493,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 
 	switch kubeType {
 	case "kubernetes":
-		t.Logf("Running ansible script for %s", kubeClusterSpec.ClusterName)
+		logrus.Infof("Running ansible script for %s", kubeClusterSpec.ClusterName)
 
 		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
 		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
@@ -508,7 +508,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 			return err
 		}
 
-		t.Logf("Cluster %s created successfully", kubeClusterSpec.ClusterName)
+		logrus.Infof("Cluster %s created successfully", kubeClusterSpec.ClusterName)
 	default:
 		return errors.New("Unsupported kube-type in test_config")
 	}
@@ -900,59 +900,59 @@ func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
 }
 
 func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeConfigPath string) error {
-	t.Log("running delete-etcd-automation.sh")
+	logrus.Info("Running delete-etcd-automation.sh")
 	wipePortworxCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", "--namespace", namespace, "--kubeConfig", kubeConfigPath)
 	if err := runExecCommand(t, wipePortworxCmd); err != nil {
-		t.Logf("error deleteing etcd operator crd: " + err.Error())
+		logrus.Infof("Error deleteing etcd operator crd: %v", err)
 	}
 
-	t.Log("deleting ectd-operator pods")
+	logrus.Info("Deleting ectd-operator pods")
 	if err := e2eutil.DeletePodsWithLabel(t, kubeClient, "name=etcd-operator", namespace); err != nil {
 		return err
 	}
 
 	// delete etcd services
-	t.Logf("deleting etcd services")
+	logrus.Info("Deleting etcd services")
 	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app=etcd"})
 	if err != nil {
 		return err
 	}
 	for _, service := range services.Items {
-		t.Logf("deleting etcd service: %+v\n", service.Name)
+		logrus.Infof("Deleting etcd service: %s", service.Name)
 		if err := kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
 
 	// delete etcd endpoints
-	t.Logf("deleting etcd endpoints")
+	logrus.Info("Deleting etcd endpoints")
 	endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: "app=etcd"})
 	if err != nil {
 		return err
 	}
 	for _, endpoint := range endpoints.Items {
-		t.Logf("deleting etcd endpoints: %+v\n", endpoint.Name)
+		logrus.Infof("deleting etcd endpoints: %s\n", endpoint.Name)
 		if err := kubeClient.CoreV1().Endpoints(namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
 	if err := kubeClient.CoreV1().Endpoints(namespace).Delete("etcd-operator", metav1.NewDeleteOptions(0)); err != nil {
-		t.Logf("etcd-operator endpoint already deleted")
+		logrus.Info("etcd-operator endpoint already deleted")
 	}
 
 	// delete etcd pods
-	t.Log("deleting etcd pods")
+	logrus.Info("Deleting etcd pods")
 	if err := e2eutil.DeletePodsWithLabel(t, kubeClient, "app=etcd", namespace); err != nil {
 		return err
 	}
 
-	t.Logf("deleting etcd deployment")
+	logrus.Info("Deleting etcd deployment")
 	DeleteOperatorCompletely(kubeClient, "etcd-operator", namespace)
 	return nil
 }
 
 func CreateEtcdCluster(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeConfigPath string) error {
-	t.Logf("deploying etcd")
+	logrus.Info("Deploying etcd")
 	createEtcCLusterdCmd := exec.Command("bash", "./resources/thirdparty/etcd/deploy-etcd-automation.sh", "--namespace", namespace, "--kubeConfig", kubeConfigPath)
 	if err := runExecCommand(t, createEtcCLusterdCmd); err != nil {
 		return errors.New("error creating etcd cluster: " + err.Error())
@@ -960,7 +960,7 @@ func CreateEtcdCluster(t *testing.T, kubeClient kubernetes.Interface, namespace,
 	if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 60, "app=etcd", namespace); err != nil {
 		return err
 	}
-	t.Logf("etcd deployed")
+	logrus.Info("etcd deployed")
 	return nil
 }
 
@@ -978,16 +978,16 @@ func GetEtcdServiceEndpoint(kubeClient kubernetes.Interface, namespace string) (
 }
 
 func CreateEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeConfigPath string) error {
-	t.Log("creating etcd cluster role")
+	logrus.Info("Creating etcd cluster role")
 	if err := RecreateClusterRolesEtcd(kubeClient); err != nil {
 		return err
 	}
-	t.Log("creating etcd cluster role binding")
+	logrus.Info("Creating etcd cluster role binding")
 	if err := RecreateClusterRoleBindingsEtcd(kubeClient, namespace); err != nil {
 		return err
 	}
 
-	t.Log("creating etcd cluster")
+	logrus.Info("Creating etcd cluster")
 	if err := CreateEtcdCluster(t, kubeClient, namespace, kubeConfigPath); err != nil {
 		return err
 	}
@@ -995,32 +995,32 @@ func CreateEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeCo
 }
 
 func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeConfigPath string) error {
-	t.Log("creating portworx service account")
+	logrus.Info("Creating portworx service account")
 	if err := RecreateServiceAccountPortworx(kubeClient); err != nil {
 		return err
 	}
 
-	t.Log("creating portworx cluster role")
+	logrus.Info("Creating portworx cluster role")
 	if err := RecreateClusterRolesPortworx(kubeClient); err != nil {
 		return err
 	}
 
-	t.Log("creating portworx cluster role binding")
+	logrus.Info("Creating portworx cluster role binding")
 	if err := RecreateClusterRoleBindingsPortworx(kubeClient); err != nil {
 		return err
 	}
 
-	t.Log("creating portworx service")
+	logrus.Info("Creating portworx service")
 	if err := RecreateServicePortworx(kubeClient); err != nil {
 		return err
 	}
 
-	t.Log("creating portworx storage class")
+	logrus.Info("Creating portworx storage class")
 	if err := RecreateStorageClassPortworx(kubeClient); err != nil {
 		return err
 	}
 
-	t.Log("grabbing etcd endpoint ip")
+	logrus.Info("Grabbing etcd endpoint ip")
 	etcdEndpointIP, err := GetEtcdServiceEndpoint(kubeClient, namespace)
 	if err != nil {
 		return err
@@ -1030,14 +1030,14 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, namespace, ku
 		return err
 	}
 
-	t.Log("deploying portworx service")
+	logrus.Info("Deploying portworx service")
 	portworxClusterName := "test-portworx-" + e2eutil.RandomSuffix()
 	deployPortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/deploy-portworx-automation.sh", etcdEndpointIP, portworxClusterName, kubeConfigPath)
 	if err := runExecCommand(t, deployPortworxCmd); err != nil {
 		return errors.New("error running submit-portworx-automation.sh: " + err.Error())
 	}
 
-	t.Log("scaling up portworx pods")
+	logrus.Info("Scaling up portworx pods")
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	numNodes := len(k8sNodeList.Items)
 	for i := 0; i < numNodes; i++ {
@@ -1048,17 +1048,15 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, namespace, ku
 			if err != nil {
 				if retryCount == 2 {
 					return err
-				} else {
-					continue
 				}
+				continue
 			}
 			node := k8sNodeList.Items[i]
 			if err := e2eutil.AddLabelToNode(t, kubeClient, node, "px/enabled", "true"); err != nil {
 				if retryCount == 2 {
 					return err
-				} else {
-					continue
 				}
+				continue
 			}
 			break
 		}
@@ -1074,37 +1072,33 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, namespace, ku
 }
 
 func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeConfigPath string) error {
-	t.Log("running delete-portworx-automation.sh")
-	exists, err := ServiceExists(kubeClient, "kube-system", "portworx-service")
-	if err != nil {
+	logrus.Info("Creating portworx service")
+	if err := RecreateServicePortworx(kubeClient); err != nil {
 		return err
 	}
-	if !exists {
-		if err := RecreateServicePortworx(kubeClient); err != nil {
-			return err
-		}
-	}
 
+	logrus.Info("Running delete-portworx-automation.sh")
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
 	if err := runExecCommand(t, deletePortworxCmd); err != nil {
 		return errors.New("error running delete-portworx-automation.sh: " + err.Error())
 	}
 
-	if err = RemoveService(kubeClient, "kube-system", "portworx-service"); err != nil {
+	logrus.Info("Deleting portworx-service")
+	if err := RemoveService(kubeClient, "kube-system", "portworx-service"); err != nil {
 		return err
 	}
 
-	t.Log("deleting portworx daemonset")
+	logrus.Info("Deleting portworx daemonset")
 	if err := e2eutil.DeleteDaemonSetsWithLabel(t, kubeClient, "name=portworx", "kube-system"); err != nil {
 		return err
 	}
 
-	t.Log("deleting portworx pods")
+	logrus.Info("Deleting portworx pods")
 	if err := e2eutil.DeletePodsWithLabel(t, kubeClient, "name=portworx", "kube-system"); err != nil {
 		return err
 	}
 
-	t.Log("deleting talisman job")
+	logrus.Info("Deleting talisman job")
 	jobs, err := kubeClient.BatchV1().Jobs("kube-system").List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -1113,7 +1107,7 @@ func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeConfigPat
 		kubeClient.BatchV1().Jobs("kube-system").Delete(job.Name, metav1.NewDeleteOptions(0))
 	}
 
-	t.Log("deleting talisman pods")
+	logrus.Info("Deleting talisman pods")
 	if err := e2eutil.DeletePodsWithLabel(t, kubeClient, "name=talisman", "kube-system"); err != nil {
 		return err
 	}
@@ -1124,22 +1118,6 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
 	switch storageClassType {
 	case "portworx":
-		logrus.Info("Deleting portworx")
-		if err := RecreateServicePortworx(kubeClient); err != nil {
-			return err
-		}
-
-		deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
-		runExecCmd(deletePortworxCmd)
-
-		if err := RemoveService(kubeClient, "kube-system", "portworx-service"); err != nil {
-			return err
-		}
-
-		logrus.Info("Deleting etcd")
-		deleteEtcdCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", "--namespace", namespace, "--kubeConfig", kubeConfigPath)
-		runExecCmd(deleteEtcdCmd)
-
 		if err := DeletePortworx(t, kubeClient, kubeConfigPath); err != nil {
 			t.Fatal(err)
 		}
@@ -1149,13 +1127,14 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		}
 
 		logrus.Info("Creating etcd cluster")
-		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
+		maxRetries := e2eutil.Retries5
+		for retryCount := 0; retryCount < maxRetries; retryCount++ {
 			if err := CreateEtcd(t, kubeClient, namespace, kubeConfigPath); err != nil {
-				t.Logf("error creating etcd: %v \n", err)
-				if retryCount == 2 {
-					t.Fatal(err)
-				}
+				logrus.Infof("Error creating etcd: %v", err)
 				DeleteEtcd(t, kubeClient, namespace, kubeConfigPath)
+				if retryCount == maxRetries-1 {
+					return err
+				}
 				time.Sleep(time.Second * 3)
 				continue
 			}
@@ -1163,13 +1142,13 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		}
 
 		logrus.Info("Creating Portworx cluster")
-		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
+		for retryCount := 0; retryCount < maxRetries; retryCount++ {
 			if err := CreatePortworx(t, kubeClient, namespace, kubeConfigPath); err != nil {
-				if retryCount == 2 {
+				logrus.Infof("Error creating portworx cluster: %v", err)
+				DeletePortworx(t, kubeClient, kubeConfigPath)
+				if retryCount == maxRetries-1 {
 					return err
 				}
-				t.Logf("Failed to create Portworx cluster: %v", err)
-				DeletePortworx(t, kubeClient, kubeConfigPath)
 				time.Sleep(time.Second * 3)
 				continue
 			}
