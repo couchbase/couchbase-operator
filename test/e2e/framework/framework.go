@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,7 +55,6 @@ type Framework struct {
 	ClusterSpec     ClusterMap
 	LogDir          string
 	SkipTeardown    bool
-	Duration        int
 	SuiteYmlData    SuiteData
 	ClusterConfFile string
 	PullDockerImage bool
@@ -82,6 +82,49 @@ func ReadYamlData() (err error) {
 	logrus.Info("Using suite file ", suiteFilePath)
 	suiteData, err = GetSuiteDataFromYml(suiteFilePath)
 	return err
+}
+
+// Returs time.Duration from given string
+// Default return value: "2h0m0s"
+func GetDuration(timeoutStr string) time.Duration {
+	// Default timeout to 2 hours
+	durationToReturn := (2 * time.Hour)
+
+	pattern, _ := regexp.Compile("^([0-9]+)([mhd])$")
+
+	// Calculates only if valid pattern exists
+	if pattern.MatchString(timeoutStr) {
+		match := pattern.FindStringSubmatch(timeoutStr)
+		timeoutVal, err := strconv.Atoi(match[1])
+		if err != nil {
+			return durationToReturn
+		}
+		timeoutDuration := time.Duration(timeoutVal)
+		switch match[2] {
+		case "m":
+			durationToReturn = timeoutDuration * time.Minute
+		case "h":
+			durationToReturn = timeoutDuration * time.Hour
+		case "d":
+			durationToReturn = timeoutDuration * (time.Hour * 24)
+		}
+	}
+	return durationToReturn
+}
+
+// Starts timeout trigger based on given value in suiteData.Timeout
+func StartTimeoutTimer() {
+	go func() {
+		// In case of SystemTests, timeout will be set as part of test case
+		if suiteData.SuiteName == "TestSystem" {
+			logrus.Info("Skipping setting timer")
+		}
+		timeoutDuration := GetDuration(suiteData.Timeout)
+		logrus.Infof("Setting timeout of %v from %v", timeoutDuration, time.Now())
+		<-time.After(timeoutDuration)
+		logrus.Infof("Timeout happened at %v", time.Now())
+		panic("Test timed out..")
+	}()
 }
 
 // Setup setups a test framework and points "Global" to it.
@@ -131,11 +174,6 @@ func Setup(t *testing.T) error {
 		return err
 	}
 
-	duration, err := strconv.Atoi(runtimeParams.TestDuration)
-	if err != nil {
-		return err
-	}
-
 	for _, kubeConf := range runtimeParams.KubeConfig {
 		clusterSpec, err := CreateKubeClusterObject(kubeConf.ClusterConfig)
 		if err != nil {
@@ -163,7 +201,6 @@ func Setup(t *testing.T) error {
 		LogDir:          logDir,
 		SkipTeardown:    runtimeParams.SkipTearDown,
 		CollectLogs:     runtimeParams.CollectLogsOnFailure,
-		Duration:        duration,
 		ClusterSpec:     clusterSpecMap,
 		SuiteYmlData:    suiteData,
 		ClusterConfFile: runtimeParams.ClusterConfFile,

@@ -81,7 +81,6 @@ type TestRunParam struct {
 	KubeVersion          string         `yaml:"kube-version"`
 	ServiceAccountName   string         `yaml:"serviceAccountName"`
 	KubeConfig           []KubeConfData `yaml:"kube-config"`
-	TestDuration         string         `yaml:"duration"`
 	SkipTearDown         bool           `yaml:"skip-tear-down"`
 	CollectLogsOnFailure bool           `yaml:"collectLogsOnFailure"`
 	ClusterConfFile      string         `yaml:"cluster-config"`
@@ -115,6 +114,7 @@ type ClusterConfig struct {
 // To decode test-suite yaml file
 type SuiteData struct {
 	SuiteName     string `yaml:"suite"`
+	Timeout       string `yaml:"timeout"`
 	TestCaseGroup []struct {
 		GroupName     string   `yaml:"name"`
 		GroupSetup    []string `yaml:"groupSetup"`

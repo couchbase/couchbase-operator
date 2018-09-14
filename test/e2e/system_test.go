@@ -18,11 +18,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// a test consists of a name, number of days to run, and a list of operations to run
+// a test consists of a name, duration of test to run, and a list of operations to run
 type sysTestDef struct {
-	name string
-	days int
-	ops  []operation
+	name     string
+	duration time.Duration
+	ops      []operation
 }
 
 // an operation  is a docker image run as a kubernetes job that executes a command
@@ -451,7 +451,6 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	time.Sleep(3 * time.Second)
 
 	// run the system test
-	to := time.After(time.Duration(testDef.days*24*60*60) * time.Second)
 	cycles := 1
 
 outerLoop:
@@ -466,7 +465,7 @@ outerLoop:
 		for {
 			select {
 			// test timeout
-			case <-to:
+			case <-time.After(testDef.duration):
 				break outerLoop
 			// receive message from MonitorJob goroutines
 			case result := <-results:
@@ -528,8 +527,8 @@ func TestFeaturesAll(t *testing.T) {
 	}
 	f := framework.Global
 	testDef := sysTestDef{
-		name: "simple",
-		days: f.Duration,
+		name:     "simple",
+		duration: framework.GetDuration(f.SuiteYmlData.Timeout),
 		ops: []operation{
 			// load data to default cluster 1
 			{

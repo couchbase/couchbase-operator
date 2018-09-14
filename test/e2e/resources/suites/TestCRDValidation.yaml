@@ -1,5 +1,6 @@
 ---
 suite: TestCRDValidation
+timeout: 6h
 tcGroups:
   - name: Group1
     clusters:

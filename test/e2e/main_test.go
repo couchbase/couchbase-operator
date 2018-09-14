@@ -17,6 +17,10 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	// Call to start timer for test timeout
+	framework.StartTimeoutTimer()
+
+	// Run Test module
 	code := m.Run()
 
 	if err := framework.Teardown(); err != nil {

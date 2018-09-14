@@ -1,5 +1,6 @@
 ---
 suite: TestCustom
+timeout: 1h
 tcGroups:
   - name: Group1
     clusters:

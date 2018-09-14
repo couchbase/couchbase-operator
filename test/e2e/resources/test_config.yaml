@@ -10,7 +10,6 @@ kube-config:  # List of Cluster KUBECONFIG to be used during tests, if not clust
   #- name: Cluster2
   #  config: ~/.kube/config_new
 collectLogsOnFailure: false   # Collect cluster logs when test case fails using cbopinfo tool
-duration: 7                   # In days. Used for system tests
 pullDockerImages: false       # If true, operator and server images will be pulled to all k8s nodes
 skip-tear-down: true          # Leaves the operator running after tests
 
