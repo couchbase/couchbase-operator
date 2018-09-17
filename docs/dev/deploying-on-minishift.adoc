@@ -12,7 +12,7 @@ This will get you the latest version of MiniShift. You will also need Virtual Ma
 
 Now that you hovae the software installed you can bring up Openshift by running the following command:
 
- $ minishift start --vm-driver=virtualbox --openshift-version=v3.9.0
+ $ minishift start --cpus 4 --memory 8192 --vm-driver=virtualbox --openshift-version=v3.9.0
 
 Note that VirtualBox and OpenShift 3.9 are not the defaults (at least at the time of this writing) so you need to modify the default slightly. If there is a released version of Openshift after 3.9 the we recommend using the newer version.
 
