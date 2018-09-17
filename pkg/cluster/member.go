@@ -22,6 +22,7 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	members.Append(status.PendingAddNodes)
 	members.Append(status.FailedAddNodes)
 	members.Append(status.DownNodes)
+	members.Append(status.WarmupNodes)
 
 	c.members = members
 	return nil
