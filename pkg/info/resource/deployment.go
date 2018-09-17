@@ -1,8 +1,6 @@
 package resource
 
 import (
-	"strings"
-
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -48,7 +46,7 @@ func (r *deploymentResource) Fetch() error {
 	r.deployments = []v1.Deployment{}
 	for _, deployment := range deployments.Items {
 		for _, container := range deployment.Spec.Template.Spec.Containers {
-			if strings.HasPrefix(container.Image, "couchbase/couchbase-operator") {
+			if container.Image == r.context.Config.OperatorImage {
 				r.deployments = append(r.deployments, deployment)
 				break
 			}
