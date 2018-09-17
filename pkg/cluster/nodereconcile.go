@@ -231,6 +231,21 @@ func handleWarmupNodes(r *ReconcileMachine, c *Cluster) error {
 
 func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.IsRebalancing {
+		// If rebalance isn't actually active then we should stop it
+		running, err := c.client.IsRebalanceActive(c.readyMembers())
+		if err != nil {
+			c.logger.Errorf("Failed to get rebalance status: %v", err)
+		} else if !running {
+			// stop rebalance
+			err := c.client.StopRebalance(c.readyMembers())
+			if err != nil {
+				c.logger.Errorf("Failed to stop inactive rebalance: %v", err)
+			} else {
+				c.logger.Info("Stopped rebalance because it wasn't actually running")
+				r.transitionState(ReconcileDownNodes)
+				return nil
+			}
+		}
 		return fmt.Errorf("Skipping reconcile loop because the cluster is currently rebalancing")
 	}
 	r.transitionState(ReconcileDownNodes)

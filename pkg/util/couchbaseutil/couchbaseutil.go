@@ -549,7 +549,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 			status.NodeStateMap[member.Name] = NodeStateUnclustered
 		}
 
-		status.IsRebalancing = (status.info.RebalanceStatus == cbmgr.RebalanceStatusRunning)
+		status.IsRebalancing = (status.info.RebalanceStatus == string(cbmgr.RebalanceStatusRunning))
 		status.NeedsRebalance = !status.info.Balanced && len(status.info.Nodes) > 1
 		return nil
 	})
@@ -601,6 +601,17 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait b
 			}
 			return err
 		})
+}
+
+func (c *CouchbaseClient) StopRebalance(ms MemberSet) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.StopRebalance()
+}
+
+// Check that cluster is actively rebalancing with status 'running'
+func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.CompareRebalanceStatus(cbmgr.RebalanceStatusRunning)
 }
 
 func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *cbapi.BucketConfig) error {
