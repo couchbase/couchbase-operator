@@ -350,6 +350,7 @@ func (c *Cluster) run() {
 
 			if err := c.reconcile(running); err != nil {
 				c.logger.Errorf("failed to reconcile: %v", err)
+				rerr = err
 			}
 
 			if err := c.updateCRStatus(); err != nil {
