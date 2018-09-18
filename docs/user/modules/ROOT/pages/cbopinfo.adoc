@@ -107,6 +107,16 @@ If specified this sets the Operator rest port.  It is used for collection of run
 --system::
 If specified, this flag will additionally collect all resources from the `kube-system` namespace, which may be useful in diagnosing problems with cluster-level roles, custom resource definitions, or system services.
 
+[TIP]
+--
+All options may also be specified as environment variables, with the command line arguments taking precendence.  For example:
+[source,console]
+----
+$ KUBECONFIG=/etc/kube/config SYSTEM=1 ALL=TRUE cbopinfo
+----
+Options which do not take any parameters must be specified as valid boolean strings as specified by the https://golang.org/pkg/strconv/#ParseBool[Go ParseBool function].
+--
+
 == Examples
 
 To perform a basic collection of all Couchbase clusters and their associated resources within a name space:
@@ -133,7 +143,7 @@ You have access to the following projects and can switch between them with 'oc p
 
 Using project "myproject".
 
-$ cbopinfo --namespace myproject
+$ cbopinfo --namespace myproject --operator-image couchbase/operator:1.0.0-1
 Wrote cluster information to cbopinfo-20180801T141838+0100.tar.gz
 ----
 

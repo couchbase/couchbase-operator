@@ -4,6 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/version"
@@ -39,6 +42,54 @@ type Configuration struct {
 	OperatorRestPort string
 }
 
+const (
+	namespaceFlag        = "namespace"
+	kubeconfigFlag       = "kubeconfig"
+	operatorImageFlag    = "operator-image"
+	operatorRestPortFlag = "operator-rest-port"
+	allFlag              = "all"
+	systemFlag           = "system"
+	collectInfoFlag      = "collectinfo"
+)
+
+// flagToEnvVar converts a command line flag to a environment variable.
+func flagToEnvVar(flag string) string {
+	// Uppercase the flag
+	key := strings.ToUpper(flag)
+
+	// Translate hyphens to underscores
+	re := regexp.MustCompile("-")
+	key = re.ReplaceAllString(key, "_")
+
+	return key
+}
+
+// lookupFlagFromEnvString looks up a string environment variable and returns a default
+// value if not defined.
+func lookupFlagFromEnvString(flag, def string) string {
+	// Lookup the environment variable and return it if it exists.
+	if value, ok := os.LookupEnv(flagToEnvVar(flag)); ok {
+		return value
+	}
+
+	// Default to the default value
+	return def
+}
+
+// lookupFlagFromEnvBool looks up a boolean environment variable and returns a default
+// value if not defined.
+func lookupFlagFromEnvBool(flag string, def bool) bool {
+	// Lookup the environment variable and return it if it exists and is valid.
+	if value, ok := os.LookupEnv(flagToEnvVar(flag)); ok {
+		if v, err := strconv.ParseBool(value); err != nil {
+			return v
+		}
+	}
+
+	// Default to the default value
+	return def
+}
+
 // Parse parses configuration from the command line and returns an initialized
 // Configuration object
 func Parse() Configuration {
@@ -46,13 +97,13 @@ func Parse() Configuration {
 
 	// Parse command line flags into our configuration
 	flagSet := flag.NewFlagSet("cbopinfo", flag.ExitOnError)
-	flagSet.StringVar(&c.Namespace, "namespace", "default", "namespace to search for couchbase clusters")
-	flagSet.StringVar(&c.KubeConfig, "kubeconfig", "~/.kube/config", "kubernetes cluster configuration file")
-	flagSet.StringVar(&c.OperatorImage, "operator-image", "couchbase/operator:1.0.0", "operator image name")
-	flagSet.StringVar(&c.OperatorRestPort, "operator-rest-port", "8080", "operator rest port")
-	flagSet.BoolVar(&c.All, "all", false, "collect all resources from the namespace")
-	flagSet.BoolVar(&c.System, "system", false, "collect kube-system resources and logs")
-	flagSet.BoolVar(&c.CollectInfo, "collectinfo", false, "collect couchbase server logs")
+	flagSet.StringVar(&c.Namespace, namespaceFlag, lookupFlagFromEnvString(namespaceFlag, "default"), "namespace to search for couchbase clusters")
+	flagSet.StringVar(&c.KubeConfig, kubeconfigFlag, lookupFlagFromEnvString(kubeconfigFlag, "~/.kube/config"), "kubernetes cluster configuration file")
+	flagSet.StringVar(&c.OperatorImage, operatorImageFlag, lookupFlagFromEnvString(operatorImageFlag, "couchbase/operator:1.0.0"), "operator image name")
+	flagSet.StringVar(&c.OperatorRestPort, operatorRestPortFlag, lookupFlagFromEnvString(operatorRestPortFlag, "8080"), "operator rest port")
+	flagSet.BoolVar(&c.All, allFlag, lookupFlagFromEnvBool(allFlag, false), "collect all resources from the namespace")
+	flagSet.BoolVar(&c.System, systemFlag, lookupFlagFromEnvBool(systemFlag, false), "collect kube-system resources and logs")
+	flagSet.BoolVar(&c.CollectInfo, collectInfoFlag, lookupFlagFromEnvBool(collectInfoFlag, false), "collect couchbase server logs")
 	flagSet.BoolVar(&c.Help, "help", false, "print this message and exit")
 	flagSet.BoolVar(&c.Version, "version", false, "print the version string and exit")
 	flagSet.Parse(os.Args[1:])
