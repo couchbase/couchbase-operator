@@ -1,5 +1,5 @@
-hash: 64a40af56e7661cc3286903dba6b21a2e18fe68eea15c802908c848b6edc6e19
-updated: 2018-08-21T12:23:19.560379-07:00
+hash: 1555238bd2edc6c3a50dc800c7fcac1fd07c59ef54e5d8280d398500765cfaa8
+updated: 2018-09-18T15:34:55.130062716+01:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 593d64559f7600f29581a3ee42177f5dbded27a9
@@ -76,6 +76,8 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
+- name: github.com/google/uuid
+  version: d460ce9f8df2e77fb1ba55ca87fafed96c607494
 - name: github.com/googleapis/gnostic
   version: 0c5108395e2debce0d731cf0287ddf7242066aba
   subpackages:
@@ -153,7 +155,7 @@ imports:
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/ini.v1
-  version: 6ecc596bd756a16c6e93e4ef9225ecdb9f54ed2c
+  version: 5cf292cae48347c2490ac1a58fe36735fb78df7e
 - name: gopkg.in/yaml.v2
   version: 670d4cfef0544295bc27a114dbac37980d83185a
 - name: k8s.io/api

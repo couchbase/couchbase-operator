@@ -90,7 +90,7 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 If specified, this flag ignores any scoping rules for a particular resource type, and collects all instances within the namespace.
 
 --collectinfo::
-If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. The logs are left in situ as they may be relatively large. The `cbopinfo` command will report how to extract the logs from each pod.
+If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. The logs are left in situ as they may be relatively large. The `cbopinfo` command will report how to extract the logs from each pod.  Logs are automatically redacted of sensitive information, `cbopinfo` will provide a choice of download options.
 
 --kubeconfig <config>::
 If specified, this points to a Kubernetes configuration file used to locate and poll the cluster API. If not set, it will default to `~/.kube/config`.
@@ -152,8 +152,13 @@ To collect all Couchbase clusters, their associated resources within a namespace
 [source,console]
 ----
 $ cbopinfo --collectinfo --system
-Server logs accessible via: kubectl cp default/cb-example-0001:/tmp/cbinfo-default-cb-example-0001-20180629T152926+0100.zip .
-Server logs accessible via: kubectl cp default/cb-example-0002:/tmp/cbinfo-default-cb-example-0002-20180629T152926+0100.zip .
-Server logs accessible via: kubectl cp default/cb-example-0000:/tmp/cbinfo-default-cb-example-0000-20180629T152926+0100.zip .
-Wrote cluster information to cbopinfo-20180629T152926+0100.tar.gz
+Plain text server logs accessible with the following commands (use 'oc' command for OpenShift deployments):
+    kubectl cp default/cb-example-0001:/tmp/cbinfo-default-cb-example-0001-20180919T092607+0100.zip .
+    kubectl cp default/cb-example-0002:/tmp/cbinfo-default-cb-example-0002-20180919T092607+0100.zip .
+    kubectl cp default/cb-example-0000:/tmp/cbinfo-default-cb-example-0000-20180919T092607+0100.zip .
+Redacted server logs accessible with the following commands (use 'oc' command for OpenShift deployments):
+    kubectl cp default/cb-example-0001:/tmp/cbinfo-default-cb-example-0001-20180919T092607+0100-redacted.zip .
+    kubectl cp default/cb-example-0002:/tmp/cbinfo-default-cb-example-0002-20180919T092607+0100-redacted.zip .
+    kubectl cp default/cb-example-0000:/tmp/cbinfo-default-cb-example-0000-20180919T092607+0100-redacted.zip .
+Wrote cluster information to cbopinfo-20180919T092607+0100.tar.gz
 ----

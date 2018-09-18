@@ -10,6 +10,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
+	"github.com/google/uuid"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -54,6 +56,8 @@ type collectInfoResult struct {
 	pod *v1.Pod
 	// fileName is the absolute filename of the log file
 	fileName string
+	// fileNameRedacted is the absolute filename of the redacted log file
+	fileNameRedacted string
 	// err is the error status.  Nil on success
 	err error
 }
@@ -82,16 +86,24 @@ func (r *couchbaseLogCollector) Fetch(res resource.ResourceReference) error {
 		}
 	}
 
+	// Generate a salt for redaction
+	salt := uuid.New().String()
+
 	// This will take an eternity so fan out processing in parallel
-	results := make(chan collectInfoResult)
+	resultChan := make(chan collectInfoResult)
 	for index, _ := range pods.Items {
 		go func(pod *v1.Pod) {
 			// Place the logs in somewhere writable to any user
+			baseFilename := "cbinfo-" + pod.Namespace + "-" + pod.Name + "-" + util.Timestamp()
+			fileName := "/tmp/" + baseFilename + ".zip"
+			fileNameRedacted := "/tmp/" + baseFilename + "-redacted.zip"
+
 			result := collectInfoResult{
-				pod:      pod,
-				fileName: "/tmp/cbinfo-" + pod.Namespace + "-" + pod.Name + "-" + util.Timestamp() + ".zip",
+				pod:              pod,
+				fileName:         fileName,
+				fileNameRedacted: fileNameRedacted,
 			}
-			defer func() { results <- result }()
+			defer func() { resultChan <- result }()
 
 			// Generate the REST request
 			req := r.context.KubeClient.CoreV1().RESTClient().Post().
@@ -103,7 +115,9 @@ func (r *couchbaseLogCollector) Fetch(res resource.ResourceReference) error {
 				Container: couchbaseServerContainerName,
 				Command: []string{
 					"/opt/couchbase/bin/cbcollect_info",
-					result.fileName,
+					"--log-redaction-level", "partial",
+					"--log-redaction-salt", salt,
+					fileName,
 				},
 				Stdout: true,
 			}, scheme.ParameterCodec)
@@ -126,15 +140,26 @@ func (r *couchbaseLogCollector) Fetch(res resource.ResourceReference) error {
 	}
 
 	// Fan in the results and output any pertinent information
+	results := []collectInfoResult{}
 	for i := 0; i < len(pods.Items); i++ {
-		result := <-results
+		result := <-resultChan
 		if result.err != nil {
 			fmt.Println(err)
 			continue
 		}
+		results = append(results, result)
+	}
 
+	fmt.Println("Plain text server logs accessible with the following commands (use 'oc' command for OpenShift deployments):")
+	for _, result := range results {
 		fileSpec := result.pod.Namespace + "/" + result.pod.Name + ":" + result.fileName
-		fmt.Println("Server logs accessible via: kubectl cp", fileSpec, ".")
+		fmt.Println("    kubectl cp", fileSpec, ".")
+	}
+
+	fmt.Println("Redacted server logs accessible with the following commands (use 'oc' command for OpenShift deployments):")
+	for _, result := range results {
+		fileSpec := result.pod.Namespace + "/" + result.pod.Name + ":" + result.fileNameRedacted
+		fmt.Println("    kubectl cp", fileSpec, ".")
 	}
 
 	return nil
