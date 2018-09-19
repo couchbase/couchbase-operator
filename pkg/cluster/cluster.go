@@ -765,12 +765,26 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
 	readyNodes := c.status.Members.Ready.Names()
+
+	// Get running pods to ensure ready nodes exists
+	running, _, err := c.pollPods()
+	if err != nil {
+		c.logger.Errorf("fail to poll pods: %v", err)
+		return c.members
+	}
+	podMembers := podsToMemberSet(running, c.isSecureClient())
 	for _, node := range readyNodes {
 		if m, ok := c.members[node]; ok {
-			members.Add(m)
+			if _, ok := podMembers[node]; ok {
+				members.Add(m)
+			}
 		}
 	}
 	if members.Empty() && c.members != nil {
+		err := c.updateMembers(podMembers)
+		if err != nil {
+			c.logger.Errorf("failed to update members: %v", err)
+		}
 		members = c.members
 	}
 	return members
