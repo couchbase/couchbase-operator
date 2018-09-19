@@ -8,28 +8,21 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// other settings
-var (
-	baseImage = "couchbase/server"
-	version   = "enterprise-5.5.0"
-
-	// Storage class defined in K8S cluster
-	StorageClassName = "standard"
-)
-
 // cluster settings
 var (
 	defaultClusterSettings = api.ClusterConfig{
-		DataServiceMemQuota:                    256,
-		IndexServiceMemQuota:                   256,
-		SearchServiceMemQuota:                  256,
-		EventingServiceMemQuota:                256,
-		AnalyticsServiceMemQuota:               1024,
+		DataServiceMemQuota:                    e2e_constants.Mem256Mb,
+		IndexServiceMemQuota:                   e2e_constants.Mem256Mb,
+		SearchServiceMemQuota:                  e2e_constants.Mem256Mb,
+		EventingServiceMemQuota:                e2e_constants.Mem256Mb,
+		AnalyticsServiceMemQuota:               e2e_constants.Mem1Gb,
 		IndexStorageSetting:                    constants.IndexStorageModeMemoryOptimized,
 		AutoFailoverTimeout:                    30,
 		AutoFailoverMaxCount:                   1,
@@ -42,7 +35,7 @@ var (
 	DefaultBucketSettings = api.BucketConfig{
 		BucketName:         "default",
 		BucketType:         constants.BucketTypeCouchbase,
-		BucketMemoryQuota:  256,
+		BucketMemoryQuota:  e2e_constants.Mem256Mb,
 		BucketReplicas:     constants.BucketReplicasOne,
 		IoPriority:         constants.BucketIoPriorityHigh,
 		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
@@ -55,7 +48,7 @@ var (
 // server settings
 var (
 	defaultServerSettings = api.ServerConfig{
-		Size: 1,
+		Size: e2e_constants.Size1,
 		Name: "test_config_1",
 		Services: api.ServiceList{
 			api.DataService,
@@ -67,24 +60,24 @@ var (
 
 func SetCbBaseImage(baseImageName string) {
 	if baseImageName = strings.TrimSpace(baseImageName); baseImageName != "" {
-		baseImage = baseImageName
+		e2e_constants.CbServerBaseImage = baseImageName
 	}
 }
 
 func SetCbImageVersion(cbImgVer string) {
 	if cbImgVer = strings.TrimSpace(cbImgVer); cbImgVer != "" {
-		version = cbImgVer
+		e2e_constants.CbServerVersion = cbImgVer
 	}
 }
 
 func SetStorageClassName(storageClassName string) {
 	if storageClassName = strings.TrimSpace(storageClassName); storageClassName != "" {
-		StorageClassName = storageClassName
+		e2e_constants.StorageClassName = storageClassName
 	}
 }
 
 func GetCouchbaseDockerImgName() string {
-	return baseImage + ":" + version
+	return e2e_constants.CbServerBaseImage + ":" + e2e_constants.CbServerVersion
 }
 
 func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
@@ -92,7 +85,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 	for _, bucketType := range bucketTypes {
 		switch {
 		case bucketType == constants.BucketTypeCouchbase:
-			bucketMemoryQuotas := []int{256}
+			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
 			bucketReplicas := []int{1}
 			ioPriorities := []string{constants.BucketIoPriorityHigh}
 			evictionPolicies := []string{constants.BucketEvictionPolicyFullEviction}
@@ -126,7 +119,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 				}
 			}
 		case bucketType == constants.BucketTypeMemcached:
-			bucketMemoryQuotas := []int{256}
+			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
 			enableFlushes := []bool{true, false}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, enableFlush := range enableFlushes {
@@ -140,7 +133,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 				}
 			}
 		case bucketType == constants.BucketTypeEphemeral:
-			bucketMemoryQuotas := []int{256}
+			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
 			bucketReplicas := []int{1}
 			ioPriorities := []string{constants.BucketIoPriorityHigh}
 			evictionPolicies := []string{constants.BucketEvictionPolicyNoEviction, constants.BucketEvictionPolicyNRUEviction}
@@ -184,9 +177,9 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 		bucketConfig = []api.BucketConfig{bucketSettings}
 	}
 	spec := api.ClusterSpec{
-		BaseImage:       baseImage,
-		Version:         version,
-		AuthSecret:      secretName,
+		BaseImage:       e2e_constants.CbServerBaseImage,
+		Version:         e2e_constants.CbServerVersion,
+		AuthSecret:      e2e_constants.KubeTestSecretName,
 		ClusterSettings: defaultClusterSettings,
 		BucketSettings:  bucketConfig,
 		ServerSettings: []api.ServerConfig{api.ServerConfig{
@@ -219,9 +212,9 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 		bucketConfig = []api.BucketConfig{bucketSettings}
 	}
 	spec := api.ClusterSpec{
-		BaseImage:       baseImage,
-		Version:         version,
-		AuthSecret:      secretName,
+		BaseImage:       e2e_constants.CbServerBaseImage,
+		Version:         e2e_constants.CbServerVersion,
+		AuthSecret:      e2e_constants.KubeTestSecretName,
 		ClusterSettings: defaultClusterSettings,
 		BucketSettings:  bucketConfig,
 		ServerSettings: []api.ServerConfig{api.ServerConfig{
@@ -255,8 +248,8 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 	exposedFeatures := api.ExposedFeatureList{}
 	serverGroups := []string{}
 	adminConsoleServices := api.ServiceList{}
-	baseImageName := baseImage
-	versionNum := version
+	baseImageName := e2e_constants.CbServerBaseImage
+	versionNum := e2e_constants.CbServerVersion
 	antiAffinity := ""
 	keys := []string{}
 	for key := range config {
@@ -465,7 +458,7 @@ func NewStatefulCluster(genName, secretName string, size int, withBucket bool, e
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			StorageClassName: &StorageClassName,
+			StorageClassName: &e2e_constants.StorageClassName,
 			Resources:        storagePolicy.Resources,
 		},
 	}

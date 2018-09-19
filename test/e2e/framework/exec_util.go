@@ -29,21 +29,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-// ExecOptions passed to ExecWithOptions
-type ExecOptions struct {
-	Command []string
-
-	Namespace     string
-	PodName       string
-	ContainerName string
-
-	Stdin         io.Reader
-	CaptureStdout bool
-	CaptureStderr bool
-	// If false, whitespace in std{err,out} will be removed.
-	PreserveWhitespace bool
-}
-
 // ExecWithOptions executes a command in the specified container,
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.

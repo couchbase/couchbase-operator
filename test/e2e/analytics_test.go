@@ -8,7 +8,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -89,7 +89,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 
 	// Verify data set doc count
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -268,7 +268,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	datasetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
 	for index, datasetName := range datasetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, datasetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries10); err != nil {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, datasetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], e2eutil.Retries10); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -360,7 +360,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	}
 
 	// Wait until analytics service is fully functional
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -473,7 +473,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
 	for index, dataSetName := range dataSetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetCount[index], e2eutil.Retries5); err != nil {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetCount[index], e2eutil.Retries5); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -511,7 +511,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		"exposedFeatures": map[string]string{"featureNames": "client"},
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 
@@ -571,7 +571,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	}
 
 	// Wait till anlytics service become functional
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, e2eutil.Retries10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -629,7 +629,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, 0, 0}
 	for index, dataSetName := range dataSetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), dataSetDocCount[index], e2eutil.Retries5); err != nil {
+		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], e2eutil.Retries5); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -534,11 +534,6 @@ func WaitForClusterUnBalancedCondition(t *testing.T, crClient versioned.Interfac
 
 // waits until the provided condition type with associated status after specified timestamp
 func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) error {
-	cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
-	if err != nil {
-		return err
-	}
-
 	timeOutChan := time.NewTimer(time.Duration(wait) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
 	for {
@@ -547,6 +542,12 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 			return fmt.Errorf("timed out waiting for condition %s with status: %s", conditionType, status)
 
 		case <-tickChan:
+			// Get current cluster condition
+			cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
+			if err != nil {
+				return err
+			}
+
 			// compare cluster conditions to desired condition
 			t.Logf("cluster status: %s", cluster.Status.Conditions)
 			if condition, ok := cluster.Status.Conditions[conditionType]; ok {
@@ -559,11 +560,6 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 						return nil
 					}
 				}
-			}
-			// update cluster
-			cluster, err = GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
-			if err != nil {
-				return err
 			}
 		}
 	}

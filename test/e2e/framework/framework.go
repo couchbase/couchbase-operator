@@ -17,10 +17,10 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
@@ -36,36 +36,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
-
-type Cluster struct {
-	KubeClient    kubernetes.Interface
-	CRClient      versioned.Interface
-	DefaultSecret *v1.Secret
-	Config        *rest.Config
-}
-
-type ClusterMap map[string]*Cluster
-
-type Framework struct {
-	opImage         string
-	Deployment      *v1beta1.Deployment
-	Namespace       string
-	KubeType        string
-	KubeVersion     string
-	ClusterSpec     ClusterMap
-	LogDir          string
-	SkipTeardown    bool
-	SuiteYmlData    SuiteData
-	ClusterConfFile string
-	PullDockerImage bool
-	CollectLogs     bool
-	//S3Cli         *s3.S3
-	//S3Bucket      string
-}
-
-var Global *Framework
-var runtimeParams TestRunParam
-var suiteData SuiteData
 
 func ReadYamlData() (err error) {
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
@@ -189,7 +159,7 @@ func Setup(t *testing.T) error {
 
 	logrus.Info("Using couchbase-operator: " + deployment.Spec.Template.Spec.Containers[0].Image)
 	logrus.Info("Using couchbase-server: " + e2espec.GetCouchbaseDockerImgName())
-	logrus.Info("Using storage class: " + e2espec.StorageClassName)
+	logrus.Info("Using storage class: " + e2e_constants.StorageClassName)
 	logrus.Info("Logs will be stored in: " + logDir)
 
 	Global = &Framework{

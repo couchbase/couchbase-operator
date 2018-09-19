@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	"gopkg.in/ini.v1"
@@ -26,106 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Const Ansible setting string
-var (
-	ansibleLoginSectionData = map[string]string{
-		"ansible_connection":      "ssh",
-		"ansible_ssh_user":        "root",
-		"ansible_ssh_pass":        "couchbase",
-		"ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
-	}
-)
-
-// TestFunc defines the test function type
-type TestFunc func(*testing.T)
-
-// DecoratorArgs will be used to pass arguments to decorators
-type DecoratorArgs struct {
-	KubeNames []string
-}
-
-// TestDecorator decorates a test function.  This is used to augment an
-// existing test usually to perform setup and tear-down tasks e.g.
-// initializing and deleting a cluster or applying TLS configuration
-type TestDecorator func(TestFunc, DecoratorArgs) TestFunc
-
-// TestSuite defines a suite of tests
-type TestSuite map[string]TestFunc
-type TestSuiteDecorator map[string]TestDecorator
-
-// Map to store Testcase name to their respective Function objects
-type FuncMap map[string]func(*testing.T)
-type DecoratorMap map[string]TestDecorator
-
-// TestResult simply maps a test name to a pass/fail flag
-type TestResult struct {
-	Name   string
-	Result bool
-}
-
 // Variable to store the results globally
 var Results = []TestResult{}
-
-// Runtime configuration
-type KubeConfData struct {
-	ClusterName   string `yaml:"name"`
-	ClusterConfig string `yaml:"config"`
-}
-
-type TestRunParam struct {
-	Namespace            string         `yaml:"namespace"`
-	OperatorImage        string         `yaml:"operator-image"`
-	SuiteToRun           string         `yaml:"suite"`
-	DeploymentSpec       string         `yaml:"deployment-spec"`
-	KubeType             string         `yaml:"kube-type"`
-	KubeVersion          string         `yaml:"kube-version"`
-	ServiceAccountName   string         `yaml:"serviceAccountName"`
-	KubeConfig           []KubeConfData `yaml:"kube-config"`
-	SkipTearDown         bool           `yaml:"skip-tear-down"`
-	CollectLogsOnFailure bool           `yaml:"collectLogsOnFailure"`
-	ClusterConfFile      string         `yaml:"cluster-config"`
-	PullDockerImages     bool           `yaml:"pullDockerImages"`
-	StorageClassName     string         `yaml:"StorageClassName"`
-	CbServerBaseImage    string         `yaml:"cbServerBaseImage"`
-	CbServerImgVer       string         `yaml:"cbServerImageVersion"`
-}
-
-// To decode cluster yaml file
-type ClusterInfo struct {
-	ClusterName      string `yaml:"name"`
-	StorageClassType string `yaml:"storageClassType"`
-	MasterNodeList   []struct {
-		Ip        string `yaml:"ip"`
-		NodeLabel string `yaml:"label"`
-	} `yaml:"master"`
-	WorkerNodeList []struct {
-		Ip        string `yaml:"ip"`
-		NodeLabel string `yaml:"label"`
-	} `yaml:"worker"`
-}
-
-type ClusterConfig struct {
-	ClusterInfo []struct {
-		Type        string        `yaml:"type"`
-		ClusterList []ClusterInfo `yaml:"clusters"`
-	} `yaml:"types"`
-}
-
-// To decode test-suite yaml file
-type SuiteData struct {
-	SuiteName     string `yaml:"suite"`
-	Timeout       string `yaml:"timeout"`
-	TestCaseGroup []struct {
-		GroupName     string   `yaml:"name"`
-		GroupSetup    []string `yaml:"groupSetup"`
-		GroupTeardown []string `yaml:"groupTearDown"`
-		ClusterName   []string `yaml:"clusters"`
-		TestCase      []struct {
-			TcName     string   `yaml:"name"`
-			Decorators []string `yaml:"decorators"`
-		} `yaml:"testcases"`
-	} `yaml:"tcGroups"`
-}
 
 // analyzeResults accepts a list of test results and displays success rates
 func AnalyzeResults(t *testing.T) {
@@ -412,7 +314,7 @@ func createAnsibleHostFileFromHosts(filePathToSave string, hostList []string) er
 		return errors.New("Error while creating new section 'nodes'")
 	}
 
-	for key, value := range ansibleLoginSectionData {
+	for key, value := range constants.AnsibleLoginSectionData {
 		loginSectionForCluster.NewKey(key, value)
 	}
 
@@ -446,7 +348,7 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 		return errors.New("Error while creating new section 'all'")
 	}
 
-	for key, value := range ansibleLoginSectionData {
+	for key, value := range constants.AnsibleLoginSectionData {
 		loginSectionForCluster.NewKey(key, value)
 	}
 
@@ -473,12 +375,6 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 		return errors.New("Unable to save cluster file: " + err.Error())
 	}
 	return nil
-}
-
-func createNamespaceFile(namespace string) error {
-	nsJsonStr := "{\"kind\": \"Namespace\",\"apiVersion\": \"v1\",\"metadata\": { \"name\": \"" + namespace + "\", \"labels\": { \"name\": \"" + namespace + "\" }}}"
-	fileByteData := []byte(nsJsonStr)
-	return ioutil.WriteFile("/tmp/namespace.json", fileByteData, 0644)
 }
 
 func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath, reqOpImage string, kubeClusterSpec ClusterInfo) error {
@@ -881,7 +777,7 @@ func RemoveStorageClass(kubeClient kubernetes.Interface, storageClassName string
 }
 
 func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
-	if err := RemoveStorageClass(kubeClient, e2espec.StorageClassName); err != nil {
+	if err := RemoveStorageClass(kubeClient, constants.StorageClassName); err != nil {
 		return err
 	}
 	parameters := make(map[string]string)
@@ -891,7 +787,7 @@ func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
 
 	storageClassSpec := &storagev1.StorageClass{
 		TypeMeta:    metav1.TypeMeta{Kind: "StorageClass", APIVersion: "storage.k8s.io/v1beta1"},
-		ObjectMeta:  metav1.ObjectMeta{Name: e2espec.StorageClassName},
+		ObjectMeta:  metav1.ObjectMeta{Name: constants.StorageClassName},
 		Provisioner: "kubernetes.io/portworx-volume",
 		Parameters:  parameters,
 	}

@@ -695,15 +695,6 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
-func KillPodsAndWaitForRecovery(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
-	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
-	KillPods(t, kubeCli, cl, numToKill)
-	_, err = WaitUntilPodSizeReached(t, kubeCli, len(pods.Items), 20, cl)
-	if err != nil {
-		t.Fatalf("Failed to recover all nodes: %v", err)
-	}
-}
-
 func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) error {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return KillMember(kubeCli, cl.Namespace, cl.Name, name)

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -294,13 +294,13 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	clusterSpec1 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec2 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	if withPvc {
-		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName, 1))
-		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName+"-data", 4))
-		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName+"-index", 4))
+		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 1))
+		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-data", 4))
+		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-index", 4))
 		clusterSpec1.SecurityContext = createPodSecurityContext(1000)
-		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName, 1))
-		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName+"-data", 4))
-		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(e2espec.StorageClassName, pvcName+"-index", 4))
+		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 1))
+		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-data", 4))
+		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-index", 4))
 		clusterSpec2.SecurityContext = createPodSecurityContext(1000)
 	}
 
