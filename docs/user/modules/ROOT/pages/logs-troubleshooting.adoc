@@ -21,17 +21,24 @@ The Operator is distributed with a support tool which can automatically collect 
 
 The Couchbase Operator generates logs that can help troubleshoot your deployment.  Using `kubectl` or `oc`, you can choose to print the Operator logs to `stdout`.
 
-On Kubernetes:
-
+[{tabs}]
+====
+Kubernetes::
++
+--
+Get the name of the operator pod:
 [source,console]
 ----
-# Get name of operator pod
 $ kubectl get po -lapp=couchbase-operator
 NAME                                  READY     STATUS    RESTARTS   AGE
 couchbase-operator-1917615544-h20bm   1/1       Running   0          20h
+----
 
-# Get logs
+Get the operator logs:
+[source,console]
+----
 $ kubectl logs couchbase-operator-1917615544-h20bm
+time="2018-01-23T22:56:34Z" level=info msg="couchbase-operator v1.0.0 (release)" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Obtaining resource lock" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Starting event recorder" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
@@ -39,13 +46,44 @@ time="2018-01-23T22:56:51Z" level=info msg="I'm the leader, attempt to start the
 time="2018-01-23T22:56:51Z" level=info msg="Creating the couchbase-operator controller" module=main
 ----
 
-On OpenShift:
-
+You can even use the deployment to show the logs as the name is not auto-generated, the underlying command will automatically select a pod, in this case we only allow one so will behave correctly:
 [source,console]
 ----
-# Get name of operator pod
-$ oc get po -lapp=couchbase-operator
+$ kubectl logs deployment/couchbase-operator
 ----
+--
+
+OpenShift::
++
+--
+Get the name of the operator pod:
+[source,console]
+----
+$ oc get po -lapp=couchbase-operator
+NAME                                  READY     STATUS    RESTARTS   AGE
+couchbase-operator-1917615544-h20bm   1/1       Running   0          20h
+----
+
+Get the operator logs:
+[source,console]
+----
+$ oc logs couchbase-operator-1917615544-h20bm
+time="2018-01-23T22:56:34Z" level=info msg="couchbase-operator v1.0.0 (release)" module=main
+time="2018-01-23T22:56:34Z" level=info msg="Obtaining resource lock" module=main
+time="2018-01-23T22:56:34Z" level=info msg="Starting event recorder" module=main
+time="2018-01-23T22:56:34Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
+time="2018-01-23T22:56:51Z" level=info msg="I'm the leader, attempt to start the operator" module=main
+time="2018-01-23T22:56:51Z" level=info msg="Creating the couchbase-operator controller" module=main
+----
+
+You can even use the deployment to show the logs as the name is not auto-generated, the underlying command will automatically select a pod,
+in this case we only allow one so will behave correctly:
+[source,console]
+----
+$ oc logs deployment/couchbase-operator
+----
+--
+====
 
 Watch for the following messages which indicate that the Operator is unable to reconcile your cluster into a desired state:
 
@@ -54,22 +92,50 @@ Watch for the following messages which indicate that the Operator is unable to r
 
 == Profiling the operator
 
-The Couchbase operator serves profiling data on it's default listenAddress `localhost:8080`.  You can access this endpoint by performing a `kubectl exec` into the operator pod, for example:
+The Couchbase operator serves profiling data on it's default listenAddress `localhost:8080`.  You can access this endpoint by running a remote shell or forwarding the port to your local system.
 
+[{tabs}]
+====
+Kubernetes::
++
+--
+Access Go routine stack backtraces via a shell:
 [source,console]
 ----
 $ kubectl exec -it couchbase-operator-599bcf47f-8wswh sh
-$ wget -O- "localhost:8080/debug/pprof/trace" | less
+$ wget -O- 'http://localhost:8080/debug/pprof/goroutine?debug=1' | less
 ----
 
-Another option is to create a custom service or forward the service directly to your localhost.
-
+Access Go memory usage via a port forward:
 [source,console]
 ----
-$ kubectl port-forward couchbase-operator-599bcf47f-8wswh  8080:8080
+$ kubectl port-forward couchbase-operator-599bcf47f-8wswh 8080:8080
 $ go tool pprof localhost:8080/debug/pprof/heap
-$ (pprof) traces
+(pprof) traces
 ----
+--
+
+OpenShift::
++
+--
+Access Go routine stack backtraces via a shell:
+[source,console]
+----
+$ oc exec -it couchbase-operator-599bcf47f-8wswh sh
+$ wget -O- 'http://localhost:8080/debug/pprof/goroutine?debug=1' | less
+----
+
+Access Go memory usage via a port forward:
+[source,console]
+----
+$ oc port-forward couchbase-operator-599bcf47f-8wswh 8080:8080
+$ go tool pprof localhost:8080/debug/pprof/heap
+(pprof) traces
+----
+--
+====
+
+For additional details on the Go language pprof feature please read the https://golang.org/pkg/net/http/pprof/[official documentation].
 
 == See Also
 
