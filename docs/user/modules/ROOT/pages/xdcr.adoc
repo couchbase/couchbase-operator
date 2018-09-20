@@ -2,18 +2,66 @@
 
 One of the Couchbase data platform's key features is the ability to replicate bucket data in another geographically remote location to provide resilience in the event of a network or power fault. This section outlines a few scenarios and how to configure your Couchbase clusters accordingly.
 
-== XDCR Within the Same Kubernetes Cluster
+== Deployment Scenarios
+
+=== XDCR Within the Same Kubernetes Cluster
 
 This is by far the simplest deployment. Since both Couchbase Server clusters are in the same pod network, and both have access to DNS, XDCR will just work out of the box. xref:tls.adoc[TLS] can also be used to secure communications with a wildcard certificate.
 
-== XDCR to a Different Kubernetes Cluster with Routed Networking
+=== XDCR to a Different Kubernetes Cluster with Routed Networking
 
 If the pod networks are able to communicate with each other, and you are using a service mesh which is able to replicate the cluster DNS records, then XDCR will work once the service that is automatically created for the cluster has been manually replicated in the remote cluster. As DNS is available, xref:tls.adoc[TLS] can also be used to secure communications with a wildcard certificate.
 
 For all other situations, you will need to enable the XDCR exposed feature in the xref:couchbase-cluster-config.adoc[cluster specification]. TLS is currently not supported, since addressing is via IP address.
 
-== Clusters in Different Clusters with Overlay Networking
+=== Clusters in Different Clusters with Overlay Networking
 
 You will need to enable XDCR under `exposedFeatures` in the xref:couchbase-cluster-config.adoc[cluster specification]. TLS is currently not supported since addressing is via IP address.
 
 NOTE: The XDCR exposed feature exposes pod ports as node ports. Clients that are aware of this extension are able to access the cluster services via node IP address and node port. As a result, the client must be able to route to the destination node network.
+
+== Establishing XDCR Connections
+
+=== Using DNS
+
+As the pods from one network are routable from the other and you have dynamic DNS, establishing an XDCR connection with the target is as easy as specifying something similar to `http://cb-example-0000.cb-example.default.svc:8091` as per usual.
+
+=== Using IP and Exposed Features
+
+The diagram below depicts the network flow when establishing an XDCR connection via IP and the `exposedFeatures` property.
+
+image:xdcr_user_docs.png["XDCR between overlay networks"]
+
+This assumes two nodes in sepparate Kubernetes clusters can communicate with each other.  The router depicted could be a switch, router, VPN connection or any other infrastructure which allows layer 3 communication.
+
+The pod in cluster 1 is only able to connect to the node port exposed in cluster 2.  Further more that port is only exposed on the node on which the pod is running.  To determine the correct connection string on the XDCR target cluster:
+
+. List all pods and select one
++
+[source,console]
+----
+$ kubectl get pods -l couchbase_cluster=cb-example
+NAME              READY     STATUS    RESTARTS   AGE
+cb-example-0000   1/1       Running   0          1h
+cb-example-0001   1/1       Running   0          1h
+cb-example-0002   1/1       Running   0          1h
+----
+
+. Get the underlying node IP address
++
+[source,console]
+----
+$ kubectl get pod cb-example-0000 -o yaml | grep hostIP
+  hostIP: 172.16.1.2
+----
+
+. Get the port number which maps to the admin port (8091)
++
+[source,console]
+----
+kubectl get service cb-example-0000-exposed-ports
+NAME                            TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                                                         AGE
+cb-example-0000-exposed-ports   NodePort   10.106.194.132   <none>        8091:31202/TCP,18091:30641/TCP,8092:31515/TCP,18092:30362/TCP,11210:30065/TCP,11207:32093/TCP   1h
+----
+
+When establishing the XDCR connection from the Couchbase UI console in cluster 1 to cluster 2 we'd use the connection string `http://172.16.1.2:31202`.
