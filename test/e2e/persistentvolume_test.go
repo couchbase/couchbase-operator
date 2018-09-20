@@ -383,12 +383,14 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 
+	event = e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberIdToKill)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+		t.Fatalf("Couchbase pod member '%d' not removed from cluster", podMemberIdToKill)
+	}
+
 	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Rebalance event not triggered after pod recovery: %v", err)
-	}
-	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
-		t.Fatal(err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)

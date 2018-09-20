@@ -1085,13 +1085,9 @@ func TestRzaServerGroupDown(t *testing.T) {
 
 	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("Unable to get Client for cluster: %v", err)
-	}
 
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, 5, 1); err != nil {
-		t.Fatalf("No unhealthy nodes in cluster: %v", err)
+	if err := e2eutil.WaitForClusterUnBalancedCondition(t, targetKube.CRClient, testCouchbase, 120); err != nil {
+		t.Fatal(err)
 	}
 
 	// Remove the taint from the node to allow pod schedulling
@@ -1106,18 +1102,13 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
-	event = e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatalf("Failed to remove unclusteres pod: %v", err)
-	}
-
 	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatal(err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
+	//expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)

@@ -763,11 +763,6 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
-
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 

@@ -76,13 +76,9 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 			return err
 		}
 
-		event := e2eutil.NewMemberDownEvent(cbCluster, memberIndex)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
-			return err
-		}
 		expectedEvents.AddMemberDownEvent(cbCluster, memberIndex)
 
-		event = e2eutil.NewMemberFailedOverEvent(cbCluster, memberIndex)
+		event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberIndex)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 90); err != nil {
 			return err
 		}
