@@ -30,6 +30,7 @@ const (
 	ReconcileNodeServices
 	ReconcileRebalance
 	ReconcileDeadMembers
+	ReconcileNotifyFinished
 	ReconcileFinished
 )
 
@@ -72,6 +73,7 @@ var (
 		ReconcileNodeServices:       handleNodeServices,
 		ReconcileRebalance:          handleRebalance,
 		ReconcileDeadMembers:        handleDeadMembers,
+		ReconcileNotifyFinished:     handleNotifyFinished,
 	}
 )
 
@@ -220,7 +222,7 @@ func handleUnknownMembers(r *ReconcileMachine, c *Cluster) error {
 func handleWarmupNodes(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.WarmupNodes.Size() > 0 && r.couchbase.DownNodes.Empty() {
 		c.logger.Info("Skipping reconcile loop because some nodes are warming up")
-		r.transitionState(ReconcileFinished)
+		r.transitionState(ReconcileNotifyFinished)
 		return nil
 	}
 	r.transitionState(ReconcileRebalanceCheck)
@@ -267,7 +269,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 						} else {
 							c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 							c.logger.Infof("Recovering node %s", m.ClientURL())
-							r.transitionState(ReconcileFinished)
+							r.transitionState(ReconcileNotifyFinished)
 							return nil
 						}
 					} else {
@@ -582,7 +584,7 @@ func handleFailedAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 		isDelta, err := c.client.IsRecoveryTypeDelta(m)
 		if err != nil {
 			c.logger.Errorf("Failed to add back node `%s` because recovery type could not be determined: %v", m.Name, err)
-			r.transitionState(ReconcileFinished)
+			r.transitionState(ReconcileNotifyFinished)
 			return nil
 		}
 		if isDelta {
@@ -618,6 +620,12 @@ func handleDeadMembers(r *ReconcileMachine, c *Cluster) error {
 		}
 	}
 
+	r.transitionState(ReconcileNotifyFinished)
+	return nil
+}
+
+func handleNotifyFinished(r *ReconcileMachine, c *Cluster) error {
+	c.logger.Info("reconcile finished")
 	r.transitionState(ReconcileFinished)
 	return nil
 }
