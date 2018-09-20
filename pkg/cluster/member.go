@@ -9,12 +9,14 @@ import (
 )
 
 func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
-
-	status, err := c.client.GetClusterStatus(known)
-	if err != nil {
-		return err
+	// If we have no known members, default to an empty status
+	status := couchbaseutil.NewClusterStatus()
+	if !known.Empty() {
+		var err error
+		if status, err = c.client.GetClusterStatus(known); err != nil {
+			return err
+		}
 	}
-	c.updateMemberStatusWithClusterInfo(status)
 
 	// Establish initial members from running cluster Pods
 	members := known
@@ -44,6 +46,8 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	}
 
 	c.members = members
+	c.updateMemberStatusWithClusterInfo(status)
+
 	return nil
 }
 

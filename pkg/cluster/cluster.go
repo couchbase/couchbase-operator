@@ -300,6 +300,69 @@ func (c *Cluster) setupServices() error {
 	return nil
 }
 
+// runReconcile gathers a list of pods in cluster from Kubernetes, optionally
+// initializes our internal member list if we need to e.g. we have been restarted and
+// have lost state or a previous error may have resulted in inconsistent state, then
+// compares reality with the specification and makes the former match it.
+//
+// It accepts a flag forcing it update internal state from Kubernetes, and returns a
+// similar flag to indicate we require a forced update with the next invocation.
+func (c *Cluster) runReconcile(forceUpdate bool) bool {
+	// Always gather runloop statistics.
+	defer c.setLastLoopTimes(time.Now())
+
+	// Always update the cluster status.
+	defer func() {
+		if err := c.updateCRStatus(); err != nil {
+			c.logger.Warningf("periodic update CR status failed: %v", err)
+		}
+	}()
+
+	// Indicate that the reconcile function is getting run.
+	c.loopStatus = "running"
+
+	// If the user has requested that we pause operations.
+	if c.cluster.Spec.Paused {
+		c.status.PauseControl()
+		c.logger.Infof("control is paused, skipping reconciliation")
+		return false
+	}
+
+	// Otherwise indicate that we are in control.
+	c.status.Control()
+
+	running, pending, err := c.pollPods()
+	if err != nil {
+		c.logger.Errorf("fail to poll pods: %v", err)
+		return false
+	}
+
+	if len(pending) > 0 {
+		// Pod startup might take long, e.g. pulling image. It would
+		// deterministically become running or succeeded/failed later.
+		c.logger.Infof("skip reconciliation: running (%v), pending (%v)",
+			k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
+		return false
+	}
+
+	// When cluster is being restored or reconcile error has occured then
+	// then the memberset can be updated from the status of running pods and
+	// persistent volumes.
+	if forceUpdate || c.members.Empty() {
+		if err := c.updateMembers(podsToMemberSet(running, c.isSecureClient())); err != nil {
+			c.logger.Errorf("failed to update members: %v", err)
+			return true
+		}
+	}
+
+	// Finally reconcile state according to the specification.
+	if err := c.reconcile(running); err != nil {
+		c.logger.Errorf("failed to reconcile: %v", err)
+	}
+
+	return false
+}
+
 func (c *Cluster) run() {
 	c.status.SetPhase(api.ClusterPhaseRunning)
 	if err := c.updateCRStatus(); err != nil {
@@ -307,77 +370,28 @@ func (c *Cluster) run() {
 	}
 	c.logger.Infof("start running...")
 
-	var rerr error
+	// First reconcile should happen instantly, no point in waiting.
+	reconcileTrigger := time.After(0)
+
+	// We prioritise runnning the reconciliation as processing cluster updates
+	// could prevent us from ever running it and leaving the cluster in a
+	// degraded state.
+	forceUpdate := false
 	for {
 		select {
+		case <-reconcileTrigger:
+			forceUpdate = c.runReconcile(forceUpdate)
+			reconcileTrigger = time.After(reconcileInterval)
+
 		case event := <-c.eventCh:
 			switch event.typ {
 			case eventModifyCluster:
 				c.handleUpdateEvent(event)
 			case eventDeleteCluster:
-				c.logger.Infof("cluster is deleted by the user")
 				return
 			default:
 				panic("unknown event type" + event.typ)
 			}
-
-		case <-time.After(reconcileInterval):
-			st := time.Now()
-			c.loopStatus = "running"
-			if c.cluster.Spec.Paused {
-				c.status.PauseControl()
-				if err := c.updateCRStatus(); err != nil {
-					c.logger.Warningf("periodic update CR status failed: %v", err)
-				}
-				c.logger.Infof("control is paused, skipping reconciliation")
-				c.setLastLoopTimes(st)
-				continue
-			} else {
-				c.status.Control()
-			}
-
-			running, pending, err := c.pollPods()
-			if err != nil {
-				c.logger.Errorf("fail to poll pods: %v", err)
-				c.setLastLoopTimes(st)
-				continue
-			}
-
-			if len(pending) > 0 {
-				// Pod startup might take long, e.g. pulling image. It would
-				// deterministically become running or succeeded/failed later.
-				c.logger.Infof("skip reconciliation: running (%v), pending (%v)",
-					k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
-				c.setLastLoopTimes(st)
-				continue
-			}
-
-			// When cluster is being restored or reconcile error has occured then
-			// then the memberset can be updated from the status of running pods.
-			// Otherwise restore members from any config maps we can find
-			if (rerr != nil || c.members == nil) && len(running) > 0 {
-				rerr = c.updateMembers(podsToMemberSet(running, c.isSecureClient()))
-				if rerr != nil {
-					c.logger.Errorf("failed to update members: %v", rerr)
-					break
-				}
-			} else if c.members == nil {
-				c.members, _ = k8sutil.PVCToMemberset(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, c.isSecureClient())
-			}
-
-			if err := c.reconcile(running); err != nil {
-				c.logger.Errorf("failed to reconcile: %v", err)
-				// If a pod is killed during a rebalance say, we'd force a reload of
-				// the members.  As server knows about the member, but it no longer
-				// exists it will error continuously, whereas previously it would have
-				// correctly reconciled.
-				//rerr = err
-			}
-
-			if err := c.updateCRStatus(); err != nil {
-				c.logger.Warningf("periodic update CR status failed: %v", err)
-			}
-			c.setLastLoopTimes(st)
 		}
 	}
 }

@@ -86,7 +86,9 @@ type ClusterStatus struct {
 // NewClusterStatus returns a cluster status object with all
 // lists and maps initialized
 func NewClusterStatus() *ClusterStatus {
-	status := &ClusterStatus{}
+	status := &ClusterStatus{
+		info: &cbmgr.ClusterInfo{},
+	}
 	status.Reset()
 	return status
 }
