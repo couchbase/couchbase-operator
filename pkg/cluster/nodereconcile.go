@@ -279,7 +279,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 					c.logger.Warnf("Waiting for auto-failover of down node `%s`", m.Name)
 				}
 			} else {
-				c.logger.Errorf("Waiting for status of down node `%s` to become unready")
+				c.logger.Errorf("Waiting for status of down node `%s` to become unready", m.Name)
 			}
 		}
 
