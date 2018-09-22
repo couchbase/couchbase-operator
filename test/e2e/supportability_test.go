@@ -97,7 +97,9 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 		return errors.New("Failed to list crds: " + err.Error())
 	}
 	for _, crd := range crds.Items {
-		*reqFileList = append(*reqFileList, crdDir+"/"+crd.Name+"/"+crd.Name+".yaml")
+		if allFlag || crd.Name == "couchbaseclusters.couchbase.com" {
+			*reqFileList = append(*reqFileList, crdDir+"/"+crd.Name+"/"+crd.Name+".yaml")
+		}
 	}
 
 	// deployment dir contents

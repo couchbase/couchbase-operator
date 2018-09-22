@@ -56,7 +56,7 @@ func (c *Validator) Validate(out io.Writer) error {
 		format := fmt.Sprintf("| %%-%ds | %%-%ds |", reasonWidth, messageWidth)
 
 		// Print out the event list with the error embedded in the correct place
-		out.Write([]byte("Event schema validation failed:"))
+		out.Write([]byte("Event schema validation failed:\n"))
 		for index, event := range c.Events {
 			line := fmt.Sprintf(format, event.Reason, event.Message)
 			if index == c.index {
@@ -201,4 +201,11 @@ func (e AnyOf) Validate(c *Validator) error {
 		c.index = index
 	}
 	return newAnyOfError()
+}
+
+func CreateEventFrom(v1_event corev1.Event) Event {
+	return Event{
+		Reason:  v1_event.Reason,
+		Message: v1_event.Message,
+	}
 }

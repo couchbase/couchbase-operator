@@ -2,9 +2,11 @@ package e2e
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -186,6 +188,19 @@ var (
 		"RemoveServerGroupLabelFromNodes": RemoveServerGroupLabelFromNodes,
 	}
 )
+
+func ValidateEvents(t *testing.T, kubeClient kubernetes.Interface, namespace, cbClusterName string, eventsequence *e2eutil.EventSequence) {
+	clusterEvents, err := e2eutil.GetCouchbaseEvents(kubeClient, cbClusterName, namespace)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	eventSeq := eventschema.Sequence(*eventsequence)
+	v := &eventschema.Validator{Events: clusterEvents, Schema: &eventSeq}
+	if err := v.Validate(os.Stdout); err != nil {
+		t.Error(err)
+	}
+}
 
 func ValidateClusterEvents(t *testing.T, kubeClient kubernetes.Interface, clusterName, namespace string, expectedEvents e2eutil.EventList) {
 	events, err := e2eutil.GetCouchbaseEvents(kubeClient, clusterName, namespace)

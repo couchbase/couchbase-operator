@@ -61,15 +61,13 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents := e2eutil.EventList{}
+	expectedEvents := e2eutil.EventValidator()
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
+		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
-
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -108,8 +106,8 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents.AppendEventList(memberDownEventsOrder)
-	expectedEvents.AppendEventList(memberFailedEventsOrder)
+	expectedEvents.AddParallelEvents(memberDownEventsOrder)
+	expectedEvents.AddParallelEvents(memberFailedEventsOrder)
 
 	// Event check for new member add
 	for memberIndex := clusterSize; memberIndex < clusterSize+3; memberIndex++ {
@@ -117,17 +115,17 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
 			t.Fatalf("Failed to create replacement pod: %v", err)
 		}
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
+		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
 
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AppendEventList(memberRemovedEvents)
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddParallelEvents(memberRemovedEvents)
 
 	event := e2eutil.RebalanceCompletedEvent(testCouchbase)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatal(err)
 	}
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
@@ -143,9 +141,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
-
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
-
+	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create 8 node couchbase server with default services over 3 server groups
@@ -212,13 +208,13 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 		testCouchbase.Name + "-0008": availableServerGroupList[2],
 	}
 
-	expectedEvents := e2eutil.EventList{}
+	expectedEvents := e2eutil.EventValidator()
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
+		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -249,20 +245,21 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 		podEventErrChan[index] = make(chan error)
 	}
 
+	memberDownEvents := e2eutil.EventList{}
 	for _, podMemberToKill := range podMembersToKill {
 		err = e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podMemberToKill)
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberToKill)
+		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
 	}
+	expectedEvents.AddParallelEvents(memberDownEvents)
 
 	event := e2eutil.NewMemberFailedOverEvent(testCouchbase, podMembersToKill[0])
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err == nil {
 		t.Fatal("Member failed over in single node service scenario")
 	}
-
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create 9 node couchbase cluster
