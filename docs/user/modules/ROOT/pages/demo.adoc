@@ -193,7 +193,7 @@ If you are not using the default namespace, you must download and update the `pi
 command: ["cbc-pillowfight",
 
                   "-U", "couchbase://cb-example-0000.cb-example.myproject.svc/default?select_bucket=true",
-                  "-I", "10000", "-B", "1000", "-c", "10", "-t", "1", "-P", "password"]
+                  "-I", "10000", "-B", "1000", "-c", "10", "-t", "1", "-u", "Administrator", "-P", "password"]
 ----
 
 To deploy the `pillowfight` data loader, run the following command:
