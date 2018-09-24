@@ -738,14 +738,13 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for nodeIndex := 0; nodeIndex < clusterSize; nodeIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	expectedEvents := e2eutil.EventValidator{}
+	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
+		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	clusterSize--
 	// scale down to a node in cluster
@@ -762,15 +761,20 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	// Add possible outcomes for this scenario into new event list
+	multipleOutcomeEvents := e2eutil.EventValidator{}
+	multipleOutcomeEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", 0)
+	multipleOutcomeEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", clusterSize)
+
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddAnyOfEvents(multipleOutcomeEvents)
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, 50); err != nil {
 		t.Logf("status: %+v", testCouchbase.Status)
 		t.Fatal(err)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Test that a node is added back when operator is resumed

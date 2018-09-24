@@ -189,14 +189,14 @@ var (
 	}
 )
 
-func ValidateEvents(t *testing.T, kubeClient kubernetes.Interface, namespace, cbClusterName string, eventsequence *e2eutil.EventSequence) {
+func ValidateEvents(t *testing.T, kubeClient kubernetes.Interface, namespace, cbClusterName string, events e2eutil.EventValidator) {
 	clusterEvents, err := e2eutil.GetCouchbaseEvents(kubeClient, cbClusterName, namespace)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	eventSeq := eventschema.Sequence(*eventsequence)
-	v := &eventschema.Validator{Events: clusterEvents, Schema: &eventSeq}
+	eventSeq := &eventschema.Sequence{Validators: events}
+	v := &eventschema.Validator{Events: clusterEvents, Schema: eventSeq}
 	if err := v.Validate(os.Stdout); err != nil {
 		t.Error(err)
 	}
