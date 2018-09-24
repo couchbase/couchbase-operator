@@ -24,7 +24,7 @@ For more information about Labeling nodes, see xref:server-groups.adoc[Server Gr
 [[addsg]]
 == Add Server Groups to configuration
 
-Once nodes are labeled according to their associating zones, these zones are added to the Couchbase Cluster spec as `Server Groups`.  Server Groups will ensure that the Operator creates Pods in a specific zone.  The following demonstrates configuring couchbase to deploy pods across 3 zone:
+Once nodes are labeled according to their associating zones, these zones are added to the Couchbase Cluster spec as `Server Groups`.  Server Groups will ensure that the Operator creates Pods in a specific zone.  The following demonstrates configuring couchbase to deploy pods across 3 zones:
 
 [source,yaml]
 ----
