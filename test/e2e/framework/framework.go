@@ -167,7 +167,7 @@ func Setup(t *testing.T) error {
 		Namespace:       runtimeParams.Namespace,
 		KubeType:        runtimeParams.KubeType,
 		KubeVersion:     runtimeParams.KubeVersion,
-		opImage:         runtimeParams.OperatorImage,
+		OpImage:         runtimeParams.OperatorImage,
 		LogDir:          logDir,
 		SkipTeardown:    runtimeParams.SkipTearDown,
 		CollectLogs:     runtimeParams.CollectLogsOnFailure,
@@ -427,7 +427,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	if Global.PullDockerImage {
-		dockerImgList := []string{f.opImage, e2espec.GetCouchbaseDockerImgName()}
+		dockerImgList := []string{f.OpImage, e2espec.GetCouchbaseDockerImgName()}
 		if err = f.PullDockerImages(targetKube.KubeClient, kubeName, dockerImgList); err != nil {
 			return err
 		}

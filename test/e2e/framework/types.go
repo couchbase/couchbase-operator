@@ -26,7 +26,7 @@ type ClusterMap map[string]*Cluster
 
 // Main framework structure
 type Framework struct {
-	opImage         string
+	OpImage         string
 	Deployment      *v1beta1.Deployment
 	Namespace       string
 	KubeType        string
