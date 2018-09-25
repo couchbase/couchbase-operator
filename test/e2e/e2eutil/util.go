@@ -523,6 +523,25 @@ func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	CleanK8Cluster(t, kubeClient, crClient, namespace)
 }
 
+func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cbCluster *api.CouchbaseCluster) {
+	t.Logf("Attempting to delete: [%v]", cbCluster.Name)
+	if err := k8sutil.DeleteCouchbaseCluster(crClient, cbCluster); err != nil {
+		t.Logf("Error: %v", err)
+	} else {
+		t.Logf("Successfully deleted: [%v]", cbCluster.Name)
+	}
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cbCluster.Name})
+	if err != nil {
+		t.Logf("Error: Failed to get pods %v", err)
+	}
+	killPods := []string{}
+	for _, pod := range pods.Items {
+		killPods = append(killPods, pod.Name)
+	}
+	t.Logf("Killing pods: %v", killPods)
+	KillMembers(kubeClient, namespace, cbCluster.Name, killPods...)
+}
+
 func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string) {
 	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
 	for _, service := range services.Items {
@@ -533,36 +552,12 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	for _, job := range jobs.Items {
 		kubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
 	}
-
 	clusters, err := crClient.CouchbaseV1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Logf("Error: %v", err)
 	}
-	clusterNameList := []string{}
 	for _, cluster := range clusters.Items {
-		clusterNameList = append(clusterNameList, cluster.Name)
-	}
-
-	t.Logf("Deleting clusters: [%v]", clusterNameList)
-	for _, cluster := range clusters.Items {
-		t.Logf("Attempting to delete: [%v]", cluster.Name)
-		err := k8sutil.DeleteCouchbaseCluster(crClient, &cluster)
-		if err != nil {
-			t.Logf("Error: %v", err)
-		} else {
-			t.Logf("Successfully deleted: [%v]", cluster.Name)
-		}
-		pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
-		killPods := []string{}
-		for _, pod := range pods.Items {
-			killPods = append(killPods, pod.Name)
-		}
-		t.Logf("Killing pods: %v", killPods)
-		KillMembers(kubeClient, namespace, cluster.Name, killPods...)
-
-		for _, pod := range killPods {
-			t.Logf("Waiting for deletion of pod: %v", pod)
-		}
+		DeleteCbCluster(t, kubeClient, crClient, namespace, &cluster)
 	}
 	WaitUntilPodDeleted(t, kubeClient, namespace)
 }

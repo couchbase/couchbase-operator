@@ -197,6 +197,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 			}
 			totalTimeToRecover += autofailoverTimeout + 30
 			memberDownEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
+			memberRecoveredEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
 		}
 		killPodsErrChan <- nil
 	}()
@@ -217,14 +218,19 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		t.Fatalf("Unable to kill requested pods: %v", err)
 	}
 
-	for _, podMemberId := range podMembersToKill {
-		memberRecoveredEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
-	}
-
-	for index := 1; index < len(podMembersToKill); index++ {
+	podMembersToKillLen := len(podMembersToKill)
+	if podMembersToKillLen == clusterSize {
+		// All cluster pods are killed, should get one less than all events since
+		// first pod recovered will not have the repective event for it
+		for index := 1; index < podMembersToKillLen; index++ {
+			expectedEvents.AddAnyOfEvents(memberDownEvents)
+		}
+		for index := 1; index < podMembersToKillLen; index++ {
+			expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
+		}
+	} else {
+		// If some pods are killed, should get all member down and recovered events
 		expectedEvents.AddAnyOfEvents(memberDownEvents)
-	}
-	for index := 1; index < len(podMembersToKill); index++ {
 		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 	}
 
@@ -397,7 +403,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 
 	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 400); err != nil {
 		t.Fatalf("Rebalance event not triggered after pod recovery: %v", err)
 	}
 
@@ -405,6 +411,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberIdToKill)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	e2eutil.DeleteCbCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, testCouchbase)
 }
 
 // Create multi-node couchbase cluster with volumeClaimTemplates

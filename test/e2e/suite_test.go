@@ -15,7 +15,6 @@ import (
 )
 
 func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInfo, namespace, testName, logDir string) {
-	operatorImage := framework.Global.OpImage
 	for _, kubeCluster := range kubeClustersToSetup {
 		if err := os.MkdirAll(logDir, 0755); err != nil {
 			t.Errorf("Failed to create dir %s: %v", logDir, err)
@@ -23,7 +22,7 @@ func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInf
 		}
 
 		kubeConfPath := e2eutil.GetKubeConfigToUse(kubeCluster.ClusterName)
-		cmdArgs := []string{"-operator-image", operatorImage, "-kubeconfig", kubeConfPath, "-namespace", namespace, "-collectinfo"}
+		cmdArgs := []string{"-operator-image", framework.Global.OpImage, "-kubeconfig", kubeConfPath, "-namespace", namespace, "-collectinfo"}
 		execOut, err := runCbopinfoCmd(cmdArgs)
 		execOutStr := strings.TrimSpace(string(execOut))
 		if err != nil {

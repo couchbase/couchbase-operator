@@ -347,7 +347,6 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
 	errMsgList := failureList{}
-	operatorImage := f.OpImage
 	operatorRestPort := "8080"
 
 	// Validate args which won't produce output file
@@ -389,7 +388,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 		{
 			Name:        "Validating '-operator-image' argument",
 			Arg:         "-operator-image",
-			ArgValue:    operatorImage,
+			ArgValue:    f.OpImage,
 			ExpectedErr: "flag needs an argument: -operator-image",
 		},
 		{
@@ -556,7 +555,6 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	operatorImage := f.OpImage
 
 	failureExists := false
 	cluster1Size := e2eutil.Size3
@@ -600,7 +598,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs from single cluster")
 	reqFileList := []string{}
 	errMsgList := failureList{}
-	commonArgs := []string{"-operator-image", operatorImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
+	commonArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
 	cmdArgs := append(commonArgs, cluster1.Name)
 	execOut, err := runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
@@ -869,7 +867,6 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 	svcAccName := "rbac-test"
 	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
-	operatorImage := f.OpImage
 
 	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
@@ -912,7 +909,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	t.Log(string(execOut))
 
 	// Collect logs
-	cmdArgs = []string{"-operator-image", operatorImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
+	cmdArgs = []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Log(execOutStr)
@@ -956,7 +953,6 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
 	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
-	operatorImage := f.OpImage
 
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -984,7 +980,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	}
 
 	// Collect logs
-	cmdArgs := []string{"-operator-image", operatorImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all", cbCluster.Name}
+	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all", cbCluster.Name}
 	execOut, err := runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
