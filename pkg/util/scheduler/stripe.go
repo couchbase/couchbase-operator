@@ -170,6 +170,9 @@ func (sched *stripeSchedulerImpl) LogStatus(w io.Writer) error {
 			// The class may not contain a particular group, and that may contain no
 			// servers, but we are protected by zero values being returned.
 			servers := sched.serverClasses[class][group]
+			if servers == nil {
+				continue
+			}
 			servers.sort()
 			for _, server := range servers.servers {
 				table.Rows = append(table.Rows, prettytable.Row{class, group, server})
