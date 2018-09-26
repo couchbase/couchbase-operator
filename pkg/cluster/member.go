@@ -1,28 +1,47 @@
 package cluster
 
 import (
+	"fmt"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-
 	"k8s.io/api/core/v1"
 )
 
 func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 
-	known.Append(c.pvcMembers())
 	status, err := c.client.GetClusterStatus(known)
 	if err != nil {
 		return err
 	}
 	c.updateMemberStatusWithClusterInfo(status)
 
-	members := couchbaseutil.MemberSet{}
-	members.Append(status.ActiveNodes)
-	members.Append(status.PendingAddNodes)
-	members.Append(status.FailedAddNodes)
-	members.Append(status.DownNodes)
-	members.Append(status.WarmupNodes)
+	// Establish initial members from running cluster Pods
+	members := known
+
+	// Sync additional members from available Persistent Volumes
+	if pvm := c.pvcMembers(); !pvm.Empty() {
+		members.Append(pvm)
+	}
+
+	// Return error in the case where cluster knows about nodes
+	// that aren't identifed as members since these are either:
+	//  1. A foreign node
+	//  2. A node with both deleted Pod and Volume
+	//  2. An ephemeral node with deleted Pod.
+	//
+	// In any of these cases nodes cannot be recovered and should
+	// be manually failed over before we allow reconcile since
+	// there's no way to determine which case we're dealing with.
+	for _, node := range status.KnownNodes() {
+		if !members.Contains(node) {
+			return fmt.Errorf("Cluster contains node `%s` which cannot be managed. Failover/Rebalance is recommended.", node)
+		}
+	}
+
+	if members.Empty() {
+		return fmt.Errorf("Cluster does not have any Pods that are running or recoverable")
+	}
 
 	c.members = members
 	return nil

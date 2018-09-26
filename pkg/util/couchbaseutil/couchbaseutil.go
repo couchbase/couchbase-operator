@@ -184,6 +184,18 @@ func (cs *ClusterStatus) getNode(hostname string) (*cbmgr.NodeInfo, error) {
 	return nil, fmt.Errorf("node %s does not exist in cluster", hostname)
 }
 
+// KnownNodes returns all nodes that the cluster is tracking
+func (cs *ClusterStatus) KnownNodes() []string {
+
+	knownNodes := []string{}
+	for _, node := range cs.info.Nodes {
+		memberName := strings.Split(node.HostName, ".")[0]
+		knownNodes = append(knownNodes, memberName)
+	}
+
+	return knownNodes
+}
+
 // getNodeState looks up node status based on Couchbase hostname.
 func getNodeState(node *cbmgr.NodeInfo) (state NodeState, err error) {
 	// Set default return values
