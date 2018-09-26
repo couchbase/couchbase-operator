@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -204,7 +205,8 @@ func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference, ctx context.Context) (*v1.PersistentVolumeClaim, error) {
 
 	// storage class must exist
-	if err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName); err != nil {
+	sc, err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName)
+	if err != nil {
 		return nil, err
 	}
 
@@ -214,6 +216,13 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 	pvc, err := kubeCli.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
 	if err != nil {
 		return nil, err
+	}
+
+	// return if volumes will be bound after Pod creation
+	if bindMode := sc.VolumeBindingMode; bindMode != nil {
+		if *bindMode == storage.VolumeBindingWaitForFirstConsumer {
+			return pvc, nil
+		}
 	}
 
 	// wait for claim to be created before allowing it to be mounted by pod
@@ -226,12 +235,12 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 	return pvc, nil
 }
 
-func verifyStorageClass(kubeCli kubernetes.Interface, storageClassName *string) error {
+func verifyStorageClass(kubeCli kubernetes.Interface, storageClassName *string) (*storage.StorageClass, error) {
 	if storageClassName == nil {
-		return fmt.Errorf("storage class required")
+		return nil, fmt.Errorf("storage class required")
 	}
-	_, err := getStorageClass(kubeCli, *storageClassName)
-	return err
+	sc, err := getStorageClass(kubeCli, *storageClassName)
+	return sc, err
 }
 
 func podVolumeSpecForClaim(configName, claimName string) v1.Volume {
