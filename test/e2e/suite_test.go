@@ -191,8 +191,8 @@ func runSuite(t *testing.T) {
 
 				// Clean up all known clusters if SkipTeardown is disabled
 				if !f.SkipTeardown {
-					for _, targetKube := range f.ClusterSpec {
-						e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+					for kubeName, targetKube := range f.ClusterSpec {
+						e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, testName)
 					}
 				}
 				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testPassed})

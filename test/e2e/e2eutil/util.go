@@ -515,11 +515,19 @@ func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	}
 }
 
-func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir string) {
-	err := WriteLogs(t, kubeClient, namespace, logDir)
-	if err != nil {
+func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir, kubeName, testName string) {
+	// Creates dir for kubename
+	logDir = filepath.Join(logDir, kubeName)
+	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+		t.Log(err)
+		return
+	}
+
+	// Pulls operator pod logs
+	if err := WriteLogs(kubeClient, namespace, logDir, testName); err != nil {
 		t.Logf("Error: %v", err)
 	}
+
 	CleanK8Cluster(t, kubeClient, crClient, namespace)
 }
 
@@ -593,7 +601,7 @@ func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, cl
 	return nil
 }
 
-func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir string) error {
+func WriteLogs(kubeClient kubernetes.Interface, namespace, logDir, testName string) error {
 	options := metav1.ListOptions{LabelSelector: CouchbaseOperatorLabel}
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(options)
 	if err != nil {
@@ -608,18 +616,15 @@ func WriteLogs(t *testing.T, kubeClient kubernetes.Interface, namespace, logDir 
 			return err
 		}
 
-		testName := t.Name()
 		if strings.Contains(testName, "/") {
-			testName = strings.Split(t.Name(), "/")[1]
+			testName = strings.Split(testName, "/")[1]
 		}
 
 		logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", testName, pod.Name))
-		err = ioutil.WriteFile(logFile, data, 0644)
-		if err != nil {
+		if err := ioutil.WriteFile(logFile, data, 0644); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 

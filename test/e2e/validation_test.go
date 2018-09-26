@@ -269,7 +269,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command
 		testCouchbase.ObjectMeta.Namespace = f.Namespace
 
 		// Removing previous deployment if any
-		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, targetKubeName, t.Name())
 
 		if command == "apply" || command == "delete" {
 			err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
@@ -398,7 +398,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command
 	}
 	// Removing deployment if any
 	if !f.SkipTeardown {
-		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir)
+		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, targetKubeName, t.Name())
 	}
 	failures.CheckFailures(t)
 }
