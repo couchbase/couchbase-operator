@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -31,7 +32,7 @@ func TestEditServiceConfig(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +47,7 @@ func TestEditServiceConfig(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -57,7 +58,7 @@ func TestEditServiceConfig(t *testing.T) {
 	// edit service size
 	newSize := "2"
 	t.Log("Changing cluster size")
-	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,31 +69,21 @@ func TestEditServiceConfig(t *testing.T) {
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSize, e2eutil.NumNodesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newSize, e2eutil.NumNodesVerifier); err != nil {
 		t.Fatalf("failed to change service size: %v", err)
 	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size2, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests invalid editing of service spec
@@ -111,7 +102,7 @@ func TestNegEditServiceConfig(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +117,7 @@ func TestNegEditServiceConfig(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -138,63 +129,47 @@ func TestNegEditServiceConfig(t *testing.T) {
 	newSize := "-2"
 	oldSize := "1"
 	t.Log("Changing cluster size to -2")
-	_, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
-	if err == nil {
+	if _, err := e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-	if !strings.Contains(err.Error(), "spec.servers.size in body should be greater than or equal to 1") {
+	} else if !strings.Contains(err.Error(), "spec.servers.size in body should be greater than or equal to 1") {
 		t.Fatalf("failed to see expected error message: %v \n", err)
 	}
 
 	t.Log("Verify resize did not happen")
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, newSize, e2eutil.NumNodesVerifier)
-	if err == nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newSize, e2eutil.NumNodesVerifier); err == nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 
 	t.Log("Verify cluster size is 1")
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, oldSize, e2eutil.NumNodesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, oldSize, e2eutil.NumNodesVerifier); err != nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 
 	t.Log("Verify cluster balanced and healthy through rest api")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
 	t.Log("Changing cluster size back to 1")
-	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", oldSize, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", oldSize, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Log("Verify cluster size is 1")
-	err = e2eutil.VerifyClusterInfo(t, client, e2eutil.Retries5, oldSize, e2eutil.NumNodesVerifier)
-	if err != nil {
+	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, oldSize, e2eutil.NumNodesVerifier); err != nil {
 		t.Fatalf("failed to reject invalid service size: %v", err)
 	}
 
 	t.Log("Verify cluster balanced and healthy through rest api")
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests manual failover and operator recovery of cluster
@@ -211,7 +186,7 @@ func TestNodeManualFailover(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	// create 2 node cluster with admin console
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size2, e2eutil.WithBucket, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size2, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,8 +218,7 @@ func TestNodeManualFailover(t *testing.T) {
 		ServerConfig: testCouchbase.Spec.ServerSettings[0].Name,
 		SecureClient: false,
 	}
-	err = client.Failover(m.HostURL())
-	if err != nil {
+	if err := client.Failover(m.HostURL()); err != nil {
 		t.Fatalf("failed to failover host %s: %v", m.HostURL(), err)
 	}
 
@@ -257,11 +231,11 @@ func TestNodeManualFailover(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// healthy 2 node cluster
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size2, constants.Retries30); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries20); err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -279,11 +253,11 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	clusterSize := e2eutil.Size1
+	clusterSize := constants.Size1
 	podToKillMemberId := 1
 
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +266,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	clusterSize = e2eutil.Size5
+	clusterSize = constants.Size5
 	if err := e2eutil.ResizeClusterNoWait(t, 0, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +331,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	podToKillMemberId := 2
 
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,39 +343,35 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	// async scale up to 3 node cluster
 	echan := make(chan error)
 	go func() {
-		echan <- e2eutil.ResizeCluster(t, 0, e2eutil.Size3, targetKube.CRClient, testCouchbase)
+		echan <- e2eutil.ResizeCluster(t, 0, constants.Size3, targetKube.CRClient, testCouchbase)
 	}()
 
 	// wait for add member event
 	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatal(err)
 	}
 
-	for nodeIndex := 1; nodeIndex < e2eutil.Size3; nodeIndex++ {
+	for nodeIndex := 1; nodeIndex < constants.Size3; nodeIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 
 	// kill pod that was just added
-	err = e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podToKillMemberId)
-	if err != nil {
+	if err := e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podToKillMemberId); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
 
 	// check response from resize request
-	err = <-echan
-	if err != nil {
+	if err := <-echan; err != nil {
 		t.Fatal(err)
 	}
-
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
 	// cluster should also be balanced
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -432,10 +402,10 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	clusterSize := e2eutil.Size1
+	clusterSize := constants.Size1
 
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithBucket, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +421,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	}
 
 	// resize to 3 member cluster
-	clusterSize = e2eutil.Size3
+	clusterSize = constants.Size3
 	e2eutil.ResizeClusterNoWait(t, 0, clusterSize, targetKube.CRClient, testCouchbase)
 
 	// detect 3rd member add event
@@ -508,7 +478,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize+1)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -535,7 +505,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	// 1. create 1 node cluster with admin console
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -572,7 +542,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	// Pause operator to avoid foreign pod deletion as soon as added
-	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,7 +558,7 @@ func TestRemoveForeignNode(t *testing.T) {
 
 	// Balanced cluster with foreign node
 	ctx := e2eutil.Context
-	err = retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.Retries30, "rebalance", testCouchbase.GetName(),
+	err = retryutil.RetryOnErr(ctx, 5*time.Second, constants.Retries30, "rebalance", testCouchbase.GetName(),
 		func() error {
 			status, err := client.Rebalance([]string{""})
 			if true && status != nil {
@@ -601,19 +571,19 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	// Resuming operator
-	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "false", targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "false", targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// resize to 2 member cluster
-	if err := e2eutil.ResizeCluster(t, 0, e2eutil.Size2, targetKube.CRClient, testCouchbase); err != nil {
+	if err := e2eutil.ResizeCluster(t, 0, constants.Size2, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 
 	// check that actual cluster size is only 2 nodes
-	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size2, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size2, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy")
 	}
 
@@ -650,7 +620,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -673,8 +643,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -703,11 +672,11 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 0)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -726,17 +695,18 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
+	clusterSize := constants.Size5
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for memberId := 0; memberId < e2eutil.Size5; memberId++ {
+	for memberId := 0; memberId < clusterSize; memberId++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -750,7 +720,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -769,12 +739,12 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	}
 
 	// Manually failover nodes
-	e2eutil.FailoverNodes(t, client, 5, 2)
+	e2eutil.FailoverNodes(t, client, clusterSize, memberIdsToKill)
 	for _, memberId := range memberIdsToKill {
 		expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberId)
 	}
 
-	for memberId := 5; memberId < 7; memberId++ {
+	for memberId := clusterSize; memberId < clusterSize+len(memberIdsToKill); memberId++ {
 		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
 			t.Fatal(err)
@@ -782,7 +752,10 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries20); err != nil {
+		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
+	}
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, clusterSize); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -791,10 +764,6 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 		expectedEvents.AddMemberRemoveEvent(testCouchbase, memberId)
 	}
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries5); err != nil {
-		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
-	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -820,14 +789,14 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for memberId := 0; memberId < e2eutil.Size5; memberId++ {
+	for memberId := 0; memberId < constants.Size5; memberId++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -842,7 +811,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -871,11 +840,11 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToKill)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -901,7 +870,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	clusterSize := e2eutil.Size5
+	clusterSize := constants.Size5
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
@@ -911,7 +880,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -943,7 +912,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -962,9 +931,22 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
 	}
 
+	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, memberIdsToKillLen); err != nil {
+		t.Fatal(err)
+	}
+
 	// Manually failover nodes
-	e2eutil.FailoverNodes(t, client, clusterSize, memberIdsToKillLen)
 	for _, memberId := range memberIdsToKill {
+		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
+		m := &couchbaseutil.Member{
+			Name:         memberName,
+			Namespace:    f.Namespace,
+			ServerConfig: testCouchbase.Spec.ServerSettings[0].Name,
+			SecureClient: false,
+		}
+		if err := client.Failover(m.HostURL()); err != nil {
+			t.Fatalf("failed to failover host %s: %v", m.HostURL(), err)
+		}
 		expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberId)
 	}
 
@@ -976,7 +958,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
@@ -986,7 +968,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries5); err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries5); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -1005,7 +987,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 	podMemberIdToKill := 0
 
-	clusterSize := e2eutil.Size5
+	clusterSize := constants.Size5
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicTwoReplicaBucket
@@ -1015,7 +997,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1037,16 +1019,12 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
 	t.Logf("killing 1 pod...")
 	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 1)
-	if err != nil {
-		t.Fatalf("failed to kill pods: %v", err)
-	}
 
 	// Wait for the nodes to be reported as down before failing over, so we deterministically
 	// see the down events
@@ -1081,11 +1059,11 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberIdToKill)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -1104,28 +1082,30 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
+	clusterSize := constants.Size5
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicTwoReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"bucket1":  bucketConfig1,
 	}
+	podMembersToKill := []int{0, 1}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for memberId := 0; memberId < e2eutil.Size5; memberId++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+	expectedEvents := e2eutil.EventValidator{}
+	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
+	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
+		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	service, err := e2eutil.CreateService(t, targetKube.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
 	if err != nil {
@@ -1145,38 +1125,28 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries20); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 
-	// Code to wait for multiple pod down / autofailover in parallel
-	failoverCompleteChan := make(chan error)
+	// For WaitForClusterEventsInParallel API
 	memberDownEvents := e2eutil.EventList{}
 	memberFailedOverEvents := e2eutil.EventList{}
 	memberRemovedEvents := e2eutil.EventList{}
-	for _, podMemberToKill := range []int{0, 1} {
+
+	// For validation purpose
+	memDownEventValidator := e2eutil.EventValidator{}
+	memFailoverEventValidator := e2eutil.EventValidator{}
+	memRemovedEventValidator := e2eutil.EventValidator{}
+
+	for _, podMemberToKill := range podMembersToKill {
 		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
 		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
 		memberRemovedEvents = append(memberRemovedEvents, *e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberToKill))
 	}
-
-	go func() {
-		memberDownEventsOrder, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30)
-		if err != nil {
-			failoverCompleteChan <- err
-			return
-		}
-
-		memberFailedEventsOrder, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60)
-		if err != nil {
-			failoverCompleteChan <- err
-			return
-		}
-		expectedEvents.AppendEventList(memberDownEventsOrder)
-		expectedEvents.AppendEventList(memberFailedEventsOrder)
-		failoverCompleteChan <- nil
-	}()
+	memDownEventValidator.AddClusterPodEvent(testCouchbase, "MemberDown", podMembersToKill...)
+	memFailoverEventValidator.AddClusterPodEvent(testCouchbase, "FailedOver", podMembersToKill...)
+	memRemovedEventValidator.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMembersToKill...)
 
 	t.Logf("killing 2 pods...")
 	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 2)
@@ -1184,33 +1154,40 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	// Manually failover nodes
-	e2eutil.FailoverNodes(t, client, 5, 2)
-
-	if err := <-failoverCompleteChan; err != nil {
+	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30); err != nil {
 		t.Fatal(err)
 	}
 
+	// Manually failover nodes
+	e2eutil.FailoverNodes(t, client, clusterSize, podMembersToKill)
+
+	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents.AddParallelEvents(memDownEventValidator)
+	expectedEvents.AddParallelEvents(memFailoverEventValidator)
+
 	// event capture for new pod creation
-	for _, memberId := range []int{5, 6} {
+	for memberId := clusterSize; memberId < clusterSize+len(podMembersToKill); memberId++ {
 		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
 			t.Fatal(err)
 		}
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries120); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries120); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries5); err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries5); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AppendEventList(memberRemovedEvents)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddParallelEvents(memRemovedEventValidator)
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
@@ -1221,12 +1198,12 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	clusterSize := e2eutil.Size5
+	clusterSize := constants.Size5
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1": bucketConfig1}
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1246,7 +1223,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1294,11 +1271,11 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberToKill)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries5); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries1); err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries1); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -1322,7 +1299,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1344,7 +1321,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1357,20 +1334,18 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, e2eutil.Retries30, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, constants.Retries30, testCouchbase); err != nil {
 		t.Logf("status: %v+", testCouchbase)
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
-	if err != nil {
+	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, 1); err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1380,8 +1355,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 5, e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 5, constants.Retries10, testCouchbase); err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
@@ -1389,23 +1363,14 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
@@ -1432,7 +1397,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1454,7 +1419,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -1463,13 +1428,11 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	//block all incoming and outgoing traffic expect ssh on port 22
-	_, err = f.ExecShellInPod(kubeName, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT"); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = f.ExecShellInPod(kubeName, memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1477,45 +1440,38 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	time.Sleep(time.Duration(int64(autofailoverTimeout/2)) * time.Second)
 
 	//revert iptable changes, allow all incoming and outgoing traffic
-	_, err = f.ExecShellInPod(kubeName, memberName, "iptables -F")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "iptables -F"); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = f.ExecShellInPod(kubeName, memberName, "iptables -X")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "iptables -X"); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = f.ExecShellInPod(kubeName, memberName, "iptables -P INPUT DROP")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "iptables -P INPUT DROP"); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = f.ExecShellInPod(kubeName, memberName, "iptables -P OUTPUT DROP")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "iptables -P OUTPUT DROP"); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = f.ExecShellInPod(kubeName, memberName, "iptables -P FORWARD DROP")
-	if err != nil {
+	if _, err := f.ExecShellInPod(kubeName, memberName, "iptables -P FORWARD DROP"); err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("waiting for pods to die...")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, constants.Retries10, testCouchbase); err != nil {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
-	err = e2eutil.WaitForUnhealthyNodes(t, client, e2eutil.Retries5, 1)
-	if err != nil {
+	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, 1); err != nil {
 		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
 	}
 
 	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, e2eutil.Retries5)
+	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get nodes from cluster: %v", err)
 	}
@@ -1525,8 +1481,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	t.Logf("waiting for cluster size to be 5")
-	_, err = e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 5, e2eutil.Retries10, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 5, constants.Retries10, testCouchbase); err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
 	}
 
@@ -1534,23 +1489,14 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
 
-	err = e2eutil.VerifyClusterBalancedAndHealthy(t, client, e2eutil.Retries10)
-	if err != nil {
+	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-
-	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
+	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
@@ -1570,7 +1516,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	}
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1594,7 +1540,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 
 	nodeIndex := 2
 	memberIdToGoDown := 1
-	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
+	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
 		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
 	}
 	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
@@ -1606,24 +1552,22 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
 	}
 
-	if err = e2eutil.WaitForUnhealthyNodes(t, client, 5, 1); err != nil {
+	if err := e2eutil.WaitForUnhealthyNodes(t, client, 5, 1); err != nil {
 		t.Fatalf("No unhealthy nodes in cluster: %v", err)
 	}
 
-	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
+	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
 		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)
 	}
 
 	event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Failed to remove pod from tainted node: %v", err)
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
 	event = e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 		t.Fatalf("Failed to remove failed pod: %v", err)
 	}
 
@@ -1631,7 +1575,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 3, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 3, constants.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)

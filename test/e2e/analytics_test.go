@@ -241,7 +241,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 
 		case clusterSize-prevClusterSize < 0:
 			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-			expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemove", clusterSize)
+			expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", clusterSize)
 			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 		}
 		prevClusterSize = clusterSize

@@ -82,7 +82,7 @@ var (
 		"eventingServiceMemQuota":  "256",
 		"analyticsServiceMemQuota": "1024",
 		"indexStorageSetting":      "memory_optimized",
-		"autoFailoverTimeout":      "10",
+		"autoFailoverTimeout":      "30",
 		"autoFailoverMaxCount":     "1"}
 
 	BasicClusterConfig2 = map[string]string{
@@ -92,7 +92,7 @@ var (
 		"eventingServiceMemQuota":  "256",
 		"analyticsServiceMemQuota": "1024",
 		"indexStorageSetting":      "memory_optimized",
-		"autoFailoverTimeout":      "10",
+		"autoFailoverTimeout":      "30",
 		"autoFailoverMaxCount":     "1"}
 
 	BasicOneReplicaBucket = map[string]string{

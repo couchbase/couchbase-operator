@@ -207,14 +207,7 @@ func cleanUpNamespace() (err error) {
 		e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
 		// Clean-up Deployments and pods
-
-		deployments, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(Global.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return errors.New("Failed to list deployments: " + err.Error())
-		}
-		for _, deployment := range deployments.Items {
-			DeleteOperatorCompletely(targetKube.KubeClient, deployment.GetName(), Global.Namespace)
-		}
+		DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, Global.Namespace)
 
 		// Clear couchbase pods
 		clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})

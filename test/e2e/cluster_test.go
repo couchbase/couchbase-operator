@@ -357,7 +357,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	}
 
 	// revert edit cluster autoFailoverTimeout
-	newAutoFailoverTimeout = "10"
+	newAutoFailoverTimeout = e2eutil.BasicClusterConfig["autoFailoverTimeout"]
 	t.Log("Changing cluster autofailover timeout")
 	if _, err := e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, e2eutil.Retries5); err != nil {
 		t.Fatal(err)

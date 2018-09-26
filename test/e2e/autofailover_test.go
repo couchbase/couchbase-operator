@@ -278,7 +278,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	targetKube := f.ClusterSpec[targetKubeName]
 
 	clusterSize := 9
-	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 10, 3, true)
+	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 3, true)
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", constants.Mem256Mb, constants.Size3, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
@@ -332,7 +332,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 
 	for memberId := clusterSize; memberId < clusterSize+podMembersToKillLen; memberId++ {
 		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)

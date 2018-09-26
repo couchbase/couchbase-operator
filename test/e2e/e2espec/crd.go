@@ -228,7 +228,7 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 		}},
 		ExposedFeatures: []string{"xdcr"},
 	}
-	spec.ClusterSettings.AutoFailoverTimeout = 10
+	spec.ClusterSettings.AutoFailoverTimeout = 30
 	spec.ClusterSettings.AutoFailoverMaxCount = 3
 	crd := NewClusterCRD(genName, spec)
 	if exposed {

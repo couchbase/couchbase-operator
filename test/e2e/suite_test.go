@@ -22,7 +22,7 @@ func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInf
 		}
 
 		kubeConfPath := e2eutil.GetKubeConfigToUse(kubeCluster.ClusterName)
-		cmdArgs := []string{"-operator-image", framework.Global.OpImage, "-kubeconfig", kubeConfPath, "-namespace", namespace, "-collectinfo"}
+		cmdArgs := []string{"-operator-image", framework.Global.OpImage, "-kubeconfig", kubeConfPath, "-namespace", namespace, "-collectinfo", "-system"}
 		execOut, err := runCbopinfoCmd(cmdArgs)
 		execOutStr := strings.TrimSpace(string(execOut))
 		if err != nil {
