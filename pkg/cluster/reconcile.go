@@ -300,33 +300,34 @@ func (c *Cluster) reconcileBuckets() error {
 		return fmt.Errorf("Unable to get list of buckets to edit: %v", err)
 	}
 
-	if len(bucketsToRemove) > 0 {
-		bucketName := bucketsToRemove[0]
+	for _, bucketName := range bucketsToRemove {
 		err := c.deleteClusterBucket(bucketName)
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket delete failed", msg)
-			return fmt.Errorf("Unable to delete bucket named - %s: %v", bucketName, err)
+			return fmt.Errorf("Unable to delete bucketName named - %s: %v", bucketName, err)
 		}
-		c.logger.Infof("Removed bucket %s", bucketName)
-	} else if len(bucketsToEdit) > 0 {
-		bucketName := bucketsToEdit[0]
+		c.logger.Infof("Removed bucketName %s", bucketName)
+	}
+
+	for _, bucketName := range bucketsToEdit {
 		err := c.editClusterBucket(bucketName)
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket edit failed", msg)
-			return fmt.Errorf("Unable to edit bucket named - %s: %v", bucketName, err)
+			return fmt.Errorf("Unable to edit bucketName named - %s: %v", bucketName, err)
 		}
-		c.logger.Infof("Edited bucket %s", bucketName)
-	} else if len(bucketsToAdd) > 0 {
-		bucketName := bucketsToAdd[0]
+		c.logger.Infof("Edited bucketName %s", bucketName)
+	}
+
+	for _, bucketName := range bucketsToAdd {
 		err := c.createClusterBucket(bucketName)
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket add failed", msg)
-			return fmt.Errorf("Unable to create bucket named - %s: %v", bucketName, err)
+			return fmt.Errorf("Unable to create bucketName named - %s: %v", bucketName, err)
 		}
-		c.logger.Infof("Created bucket %s", bucketName)
+		c.logger.Infof("Created bucketName %s", bucketName)
 	}
 
 	c.status.ClearCondition(api.ClusterConditionManageBuckets)

@@ -506,7 +506,7 @@ func (c *BucketConfig) Equals(other *BucketConfig) bool {
 	return reflect.DeepEqual(c, other)
 }
 
-// check wether item exists within array
+// check whether item exists within array
 func HasItem(itm string, arr []string) (int, bool) {
 	for i, a := range arr {
 		if a == itm {
