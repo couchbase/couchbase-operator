@@ -1231,8 +1231,15 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 
 	memberToKill := 0
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberToKill)
-	if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
-		t.Fatal(err)
+
+	if f.KubeType == "kubernetes" {
+		if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	autofailoverTimeout, err := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])

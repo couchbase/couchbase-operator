@@ -17,10 +17,10 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
@@ -159,7 +159,7 @@ func Setup(t *testing.T) error {
 
 	logrus.Info("Using couchbase-operator: " + deployment.Spec.Template.Spec.Containers[0].Image)
 	logrus.Info("Using couchbase-server: " + e2espec.GetCouchbaseDockerImgName())
-	logrus.Info("Using storage class: " + e2e_constants.StorageClassName)
+	logrus.Info("Using storage class: " + constants.StorageClassName)
 	logrus.Info("Logs will be stored in: " + logDir)
 
 	Global = &Framework{
@@ -321,7 +321,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	if err := RemoveLabels(constants.ServerGroupLabel, targetKube.KubeClient); err != nil {
+	if err := RemoveLabels(pkg_constants.ServerGroupLabel, targetKube.KubeClient); err != nil {
 		return err
 	}
 
@@ -367,7 +367,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	time.Sleep(2 * time.Second)
 
 	logrus.Info("Deleting services")
-	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
+	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	for _, service := range services.Items {
 		if err := targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
@@ -376,7 +376,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	logrus.Info("Deleting orphaned pods")
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	for _, pod := range pods.Items {
 		err = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 		if err != nil {
@@ -385,13 +385,12 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("Pod deleted: %v", pod.Name)
 	}
 
-	endpoints, err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseLabel})
+	endpoints, err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return err
 	}
 	for _, endpoint := range endpoints.Items {
-		err = targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0))
-		if err != nil {
+		if err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 		logrus.Infof("Endpoint deleted: %v", endpoint.Name)
@@ -470,12 +469,10 @@ func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName s
 }
 
 func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
-	_, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(f.Deployment)
-	if err != nil {
+	if _, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(f.Deployment); err != nil {
 		return err
 	}
-
-	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, e2eutil.CouchbaseOperatorLabel)
+	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, constants.CouchbaseOperatorLabel)
 }
 
 func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, namespace string) int32 {

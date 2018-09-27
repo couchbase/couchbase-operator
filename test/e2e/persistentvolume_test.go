@@ -203,7 +203,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	}()
 
 	// kill couchbase operator
-	operatorPodList, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: e2eutil.CouchbaseOperatorLabel})
+	operatorPodList, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseOperatorLabel})
 	if err != nil {
 		t.Fatal(err)
 	}
