@@ -21,7 +21,7 @@ func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInf
 			continue
 		}
 
-		kubeConfPath := e2eutil.GetKubeConfigToUse(kubeCluster.ClusterName)
+		kubeConfPath := e2eutil.GetKubeConfigToUse(framework.Global.KubeType, kubeCluster.ClusterName)
 		cmdArgs := []string{"-operator-image", framework.Global.OpImage, "-kubeconfig", kubeConfPath, "-namespace", namespace, "-collectinfo", "-system"}
 		execOut, err := runCbopinfoCmd(cmdArgs)
 		execOutStr := strings.TrimSpace(string(execOut))
@@ -95,7 +95,7 @@ func runSuite(t *testing.T) {
 				break
 			}
 
-			kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeCluster.ClusterName
+			kubeConfigPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeCluster.ClusterName)
 			clusterSpec, err := framework.CreateKubeClusterObject(kubeConfigPath)
 			if err != nil {
 				skipCurrTestGroup = true

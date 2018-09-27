@@ -381,6 +381,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 	clusterHostFile := ymlFilePath + "/" + kubeClusterSpec.ClusterName
 	clusterInitFile := ymlFilePath + "/" + kubeType + "/initialize.yaml"
 	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yaml"
+	clusterConfFile := "config_" + kubeType + "_" + kubeClusterSpec.ClusterName
 
 	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
 	if err != nil {
@@ -398,7 +399,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 		}
 		kubeVersionParsed := strings.Split(kubeVersion, "-")
 		kubeVersion = kubeVersionParsed[0]
-		ansibleExtraVarParam = "kubeConfPathToSave=config_" + kubeClusterSpec.ClusterName + " kubeVersion=" + kubeVersion
+		ansibleExtraVarParam = "kubeConfPathToSave=" + clusterConfFile + " kubeVersion=" + kubeVersion
 		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
 		if err := runExecCommand(t, ansibleCmd); err != nil {
 			return err
@@ -1011,7 +1012,7 @@ func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeConfigPat
 }
 
 func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeName, storageClassType string) error {
-	kubeConfigPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+	kubeConfigPath := e2eutil.GetKubeConfigToUse(Global.KubeType, kubeName)
 	switch storageClassType {
 	case "portworx":
 		if err := DeletePortworx(t, kubeClient, kubeConfigPath); err != nil {

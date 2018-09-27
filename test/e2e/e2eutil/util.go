@@ -960,8 +960,8 @@ func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node,
 }
 
 // Returns KubeConfig file path to use for testing
-func GetKubeConfigToUse(kubeName string) string {
-	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeName
+func GetKubeConfigToUse(kubeType, kubeName string) string {
+	kubeConfPath := os.Getenv("HOME") + "/.kube/config_" + kubeType + "_" + kubeName
 	// If cluster specific file doesn't exists, point to default file
 	if _, err := os.Stat(kubeConfPath); os.IsNotExist(err) {
 		kubeConfPath = os.Getenv("HOME") + "/.kube/config"

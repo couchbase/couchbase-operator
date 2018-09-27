@@ -345,7 +345,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
 	errMsgList := failureList{}
 	operatorRestPort := "8080"
 
@@ -491,8 +491,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 // Negative test scenarios with command argument
 func TestNegLogCollectValidateArgs(t *testing.T) {
-	invalidKubeConfPath := e2eutil.GetKubeConfigToUse("k8s_reclustered")
-	unreachableKubeConfPath := e2eutil.GetKubeConfigToUse("k8s_unreachable")
+	invalidKubeConfPath := e2eutil.GetKubeConfigToUse(framework.Global.KubeType, "k8s_reclustered")
+	unreachableKubeConfPath := e2eutil.GetKubeConfigToUse(framework.Global.KubeType, "k8s_unreachable")
 	errMsgList := failureList{}
 
 	validArgumentList := []cbopinfoArg{
@@ -589,7 +589,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		}
 	}
 
-	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
 	isAllFlagSet := false
 
 	/////////////////////////////////////////////////////
@@ -866,7 +866,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 	svcAccName := "rbac-test"
-	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
 
 	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
 	if err != nil {
@@ -952,7 +952,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	f := framework.Global
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := e2eutil.GetKubeConfigToUse(kubeName)
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
 
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig

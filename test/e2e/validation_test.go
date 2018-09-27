@@ -239,7 +239,6 @@ func VerifyClusterParameter(cluster *api.CouchbaseCluster, param parameter) erro
 			return fmt.Errorf("%+v != %+v", clusterVal, compareVal)
 		}
 	}
-
 	return nil
 }
 
@@ -251,10 +250,11 @@ func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
 	return clusterSize
 }
 
-func runValidationTest(t *testing.T, f *framework.Framework, testDefs []testDef, targetKubeName, command string) {
+func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command string) {
+	f := framework.Global
 	failures := failureList{}
 	targetKube := f.ClusterSpec[targetKubeName]
-	os.Setenv("KUBECONFIG", e2eutil.GetKubeConfigToUse(targetKubeName))
+	os.Setenv("KUBECONFIG", e2eutil.GetKubeConfigToUse(f.KubeType, targetKubeName))
 	for _, test := range testDefs {
 		t.Logf("Running test: %s", test.name)
 
@@ -407,8 +407,6 @@ func TestValidationCreate(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:             "create default yaml",
@@ -419,14 +417,13 @@ func TestValidationCreate(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "create")
+	runValidationTest(t, testDefs, kubeName, "create")
 }
 
 func TestNegValidationCreate(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		// Spec.ExposedFeatures list validation
 		{
@@ -920,14 +917,13 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "create")
+	runValidationTest(t, testDefs, kubeName, "create")
 }
 
 func TestValidationDefaultCreate(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "create:default:Spec.BaseImage",
@@ -970,14 +966,13 @@ func TestValidationDefaultCreate(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "create")
+	runValidationTest(t, testDefs, kubeName, "create")
 }
 
 func TestNegValidationDefaultCreate(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "create:default:Spec.ClusterSettings.DataServiceMemQuota",
@@ -1000,14 +995,13 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "create")
+	runValidationTest(t, testDefs, kubeName, "create")
 }
 
 func TestNegValidationConstraintsCreate(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "more than 4 adminConsoleServices",
@@ -1122,7 +1116,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "create")
+	runValidationTest(t, testDefs, kubeName, "create")
 }
 
 // cbopctl apply tests
@@ -1131,7 +1125,6 @@ func TestValidationApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name:             "apply:",
@@ -1162,14 +1155,13 @@ func TestValidationApply(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "apply")
+	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
 func TestNegValidationApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "apply invalid changes to bucket name",
@@ -1214,14 +1206,13 @@ func TestNegValidationApply(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "apply")
+	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
 func TestValidationDefaultApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "apply defaults to base image",
@@ -1304,14 +1295,13 @@ func TestValidationDefaultApply(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "apply")
+	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
 func TestNegValidationDefaultApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "create:default:Spec.ClusterSettings.DataServiceMemQuota",
@@ -1328,14 +1318,13 @@ func TestNegValidationDefaultApply(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "create")
+	runValidationTest(t, testDefs, kubeName, "create")
 }
 
 func TestNegValidationConstraintsApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "more than 4 adminConsoleServices",
@@ -1428,14 +1417,13 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "apply")
+	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
 func TestNegValidationImmutableApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		// Bucket spec updation
 		{
@@ -1739,7 +1727,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "apply")
+	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
 //cbopctl delete tests
@@ -1747,7 +1735,6 @@ func TestValidationDelete(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "delete after modifying",
@@ -1772,14 +1759,13 @@ func TestValidationDelete(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "delete")
+	runValidationTest(t, testDefs, kubeName, "delete")
 }
 
 func TestNegValidationDelete(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "delete",
@@ -1796,7 +1782,7 @@ func TestNegValidationDelete(t *testing.T) {
 		},
 	}
 	kubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, kubeName, "delete")
+	runValidationTest(t, testDefs, kubeName, "delete")
 }
 
 /*******************************************************************
@@ -1805,7 +1791,6 @@ func TestNegValidationDelete(t *testing.T) {
 
 // Deploy couchbase cluster over non existent server group
 func TestRzaNegCreateCluster(t *testing.T) {
-	f := framework.Global
 	testDefs := []testDef{
 		{
 			name: "Creating cluster with incorrect server-group in static config",
@@ -1829,5 +1814,5 @@ func TestRzaNegCreateCluster(t *testing.T) {
 		},
 	}
 	targetKubeName := "NewCluster1"
-	runValidationTest(t, f, testDefs, targetKubeName, "create")
+	runValidationTest(t, testDefs, targetKubeName, "create")
 }
