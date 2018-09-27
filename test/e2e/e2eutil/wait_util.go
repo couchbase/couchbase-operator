@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -295,7 +296,7 @@ func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName strin
 }
 
 func WaitUntilPodDeleted(t *testing.T, kubeClient kubernetes.Interface, namespace string) error {
-	undeletedPods, err := WaitPodsDeleted(kubeClient, namespace, 3, metav1.ListOptions{LabelSelector: "app=couchbase"})
+	undeletedPods, err := WaitPodsDeleted(kubeClient, namespace, 3, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
 			p := undeletedPods[0]

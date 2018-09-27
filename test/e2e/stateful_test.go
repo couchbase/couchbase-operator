@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
@@ -21,8 +22,8 @@ func TestCreateStatefulCluster(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	clusterSize := e2eutil.Size3
-	testCouchbase, err := e2eutil.NewStatefulCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	clusterSize := constants.Size3
+	testCouchbase, err := e2eutil.NewStatefulCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 		}
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

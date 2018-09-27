@@ -1024,7 +1024,7 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		}
 
 		logrus.Info("Creating etcd cluster")
-		maxRetries := e2eutil.Retries5
+		maxRetries := constants.Retries5
 		for retryCount := 0; retryCount < maxRetries; retryCount++ {
 			if err := CreateEtcd(t, kubeClient, namespace, kubeConfigPath); err != nil {
 				logrus.Infof("Error creating etcd: %v", err)

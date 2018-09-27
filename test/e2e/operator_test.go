@@ -23,7 +23,7 @@ func TestPauseOperator(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 	memberIdToKill := 0
 
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,13 +35,13 @@ func TestPauseOperator(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase)
+	_, err = e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, constants.Size3, constants.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create 3 members couchbase cluster: %v", err)
 	}
 
 	t.Logf("Pausing operator...")
-	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to pause control: %v", err)
 	}
@@ -52,16 +52,16 @@ func TestPauseOperator(t *testing.T) {
 
 	t.Logf("Killing pod...")
 	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 1)
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, e2eutil.Size2, e2eutil.Retries10, testCouchbase); err != nil {
+	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, constants.Size2, constants.Retries10, testCouchbase); err != nil {
 		t.Fatalf("failed to wait for killed member to die: %v", err)
 	}
 
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, e2eutil.Size3, e2eutil.Retries10, testCouchbase); err == nil {
+	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, constants.Size3, constants.Retries10, testCouchbase); err == nil {
 		t.Fatalf("cluster should not be recovered: control is paused")
 	}
 
 	t.Logf("Resuming operator...")
-	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "false", targetKube.CRClient, testCouchbase, e2eutil.Retries10)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("Paused", "false", targetKube.CRClient, testCouchbase, constants.Retries10)
 	if err != nil {
 		t.Fatalf("failed to resume control: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestPauseOperator(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToKill)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -96,7 +96,7 @@ func TestKillOperator(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, e2eutil.Retries5)
+	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -190,7 +190,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 		t.Fatalf("failed to kill couchbase operator: %v", err)
 	}
 
-	if err := e2eutil.EditBucketAndVerify(t, client, bucket, e2eutil.Retries5, e2eutil.FlushDisabledVerifier); err != nil {
+	if err := e2eutil.EditBucketAndVerify(t, client, bucket, constants.Retries5, e2eutil.FlushDisabledVerifier); err != nil {
 		t.Fatalf("error occurred editing cluster bucket %v", err)
 	}
 	if _, allowed := err.(errors.ErrInvalidBucketParamChange); allowed {

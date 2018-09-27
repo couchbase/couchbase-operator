@@ -14,6 +14,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -287,7 +288,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command
 
 			if !test.shouldFail {
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30)
+				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30)
 				if err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)
@@ -364,7 +365,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command
 					failures.AppendFailure(test.name, errors.New("cluster deletion should work"))
 					continue
 				}
-				_, err = e2eutil.WaitPodsDeleted(targetKube.KubeClient, f.Namespace, e2eutil.Retries30, metav1.ListOptions{LabelSelector: "app=couchbase"})
+				_, err = e2eutil.WaitPodsDeleted(targetKube.KubeClient, f.Namespace, constants.Retries30, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 				if err != nil {
 					failures.AppendFailure(test.name, err)
 					continue
@@ -386,7 +387,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command
 				}
 
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30)
+				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30)
 				if err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)

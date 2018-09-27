@@ -304,12 +304,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		clusterSpec2.SecurityContext = createPodSecurityContext(1000)
 	}
 
-	testCouchbase1, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec1)
+	testCouchbase1, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminExposed, clusterSpec2)
+	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,11 +343,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")
-	testCouchbase1, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase1, e2eutil.Retries5)
+	testCouchbase1, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase1, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to pause control: %v", err)
 	}
-	testCouchbase2, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase2, e2eutil.Retries5)
+	testCouchbase2, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase2, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to pause control: %v", err)
 	}
@@ -364,12 +364,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// get info from cluster to add to the scope
 	t.Logf("grabbing cluster info")
-	clusterInfo1, err := e2eutil.GetClusterInfo(t, client1, e2eutil.Retries5)
+	clusterInfo1, err := e2eutil.GetClusterInfo(t, client1, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
 	t.Logf("cluster info: %v", clusterInfo1)
-	clusterInfo2, err := e2eutil.GetClusterInfo(t, client2, e2eutil.Retries5)
+	clusterInfo2, err := e2eutil.GetClusterInfo(t, client2, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
 	}
@@ -506,11 +506,11 @@ outerLoop:
 			}
 		}
 		// make sure cluster is healthy before running next cycle
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1.Name, f.Namespace, e2eutil.Size4, e2eutil.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1.Name, f.Namespace, constants.Size4, constants.Retries10)
 		if err != nil {
 			t.Fatalf("failed to wait for cluster to be healthy %v", err)
 		}
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2.Name, f.Namespace, e2eutil.Size4, e2eutil.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2.Name, f.Namespace, constants.Size4, constants.Retries10)
 		if err != nil {
 			t.Fatalf("failed to wait for cluster to be healthy %v", err)
 		}

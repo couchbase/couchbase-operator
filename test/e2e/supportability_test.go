@@ -37,7 +37,7 @@ func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *fa
 
 // Function to check collecinfo related prints from cmd output
 func checkCollectInfoLogs(execOut []byte, kubeClient kubernetes.Interface, namespace, cbClusterName, cbopinfoLogDir string, errMsgList *failureList) error {
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cbClusterName})
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
 	if err != nil {
 		return errors.New("Failed to list pods: " + err.Error())
 	}
@@ -197,7 +197,7 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 		*reqFileList = append(*reqFileList, cbClusterDir+"/"+cbCluster.Name+"/"+cbCluster.Name+".yaml")
 
 		// pod dir contents
-		pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cbCluster.Name})
+		pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
 		if err != nil {
 			return errors.New("Failed to list pods: " + err.Error())
 		}
@@ -206,7 +206,7 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
 		}
 
-		endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase, couchbase_cluster=" + cbCluster.Name})
+		endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
 		if err != nil {
 			return errors.New("Failed to list endpoints: " + err.Error())
 		}
@@ -215,7 +215,7 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 		}
 
 		// service dir contents
-		services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cbCluster.Name})
+		services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
 		if err != nil {
 			return errors.New("Failed to list services: " + err.Error())
 		}
@@ -431,7 +431,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 
 	// Deploy cb server for cbopinfo validation
-	if _, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden); err != nil {
+	if _, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithoutBucket, constants.AdminHidden); err != nil {
 		t.Fatal(err)
 	}
 
@@ -557,9 +557,9 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	failureExists := false
-	cluster1Size := e2eutil.Size3
-	cluster2Size := e2eutil.Size3
-	cluster3Size := e2eutil.Size1
+	cluster1Size := constants.Size3
+	cluster2Size := constants.Size3
+	cluster3Size := constants.Size1
 	var cluster1, cluster2, cluster3 *api.CouchbaseCluster
 	cluster1Err := make(chan error)
 	cluster2Err := make(chan error)
@@ -567,19 +567,19 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 
 	go func() {
 		var err error
-		cluster1, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster1Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster1, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster1Size, constants.WithoutBucket, constants.AdminHidden)
 		cluster1Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster2, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster2Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster2, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster2Size, constants.WithoutBucket, constants.AdminHidden)
 		cluster2Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster3, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster3Size, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster3, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster3Size, constants.WithoutBucket, constants.AdminHidden)
 		cluster3Err <- err
 	}()
 
@@ -868,7 +868,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	svcAccName := "rbac-test"
 	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
 
-	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -956,7 +956,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(e2eutil.Size2, "test_config_1", []string{"data", "query", "index", "analytics"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_1", []string{"data", "query", "index", "analytics"})
 	serviceConfig1["defaultVolMnt"] = pvcName
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
@@ -974,7 +974,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	clusterSpec.SecurityContext = createPodSecurityContext(1000)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, e2eutil.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
 	if err != nil {
 		t.Fatal(err)
 	}

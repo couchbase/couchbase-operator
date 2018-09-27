@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	e2e_const "github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -111,14 +111,14 @@ func GetExpectedRzaResultMap(clusterSize int, availableServerGroupList []string)
 // Returns for map of ServerGroup names with the pod count in the group
 func GetDeployedRzaMap(kubeClient kubernetes.Interface, namespace string) (map[string]int, error) {
 	// Get all couchbase pods
-	couchbasePodList, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	couchbasePodList, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return nil, err
 	}
 
 	deployedRzaGroupsMap := map[string]int{}
 	for _, cbPod := range couchbasePodList.Items {
-		currRzaGroup := cbPod.Spec.NodeSelector[constants.ServerGroupLabel]
+		currRzaGroup := cbPod.Spec.NodeSelector[pkg_constants.ServerGroupLabel]
 		if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {
 			deployedRzaGroupsMap[currRzaGroup]++
 		} else {
@@ -131,14 +131,14 @@ func GetDeployedRzaMap(kubeClient kubernetes.Interface, namespace string) (map[s
 // Returns for map of pod name with the ServerGroup name on which they are deployed on
 func GetDeployedRzaPodMap(kubeClient kubernetes.Interface, namespace string) (map[string]string, error) {
 	// Get all couchbase pods
-	couchbasePodList, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	couchbasePodList, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return nil, err
 	}
 
 	deployedRzaGroupsMap := map[string]string{}
 	for _, cbPod := range couchbasePodList.Items {
-		deployedRzaGroupsMap[cbPod.Name] = cbPod.Spec.NodeSelector[constants.ServerGroupLabel]
+		deployedRzaGroupsMap[cbPod.Name] = cbPod.Spec.NodeSelector[pkg_constants.ServerGroupLabel]
 	}
 	return deployedRzaGroupsMap, err
 }
@@ -182,12 +182,12 @@ func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) 
 
 		// Adding retry loop because sometimes node label update is failing. On retry, it will succeed
 		if !f.SkipTeardown {
-			defer K8SNodesRemoveLabel(constants.ServerGroupLabel, targetKube.KubeClient)
+			defer K8SNodesRemoveLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient)
 		}
 		for retryCount := 0; retryCount < 3; retryCount++ {
 			t.Logf("Retry node label update: %d", retryCount)
 			// Label K8S nodes based on the labels present in the cluster conf yaml file
-			err = K8SNodesAddLabel(constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0])
+			err = K8SNodesAddLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0])
 			if err == nil {
 				break
 			}
@@ -257,7 +257,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -291,7 +291,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries5); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries5); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -344,7 +344,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +372,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	k8sNodeLabelUpdateFunc := func() {
 		// Rename node labels for particular server-group
 		// Node label get updated in both update / remove scenario
-		nodeUpdateErrChan <- UpdateServerGroupLabel(constants.ServerGroupLabel, availableServerGroupList[0], "NewRzaGroup-1", targetKube.KubeClient)
+		nodeUpdateErrChan <- UpdateServerGroupLabel(pkg_constants.ServerGroupLabel, availableServerGroupList[0], "NewRzaGroup-1", targetKube.KubeClient)
 	}
 
 	if strings.Contains(editType, "InParallel") {
@@ -390,7 +390,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 		// Updating CRD to add new server-group in CRD
 		newAvailableServerGroupList = append(availableServerGroupList, "NewRzaGroup-1")
 		newAvailableServerGroups := strings.Join(newAvailableServerGroupList, ",")
-		testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+		testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 		if err != nil {
 			t.Fatalf("Failed to update server groups: %v", err)
 		}
@@ -406,7 +406,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal(err)
 	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -464,7 +464,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -522,7 +522,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	}
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -610,7 +610,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -663,13 +663,13 @@ func TestRzaResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, e2eutil.Retries120, testCouchbase)
+		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
 			t.Fatal(err.Error())
 		}
 
@@ -738,7 +738,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -764,7 +764,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 
 	availableServerGroupList = []string{availableServerGroupList[0], availableServerGroupList[2]}
 	availableServerGroups = strings.Join(availableServerGroupList, ",")
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, e2e_const.Retries5)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatalf("Failed to update server groups: %v", err)
 	}
@@ -781,7 +781,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2e_const.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
@@ -823,7 +823,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, serverGroupsUsed)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -848,7 +848,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	}
 
 	availableServerGroups = strings.Join(availableServerGroupList, ",")
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, e2e_const.Retries5)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatalf("Failed to update server groups: %v", err)
 	}
@@ -865,7 +865,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -919,7 +919,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -936,7 +936,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	newAvailableServerGroupList := append(availableServerGroupList, "InvalidGroup-1")
 	newAvailableServerGroups := strings.Join(newAvailableServerGroupList, ",")
 
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatalf("Failed to update server groups: %v", err)
 	}
@@ -955,7 +955,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize-1)
 
 	// Revert server group addition
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, e2eutil.Retries5)
+	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatalf("Failed to update server groups: %v", err)
 	}
@@ -1023,7 +1023,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1107,7 +1107,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedAddNode", memberIdToGoDown)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")

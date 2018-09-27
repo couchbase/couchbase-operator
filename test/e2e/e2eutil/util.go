@@ -34,36 +34,6 @@ import (
 )
 
 var (
-	Size1 = 1
-	Size2 = 2
-	Size3 = 3
-	Size4 = 4
-	Size5 = 5
-)
-
-var (
-	WithBucket    = true
-	WithoutBucket = false
-	AdminExposed  = true
-	AdminHidden   = false
-
-	BucketFlushEnabled   = true
-	BucketFlushDisabled  = false
-	IndexReplicaEnabled  = true
-	IndexReplicaDisabled = false
-)
-
-var (
-	Retries1   = 1
-	Retries5   = 5
-	Retries10  = 10
-	Retries20  = 20
-	Retries30  = 30
-	Retries60  = 60
-	Retries120 = 120
-)
-
-var (
 	BasicClusterConfig = map[string]string{
 		"dataServiceMemQuota":      string(constants.Mem256Mb),
 		"indexServiceMemQuota":     string(constants.Mem256Mb),
@@ -123,15 +93,15 @@ type ClusterReadyRetries struct {
 
 var (
 	defaultRetries = &ClusterReadyRetries{
-		Size:    Retries120,
-		Bucket:  Retries60,
-		Service: Retries20,
+		Size:    constants.Retries120,
+		Bucket:  constants.Retries60,
+		Service: constants.Retries20,
 	}
 
 	systemTestRetries = &ClusterReadyRetries{
-		Size:    Retries120,
-		Bucket:  Retries120,
-		Service: Retries120,
+		Size:    constants.Retries120,
+		Bucket:  constants.Retries120,
+		Service: constants.Retries120,
 	}
 )
 
@@ -219,7 +189,7 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 	errChan := make(chan error)
 	go func() {
 		// Expect the cluster to enter a failed state
-		if err := WaitClusterPhaseFailed(t, crClient, cluster.Name, namespace, Retries20); err == nil {
+		if err := WaitClusterPhaseFailed(t, crClient, cluster.Name, namespace, constants.Retries20); err == nil {
 			errChan <- errors.New("Cluster entered failed state")
 		}
 	}()
@@ -527,7 +497,7 @@ func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	} else {
 		t.Logf("Successfully deleted: [%v]", cbCluster.Name)
 	}
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cbCluster.Name})
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
 	if err != nil {
 		t.Logf("Error: Failed to get pods %v", err)
 	}
@@ -540,7 +510,7 @@ func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 }
 
 func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string) {
-	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	for _, service := range services.Items {
 		kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
@@ -859,7 +829,7 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace, claimName, memberName
 }
 
 func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string) error {
-	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return fmt.Errorf("Unable to get couchbase pods: %v", err)
 	}
@@ -886,7 +856,7 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, n
 			return err
 		}
 	}
-	_, err = WaitPodsDeleted(kubeClient, namespace, Retries30, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitPodsDeleted(kubeClient, namespace, constants.Retries30, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
@@ -913,7 +883,7 @@ func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, la
 			return err
 		}
 	}
-	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, Retries30, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, constants.Retries30, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}

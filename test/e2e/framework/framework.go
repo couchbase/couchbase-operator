@@ -216,7 +216,7 @@ func cleanUpNamespace() (err error) {
 		}
 		for _, cluster := range clusters.Items {
 			targetKube.CRClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
-			pods, err := targetKube.KubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
+			pods, err := targetKube.KubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
 			if err != nil {
 				return errors.New("Failed to list pods for cluster: " + err.Error())
 			}
@@ -228,7 +228,7 @@ func cleanUpNamespace() (err error) {
 		}
 
 		// Clean-up Couchbase services
-		services, err := targetKube.KubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+		services, err := targetKube.KubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 		if err != nil {
 			return errors.New("Failed to list services: " + err.Error())
 		}
@@ -295,7 +295,7 @@ func (f *Framework) DeleteCRDs(config *rest.Config) error {
 func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	logrus.Info("Marking all nodes as schedulable")
 	nodeTaintList := []v1.Taint{}
-	for i := 0; i < e2eutil.Retries5; i++ {
+	for i := 0; i < constants.Retries5; i++ {
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil && i == 2 {
 			return errors.New("Failed to get node list: " + err.Error())
@@ -344,7 +344,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 			return err
 		}
 		logrus.Infof("Cluster deleted: %v", cluster.Name)
-		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase,couchbase_cluster=" + cluster.Name})
+		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
 		if err != nil {
 			return errors.New("failed to list pods for cluster: " + err.Error())
 		}

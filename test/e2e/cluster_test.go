@@ -430,7 +430,7 @@ func TestInvalidAuthSecret(t *testing.T) {
 
 	expectedEvents := e2eutil.EventList{}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if len(pods.Items) != 0 {
 		t.Fatalf("more than zero pods: %+v", pods.Items)
 	}
@@ -472,7 +472,7 @@ func TestInvalidBaseImage(t *testing.T) {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if len(pods.Items) != 1 {
 		t.Fatalf("more than one pod: %v", pods.Items)
 	}
@@ -540,7 +540,7 @@ func TestInvalidVersion(t *testing.T) {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if len(pods.Items) != 1 {
 		t.Fatalf("more than one pod: %v", pods.Items)
 	}

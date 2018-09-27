@@ -7,6 +7,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -62,7 +63,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	}
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	}
 
 	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
@@ -134,7 +135,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
@@ -184,7 +185,7 @@ func TestEventingResizeCluster(t *testing.T) {
 
 	// Cross check number of docs inserted reflected in eventing
 	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -236,13 +237,13 @@ func TestEventingResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, e2eutil.Retries120, testCouchbase)
+		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
 			t.Fatal(err.Error())
 		}
 
@@ -264,7 +265,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -275,7 +276,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
@@ -298,7 +299,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, e2eutil.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
@@ -348,7 +349,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	// Cross check number of docs inserted reflected in eventing
 	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -406,7 +407,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, e2eutil.Retries10); err != nil {
+	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)

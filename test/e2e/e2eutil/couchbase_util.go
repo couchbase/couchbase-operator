@@ -15,6 +15,7 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/gocbmgr"
 
@@ -233,7 +234,7 @@ func FailoverNode(t *testing.T, client *cbmgr.Couchbase, tries int, nodeName str
 // FailoverNodes manually fails over nodes, raises an error if the cluster is the wrong size
 // or the number of down nodes is wrong
 func FailoverNodes(t *testing.T, client *cbmgr.Couchbase, cbClusterSize int, memberIdsToFailover []int) {
-	clusterNodes, err := GetNodesFromCluster(t, client, Retries5)
+	clusterNodes, err := GetNodesFromCluster(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("Failed to get nodes from cluster: %v", err)
 	}
@@ -251,7 +252,7 @@ func FailoverNodes(t *testing.T, client *cbmgr.Couchbase, cbClusterSize int, mem
 
 	t.Logf("Failing over nodes: %v", nodesToFailover)
 	for _, nodeName := range nodesToFailover {
-		if err := FailoverNode(t, client, Retries5, nodeName); err != nil {
+		if err := FailoverNode(t, client, constants.Retries5, nodeName); err != nil {
 			t.Fatalf("Failed to failover node '%s': %v", nodeName, err)
 		}
 	}

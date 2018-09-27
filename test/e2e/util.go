@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -252,10 +253,10 @@ func AddServerGroupLabelToNodes(t *testing.T, clusterInfoList []framework.Cluste
 			return errors.New("Failed to read cluster yaml data: " + err.Error())
 		}
 
-		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
+		for retryCount := 0; retryCount < constants.Retries5; retryCount++ {
 			t.Logf("Update node label count: %d", retryCount)
 			// Label K8S nodes based on the labels present in the cluster conf yaml file
-			if err = K8SNodesAddLabel(constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0]); err == nil {
+			if err = K8SNodesAddLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0]); err == nil {
 				break
 			}
 		}
@@ -269,9 +270,9 @@ func RemoveServerGroupLabelFromNodes(t *testing.T, clusterInfoList []framework.C
 	for _, clusterInfo := range clusterInfoList {
 		kubeName := clusterInfo.ClusterName
 		targetKube := f.ClusterSpec[kubeName]
-		for retryCount := 0; retryCount < e2eutil.Retries5; retryCount++ {
+		for retryCount := 0; retryCount < constants.Retries5; retryCount++ {
 			t.Logf("Update node label count: %d", retryCount)
-			if err = K8SNodesRemoveLabel(constants.ServerGroupLabel, targetKube.KubeClient); err == nil {
+			if err = K8SNodesRemoveLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient); err == nil {
 				break
 			}
 		}

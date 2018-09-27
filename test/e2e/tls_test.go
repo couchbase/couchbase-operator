@@ -6,6 +6,7 @@ import (
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -147,7 +148,7 @@ func randomClusterName(randomSuffix string) string {
 // installs them into K8S before running the test(s)
 func tlsDecorator(test framework.TestFunc, keyType e2eutil.KeyType, args framework.DecoratorArgs) framework.TestFunc {
 	f := framework.Global
-	maxClustersPerCluster := e2eutil.Size3
+	maxClustersPerCluster := constants.Size3
 	var wrapper framework.TestFunc
 	for j := 0; j < maxClustersPerCluster; j++ {
 		RandomNameSuffix = e2eutil.RandomSuffix()
@@ -200,7 +201,7 @@ func TestTlsCreateCluster(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal("Create cluster failed:", err)
 	}
@@ -212,12 +213,12 @@ func TestTlsCreateCluster(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
 	if err != nil {
 		t.Fatal("Cluster failed to become healthy:", err.Error())
 	}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		t.Fatal("Unable to get couchbase pods:", err)
 	}
@@ -246,7 +247,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 	podToKillMemberId := 1
 
 	// create 1 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +257,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// async scale up to 3 node cluster
-	if err := e2eutil.ResizeClusterNoWait(t, 0, e2eutil.Size3, targetKube.CRClient, testCouchbase); err != nil {
+	if err := e2eutil.ResizeClusterNoWait(t, 0, constants.Size3, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal("Failed to trigger cluster resize")
 	}
 
@@ -266,7 +267,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for nodeIndex := 1; nodeIndex < e2eutil.Size3; nodeIndex++ {
+	for nodeIndex := 1; nodeIndex < constants.Size3; nodeIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 	}
 
@@ -284,7 +285,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// cluster should also be balanced
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries20)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +304,7 @@ func TestTlsResizeCluster(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size1, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +314,7 @@ func TestTlsResizeCluster(t *testing.T) {
 
 	clusterSizes := []int{2, 3, 2, 1}
 
-	prevClusterSize := e2eutil.Size1
+	prevClusterSize := constants.Size1
 
 	for _, clusterSize := range clusterSizes {
 		service := 0
@@ -322,7 +323,7 @@ func TestTlsResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, e2eutil.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10)
 		if err != nil {
 			t.Fatal("Cluster not healthy:", err)
 		}
@@ -341,7 +342,7 @@ func TestTlsResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size1, e2eutil.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -361,7 +362,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	podToKillMemberId := 1
 
 	// create 3 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +425,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -449,7 +450,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	// create 3 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +463,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -488,7 +489,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 
 	go func() {
 		service := 0
-		resizeErr <- e2eutil.ResizeCluster(t, service, e2eutil.Size5, targetKube.CRClient, testCouchbase)
+		resizeErr <- e2eutil.ResizeCluster(t, service, constants.Size5, targetKube.CRClient, testCouchbase)
 	}()
 
 	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
@@ -513,7 +514,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size5, e2eutil.Retries20)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size5, constants.Retries20)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -536,7 +537,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	podToKillMemberId := 1
 
 	// create 3 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -589,7 +590,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, e2eutil.Size3, e2eutil.Retries30)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries30)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -609,7 +610,7 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	// create 3 node cluster
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithBucket, e2eutil.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,7 +631,7 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 
 	// Set the resize off
 	service := 0
-	if err := e2eutil.ResizeClusterNoWait(t, service, e2eutil.Size4, targetKube.CRClient, testCouchbase); err != nil {
+	if err := e2eutil.ResizeClusterNoWait(t, service, constants.Size4, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal(err)
 	}
 
@@ -656,7 +657,7 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 
 	// Actual Test case function
 	TestToRun := func(t *testing.T) {
-		cluster, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 		if err != nil {
 			t.Fatal("Cluster creation failed:", err)
 		}
@@ -702,19 +703,19 @@ func TestTlsCertificateExpiry(t *testing.T) {
 
 	// Actual Test case function
 	TestToRun := func(t *testing.T) {
-		testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		expectedEvents := e2eutil.EventList{}
-		for memberId := 0; memberId < e2eutil.Size3; memberId++ {
+		for memberId := 0; memberId < constants.Size3; memberId++ {
 			expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 		}
 		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -736,7 +737,7 @@ func TestTlsCertificateExpiry(t *testing.T) {
 
 		go func() {
 			service := 0
-			if err := e2eutil.ResizeCluster(t, service, e2eutil.Size4, targetKube.CRClient, testCouchbase); err == nil {
+			if err := e2eutil.ResizeCluster(t, service, constants.Size4, targetKube.CRClient, testCouchbase); err == nil {
 				t.Fatalf("Resize cluster successful with expired certificates")
 			}
 		}()
@@ -768,7 +769,7 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 
 	// Actual Test case function
 	TestToRun := func(t *testing.T) {
-		cluster, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 		if err != nil {
 			t.Fatalf("Cluster creation failed: %v\n", err)
 		}
@@ -811,7 +812,7 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 		var err error
 		createClusterErrChan := make(chan error)
 		go func() {
-			_, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+			_, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 			createClusterErrChan <- err
 		}()
 		time.Sleep(time.Second)
@@ -823,7 +824,7 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 				break
 			}
 
-			pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
+			pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -860,7 +861,7 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 	// Actual Test case function
 	TestToRun := func(t *testing.T) {
 		// Create cluster
-		testCouchbase, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		testCouchbase, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 		if err != nil {
 			t.Fatalf("Error while creating cluster: %v\n", err)
 		}
@@ -895,7 +896,7 @@ func TestTlsGenerateWrongCertType(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	TestToRun := func(t *testing.T) {
-		cluster, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, e2eutil.Size3, e2eutil.WithoutBucket, e2eutil.AdminHidden)
+		cluster, err := e2eutil.NewClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 		if err != nil {
 			t.Fatalf("Cluster creation failed: %v\n", err)
 		}

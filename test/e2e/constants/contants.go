@@ -29,10 +29,11 @@ var (
 
 var (
 	// Couchbase cluster
-	ClusterNamePrefix         = "test-couchbase-"
-	CouchbaseLabel            = util_const.LabelApp + "=" + util_const.App
-	CouchbaseOperatorLabel    = util_const.LabelApp + "=couchbase-operator"
-	CouchbaseServerClusterKey = "couchbase_cluster"
+	ClusterNamePrefix          = "test-couchbase-"
+	CouchbaseLabel             = util_const.LabelApp + "=" + util_const.App
+	CouchbaseOperatorLabel     = util_const.LabelApp + "=couchbase-operator"
+	CouchbaseServerClusterKey  = "couchbase_cluster"
+	CouchbaseServerPodLabelStr = CouchbaseLabel + "," + CouchbaseServerClusterKey + "="
 )
 
 var (
