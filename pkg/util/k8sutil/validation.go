@@ -20,6 +20,7 @@ var (
 	maximumBucketReplicas              float64 = 3
 	minimumAutofailoverMaxCount        float64 = 1
 	maximumAutofailoverMaxCount        float64 = 3
+	minimumLogRetentionCount           float64 = 0
 )
 
 const (
@@ -122,6 +123,14 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 						},
 						"disableBucketManagement": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "boolean",
+						},
+						"logRetentionTime": apiextensionsv1beta1.JSONSchemaProps{
+							Type:    "string",
+							Pattern: `^\d+(ns|us|ms|s|m|h)$`,
+						},
+						"logRetentionCount": apiextensionsv1beta1.JSONSchemaProps{
+							Type:    "integer",
+							Minimum: &minimumLogRetentionCount,
 						},
 						"cluster": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",

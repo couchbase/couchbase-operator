@@ -135,6 +135,9 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		return nil
 	}
 
+	// Spawn the janitor process which monitors persistent log volumes.
+	go newJanitor(c).run()
+
 	go func() {
 		if err := c.setup(); err != nil {
 			c.logger.Errorf("Cluster setup failed: %v", err)

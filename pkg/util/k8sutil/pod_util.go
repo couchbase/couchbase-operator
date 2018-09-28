@@ -879,3 +879,12 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 	}
 	return nil
 }
+
+// IsLogPVC returns whether this is a volume containing Couchbase logs.
+func IsLogPVC(pvc *v1.PersistentVolumeClaim) (bool, error) {
+	path, ok := pvc.Annotations["path"]
+	if !ok {
+		return false, fmt.Errorf("path annotation missing for pvc %s", pvc.Name)
+	}
+	return path == CouchbaseVolumeMountLogsDir, nil
+}

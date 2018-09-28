@@ -39,6 +39,8 @@ spec:
     runAsNonRoot: true
     fsGroup: 1000
   disableBucketManagement: false
+  logRetentionTime: 604800s
+  logRetentionCount: 20
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
@@ -184,6 +186,8 @@ spec:
     runAsNonRoot: true
     fsGroup: 1000
   disableBucketManagement: false
+  logRetentionTime: 604800s
+  logRetentionCount: 20
 ----
 
 === baseImage
@@ -312,6 +316,26 @@ If set to `true`, the creation and deletion of buckets must be done manually usi
 
 ____
 _Field rules:_ The `disableBucketManagement` field is optional and defaults to `false`.
+____
+
+=== logRetentionTime
+
+This field is used in conjunction with the `logs` persistent volume mount.  The value can be anything that can be parsed by the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration] function.  If specified this controls the retention period that log volumes are kept for after their associated pods have been deleted.  If not specified (the default) or zero e.g. 0s, log volumes are retained indefinitely.
+
+It is recommended to specify this field when using ephemeral server classes so that potentially sensitive information is not retained indefinitely.  This allows compliance with data privacy legislation.
+
+____
+_Field rules:_ The `logRetentionTime` field is optional and defaults to `""`.  If specified it must contain a decimal number and a unit suffix such as `s`, `m` or `h`.  The decimal number cannot be negative.
+____
+
+=== logRetentionCount
+
+This field is used in conjunction with the `logs` persistent volume mount.  If specified this controls the maximum number of log volumes that can be kept after their associated pods have been deleted.  If this threshold is passed, log volumes are deleted starting with the oldest first.  If not specified or zero, log volumes are retained indefinitely.
+
+It is recommended to specify this field when using ephemeral server classes so an unlimited number of persistent volumes cannot be created.  This ensures storage quotas are not exhausted or significant costs are incurred.
+
+____
+_Field rules:_ The `logRetentionCount` field is optional and defaults to `0`.  The value must be any non-negative integer.
 ____
 
 == spec.cluster

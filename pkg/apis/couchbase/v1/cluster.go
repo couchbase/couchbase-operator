@@ -224,6 +224,12 @@ type ClusterSpec struct {
 	// DisableBucketManagement tells the reconcile loop to ignore all
 	// buckets in the system and leave that entirely to the customer
 	DisableBucketManagement bool `json:"disableBucketManagement,omitempty"`
+
+	// LogRetentionTime gives the time to keep persistent log PVCs alive for.
+	LogRetentionTime string `json:"logRetentionTime,omitempty"`
+
+	// LogRetentionCount gives the number of persistent log PVCs to keep.
+	LogRetentionCount int `json:"logRetentionCount,omitempty"`
 }
 
 type ClusterConfig struct {
