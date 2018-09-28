@@ -350,7 +350,11 @@ func (c *Cluster) run() {
 
 			if err := c.reconcile(running); err != nil {
 				c.logger.Errorf("failed to reconcile: %v", err)
-				rerr = err
+				// If a pod is killed during a rebalance say, we'd force a reload of
+				// the members.  As server knows about the member, but it no longer
+				// exists it will error continuously, whereas previously it would have
+				// correctly reconciled.
+				//rerr = err
 			}
 
 			if err := c.updateCRStatus(); err != nil {
