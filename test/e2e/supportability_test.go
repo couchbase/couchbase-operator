@@ -42,7 +42,7 @@ func checkCollectInfoLogs(execOut []byte, kubeClient kubernetes.Interface, names
 		return errors.New("Failed to list pods: " + err.Error())
 	}
 	execOutStr := string(execOut)
-	commonLogStr := "Server logs accessible via: kubectl cp " + namespace + "/"
+	commonLogStr := "kubectl cp " + namespace + "/"
 	logFileTimeStampStr := strings.Split(cbopinfoLogDir, ".")[0]
 	logFileTimeStampStr = strings.Split(logFileTimeStampStr, "-")[1]
 	for _, pod := range pods.Items {

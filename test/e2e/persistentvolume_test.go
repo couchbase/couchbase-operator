@@ -107,27 +107,31 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	// Kill couchbase server process in target pods
-	for _, podMemberId := range podMembersToKill {
-		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		if _, err := f.ExecShellInPod(targetKubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
+	// Execute this test code only in case of kubernetes cluster,
+	// since openshift container does not have permissions to execute in privileged mode
+	if f.KubeType == "kubernetes" {
+		// Kill couchbase server process in target pods
+		for _, podMemberId := range podMembersToKill {
+			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
+			if _, err := f.ExecShellInPod(targetKubeName, memberName, "pkill beam.smp && pkill couchbase-server"); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		eventsExpected = e2eutil.EventList{}
+		for _, podMemberId := range podMembersToKill {
+			eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
+		}
+		eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
+		eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
+		receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 300)
+		if err != nil {
 			t.Fatal(err)
 		}
-	}
 
-	eventsExpected = e2eutil.EventList{}
-	for _, podMemberId := range podMembersToKill {
-		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
-	}
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 300)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, recEvent := range receivedEvents {
-		expectedEvents = append(expectedEvents, recEvent)
+		for _, recEvent := range receivedEvents {
+			expectedEvents = append(expectedEvents, recEvent)
+		}
 	}
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
@@ -553,77 +557,106 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents := e2eutil.EventList{}
+	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
+		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Calculate sleep time for action to be taken by operator
 	timeToSleep := time.Duration(autofailoverTimeout)*time.Second + 30
 
-	// Kill couchbase server pods in cluster and test auto failover
+	//For event validation
+	memDownEventsValidator := e2eutil.EventValidator{}
+
+	// For event tracking
 	allMemberDownEvents := e2eutil.EventList{}
-	allMemberRecoveryEvents := e2eutil.EventList{}
+	allMemberRecoveredEvents := e2eutil.EventList{}
+
+	// Kill couchbase server pods in cluster and test auto failover
 	for _, podMemberId := range podMembersToKill {
 		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
 		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberName, &metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
+
+		// Saving both events in same validator, since it can occur in any order in real time
+		memDownEventsValidator.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
+		memDownEventsValidator.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
+
 		allMemberDownEvents = append(allMemberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
-		allMemberRecoveryEvents = append(allMemberRecoveryEvents, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
+		allMemberRecoveredEvents = append(allMemberRecoveredEvents, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
 	}
 
-	createdEvents, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberDownEvents, clusterSize-1, 60)
-	if err != nil {
+	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberDownEvents, clusterSize-1, 60); err != nil {
 		t.Error(err)
 	}
-	expectedEvents.AppendEventList(createdEvents)
 
-	for _, _ = range podMembersToKill {
-		time.Sleep(timeToSleep)
-	}
-
-	createdEvents, err = e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveryEvents, clusterSize-1, 300)
-	if err != nil {
-		t.Error(err)
-	}
-	expectedEvents.AppendEventList(createdEvents)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	// Wait for cluster balanced condition after recovering the cluster pods
-	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
-		t.Fatal(err)
-	}
-
-	// Kill couchbase server process in target pods
-	for _, podMemberId := range podMembersToKill {
-		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		if _, err := f.ExecShellInPod(targetKubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
-			t.Fatal(err)
-		}
-		expectedEvents.AddMemberDownEvent(testCouchbase, podMemberId)
-	}
+	clusterBalancedErr := make(chan error)
+	go func() {
+		// Wait for cluster balanced condition after recovering the cluster pods
+		clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300)
+	}()
 
 	time.Sleep(timeToSleep)
 
-	for _, podMemberId := range podMembersToKill {
-		event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-			t.Fatal(err)
-		}
-		expectedEvents.AddMemberRecoveredEvent(testCouchbase, podMemberId)
+	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300); err != nil {
+		t.Error(err)
 	}
 
-	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
+	for index := 0; index < (clusterSize-1)*2; index++ {
+		expectedEvents.AddParallelEvents(memDownEventsValidator)
+	}
+
+	if err := <-clusterBalancedErr; err != nil {
 		t.Fatal(err)
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	ValidateClusterEventsWithoutError(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+
+	// Execute this test code only in case of kubernetes cluster,
+	// since openshift container does not have permissions to execute in privileged mode
+	if f.KubeType == "kubernetes" {
+		// Kill couchbase server process in target pods
+		for _, podMemberId := range podMembersToKill {
+			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
+			if _, err := f.ExecShellInPod(targetKubeName, memberName, "pkill beam.smp && pkill couchbase-server"); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		time.Sleep(timeToSleep)
+
+		if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberDownEvents, clusterSize-1, 120); err != nil {
+			t.Error(err)
+		}
+
+		clusterBalancedErr := make(chan error)
+		go func() {
+			// Wait for cluster balanced condition after recovering the cluster pods
+			clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300)
+		}()
+
+		time.Sleep(timeToSleep)
+
+		if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300); err != nil {
+			t.Error(err)
+		}
+
+		for index := 0; index < (clusterSize-1)*2; index++ {
+			expectedEvents.AddParallelEvents(memDownEventsValidator)
+		}
+
+		if err := <-clusterBalancedErr; err != nil {
+			t.Fatal(err)
+		}
+		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	}
+	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create cb cluster with PVC enabled
