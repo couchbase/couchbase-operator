@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -285,7 +286,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	}
 
 	// revert edit cluster dataServiceMemQuota
-	newDataServiceMemQuota = string(constants.Mem256Mb)
+	newDataServiceMemQuota = strconv.Itoa(constants.Mem256Mb)
 	t.Log("Changing cluster data service mem quota")
 	if _, err := e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
 		t.Fatal(err)
@@ -309,7 +310,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	}
 
 	// revert edit cluster indexServiceMemQuota
-	newIndexServiceMemQuota = string(constants.Mem256Mb)
+	newIndexServiceMemQuota = strconv.Itoa(constants.Mem256Mb)
 	t.Log("Changing cluster index service mem quota")
 	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
@@ -334,7 +335,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	}
 
 	// revert edit cluster searchServiceMemQuota
-	newSearchServiceMemQuota = string(constants.Mem256Mb)
+	newSearchServiceMemQuota = strconv.Itoa(constants.Mem256Mb)
 	t.Log("Changing cluster search service mem quota")
 	if _, err := e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
 		t.Fatal(err)
@@ -1614,7 +1615,7 @@ func TestManageMultipleClusters(t *testing.T) {
 		t.Fatalf("failed to create bucket %v", err)
 	}
 
-	if err := e2eutil.VerifyBucketInfo(t, client1, constants.Retries5, "default1", "BucketMemoryQuota", string(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
+	if err := e2eutil.VerifyBucketInfo(t, client1, constants.Retries5, "default1", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
 	expectedEvents1.AddBucketCreateEvent(testCouchbase1, "default1")
@@ -1645,7 +1646,7 @@ func TestManageMultipleClusters(t *testing.T) {
 		t.Fatalf("failed to create bucket %v", err)
 	}
 
-	if err := e2eutil.VerifyBucketInfo(t, client2, constants.Retries5, "default2", "BucketMemoryQuota", string(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
+	if err := e2eutil.VerifyBucketInfo(t, client2, constants.Retries5, "default2", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
 	expectedEvents2.AddBucketCreateEvent(testCouchbase2, "default2")
@@ -1677,7 +1678,7 @@ func TestManageMultipleClusters(t *testing.T) {
 		t.Fatalf("failed to create bucket %v", err)
 	}
 
-	if err := e2eutil.VerifyBucketInfo(t, client3, constants.Retries5, "default3", "BucketMemoryQuota", string(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
+	if err := e2eutil.VerifyBucketInfo(t, client3, constants.Retries5, "default3", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
 

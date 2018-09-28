@@ -409,7 +409,7 @@ func TestEditBucket(t *testing.T) {
 	}
 
 	// change memory quota back
-	if _, err := e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", string(constants.Mem256Mb), targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
+	if _, err := e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
 		t.Fatal(err)
 	}
 
@@ -426,7 +426,7 @@ func TestEditBucket(t *testing.T) {
 		t.Fatalf("failed to change default bucket ram quota back %v", err)
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", string(constants.Mem256Mb), e2eutil.BucketInfoVerifier)
+	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier)
 	if err != nil {
 		t.Fatalf("failed to verify default bucket ram quota: %v", err)
 	}
@@ -670,7 +670,7 @@ func TestNegBucketEdit(t *testing.T) {
 		t.Fatalf("failed to revert bucket edit: %c", err)
 	}
 
-	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", string(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
+	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
 		t.Fatalf("failed to verify bucket: %v", err)
 	}
 

@@ -35,21 +35,21 @@ import (
 
 var (
 	BasicClusterConfig = map[string]string{
-		"dataServiceMemQuota":      string(constants.Mem256Mb),
-		"indexServiceMemQuota":     string(constants.Mem256Mb),
-		"searchServiceMemQuota":    string(constants.Mem256Mb),
-		"eventingServiceMemQuota":  string(constants.Mem256Mb),
-		"analyticsServiceMemQuota": string(constants.Mem1Gb),
+		"dataServiceMemQuota":      strconv.Itoa(constants.Mem256Mb),
+		"indexServiceMemQuota":     strconv.Itoa(constants.Mem256Mb),
+		"searchServiceMemQuota":    strconv.Itoa(constants.Mem256Mb),
+		"eventingServiceMemQuota":  strconv.Itoa(constants.Mem256Mb),
+		"analyticsServiceMemQuota": strconv.Itoa(constants.Mem1Gb),
 		"indexStorageSetting":      "memory_optimized",
 		"autoFailoverTimeout":      "30",
 		"autoFailoverMaxCount":     "1"}
 
 	BasicClusterConfig2 = map[string]string{
-		"dataServiceMemQuota":      string(constants.Mem1Gb),
-		"indexServiceMemQuota":     string(constants.Mem256Mb),
-		"searchServiceMemQuota":    string(constants.Mem256Mb),
-		"eventingServiceMemQuota":  string(constants.Mem256Mb),
-		"analyticsServiceMemQuota": string(constants.Mem1Gb),
+		"dataServiceMemQuota":      strconv.Itoa(constants.Mem1Gb),
+		"indexServiceMemQuota":     strconv.Itoa(constants.Mem256Mb),
+		"searchServiceMemQuota":    strconv.Itoa(constants.Mem256Mb),
+		"eventingServiceMemQuota":  strconv.Itoa(constants.Mem256Mb),
+		"analyticsServiceMemQuota": strconv.Itoa(constants.Mem1Gb),
 		"indexStorageSetting":      "memory_optimized",
 		"autoFailoverTimeout":      "30",
 		"autoFailoverMaxCount":     "1"}
