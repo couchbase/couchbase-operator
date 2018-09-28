@@ -290,9 +290,9 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 						} else {
 							c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 							c.logger.Infof("Recovering node %s", m.ClientURL())
-							r.transitionState(ReconcileNotifyFinished)
-							return nil
 						}
+						r.transitionState(ReconcileNotifyFinished)
+						return nil
 					} else {
 						c.logger.Errorf("Waiting for auto-failover of down node `%s`.  Automated recovery will begin after (%s) if auto-failover cannot be performed", m.Name, remainingTs)
 					}
@@ -344,6 +344,8 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				c.logger.Errorf("Failed pending add node `%s` could not be recovered: %s", m.Name, err.Error())
+				r.transitionState(ReconcileNotifyFinished)
+				return nil
 			} else {
 				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 				return fmt.Errorf("recovering pending  add node %s", m.ClientURL())
@@ -421,6 +423,8 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				c.logger.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
+				r.transitionState(ReconcileNotifyFinished)
+				return nil
 			} else {
 				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 				return fmt.Errorf("recovering node %s", m.ClientURL())
