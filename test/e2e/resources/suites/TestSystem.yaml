@@ -7,5 +7,3 @@ tcGroups:
       - AuxillaryCluster1
     testcases:
       - name: TestFeaturesAll
-        decorators:
-          - portworxProvisioner
