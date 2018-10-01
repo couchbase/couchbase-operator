@@ -297,11 +297,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 1))
 		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-data", 4))
 		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-index", 4))
-		clusterSpec1.SecurityContext = createPodSecurityContext(1000)
+		createPodSecurityContext(1000, &clusterSpec1)
 		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 1))
 		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-data", 4))
 		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName+"-index", 4))
-		clusterSpec2.SecurityContext = createPodSecurityContext(1000)
+		createPodSecurityContext(1000, &clusterSpec2)
 	}
 
 	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})

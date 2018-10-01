@@ -17,6 +17,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -184,56 +185,89 @@ func Setup(t *testing.T) error {
 	return nil
 }
 
-func cleanUpNamespace() (err error) {
-	logrus.Info("Cleaning up namespace")
-	for _, targetKube := range Global.ClusterSpec {
-		// Clean-up Jobs and Secrets
-		jobs, err := targetKube.KubeClient.BatchV1().Jobs(Global.Namespace).List(metav1.ListOptions{})
+func DeleteAllJobs(kubeClient kubernetes.Interface) error {
+	logrus.Info("Deleting jobs")
+	jobs, err := kubeClient.BatchV1().Jobs(Global.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return errors.New("Failed to list jobs: " + err.Error())
+	}
+	for _, job := range jobs.Items {
+		if err := kubeClient.BatchV1().Jobs(Global.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return errors.New("Failed to delete job: " + err.Error())
+		}
+		logrus.Infof("Job deleted: %s", job.Name)
+	}
+	return nil
+}
+
+func DeleteCouchbaseServices(kubeClient kubernetes.Interface) error {
+	logrus.Info("Deleting Couchbase services")
+	services, err := kubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	if err != nil {
+		return errors.New("Failed to list services: " + err.Error())
+	}
+	for _, service := range services.Items {
+		if err := kubeClient.CoreV1().Services(Global.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+		logrus.Infof("Service deleted: %s", service.Name)
+	}
+	return nil
+}
+
+func DeleteCouchbaseClusters(kubeClient kubernetes.Interface, crClient versioned.Interface) error {
+	logrus.Info("Deleting Couchbase clusters")
+	clusters, err := crClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
+	if err != nil && !k8sutil.IsKubernetesResourceNotFoundError(err) {
+		return err
+	}
+	for _, cluster := range clusters.Items {
+		if err := crClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+		logrus.Infof("Deleted Couchbase cluster: %s", cluster.Name)
+		pods, err := kubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
 		if err != nil {
-			return errors.New("Failed to list jobs: " + err.Error())
+			return errors.New("Failed to list pods for cluster: " + err.Error())
 		}
-		for _, job := range jobs.Items {
-			err = targetKube.KubeClient.BatchV1().Jobs(Global.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
-			if err != nil {
-				return errors.New("Failed to delete job: " + err.Error())
-			}
+		killPods := []string{}
+		for _, pod := range pods.Items {
+			killPods = append(killPods, pod.Name)
 		}
+		e2eutil.KillMembers(kubeClient, Global.Namespace, cluster.Name, killPods...)
+	}
+	return nil
+}
+
+func cleanUpNamespace() (err error) {
+	logrus.Infof("Cleaning up namespace: %s", Global.Namespace)
+	for _, targetKube := range Global.ClusterSpec {
+		// Clean-up Jobs
+		if err := DeleteAllJobs(targetKube.KubeClient); err != nil {
+			return err
+		}
+
+		// Remove secrets
 		if targetKube.DefaultSecret != nil {
-			err = e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, targetKube.DefaultSecret.Name, &metav1.DeleteOptions{})
-			if err != nil {
+			if err := e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, targetKube.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
 				return errors.New("Unable to delete the default secret: " + err.Error())
 			}
 		}
 		e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
 
 		// Clean-up Deployments and pods
-		DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, Global.Namespace)
-
-		// Clear couchbase pods
-		clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return errors.New("Failed to list clusters: " + err.Error())
+		if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, Global.Namespace); err != nil {
+			return err
 		}
-		for _, cluster := range clusters.Items {
-			targetKube.CRClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0))
-			pods, err := targetKube.KubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
-			if err != nil {
-				return errors.New("Failed to list pods for cluster: " + err.Error())
-			}
-			killPods := []string{}
-			for _, pod := range pods.Items {
-				killPods = append(killPods, pod.Name)
-			}
-			e2eutil.KillMembers(targetKube.KubeClient, Global.Namespace, cluster.Name, killPods...)
+
+		// Clear all couchbase clusters
+		if err := DeleteCouchbaseClusters(targetKube.KubeClient, targetKube.CRClient); err != nil {
+			return err
 		}
 
 		// Clean-up Couchbase services
-		services, err := targetKube.KubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-		if err != nil {
-			return errors.New("Failed to list services: " + err.Error())
-		}
-		for _, service := range services.Items {
-			targetKube.KubeClient.CoreV1().Services(Global.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+		if err := DeleteCouchbaseServices(targetKube.KubeClient); err != nil {
+			return err
 		}
 	}
 
@@ -326,53 +360,26 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	// Creating required namespaces and cluster roles before deploying the operator
-	logrus.Info("Creating namespace")
 	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
 		return err
 	}
 
-	logrus.Info("Cleaning up namespace before deployment for " + kubeName)
-	logrus.Infof("Deleting deployment: %s", Global.Deployment.Name)
+	logrus.Infof("Cleaning up namespace %s before deployment in %s", f.Namespace, kubeName)
 	if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, f.Namespace); err == nil {
 		logrus.Infof("Deployment deleted: %v", Global.Deployment.Name)
 	}
 
-	logrus.Info("Deleting clusters")
-	clusters, _ := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
-	for _, cluster := range clusters.Items {
-		if err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
-		logrus.Infof("Cluster deleted: %v", cluster.Name)
-		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
-		if err != nil {
-			return errors.New("failed to list pods for cluster: " + err.Error())
-		}
-		killPods := []string{}
-		for _, pod := range pods.Items {
-			killPods = append(killPods, pod.Name)
-		}
-		e2eutil.KillMembers(targetKube.KubeClient, Global.Namespace, cluster.Name, killPods...)
+	if err := DeleteCouchbaseClusters(targetKube.KubeClient, targetKube.CRClient); err != nil {
+		return err
 	}
 
-	logrus.Info("Deleting jobs")
-	jobs, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).List(metav1.ListOptions{})
-	for _, job := range jobs.Items {
-		err = targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
-		if err != nil {
-			return err
-		}
-		logrus.Infof("Job deleted: %v", job.Name)
+	if err := DeleteAllJobs(targetKube.KubeClient); err != nil {
+		return err
 	}
 	time.Sleep(2 * time.Second)
 
-	logrus.Info("Deleting services")
-	services, err := targetKube.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	for _, service := range services.Items {
-		if err := targetKube.KubeClient.CoreV1().Services(f.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
-		logrus.Infof("Service deleted: %v", service.Name)
+	if err := DeleteCouchbaseServices(targetKube.KubeClient); err != nil {
+		return err
 	}
 
 	logrus.Info("Deleting orphaned pods")
@@ -488,14 +495,13 @@ func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, nam
 }
 
 func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, namespace string) error {
-	err := deleteOperator(kubeClient, deploymentName, namespace)
-	if err != nil {
+	if err := deleteOperator(kubeClient, deploymentName, namespace); err != nil {
 		return err
 	}
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
-	err = retryutil.Retry(e2eutil.Context, 5*time.Second, 24, func() (bool, error) {
-		_, err = kubeClient.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+	err := retryutil.Retry(e2eutil.Context, 5*time.Second, 24, func() (bool, error) {
+		_, err := kubeClient.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return false, err
 		}
