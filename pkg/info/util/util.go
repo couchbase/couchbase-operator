@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -50,6 +53,10 @@ func AbsolutePath(path string) (string, error) {
 var (
 	// timestamp caches the timestamp returned by Timestamp()
 	timestamp = ""
+	// salt caches the uuid used to salt redacted logs
+	salt = ""
+	// saltMutex is used to avoid concurrent updates
+	saltMutex = &sync.Mutex{}
 )
 
 // Timestamp returns an ISO8601 formatted timestamp suitable for
@@ -64,6 +71,21 @@ func Timestamp() string {
 	format := "20060102T150405-0700"
 	timestamp = time.Now().Format(format)
 	return timestamp
+}
+
+// Salt returns a UUID used on a per-run basis for redacting server logs.
+// This is a 'singleton' style function whose subsequent invokations return
+// the same result.
+func Salt() string {
+	saltMutex.Lock()
+	defer saltMutex.Unlock()
+
+	if salt != "" {
+		return salt
+	}
+
+	salt = uuid.New().String()
+	return salt
 }
 
 // ArchiveName returns an archive name for an archive type.  The suffix is back end dependant

@@ -418,6 +418,10 @@ func couchbaseVolumeMounts() []v1.VolumeMount {
 	}
 }
 
+func CouchbaseContainer(baseImage, version string) v1.Container {
+	return couchbaseContainer("", baseImage, version)
+}
+
 func couchbaseContainer(commands, baseImage, version string) v1.Container {
 	c := v1.Container{
 		Name:  couchbaseContainerName,

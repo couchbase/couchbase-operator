@@ -40,6 +40,8 @@ type Configuration struct {
 	OperatorImage string
 	// OperatorRestPort defines what port the operator is listening on for HTTP requests
 	OperatorRestPort string
+	// ServerImage defines the server image to use for log collection
+	ServerImage string
 }
 
 const (
@@ -47,6 +49,7 @@ const (
 	kubeconfigFlag       = "kubeconfig"
 	operatorImageFlag    = "operator-image"
 	operatorRestPortFlag = "operator-rest-port"
+	serverImageFlag      = "server-image"
 	allFlag              = "all"
 	systemFlag           = "system"
 	collectInfoFlag      = "collectinfo"
@@ -101,6 +104,7 @@ func Parse() Configuration {
 	flagSet.StringVar(&c.KubeConfig, kubeconfigFlag, lookupFlagFromEnvString(kubeconfigFlag, "~/.kube/config"), "kubernetes cluster configuration file")
 	flagSet.StringVar(&c.OperatorImage, operatorImageFlag, lookupFlagFromEnvString(operatorImageFlag, "couchbase/operator:1.0.0"), "operator image name")
 	flagSet.StringVar(&c.OperatorRestPort, operatorRestPortFlag, lookupFlagFromEnvString(operatorRestPortFlag, "8080"), "operator rest port")
+	flagSet.StringVar(&c.ServerImage, serverImageFlag, lookupFlagFromEnvString(serverImageFlag, "couchbase/server:enterprise-5.5.1"), "couchbase server image")
 	flagSet.BoolVar(&c.All, allFlag, lookupFlagFromEnvBool(allFlag, false), "collect all resources from the namespace")
 	flagSet.BoolVar(&c.System, systemFlag, lookupFlagFromEnvBool(systemFlag, false), "collect kube-system resources and logs")
 	flagSet.BoolVar(&c.CollectInfo, collectInfoFlag, lookupFlagFromEnvBool(collectInfoFlag, false), "collect couchbase server logs")

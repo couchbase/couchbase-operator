@@ -93,6 +93,8 @@ If specified, this flag ignores any scoping rules for a particular resource type
 --collectinfo::
 If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. The logs are left in situ as they may be relatively large. The `cbopinfo` command will report how to extract the logs from each pod.  Logs are automatically redacted of sensitive information, `cbopinfo` will provide a choice of download options.
 
+For log volumes which were previously attached to ephemeral pods it will display a table of available logs that are available for collection.  The user is able to interactively select which logs to collect.  `cbopinfo` will create a temporary pod (as defined by `--server-image`), run `cbcollect_info` and download the logs before finally deleting the temporary pod.
+
 --kubeconfig <config>::
 If specified, this points to a Kubernetes configuration file used to locate and poll the cluster API. If not set, it will default to `~/.kube/config`.
 
@@ -100,10 +102,13 @@ If specified, this points to a Kubernetes configuration file used to locate and 
 If specified, this selects which namespace to collect resources and logs from. If not set, it will default to `default`.
 
 --operator-image::
-If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to _couchbase/operator:1.0.0_.
+If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:1.0.0`.
 
 --operator-rest-port::
 If specified this sets the Operator rest port.  It is used for collection of runtime information.  If not set it will default to _8080_.
+
+--server-image::
+If specified this defines the Couchbase Server image to use when collecting logs from detached log volumes.  If not set, it will default to `couchbase/server:enterprise-5.5.1`
 
 --system::
 If specified, this flag will additionally collect all resources from the `kube-system` namespace, which may be useful in diagnosing problems with cluster-level roles, custom resource definitions, or system services.
