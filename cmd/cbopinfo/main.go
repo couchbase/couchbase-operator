@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -11,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
+	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -149,6 +151,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer backend.Close()
+
+	// Store the arguments used to invoke the command
+	backend.WriteFile(util.ArchiveName()+"/cmdline", strings.Join(os.Args, " "))
 
 	// Harvest the content defined by the user context
 	if err := harvest(context, backend, resourceInitializers); err != nil {
