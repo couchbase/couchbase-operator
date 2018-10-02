@@ -36,8 +36,6 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestTlsCreateCluster
-        decorators:
-          - rsaDecorator
 
   - name: XdcrTests
     clusters:
