@@ -813,11 +813,14 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 		}
 
 		if path, ok := pvc.Annotations["path"]; ok {
-			if path != defaultSubPathName {
+			if path != couchbaseVolumeDefaultConfigDir {
 				// members can only be recovered from
 				// claims representing default volume
 				continue
 			}
+		} else {
+			// require members to have path
+			continue
 		}
 
 		m := couchbaseutil.Member{}
