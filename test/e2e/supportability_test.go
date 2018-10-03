@@ -44,7 +44,7 @@ func checkCollectInfoLogs(execOut []byte, kubeClient kubernetes.Interface, names
 	execOutStr := string(execOut)
 	commonLogStr := "kubectl cp " + namespace + "/"
 	logFileTimeStampStr := strings.Split(cbopinfoLogDir, ".")[0]
-	logFileTimeStampStr = strings.Split(logFileTimeStampStr, "-")[1]
+	logFileTimeStampStr = strings.Join(strings.Split(logFileTimeStampStr, "-")[1:], "-")
 	for _, pod := range pods.Items {
 		expectedStr := commonLogStr + pod.Name + ":/tmp/cbinfo-" + namespace + "-" + pod.Name + "-" + logFileTimeStampStr + ".zip ."
 		if !strings.Contains(execOutStr, expectedStr) {
