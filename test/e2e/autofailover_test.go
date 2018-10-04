@@ -317,7 +317,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 		memDownParallelEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberToKill)
 		memFailoverParallelEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberToKill)
 		memRemoveParallelEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberToKill)
-		time.Sleep(time.Second * 15)
+		time.Sleep(time.Second * 31)
 	}
 	expectedEvents.AddParallelEvents(memDownParallelEvents)
 	expectedEvents.AddParallelEvents(memFailoverParallelEvents)
