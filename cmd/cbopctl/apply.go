@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -44,6 +45,12 @@ func (ctx *ApplyContext) Run() {
 		os.Exit(1)
 	}
 
+	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		os.Exit(1)
+	}
+
 	crClient := client.MustNew(config)
 	current, err := crClient.CouchbaseV1().CouchbaseClusters(resource.Namespace).Get(resource.Name, metav1.GetOptions{})
 	if err != nil {
@@ -56,7 +63,9 @@ func (ctx *ApplyContext) Run() {
 	if !ctx.verifyVersion {
 		resource.Spec.Version = constants.CouchbaseVersionMin
 	}
-	errs, warnings := validator.Update(current, resource)
+
+	v := validator.New(kubeClient)
+	errs, warnings := v.Update(current, resource)
 	if warnings != nil {
 		for _, warning := range warnings {
 			fmt.Printf("%s\n", warning.String())

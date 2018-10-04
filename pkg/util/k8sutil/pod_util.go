@@ -264,7 +264,7 @@ func verifyStorageClass(kubeCli kubernetes.Interface, storageClassName *string) 
 	if storageClassName == nil {
 		return nil, fmt.Errorf("storage class required")
 	}
-	sc, err := getStorageClass(kubeCli, *storageClassName)
+	sc, err := GetStorageClass(kubeCli, *storageClassName)
 	return sc, err
 }
 

@@ -1216,7 +1216,7 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
 }
 
-func getStorageClass(kubeCli kubernetes.Interface, name string) (*storage.StorageClass, error) {
+func GetStorageClass(kubeCli kubernetes.Interface, name string) (*storage.StorageClass, error) {
 	return kubeCli.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
 }
 

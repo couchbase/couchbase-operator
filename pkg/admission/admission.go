@@ -156,8 +156,10 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 		}
 	}
 
+	v := validator.New(getClient())
+
 	// Check that the CouchbaseCluster is correctly configured
-	if err := validator.CheckConstraints(&couchbaseCluster); err != nil {
+	if err := v.CheckConstraints(&couchbaseCluster); err != nil {
 		glog.Error(err)
 		return errorResponse(err)
 	}

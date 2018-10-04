@@ -27,6 +27,10 @@ type testDef struct {
 	// expectedErr is the expected set of errors detected by CRD validation,
 	// custom validation and immutability tests.
 	expectedErr *errors.CompositeError
+	// secretMissing indicates that the operator admin secret isn't present.
+	secretMissing bool
+	// storageClassMissing indicates that a requested storage class isn't present.
+	storageClassMissing bool
 }
 
 var testDefs = []testDef{
@@ -669,6 +673,32 @@ var testDefs = []testDef{
 			errors.Required("analytics", "spec.servers[1].services"),
 		),
 	},
+	{
+		name:        "TestSecretDoesNotExistInK8s",
+		path:        "tests/0001.yaml",
+		description: "Tests a config where the specified secret does not exist in k8s",
+		expectedErr: errors.CompositeValidationError(
+			fmt.Errorf("secret cb-example-auth must exist"),
+		),
+		secretMissing: true,
+	},
+	{
+		name:        "TestStorageClassMissingInK8s",
+		path:        "tests/0054.yaml",
+		description: "Tests a config where one or more storage classes does not exist in k8s",
+		expectedErr: errors.CompositeValidationError(
+			fmt.Errorf("storage class standard must exist"),
+		),
+		storageClassMissing: true,
+	},
+	{
+		name:        "TestVolumeClaimsUnique",
+		path:        "tests/0086.yaml",
+		description: "Tests a config where two volume claims have the same metadata.name",
+		expectedErr: errors.CompositeValidationError(
+			errors.DuplicateItems("spec.volumeClaimTemplates[1].metadata.name", "body"),
+		),
+	},
 }
 
 // loadCustomResource loads a custom resource.  If the load failed we check against
@@ -691,7 +721,23 @@ func loadCustomResource(t *testing.T, tc testDef, path string) (*api.CouchbaseCl
 
 }
 
-func TestValiation(t *testing.T) {
+type kubeAbstractionTestImpl struct {
+	testCase *testDef
+}
+
+func (ab *kubeAbstractionTestImpl) secretExists(string, string) (bool, error) {
+	return !ab.testCase.secretMissing, nil
+}
+
+func (ab *kubeAbstractionTestImpl) storageClassExists(string) (bool, error) {
+	return !ab.testCase.storageClassMissing, nil
+}
+
+func newTestValidator(testCase *testDef) Validator {
+	return Validator{&kubeAbstractionTestImpl{testCase}}
+}
+
+func TestValidation(t *testing.T) {
 	err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
 		t.Fatalf("Failed to register CRD scheme due to %v", err)
@@ -710,18 +756,20 @@ func TestValiation(t *testing.T) {
 				return
 			}
 
+			v := newTestValidator(&tc)
+
 			// If this is a pure input test run a Create command.
 			if tc.existingPath == "" {
-				checkErrors(t, tc, Create(current))
+				checkErrors(t, tc, v.Create(current))
 				return
 			}
 
-			// Othewise it's an update test, load the existing resource and run an Update command.
+			// Otherwise it's an update test, load the existing resource and run an Update command.
 			previous, cont := loadCustomResource(t, tc, tc.existingPath)
 			if !cont {
 				t.Fatal("unexpected load failure of existing resource")
 			}
-			err, _ = Update(previous, current)
+			err, _ = v.Update(previous, current)
 			checkErrors(t, tc, err)
 		})
 	}

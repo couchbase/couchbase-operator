@@ -7,6 +7,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/go-openapi/errors"
 )
@@ -55,17 +56,72 @@ func BoundedErrorUint(name, in string, value, min, max uint64) error {
 	return nil
 }
 
-func Create(resource *api.CouchbaseCluster) error {
-	ApplyDefaults(resource)
+// KubeAbstraction contains methods and data that help facilitate
+// the discovery of objects that already exist or not in K8s, so
+// we can validate our cbc YAML file against secrets or storage classes
+// that may or may not exist before being accepted by K8s itself.
+type KubeAbstraction interface {
+	// secretExists checks whether the named secret exists in the specified namespace.
+	secretExists(string, string) (bool, error)
+	// storageClassExists checks whether the named stoage class exists.
+	storageClassExists(string) (bool, error)
+}
 
-	if err := CheckConstraints(resource); err != nil {
+// kubeAbstractionImpl Implements KubeAbstraction, operating on a real kubernetes cluster.
+type kubeAbstractionImpl struct {
+	client kubernetes.Interface
+}
+
+// secretExists checks whether the named secret exists in the specified namespace.
+func (ab *kubeAbstractionImpl) secretExists(namespace, name string) (bool, error) {
+	_, err := k8sutil.GetSecret(ab.client, name, namespace, nil)
+	if err != nil {
+		if k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// storageClassExists checks whether the named stoage class exists.
+func (ab *kubeAbstractionImpl) storageClassExists(name string) (bool, error) {
+	_, err := k8sutil.GetStorageClass(ab.client, name)
+	if err != nil {
+		if k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// Validator is an abstraction layer for communicating with kubernetes
+// to sanity check resources.
+type Validator struct {
+	abstraction KubeAbstraction
+}
+
+// New instantiates a new Validator with kubeAbstractionImpl
+func New(client kubernetes.Interface) Validator {
+	abs := kubeAbstractionImpl{
+		client: client,
+	}
+	return Validator{
+		abstraction: &abs,
+	}
+}
+
+func (v *Validator) Create(resource *api.CouchbaseCluster) error {
+	ApplyDefaults(resource)
+	if err := v.CheckConstraints(resource); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
+func (v *Validator) Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
 	ApplyDefaults(updated)
 
 	err, warn := CheckImmutableFields(current, updated)
@@ -73,7 +129,7 @@ func Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
 		return err, warn
 	}
 
-	if err := CheckConstraints(updated); err != nil {
+	if err := v.CheckConstraints(updated); err != nil {
 		return err, warn
 	}
 
@@ -139,9 +195,16 @@ func uniqueString(strList []string) bool {
 	return len(set) == len(strList)
 }
 
-func CheckConstraints(customResource *api.CouchbaseCluster) error {
+func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error {
 	// Custom validation
 	errs := []error{}
+
+	// Ensure secret exists
+	if exists, err := v.abstraction.secretExists(customResource.Namespace, customResource.Spec.AuthSecret); err != nil {
+		errs = append(errs, err)
+	} else if !exists {
+		errs = append(errs, fmt.Errorf("secret %s must exist", customResource.Spec.AuthSecret))
+	}
 
 	// Ensure one service is specified when the admin console is exposed
 	if customResource.Spec.ExposeAdminConsole && len(customResource.Spec.AdminConsoleServices) == 0 {
@@ -172,7 +235,7 @@ func CheckConstraints(customResource *api.CouchbaseCluster) error {
 		// If we want to auto failover on disk issues, we must specify a time period.  CRD validation
 		// will catch where it is specified and out of bounds. We can catch the fact it is unspecified
 		// by checking for the zero value
-		errs = append(errs, errors.Required("spec.cluster.aautoFailoverOnDataDiskIssuesTimePeriod", "body"))
+		errs = append(errs, errors.Required("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body"))
 	}
 
 	// Ensure buckets are named uniquely
@@ -402,7 +465,8 @@ func CheckConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	// validate claim templates such that storage class is provided along with valid request
-	for _, pvc := range customResource.Spec.VolumeClaimTemplates {
+	pvcMap := map[string]bool{}
+	for i, pvc := range customResource.Spec.VolumeClaimTemplates {
 		hasStorageQuantity := false
 		if quantity, ok := pvc.Spec.Resources.Requests["storage"]; ok {
 			hasStorageQuantity = hasStorageQuantity || !quantity.IsZero()
@@ -413,6 +477,23 @@ func CheckConstraints(customResource *api.CouchbaseCluster) error {
 		if !hasStorageQuantity {
 			err := errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits")
 			errs = append(errs, err)
+		}
+
+		pvcName := pvc.ObjectMeta.Name
+		if pvcMap[pvcName] {
+			err := errors.DuplicateItems(fmt.Sprintf("spec.volumeClaimTemplates[%d].metadata.name", i), "body")
+			errs = append(errs, err)
+		} else {
+			pvcMap[pvcName] = true
+		}
+
+		// Ensure storageClass exists
+		if pvc.Spec.StorageClassName != nil {
+			if exists, err := v.abstraction.storageClassExists(*pvc.Spec.StorageClassName); err != nil {
+				errs = append(errs, err)
+			} else if !exists {
+				errs = append(errs, fmt.Errorf("storage class %s must exist", *pvc.Spec.StorageClassName))
+			}
 		}
 	}
 
