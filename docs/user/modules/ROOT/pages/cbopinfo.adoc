@@ -1,4 +1,5 @@
 = About cbopinfo
+:tabs:
 
 `cbopinfo` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package]. It is used to collect resources and logs via the Kubernetes API in order to support the Operator and Couchbase Server.
 
