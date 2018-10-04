@@ -105,6 +105,7 @@ spec:
           analytics:
             - couchbase
             - couchbase
+          logs: couchbase
   volumeClaimTemplates:
     - metadata:
         name: couchbase
@@ -661,6 +662,7 @@ spec:
         analytics:
           - couchbase
           - couchbase
+        logs: couchbase
 ----
 
 === couchbaseEnv
@@ -748,6 +750,7 @@ spec:
         analytics:
           - couchbase
           - couchbase
+        logs: couchbase
 ----
 
 The `VolumeMounts` configuration specifies the claims to use for the storage that is used by the Couchbase Server cluster.
@@ -756,17 +759,39 @@ The `VolumeMounts` configuration specifies the claims to use for the storage tha
 
 This field is required when using persistent volumes. The value specifies the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `default` path. This is always `/opt/couchbase/var/lib/couchbase`. The claim must match the name of a `volumeClaimTemplate` within the spec.
 
+____
+_Field rules:_ The `default` volume mount may be specified for production clusters or those that require support.  Please consult xref:best-practices.adoc#storage[the best practices guide] for more information. It must be specified with server classes running any of the `data`, `index` or `analytics` services.  It may however, be used with any service.  It cannot be specified at the same time as the `logs` volume mount for a specific server configuration.
+____
+
 === data
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `data` path. When specified, the data path will be `/mnt/data`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
+
+____
+_Field rules:_ The `data` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `data` service.
+____
 
 === index
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `index` path. When specified, the index path will be `/mnt/index`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
+____
+_Field rules:_ The `index` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `index` service.
+____
+
 === analytics
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `analytics` paths. When specified, the analytics paths will be `/mnt/analytics-00` (where `00` denotes the first path), with all subsequent paths having incrementing values. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
+
+_Field rules:_ The `analytics` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `analytics` service.
+
+=== logs
+
+This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `logs` path.  When specified, the logs path will be `/opt/couchbase/var/lib/couchbase/logs`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created.
+
+____
+_Field rules:_ The `logs` volume mount may be specified for production clusters that require support. Please consult xref:best-practices.adoc#storage[the best practices guide] for more information.  It may only be specified with server classes not running any of the `data`, `index` or `analytics` services.  It cannot be specified at the same time as the `default` volume mount a specific server configuration.
+____
 
 == spec.volumeClaimTemplates
 
