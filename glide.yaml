@@ -14,7 +14,7 @@ import:
 - package: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - package: github.com/couchbase/gocbmgr
-  version: 520181c41b84720adf1a2cdadde319d4ba2a0396
+  version: 87d1b9eadcc458c8e2087bf60a5f7699e8ec77a0
 - package: github.com/couchbase/cbflag
   version: dbeda68bf448ce8e85e52a3216f3b031ef18a4b7
 - package: github.com/google/uuid
