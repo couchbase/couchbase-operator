@@ -1,4 +1,4 @@
-# A configuration to check volume mounts 
+# A configuration whose stateless_services has an analytics mount but no analytics service
 apiVersion: couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
@@ -21,16 +21,23 @@ spec:
       enableIndexReplica: true
   servers:
     - size: 3
-      name: all_services
+      name: stateful_services
       services:
         - data
         - index
+      pod:
+        volumeMounts:
+          default: couchbase
+    - size: 3
+      name: stateless_services
+      services:
         - query
         - search
       pod:
         volumeMounts:
-          data: couchbase
-          logs: couchbase
+          default: couchbase
+          analytics:
+          - couchbase
   volumeClaimTemplates:
     - metadata:
         name: couchbase

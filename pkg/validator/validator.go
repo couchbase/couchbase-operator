@@ -307,13 +307,52 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		errs = append(errs, err)
 	}
 
+	// Validate the cluster is supportable.
+	// 1. If any server class has a log volume or a default volume they all should.
+	// 2. Log volumes can only be used on server classes containing query, search and eventing services.
+	//    Data, index and analytics volumes must use the default mount for data persistence.
+	anySupportable := false
+	for _, class := range customResource.Spec.ServerSettings {
+		if class.Pod != nil && class.Pod.VolumeMounts != nil {
+			if class.Pod.VolumeMounts.DefaultClaim != "" || class.Pod.VolumeMounts.LogsClaim != "" {
+				anySupportable = true
+			}
+		}
+	}
+
+	if anySupportable {
+		for index, class := range customResource.Spec.ServerSettings {
+			// Volume mounts must be specified if any others are supportable
+			if class.Pod == nil || class.Pod.VolumeMounts == nil {
+				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d].pod", index)))
+			} else {
+				// These stateful services must have a "default" mount
+				if class.Services.ContainsAny(api.DataService, api.IndexService, api.AnalyticsService) &&
+					class.Pod.VolumeMounts.DefaultClaim == "" {
+					errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index)))
+				}
+			}
+		}
+	}
+
 	// validate persistent volume spec such that when volumeMounts are specified, claim for
 	// `default` must be provided, and all mounts much pair to associated persistentVolumeClaims.
 	// `logs` claim cannot be used in conjunction with `default` claim.
-	for _, config := range customResource.Spec.ServerSettings {
+	for index, config := range customResource.Spec.ServerSettings {
 		if config.Pod != nil && config.Pod.VolumeMounts != nil {
 			mounts := config.Pod.VolumeMounts
 			hasSecondaryMounts := mounts.DataClaim != "" || mounts.IndexClaim != "" || mounts.AnalyticsClaims != nil
+
+			// Check the associated service is enabled
+			if mounts.DataClaim != "" && !config.Services.Contains(api.DataService) {
+				errs = append(errs, errors.Required(string(api.DataService), fmt.Sprintf("spec.servers[%d].services", index)))
+			}
+			if mounts.IndexClaim != "" && !config.Services.Contains(api.IndexService) {
+				errs = append(errs, errors.Required(string(api.IndexService), fmt.Sprintf("spec.servers[%d].services", index)))
+			}
+			if mounts.AnalyticsClaims != nil && !config.Services.Contains(api.AnalyticsService) {
+				errs = append(errs, errors.Required(string(api.AnalyticsService), fmt.Sprintf("spec.servers[%d].services", index)))
+			}
 
 			if mounts.LogsOnly() {
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.LogsClaim); template == nil {

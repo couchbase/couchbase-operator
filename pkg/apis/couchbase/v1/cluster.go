@@ -88,6 +88,16 @@ func (l ServiceList) Contains(service Service) bool {
 	return false
 }
 
+// ContainsAny returns true if any service is part of a service list
+func (l ServiceList) ContainsAny(services ...Service) bool {
+	for _, service := range services {
+		if l.Contains(service) {
+			return true
+		}
+	}
+	return false
+}
+
 // Sub removes members from 'other' from a ServiceList
 func (l ServiceList) Sub(other ServiceList) ServiceList {
 	out := ServiceList{}

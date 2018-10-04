@@ -615,19 +615,56 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:        "TestLogsWithDataMountNotAllowed",
-		path:        "tests/0074.yaml",
-		description: "Tests that logs claim with data mount not allowed",
-		expectedErr: errors.CompositeValidationError(
-			errors.AdditionalItemsNotAllowed("default|data|index|analytics", "spec.volumeMounts.logs"),
-		),
-	},
-	{
 		name:        "TestOnlyDataMountNotAllowed",
 		path:        "tests/0075.yaml",
 		description: "Tests specifying only data mount is not allowed",
 		expectedErr: errors.CompositeValidationError(
 			errors.Required("default", "spec.volumeMounts"),
+		),
+	},
+	{
+		name:        "TestSupportableCluster",
+		path:        "tests/0076.yaml",
+		description: "Tests a supportable configuration with stateful and stateless classes",
+	},
+	{
+		name:        "TestUnsupportableCluster",
+		path:        "tests/0077.yaml",
+		description: "Tests an unsupportable configuration with stateful and stateless classes",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required("volumeMounts", "spec.servers[1].pod"),
+		),
+	},
+	{
+		name:        "TestUnsupportableClusterStatefulServices",
+		path:        "tests/0078.yaml",
+		description: "Tests an unsupportable configuration whose stateful services don't have a default mount",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required("default", "spec.servers[0].pod.volumeMounts"),
+		),
+	},
+	{
+		name:        "TestDataMountWithoutDataService",
+		path:        "tests/0079.yaml",
+		description: "Tests a server class with the data mount set but no data service enabled",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required("data", "spec.servers[1].services"),
+		),
+	},
+	{
+		name:        "TestIndexMountWithoutIndexService",
+		path:        "tests/0080.yaml",
+		description: "Tests a server class with the index mount set but no index service enabled",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required("index", "spec.servers[1].services"),
+		),
+	},
+	{
+		name:        "TestAnalyticsMountWithoutAnalyticsService",
+		path:        "tests/0081.yaml",
+		description: "Tests a server class with an analyitics mount set but no analytics service enabled",
+		expectedErr: errors.CompositeValidationError(
+			errors.Required("analytics", "spec.servers[1].services"),
 		),
 	},
 }
