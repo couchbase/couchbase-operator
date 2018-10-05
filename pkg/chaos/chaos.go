@@ -3,8 +3,10 @@ package chaos
 import (
 	"context"
 	"math/rand"
+	"os"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -26,11 +28,12 @@ type CrashConfig struct {
 	Namespace string
 	Selector  labels.Selector
 
-	KillRate        rate.Limit
-	KillProbability float64
-	KillMax         int
-	MinPods         int
-	logger          *logrus.Entry
+	KillRate          rate.Limit
+	CbKillProbability float64
+	OpKillProbability float64
+	KillMax           int
+	MinPods           int
+	logger            *logrus.Entry
 }
 
 // TODO: respect context in k8s operations.
@@ -49,8 +52,15 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 			return
 		}
 
-		if p := rand.Float64(); p > c.KillProbability {
-			c.logger.Infof("skip killing pod: probability: %v, got p: %v", c.KillProbability, p)
+		if p := rand.Float64(); p < c.OpKillProbability {
+			c.logger.Infof("killing operator pod: probability: %v, got p: %v", c.OpKillProbability, p)
+			time.Sleep(5 * time.Second)
+			// fare thee well
+			os.Exit(0)
+		}
+
+		if p := rand.Float64(); p > c.CbKillProbability {
+			c.logger.Infof("skip killing pod: probability: %v, got p: %v", c.CbKillProbability, p)
 			continue
 		}
 
@@ -85,7 +95,7 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 		}
 
 		for tokill := range tokills {
-			err = m.kubecli.CoreV1().Pods(ns).Delete(tokill, metav1.NewDeleteOptions(0))
+			err = k8sutil.DeletePod(m.kubecli, ns, tokill, metav1.NewDeleteOptions(0))
 			if err != nil {
 				c.logger.Errorf("failed to kill pod %v: %v", tokill, err)
 				continue
@@ -107,11 +117,12 @@ func Start(ctx context.Context, kubecli kubernetes.Interface, ns string, chaosLe
 			Namespace: ns,
 			Selector:  ls,
 
-			KillRate:        rate.Every(30 * time.Second),
-			KillProbability: 0.5,
-			KillMax:         2,
-			MinPods:         1,
-			logger:          logger,
+			KillRate:          rate.Every(30 * time.Second),
+			CbKillProbability: 0.5,
+			OpKillProbability: 0,
+			KillMax:           2,
+			MinPods:           1,
+			logger:            logger,
 		}
 		go func() {
 			time.Sleep(30 * time.Second)
@@ -123,11 +134,12 @@ func Start(ctx context.Context, kubecli kubernetes.Interface, ns string, chaosLe
 			Namespace: ns,
 			Selector:  ls,
 
-			KillRate:        rate.Every(120 * time.Second),
-			KillProbability: 0.5,
-			KillMax:         2,
-			MinPods:         1,
-			logger:          logger,
+			KillRate:          rate.Every(120 * time.Second),
+			CbKillProbability: 0.5,
+			OpKillProbability: 0,
+			KillMax:           2,
+			MinPods:           1,
+			logger:            logger,
 		}
 		go func() {
 			time.Sleep(300 * time.Second)
@@ -139,11 +151,12 @@ func Start(ctx context.Context, kubecli kubernetes.Interface, ns string, chaosLe
 			Namespace: ns,
 			Selector:  ls,
 
-			KillRate:        rate.Every(120 * time.Second),
-			KillProbability: 0.5,
-			KillMax:         2,
-			MinPods:         0,
-			logger:          logger,
+			KillRate:          rate.Every(120 * time.Second),
+			CbKillProbability: 0.5,
+			OpKillProbability: 0,
+			KillMax:           2,
+			MinPods:           0,
+			logger:            logger,
 		}
 		go func() {
 			time.Sleep(300 * time.Second)
@@ -155,14 +168,34 @@ func Start(ctx context.Context, kubecli kubernetes.Interface, ns string, chaosLe
 			Namespace: ns,
 			Selector:  ls,
 
-			KillRate:        rate.Every(30 * time.Second),
-			KillProbability: 0.5,
-			KillMax:         5,
-			MinPods:         0,
-			logger:          logger,
+			KillRate:          rate.Every(30 * time.Second),
+			CbKillProbability: 0.5,
+			OpKillProbability: 0,
+			KillMax:           5,
+			MinPods:           0,
+			logger:            logger,
 		}
+		go func() {
+			time.Sleep(300 * time.Second)
+			m.CrushPods(ctx, c)
+		}()
+	case 5:
+		logger.Info("chaos level = 5: randomly kill couchbase pods (50%) or operator (20%) every 2 minutes")
+		c := &CrashConfig{
+			Namespace: ns,
+			Selector:  ls,
 
-		go m.CrushPods(ctx, c)
+			KillRate:          rate.Every(120 * time.Second),
+			CbKillProbability: 0.5,
+			OpKillProbability: 0.2,
+			KillMax:           2,
+			MinPods:           0,
+			logger:            logger,
+		}
+		go func() {
+			time.Sleep(300 * time.Second)
+			m.CrushPods(ctx, c)
+		}()
 
 	default:
 	}
