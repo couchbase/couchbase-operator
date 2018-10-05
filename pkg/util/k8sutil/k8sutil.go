@@ -960,6 +960,9 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 			return ctx.Err()
 		// Process K8S events for our chosen pod
 		case ev := <-events:
+			if ev.Object == nil {
+				continue
+			}
 			obj := ev.Object.(*v1.Pod)
 			status := obj.Status
 
@@ -1032,6 +1035,9 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 			return ctx.Err()
 		// Process K8S events for our chosen pod
 		case ev := <-events:
+			if ev.Object == nil {
+				continue
+			}
 			obj := ev.Object.(*v1.Pod)
 			status := obj.Status
 
@@ -1073,6 +1079,9 @@ func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interf
 
 		// Process K8S events of creation cycle
 		case ev := <-events:
+			if ev.Object == nil {
+				continue
+			}
 			obj := ev.Object.(*v1.PersistentVolumeClaim)
 			status := obj.Status
 
@@ -1131,6 +1140,9 @@ func WaitForPersistentVolume(ctx context.Context, kubeCli kubernetes.Interface, 
 
 		// Process K8S events of creation cycle
 		case ev := <-events:
+			if ev.Object == nil {
+				continue
+			}
 			obj := ev.Object.(*v1.PersistentVolume)
 			status := obj.Status
 
