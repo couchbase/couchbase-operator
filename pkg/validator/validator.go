@@ -148,6 +148,14 @@ func ApplyDefaults(customResource *api.CouchbaseCluster) {
 		customResource.Spec.BaseImage = DefaultBaseImage
 	}
 
+	if customResource.Spec.ExposedFeatureServiceType == "" {
+		customResource.Spec.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
+	}
+
+	if customResource.Spec.AdminConsoleServiceType == "" {
+		customResource.Spec.AdminConsoleServiceType = corev1.ServiceTypeNodePort
+	}
+
 	if customResource.Spec.ClusterSettings.DataServiceMemQuota == 0 {
 		customResource.Spec.ClusterSettings.DataServiceMemQuota = DefaultServiceMemQuota
 	}
@@ -182,6 +190,14 @@ func ApplyDefaults(customResource *api.CouchbaseCluster) {
 
 	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
 		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = DefaultAutoFailoverOnDataDiskIssuesTimePeriod
+	}
+
+	if customResource.Spec.AdminConsoleServiceType == "" {
+		customResource.Spec.AdminConsoleServiceType = corev1.ServiceTypeNodePort
+	}
+
+	if customResource.Spec.ExposedFeatureServiceType == "" {
+		customResource.Spec.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
 	}
 }
 
@@ -502,8 +518,27 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 		errs = append(errs, err)
 	}
 
+	// Record the zones that the server certificate needs to support as we look at the network configuration.
+	zones := []string{
+		customResource.Name + "." + customResource.Namespace + ".svc",
+	}
+	if customResource.Spec.DNS != nil {
+		zone := customResource.Name + "." + customResource.Spec.DNS.Domain
+		zones = append(zones, zone)
+	}
+
 	// Check TLS
-	errs = append(errs, v.validateTLS(customResource)...)
+	errs = append(errs, v.validateTLS(customResource, zones)...)
+
+	// Require that publically visible service ports have DNS information available.
+	if customResource.Spec.IsExposedFeatureServiceTypePublic() || customResource.Spec.IsAdminConsoleServiceTypePublic() {
+		if customResource.Spec.TLS == nil {
+			errs = append(errs, errors.Required("spec.tls", "body"))
+		}
+		if customResource.Spec.DNS == nil {
+			errs = append(errs, errors.Required("spec.dns", "body"))
+		}
+	}
 
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
@@ -520,54 +555,52 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 //   * in date
 //   * have the correct attributes
 // * leaf certificate has the correct SANs
-func (v *Validator) validateTLS(cluster *api.CouchbaseCluster) (errs []error) {
+func (v *Validator) validateTLS(cluster *api.CouchbaseCluster, zones []string) (errs []error) {
 	if cluster.Spec.TLS != nil {
-		if cluster.Spec.TLS.Static != nil {
-			// CRD validation requires all the necessary fields are populated
-			operatorSecretName := cluster.Spec.TLS.Static.OperatorSecret
-			serverSecretName := cluster.Spec.TLS.Static.Member.ServerSecret
+		// CRD validation requires all the necessary fields are populated
+		operatorSecretName := cluster.Spec.TLS.Static.OperatorSecret
+		serverSecretName := cluster.Spec.TLS.Static.Member.ServerSecret
 
-			var key []byte
-			var chain []byte
-			var ca []byte
-			var ok bool
+		var key []byte
+		var chain []byte
+		var ca []byte
+		var ok bool
 
-			// Check the operator secret exists and has the correct keys
-			operatorSecret, err := v.abstraction.getSecret(cluster.Namespace, operatorSecretName)
-			if err != nil {
-				errs = append(errs, err)
-			} else if operatorSecret == nil {
-				errs = append(errs, fmt.Errorf("tls operator secret %s must exist", operatorSecretName))
-			} else {
-				if ca, ok = operatorSecret.Data["ca.crt"]; !ok {
-					errs = append(errs, fmt.Errorf("tls operator secret %s must contain ca.crt", operatorSecretName))
-				}
+		// Check the operator secret exists and has the correct keys
+		operatorSecret, err := v.abstraction.getSecret(cluster.Namespace, operatorSecretName)
+		if err != nil {
+			errs = append(errs, err)
+		} else if operatorSecret == nil {
+			errs = append(errs, fmt.Errorf("tls operator secret %s must exist", operatorSecretName))
+		} else {
+			if ca, ok = operatorSecret.Data["ca.crt"]; !ok {
+				errs = append(errs, fmt.Errorf("tls operator secret %s must contain ca.crt", operatorSecretName))
 			}
+		}
 
-			// Check the server secret exists and has the correct keys
-			serverSecret, err := v.abstraction.getSecret(cluster.Namespace, serverSecretName)
-			if err != nil {
-				errs = append(errs, err)
-			} else if serverSecret == nil {
-				errs = append(errs, fmt.Errorf("tls server secret %s must exist", serverSecretName))
-			} else {
-				if chain, ok = serverSecret.Data["chain.pem"]; !ok {
-					errs = append(errs, fmt.Errorf("tls server secret %s must contain chain.pem", serverSecretName))
-				}
-				if key, ok = serverSecret.Data["pkey.key"]; !ok {
-					errs = append(errs, fmt.Errorf("tls server secret %s must contain pkey.key", serverSecretName))
-				}
+		// Check the server secret exists and has the correct keys
+		serverSecret, err := v.abstraction.getSecret(cluster.Namespace, serverSecretName)
+		if err != nil {
+			errs = append(errs, err)
+		} else if serverSecret == nil {
+			errs = append(errs, fmt.Errorf("tls server secret %s must exist", serverSecretName))
+		} else {
+			if chain, ok = serverSecret.Data["chain.pem"]; !ok {
+				errs = append(errs, fmt.Errorf("tls server secret %s must contain chain.pem", serverSecretName))
 			}
-
-			// Something is wrong, bomb out now
-			if len(errs) > 0 {
-				return
+			if key, ok = serverSecret.Data["pkey.key"]; !ok {
+				errs = append(errs, fmt.Errorf("tls server secret %s must contain pkey.key", serverSecretName))
 			}
+		}
 
-			// Validate the TLS configuration is going to work
-			errs = x509.Verify(ca, chain, key, cluster.Name, cluster.Namespace)
+		// Something is wrong, bomb out now
+		if len(errs) > 0 {
 			return
 		}
+
+		// Validate the TLS configuration is going to work
+		errs = x509.Verify(ca, chain, key, zones)
+		return
 	}
 	return
 }

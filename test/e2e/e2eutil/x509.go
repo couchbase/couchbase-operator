@@ -448,6 +448,8 @@ type TlsContext struct {
 }
 
 type TlsOpts struct {
+	// ClusterName is the name of the cluster
+	ClusterName string
 	// keyType is the type of key to use e.g. RSA or EC.  Defaults to KeyTypeRSA.
 	KeyType *KeyType
 	// altNames is the set of DNS alternative names to use.  Defaults to the cluster wildcard and localhost.
@@ -485,6 +487,9 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 
 	// Generate an explicit cluster name to use
 	ctx.ClusterName = "test-couchbase-" + RandomSuffix()
+	if opts.ClusterName != "" {
+		ctx.ClusterName = opts.ClusterName
+	}
 
 	// Generate alt names.
 	altNames := ctx.clusterSANs()

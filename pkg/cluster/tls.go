@@ -132,8 +132,17 @@ func (c *Cluster) reconcileTLS() error {
 		return err
 	}
 
+	// Work out what zones should be in the certificate for verfication purposes.
+	zones := []string{
+		c.cluster.Name + "." + c.cluster.Namespace + ".svc",
+	}
+	if c.cluster.Spec.DNS != nil {
+		zone := c.cluster.Name + "." + c.cluster.Spec.DNS.Domain
+		zones = append(zones, zone)
+	}
+
 	// Verify that the configuration is valid.
-	if errs := util_x509.Verify(cacert, chain, key, c.cluster.Name, c.cluster.Namespace); len(errs) != 0 {
+	if errs := util_x509.Verify(cacert, chain, key, zones); len(errs) != 0 {
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 
 		errStrings := []string{}

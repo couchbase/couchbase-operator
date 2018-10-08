@@ -22,6 +22,8 @@ spec:
     - RzaGroup-1
     - RzaGroup-2
     - RzaGroup-3
+  dns:
+    domain: "example.com"
   cluster:
     dataServiceMemoryQuota: 600
     indexServiceMemoryQuota: 256

@@ -158,6 +158,16 @@ func (efl ExposedFeatureList) Contains(feature string) bool {
 	return false
 }
 
+// PlatformType defines the platform you are running on which provides explicit
+// control over how resources are configured.
+type PlatformType string
+
+const (
+	PlatformTypeAWS   = "aws"
+	PlatformTypeGCE   = "gce"
+	PlatformTypeAzure = "azure"
+)
+
 type ClusterSpec struct {
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
@@ -230,6 +240,25 @@ type ClusterSpec struct {
 
 	// LogRetentionCount gives the number of persistent log PVCs to keep.
 	LogRetentionCount int `json:"logRetentionCount,omitempty"`
+
+	// ExposedFeatureServiceType defines whether to create a NodePort or LoadBalancer service.
+	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
+
+	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
+	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
+
+	// DNS points to information for Dynamic DNS support.
+	DNS *DNS `json:"dns,omitempty"`
+
+	// Platform gives a hint as to what platform we are running on and how
+	// to configure services etc.
+	Platform PlatformType `json:"platform,omitempty"`
+}
+
+// DNS contains information for Dynamic DNS support.
+type DNS struct {
+	// Domain is the domain to create pods in.
+	Domain string `json:"domain,omitempty"`
 }
 
 type ClusterConfig struct {
@@ -575,4 +604,16 @@ func boolPtrEquals(p1, p2 *bool) bool {
 // alternate addresses in server.
 func (cs *ClusterSpec) HasExposedFeatures() bool {
 	return len(cs.ExposedFeatures) != 0
+}
+
+// IsExposedFeatureServiceTypePublic returns whether exposed ports will be public and
+// therefore need to be TLS protected and may have DDNS entries created.
+func (cs *ClusterSpec) IsExposedFeatureServiceTypePublic() bool {
+	return cs.ExposedFeatureServiceType == v1.ServiceTypeLoadBalancer
+}
+
+// IsAdminConsoleServiceTypePublic returns whether exposed ports will be public and
+// therefore need to be TLS protected and may have DDNS entries created.
+func (cs *ClusterSpec) IsAdminConsoleServiceTypePublic() bool {
+	return cs.AdminConsoleServiceType == v1.ServiceTypeLoadBalancer
 }

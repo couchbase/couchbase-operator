@@ -1,7 +1,8 @@
 package k8sutil
 
 import (
-	cbapi_v1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
@@ -56,6 +57,9 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 						},
 						"tls": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
+							Required: []string{
+								"static",
+							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"static": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "object",
@@ -95,12 +99,12 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 								Schema: &apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"` + string(cbapi_v1.DataService) + `"`)},
-										{Raw: []byte(`"` + string(cbapi_v1.IndexService) + `"`)},
-										{Raw: []byte(`"` + string(cbapi_v1.QueryService) + `"`)},
-										{Raw: []byte(`"` + string(cbapi_v1.SearchService) + `"`)},
-										{Raw: []byte(`"` + string(cbapi_v1.EventingService) + `"`)},
-										{Raw: []byte(`"` + string(cbapi_v1.AnalyticsService) + `"`)},
+										{Raw: []byte(`"` + string(couchbasev1.DataService) + `"`)},
+										{Raw: []byte(`"` + string(couchbasev1.IndexService) + `"`)},
+										{Raw: []byte(`"` + string(couchbasev1.QueryService) + `"`)},
+										{Raw: []byte(`"` + string(couchbasev1.SearchService) + `"`)},
+										{Raw: []byte(`"` + string(couchbasev1.EventingService) + `"`)},
+										{Raw: []byte(`"` + string(couchbasev1.AnalyticsService) + `"`)},
 									},
 								},
 							},
@@ -139,6 +143,39 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 						"logRetentionCount": apiextensionsv1beta1.JSONSchemaProps{
 							Type:    "integer",
 							Minimum: &minimumLogRetentionCount,
+						},
+						"exposedFeatureServiceType": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "string",
+							Enum: []apiextensionsv1beta1.JSON{
+								{Raw: []byte(`"` + corev1.ServiceTypeNodePort + `"`)},
+								{Raw: []byte(`"` + corev1.ServiceTypeLoadBalancer + `"`)},
+							},
+						},
+						"adminConsoleServiceType": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "string",
+							Enum: []apiextensionsv1beta1.JSON{
+								{Raw: []byte(`"` + corev1.ServiceTypeNodePort + `"`)},
+								{Raw: []byte(`"` + corev1.ServiceTypeLoadBalancer + `"`)},
+							},
+						},
+						"dns": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Required: []string{
+								"domain",
+							},
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"domain": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+						"platform": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "string",
+							Enum: []apiextensionsv1beta1.JSON{
+								{Raw: []byte(`"` + couchbasev1.PlatformTypeAWS + `"`)},
+								{Raw: []byte(`"` + couchbasev1.PlatformTypeGCE + `"`)},
+								{Raw: []byte(`"` + couchbasev1.PlatformTypeAzure + `"`)},
+							},
 						},
 						"cluster": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
@@ -298,12 +335,12 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 												Schema: &apiextensionsv1beta1.JSONSchemaProps{
 													Type: "string",
 													Enum: []apiextensionsv1beta1.JSON{
-														{Raw: []byte(`"` + string(cbapi_v1.DataService) + `"`)},
-														{Raw: []byte(`"` + string(cbapi_v1.IndexService) + `"`)},
-														{Raw: []byte(`"` + string(cbapi_v1.QueryService) + `"`)},
-														{Raw: []byte(`"` + string(cbapi_v1.SearchService) + `"`)},
-														{Raw: []byte(`"` + string(cbapi_v1.EventingService) + `"`)},
-														{Raw: []byte(`"` + string(cbapi_v1.AnalyticsService) + `"`)},
+														{Raw: []byte(`"` + string(couchbasev1.DataService) + `"`)},
+														{Raw: []byte(`"` + string(couchbasev1.IndexService) + `"`)},
+														{Raw: []byte(`"` + string(couchbasev1.QueryService) + `"`)},
+														{Raw: []byte(`"` + string(couchbasev1.SearchService) + `"`)},
+														{Raw: []byte(`"` + string(couchbasev1.EventingService) + `"`)},
+														{Raw: []byte(`"` + string(couchbasev1.AnalyticsService) + `"`)},
 													},
 												},
 											},

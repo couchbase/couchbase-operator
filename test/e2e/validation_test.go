@@ -90,7 +90,15 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				t.Fatal(err)
 			}
 
-			ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
+			// TODO: May be better to make this part of the test spec.
+			tlsOpts := &e2eutil.TlsOpts{
+				ClusterName: testCouchbase.Name,
+				AltNames: []string{
+					"*." + testCouchbase.Name + "." + f.Namespace + ".svc",
+					"*." + testCouchbase.Name + ".example.com",
+				},
+			}
+			ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOpts)
 			defer teardown()
 
 			testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
@@ -478,6 +486,45 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"secret does-not-exist must exist"},
 		},
+		// Missing Network configuration
+		{
+			name: "TestValidateDNSReqiredWithPublicAdminConsoleService",
+			mutations: jsonpatch.NewPatchSet().
+				Replace("/Spec/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer).
+				Remove("/Spec/DNS"),
+			shouldFail:     true,
+			expectedErrors: []string{`spec.dns in body is required`},
+		},
+		{
+			name: "TestValidateDNSReqiredWithPublicExposedFeatureService",
+			mutations: jsonpatch.NewPatchSet().
+				Replace("/Spec/ExposedFeatureServiceType", corev1.ServiceTypeLoadBalancer).
+				Remove("/Spec/DNS"),
+			shouldFail:     true,
+			expectedErrors: []string{`spec.dns in body is required`},
+		},
+		{
+			name: "TestValidateTLSRequiredWithPublicAdminConsoleService",
+			mutations: jsonpatch.NewPatchSet().
+				Replace("/Spec/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer).
+				Remove("/Spec/TLS"),
+			shouldFail:     true,
+			expectedErrors: []string{`spec.tls in body is required`},
+		},
+		{
+			name: "TestValidateTLSRequiredWithPublicExposedFeatureService",
+			mutations: jsonpatch.NewPatchSet().
+				Replace("/Spec/ExposedFeatureServiceType", corev1.ServiceTypeLoadBalancer).
+				Remove("/Spec/TLS"),
+			shouldFail:     true,
+			expectedErrors: []string{`spec.tls in body is required`},
+		},
+		{
+			name:           "TestValidateMissingDNSSubjectAltName",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/DNS/Domain", "acme.com"),
+			shouldFail:     true,
+			expectedErrors: []string{`certificate is valid for *.cb-example.default.svc, *.cb-example.example.com, not verify.cb-example.acme.com`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]
@@ -602,6 +649,16 @@ func TestValidationDefaultCreate(t *testing.T) {
 			name:        "TestValidateAutoFailoverOnDataDiskIssuesPeriodDefault",
 			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoFailoverOnDataDiskIssuesTimePeriod"),
 			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoFailoverOnDataDiskIssuesTimePeriod", uint64(120)),
+		},
+		{
+			name:        "TestValidateAdminConsoleServiceTypeDefault",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/AdminConsoleServiceType"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/AdminConsoleServiceType", corev1.ServiceTypeNodePort),
+		},
+		{
+			name:        "TestValidateExposedFeatureServiceTypeDefault",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ExposedFeatureServiceType"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ExposedFeatureServiceType", corev1.ServiceTypeNodePort),
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

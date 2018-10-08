@@ -292,13 +292,7 @@ func (c *Cluster) setupServices() error {
 		return err
 	}
 	if c.cluster.Spec.ExposeAdminConsole {
-		c.logger.Infof("Creating NodePort UI service (%s) for %s nodes", k8sutil.AdminServiceName(c.cluster.Name),
-			strings.Join(c.cluster.Spec.AdminConsoleServices.StringSlice(), ","))
-		svc, err := c.createUIService(c.cluster.Spec.AdminConsoleServices)
-		if err != nil {
-			return err
-		}
-		c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
+		c.reconcileAdminService()
 	}
 	return nil
 }
@@ -712,22 +706,6 @@ func (c *Cluster) initCouchbaseClient() error {
 	}
 
 	return nil
-}
-
-func (c *Cluster) createUIService(services api.ServiceList) (*v1.Service, error) {
-	svc, err := k8sutil.CreateUIService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, services, c.cluster.AsOwner())
-	if err == nil {
-		c.status.AdminConsolePort, c.status.AdminConsolePortSSL = k8sutil.GetAdminConsolePorts(svc)
-	}
-	return svc, err
-}
-
-func (c *Cluster) deleteUIService(svcName string) error {
-	err := k8sutil.DeleteService(c.config.KubeCli, c.cluster.Namespace, svcName, nil)
-	if err == nil {
-		c.status.AdminConsolePort, c.status.AdminConsolePortSSL = "", ""
-	}
-	return err
 }
 
 func (c *Cluster) indexOfServerConfigWithService(svc api.Service) int {

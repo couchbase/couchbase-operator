@@ -20,7 +20,7 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 }
 
 // Verify checks the given chain and CA are valid to be installed
-func Verify(caData, chainData, keyData []byte, clusterName, namespace string) (errors []error) {
+func Verify(caData, chainData, keyData []byte, zones []string) (errors []error) {
 	// Decode CA certificate
 	caPem := DecodePEM(caData)
 	switch {
@@ -55,7 +55,6 @@ func Verify(caData, chainData, keyData []byte, clusterName, namespace string) (e
 	serverCert := chain[0]
 	intermediates := chain[1:]
 	verifyOptions := x509.VerifyOptions{
-		DNSName:       fmt.Sprintf("test.%s.%s.svc", clusterName, namespace),
 		Intermediates: x509.NewCertPool(),
 		Roots:         x509.NewCertPool(),
 	}
@@ -63,8 +62,11 @@ func Verify(caData, chainData, keyData []byte, clusterName, namespace string) (e
 	for _, cert := range intermediates {
 		verifyOptions.Intermediates.AddCert(cert)
 	}
-	if _, err := serverCert.Verify(verifyOptions); err != nil {
-		errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
+	for _, zone := range zones {
+		verifyOptions.DNSName = "verify." + zone
+		if _, err := serverCert.Verify(verifyOptions); err != nil {
+			errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
+		}
 	}
 
 	// Decode key

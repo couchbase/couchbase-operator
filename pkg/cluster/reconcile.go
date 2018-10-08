@@ -345,45 +345,22 @@ func (c *Cluster) reconcileBuckets() error {
 // reconcile changes to selected pod labels for
 // the nodePort service exposing admin console
 func (c *Cluster) reconcileAdminService() {
-
-	svcName := k8sutil.AdminServiceName(c.cluster.Name)
-	svc, err := k8sutil.GetService(c.config.KubeCli, svcName, c.cluster.Namespace, nil)
-
-	if (err == nil) && !c.cluster.Spec.ExposeAdminConsole {
-		// deleting admin service
-		err = c.deleteUIService(svcName)
-		if err != nil {
-			c.logger.Warnf("Error occured deleting admin service: %s", err.Error())
-		} else {
-			c.raiseEvent(k8sutil.AdminConsoleSvcDeleteEvent(svc.Name, c.cluster))
-		}
+	status, err := k8sutil.UpdateAdminConsole(c.config.KubeCli, c.cluster, &c.status)
+	if err != nil {
+		c.logger.Warnf("error reconciling admin console service: %v", err)
 		return
 	}
 
-	// create service if it doesn't exist and new expose requested
-	desiredServices := c.cluster.Spec.AdminConsoleServices
-	if k8sutil.IsKubernetesResourceNotFoundError(err) {
-		if c.cluster.Spec.ExposeAdminConsole {
-			svc, err = c.createUIService(desiredServices)
-			if err != nil {
-				c.logger.Warnf("Error occured creating admin service: %s", err.Error())
-			} else {
-				c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(svc.Name, c.cluster))
-			}
-		}
-		return
-	} else if err != nil {
-		c.logger.Warnf("Unable to get admin service: %s", err.Error())
-		return
-	}
-
-	desiredSelector := k8sutil.LabelsForAdminConsole(c.cluster.Name, desiredServices)
-	if !reflect.DeepEqual(svc.Spec.Selector, desiredSelector) {
-		// update admin service
-		svc.Spec.Selector = desiredSelector
-		if _, err = k8sutil.UpdateService(c.config.KubeCli, c.cluster.Namespace, svc); err != nil {
-			c.logger.Warnf("Error occured updating admin service: %s", err.Error())
-		}
+	serviceName := k8sutil.ConsoleServiceName(c.cluster.Name)
+	switch status {
+	case k8sutil.ReconcileStatusCreated:
+		c.logger.Infof("Created service %s for admin console", serviceName)
+		c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(serviceName, c.cluster))
+	case k8sutil.ReconcileStatusDeleted:
+		c.logger.Infof("Deleted service %s for admin console", serviceName)
+		c.raiseEvent(k8sutil.AdminConsoleSvcDeleteEvent(serviceName, c.cluster))
+	case k8sutil.ReconcileStatusUpdated:
+		c.logger.Infof("Updated service %s for admin console", serviceName)
 	}
 }
 
@@ -773,6 +750,13 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 // alternate address to the DDNS name.  For private addresses these will be an IP based on the
 // node address and node ports in the 30000 range.
 func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
+	if c.cluster.Spec.IsExposedFeatureServiceTypePublic() {
+		addresses := &cbmgr.AlternateAddressesExternal{
+			Hostname: k8sutil.GetDNSName(c.cluster, member.Name),
+		}
+		return addresses, nil
+	}
+
 	// Lookup the node IP the pod is running on.
 	hostname, err := k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
 	if err != nil {
