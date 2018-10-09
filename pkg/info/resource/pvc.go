@@ -128,6 +128,12 @@ func parseIndices(input string, max int) (map[int]interface{}, error) {
 	// Sanitise the input, it will probably have a trailling new line.
 	input = strings.TrimSpace(input)
 
+	// No input, this is fine, explicitly check as Split always returns a single
+	// empty string :/
+	if input == "" {
+		return indices, nil
+	}
+
 	// Split into individual indices or ranges and parse, accumulating the set
 	fields := strings.Split(input, ",")
 	for _, field := range fields {
