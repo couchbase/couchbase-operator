@@ -12,6 +12,7 @@ import (
 )
 
 func CreateService(t *testing.T, kubeClient kubernetes.Interface, namespace string, service *v1.Service) (*v1.Service, error) {
+	t.Logf("creating service: %s", service.Name)
 	service, err := kubeClient.CoreV1().Services(namespace).Create(service)
 	if err != nil {
 		return nil, err
@@ -20,9 +21,37 @@ func CreateService(t *testing.T, kubeClient kubernetes.Interface, namespace stri
 	return service, nil
 }
 
+func UpdateService(t *testing.T, kubeClient kubernetes.Interface, namespace string, service *v1.Service) (*v1.Service, error) {
+	t.Logf("creating service: %s", service.Name)
+	service, err := kubeClient.CoreV1().Services(namespace).Update(service)
+	if err != nil {
+		return nil, err
+	}
+	t.Logf("updated service: %s", service.Name)
+	return service, nil
+}
+
 func DeleteService(t *testing.T, kubeClient kubernetes.Interface, namespace string, serviceName string, options *metav1.DeleteOptions) error {
 	t.Logf("deleting service: %s", serviceName)
 	return kubeClient.CoreV1().Services(namespace).Delete(serviceName, options)
+}
+
+func GetService(t *testing.T, kubeClient kubernetes.Interface, namespace string, serviceName string) (*v1.Service, error) {
+	t.Logf("getting service: %s", serviceName)
+	service, err := kubeClient.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return service, nil
+}
+
+func GetServices(t *testing.T, kubeClient kubernetes.Interface, namespace string) ([]v1.Service, error) {
+	t.Logf("getting all services")
+	serviceList, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return serviceList.Items, nil
 }
 
 // Node port service provides access to couchbase server via:

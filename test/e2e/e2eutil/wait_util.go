@@ -757,3 +757,29 @@ func waitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, retri
 	})
 	return dss, err
 }
+
+func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, namespace string, loadBalancerServiceName string, waitTimeInSec int) error {
+	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
+	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	for {
+		select {
+		case <-timeOutChan:
+			return errors.New("Timed out to get K8S node to ready state")
+
+		case <-tickChan:
+			service, err := GetService(t, kubeClient, namespace, loadBalancerServiceName)
+			if err != nil {
+				continue
+			}
+
+			t.Logf("loadBalancer service: \n\n %+v \n\n", service)
+			t.Logf("loadBalancer ingress: %+v", service.Status.LoadBalancer.Ingress)
+
+			if len(service.Status.LoadBalancer.Ingress) > 0 {
+				if service.Status.LoadBalancer.Ingress[0].IP != "" {
+					return nil
+				}
+			}
+		}
+	}
+}

@@ -22,3 +22,4 @@ kube-version: 1.10.5-0      # KUBE version to install
 StorageClassName: standard  # Storage class defined in cluster to use for PV cases
 
 serviceAccountName: default  # Service account to use while running Tests
+platformType: custom         # custom, azure

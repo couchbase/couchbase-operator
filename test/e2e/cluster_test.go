@@ -154,7 +154,7 @@ func TestEditClusterSettings(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -228,6 +228,7 @@ func TestEditClusterSettings(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+
 }
 
 // Tests invalid editing of cluster settings (setting changes should not take hold)
@@ -261,7 +262,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -921,7 +922,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1132,7 +1133,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1408,7 +1409,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1463,7 +1464,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1554,7 +1555,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	expectedEvents3.AddRebalanceCompletedEvent(testCouchbase3)
 
 	// create connection to couchbase nodes
-	client1, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase1)
+	client1, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1566,7 +1567,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo1)
 
 	// create connection to couchbase nodes
-	client2, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase2)
+	client2, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1578,7 +1579,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo2)
 
 	// create connection to couchbase nodes
-	client3, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase3)
+	client3, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase3)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}

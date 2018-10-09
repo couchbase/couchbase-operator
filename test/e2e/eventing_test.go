@@ -41,8 +41,8 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 3
 	numOfDocs := 10
@@ -82,12 +82,12 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket3["bucketName"])
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(targetKubeName)
+	k8sMasterIp, err := f.GetKubeHostname(kubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,8 +125,8 @@ func TestEventingResizeCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[kubeName]
 
 	nonEventingNodes := 2
 	eventingNodes := 3
@@ -154,12 +154,12 @@ func TestEventingResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(targetKubeName)
+	k8sMasterIp, err := f.GetKubeHostname(kubeName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,8 +289,8 @@ func TestEventingKillEventingPods(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[kubeName]
 
 	nonEventingNodes := 2
 	eventingNodes := 3
@@ -318,12 +318,12 @@ func TestEventingKillEventingPods(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(targetKubeName)
+	k8sMasterIp, err := f.GetKubeHostname(kubeName)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -175,6 +175,7 @@ func Setup(t *testing.T) error {
 		SuiteYmlData:    suiteData,
 		ClusterConfFile: runtimeParams.ClusterConfFile,
 		PullDockerImage: runtimeParams.PullDockerImages,
+		PlatformType:    runtimeParams.PlatformType,
 	}
 	for kubeName, _ := range Global.ClusterSpec {
 		if err = Global.SetupFramework(kubeName); err != nil {

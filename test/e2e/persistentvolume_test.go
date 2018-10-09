@@ -52,8 +52,8 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
@@ -128,7 +128,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		// Kill couchbase server process in target pods
 		for _, podMemberId := range podMembersToKill {
 			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-			if _, err := f.ExecShellInPod(targetKubeName, memberName, "pkill beam.smp"); err != nil {
+			if _, err := f.ExecShellInPod(kubeName, memberName, "pkill beam.smp"); err != nil {
 				t.Fatal(err)
 			}
 			eventsExpected = append(eventsExpected, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
@@ -162,8 +162,8 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	autofailoverTimeout := 30
 	totalTimeToRecover := 0
@@ -273,8 +273,8 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSizeWithOutPvc, _ := strconv.Atoi(serviceConfig1["size"])
 	clusterSizeWithPvc1, _ := strconv.Atoi(serviceConfig2["size"])
@@ -388,7 +388,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	// Sleep for autofailover to occur
 	time.Sleep(time.Second*time.Duration(autofailoverTimeout) + 120)
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(targetKubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
 	}
@@ -440,8 +440,8 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 5
 	bucketName := "PVBucket"
@@ -538,8 +538,8 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 4
 	podMembersToKill := []int{0, 1, 2, 3}
@@ -637,7 +637,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		// Kill couchbase server process in target pods
 		for _, podMemberId := range podMembersToKill {
 			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-			if _, err := f.ExecShellInPod(targetKubeName, memberName, "pkill beam.smp"); err != nil {
+			if _, err := f.ExecShellInPod(kubeName, memberName, "pkill beam.smp"); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -682,8 +682,8 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 5
 	podMemberToKill := 3
@@ -825,12 +825,12 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 9
 	pvcName := "couchbase"
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
+	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{kubeName})
 	if err != nil {
 		t.Fatalf("Failed to read cluster yaml data: %v", err)
 	}
@@ -948,12 +948,12 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 9
 	pvcName := "couchbase"
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
+	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{kubeName})
 	if err != nil {
 		t.Fatalf("Failed to read cluster yaml data: %v", err)
 	}
@@ -1133,8 +1133,8 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 5
 	bucketName := "PVBucket"
@@ -1206,8 +1206,8 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := "NewCluster1"
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 3
 	bucketName := "PVBucket"

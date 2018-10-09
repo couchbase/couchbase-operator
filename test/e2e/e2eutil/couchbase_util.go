@@ -43,15 +43,30 @@ func NewClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseC
 
 // Creates client for interacting with admin console of crd
 // TODO: testing arg is not needed and will be removed, but has depends here
-func CreateAdminConsoleClient(t *testing.T, apiServerHost string, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) (*cbmgr.Couchbase, error) {
+func CreateAdminConsoleClient(t *testing.T, apiServerHost string, namespace string, platformType string, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) (*cbmgr.Couchbase, error) {
+	t.Logf("Creating AdminConsoleClient \n")
 	if cl.Spec.ExposeAdminConsole == false {
 		return nil, NewErrConsoleNotExposed()
 	}
-	consoleURL, err := AdminConsoleURL(apiServerHost, cl.Status.AdminConsolePort)
+	consoleURL := ""
+	if platformType == "azure" {
+		serviceName := cl.Name + "-ui"
+		service, _ := GetService(t, kubeClient, namespace, serviceName)
+		service.Spec.Type = "LoadBalancer"
+		service, _ = UpdateService(t, kubeClient, namespace, service)
+		_ = WaitForExternalLoadBalancer(t, kubeClient, namespace, service.Name, 300)
+		service, _ = GetService(t, kubeClient, namespace, serviceName)
+		consoleURL = "http://" + service.Status.LoadBalancer.Ingress[0].IP + ":8091"
+	} else {
+		consoleURL, _ = AdminConsoleURL(apiServerHost, cl.Status.AdminConsolePort)
+	}
+	t.Logf("Admin console url: %s", consoleURL)
+	client, err := NewClient(t, kubeClient, cl, []string{consoleURL})
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(t, kubeClient, cl, []string{consoleURL})
+	t.Logf("Client created \n")
+	return client, nil
 }
 
 func EditBucket(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket) error {

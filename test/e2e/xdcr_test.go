@@ -23,7 +23,7 @@ func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, cluste
 	targetKube := f.ClusterSpec[kubeName]
 	nextNodeToBeAdded := clusterSize
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, cbCluster)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, cbCluster)
 	if err != nil {
 		return errors.New("Failed to create cluster client: " + err.Error())
 	}

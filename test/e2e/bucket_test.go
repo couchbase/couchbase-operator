@@ -84,7 +84,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -191,7 +191,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -374,7 +374,7 @@ func TestEditBucket(t *testing.T) {
 	}
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -555,7 +555,7 @@ func TestNegBucketEdit(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -705,7 +705,7 @@ func TestRevertExternalBucketAdd(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -789,7 +789,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
