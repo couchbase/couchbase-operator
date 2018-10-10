@@ -53,6 +53,17 @@ artifacts:
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --version $(productVersion)
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(productVersion)
 
+image-artifacts: build
+	mkdir -p build/image-artifacts/docs
+	mkdir -p build/image-artifacts/build/bin
+	cp docs/License.txt build/image-artifacts/docs/License.txt
+	cp docs/README.txt build/image-artifacts/docs/License.txt
+	cp $(BINARY) build/image-artifacts/$(BINARY)
+	cp Dockerfile build/image-artifacts/Dockerfile
+	cp Dockerfile build/image-artifacts/Dockerfile.rhel
+	tar -C build -czf build/image-artifacts.zip image-artifacts
+	rm -rf build/image-artifacts
+
 prod: container tools artifacts
 
 prod-rhel: container-rhel tools artifacts
