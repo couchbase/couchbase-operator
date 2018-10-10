@@ -957,7 +957,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 		select {
 		// Handle timeout and cancellation events
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("%v: Pod Creation error - error creating pod %v", ctx.Err(), podName)
 		// Process K8S events for our chosen pod
 		case ev := <-events:
 			if ev.Object == nil {
@@ -1006,7 +1006,6 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 }
 
 func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespace, podName string) error {
-
 	_, err := kubeCli.Core().Pods(namespace).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		if IsKubernetesResourceNotFoundError(err) {
@@ -1032,7 +1031,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 		select {
 		// Handle timeout and cancellation events
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("%v: Pod Deletion error - error deleting pod %v", ctx.Err(), podName)
 		// Process K8S events for our chosen pod
 		case ev := <-events:
 			if ev.Object == nil {
@@ -1075,7 +1074,7 @@ func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interf
 		select {
 		// Handle timeout and cancellation events
 		case <-ctx.Done():
-			return cberrors.ErrCreatingPersistentVolumeClaim{Reason: ctx.Err().Error()}
+			return cberrors.ErrCreatingPersistentVolumeClaim{Reason: fmt.Sprintf("%v for %v", ctx.Err().Error(), claimName)}
 
 		// Process K8S events of creation cycle
 		case ev := <-events:
@@ -1117,7 +1116,7 @@ func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interf
 }
 
 // Wait for volume which is bound by claim.  In general when the claim status is 'ClaimBound' then it may
-// be assumed that it's volume is ready, but we should check actual volume for the sake of complemetness.
+// be assumed that it's volume is ready, but we should check actual volume for the sake of completeness.
 func WaitForPersistentVolume(ctx context.Context, kubeCli kubernetes.Interface, volumeName string) error {
 
 	opts := metav1.ListOptions{
@@ -1136,7 +1135,7 @@ func WaitForPersistentVolume(ctx context.Context, kubeCli kubernetes.Interface, 
 		select {
 		// Handle timeout and cancellation events
 		case <-ctx.Done():
-			return cberrors.ErrCreatingPersistentVolume{Reason: ctx.Err().Error()}
+			return cberrors.ErrCreatingPersistentVolume{Reason: fmt.Sprintf("%v for %v", ctx.Err().Error(), volumeName)}
 
 		// Process K8S events of creation cycle
 		case ev := <-events:

@@ -31,7 +31,7 @@ func WaitForHostPort(ctx context.Context, hostport string) error {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("%v: Connection error - %v", ctx.Err(), err)
 		}
 	}
 }
@@ -66,7 +66,7 @@ func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) err
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("%v: TLS Configuration error - %v", ctx.Err(), err)
 		}
 	}
 }
