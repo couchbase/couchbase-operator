@@ -61,7 +61,7 @@ image-artifacts: build
 	cp $(BINARY) build/image-artifacts/$(BINARY)
 	cp Dockerfile build/image-artifacts/Dockerfile
 	cp Dockerfile build/image-artifacts/Dockerfile.rhel
-	tar -C build -czf build/image-artifacts.zip image-artifacts
+	tar -C build -czf build/image-artifacts.tgz image-artifacts
 	rm -rf build/image-artifacts
 
 prod: container tools artifacts
