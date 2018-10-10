@@ -152,3 +152,5 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestLogCollectRbacPermission
+      - name: TestExtendedDebugWithInvalidValues
+      - name: TestExtendedDebugKillOperatorDuringLogCollection

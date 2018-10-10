@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -97,46 +98,64 @@ func StartTimeoutTimer() {
 	}()
 }
 
-// Setup setups a test framework and points "Global" to it.
-func Setup(t *testing.T) error {
-	clusterSpecMap := make(ClusterMap)
-
-	err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
+func CreateDeploymentObject(operatorImageName string, restPort int32) (deployment *v1beta1.Deployment, err error) {
+	if err = v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
+		return
 	}
 
-	err = api.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
+	if err = api.AddToScheme(scheme.Scheme); err != nil {
+		return
 	}
 
 	deploymentSpecContent, err := ioutil.ReadFile(runtimeParams.DeploymentSpec)
 	if err != nil {
-		return err
+		return
 	}
 
 	deserializer := scheme.Codecs.UniversalDeserializer()
 	obj, _, err := deserializer.Decode([]byte(deploymentSpecContent), nil, nil)
 	if err != nil {
-		return err
+		return
 	}
 
 	deployment, ok := obj.(*v1beta1.Deployment)
 	if !ok {
 		errMsg := "File " + runtimeParams.DeploymentSpec + " does not define a deployment"
-		return errors.New(errMsg)
+		err = errors.New(errMsg)
+		return
 	}
 
 	// set operator image from env var
-	oi := runtimeParams.OperatorImage
-	if oi != "" {
-		deployment.Spec.Template.Spec.Containers[0].Image = oi
+	if operatorImageName != "" {
+		deployment.Spec.Template.Spec.Containers[0].Image = operatorImageName
 	}
 
 	// set ServiceAccountName if default is not being used for testing
 	if runtimeParams.ServiceAccountName != "" {
 		deployment.Spec.Template.Spec.ServiceAccountName = runtimeParams.ServiceAccountName
+	}
+
+	// set given rest port as the readiness-port in deployment spec
+	for index, containers := range deployment.Spec.Template.Spec.Containers {
+		if containers.Image == operatorImageName {
+			deployment.Spec.Template.Spec.Containers[index].ReadinessProbe.HTTPGet.Port = intstr.FromInt(int(restPort))
+			// if given rest port is not a default one, include '-listen-addr' as operator's arg list
+			if restPort != constants.OperatorRestPort {
+				listerAddrArg := "-listen-addr=0.0.0.0:" + strconv.Itoa(int(restPort))
+				deployment.Spec.Template.Spec.Containers[index].Args = append(deployment.Spec.Template.Spec.Containers[index].Args, listerAddrArg)
+			}
+		}
+	}
+	return
+}
+
+// Setup setups a test framework and points "Global" to it.
+func Setup(t *testing.T) error {
+	clusterSpecMap := make(ClusterMap)
+
+	deployment, err := CreateDeploymentObject(runtimeParams.OperatorImage, constants.OperatorRestPort)
+	if err != nil {
+		return err
 	}
 
 	logDir, err := makeLogDir()
@@ -351,10 +370,6 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	if err := f.DeleteCRDs(targetKube.Config); err != nil {
-		return err
-	}
-
 	// Creating required namespaces and cluster roles before deploying the operator
 	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
 		return err
@@ -402,6 +417,10 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	logrus.Info("Deleting secrets")
 	if err := e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
 		logrus.Infof("Secret deleted: %v", "basic-test-secret")
+	}
+
+	if err := f.DeleteCRDs(targetKube.Config); err != nil {
+		return err
 	}
 
 	logrus.Info("Recreating cluster role")

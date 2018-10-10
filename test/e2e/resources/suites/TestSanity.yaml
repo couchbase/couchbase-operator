@@ -66,6 +66,7 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestLogCollectValidateArguments
+      - name: TestExtendedDebugWithDefaultValues
 
   - name: CouchbaseServerServiceTests
     cluster:

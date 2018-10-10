@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,13 +27,21 @@ import (
 )
 
 // Function to cross check log dir contents against populated file list
-func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *failureList) error {
-	for _, reqFile := range reqFileList {
-		if _, err := os.Stat(reqFile); err != nil {
-			errMsgList.AppendFailure("File "+reqFile, errors.New("not found"))
+func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *failureList) {
+	for _, fileName := range reqFileList {
+		if _, err := os.Stat(fileName); err != nil {
+			errMsgList.AppendFailure("File "+fileName, errors.New("File not found!"))
 		}
 	}
-	return nil
+}
+
+// Function to cross check log dir contents are not present against the populated file list
+func checkLogDirContentsForExcludedFiles(excludedFileList []string, logFileDir string, errMsgList *failureList) {
+	for _, fileName := range excludedFileList {
+		if _, err := os.Stat(fileName); err == nil {
+			errMsgList.AppendFailure("File "+fileName, errors.New("File Exists!"))
+		}
+	}
 }
 
 // Function to check collecinfo related prints from cmd output
@@ -49,6 +58,21 @@ func checkCollectInfoLogs(execOut []byte, kubeClient kubernetes.Interface, names
 		expectedStr := commonLogStr + pod.Name + ":/tmp/cbinfo-" + namespace + "-" + pod.Name + "-" + logFileTimeStampStr + ".zip ."
 		if !strings.Contains(execOutStr, expectedStr) {
 			errMsgList.AppendFailure("Collectinfo for pod "+pod.Name, errors.New("collectinfo log print missing"))
+		}
+	}
+	return nil
+}
+
+// Function to populate deployment file list
+func getDeployementFileList(kubeClient kubernetes.Interface, namespace, deploymentDir string, fileList *[]string) error {
+	deployments, err := kubeClient.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return errors.New("Failed to list deployments: " + err.Error())
+	}
+	for _, deployment := range deployments.Items {
+		*fileList = append(*fileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".yaml")
+		if namespace != "kube-system" {
+			*fileList = append(*fileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".log")
 		}
 	}
 	return nil
@@ -103,15 +127,8 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 	}
 
 	// deployment dir contents
-	deployments, err := kubeClient.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list deployments: " + err.Error())
-	}
-	for _, deployment := range deployments.Items {
-		*reqFileList = append(*reqFileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".yaml")
-		if namespace != "kube-system" {
-			*reqFileList = append(*reqFileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".log")
-		}
+	if err := getDeployementFileList(kubeClient, namespace, deploymentDir, reqFileList); err != nil {
+		return err
 	}
 
 	if allFlag {
@@ -173,6 +190,16 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 		*reqFileList = append(*reqFileList, pvcDir+"/"+pvc.Name+"/"+pvc.Name+".yaml")
 	}
 	return nil
+}
+
+// Function to get autonomous-operator extended debug file list
+func getOperatorExtendedDebugFileList(namespace, deploymentName, cbopinfoLogDir string, reqFileList *[]string) {
+	namespaceDir := cbopinfoLogDir + "/" + namespace
+	deploymentDir := namespaceDir + "/deployment/" + deploymentName
+	debugFileList := []string{"pprof.block", "pprof.goroutine", "pprof.heap", "pprof.mutex", "pprof.threadcreate", "stats.cluster"}
+	for _, fileName := range debugFileList {
+		*reqFileList = append(*reqFileList, deploymentDir+"/"+fileName)
+	}
 }
 
 // Function to get couchbase cluster specific log file names
@@ -347,7 +374,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
 	errMsgList := failureList{}
-	operatorRestPort := "8080"
+	operatorRestPort := strconv.Itoa(int(constants.OperatorRestPort))
 
 	// Validate args which won't produce output file
 	for _, arg := range []string{"-help", "-version"} {
@@ -1010,4 +1037,286 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 		t.Error(err)
 	}
 	errMsgList.CheckFailures(t)
+}
+
+func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName string, port int32) error {
+	f := framework.Global
+
+	// Delete existing Deployment
+	if err := framework.DeleteOperatorCompletely(kubeClient, f.Deployment.Name, f.Namespace); err != nil {
+		return err
+	}
+
+	// Create new deployment object to deploy
+	deployment, err := framework.CreateDeploymentObject(imageName, port)
+	if err != nil {
+		return err
+	}
+
+	t.Logf("Deploying operator using image '%s' and port %d", imageName, port)
+	if _, err := kubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(deployment); err != nil {
+		return err
+	}
+	if err := e2eutil.WaitUntilOperatorReady(kubeClient, f.Namespace, constants.CouchbaseOperatorLabel); err != nil {
+		return err
+	}
+	return nil
+}
+
+func CollectExtendedDebugLogGeneric(t *testing.T, kubeName, opImageName string, testPort, defPort int32, cmdArgs []string) {
+	f := framework.Global
+	targetKube := f.ClusterSpec[kubeName]
+	clusterSize := 3
+
+	defer ReDeployOperator(t, targetKube.KubeClient, f.OpImage, defPort)
+	if err := ReDeployOperator(t, targetKube.KubeClient, opImageName, testPort); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create Couchbase cluster
+	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
+
+	// Collect logs
+	execOut, err := runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
+	defer os.Remove(logFileName)
+
+	logFileDir := strings.Split(logFileName, ".")[0]
+	defer os.RemoveAll(logFileDir)
+	if err := untarGzFile(logFileName); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify file list
+	errMsgList := failureList{}
+	reqFileList := []string{}
+
+	getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &reqFileList)
+
+	isAllFlagSet := true
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+		t.Fatal(err)
+	}
+	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
+		t.Fatal(err)
+	}
+
+	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists := errMsgList.PrintFailures(t)
+
+	if err := checkCollectInfoLogs(execOut, targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, &errMsgList); err != nil {
+		t.Fatal(err)
+	}
+
+	if failureExists {
+		t.Fatal("Test failed")
+	}
+}
+
+// Collect cbopinfo using '--operator-image' and '--operator-rest-port'
+// with default values and validate the logs collected
+func TestExtendedDebugWithDefaultValues(t *testing.T) {
+	f := framework.Global
+	kubeName := "BasicCluster"
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	defPort := constants.OperatorRestPort
+	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all"}
+	CollectExtendedDebugLogGeneric(t, kubeName, constants.DefOperatorImgTag, defPort, defPort, cmdArgs)
+}
+
+// Collect cbopinfo using '--operator-image' and '--operator-rest-port'
+// with custom values and validate the logs collected
+func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
+	f := framework.Global
+	kubeName := "BasicCluster"
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	var defPort int32
+	var testPort int32
+	testPort = 32123
+	containerPorts := f.Deployment.Spec.Template.Spec.Containers[0].Ports
+	for _, temPort := range containerPorts {
+		if temPort.Name == "readiness-port" {
+			defPort = temPort.ContainerPort
+		}
+	}
+	cmdArgs := []string{"-operator-image", f.OpImage, "-operator-rest-port", strconv.Itoa(int(testPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all"}
+	CollectExtendedDebugLogGeneric(t, kubeName, f.OpImage, testPort, defPort, cmdArgs)
+}
+
+// Collect cbopinfo with '--operator-image' & '-operator-rest-port'
+// with invalid values and validate the log collection
+func TestExtendedDebugWithInvalidValues(t *testing.T) {
+	f := framework.Global
+	kubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[kubeName]
+	invalidImgName := "couchbase/couchbase-operator:invalidversion"
+	invalidPortVal := "32080"
+	clusterSize := constants.Size1
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+
+	// Create Couchbase cluster
+	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Collect logs with invalid operator-image-name
+	t.Log("Collecting logs using invalid -operator-image arg value")
+	cmdArgs := []string{"-operator-image", invalidImgName, "-operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
+
+	execOut, err := runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
+	defer os.Remove(logFileName)
+
+	// Untar log file
+	logFileDir := strings.Split(logFileName, ".")[0]
+	defer os.RemoveAll(logFileDir)
+	if err := untarGzFile(logFileName); err != nil {
+		t.Error(err)
+	} else {
+		// Verify file list if untar is successful
+		errMsgList := failureList{}
+		excludedFileList := []string{}
+		deploymentDir := logFileDir + "/" + f.Namespace + "/deployment"
+
+		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &excludedFileList); err != nil {
+			t.Error(err)
+		}
+		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
+
+		checkLogDirContentsForExcludedFiles(excludedFileList, logFileDir, &errMsgList)
+		if failureExists := errMsgList.PrintFailures(t); failureExists {
+			t.Error("Log file verification failed")
+		}
+	}
+
+	// Collect logs with invalid operator-rest-port
+	t.Log("Collecting logs using invalid -operator-rest-port arg value")
+	cmdArgs = []string{"-operator-image", f.OpImage, "-operator-rest-port", invalidPortVal, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
+
+	execOut, err = runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
+	execOutStr = strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFileName = getLogFileNameFromExecOutput(execOutStr)
+	defer os.Remove(logFileName)
+
+	// Untar log file
+	logFileDir = strings.Split(logFileName, ".")[0]
+	defer os.RemoveAll(logFileDir)
+	if err := untarGzFile(logFileName); err != nil {
+		t.Error(err)
+	} else {
+		// Verify file list if untar is successful
+		errMsgList := failureList{}
+		reqFileList := []string{}
+		excludedFileList := []string{}
+		deploymentDir := logFileDir + "/" + f.Namespace + "/deployment"
+
+		// In invalid rest-port case, deployment yaml, logs will exists. Only rest-port files will be missing
+		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &reqFileList); err != nil {
+			t.Error(err)
+		}
+		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
+
+		checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+		checkLogDirContentsForExcludedFiles(excludedFileList, logFileDir, &errMsgList)
+		if failureExists := errMsgList.PrintFailures(t); failureExists {
+			t.Error("Log file verification failed")
+		}
+	}
+}
+
+// Collect cbopinfo with '--operator-image' & '-operator-rest-port'
+// and kill the operator pod during log collection in parallel
+func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
+	f := framework.Global
+	kubeName := "BasicCluster"
+	targetKube := f.ClusterSpec[kubeName]
+	clusterSize := constants.Size1
+	execOut := []byte{}
+	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+
+	// Create Couchbase cluster
+	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Collecting logs using invalid operator-image value")
+	cmdArgs := []string{"-operator-image", f.OpImage, "-operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all"}
+
+	logFileNameChan := make(chan string)
+	go func() {
+		// Collect logs when operator pod goes down in parallel
+		t.Log("Starting log collection")
+		execOut, err = runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
+		execOutStr := strings.TrimSpace(string(execOut))
+		t.Logf("Returned: %s\n", execOutStr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		logFileNameChan <- getLogFileNameFromExecOutput(execOutStr)
+	}()
+
+	t.Logf("Killing operator...")
+	if err := e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace); err != nil {
+		t.Fatalf("Failed to kill couchbase operator: %v", err)
+	}
+
+	t.Logf("Waiting for operator to recover...")
+	if err := e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, constants.CouchbaseOperatorLabel); err != nil {
+		t.Fatalf("Failed to recover couchbase operator: %v", err)
+	}
+	t.Logf("Operator recovered...")
+
+	logFileName := <-logFileNameChan
+	defer os.Remove(logFileName)
+
+	logFileDir := strings.Split(logFileName, ".")[0]
+	defer os.RemoveAll(logFileDir)
+	if err := untarGzFile(logFileName); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify file list
+	errMsgList := failureList{}
+	reqFileList := []string{}
+
+	getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &reqFileList)
+
+	isAllFlagSet := true
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+		t.Fatal(err)
+	}
+	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
+		t.Fatal(err)
+	}
+
+	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	failureExists := errMsgList.PrintFailures(t)
+
+	if err := checkCollectInfoLogs(execOut, targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, &errMsgList); err != nil {
+		t.Fatal(err)
+	}
+
+	if failureExists {
+		t.Fatal("Test failed")
+	}
 }

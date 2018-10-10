@@ -168,12 +168,18 @@ var (
 		"TestPersistentVolumeRzaFailover":            TestPersistentVolumeRzaFailover,
 		"TestPersistentVolumeWithSingleNodeService":  TestPersistentVolumeWithSingleNodeService,
 		"TestPersistentVolumeResizeCluster":          TestPersistentVolumeResizeCluster,
+
 		// Supportability cases
 		"TestLogCollectValidateArguments":            TestLogCollectValidateArguments,
 		"TestNegLogCollectValidateArgs":              TestNegLogCollectValidateArgs,
 		"TestLogCollectUsingClusterNameAndNamespace": TestLogCollectUsingClusterNameAndNamespace,
 		"TestLogCollectRbacPermission":               TestLogCollectRbacPermission,
 		"TestLogCollectClusterWithPVC":               TestLogCollectClusterWithPVC,
+		// Extended log collection cases
+		"TestExtendedDebugWithDefaultValues":               TestExtendedDebugWithDefaultValues,
+		"TestExtendedDebugWithNonDefaultValues":            TestExtendedDebugWithNonDefaultValues,
+		"TestExtendedDebugWithInvalidValues":               TestExtendedDebugWithInvalidValues,
+		"TestExtendedDebugKillOperatorDuringLogCollection": TestExtendedDebugKillOperatorDuringLogCollection,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{

@@ -47,6 +47,11 @@ var (
 )
 
 const (
+	// Operator constants
+	OperatorRestPort  int32  = 8080
+	DefOperatorImgTag string = "couchbase/operator:1.0.0"
+
+	// Couchbase cluster constants
 	CbClusterRestPort int32 = 8091
 )
 

@@ -147,3 +147,5 @@ tcGroups:
       - name: TestLogCollectValidateArguments
       - name: TestNegLogCollectValidateArgs
       - name: TestLogCollectUsingClusterNameAndNamespace
+      - name: TestExtendedDebugWithDefaultValues
+      - name: TestExtendedDebugWithNonDefaultValues
