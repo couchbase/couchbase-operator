@@ -67,6 +67,7 @@ tcGroups:
     testcases:
       - name: TestLogCollectValidateArguments
       - name: TestExtendedDebugWithDefaultValues
+      - name: TestCollectLogFromEphemeralPodsUsingLogPV
 
   - name: CouchbaseServerServiceTests
     cluster:

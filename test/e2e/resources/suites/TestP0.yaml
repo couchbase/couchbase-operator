@@ -149,3 +149,4 @@ tcGroups:
       - name: TestLogCollectUsingClusterNameAndNamespace
       - name: TestExtendedDebugWithDefaultValues
       - name: TestExtendedDebugWithNonDefaultValues
+      - name: TestCollectLogFromEphemeralPodsUsingLogPV

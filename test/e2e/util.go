@@ -180,6 +180,13 @@ var (
 		"TestExtendedDebugWithNonDefaultValues":            TestExtendedDebugWithNonDefaultValues,
 		"TestExtendedDebugWithInvalidValues":               TestExtendedDebugWithInvalidValues,
 		"TestExtendedDebugKillOperatorDuringLogCollection": TestExtendedDebugKillOperatorDuringLogCollection,
+
+		// Log collection from EphmeralPods
+		"TestCollectLogFromEphemeralPodsUsingLogPV":         TestCollectLogFromEphemeralPodsUsingLogPV,
+		"TestCollectLogFromEphemeralPodsWithOperatorKilled": TestCollectLogFromEphemeralPodsWithOperatorKilled,
+		"TestEphemeralLogCollectResizeCluster":              TestEphemeralLogCollectResizeCluster,
+		"TestLogCollectWithDefaultRetentionAndSize":         TestLogCollectWithDefaultRetentionAndSize,
+		"TestLogCollectWithCustomRetentionAndSize":          TestLogCollectWithCustomRetentionAndSize,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{

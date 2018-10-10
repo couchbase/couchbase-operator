@@ -749,6 +749,20 @@ func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) err
 	return kubeCli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 }
 
+func KillOperatorAndWaitForRecovery(t *testing.T, kubeClient kubernetes.Interface, namespace string) error {
+	t.Logf("Killing operator...")
+	if err := DeleteCouchbaseOperator(kubeClient, namespace); err != nil {
+		return errors.New("Failed to kill couchbase operator: " + err.Error())
+	}
+
+	t.Logf("Waiting for operator to recover...")
+	if err := WaitUntilOperatorReady(kubeClient, namespace, constants.CouchbaseOperatorLabel); err != nil {
+		return errors.New("Failed to recover couchbase operator: " + err.Error())
+	}
+	t.Logf("Operator recovered...")
+	return nil
+}
+
 func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, error) {
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("app", "couchbase-operator")))
 	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})

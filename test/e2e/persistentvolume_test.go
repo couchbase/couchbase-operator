@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"sort"
@@ -19,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // This will create a Persistent volume claim data
@@ -44,6 +46,32 @@ func createPodSecurityContext(fsGroup int, clusterSpec *v1.ClusterSpec) {
 		sc := corev1.PodSecurityContext{FSGroup: &fsGroupVal}
 		clusterSpec.SecurityContext = &sc
 	}
+}
+
+// Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user
+func VerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, namespace string, expectedPvcMap map[string]int) (errToReturn error) {
+	pvcMappingVerify := func() error {
+		for memberName, pvcCount := range expectedPvcMap {
+			pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
+			if err != nil {
+				return err
+			} else if len(pvcList.Items) != pvcCount {
+				t.Logf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
+				return errors.New("PVC mapping verification failed")
+			}
+		}
+		return nil
+	}
+
+	maxRetires := constants.Retries5
+	for retryCount := 0; retryCount < maxRetires; retryCount++ {
+		// Sleep before next poll
+		time.Sleep(time.Second * 5)
+		if errToReturn = pvcMappingVerify(); errToReturn == nil {
+			return
+		}
+	}
+	return
 }
 
 // Generic function to test the cb-server down and pod remove scenarios
@@ -364,15 +392,9 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 		t.Fatal(err)
 	}
 
-	// Should be same after recovering the pod with PVC intact
-	for memberName, pvcCount := range expectedPvcMap {
-		pvcList, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(f.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(pvcList.Items) != pvcCount {
-			t.Fatalf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
-		}
+	// To cross check number of persistent vol claims matches the defined spec
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		t.Error(err)
 	}
 
 	// Kill pod along with its PVC
@@ -496,14 +518,9 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 		couchbaseutil.CreateMemberName(testCouchbase.Name, 4): 5,
 	}
 
-	for memberName, pvcCount := range expectedPvcMap {
-		pvcList, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(f.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(pvcList.Items) != pvcCount {
-			t.Fatalf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
-		}
+	// To cross check number of persistent vol claims matches the defined spec
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		t.Error(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
@@ -785,14 +802,9 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 		couchbaseutil.CreateMemberName(testCouchbase.Name, 6): 0,
 	}
 
-	for memberName, pvcCount := range expectedPvcMap {
-		pvcList, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(f.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(pvcList.Items) != pvcCount {
-			t.Fatalf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
-		}
+	// To cross check number of persistent vol claims matches the defined spec
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		t.Error(err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
@@ -1186,14 +1198,9 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 		couchbaseutil.CreateMemberName(testCouchbase.Name, 4): 5,
 	}
 
-	for memberName, pvcCount := range expectedPvcMap {
-		pvcList, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(f.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(pvcList.Items) != pvcCount {
-			t.Fatalf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
-		}
+	// To cross check number of persistent vol claims matches the defined spec
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		t.Error(err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
@@ -1300,14 +1307,8 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 
 		// To cross check number of persistent vol claims matches the defined spec
-		for memberName, pvcCount := range expectedPvcMap {
-			pvcList, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(f.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(pvcList.Items) != pvcCount {
-				t.Fatalf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
-			}
+		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+			t.Error(err)
 		}
 	}
 

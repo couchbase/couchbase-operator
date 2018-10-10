@@ -112,16 +112,9 @@ func TestKillOperator(t *testing.T) {
 		t.Fatalf("failed to create 3 members couchbase cluster: %v", err)
 	}
 
-	t.Logf("Killing operator...")
-	if err := e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace); err != nil {
-		t.Fatalf("failed to kill couchbase operator: %v", err)
+	if err := e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace); err != nil {
+		t.Fatal(err)
 	}
-
-	t.Logf("Waiting for operator to recover...")
-	if err := e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, constants.CouchbaseOperatorLabel); err != nil {
-		t.Fatalf("failed to recover couchbase operator: %v", err)
-	}
-	t.Logf("Operator recovered...")
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10); err != nil {
 		t.Fatal(err.Error())

@@ -154,3 +154,5 @@ tcGroups:
       - name: TestLogCollectRbacPermission
       - name: TestExtendedDebugWithInvalidValues
       - name: TestExtendedDebugKillOperatorDuringLogCollection
+      - name: TestCollectLogFromEphemeralPodsWithOperatorKilled
+      - name: TestEphemeralLogCollectResizeCluster

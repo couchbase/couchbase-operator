@@ -1,8 +1,6 @@
 package e2espec
 
 import (
-	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -242,91 +240,100 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 
 // new custom cluster
 func CreateClusterSpec(genName, secretName string, config map[string]map[string]string) api.ClusterSpec {
-	clusterSettings := api.ClusterConfig(defaultClusterSettings)
-	bucketConfig := []api.BucketConfig{}
-	serverConfig := []api.ServerConfig{}
-	exposedFeatures := api.ExposedFeatureList{}
-	serverGroups := []string{}
-	adminConsoleServices := api.ServiceList{}
-	baseImageName := e2e_constants.CbServerBaseImage
-	versionNum := e2e_constants.CbServerVersion
-	antiAffinity := ""
 	keys := []string{}
 	for key := range config {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+
+	// Spec object to return
+	spec := api.ClusterSpec{
+		BaseImage:            e2e_constants.CbServerBaseImage,
+		Version:              e2e_constants.CbServerVersion,
+		AuthSecret:           secretName,
+		ClusterSettings:      api.ClusterConfig(defaultClusterSettings),
+		BucketSettings:       []api.BucketConfig{},
+		ServerSettings:       []api.ServerConfig{},
+		AdminConsoleServices: api.ServiceList{},
+		ExposedFeatures:      api.ExposedFeatureList{},
+		ServerGroups:         []string{},
+	}
+
 	for _, key := range keys {
 		switch {
+		// Updates Cluster settings in ClusterSpec
 		case strings.Contains(key, "cluster"):
 			for setting := range config[key] {
-				switch {
-				case setting == "dataServiceMemQuota":
+				switch setting {
+				case "dataServiceMemQuota":
 					dataServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.DataServiceMemQuota = dataServiceMemQuota
-				case setting == "indexServiceMemQuota":
+					spec.ClusterSettings.DataServiceMemQuota = dataServiceMemQuota
+				case "indexServiceMemQuota":
 					indexServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.IndexServiceMemQuota = indexServiceMemQuota
-				case setting == "searchServiceMemQuota":
+					spec.ClusterSettings.IndexServiceMemQuota = indexServiceMemQuota
+				case "searchServiceMemQuota":
 					searchServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.SearchServiceMemQuota = searchServiceMemQuota
-				case setting == "indexStorageSetting":
-					clusterSettings.IndexStorageSetting = config[key][setting]
-				case setting == "eventingServiceMemQuota":
+					spec.ClusterSettings.SearchServiceMemQuota = searchServiceMemQuota
+				case "indexStorageSetting":
+					spec.ClusterSettings.IndexStorageSetting = config[key][setting]
+				case "eventingServiceMemQuota":
 					eventingServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.EventingServiceMemQuota = eventingServiceMemQuota
-				case setting == "analyticsServiceMemQuota":
+					spec.ClusterSettings.EventingServiceMemQuota = eventingServiceMemQuota
+				case "analyticsServiceMemQuota":
 					analyticsServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.AnalyticsServiceMemQuota = analyticsServiceMemQuota
-				case setting == "autoFailoverTimeout":
+					spec.ClusterSettings.AnalyticsServiceMemQuota = analyticsServiceMemQuota
+				case "autoFailoverTimeout":
 					autoFailoverTimeout, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.AutoFailoverTimeout = autoFailoverTimeout
-				case setting == "autoFailoverMaxCount":
+					spec.ClusterSettings.AutoFailoverTimeout = autoFailoverTimeout
+				case "autoFailoverMaxCount":
 					autoFailoverMaxCount, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.AutoFailoverMaxCount = autoFailoverMaxCount
-				case setting == "autoFailoverServerGroup":
+					spec.ClusterSettings.AutoFailoverMaxCount = autoFailoverMaxCount
+				case "autoFailoverServerGroup":
 					autoFailoverServerGroup, _ := strconv.ParseBool(config[key][setting])
-					clusterSettings.AutoFailoverServerGroup = autoFailoverServerGroup
-				case setting == "autoFailoverOnDiskIssues":
+					spec.ClusterSettings.AutoFailoverServerGroup = autoFailoverServerGroup
+				case "autoFailoverOnDiskIssues":
 					autoFailoverOnDiskIssues, _ := strconv.ParseBool(config[key][setting])
-					clusterSettings.AutoFailoverOnDataDiskIssues = autoFailoverOnDiskIssues
-				case setting == "autoFailoverOnDiskIssuesTimeout":
+					spec.ClusterSettings.AutoFailoverOnDataDiskIssues = autoFailoverOnDiskIssues
+				case "autoFailoverOnDiskIssuesTimeout":
 					autoFailoverOnDiskIssuesTimeout, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = autoFailoverOnDiskIssuesTimeout
+					spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = autoFailoverOnDiskIssuesTimeout
 				}
 			}
+
+		// Update Buckets configs in ClusterSpec
 		case strings.Contains(key, "bucket"):
 			bucketSettings := api.BucketConfig(DefaultBucketSettings)
 			for setting := range config[key] {
-				switch {
-				case setting == "bucketName":
+				switch setting {
+				case "bucketName":
 					bucketSettings.BucketName = config[key][setting]
-				case setting == "bucketType":
+				case "bucketType":
 					bucketSettings.BucketType = config[key][setting]
-				case setting == "bucketMemoryQuota":
+				case "bucketMemoryQuota":
 					bucketMemoryQuota, _ := strconv.Atoi(config[key][setting])
 					bucketSettings.BucketMemoryQuota = bucketMemoryQuota
-				case setting == "bucketReplicas":
+				case "bucketReplicas":
 					bucketReplicas, _ := strconv.Atoi(config[key][setting])
 					bucketSettings.BucketReplicas = bucketReplicas
-				case setting == "ioPriority":
+				case "ioPriority":
 					ioPriority := config[key][setting]
 					bucketSettings.IoPriority = ioPriority
-				case setting == "evictionPolicy":
+				case "evictionPolicy":
 					policy := config[key][setting]
 					bucketSettings.EvictionPolicy = policy
-				case setting == "conflictResolution":
+				case "conflictResolution":
 					confResoultion := config[key][setting]
 					bucketSettings.ConflictResolution = confResoultion
-				case setting == "enableFlush":
+				case "enableFlush":
 					enableFlush, _ := strconv.ParseBool(config[key][setting])
 					bucketSettings.EnableFlush = enableFlush
-				case setting == "enableIndexReplica":
+				case "enableIndexReplica":
 					enableIndexReplica, _ := strconv.ParseBool(config[key][setting])
 					bucketSettings.EnableIndexReplica = enableIndexReplica
 				}
 			}
-			bucketConfig = append(bucketConfig, bucketSettings)
+			spec.BucketSettings = append(spec.BucketSettings, bucketSettings)
+
+		// Modify Service in ClusterSpec
 		case strings.Contains(key, "service"):
 			serverSettings := api.ServerConfig(defaultServerSettings)
 			volumeMnt := &api.VolumeMounts{}
@@ -337,90 +344,95 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 			}
 			serverSettings.Pod = podPolicy
 			for setting := range config[key] {
-				switch {
-				case setting == "name":
+				switch setting {
+				case "name":
 					serverSettings.Name = config[key][setting]
-				case setting == "size":
+				case "size":
 					size, _ := strconv.Atoi(config[key][setting])
 					serverSettings.Size = size
-				case setting == "services":
+				case "services":
 					serverSettings.Services = api.NewServiceList(strings.Split(config[key][setting], ","))
-				case setting == "serverGroups":
+				case "serverGroups":
 					serverGroups := []string{}
 					parsedGroups := strings.Split(config[key][setting], ",")
 					for _, group := range parsedGroups {
 						serverGroups = append(serverGroups, group)
 					}
 					serverSettings.ServerGroups = serverGroups
-				case setting == "resourceMemLimit":
-					limit, _ := strconv.Atoi(config[key][setting])
-					serverSettings.Pod.Resources.Limits[v1.ResourceMemory] = resource.MustParse(fmt.Sprintf("%d%s", limit, "Mi"))
-				case setting == "resourceMemRequest":
-					request, _ := strconv.Atoi(config[key][setting])
-					serverSettings.Pod.Resources.Requests[v1.ResourceMemory] = resource.MustParse(fmt.Sprintf("%d%s", request, "Mi"))
-				case setting == "defaultVolMnt":
+				case "resourceMemLimit":
+					if _, err := strconv.Atoi(config[key][setting]); err == nil {
+						serverSettings.Pod.Resources.Limits[v1.ResourceMemory] = resource.MustParse(config[key][setting] + "Mi")
+					}
+				case "resourceMemRequest":
+					if _, err := strconv.Atoi(config[key][setting]); err == nil {
+						serverSettings.Pod.Resources.Requests[v1.ResourceMemory] = resource.MustParse(config[key][setting] + "Mi")
+					}
+				case "defaultVolMnt":
 					if serverSettings.Pod.VolumeMounts == nil {
 						serverSettings.Pod.VolumeMounts = volumeMnt
 					}
 					serverSettings.Pod.VolumeMounts.DefaultClaim = config[key][setting]
-				case setting == "indexVolMnt":
+				case "indexVolMnt":
 					if serverSettings.Pod.VolumeMounts == nil {
 						serverSettings.Pod.VolumeMounts = volumeMnt
 					}
 					serverSettings.Pod.VolumeMounts.IndexClaim = config[key][setting]
-				case setting == "dataVolMnt":
+				case "dataVolMnt":
 					if serverSettings.Pod.VolumeMounts == nil {
 						serverSettings.Pod.VolumeMounts = volumeMnt
 					}
 					serverSettings.Pod.VolumeMounts.DataClaim = config[key][setting]
-				case setting == "analyticsVolMnt":
+				case "analyticsVolMnt":
 					if serverSettings.Pod.VolumeMounts == nil {
 						serverSettings.Pod.VolumeMounts = volumeMnt
 					}
 					serverSettings.Pod.VolumeMounts.AnalyticsClaims = strings.Split(config[key][setting], ",")
+				case "logVolMnt":
+					if serverSettings.Pod.VolumeMounts == nil {
+						serverSettings.Pod.VolumeMounts = volumeMnt
+					}
+					serverSettings.Pod.VolumeMounts.LogsClaim = config[key][setting]
 				}
 			}
-			serverConfig = append(serverConfig, serverSettings)
+			spec.ServerSettings = append(spec.ServerSettings, serverSettings)
+
+		// Sets ExposedFeatures in ClusterSpec
 		case key == "exposedFeatures":
-			exposedFeatures = strings.Split(config[key]["featureNames"], ",")
+			spec.ExposedFeatures = strings.Split(config[key]["featureNames"], ",")
+
+		// Updates AdminConsoleServices in ClusterSpec
 		case key == "adminConsoleServices":
 			for _, serviceName := range strings.Split(config[key]["services"], ",") {
-				adminConsoleServices = append(adminConsoleServices, api.Service(serviceName))
+				spec.AdminConsoleServices = append(spec.AdminConsoleServices, api.Service(serviceName))
 			}
+
+		// Sets ServerGroups in ClusterSpec
 		case key == "serverGroups":
-			serverGroups = strings.Split(config[key]["groupNames"], ",")
+			spec.ServerGroups = strings.Split(config[key]["groupNames"], ",")
+
+		// Updates ClusterSpec settings like BaseImage, version, antiaffinity...
 		case strings.Contains(key, "other"):
 			for setting := range config[key] {
-				switch {
-				case setting == "antiAffinity":
-					antiAffinity = config[key][setting]
-				case setting == "baseImageName":
-					baseImageName = config[key][setting]
-				case setting == "versionNum":
-					versionNum = config[key][setting]
+				switch setting {
+				case "baseImageName":
+					spec.BaseImage = config[key][setting]
+				case "versionNum":
+					spec.Version = config[key][setting]
+				case "antiAffinity":
+					if config[key][setting] == "on" {
+						spec.AntiAffinity = true
+					} else if config[key][setting] == "off" {
+						spec.AntiAffinity = false
+					}
+				case "logRetentionTime":
+					spec.LogRetentionTime = config[key][setting]
+				case "logRetentionCount":
+					if logRetentionCount, err := strconv.Atoi(config[key][setting]); err == nil {
+						spec.LogRetentionCount = logRetentionCount
+					}
 				}
 			}
 		}
-	}
-
-	spec := api.ClusterSpec{
-		BaseImage:            baseImageName,
-		Version:              versionNum,
-		AuthSecret:           secretName,
-		ClusterSettings:      clusterSettings,
-		BucketSettings:       bucketConfig,
-		ServerSettings:       serverConfig,
-		AdminConsoleServices: adminConsoleServices,
-		ExposedFeatures:      exposedFeatures,
-		ServerGroups:         serverGroups,
-	}
-
-	switch {
-	case antiAffinity == "on":
-		spec.AntiAffinity = true
-
-	case antiAffinity == "off":
-		spec.AntiAffinity = false
 	}
 	return spec
 }
@@ -495,9 +507,7 @@ func CreatePodPolicy(resourceName v1.ResourceName, request, limit int, scale str
 		Limits:   make(v1.ResourceList),
 		Requests: make(v1.ResourceList),
 	}
-	resourceValue := fmt.Sprintf("%d%s", limit, scale)
-	podPolicy.Resources.Limits[resourceName] = resource.MustParse(resourceValue)
-	resourceValue = fmt.Sprintf("%d%s", request, scale)
-	podPolicy.Resources.Requests[resourceName] = resource.MustParse(resourceValue)
+	podPolicy.Resources.Limits[resourceName] = resource.MustParse(strconv.Itoa(limit) + scale)
+	podPolicy.Resources.Requests[resourceName] = resource.MustParse(strconv.Itoa(request) + scale)
 	return podPolicy
 }

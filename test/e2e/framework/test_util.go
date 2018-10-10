@@ -383,8 +383,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 	clusterSetupFile := ymlFilePath + "/" + kubeType + "/setupCluster.yaml"
 	clusterConfFile := "config_" + kubeType + "_" + kubeClusterSpec.ClusterName
 
-	err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec)
-	if err != nil {
+	if err := createAnsibleHostFiles(clusterHostFile, kubeClusterSpec); err != nil {
 		return err
 	}
 
@@ -803,7 +802,7 @@ func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeCo
 		logrus.Infof("Error deleteing etcd operator crd: %v", err)
 	}
 
-	logrus.Info("Deleting ectd-operator pods")
+	logrus.Info("Deleting etcd-operator pods")
 	if err := e2eutil.DeletePodsWithLabel(t, kubeClient, "name=etcd-operator", namespace); err != nil {
 		return err
 	}
