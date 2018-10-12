@@ -8,10 +8,11 @@ kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
 namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
 deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
-productVersion = $(if $(VERSION),$(VERSION),1.1.0)
+bldNum = $(if $(BLD_NUM),$(BLD_NUM),999)
+productVersion = $(if $(VERSION),$(VERSION)-$(bldNum),1.1.0-999)
 testname = $(E2E_TEST)
 
-.PHONY: all dep build container test test-indv
+.PHONY: all dep build container dist test test-indv
 
 all: build
 
@@ -31,13 +32,25 @@ $(BINARY): $(SOURCE)
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopinfo ./cmd/cbopinfo
 	build/bin/crdgen -outfile example/crd.yaml
 
+# NOTE: This target is only for local development. While we use this Dockerfile
+# (for now), the actual "docker build" command is located in the Jenkins job
+# "couchbase-operator-docker". We could make use of this Makefile there as
+# well, but it is quite possible in future that the canonical Dockerfile will
+# need to be moved to a separate repo in which case the "docker build" command
+# can't be here anyway.
 container: build
 	docker build -f Dockerfile -t couchbase/couchbase-operator:v1 .
 
+# NOTE: This target is only for local development. While we use this Dockerfile
+# (for now), the actual "docker build" command is located in the Jenkins job
+# "couchbase-operator-docker". We could make use of this Makefile there as
+# well, but it is quite possible in future that the canonical Dockerfile will
+# need to be moved to a separate repo in which case the "docker build" command
+# can't be here anyway.
 container-rhel: build
 	docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
 
-tools:
+tools: build
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopctl ./cmd/cbopctl/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopctl ./cmd/cbopctl/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopctl ./cmd/cbopctl/
@@ -45,7 +58,7 @@ tools:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopinfo ./cmd/cbopinfo/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo ./cmd/cbopinfo/
 
-artifacts:
+artifacts: tools
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(productVersion)
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --version $(productVersion)
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --version $(productVersion)
@@ -57,12 +70,20 @@ image-artifacts: build
 	mkdir -p build/image-artifacts/docs
 	mkdir -p build/image-artifacts/build/bin
 	cp docs/License.txt build/image-artifacts/docs/License.txt
-	cp docs/README.txt build/image-artifacts/docs/License.txt
+	cp docs/README.txt build/image-artifacts/docs/README.txt
 	cp $(BINARY) build/image-artifacts/$(BINARY)
 	cp Dockerfile build/image-artifacts/Dockerfile
-	cp Dockerfile build/image-artifacts/Dockerfile.rhel
-	tar -C build -czf build/image-artifacts.tgz image-artifacts
+	cp Dockerfile.rhel build/image-artifacts/Dockerfile.rhel
+	tar -C build/image-artifacts -czf build/couchbase-autonomous-operator-image_$(productVersion).tgz .
 	rm -rf build/image-artifacts
+
+# This target (and only this target) is invoked by the production build job.
+# This job will archive all files that end up in the dist/ directory.
+dist: artifacts image-artifacts
+	rm -rf dist
+	mkdir dist
+	cp build/couchbase-autonomous-operator-image_*.tgz dist
+	cp build/couchbase-autonomous-operator-*.zip dist
 
 prod: container tools artifacts
 
