@@ -578,7 +578,11 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 
 	// Finally update the status
 	status.ExposedFeatures = cluster.Spec.ExposedFeatures
-	status.ExposedPorts = portStatus
+	if len(portStatus) > 0 {
+		status.ExposedPorts = portStatus
+	} else {
+		status.ExposedPorts = cbapi.PortStatusMap(nil)
+	}
 
 	return ret, nil
 }
