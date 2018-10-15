@@ -104,7 +104,7 @@ func waitSizeReachedWithAccept(t *testing.T, crClient versioned.Interface, size,
 			}
 		}
 
-		names = currCluster.Status.Members.Ready.Names()
+		names = currCluster.Status.Members.Ready
 		LogfWithTimestamp(t, "waiting size (%d), healthy couchbase members: names (%v)", size, names)
 		if len(names) != size {
 			return false, nil
