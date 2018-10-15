@@ -56,10 +56,6 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
-	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
-
 	// Creates the client with exposed admin port
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
@@ -67,6 +63,12 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+		t.Fatal(err)
+	}
+	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+
+	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,10 +132,6 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
-	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
-
 	// Creates the client with exposed admin port
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
@@ -141,6 +139,13 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	}
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+		t.Fatal(err)
+	}
+
+	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+
+	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -313,10 +318,6 @@ func TestAnalyticsKillPods(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
-	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
-
 	// Creates the client with exposed admin port
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
@@ -325,6 +326,13 @@ func TestAnalyticsKillPods(t *testing.T) {
 
 	// Load default data set into couchbase bucket
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+		t.Fatal(err)
+	}
+
+	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+
+	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -520,10 +528,6 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	analyticsHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, analyticsNodeName)
-	analyticsNodePortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
-
 	// Creates the client with exposed admin port
 	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
@@ -531,6 +535,13 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	}
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+		t.Fatal(err)
+	}
+
+	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+
+	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
+	if err != nil {
 		t.Fatal(err)
 	}
 

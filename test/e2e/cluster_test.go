@@ -490,6 +490,7 @@ func TestInvalidBaseImage(t *testing.T) {
 		"rpc error: code = Unknown desc = repository docker.io/" + couchbaseBaseImage + " not found: does not exist or no pull access",
 		// For openshift v3.9.33, kubernetes v1.9.1+a0ce1bc657
 		"rpc error: code = Unknown desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
+		"rpc error: code = Unknown desc = Error response from daemon: repository " + couchbaseBaseImage + " not found: does not exist or no pull access",
 	}
 
 	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
@@ -839,11 +840,11 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	clusterNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	nodePortService := e2espec.NewNodePortService(f.Namespace)
 	nodePortService.Spec.Selector["couchbase_node"] = clusterNodeName
-	service, err := e2eutil.CreateService(t, targetKube.KubeClient, f.Namespace, nodePortService)
+	service, err := e2eutil.CreateService(targetKube.KubeClient, f.Namespace, nodePortService)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.DeleteService(t, targetKube.KubeClient, f.Namespace, service.Name, nil)
+	defer e2eutil.DeleteService(targetKube.KubeClient, f.Namespace, service.Name, nil)
 
 	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(kubeName), service)
 	if err != nil {

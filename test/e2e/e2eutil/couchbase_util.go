@@ -51,11 +51,11 @@ func CreateAdminConsoleClient(t *testing.T, apiServerHost string, namespace stri
 	consoleURL := ""
 	if platformType == "azure" {
 		serviceName := cl.Name + "-ui"
-		service, _ := GetService(t, kubeClient, namespace, serviceName)
+		service, _ := GetService(kubeClient, namespace, serviceName)
 		service.Spec.Type = "LoadBalancer"
-		service, _ = UpdateService(t, kubeClient, namespace, service)
+		service, _ = UpdateService(kubeClient, namespace, service)
 		_ = WaitForExternalLoadBalancer(t, kubeClient, namespace, service.Name, 300)
-		service, _ = GetService(t, kubeClient, namespace, serviceName)
+		service, _ = GetService(kubeClient, namespace, serviceName)
 		consoleURL = "http://" + service.Status.LoadBalancer.Ingress[0].IP + ":8091"
 	} else {
 		consoleURL, _ = AdminConsoleURL(apiServerHost, cl.Status.AdminConsolePort)
@@ -67,6 +67,18 @@ func CreateAdminConsoleClient(t *testing.T, apiServerHost string, namespace stri
 	}
 	t.Logf("Client created \n")
 	return client, nil
+}
+
+func GetAdminConsoleHostURL(k8sMasterIp string, namespace string, platformType string, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) (string, error) {
+	if platformType == "azure" {
+		serviceName := cl.Name + "-ui"
+		service, _ := GetService(kubeClient, namespace, serviceName)
+		hostUrl := service.Status.LoadBalancer.Ingress[0].IP + ":8091"
+		return hostUrl, nil
+	} else {
+		hostUrl := k8sMasterIp + ":" + cl.Status.AdminConsolePort
+		return hostUrl, nil
+	}
 }
 
 func EditBucket(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket) error {

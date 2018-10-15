@@ -312,7 +312,22 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcr1KubeName), f.Namespace, f.PlatformType, xdcr1Kube.KubeClient, xdcrCluster1)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcr2KubeName), f.Namespace, f.PlatformType, xdcr2Kube.KubeClient, xdcrCluster2)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
 	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hostUrl, err := e2eutil.GetAdminConsoleHostURL(xdcr1KubeHost, f.Namespace, f.PlatformType, xdcr1Kube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,8 +337,10 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 		t.Fatal(err)
 	}
 
-	hostUrl := xdcr1KubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
-	destUrl := xdcr2KubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
+	destUrl, err := e2eutil.GetAdminConsoleHostURL(xdcr2KubeHost, f.Namespace, f.PlatformType, xdcr2Kube.KubeClient, xdcrCluster2)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	srcBucketName := "default"
 	destBucketName := "default"
@@ -668,7 +685,7 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		}
 		for _, service := range services.Items {
 			if strings.HasSuffix(service.Name, "-exposed-ports") {
-				if err := e2eutil.DeleteService(t, defKube.KubeClient, f.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
+				if err := e2eutil.DeleteService(defKube.KubeClient, f.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
 					errChan <- err
 					return
 				}
@@ -800,16 +817,36 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", api.AdminService, api.DataService, api.IndexService)
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	defKubeHost, err := f.GetKubeHostname(kubeName1)
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName1), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName2), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
+	xdcr1KubeHost, err := f.GetKubeHostname(kubeName1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	xdcrKubeHost, err := f.GetKubeHostname(kubeName2)
+
+	hostUrl, err := e2eutil.GetAdminConsoleHostURL(xdcr1KubeHost, f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
-	destUrl := xdcrKubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
+
+	xdcr2KubeHost, err := f.GetKubeHostname(kubeName2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl, err := e2eutil.GetAdminConsoleHostURL(xdcr2KubeHost, f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	srcBucketName := "default"
 	destBucketName := "default"
 	versionType := "xmem"

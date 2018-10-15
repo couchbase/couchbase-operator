@@ -320,6 +320,7 @@ func CreateKubeClusterObject(kubeConfPath string) (Cluster, error) {
 	clusterSpec.Config = config
 	clusterSpec.CRClient = client.MustNew(config)
 	clusterSpec.KubeClient = cli
+	clusterSpec.KubeConfPath = kubeConfPath
 	return clusterSpec, err
 }
 

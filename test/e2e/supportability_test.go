@@ -380,7 +380,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath //e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	t.Logf("KubeConfPath: %+v", kubeConfPath)
 	errMsgList := failureList{}
 	operatorRestPort := strconv.Itoa(int(constants.OperatorRestPort))
 
@@ -624,7 +625,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		}
 	}
 
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath //e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
 	isAllFlagSet := false
 
 	/////////////////////////////////////////////////////

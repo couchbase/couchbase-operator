@@ -1015,7 +1015,7 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 	switch storageClassType {
 	case "portworx":
 		if err := DeletePortworx(t, kubeClient, kubeConfigPath); err != nil {
-			t.Fatal(err)
+			t.Logf("non fatal error deleting portworx: %+v", err)
 		}
 
 		if err := DeleteEtcd(t, kubeClient, namespace, kubeConfigPath); err != nil {

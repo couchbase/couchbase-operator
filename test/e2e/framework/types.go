@@ -19,6 +19,7 @@ type Cluster struct {
 	CRClient      versioned.Interface
 	DefaultSecret *v1.Secret
 	Config        *rest.Config
+	KubeConfPath  string
 }
 
 // To store each Cluster object denoted by it's Kube name

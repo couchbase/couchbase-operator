@@ -87,17 +87,16 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(kubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
+
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	eventingHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, eventingNodeName)
-	eventingPortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[eventingNodeName].EventingServicePort))
+
+	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
@@ -111,7 +110,15 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
+	k8sMasterIp, err := f.GetKubeHostname(kubeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostUrl, err := e2eutil.GetAdminConsoleHostURL(k8sMasterIp, f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
@@ -159,17 +166,16 @@ func TestEventingResizeCluster(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(kubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
-	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 2)
-	eventingHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, eventingNodeName)
-	eventingPortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[eventingNodeName].EventingServicePort))
+
+	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+
+	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
@@ -184,7 +190,14 @@ func TestEventingResizeCluster(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
+	k8sMasterIp, err := f.GetKubeHostname(kubeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostUrl, err := e2eutil.GetAdminConsoleHostURL(k8sMasterIp, f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
@@ -323,18 +336,16 @@ func TestEventingKillEventingPods(t *testing.T) {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	k8sMasterIp, err := f.GetKubeHostname(kubeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
-	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 2)
-	eventingHostUrl := framework.GetNodeIpForPod(targetKube.KubeClient, f.Namespace, eventingNodeName)
-	eventingPortStr := strconv.Itoa(int(testCouchbase.Status.ExposedPorts[eventingNodeName].EventingServicePort))
 
+	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+
+	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
 	eventingMetaBucketName := "eventingMetaBucket"
@@ -348,7 +359,14 @@ func TestEventingKillEventingPods(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	hostUrl := k8sMasterIp + ":" + testCouchbase.Status.AdminConsolePort
+	k8sMasterIp, err := f.GetKubeHostname(kubeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostUrl, err := e2eutil.GetAdminConsoleHostURL(k8sMasterIp, f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}

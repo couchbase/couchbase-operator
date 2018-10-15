@@ -767,16 +767,14 @@ func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, 
 			return errors.New("Timed out to get K8S node to ready state")
 
 		case <-tickChan:
-			service, err := GetService(t, kubeClient, namespace, loadBalancerServiceName)
+			service, err := GetService(kubeClient, namespace, loadBalancerServiceName)
 			if err != nil {
 				continue
 			}
 
-			t.Logf("loadBalancer service: \n\n %+v \n\n", service)
-			t.Logf("loadBalancer ingress: %+v", service.Status.LoadBalancer.Ingress)
-
 			if len(service.Status.LoadBalancer.Ingress) > 0 {
 				if service.Status.LoadBalancer.Ingress[0].IP != "" {
+					t.Logf("load balancer ingress: %+v", service.Status.LoadBalancer.Ingress)
 					return nil
 				}
 			}

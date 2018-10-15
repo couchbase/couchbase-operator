@@ -894,12 +894,12 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	service, err := e2eutil.CreateService(t, targetKube.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	service, err := e2eutil.CreateService(targetKube.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := e2eutil.DeleteService(t, targetKube.KubeClient, f.Namespace, service.Name, nil); err != nil {
+		if err := e2eutil.DeleteService(targetKube.KubeClient, f.Namespace, service.Name, nil); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1107,12 +1107,12 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	service, err := e2eutil.CreateService(t, targetKube.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
+	service, err := e2eutil.CreateService(targetKube.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := e2eutil.DeleteService(t, targetKube.KubeClient, f.Namespace, service.Name, nil); err != nil {
+		if err := e2eutil.DeleteService(targetKube.KubeClient, f.Namespace, service.Name, nil); err != nil {
 			t.Fatal(err)
 		}
 	}()
