@@ -26,6 +26,7 @@
  ** xref:scaling-couchbase.adoc[Scaling a Couchbase Deployment]
  ** xref:node-recovery.adoc[Recovering From a Node Failure]
  ** xref:delete-couchbase-cluster.adoc[Deleting a Couchbase Deployment]
+ ** xref:upgrading-kubernetes.adoc[Upgrading the Kubernetes Cluster]
  ** xref:backup-and-restore.adoc[Backing up and Restoring a Couchbase Deployment]
  ** xref:conditions-and-events.adoc[Monitoring Couchbase Events]
  ** xref:cluster-status-guide.adoc[Monitoring Couchbase Cluster Status]

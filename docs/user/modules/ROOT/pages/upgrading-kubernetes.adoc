@@ -1,0 +1,61 @@
+= Upgrading the Kubernetes Cluster
+
+During your normal course of operations, you'll no doubt need to upgrade the Kubernetes cluster on which your Couchbase deployment resides.
+This page details the requirements and considerations that you'll need to take into account when performing an online upgrade of a Kubernetes cluster that's hosting a stateful application like Couchbase Server.
+
+== Overview
+
+The general procedure for upgrading a Kubernetes cluster starts with upgrading the Kubernetes master components (e.g. API, controllers, and database).
+This part of the upgrade should not affect the operation of existing Operator deployments or Couchbase cluster resources.
+
+Once the upgrades to the master components are complete, the next step is to manually drain the Kubernetes nodes, one at a time, of their containers.
+After a node is completely drained, you can upgrade the `kubelet` component and make any other necessary hypervisor upgrades (e.g. security patching and kernel updates).
+Once the node has completed all of its upgrades, it can then be untainted and used again by Kubernetes to schedule and run pods on.
+
+When upgrading Kubernetes nodes that are running Couchbase pods, there are certain requirements that you need to adhere to before and after each node has been drained.
+These requirements, detailed in the following sections, must be met for each node before you can move on to another node.
+
+IMPORTANT: The exact upgrade process is dependent on your Kubernetes installation method or cloud provider.
+Consult the relevant third-party documentation for full instructions.
+
+== Operator and Couchbase Cluster Considerations
+
+Kubernetes provides some resources that help with upgrades to minimize disruption due to pods being evicted from Kubernetes nodes.
+Pod https://kubernetes.io/docs/concepts/workloads/pods/disruptions/[disruption budgets^], for example, may limit the number of pods matching a rule that are allowed to be down at the same time.
+Pods cannot be evicted from a Kubernetes node if this limit is passed.
+Only once the number of _ready_ pods are within the specified tolerance, can evictions start again.
+
+For a stateful application, like Couchbase Server, a pod being _ready_ (responding to API requests on the admin port) after it has been evicted and recreated by the Operator, does not mean that the environment is safe to evict another pod. Instead, you must ensure that all data is safely rebalanced and replicated across the Couchbase cluster before you can evict another.
+Failure to do so may result in data loss.
+
+NOTE: It is possible that multiple Couchbase Server pods may be resident on the same node that is being evicted.
+This depends on your specific deployment configuration.
+If the pods belong to the same cluster, they may need to be manually failed over via the xref:accessing-couchbase.adoc#accessing-the-couchbase-server-web-console[Couchbase Web Console] in order for the Operator to recover and rebalance.
+
+The Operator itself is a stateless application typically managed by a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[Deployment^].
+When an Operator pod is evicted, the Deployment controller will automatically recreate a replacement pod that will begin managing _CouchbaseCluster_ resources in its name space.
+
+== Preparation for Upgrade
+
+Before beginning an upgrade to your Kubernetes cluster, review the following considerations and prerequisites:
+
+* Because an eviction deletes a pod, ensure that the Couchbase cluster is scaled correctly so that it can handle the increased load of having a pod down while a new pod is balanced into the cluster.
+
+* To minimize disruption, ensure that a short failover period is configured with the xref:couchbase-cluster-config.adoc#autofailovertimeout[autoFailoverTimeout parameter] to reduce down time before another node takes over the load.
+
+* Ensure that there is capacity in your Kubernetes cluster to handle the scheduling of replacement Couchbase pods.
+For example, if a Couchbase cluster were running on Kubernetes nodes marked exclusively for use by Couchbase, and anti-affinity were enabled as per the deployment xref:best-practices.adoc[best practices], the Kubernetes cluster would require at least one other node capable of scheduling and running your Couchbase workload.
+For clusters deployed with server group support, this would require another node per availability zone.
+
+== Performing the Upgrade
+
+When you drain a Kubernetes node containing a Couchbase pod, the following sequence of events will occur:
+
+* The Operator will detect that a cluster member is down.
+You should monitor this via the xref:logs-troubleshooting.adoc#operator-logs[Operator logs] or xref:accessing-couchbase.adoc#accessing-the-couchbase-server-web-console[Couchbase Web Console].
+
+* The Couchbase pod will be failed over and the Operator will create a replacement pod in order to restore server class sizing.
+
+* The Operator will initiate a rebalance to redistribute data across the cluster and restore redundancy constraints.
+
+Only when the rebalance is successfully complete can you safely drain and upgrade another Kubernetes node containing a Couchbase pod belonging to the same Couchbase cluster.
