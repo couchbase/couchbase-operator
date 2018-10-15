@@ -16,6 +16,7 @@ type Member struct {
 	Namespace    string
 	ServerConfig string
 	SecureClient bool
+	Version      string
 }
 
 type MemberSet map[string]*Member

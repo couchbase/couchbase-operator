@@ -39,30 +39,10 @@ const (
 	ClusterConditionManageBuckets                      = "ManageBuckets"
 	ClusterConditionManageConfig                       = "ManageConfig"
 	ClusterConditionScaling                            = "Scaling"
+	ClusterConditionUpgrading                          = "Upgrading"
 )
 
 type ClusterStatusMap map[ClusterConditionType]*ClusterCondition
-
-// If the status contains an UpgradeStatus object then an upgrade is in progress.
-//
-// Initially when we detect a modification to the cluster version the struct is
-// populated with the target version to upgrade to and the set of all member
-// nodes, less the first node to upgrade.  The first node to upgrade is recorded
-// along with the name of the new upgraded node to replace it with. Nodes are ordered
-// and processed in lexical order to allow determinism.  All this is atomically
-// added to the status.
-type UpgradeStatus struct {
-	// Version to upgrade to
-	TargetVersion string `json:"targetVersion"`
-	// Nodes ready to be upgraded
-	ReadyNodes []string `json:"readyNodes,omitempty"`
-	// Upgrading node
-	UpgradingNode string `json:"upgradingNode"`
-	// Upgraded node
-	UpgradedNode string `json:"upgradedNode"`
-	// Nodes who have been upgraded
-	DoneNodes []string `json:"doneNodes,omitempty"`
-}
 
 // PortStatus contains the K8S port mappings for various services
 type PortStatus struct {
@@ -118,9 +98,6 @@ type ClusterStatus struct {
 
 	// ports exposing couchbase cluster on the K8S node network
 	ExposedPorts PortStatusMap `json:"nodePorts,omitempty"`
-
-	// upgrade status
-	UpgradeStatus *UpgradeStatus `json:"upgrade,omitempty"`
 }
 
 type MemberTimestamp struct {
@@ -202,40 +179,6 @@ func (ms *MembersStatus) SetUnready(unready []string) {
 
 func (cs *ClusterStatus) SetVersion(v string) {
 	cs.CurrentVersion = v
-}
-
-// If the upgrade status is set then we are upgrading
-func (cs *ClusterStatus) Upgrading() bool {
-	return cs.UpgradeStatus != nil
-}
-
-// Flag upgrade start by setting the upgrade status, only if not set
-func (cs *ClusterStatus) StartUpgrade(status *UpgradeStatus) error {
-	if cs.Upgrading() {
-		return fmt.Errorf("unable to start upgrade upgrade state when upgrading")
-	}
-	cs.UpgradeStatus = status
-	return nil
-}
-
-// Update upgrade status if we are already in an upgrade
-func (cs *ClusterStatus) UpdateUpgrade(status *UpgradeStatus) error {
-	if !cs.Upgrading() {
-		return fmt.Errorf("unable to update upgrade status when not upgrading")
-	}
-	cs.UpgradeStatus = status
-	return nil
-}
-
-// Complete an upgrade by making the current version the target and unsetting
-// the upgrade status, but only if we are already upgrading
-func (cs *ClusterStatus) CompleteUpgrade() error {
-	if !cs.Upgrading() {
-		return fmt.Errorf("unable to complete upgrade when not upgrading")
-	}
-	cs.CurrentVersion = cs.UpgradeStatus.TargetVersion
-	cs.UpgradeStatus = nil
-	return nil
 }
 
 func (cs *ClusterStatus) UpdateBuckets(name string, config *BucketConfig) {
@@ -331,11 +274,23 @@ func (cs *ClusterStatus) SetConfigRejectedCondition(message string) {
 	cs.setClusterCondition(ClusterConditionManageConfig, c)
 }
 
+func (cs *ClusterStatus) SetUpgradingCondition(status *UpgradeStatus) {
+	c := newClusterCondition(v1.ConditionTrue, "Cluster upgrading", status.Format())
+	cs.setClusterCondition(ClusterConditionUpgrading, c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	if cs.Conditions == nil {
 		cs.Conditions = ClusterStatusMap{}
 	}
 	delete(cs.Conditions, t)
+}
+
+func (cs *ClusterStatus) GetCondition(t ClusterConditionType) *ClusterCondition {
+	if cs.Conditions == nil {
+		return nil
+	}
+	return cs.Conditions[t]
 }
 
 func (cs *ClusterStatus) setClusterCondition(t ClusterConditionType, c *ClusterCondition) {
@@ -363,4 +318,39 @@ func newClusterCondition(status v1.ConditionStatus, reason, message string) *Clu
 
 func scalingMsg(from, to int) string {
 	return fmt.Sprintf("Current cluster size: %d, desired cluster size: %d", from, to)
+}
+
+// Used to marshal and unmarshal information from the Upgrading condition.
+type UpgradeStatus struct {
+	State       string
+	Source      string
+	Target      string
+	TargetCount int
+	TotalCount  int
+}
+
+const (
+	// UpgradingMessageFormat is the message format used when the cluster is upgrading.
+	// The first field is the state of the operation, the second and third fields are
+	// the source and target versions repsectively, the forth and fifth fields are the
+	// counts of members at the target version and total members repsectively.
+	UpgradingMessageFormat = "Cluster %s from %s to %s (progress %d/%d)"
+	// UpgradingMessageStateUpgrading is used in the UpgradingMessageFormat to indicate
+	// an upgrade in progress.
+	UpgradingMessageStateUpgrading = "upgrading"
+	// UpgradingMessageStateRollback is used in the UpgradingMessageFormat to indicate
+	// a rollback in process.
+	UpgradingMessageStateRollback = "rolling-back"
+)
+
+// Format creates an upgrade condition message.
+func (status *UpgradeStatus) Format() string {
+	return fmt.Sprintf(UpgradingMessageFormat, status.State, status.Source, status.Target, status.TargetCount, status.TotalCount)
+}
+
+// NewUpgradeStatus creates an UpgradeStatus from an upgrade condition message.
+func NewUpgradeStatus(message string) *UpgradeStatus {
+	status := &UpgradeStatus{}
+	fmt.Sscanf(message, UpgradingMessageFormat, &status.State, &status.Source, &status.Target, &status.TargetCount, &status.TotalCount)
+	return status
 }

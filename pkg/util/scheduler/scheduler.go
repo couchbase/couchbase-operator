@@ -20,6 +20,9 @@ type Scheduler interface {
 	// Delete selects a server name to delete from a specific server class.
 	Delete(class string) (string, error)
 
+	// Upgrade removes a node from the scheduler as it's an upgrade target.
+	Upgrade(class, name string) error
+
 	// LogStatus writes out the status to a writer.
 	LogStatus(io.Writer) error
 }

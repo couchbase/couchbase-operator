@@ -82,6 +82,11 @@ func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	return server, nil
 }
 
+// Upgrade removes a node from the scheduler as it's an upgrade target.
+func (sched *nullSchedulerImpl) Upgrade(class, name string) error {
+	return sched.serverClasses[class].del(name)
+}
+
 // LogStatus returns nothing
 func (sched *nullSchedulerImpl) LogStatus(w io.Writer) error {
 	return nil

@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
@@ -23,6 +24,7 @@ const (
 	ReconcileFailedAddBackNodes
 	ReconcileFailedNodes
 	ReconcileServerConfigs
+	ReconcileUpgradeNode
 	ReconcileRemoveNodes
 	ReconcileRemoveUnmanaged
 	ReconcileAddNodes
@@ -66,6 +68,7 @@ var (
 		ReconcileFailedAddBackNodes: handleFailedAddBackNodes,
 		ReconcileFailedNodes:        handleFailedNodes,
 		ReconcileServerConfigs:      handleUnknownServerConfigs,
+		ReconcileUpgradeNode:        handleUpgradeNode,
 		ReconcileRemoveNodes:        handleRemoveNode,
 		ReconcileRemoveUnmanaged:    handleUnmanagedNodes,
 		ReconcileAddNodes:           handleAddNode,
@@ -181,6 +184,10 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 	if updated, err := c.wouldReconcileServerGroups(); err != nil {
 		return err
 	} else if updated {
+		needsReconcile = true
+	}
+
+	if candidate, _ := c.needsUpgrade(); candidate != nil {
 		needsReconcile = true
 	}
 	// TEMPORARY HACK END
@@ -546,6 +553,61 @@ func handleAddNode(r *ReconcileMachine, c *Cluster) error {
 			r.runningPods.Add(m)
 			addCount++
 		}
+	}
+
+	r.transitionState(ReconcileUpgradeNode)
+	return nil
+}
+
+func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
+	// Something is broken, let that get fixed up first.
+	if r.couchbase.NeedsRebalance {
+		r.transitionState(ReconcileServerGroups)
+		return nil
+	}
+
+	// Nothing to do, move along.
+	candidate, targetCount := c.needsUpgrade()
+	if candidate == nil {
+		r.transitionState(ReconcileServerGroups)
+		return nil
+	}
+
+	c.logger.Infof("Planning upgrade of candidate %s from %s to %s", candidate.Name, candidate.Version, c.cluster.Spec.Version)
+	status := &couchbasev1.UpgradeStatus{
+		Source:      candidate.Version,
+		Target:      c.cluster.Spec.Version,
+		TargetCount: targetCount,
+		TotalCount:  len(c.members),
+	}
+
+	// Flag that an upgrade is in action, validation will use this to control what
+	// resource modifications are allowed.
+	c.reportUpgrade(status)
+
+	// Remove the candidate from the scheduler.
+	c.scheduler.Upgrade(candidate.ServerConfig, candidate.Name)
+
+	// Grab the server class.
+	class := c.cluster.Spec.GetServerConfigByName(candidate.ServerConfig)
+	if class == nil {
+		return fmt.Errorf("upgrade unable to determine server class %s for member %s", candidate.Name, candidate.ServerConfig)
+	}
+
+	// Add the new member.
+	member, err := c.addMember(*class)
+	if err != nil {
+		return fmt.Errorf("upgrade failed to add new node to cluster: %v", err)
+	}
+
+	// Update book keeping
+	r.knownNodes.Add(member)
+	r.runningPods.Add(member)
+	r.knownNodes.Remove(candidate.Name)
+	r.ejectNodes.Add(candidate)
+	r.couchbase.NeedsRebalance = true
+	if c.memberHasLogVolumes(candidate.Name) {
+		r.removeVolumes[candidate.Name] = true
 	}
 
 	r.transitionState(ReconcileServerGroups)

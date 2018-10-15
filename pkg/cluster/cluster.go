@@ -58,7 +58,6 @@ type Config struct {
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
 	LogLevel       logrus.Level
-	EnableUpgrades bool
 }
 
 type ClusterStats struct {
@@ -450,15 +449,7 @@ func (c *Cluster) isSecureClient() bool {
 }
 
 func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
-	// Always use the status version to create new pods, unless upgrading, and
-	// not that in the spec.  This avoids any potential race conditions where
-	// the upgrade code allows reconciliation, but picks up potentially illegal
-	// container versions from the spec.
-	version := c.status.CurrentVersion
-	if c.upgrading() {
-		version = c.status.UpgradeStatus.TargetVersion
-	}
-
+	version := c.cluster.Spec.Version
 	c.logger.Infof("Creating a pod (%s) running Couchbase %s", m.Name, version)
 	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, c.ctx)
 	return err

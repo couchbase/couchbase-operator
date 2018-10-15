@@ -39,6 +39,17 @@ func (s *serverList) pop() (string, error) {
 	return server, nil
 }
 
+// del removes the named server from the server list.
+func (s *serverList) del(name string) error {
+	for index, server := range s.servers {
+		if server == name {
+			s.servers = append(s.servers[:index], s.servers[index+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("del of non-existent server from server list")
+}
+
 // serverGroups maps server group names to a list of servers
 type serverGroups map[string]*serverList
 

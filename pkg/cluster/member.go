@@ -53,13 +53,14 @@ func (c *Cluster) nextMemberName() string {
 	return couchbaseutil.CreateMemberName(c.cluster.Name, index)
 }
 
-func (c *Cluster) newMember(id int, serverSpecName string) *couchbaseutil.Member {
+func (c *Cluster) newMember(id int, serverSpecName, version string) *couchbaseutil.Member {
 	name := couchbaseutil.CreateMemberName(c.cluster.Name, id)
 	return &couchbaseutil.Member{
 		Name:         name,
 		Namespace:    c.cluster.Namespace,
 		ServerConfig: serverSpecName,
 		SecureClient: false,
+		Version:      version,
 	}
 }
 
@@ -86,11 +87,17 @@ func podsToMemberSet(pods []*v1.Pod, sc bool) couchbaseutil.MemberSet {
 			config = val
 		}
 
+		version := ""
+		if val, ok := pod.Annotations[constants.CouchbaseVersionAnnotationKey]; ok {
+			version = val
+		}
+
 		m := &couchbaseutil.Member{
 			Name:         pod.Name,
 			Namespace:    pod.Namespace,
 			ServerConfig: config,
 			SecureClient: sc,
+			Version:      version,
 		}
 		members.Add(m)
 	}

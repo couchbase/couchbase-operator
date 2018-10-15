@@ -194,6 +194,11 @@ var (
 		// Log redaction cases
 		"TestLogRedactionVerify":       TestLogRedactionVerify,
 		"TestLogRedactionWithPvVerify": TestLogRedactionWithPvVerify,
+
+		// Upgrade tests
+		"TestUpgrade":                TestUpgrade,
+		"TestUpgradeRollback":        TestUpgradeRollback,
+		"TestUpgradeKillPodOnCreate": TestUpgradeKillPodOnCreate,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{

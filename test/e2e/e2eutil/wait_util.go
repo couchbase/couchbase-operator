@@ -218,6 +218,10 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 				v1.ConditionFalse,
 				"Cluster scaling ...",
 			},
+			api.ClusterConditionUpgrading: {
+				v1.ConditionFalse,
+				"Cluster upgrading ...",
+			},
 		}
 
 		for kind, cond := range cl.Status.Conditions {
@@ -239,6 +243,12 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 		return fmt.Errorf("fail to wait for cluster status to be healthy: %v \n", err)
 	}
 	return nil
+}
+
+func MustWaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, namespace string, expectedNodes, retries int) {
+	if err := WaitClusterStatusHealthy(t, crClient, name, namespace, expectedNodes, retries); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, retries int) error {
@@ -450,6 +460,12 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
+func MustWaitForClusterEvent(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, seconds int) {
+	if err := WaitForClusterEvent(kubeClient, cl, event, seconds); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func WaitForClusterEventsInParallel(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, expectedEvents EventList, seconds int) (EventList, error) {
 	receivedEvents := EventList{}
 	eventChan := make(chan v1.Event)
@@ -563,6 +579,12 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 				}
 			}
 		}
+	}
+}
+
+func MustWaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) {
+	if err := WaitForClusterCondition(t, crClient, conditionType, status, cl, after, wait); err != nil {
+		t.Fatal(err)
 	}
 }
 

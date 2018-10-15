@@ -324,6 +324,14 @@ func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
 }
 
+func MustNewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+	cluster, err := NewClusterBasic(t, kubeClient, crClient, namespace, secretName, size, withBucket, exposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
+}
+
 // NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
 func NewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
@@ -413,8 +421,18 @@ func UpdateClusterSpec(field string, value string, crClient versioned.Interface,
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerGroups = strings.Split(value, ",") }
 	case field == "AntiAffinity":
 		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.AntiAffinity, _ = strconv.ParseBool(value) }
+	case field == "Version":
+		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.Version = value }
 	}
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+}
+
+func MustUpdateClusterSpec(t *testing.T, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) *api.CouchbaseCluster {
+	cluster, err := UpdateClusterSpec(field, value, crClient, cl, maxRetries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
 }
 
 func UpdateClusterSettings(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
@@ -748,6 +766,12 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) error {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return KillMember(kubeCli, cl.Namespace, cl.Name, name)
+}
+
+func MustKillPodForMember(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) {
+	if err := KillPodForMember(kubeCli, cl, memberId); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *api.CouchbaseCluster, clusterName, namespace string) (*v1.Pod, error) {

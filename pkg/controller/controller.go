@@ -52,7 +52,6 @@ type Config struct {
 	Namespace      string
 	ServiceAccount string
 	CreateCrd      bool
-	EnableUpgrades bool
 	KubeCli        kubernetes.Interface
 	CouchbaseCRCli versioned.Interface
 	VerifyVersion  bool
@@ -201,7 +200,6 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 		KubeCli:        c.Config.KubeCli,
 		CouchbaseCRCli: c.Config.CouchbaseCRCli,
 		LogLevel:       logutil.LogLevel(),
-		EnableUpgrades: c.Config.EnableUpgrades,
 	}
 }
 

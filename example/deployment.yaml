@@ -20,7 +20,6 @@ spec:
         # Remove the arguments section if you are installing the CRD manually
         args:
         - -create-crd
-        - -enable-upgrades=false
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:

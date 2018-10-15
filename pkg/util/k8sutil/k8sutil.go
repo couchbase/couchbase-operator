@@ -29,8 +29,6 @@ import (
 )
 
 const (
-	couchbaseVersionAnnotationKey = "couchbase.version"
-
 	// Fixed port names (generate SRV records for the peer services)
 	couchbaseSRVName    = "couchbase"
 	couchbaseSRVNameTLS = "couchbases"
@@ -126,7 +124,7 @@ const (
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 
 func SetCouchbaseVersion(pod *v1.Pod, version string) {
-	pod.Annotations[couchbaseVersionAnnotationKey] = version
+	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = version
 }
 
 func ClientServiceName(clusterName string) string {

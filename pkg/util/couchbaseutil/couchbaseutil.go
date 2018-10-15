@@ -169,9 +169,10 @@ func (c *CouchbaseClient) SetUUID(uuid string) {
 
 // nodeStatus is an intermediate data structured used to log node status information.
 type nodeStatus struct {
-	name  string
-	class string
-	state string
+	name    string
+	version string
+	class   string
+	state   string
 }
 
 // GetNode looks up node based on Couchbase hostname.
@@ -308,11 +309,13 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 
 		// Buffer up the status entry
 		class := cs.managedNodes[name].ServerConfig
+		version := cs.managedNodes[name].Version
 
 		status := nodeStatus{
-			name:  name,
-			class: class,
-			state: strings.Join(states, "+"),
+			name:    name,
+			version: version,
+			class:   class,
+			state:   strings.Join(states, "+"),
 		}
 		statuses = append(statuses, status)
 
@@ -359,10 +362,10 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 
 	// Format our table
 	table := prettytable.Table{
-		Header: prettytable.Row{"Server", "Class", "Status"},
+		Header: prettytable.Row{"Server", "Version", "Class", "Status"},
 	}
 	for _, status := range statuses {
-		table.Rows = append(table.Rows, prettytable.Row{status.name, status.class, status.state})
+		table.Rows = append(table.Rows, prettytable.Row{status.name, status.version, status.class, status.state})
 	}
 	return table.Write(w)
 }

@@ -46,25 +46,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return nil
 	}
 
-	if c.config.EnableUpgrades {
-		// Upgrading must override reconciliation as during the process the
-		// cluster will be oversized and we don't want nodes to disappear ...
-		upgrading := c.upgrading()
-		if err := c.upgrade(status); err != nil {
-			return err
-		}
-		// ... addtionally if we were previously or currently are upgrading then
-		// state may have altered and reality may not match 'pods' without
-		// probing the API again
-		if upgrading || c.upgrading() {
-			return nil
-		}
-	} else {
-		if c.cluster.Spec.Version != c.status.CurrentVersion {
-			return fmt.Errorf("cluster upgrades are unsupported")
-		}
-	}
-
 	state := &ReconcileMachine{
 		runningPods:   podsToMemberSet(pods, c.isSecureClient()),
 		knownNodes:    couchbaseutil.NewMemberSet(),
@@ -93,6 +74,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	c.reconcileAdminService()
 
+	c.reportUpgradeComplete()
 	c.status.ClearCondition(api.ClusterConditionScaling)
 	c.status.SetReadyCondition()
 
@@ -135,7 +117,7 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 	c.incPodIndex()
 
 	// Create a new member
-	newMember := c.newMember(index, serverSpec.Name)
+	newMember := c.newMember(index, serverSpec.Name, c.cluster.Spec.Version)
 
 	// Prepare to delete member Pod if any errors
 	// occur during creation or configuration
@@ -1102,4 +1084,85 @@ func getServiceDataPaths(mounts *api.VolumeMounts) (string, string, []string) {
 		}
 	}
 	return dataPath, indexPath, analyticsPaths
+}
+
+// needsUpgrade does an ordered walk down the list of members, if a member is not
+// the correct version then return it as an upgrade canididate  It also returns the
+// counts of members in the various versions.
+func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int) {
+	version := c.cluster.Spec.Version
+	for _, member := range c.members {
+		// Book keep the target version count for status reporting and
+		// update the candidate with the first we find
+		if member.Version == version {
+			target++
+		} else if candidate == nil {
+			candidate = member
+		}
+	}
+	return
+}
+
+// reportUpgrade looks at the current state and any existing upgrade status
+// condition, makes condition updates and raises events.
+func (c *Cluster) reportUpgrade(status *api.UpgradeStatus) {
+	// Look for an existing condition
+	condition := c.status.GetCondition(api.ClusterConditionUpgrading)
+
+	if condition == nil {
+		// No existing condition, we are guaranteed to be upgrading.
+		status.State = api.UpgradingMessageStateUpgrading
+		c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
+	} else {
+		// There is an existing condition, check to see which way we are going.
+		// If we have switched directions we will need a new event.
+		oldStatus := api.NewUpgradeStatus(condition.Message)
+		if status.Target != oldStatus.Target {
+			version, _ := couchbaseutil.NewVersion(status.Target)
+			oldVersion, _ := couchbaseutil.NewVersion(oldStatus.Target)
+			switch version.Compare(oldVersion) {
+			case 1:
+				// Upgrading
+				status.State = api.UpgradingMessageStateUpgrading
+				c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
+			case -1:
+				// Rolling back
+				status.State = api.UpgradingMessageStateRollback
+				c.raiseEvent(k8sutil.RollbackStartedEvent(status.Source, status.Target, c.cluster))
+			}
+		} else {
+			status.State = oldStatus.State
+		}
+	}
+
+	c.status.SetUpgradingCondition(status)
+	c.updateCRStatus()
+}
+
+// reportUpgradeComplete is called unconditionally when the reconcile is complete.
+// If there was an unpgrade condition and the cluster no longer needs an upgrade clear
+// the condition and raise any necessary events.
+func (c *Cluster) reportUpgradeComplete() {
+	// Still upgrading do nothing
+	if candidate, _ := c.needsUpgrade(); candidate != nil {
+		return
+	}
+
+	// There is no condition, we weren't upgrading, do nothing
+	condition := c.status.GetCondition(api.ClusterConditionUpgrading)
+	if condition == nil {
+		return
+	}
+
+	status := api.NewUpgradeStatus(condition.Message)
+	switch status.State {
+	case api.UpgradingMessageStateUpgrading:
+		c.raiseEvent(k8sutil.UpgradeFinishedEvent(status.Source, status.Target, c.cluster))
+	case api.UpgradingMessageStateRollback:
+		c.raiseEvent(k8sutil.RollbackFinishedEvent(status.Source, status.Target, c.cluster))
+	}
+
+	c.status.ClearCondition(api.ClusterConditionUpgrading)
+	c.status.CurrentVersion = c.cluster.Spec.Version
+	c.updateCRStatus()
 }

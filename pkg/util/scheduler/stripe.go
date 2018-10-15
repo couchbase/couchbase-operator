@@ -130,6 +130,16 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 	return server, nil
 }
 
+// Upgrade removes a node from the scheduler as it's an upgrade target.
+func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
+	for serverGroup, _ := range sched.serverClasses[class] {
+		if err := sched.serverClasses[class][serverGroup].del(name); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s: server '%s' does not exist in class '%s'", stripeErrorHeader, name, class)
+}
+
 // LogStatus writes formatted state for debugging
 func (sched *stripeSchedulerImpl) LogStatus(w io.Writer) error {
 	if _, err := w.Write([]byte("Scheduler status:\n")); err != nil {
