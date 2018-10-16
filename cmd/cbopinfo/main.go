@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/config"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
+	"github.com/couchbase/couchbase-operator/pkg/info/logs"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
@@ -39,7 +40,6 @@ var (
 
 	// Define all implied sub-resources we can collect information for
 	collectorInitializers = []collector.CollectorInitializer{
-		collector.NewCouchbaseLogCollector,
 		collector.NewEventCollector,
 		collector.NewLogCollector,
 		collector.NewOperatorCollector,
@@ -143,6 +143,12 @@ func main() {
 			fmt.Println("requested cluster", name, "not found in namespace", context.Config.Namespace)
 			os.Exit(1)
 		}
+	}
+
+	// Collect logs first, this supports reporting which logs are available to be collected
+	// which can then be explicitly collected on the next run.
+	if err := logs.Collect(context); err != nil {
+		fmt.Println("log collection failed: %v", err)
 	}
 
 	// Initialize the backend file writer, defer closing so it will flush any

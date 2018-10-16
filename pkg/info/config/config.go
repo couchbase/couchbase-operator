@@ -32,6 +32,14 @@ type Configuration struct {
 	KubeConfig string
 	// CollectInfo determines whether to collect Couchbase server logs
 	CollectInfo bool
+	// CollectInfoRedact determines whether to automatically redact logs
+	CollectInfoRedact bool
+	// CollectInfoList lists the logs that can be collected to the console and
+	// immediatedly exists.
+	CollectInfoList bool
+	// CollectInfoCollect determines the logs to collect from the CLI.  Valid values
+	// are an indices e.g. 1, ranges 2-3, a comma separated combination 1,3,5-6 or all.
+	CollectInfoCollect string
 	// Help determines whether to print help and exit
 	Help bool
 	// Version determines whether to print out the version string and exit
@@ -45,14 +53,17 @@ type Configuration struct {
 }
 
 const (
-	namespaceFlag        = "namespace"
-	kubeconfigFlag       = "kubeconfig"
-	operatorImageFlag    = "operator-image"
-	operatorRestPortFlag = "operator-rest-port"
-	serverImageFlag      = "server-image"
-	allFlag              = "all"
-	systemFlag           = "system"
-	collectInfoFlag      = "collectinfo"
+	namespaceFlag          = "namespace"
+	kubeconfigFlag         = "kubeconfig"
+	operatorImageFlag      = "operator-image"
+	operatorRestPortFlag   = "operator-rest-port"
+	serverImageFlag        = "server-image"
+	allFlag                = "all"
+	systemFlag             = "system"
+	collectInfoFlag        = "collectinfo"
+	collectInfoRedactFlag  = "collectinfo-redact"
+	collectInfoListFlag    = "collectinfo-list"
+	collectInfoCollectFlag = "collectinfo-collect"
 )
 
 // flagToEnvVar converts a command line flag to a environment variable.
@@ -105,9 +116,12 @@ func Parse() Configuration {
 	flagSet.StringVar(&c.OperatorImage, operatorImageFlag, lookupFlagFromEnvString(operatorImageFlag, "couchbase/operator:"+version.Version), "operator image name")
 	flagSet.StringVar(&c.OperatorRestPort, operatorRestPortFlag, lookupFlagFromEnvString(operatorRestPortFlag, "8080"), "operator rest port")
 	flagSet.StringVar(&c.ServerImage, serverImageFlag, lookupFlagFromEnvString(serverImageFlag, "couchbase/server:enterprise-5.5.1"), "couchbase server image")
+	flagSet.StringVar(&c.CollectInfoCollect, collectInfoCollectFlag, lookupFlagFromEnvString(collectInfoCollectFlag, ""), "collect couchbase server logs non-interactively")
 	flagSet.BoolVar(&c.All, allFlag, lookupFlagFromEnvBool(allFlag, false), "collect all resources from the namespace")
 	flagSet.BoolVar(&c.System, systemFlag, lookupFlagFromEnvBool(systemFlag, false), "collect kube-system resources and logs")
 	flagSet.BoolVar(&c.CollectInfo, collectInfoFlag, lookupFlagFromEnvBool(collectInfoFlag, false), "collect couchbase server logs")
+	flagSet.BoolVar(&c.CollectInfoRedact, collectInfoRedactFlag, lookupFlagFromEnvBool(collectInfoRedactFlag, false), "redact couchbase server logs")
+	flagSet.BoolVar(&c.CollectInfoList, collectInfoListFlag, lookupFlagFromEnvBool(collectInfoListFlag, false), "list all log sources in json and exit")
 	flagSet.BoolVar(&c.Help, "help", false, "print this message and exit")
 	flagSet.BoolVar(&c.Version, "version", false, "print the version string and exit")
 	flagSet.Parse(os.Args[1:])

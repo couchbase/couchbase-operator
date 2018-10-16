@@ -8,10 +8,10 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/couchbase/couchbase-operator/pkg/info/context"
+
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 )
 
@@ -26,26 +26,28 @@ type CollectInfoResult struct {
 	Pod *v1.Pod
 	// fileName is the absolute filename of the log file
 	FileName string
-	// fileNameRedacted is the absolute filename of the redacted log file
-	FileNameRedacted string
 	// err is the error status.  Nil on success
 	Err error
 }
 
-func CollectInfo(client kubernetes.Interface, config *rest.Config, pod *v1.Pod) (result *CollectInfoResult) {
+// Runs cbcollect_info on the specified pod.
+func CollectInfo(context *context.Context, pod *v1.Pod) (result *CollectInfoResult) {
 	// Place the logs in somewhere writable to any user
 	baseFilename := "cbinfo-" + pod.Namespace + "-" + pod.Name + "-" + Timestamp()
+
+	// The file name will differ based on redaction settings
 	fileName := "/tmp/" + baseFilename + ".zip"
-	fileNameRedacted := "/tmp/" + baseFilename + "-redacted.zip"
+	if context.Config.CollectInfoRedact {
+		fileName = "/tmp/" + baseFilename + "-redacted.zip"
+	}
 
 	result = &CollectInfoResult{
-		Pod:              pod,
-		FileName:         fileName,
-		FileNameRedacted: fileNameRedacted,
+		Pod:      pod,
+		FileName: fileName,
 	}
 
 	// Generate the REST request
-	req := client.CoreV1().RESTClient().Post().
+	req := context.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(pod.Namespace).
 		Name(pod.Name).
@@ -62,7 +64,7 @@ func CollectInfo(client kubernetes.Interface, config *rest.Config, pod *v1.Pod) 
 	}, scheme.ParameterCodec)
 
 	// Create an executor running over HTTP2
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	exec, err := remotecommand.NewSPDYExecutor(context.KubeConfig, "POST", req.URL())
 	if err != nil {
 		result.Err = fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
 		return
@@ -79,11 +81,12 @@ func CollectInfo(client kubernetes.Interface, config *rest.Config, pod *v1.Pod) 
 	return
 }
 
-func CopyFromPod(client kubernetes.Interface, config *rest.Config, pod *v1.Pod, paths []string) error {
+// Copy file from a pod.
+func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 	// Generate the REST request
 	command := []string{"tar", "cf", "-"}
 	command = append(command, paths...)
-	req := client.CoreV1().RESTClient().Post().
+	req := context.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(pod.Namespace).
 		Name(pod.Name).
@@ -95,7 +98,7 @@ func CopyFromPod(client kubernetes.Interface, config *rest.Config, pod *v1.Pod, 
 	}, scheme.ParameterCodec)
 
 	// Create an executor running over HTTP2
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	exec, err := remotecommand.NewSPDYExecutor(context.KubeConfig, "POST", req.URL())
 	if err != nil {
 		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
 	}
@@ -117,5 +120,34 @@ func CopyFromPod(client kubernetes.Interface, config *rest.Config, pod *v1.Pod, 
 		}
 		ioutil.WriteFile(filepath.Base(header.Name), stdout.Bytes(), 0644)
 	}
+	return nil
+}
+
+// Cleans all log entries from a pod to save ephemeral space.
+func CleanLogs(context *context.Context, pod *v1.Pod) error {
+	command := []string{"rm", "-f", "/tmp/cbinfo-*"}
+	req := context.KubeClient.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Namespace(pod.Namespace).
+		Name(pod.Name).
+		SubResource("exec")
+	req.VersionedParams(&v1.PodExecOptions{
+		Container: CouchbaseServerContainerName,
+		Command:   command,
+		Stdout:    true,
+	}, scheme.ParameterCodec)
+
+	// Create an executor running over HTTP2
+	exec, err := remotecommand.NewSPDYExecutor(context.KubeConfig, "POST", req.URL())
+	if err != nil {
+		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+	}
+
+	// Finally run the delete command
+	stdout := &bytes.Buffer{}
+	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
+		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+	}
+
 	return nil
 }

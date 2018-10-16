@@ -94,11 +94,16 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
 
 // PodExists returns whether a pod exists or not.
 func (j *janitorAbstractionInterfaceImpl) PodExists(name string) (bool, error) {
-	if _, err := k8sutil.GetPod(j.cluster.config.KubeCli, j.cluster.cluster.Namespace, name); err != nil {
+	pod, err := k8sutil.GetPod(j.cluster.config.KubeCli, j.cluster.cluster.Namespace, name)
+	if err != nil {
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return false, nil
 		}
 		return false, err
+	}
+	// Check this isn't cbopinfo doing a collection.
+	if v, ok := pod.Labels["app"]; ok && v == "cbopinfo" {
+		return false, nil
 	}
 	return true, nil
 }
