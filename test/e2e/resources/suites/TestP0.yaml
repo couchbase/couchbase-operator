@@ -142,7 +142,7 @@ tcGroups:
 
   - name: SupportabilityTests
     clusters:
-      - BasicCluster
+      - NewCluster1
     testcases:
       - name: TestLogCollectValidateArguments
       - name: TestNegLogCollectValidateArgs

@@ -174,19 +174,23 @@ var (
 		"TestNegLogCollectValidateArgs":              TestNegLogCollectValidateArgs,
 		"TestLogCollectUsingClusterNameAndNamespace": TestLogCollectUsingClusterNameAndNamespace,
 		"TestLogCollectRbacPermission":               TestLogCollectRbacPermission,
-		"TestLogCollectClusterWithPVC":               TestLogCollectClusterWithPVC,
 		// Extended log collection cases
 		"TestExtendedDebugWithDefaultValues":               TestExtendedDebugWithDefaultValues,
 		"TestExtendedDebugWithNonDefaultValues":            TestExtendedDebugWithNonDefaultValues,
 		"TestExtendedDebugWithInvalidValues":               TestExtendedDebugWithInvalidValues,
 		"TestExtendedDebugKillOperatorDuringLogCollection": TestExtendedDebugKillOperatorDuringLogCollection,
 
-		// Log collection from EphmeralPods
-		"TestCollectLogFromEphemeralPodsUsingLogPV":         TestCollectLogFromEphemeralPodsUsingLogPV,
-		"TestCollectLogFromEphemeralPodsWithOperatorKilled": TestCollectLogFromEphemeralPodsWithOperatorKilled,
-		"TestEphemeralLogCollectResizeCluster":              TestEphemeralLogCollectResizeCluster,
-		"TestLogCollectWithDefaultRetentionAndSize":         TestLogCollectWithDefaultRetentionAndSize,
-		"TestLogCollectWithCustomRetentionAndSize":          TestLogCollectWithCustomRetentionAndSize,
+		// Log collection from Ephmeral pods
+		"TestCollectLogFromEphemeralPodsUsingLogPV":           TestCollectLogFromEphemeralPodsUsingLogPV,
+		"TestCollectLogFromEphemeralPodsWithOperatorKilled":   TestCollectLogFromEphemeralPodsWithOperatorKilled,
+		"TestEphemeralLogCollectResizeCluster":                TestEphemeralLogCollectResizeCluster,
+		"TestLogCollectWithClusterResizeAndServerPodKilled":   TestLogCollectWithClusterResizeAndServerPodKilled,
+		"TestLogCollectWithClusterResizeAndOperatorPodKilled": TestLogCollectWithClusterResizeAndOperatorPodKilled,
+		"TestLogCollectWithDefaultRetentionAndSize":           TestLogCollectWithDefaultRetentionAndSize,
+		"TestLogCollectWithCustomRetentionAndSize":            TestLogCollectWithCustomRetentionAndSize,
+		// Log collection from Persistent pods
+		"TestLogCollectClusterWithPVC":     TestLogCollectClusterWithPVC,
+		"TestCollectLogFromPvPodRecovered": TestCollectLogFromPvPodRecovered,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{

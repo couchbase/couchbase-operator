@@ -1056,14 +1056,6 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 	return nil
 }
 
-func GetNodeIpForPod(kubeClient kubernetes.Interface, namespace, podName string) string {
-	pod, err := kubeClient.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
-	if err != nil {
-		return ""
-	}
-	return pod.Status.HostIP
-}
-
 // Remove specified label from all k8s nodes identified by kubeName
 func RemoveLabels(nodeLabelName string, kubeClient kubernetes.Interface) error {
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})

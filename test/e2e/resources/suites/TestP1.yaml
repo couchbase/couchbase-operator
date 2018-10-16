@@ -149,7 +149,7 @@ tcGroups:
 
   - name: SupportabilityTests
     clusters:
-      - BasicCluster
+      - NewCluster1
     testcases:
       - name: TestLogCollectRbacPermission
       - name: TestExtendedDebugWithInvalidValues

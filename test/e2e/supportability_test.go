@@ -378,9 +378,9 @@ func createClusterRoles(kubeClient kubernetes.Interface, roleName string) error 
 // and validate the exit status of the commands
 func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
-	kubeName := "BasicCluster"
+	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := targetKube.KubeConfPath //e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath
 	t.Logf("KubeConfPath: %+v", kubeConfPath)
 	errMsgList := failureList{}
 	operatorRestPort := strconv.Itoa(int(constants.OperatorRestPort))
@@ -589,7 +589,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
+	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
 
 	failureExists := false
@@ -625,7 +625,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		}
 	}
 
-	kubeConfPath := targetKube.KubeConfPath //e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath
 	isAllFlagSet := false
 
 	/////////////////////////////////////////////////////
@@ -902,7 +902,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 	svcAccName := "rbac-test"
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath
 
 	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
@@ -1073,7 +1073,8 @@ func CollectExtendedDebugLogGeneric(t *testing.T, kubeName, opImageName string, 
 func TestExtendedDebugWithDefaultValues(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	targetKube := f.ClusterSpec[kubeName]
+	kubeConfPath := targetKube.KubeConfPath
 	defPort := constants.OperatorRestPort
 	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all"}
 	CollectExtendedDebugLogGeneric(t, kubeName, constants.DefOperatorImgTag, defPort, defPort, cmdArgs)
@@ -1084,7 +1085,8 @@ func TestExtendedDebugWithDefaultValues(t *testing.T) {
 func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	f := framework.Global
 	kubeName := "BasicCluster"
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	targetKube := f.ClusterSpec[kubeName]
+	kubeConfPath := targetKube.KubeConfPath
 	var defPort int32
 	var testPort int32
 	testPort = 32123
@@ -1107,7 +1109,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	invalidImgName := "couchbase/couchbase-operator:invalidversion"
 	invalidPortVal := "32080"
 	clusterSize := constants.Size1
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath
 
 	// Create Couchbase cluster
 	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
@@ -1197,7 +1199,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 	clusterSize := constants.Size1
 	execOut := []byte{}
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath
 
 	// Create Couchbase cluster
 	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
@@ -1285,7 +1287,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query", "eventing"})
 	serviceConfig2["logVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
+	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	otherConfig1 := map[string]string{
 		"logRetentionTime":  "2h",
 		"logRetentionCount": "3",
@@ -1299,19 +1301,18 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 		"other1":   otherConfig1,
 	}
 
-	killOperatorFunc := func() {
-		operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace)
-	}
-
 	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	// Create Couchbase cluster
 	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Cleanup cluster after test execution
+	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
 		t.Fatal(err)
@@ -1345,7 +1346,9 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 
 		// Kills operator pod in async way
 		if isOperatorKilledWithServerPod {
-			go killOperatorFunc()
+			go func() {
+				operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace)
+			}()
 		}
 
 		// Bring down couchbase server pod
@@ -1367,37 +1370,165 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 			}
 		}
 
-		event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
-			t.Fatal(err)
-		}
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberToKill)
-		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberToKill)
+		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 
-		event = e2eutil.NewMemberAddEvent(cbCluster, newMemberIndex)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 180); err != nil {
-			t.Fatal(err)
+		// Only in case of DeletePod, FailOver and NewMemberAdd is triggered
+		switch podDownMethod {
+		case "deletePod":
+			event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill)
+			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
+				t.Fatal(err)
+			}
+			expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberToKill)
+
+			event = e2eutil.NewMemberAddEvent(cbCluster, newMemberIndex)
+			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 180); err != nil {
+				t.Fatal(err)
+			}
+			expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newMemberIndex)
+
+			// To validate the new PVC created for new pod
+			newMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, newMemberIndex)
+			expectedPvcMap[newMemberName] = 1
+
+			event = e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill)
+			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
+				t.Fatal(err)
+			}
+			expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberToKill)
 		}
-		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newMemberIndex)
 
-		// To validate the new PVC created for new pod
-		newMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, newMemberIndex)
-		expectedPvcMap[newMemberName] = 1
-
-		event = e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-			t.Fatal(err)
-		}
-
-		event = e2eutil.RebalanceCompletedEvent(cbCluster)
+		event := e2eutil.RebalanceCompletedEvent(cbCluster)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
 			t.Fatal(err)
 		}
-		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberToKill)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 		newMemberIndex++
 	}
+
+	// Verifying the persistence of log PVs are preserved by operator
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		t.Error(err)
+	}
+	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
+}
+
+// Generic function to kill Cb server pod and update the server class in parallel
+// and check how operator handles the log retention as expected
+func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperatorKilledWithServerPod bool) {
+	f := framework.Global
+	kubeName := f.TestClusters[0]
+	targetKube := f.ClusterSpec[kubeName]
+
+	operatorKilledErrChan := make(chan error)
+	clusterSize := 6
+	serverIndexToResize := 1
+	podMemberToKill := 3
+	bucketName := "PVBucket"
+	pvcName := "couchbase-log-pv"
+	clusterConfig := e2eutil.BasicClusterConfig
+	clusterConfig["autoFailoverOnDiskIssues"] = "true"
+	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
+	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_1", []string{"data"})
+	serviceConfig1["defaultVolMnt"] = pvcName
+
+	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query"})
+	serviceConfig2["logVolMnt"] = pvcName
+
+	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushDisabled, constants.IndexReplicaDisabled)
+
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"service2": serviceConfig2,
+		"bucket1":  bucketConfig1,
+	}
+
+	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
+	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
+	createPodSecurityContext(1000, &clusterSpec)
+
+	// Create Cb cluster
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add expected kube events for verification
+	expectedEvents := e2eutil.EventValidator{}
+	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
+		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", memberIndex)
+	}
+	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
+	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", bucketName)
+
+	// To cross check number of persistent vol claims matches the defined spec
+	expectedPvcMap := map[string]int{
+		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 3): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 4): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 5): 1,
+	}
+
+	// Verifying the persistence of log PVs are preserved by operator
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		t.Error(err)
+	}
+
+	// Trigger async Cluster's service config resize
+	if err := e2eutil.ResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube.CRClient, cbCluster); err != nil {
+		t.Fatal(err)
+	}
+
+	// Kill operator if flag is enabled
+	if isOperatorKilledWithServerPod {
+		go func() {
+			operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace)
+		}()
+	}
+
+	// Kill pod in parallel to resize
+	podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, podMemberToKill)
+	if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, metav1.NewDeleteOptions(0)); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", podMemberToKill)
+
+	// If operator was killed, will waits for operator recovery to happen
+	if isOperatorKilledWithServerPod {
+		if err := <-operatorKilledErrChan; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Wait for failover of killed server pod
+	event := e2eutil.NewMemberFailedOverEvent(cbCluster, podMemberToKill)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 90); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", podMemberToKill)
+
+	// Wait for rebalance complete event
+	event = e2eutil.RebalanceCompletedEvent(cbCluster)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
+	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", podMemberToKill)
+	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", clusterSize-1)
+	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
+
+	// Updating expectedPvcMap for resizing pods
+	expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, clusterSize-1)] = 0
 
 	// Verifying the persistence of log PVs are preserved by operator
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
@@ -1410,15 +1541,15 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 // even after abnormal pod removal
 func TestCollectLogFromEphemeralPodsUsingLogPV(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	kubeName := f.TestClusters[0]
 	isOperatorKilledWithServerPod := false
 
 	// Pods brought down using DeletePod method
-	EphemeralLogCollectUsingLogPVGeneric(t, targetKubeName, "deletePod", isOperatorKilledWithServerPod)
+	EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "deletePod", isOperatorKilledWithServerPod)
 
 	// Pods brought down by killing cb-server process
 	if f.KubeType == "kubernetes" {
-		EphemeralLogCollectUsingLogPVGeneric(t, targetKubeName, "killServerProcess", isOperatorKilledWithServerPod)
+		EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "killServerProcess", isOperatorKilledWithServerPod)
 	}
 }
 
@@ -1426,15 +1557,15 @@ func TestCollectLogFromEphemeralPodsUsingLogPV(t *testing.T) {
 // even after abnormal pod removal
 func TestCollectLogFromEphemeralPodsWithOperatorKilled(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
+	kubeName := f.TestClusters[0]
 	isOperatorKilledWithServerPod := true
 
 	// Pods brought down using DeletePod method
-	EphemeralLogCollectUsingLogPVGeneric(t, targetKubeName, "deletePod", isOperatorKilledWithServerPod)
+	EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "deletePod", isOperatorKilledWithServerPod)
 
 	// Pods brought down by killing cb-server process
 	if f.KubeType == "kubernetes" {
-		EphemeralLogCollectUsingLogPVGeneric(t, targetKubeName, "killServerProcess", isOperatorKilledWithServerPod)
+		EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "killServerProcess", isOperatorKilledWithServerPod)
 	}
 }
 
@@ -1442,8 +1573,8 @@ func TestCollectLogFromEphemeralPodsWithOperatorKilled(t *testing.T) {
 // Scale down the couchbase cluster and check log PVs cleanup has happened
 func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	f := framework.Global
-	targetKubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[targetKubeName]
+	kubeName := f.TestClusters[0]
+	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 7
 	bucketName := "PVBucket"
@@ -1458,7 +1589,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size5, "test_config_2", []string{"search", "query", "eventing"})
 	serviceConfig2["logVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
+	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushDisabled, constants.IndexReplicaDisabled)
 	otherConfig1 := map[string]string{
 		"logRetentionTime":  "2h",
 		"logRetentionCount": "3",
@@ -1587,11 +1718,25 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
+// Kill Cb server pod and update the server class in parallel
+// and check how operator handles the log retention
+func TestLogCollectWithClusterResizeAndServerPodKilled(t *testing.T) {
+	isOperatorKilledWithServerPod := false
+	LogCollectWithClusterResizeAndServerPodKilledGeneric(t, isOperatorKilledWithServerPod)
+}
+
+// Kill Operator, Cb server pod anb update the server class all in parallel
+// and check how operator handles the log retention
+func TestLogCollectWithClusterResizeAndOperatorPodKilled(t *testing.T) {
+	isOperatorKilledWithServerPod := true
+	LogCollectWithClusterResizeAndServerPodKilledGeneric(t, isOperatorKilledWithServerPod)
+}
+
 // Collect logs from ephemeral log PVs
 // using default log retention time and size values
 func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	f := framework.Global
-	kubeName := "NewCluster1"
+	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 5
@@ -1607,8 +1752,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query", "eventing"})
 	serviceConfig2["logVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
-
+	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
@@ -1700,7 +1844,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 // using custom log retention time and size values
 func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	f := framework.Global
-	kubeName := "NewCluster1"
+	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := 5
@@ -1717,7 +1861,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query", "eventing"})
 	serviceConfig2["logVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
+	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	otherConfig1 := map[string]string{
 		"logRetentionTime":  "15m",
 		"logRetentionCount": strconv.Itoa(logRetentionCount),
@@ -1839,26 +1983,25 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
   Persistent pods log collection cases
 ***************************************/
 
-// Create couchbase cluster with persistent volume claim
-// Collect log and check for persistent volume definition files
-func TestLogCollectClusterWithPVC(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+// Generic function to deploy Couchbase server with default persistent volumes mounts
+// Argument 'serverMemberIdsToKill' will kill those pod members and wait for recovery before log collection
+// Argument 'isOperatorKilledWithServerPod' tells whether operator needs to be killed along with server pods
+func LogCollectionWithDefaultPvcMount(t *testing.T, kubeName string, serverMemberIdToKill map[int]string, isOperatorKilledWithServerPod bool) {
 	f := framework.Global
-	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
-	kubeConfPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeName)
+	kubeConfPath := targetKube.KubeConfPath
 
+	clusterSize := constants.Size2
+	operatorKilledErrChan := make(chan error)
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_1", []string{"data", "query", "index", "analytics"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
 	serviceConfig1["defaultVolMnt"] = pvcName
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
 	serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", 100, 2, true, false)
+	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
@@ -1870,9 +2013,55 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	// Create Couchbase cluster
 	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+		t.Fatal(err.Error())
+	}
+
+	// Kills operator pod in async way
+	if isOperatorKilledWithServerPod {
+		go func() {
+			operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace)
+		}()
+	}
+
+	// Delete pod with default persistent volumes defined for it
+	for podMemberToKill, podDownMethod := range serverMemberIdToKill {
+		podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, podMemberToKill)
+		switch podDownMethod {
+		case "deletePod":
+			if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, metav1.NewDeleteOptions(0)); err != nil {
+				t.Fatal(err)
+			}
+		case "killServerProcess":
+			if _, err := f.ExecShellInPod(kubeName, podNameToKill, "pkill beam.smp"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Wait for operator recovery to happen
+	if isOperatorKilledWithServerPod {
+		if err := <-operatorKilledErrChan; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if len(serverMemberIdToKill) != 0 {
+		// Wait for cluster to be rebalanced before log collection and verification
+		event := e2eutil.RebalanceStartedEvent(cbCluster)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
+			t.Fatal(err)
+		}
+
+		event = e2eutil.RebalanceCompletedEvent(cbCluster)
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Collect logs
@@ -1906,4 +2095,68 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 		t.Error(err)
 	}
 	errMsgList.CheckFailures(t)
+}
+
+// Create couchbase cluster with persistent volume claim
+// Collect log and check for persistent volume definition files
+func TestLogCollectClusterWithPVC(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	kubeName := f.TestClusters[0]
+	serverPodsToKill := map[int]string{}
+	isOperatorKilledWithServerPod := false
+	LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+}
+
+// Create couchbase cluster with persistent volume claim
+// Bring down a pod and collect log and check for persistent volume definition files
+func TestCollectLogFromPvPodRecovered(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	kubeName := f.TestClusters[0]
+	isOperatorKilledWithServerPod := false
+
+	// Pods brought down by DeletePod API
+	serverPodsToKill := map[int]string{
+		1: "deletePod",
+	}
+	LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+
+	// Pods brought down by killing cb-server process
+	if f.KubeType == "kubernetes" {
+		serverPodsToKill := map[int]string{
+			1: "killServerProcess",
+		}
+		LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+	}
+}
+
+// Create couchbase cluster with persistent volume claim
+// Bring down a pod with operator and wait for recovery
+// Collect log and check for persistent volume definition files
+func TestCollectLogFromPvPodAndOperatorRecovered(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
+	f := framework.Global
+	kubeName := f.TestClusters[0]
+	isOperatorKilledWithServerPod := true
+
+	// Pods brought down by DeletePod API
+	serverPodsToKill := map[int]string{
+		1: "deletePod",
+	}
+	LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+
+	// Pods brought down by killing cb-server process
+	if f.KubeType == "kubernetes" {
+		serverPodsToKill := map[int]string{
+			1: "killServerProcess",
+		}
+		LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+	}
 }

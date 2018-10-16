@@ -251,11 +251,11 @@ func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
 	return clusterSize
 }
 
-func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command string) {
+func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command string) {
 	f := framework.Global
 	failures := failureList{}
-	targetKube := f.ClusterSpec[targetKubeName]
-	os.Setenv("KUBECONFIG", e2eutil.GetKubeConfigToUse(f.KubeType, targetKubeName))
+	targetKube := f.ClusterSpec[kubeName]
+	os.Setenv("KUBECONFIG", targetKube.KubeConfPath)
 	for _, test := range testDefs {
 		t.Logf("Running test: %s", test.name)
 
@@ -270,7 +270,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command
 		testCouchbase.ObjectMeta.Namespace = f.Namespace
 
 		// Removing previous deployment if any
-		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, targetKubeName, t.Name())
+		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
 
 		if command == "apply" || command == "delete" {
 			err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
@@ -399,7 +399,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, targetKubeName, command
 	}
 	// Removing deployment if any
 	if !f.SkipTeardown {
-		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, targetKubeName, t.Name())
+		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
 	}
 	failures.CheckFailures(t)
 }
@@ -417,7 +417,7 @@ func TestValidationCreate(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
@@ -917,7 +917,7 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedMessages: []string{"\"invalidClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
@@ -966,7 +966,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
@@ -995,7 +995,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
@@ -1116,7 +1116,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			expectedMessages: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
@@ -1155,7 +1155,7 @@ func TestValidationApply(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
@@ -1206,7 +1206,7 @@ func TestNegValidationApply(t *testing.T) {
 			expectedMessages: []string{"spec.servers[0].services in body cannot be updated"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
@@ -1295,7 +1295,7 @@ func TestValidationDefaultApply(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
@@ -1318,7 +1318,7 @@ func TestNegValidationDefaultApply(t *testing.T) {
 			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
@@ -1417,7 +1417,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			expectedWarn:     "Changing the Eviction Policy will cause the bucket default1 to be temporarily unavailable",
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
@@ -1727,7 +1727,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			expectedMessages: []string{"\"storage\" in spec.volumeClaimTemplates[*].resources.limits cannot be updated"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
@@ -1759,7 +1759,7 @@ func TestValidationDelete(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" deleted"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "delete")
 }
 
@@ -1782,7 +1782,7 @@ func TestNegValidationDelete(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters.couchbase.com \"cb-example1\" not found"},
 		},
 	}
-	kubeName := "NewCluster1"
+	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "delete")
 }
 
@@ -1814,6 +1814,6 @@ func TestRzaNegCreateCluster(t *testing.T) {
 			expectedMessages: []string{"spec.servergroups missing for "},
 		},
 	}
-	targetKubeName := "NewCluster1"
-	runValidationTest(t, testDefs, targetKubeName, "create")
+	kubeName := framework.Global.TestClusters[0]
+	runValidationTest(t, testDefs, kubeName, "create")
 }
