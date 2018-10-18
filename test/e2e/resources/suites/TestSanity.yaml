@@ -68,6 +68,9 @@ tcGroups:
       - name: TestLogCollectValidateArguments
       - name: TestExtendedDebugWithDefaultValues
       - name: TestCollectLogFromEphemeralPodsUsingLogPV
+      - name: TestCollectLogFromPvPodRecovered
+      - name: TestLogCollectWithDefaultRetentionAndSize
+      - name: TestLogRedactionVerify
 
   - name: CouchbaseServerServiceTests
     cluster:

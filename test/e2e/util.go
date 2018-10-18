@@ -191,6 +191,9 @@ var (
 		// Log collection from Persistent pods
 		"TestLogCollectClusterWithPVC":     TestLogCollectClusterWithPVC,
 		"TestCollectLogFromPvPodRecovered": TestCollectLogFromPvPodRecovered,
+		// Log redaction cases
+		"TestLogRedactionVerify":       TestLogRedactionVerify,
+		"TestLogRedactionWithPvVerify": TestLogRedactionWithPvVerify,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{

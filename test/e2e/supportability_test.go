@@ -2,12 +2,16 @@ package e2e
 
 import (
 	"archive/tar"
+	"archive/zip"
+	"bufio"
 	"compress/gzip"
 	"errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,6 +32,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+// Removes first dir name present in the file path
+func parentDirStrRemover(fileList []string) {
+	for index, fileName := range fileList {
+		fileList[index] = strings.Join(strings.Split(fileName, "/")[1:], "/")
+	}
+}
 
 // Function to cross check log dir contents against populated file list
 func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *failureList) {
@@ -67,6 +78,206 @@ func checkCollectInfoLogs(execOut []byte, kubeClient kubernetes.Interface, names
 		if !strings.Contains(execOutStr, expectedCbInfoRedactionStr) {
 			errMsgList.AppendFailure("For pod "+pod.Name, errors.New("CbCollectInfo redaction file print missing"))
 		}
+	}
+	return nil
+}
+
+// Function to compare file list on redacted and non-redacted dir contents
+func compareCbCollectInfoFileList(nonRedactedFileList, redactedFileList []string, errMsgList *failureList) {
+	nonRedactedFileListLen := len(nonRedactedFileList)
+	redactedFileListLen := len(redactedFileList)
+
+	// Redacted will be one less than non-redacted file list (users.dets file will not be in redacted files)
+	if redactedFileListLen != nonRedactedFileListLen-1 {
+		errMsgStr := "Non-redacted files: " + strconv.Itoa(nonRedactedFileListLen) + ", Redacted files: " + strconv.Itoa(redactedFileListLen)
+		errMsgList.AppendFailure(errMsgStr, errors.New("File number mismatch in non-redacted and redacted dir content"))
+	}
+
+	for _, fileName := range nonRedactedFileList {
+		if strings.Contains(fileName, "users.dets") {
+			if framework.ElementExistsInArr(fileName, redactedFileList) {
+				errMsgList.AppendFailure("Non-redacted file: users.dets", errors.New("Users file found in redacted file list"))
+			}
+		} else if !framework.ElementExistsInArr(fileName, redactedFileList) {
+			errMsgList.AppendFailure("Non-redacted file: "+fileName, errors.New("File not found in redacted file list"))
+		}
+	}
+}
+
+// Function to verify <ud> tag in collectinfo redacted logs
+func checkRedactionLogData(commonFileList []string, nonRedactedDirName, redactedDirName string, errMsgList *failureList) {
+	// Regexp for ud in log file
+	udRegexpForNonRedactedStr, _ := regexp.Compile("<ud>(.+)</ud>")
+	udRegexpForRedactedStr, _ := regexp.Compile("<ud>([a-f0-9]{40})</ud>")
+
+	// Errors to use for logging purpose
+	redactedHashPatternNotFoundErr := errors.New("Redacted hashing pattern not found")
+	nonRedactedHashPatternNotFoundErr := errors.New("Non-redacted <ud> data not found")
+
+	// Function to read / process log files
+	readUdTagsFromFile := func(fileName string, isRedactedFile bool) map[int]string {
+		// Returns map 'line number: <ud>.*</ud> line string' from input files
+		parsedLineData := map[int]string{}
+
+		fPtr, err := os.Open(fileName)
+		if err != nil {
+			errMsgList.AppendFailure("Failed to open "+fileName, err)
+			return parsedLineData
+		}
+		defer fPtr.Close()
+
+		lineNum := 1
+		fileScanner := bufio.NewScanner(fPtr)
+		for fileScanner.Scan() {
+			line := fileScanner.Text()
+			lineNumStr := strconv.Itoa(lineNum)
+
+			redactedStrMatch := udRegexpForRedactedStr.FindStringSubmatch(line)
+			nonRedactedStrMatch := udRegexpForNonRedactedStr.FindStringSubmatch(line)
+
+			// Process only if valid <ud> tag found in the line
+			if len(nonRedactedStrMatch) > 0 || len(redactedStrMatch) > 0 {
+				if isRedactedFile {
+					// If redacted file, store the found pattern to the redacted map for further verification
+					if len(redactedStrMatch) == 2 {
+						parsedLineData[lineNum] = redactedStrMatch[1]
+					} else {
+						errMsgList.AppendFailure("File "+fileName+", line "+lineNumStr, redactedHashPatternNotFoundErr)
+					}
+				} else {
+					// If non-redacted file, store the found pattern to the non-redacted map for further verification
+					if len(nonRedactedStrMatch) == 2 {
+						parsedLineData[lineNum] = nonRedactedStrMatch[1]
+					} else {
+						errMsgList.AppendFailure("File "+fileName+", line "+lineNumStr, nonRedactedHashPatternNotFoundErr)
+					}
+				}
+			}
+			lineNum++
+		}
+		return parsedLineData
+	}
+
+	// File for <ud> tag data verification
+	for _, fileName := range commonFileList {
+		// Continue if the file type is other than '.log'
+		if !strings.HasSuffix(fileName, ".log") {
+			continue
+		}
+
+		nonRedactedFileName := nonRedactedDirName + "/" + fileName
+		redactedFileName := redactedDirName + "/" + fileName
+
+		nonRedactedMapData := readUdTagsFromFile(nonRedactedFileName, false)
+		redactedMapData := readUdTagsFromFile(redactedFileName, true)
+
+		nonRedactedMapDataLen := len(nonRedactedMapData)
+		redactedMapDataLen := len(redactedMapData)
+
+		// Verify the length of constructed <ud> data map is same
+		if nonRedactedMapDataLen != redactedMapDataLen {
+			errMsgStr := "Non-redacted file has " + strconv.Itoa(nonRedactedMapDataLen) + ", Redacted file has " + strconv.Itoa(redactedMapDataLen)
+			errMsgList.AppendFailure("Mismatch in <ud> tag list in file "+fileName, errors.New(errMsgStr))
+		}
+
+		// Verify <ud> data between redacted and non-redacted values are not same
+		for lineNum, nonRedactedUdData := range nonRedactedMapData {
+			if redactedUdData, ok := redactedMapData[lineNum]; ok {
+				// Verify <ud> tag value is hashed in redacted file
+				if nonRedactedUdData == redactedUdData {
+					errMsgStr := "Non-redacted <ud> value " + nonRedactedUdData + ", Redacted <ud> value " + redactedUdData
+					errMsgList.AppendFailure("Redacted value not hashed in file "+fileName, errors.New(errMsgStr))
+				}
+			} else {
+				// Error if line number not matching in redacted file
+				errMsgStr := "Line num: " + strconv.Itoa(lineNum) + " not found in redacted file"
+				errMsgList.AppendFailure("Line number not found in redacted file "+fileName, errors.New(errMsgStr))
+			}
+		}
+	}
+}
+
+// Function to verify log redaction from cbcollectinfo files
+func verifyLogRedaction(kubeClient kubernetes.Interface, namespace, cbClusterName, cbopinfoLogDir, kubeConfPath, execOutStr string, errMsgList *failureList) error {
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+	if err != nil {
+		return errors.New("Failed to list pods: " + err.Error())
+	}
+
+	cmdName := "kubectl"
+	commonCmdToExec := []string{"--kubeconfig", kubeConfPath, "cp"}
+	logFileTimeStampStr := strings.Split(cbopinfoLogDir, ".")[0]
+	logFileTimeStampStr = strings.Join(strings.Split(logFileTimeStampStr, "-")[1:], "-")
+	for _, pod := range pods.Items {
+		// Construct src zip file name
+		nonRedactedDirName := "cbinfo-" + namespace + "-" + pod.Name + "-" + logFileTimeStampStr
+		redactedDirName := nonRedactedDirName + "-redacted"
+		srcNonRedactedFileName := nonRedactedDirName + ".zip"
+		srcRedactedFileName := redactedDirName + ".zip"
+
+		// Construct kubectl command string for exec.Command API call
+		temSrcFileStr := namespace + "/" + pod.Name + ":/tmp/"
+		cmdForNonRedactedLog := append(commonCmdToExec, temSrcFileStr+srcNonRedactedFileName, ".")
+		cmdForRedactedLog := append(commonCmdToExec, temSrcFileStr+srcRedactedFileName, ".")
+
+		// Execute exec.Command to copy collectinfo & collectinfo-redacted zip file from KUBE
+		if _, err := exec.Command(cmdName, cmdForNonRedactedLog...).CombinedOutput(); err != nil {
+			errMsgList.AppendFailure("Error while executing "+strings.Join(cmdForNonRedactedLog, " "), err)
+		}
+
+		if _, err := exec.Command(cmdName, cmdForRedactedLog...).CombinedOutput(); err != nil {
+			errMsgList.AppendFailure("Error while executing "+strings.Join(cmdForRedactedLog, " "), err)
+		}
+
+		// Remove copied zip file from local path during function execution
+		defer os.Remove(srcNonRedactedFileName)
+		defer os.Remove(srcRedactedFileName)
+
+		// Remove unzipped dir contents from local path after function execution
+		defer os.RemoveAll(nonRedactedDirName)
+		defer os.RemoveAll(redactedDirName)
+
+		// Unzip the copied cbcollectinfo zip files
+		if err := unzipFile(srcNonRedactedFileName); err != nil {
+			errMsgList.AppendFailure("Error while unzipping "+srcNonRedactedFileName, err)
+		}
+
+		if err := unzipFile(srcRedactedFileName); err != nil {
+			errMsgList.AppendFailure("Error while unzipping "+srcRedactedFileName, err)
+		}
+
+		temFileList := []string{}
+
+		// Function to return available files in the unzipped dir
+		walkFunc := func(filePath string, fileInfo os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if fileInfo.IsDir() {
+				return nil
+			}
+			temFileList = append(temFileList, filePath)
+			return nil
+		}
+
+		// Populate file list in non-redacted dir
+		temFileList = []string{}
+		filepath.Walk(nonRedactedDirName, walkFunc)
+		nonRedactedFileList := temFileList
+
+		// Populate file list in redacted dir
+		temFileList = []string{}
+		filepath.Walk(redactedDirName, walkFunc)
+		redactedFileList := temFileList
+
+		parentDirStrRemover(nonRedactedFileList)
+		parentDirStrRemover(redactedFileList)
+
+		// Compare file list in both redacted and non-redacted dir are same
+		compareCbCollectInfoFileList(nonRedactedFileList, redactedFileList, errMsgList)
+
+		// Cross check user data <ud> tag contents
+		checkRedactionLogData(nonRedactedFileList, nonRedactedDirName, redactedDirName, errMsgList)
 	}
 	return nil
 }
@@ -256,6 +467,52 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 		}
 		for _, service := range services.Items {
 			*reqFileList = append(*reqFileList, serviceDir+"/"+service.Name+"/"+service.Name+".yaml")
+		}
+	}
+	return nil
+}
+
+// Function to unzip the zip file
+func unzipFile(zipFileName string) error {
+	destFileName := strings.Replace(zipFileName, ".zip", "", -1)
+	zipReader, err := zip.OpenReader(zipFileName)
+	if err != nil {
+		return err
+	}
+	defer zipReader.Close()
+
+	os.MkdirAll(destFileName, 0777)
+
+	// Closure to address file descriptors issue with all the deferred .Close() methods
+	extractAndWriteFile := func(file *zip.File) error {
+		rc, err := file.Open()
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+
+		filePath := filepath.Join(destFileName, file.Name)
+
+		if file.FileInfo().IsDir() {
+			os.MkdirAll(filePath, 0777)
+		} else {
+			os.MkdirAll(filepath.Dir(filePath), 0777)
+			fPtr, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+			if err != nil {
+				return err
+			}
+			defer fPtr.Close()
+
+			if _, err := io.Copy(fPtr, rc); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	for _, file := range zipReader.File {
+		if err := extractAndWriteFile(file); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -2158,5 +2415,151 @@ func TestCollectLogFromPvPodAndOperatorRecovered(t *testing.T) {
 			1: "killServerProcess",
 		}
 		LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+	}
+}
+
+/***********************************
+   Log redaction verification
+***********************************/
+
+func TestLogRedactionVerify(t *testing.T) {
+	f := framework.Global
+	kubeName := f.TestClusters[0]
+	targetKube := f.ClusterSpec[kubeName]
+	kubeConfPath := targetKube.KubeConfPath
+
+	clusterSize := constants.Size3
+	bucketName := "default"
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size1, "test_config_1", []string{"data"})
+	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_2", []string{"query", "index", "analytics"})
+	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"service2": serviceConfig2,
+		"bucket1":  bucketConfig1,
+	}
+
+	// Create Couchbase cluster
+	cbCluster, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminExposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+		t.Fatal(err)
+	}
+
+	// Collect logs
+	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all", cbCluster.Name}
+	execOut, err := runCbopinfoCmd(cmdArgs)
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
+	defer os.Remove(logFileName)
+
+	logFileDir := strings.Split(logFileName, ".")[0]
+	defer os.RemoveAll(logFileDir)
+	if err := untarGzFile(logFileName); err != nil {
+		t.Fatal(err)
+	}
+
+	// Variable to denote failure of test
+	testHasErrors := false
+
+	// Verify required log files are generated
+	errMsgList := failureList{}
+	if err := checkCollectInfoLogs(execOut, targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, &errMsgList); err != nil {
+		t.Error(err)
+	}
+	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
+
+	// Verify log redaction part in collected files
+	errMsgList = failureList{}
+	if err := verifyLogRedaction(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, kubeConfPath, execOutStr, &errMsgList); err != nil {
+		t.Error(err)
+	}
+	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
+
+	if testHasErrors {
+		t.Fail()
+	}
+}
+
+func TestLogRedactionWithPvVerify(t *testing.T) {
+	f := framework.Global
+	kubeName := f.TestClusters[0]
+	targetKube := f.ClusterSpec[kubeName]
+	kubeConfPath := targetKube.KubeConfPath
+
+	clusterSize := constants.Size3
+	pvcName := "couchbase"
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
+	serviceConfig1["defaultVolMnt"] = pvcName
+	serviceConfig1["dataVolMnt"] = pvcName
+	serviceConfig1["indexVolMnt"] = pvcName
+	serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
+
+	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"bucket1":  bucketConfig1,
+	}
+
+	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
+	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
+	createPodSecurityContext(1000, &clusterSpec)
+
+	// Create Couchbase cluster
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+		t.Fatal(err.Error())
+	}
+
+	// Collect logs
+	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-all", cbCluster.Name}
+	execOut, err := runCbopinfoCmd(cmdArgs)
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
+	defer os.Remove(logFileName)
+
+	logFileDir := strings.Split(logFileName, ".")[0]
+	defer os.RemoveAll(logFileDir)
+	if err := untarGzFile(logFileName); err != nil {
+		t.Fatal(err)
+	}
+
+	// Variable to denote failure of test
+	testHasErrors := false
+
+	// Verify required log files are generated
+	errMsgList := failureList{}
+	if err := checkCollectInfoLogs(execOut, targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, &errMsgList); err != nil {
+		t.Error(err)
+	}
+	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
+
+	// Verify log redaction part in collected files
+	errMsgList = failureList{}
+	if err := verifyLogRedaction(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, kubeConfPath, execOutStr, &errMsgList); err != nil {
+		t.Error(err)
+	}
+	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
+
+	if testHasErrors {
+		t.Fail()
 	}
 }

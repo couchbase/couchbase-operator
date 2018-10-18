@@ -150,3 +150,7 @@ tcGroups:
       - name: TestExtendedDebugWithDefaultValues
       - name: TestExtendedDebugWithNonDefaultValues
       - name: TestCollectLogFromEphemeralPodsUsingLogPV
+      - name: TestCollectLogFromPvPodRecovered
+      - name: TestLogCollectWithDefaultRetentionAndSize
+      - name: TestLogRedactionVerify
+      - name: TestLogRedactionWithPvVerify
