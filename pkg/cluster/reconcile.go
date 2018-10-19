@@ -78,6 +78,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	if err := c.reconcileReadiness(); err != nil {
+		return err
+	}
+
 	c.reconcileAdminService()
 
 	c.reportUpgradeComplete()
@@ -1171,4 +1175,16 @@ func (c *Cluster) reportUpgradeComplete() {
 	c.status.ClearCondition(api.ClusterConditionUpgrading)
 	c.status.CurrentVersion = c.cluster.Spec.Version
 	c.updateCRStatus()
+}
+
+// reconcileReadiness marks the pods as "ready" once everything is repaired, scaled and
+// balanced.  It also reconciles a pod disruption budget so we only tolerate a certain
+// number of evictions during a drain i.e. k8s upgrade.
+func (c *Cluster) reconcileReadiness() error {
+	for name, _ := range c.members {
+		if err := k8sutil.FlagPodReady(c.config.KubeCli, c.cluster.Namespace, name); err != nil {
+			return err
+		}
+	}
+	return k8sutil.ReconcilePDB(c.config.KubeCli, c.cluster)
 }

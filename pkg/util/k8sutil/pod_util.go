@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -15,8 +16,9 @@ import (
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 const (
@@ -31,6 +33,7 @@ const (
 	CouchbaseVolumeMountIndexDir    = "/mnt/index"
 	defaultSubPathName              = "default"
 	etcSubPathName                  = "etc"
+	readinessFile                   = "/tmp/ready"
 )
 
 var (
@@ -745,8 +748,8 @@ func containerWithRequirements(c v1.Container, r v1.ResourceRequirements) v1.Con
 func couchbaseReadinessProbe() *v1.Probe {
 	return &v1.Probe{
 		Handler: v1.Handler{
-			TCPSocket: &v1.TCPSocketAction{
-				Port: intstr.FromInt(8091),
+			Exec: &v1.ExecAction{
+				Command: []string{"test", "-f", readinessFile},
 			},
 		},
 		InitialDelaySeconds: 10,
@@ -893,4 +896,51 @@ func IsLogPVC(pvc *v1.PersistentVolumeClaim) (bool, error) {
 		return false, fmt.Errorf("path annotation missing for pvc %s", pvc.Name)
 	}
 	return path == CouchbaseVolumeMountLogsDir, nil
+}
+
+// exec shells onto a pod and runs a command.
+func exec(client kubernetes.Interface, pod *v1.Pod, command []string) error {
+	config, err := InClusterConfig()
+	if err != nil {
+		return err
+	}
+
+	// Generate the REST request
+	req := client.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Namespace(pod.Namespace).
+		Name(pod.Name).
+		SubResource("exec")
+	req.VersionedParams(&v1.PodExecOptions{
+		Container: couchbaseContainerName,
+		Command:   command,
+		Stdout:    true,
+	}, scheme.ParameterCodec)
+
+	// Create an executor running over HTTP2
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	if err != nil {
+		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+	}
+
+	// Finally run the command
+	stdout := &bytes.Buffer{}
+	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
+		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+	}
+
+	return nil
+}
+
+// FlagPodReady adds a file on the pod that flags the pod is ready and can be safely
+// killed by Kubernetes.
+func FlagPodReady(client kubernetes.Interface, namespace, name string) error {
+	pod, err := GetPod(client, namespace, name)
+	if err != nil {
+		return err
+	}
+	if err := exec(client, pod, []string{"touch", readinessFile}); err != nil {
+		return err
+	}
+	return nil
 }
