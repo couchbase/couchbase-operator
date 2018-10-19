@@ -527,7 +527,7 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedMessages: []string{"enableReplicaIndex in spec.buckets[3] must be of type nil: \"Bucket type is ephemeral\""},
 		},
 		{
-			name: "Validate spec.bucket.bucketReplicas with memcached bucket",
+			name: "Validate spec.bucket.replicas with memcached bucket",
 			paramsIn: []parameter{
 				{
 					field:      []string{"Spec", "BucketSettings", "2", "BucketReplicas"},
@@ -537,7 +537,7 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"bucketReplicas in spec.buckets[2] must be of type nil: \"Bucket type is memcached\""},
+			expectedMessages: []string{"replicas in spec.buckets[2] must be of type nil: \"Bucket type is memcached\""},
 		},
 		{
 			name: "Validate spec.bucket.conflictResolution with memcached bucket",

@@ -202,7 +202,7 @@ var testDefs = []testDef{
 		description: "Tests a valid memcached bucket configuration with invalid parameters",
 		expectedErr: errors.CompositeValidationError(
 			errors.InvalidType("enableReplicaIndex", "spec.buckets[0]", "nil", "Bucket type is memcached"),
-			errors.InvalidType("bucketReplicas", "spec.buckets[0]", "nil", "Bucket type is memcached"),
+			errors.InvalidType("replicas", "spec.buckets[0]", "nil", "Bucket type is memcached"),
 			errors.InvalidType("conflictResolution", "spec.buckets[0]", "nil", "Bucket type is memcached"),
 			errors.InvalidType("evictionPolicy", "spec.buckets[0]", "nil", "Bucket type is memcached"),
 			errors.InvalidType("ioPriority", "spec.buckets[0]", "nil", "Bucket type is memcached"),

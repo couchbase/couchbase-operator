@@ -209,7 +209,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 		}
 
 		if customResource.Spec.BucketSettings[i].BucketReplicas != 0 {
-			err := errors.InvalidType("bucketReplicas", fmt.Sprintf("spec.buckets[%d]", i),
+			err := errors.InvalidType("replicas", fmt.Sprintf("spec.buckets[%d]", i),
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
 		}
