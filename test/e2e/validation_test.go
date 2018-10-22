@@ -89,8 +89,7 @@ func ClusterToYAML(cluster *api.CouchbaseCluster, yamlPath string) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(yamlPath, cbyaml, 0644)
-	if err != nil {
+	if err := ioutil.WriteFile(yamlPath, cbyaml, 0644); err != nil {
 		return err
 	}
 	return nil
@@ -157,8 +156,7 @@ func SetClusterParameter(cluster *api.CouchbaseCluster, param parameter) error {
 
 		case "array":
 			var newArray []string
-			err := json.Unmarshal([]byte(param.fieldValue), &newArray)
-			if err != nil {
+			if err := json.Unmarshal([]byte(param.fieldValue), &newArray); err != nil {
 				return err
 			}
 			v.Set(reflect.ValueOf(newArray))
@@ -176,8 +174,7 @@ func SetClusterParameter(cluster *api.CouchbaseCluster, param parameter) error {
 
 		case "v1.ServiceList":
 			var serviceArray []api.Service
-			err := json.Unmarshal([]byte(param.fieldValue), &serviceArray)
-			if err != nil {
+			if err := json.Unmarshal([]byte(param.fieldValue), &serviceArray); err != nil {
 				return err
 			}
 			v.Set(reflect.ValueOf(serviceArray))
@@ -273,8 +270,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
 
 		if command == "apply" || command == "delete" {
-			err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
-			if err != nil {
+			if err := ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml"); err != nil {
 				t.Logf("error: %v", err)
 				failures.AppendFailure(test.name, err)
 				continue
@@ -288,8 +284,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 			if !test.shouldFail {
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30)
-				if err != nil {
+				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)
 					continue
@@ -306,16 +301,14 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 		for _, param := range test.paramsIn {
 			t.Logf("setting parameter: %+v", param)
-			err = SetClusterParameter(testCouchbase, param)
-			if err != nil {
+			if err := SetClusterParameter(testCouchbase, param); err != nil {
 				t.Logf("error: %v", err)
 				failures.AppendFailure(test.name, err)
 				continue
 			}
 		}
 
-		err = ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml")
-		if err != nil {
+		if err := ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml"); err != nil {
 			t.Logf("error: %v", err)
 			failures.AppendFailure(test.name, err)
 			continue
@@ -365,8 +358,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 					failures.AppendFailure(test.name, errors.New("cluster deletion should work"))
 					continue
 				}
-				_, err = e2eutil.WaitPodsDeleted(targetKube.KubeClient, f.Namespace, constants.Retries30, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-				if err != nil {
+				if _, err := e2eutil.WaitPodsDeleted(targetKube.KubeClient, f.Namespace, constants.Retries30, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel}); err != nil {
 					failures.AppendFailure(test.name, err)
 					continue
 				}
@@ -379,16 +371,14 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				testCouchbase = &clusters.Items[0]
 				for _, param := range test.paramsOut {
 					t.Logf("verifying parameter: %+v", param)
-					err = VerifyClusterParameter(testCouchbase, param)
-					if err != nil {
+					if err := VerifyClusterParameter(testCouchbase, param); err != nil {
 						failures.AppendFailure(test.name, err)
 						continue
 					}
 				}
 
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30)
-				if err != nil {
+				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)
 					continue
@@ -408,6 +398,9 @@ func TestValidationCreate(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
+
+	supportedTimeUnits := []string{"ns", "us", "ms", "s", "m", "h"}
+
 	testDefs := []testDef{
 		{
 			name:             "create default yaml",
@@ -416,6 +409,24 @@ func TestValidationCreate(t *testing.T) {
 			shouldFail:       false,
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
 		},
+	}
+
+	// Cases to verify supported time units for Spec.LogRetentionTime
+	for _, timeUnit := range supportedTimeUnits {
+		testDefCase := testDef{
+			name: "Apply spec.logRetentionTime with time duration in '" + timeUnit + "'",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "LogRetentionTime"},
+					fieldType:  "string",
+					fieldValue: "1" + timeUnit,
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       false,
+			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
+		}
+		testDefs = append(testDefs, testDefCase)
 	}
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
@@ -836,34 +847,23 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 
 		// Persistent volume claim cases
-		// this test is not valid for 1.0.0
-		//{
-		//	name: "Validate spec.volumeClaimTemplates.Spec.storageClassName to be defined",
-		//	paramsIn: []parameter{
-		//		{
-		//			field:          []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "StorageClassName"},
-		//			fieldType:      "string",
-		//			fieldValue:     "unavailableStorageClass",
-		//			fieldIsPointer: true,
-		//		},
-		//	},
-		//	paramsOut:        []parameter{},
-		//	shouldFail:       true,
-		//	expectedMessages: []string{"spec.volumeClaimTemplates[0].Spec.storageClassName in body should be unique"},
-		//},
-		{
-			name: "Create PVC cluster with unavailable default volume claim in pod spec",
-			paramsIn: []parameter{
-				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DefaultClaim"},
-					fieldType:  "string",
-					fieldValue: "InvalidDefaultClaim",
+		/*
+			// K8S-485, targetted for 1.2.0
+			{
+				name: "Validate spec.volumeClaimTemplates.Spec.storageClassName to be defined",
+				paramsIn: []parameter{
+					{
+						field:          []string{"Spec", "VolumeClaimTemplates", "0", "Spec", "StorageClassName"},
+						fieldType:      "string",
+						fieldValue:     "unavailableStorageClass",
+						fieldIsPointer: true,
+					},
 				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"spec.volumeClaimTemplates[0].Spec.storageClassName in body should be unique"},
 			},
-			paramsOut:        []parameter{},
-			shouldFail:       true,
-			expectedMessages: []string{"\"InvalidDefaultClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
-		},
+		*/
 		{
 			name: "Create PVC cluster with unavailable volume claim template defined in spec",
 			paramsIn: []parameter{
@@ -877,11 +877,194 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required\n\"couchbase\" in spec.volumeClaimTemplates[*].metadata.name is required"},
 		},
+
+		// Verify for Default/Log volume mounts mutual exclusion
 		{
-			name: "Validate spec.servers.pod.volumeMounts.properties.data values to be defined",
+			name: "Log volume defined on top of default volume mount in spec.servers.pod.volumeMounts.properties",
 			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DataClaim"},
+					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "LogsClaim"},
+					fieldType:  "string",
+					fieldValue: "couchbase",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"default|data|index|analytics in spec.volumeMounts.logs can't have additional items"},
+		},
+		{
+			name: "default volume defined on top of log volume mounts specified in spec.servers.pod.volumeMounts.properties",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "3", "Pod", "VolumeMounts", "DefaultClaim"},
+					fieldType:  "string",
+					fieldValue: "couchbase-log-pv",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"default|data|index|analytics in spec.volumeMounts.logs can't have additional items"},
+		},
+		{
+			name: "Create with data service on top of stateless services",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "3", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"data\", \"query\", \"search\", \"eventing\", \"analytics\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"default in spec.servers[3].pod.volumeMounts is required"},
+		},
+
+		// Verification for spec.securityContext field values
+		// K8S-648, targetted for 1.2.0
+		// Once fixed, need to add code to verify in TestNegValidationApply case as well
+		/*
+			{
+				name: "Invalid type for spec.securityContext.RunAsUser",
+				paramsIn: []parameter{
+					{
+						field:          []string{"Spec", "SecurityContext", "RunAsUser"},
+						fieldType:      "string",
+						fieldValue:     "1000",
+						fieldIsPointer: true,
+					},
+				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"couchbaseclusters creation failed"},
+			},
+			{
+				name: "Invalid type for spec.securityContext.RunAsNonRoot",
+				paramsIn: []parameter{
+					{
+						field:          []string{"Spec", "SecurityContext", "RunAsNonRoot"},
+						fieldType:      "string",
+						fieldValue:     "true",
+						fieldIsPointer: true,
+					},
+				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"couchbaseclusters creation failed"},
+			},
+			{
+				name: "Invalid type for spec.securityContext.fsGroup",
+				paramsIn: []parameter{
+					{
+						field:          []string{"Spec", "SecurityContext", "FsGroup"},
+						fieldType:      "string",
+						fieldValue:     "1000",
+						fieldIsPointer: true,
+					},
+				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"couchbaseclusters creation failed"},
+			},
+			{
+				name: "Invalid type for spec.paused",
+				paramsIn: []parameter{
+					{
+						field:      []string{"Spec", "Paused"},
+						fieldType:  "string",
+						fieldValue: "false",
+					},
+				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"couchbaseclusters creation failed"},
+			},
+			{
+				name: "Invalid type for spec.disableBucketManagement",
+				paramsIn: []parameter{
+					{
+						field:      []string{"Spec", "DisableBucketManagement"},
+						fieldType:  "string",
+						fieldValue: "false",
+					},
+				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"couchbaseclusters creation failed"},
+			},
+		*/
+
+		// Validation for logRetentionTime and logRetentionCount field
+		{
+			name: "Invalid value for spec.logRetentionTime",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "LogRetentionTime"},
+					fieldType:  "string",
+					fieldValue: "1",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.logRetentionTime in body should match '^\\d+(ns|us|ms|s|m|h)$'"},
+		},
+		{
+			name: "Negative value for spec.logRetentionCount",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "LogRetentionCount"},
+					fieldType:  "int",
+					fieldValue: "-1",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.logRetentionCount in body should be greater than or equal to 0"},
+		},
+
+		// K8S-648, targetted for 1.2.0
+		// Once fixed, need to add code to verify in TestNegValidationApply case as well
+		/*
+			{
+				name: "Huge value for spec.logRetentionCount",
+				paramsIn: []parameter{
+					{
+						field:      []string{"Spec", "LogRetentionCount"},
+						fieldType:  "int",
+						fieldValue: "9999999999999999999999",
+					},
+				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"spec.logRetentionCount in body should be greater than or equal to 0"},
+			},
+			{
+				name: "Invalid type for spec.logRetentionTime",
+				paramsIn: []parameter{
+					{
+						field:      []string{"Spec", "LogRetentionTime"},
+						fieldType:  "int",
+						fieldValue: "86400",
+					},
+				},
+				paramsOut:        []parameter{},
+				shouldFail:       true,
+				expectedMessages: []string{"spec.logRetentionTime in body should match '^\\d+(ns|us|ms|s|m|h)$'"},
+			},
+		*/
+	}
+
+	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]
+	volMountsMap := map[string]string{
+		"DefaultClaim": "default",
+		"DataClaim":    "data",
+		"IndexClaim":   "index",
+	}
+	for mntField, mntName := range volMountsMap {
+		testCase := testDef{
+			name: "Validate spec.servers.pod.volumeMounts.properties." + mntName + " values to be defined",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", mntField},
 					fieldType:  "string",
 					fieldValue: "invalidClaim",
 				},
@@ -889,33 +1072,76 @@ func TestNegValidationCreate(t *testing.T) {
 			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{"\"invalidClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
-		},
-		{
-			name: "Validate spec.servers.pod.volumeMounts.properties.default values to be defined",
+		}
+		testDefs = append(testDefs, testCase)
+	}
+
+	// Cases to validate with all volume mounts present in Pod.VolumeMounts but one of the Service missing in ServersSettings
+	for _, serviceToSkip := range constants.StatefulCbServiceList {
+		fieldValueToUse := constants.StatelessCbServiceList
+		for _, statefulService := range constants.StatefulCbServiceList {
+			if statefulService == serviceToSkip {
+				continue
+			}
+			fieldValueToUse = append(fieldValueToUse, statefulService)
+		}
+		testCase := testDef{
+			name: "Validate spec.servers.services with all persistent mount defined, but " + serviceToSkip + "service missing in config",
 			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "DefaultClaim"},
-					fieldType:  "string",
-					fieldValue: "invalidClaim",
+					field:      []string{"Spec", "ServerSettings", "1", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"" + strings.Join(fieldValueToUse, "\",\"") + "\"]",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"\"invalidClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
-		},
-		{
-			name: "Validate spec.servers.pod.volumeMounts.properties.index values to be defined",
+			expectedMessages: []string{serviceToSkip + " in spec.servers[1].services is required"},
+		}
+		testDefs = append(testDefs, testCase)
+	}
+
+	// Cases to validate with Log PV only defined,but one of stateful service is included
+	for _, statefulService := range constants.StatefulCbServiceList {
+		testCase := testDef{
+			name: "Validate spec.servers.services with only log volume mount defined, with " + statefulService + " service included",
 			paramsIn: []parameter{
 				{
-					field:      []string{"Spec", "ServerSettings", "1", "Pod", "VolumeMounts", "IndexClaim"},
-					fieldType:  "string",
-					fieldValue: "invalidClaim",
+					field:      []string{"Spec", "ServerSettings", "3", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"query\", \"search\", \"eventing\", \"" + statefulService + "\"]",
 				},
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"\"invalidClaim\" in spec.volumeClaimTemplates[*].metadata.name is required"},
-		},
+			expectedMessages: []string{"default in spec.servers[3].pod.volumeMounts is required"},
+		}
+		testDefs = append(testDefs, testCase)
+	}
+
+	// Cases for defining Stateful claims without specifying Default volume mounts
+	claimFieldNames := []string{"DataClaim", "IndexClaim", "AnalyticsClaims"}
+	for _, claimField := range claimFieldNames {
+		temTestDefCase := testDef{
+			name: "Validate by defining " + claimField + " without Default volume mount",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", claimField},
+					fieldType:  "string",
+					fieldValue: "couchbase",
+				},
+			},
+			paramsOut: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "DefaultClaim"},
+					fieldType:  "string",
+					fieldValue: "couchbase",
+				},
+			},
+			shouldFail:       true,
+			expectedMessages: []string{"default in spec.servers[0].pod.volumeMounts is required"},
+		}
+		testDefs = append(testDefs, temTestDefCase)
 	}
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
@@ -1126,6 +1352,9 @@ func TestValidationApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
+
+	supportedTimeUnits := []string{"ns", "us", "ms", "s", "m", "h"}
+
 	testDefs := []testDef{
 		{
 			name:             "apply:",
@@ -1155,6 +1384,24 @@ func TestValidationApply(t *testing.T) {
 			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
 		},
 	}
+
+	// Cases to verify supported time units for Spec.LogRetentionTime
+	for _, timeUnit := range supportedTimeUnits {
+		testDefCase := testDef{
+			name: "Apply spec.logRetentionTime with time duration in '" + timeUnit + "'",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "LogRetentionTime"},
+					fieldType:  "string",
+					fieldValue: "100" + timeUnit,
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       false,
+			expectedMessages: []string{"couchbaseclusters \"cb-example\" applied"},
+		}
+		testDefs = append(testDefs, testDefCase)
+	}
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
@@ -1163,6 +1410,7 @@ func TestNegValidationApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
+
 	testDefs := []testDef{
 		{
 			name: "apply invalid changes to bucket name",
@@ -1205,6 +1453,149 @@ func TestNegValidationApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.servers[0].services in body cannot be updated"},
 		},
+
+		// Verify for Default/Log volume mounts mutual exclusion
+		{
+			name: "Log volume defined on top of default volume mount in spec.servers.pod.volumeMounts.properties",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "LogsClaim"},
+					fieldType:  "string",
+					fieldValue: "couchbase",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"logs in spec.servers[*].Pod.VolumeMounts cannot be updated"},
+		},
+		{
+			name: "Default volume defined on top of log volume mount in spec.servers.pod.volumeMounts.properties",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "3", "Pod", "VolumeMounts", "DefaultClaim"},
+					fieldType:  "string",
+					fieldValue: "couchbase-log-pv",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"default in spec.servers[*].Pod.VolumeMounts cannot be updated"},
+		},
+		{
+			name: "Log volume defined on top of default volume mount in spec.servers.pod.volumeMounts.properties",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "2", "Pod", "VolumeMounts", "LogsClaim"},
+					fieldType:  "string",
+					fieldValue: "couchbase-log-pv",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"logs in spec.servers[*].Pod.VolumeMounts cannot be updated"},
+		},
+
+		// Validation for logRetentionTime and logRetentionCount field
+		{
+			name: "Invalid value for spec.logRetentionTime",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "LogRetentionTime"},
+					fieldType:  "string",
+					fieldValue: "1",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.logRetentionTime in body should match '^\\d+(ns|us|ms|s|m|h)$'"},
+		},
+		{
+			name: "Negative value for spec.logRetentionCount",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "LogRetentionCount"},
+					fieldType:  "int",
+					fieldValue: "-1",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.logRetentionCount in body should be greater than or equal to 0"},
+		},
+	}
+
+	// Cases to validate with all volume mounts present in Pod.VolumeMounts but one of the Service missing in ServersSettings
+	for _, serviceToSkip := range constants.StatefulCbServiceList {
+		fieldValueToUse := constants.StatelessCbServiceList
+		for _, statefulService := range constants.StatefulCbServiceList {
+			if statefulService == serviceToSkip {
+				continue
+			}
+			fieldValueToUse = append(fieldValueToUse, statefulService)
+		}
+		testCase := testDef{
+			name: "Validate spec.servers.services with all persistent mount defined, but " + serviceToSkip + "service missing in config",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "1", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"" + strings.Join(fieldValueToUse, "\",\"") + "\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[1].services in body cannot be updated"},
+		}
+		testDefs = append(testDefs, testCase)
+	}
+
+	// Cases to validate with Log PV defined along with stateful services
+	for _, serviceName := range constants.StatefulCbServiceList {
+		fieldValueToUse := constants.StatelessCbServiceList
+		fieldValueToUse = append(fieldValueToUse, serviceName)
+		testCase := testDef{
+			name: "Validate spec.servers.services with only log volume mount defined, with " + serviceName + " service included",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "3", "Services"},
+					fieldType:  "v1.ServiceList",
+					fieldValue: "[\"" + strings.Join(fieldValueToUse, "\",\"") + "\"]",
+				},
+			},
+			paramsOut:        []parameter{},
+			shouldFail:       true,
+			expectedMessages: []string{"spec.servers[3].services in body cannot be updated"},
+		}
+		testDefs = append(testDefs, testCase)
+	}
+
+	// Cases to validate by defining Stateful volumes without defining DefaultClaim
+	volMountsMap := map[string]string{
+		"DataClaim":       "data",
+		"IndexClaim":      "index",
+		"AnalyticsClaims": "analytics",
+	}
+	for mntField, mntName := range volMountsMap {
+		testCase := testDef{
+			name: "Validate by defining " + mntField + " without Default volume mount",
+			paramsIn: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", mntField},
+					fieldType:  "string",
+					fieldValue: "couchbase",
+				},
+			},
+			paramsOut: []parameter{
+				{
+					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "DefaultClaim"},
+					fieldType:  "string",
+					fieldValue: "couchbase",
+				},
+			},
+			shouldFail:       true,
+			expectedMessages: []string{mntName + " in spec.servers[*].Pod.VolumeMounts cannot be updated"},
+		}
+		testDefs = append(testDefs, testCase)
 	}
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")

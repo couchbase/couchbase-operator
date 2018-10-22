@@ -1628,11 +1628,10 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 		}
 
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberToKill)
-		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 
-		// Only in case of DeletePod, FailOver and NewMemberAdd is triggered
 		switch podDownMethod {
 		case "deletePod":
+			// Only in DeletePod, FailOver and NewMemberAdd is triggered
 			event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill)
 			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
 				t.Fatal(err)
@@ -1644,6 +1643,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 				t.Fatal(err)
 			}
 			expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newMemberIndex)
+			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 
 			// To validate the new PVC created for new pod
 			newMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, newMemberIndex)
@@ -1654,6 +1654,10 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 				t.Fatal(err)
 			}
 			expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberToKill)
+
+		case "killServerProcess":
+			// In KillServerProcess, cluster rebalance is triggered after cb service is restarted by operator
+			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 		}
 
 		event := e2eutil.RebalanceCompletedEvent(cbCluster)

@@ -34,6 +34,10 @@ var (
 	CouchbaseOperatorLabel     = util_const.LabelApp + "=couchbase-operator"
 	CouchbaseServerClusterKey  = "couchbase_cluster"
 	CouchbaseServerPodLabelStr = CouchbaseLabel + "," + CouchbaseServerClusterKey + "="
+
+	// List of Couchbase-cluster services
+	StatefulCbServiceList  = []string{"data", "index", "analytics"}
+	StatelessCbServiceList = []string{"query", "search", "eventing"}
 )
 
 var (

@@ -9,12 +9,15 @@ spec:
   version: enterprise-5.5.0
   authSecret: basic-test-secret
   exposeAdminConsole: false
+  paused: false
+  disableBucketManagement: false
+  logRetentionTime: "24h"
+  logRetentionCount: 10
   adminConsoleServices:
       - data
       - index
       - query
       - search
-  paused: false
   serverGroups:
     - RzaGroup-1
     - RzaGroup-2
@@ -74,12 +77,19 @@ spec:
       services:
         - data
         - index
+        - analytics
         - query
         - search
+        - eventing
+      pod:
+        volumeMounts:
+          default: couchbase
     - size: 1
-      name: data_only
+      name: statefull_services
       services:
         - data
+        - index
+        - analytics
       pod:
         volumeMounts:
           default: couchbase
@@ -94,14 +104,44 @@ spec:
         - data
         - index
         - query
+      pod:
+        volumeMounts:
+          default: couchbase
       serverGroups:
         - RzaGroup-1
         - RzaGroup-2
+    - size: 1
+      name: stateless_services
+      services:
+        - query
+        - search
+        - eventing
+      pod:
+        volumeMounts:
+          logs: couchbase-log-pv
+    - size: 1
+      name: data_only
+      services:
+        - data
+      pod:
+        volumeMounts:
+          default: couchbase
   securityContext:
+    runAsUser: 1000
+    runAsNonRoot: false
     fsGroup: 1000
   volumeClaimTemplates:
     - metadata:
         name: couchbase
+      spec:
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
+          limits:
+            storage: 2Gi
+    - metadata:
+        name: couchbase-log-pv
       spec:
         storageClassName: standard
         resources:
