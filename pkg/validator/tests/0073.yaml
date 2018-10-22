@@ -27,9 +27,14 @@ spec:
         - index
         - query
         - search
+        - analytics
       pod:
         volumeMounts:
           default: couchbase
+          data: couchbase
+          index: couchbase
+          analytics:
+          - couchbase
           logs: couchbase
   volumeClaimTemplates:
     - metadata:

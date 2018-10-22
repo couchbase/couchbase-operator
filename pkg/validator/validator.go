@@ -341,7 +341,18 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	for index, config := range customResource.Spec.ServerSettings {
 		if config.Pod != nil && config.Pod.VolumeMounts != nil {
 			mounts := config.Pod.VolumeMounts
-			hasSecondaryMounts := mounts.DataClaim != "" || mounts.IndexClaim != "" || mounts.AnalyticsClaims != nil
+
+			secondaryMounts := []string{}
+			if mounts.DataClaim != "" {
+				secondaryMounts = append(secondaryMounts, "data")
+			}
+			if mounts.IndexClaim != "" {
+				secondaryMounts = append(secondaryMounts, "index")
+			}
+			if mounts.AnalyticsClaims != nil {
+				secondaryMounts = append(secondaryMounts, "analytics")
+			}
+			hasSecondaryMounts := len(secondaryMounts) > 0
 
 			// Check the associated service is enabled
 			if mounts.DataClaim != "" && !config.Services.Contains(api.DataService) {
@@ -360,8 +371,12 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 					errs = append(errs, err)
 				}
 				if mounts.DefaultClaim != "" || hasSecondaryMounts {
-					err := errors.AdditionalItemsNotAllowed("default|data|index|analytics", "spec.volumeMounts.logs")
-					errs = append(errs, err)
+					if mounts.DefaultClaim != "" {
+						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index), "", "default"))
+					}
+					for _, secondaryMount := range secondaryMounts {
+						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index), "", secondaryMount))
+					}
 				}
 			} else if mounts.DefaultClaim != "" {
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
@@ -389,8 +404,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 					}
 				}
 			} else if hasSecondaryMounts {
-				err := errors.Required("default", "spec.volumeMounts")
-				errs = append(errs, err)
+				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index)))
 			}
 		}
 	}

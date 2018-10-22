@@ -611,7 +611,10 @@ var testDefs = []testDef{
 		path:        "tests/0073.yaml",
 		description: "Tests that default and logs claim are mutually exclusive",
 		expectedErr: errors.CompositeValidationError(
-			errors.AdditionalItemsNotAllowed("default|data|index|analytics", "spec.volumeMounts.logs"),
+			errors.PropertyNotAllowed("spec.servers[0].pod.volumeMounts", "", "default"),
+			errors.PropertyNotAllowed("spec.servers[0].pod.volumeMounts", "", "data"),
+			errors.PropertyNotAllowed("spec.servers[0].pod.volumeMounts", "", "index"),
+			errors.PropertyNotAllowed("spec.servers[0].pod.volumeMounts", "", "analytics"),
 		),
 	},
 	{
@@ -619,7 +622,7 @@ var testDefs = []testDef{
 		path:        "tests/0075.yaml",
 		description: "Tests specifying only data mount is not allowed",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required("default", "spec.volumeMounts"),
+			errors.Required("default", "spec.servers[0].pod.volumeMounts"),
 		),
 	},
 	{
