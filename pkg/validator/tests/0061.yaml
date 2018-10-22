@@ -4,10 +4,18 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
+  baseImage: couchbase/server
   version: enterprise-5.1.0
   authSecret: cb-example-auth
   cluster:
+    dataServiceMemoryQuota: 256
+    indexServiceMemoryQuota: 256
+    searchServiceMemoryQuota: 256
+    eventingServiceMemoryQuota: 256
+    analyticsServiceMemoryQuota: 1024
     indexStorageSetting: plasma
+    autoFailoverTimeout: 120
+    autoFailoverMaxCount: 3
   servers:
     - size: 3
       name: all_services

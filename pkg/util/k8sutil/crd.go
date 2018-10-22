@@ -14,6 +14,7 @@ import (
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -89,7 +90,7 @@ func MustNewKubeExtClient() apiextensionsclient.Interface {
 	return apiextensionsclient.NewForConfigOrDie(cfg)
 }
 
-func ValidateCRD(customResource *api.CouchbaseCluster) error {
+func ValidateCRD(customResource *unstructured.Unstructured) error {
 	validation := apiextensions.CustomResourceValidation{}
 	err := scheme.Scheme.Convert(getCustomResourceValidation(), &validation, nil)
 

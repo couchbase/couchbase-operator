@@ -3,3 +3,4 @@ apiVersion: couchbase.com/v1
 kind: CouchbaseCluster
 metadata:
   name: cb-example
+spec: {}

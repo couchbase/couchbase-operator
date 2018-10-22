@@ -16,11 +16,16 @@ import (
 )
 
 type testDef struct {
-	name        string
-	path        string
-	updatePath  string
+	// name is the test name.
+	name string
+	// path is the path to the YAML to be applied.
+	path string
+	// existingPath is the path to the existing YAML CR in the system.
+	existingPath string
+	// description describes what the test is testing for.
 	description string
-	typeFail    bool
+	// expectedErr is the expected set of errors detected by CRD validation,
+	// custom validation and immutability tests.
 	expectedErr *errors.CompositeError
 }
 
@@ -36,17 +41,17 @@ var testDefs = []testDef{
 		path:        "tests/0002.yaml",
 		description: "Tests that a config with no spec section fails",
 		expectedErr: errors.CompositeValidationError(
+			errors.Required("spec.baseImage", "body"),
 			errors.Required("spec.version", "body"),
+			errors.Required("spec.authSecret", "body"),
+			errors.Required("spec.cluster", "body"),
 			errors.Required("spec.servers", "body"),
-			errors.TooShort("spec.authSecret", "body", 1),
-			errors.EnumFail("spec.cluster.indexStorageSetting", "body", nil, []interface{}{"plasma", "memory_optimized"}),
 		),
 	},
 	{
 		name:        "TestBaseImageCustomValue",
 		path:        "tests/0003.yaml",
 		description: "Tests a config with a non-default value for the baseImage field",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestMissingVersion",
@@ -60,53 +65,50 @@ var testDefs = []testDef{
 		name:        "TestPausedTrue",
 		path:        "tests/0005.yaml",
 		description: "Tests a config with paused set to true",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestPausedNonBoolean",
 		path:        "tests/0006.yaml",
 		description: "Tests a config with paused set to a non-boolean value",
-		typeFail:    true,
-		expectedErr: nil,
+		expectedErr: errors.CompositeValidationError(
+			errors.InvalidType("spec.paused", "body", "boolean", "string"),
+		),
 	},
 	{
 		name:        "TestAntiAffinityTrue",
 		path:        "tests/0007.yaml",
 		description: "Tests a config with antiAffinity set to true",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestAntiAffinityNonBoolean",
 		path:        "tests/0008.yaml",
 		description: "Tests a config with antiAffinity set to a non-boolean value",
-		typeFail:    true,
-		expectedErr: nil,
+		expectedErr: errors.CompositeValidationError(
+			errors.InvalidType("spec.antiAffinity", "body", "boolean", "string"),
+		),
 	},
 	{
 		name:        "TestMissingAuthSecret",
 		path:        "tests/0009.yaml",
 		description: "Tests a config with no authSecret fails",
 		expectedErr: errors.CompositeValidationError(
-			errors.TooShort("spec.authSecret", "body", 1),
+			errors.Required("spec.authSecret", "body"),
 		),
 	},
 	{
 		name:        "TestExposeAdminConsoleTrue",
 		path:        "tests/0010.yaml",
 		description: "Tests a config with exposeAdminConsole set to true",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestSetAdminConsoleServicesToDataService",
 		path:        "tests/0011.yaml",
 		description: "Tests a config with adminConsoleService set to data",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestSetAdminConsoleServicesAll",
 		path:        "tests/0012.yaml",
 		description: "Tests a config with all adminConsoleService services set",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestSetAdminConsoleServicesTooMany",
@@ -129,8 +131,9 @@ var testDefs = []testDef{
 		name:        "TestSetAdminConsoleServicesNotArray",
 		path:        "tests/0015.yaml",
 		description: "Tests a config where adminConsoleService is not an array",
-		typeFail:    true,
-		expectedErr: nil,
+		expectedErr: errors.CompositeValidationError(
+			errors.InvalidType("spec.adminConsoleServices", "body", "array", "string"),
+		),
 	},
 	{
 		name:        "TestDataServiceMemoryQuotaTooSmall",
@@ -174,19 +177,16 @@ var testDefs = []testDef{
 		name:        "TestCouchbaseBucketCreation",
 		path:        "tests/0019.yaml",
 		description: "Tests a valid couchbase bucket configuration",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestEphemeralBucketCreation",
 		path:        "tests/0020.yaml",
 		description: "Tests a valid ephemeral bucket configuration",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestMemcachedBucketCreation",
 		path:        "tests/0021.yaml",
 		description: "Tests a valid memcached bucket configuration",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestEphemeralBucketCreationInvalidParameters",
@@ -293,9 +293,9 @@ var testDefs = []testDef{
 		path:        "tests/0034.yaml",
 		description: "Tests the required parameters in the servers section",
 		expectedErr: errors.CompositeValidationError(
-			errors.TooShort("spec.servers.name", "body", 1),
-			errors.ExceedsMinimumInt("spec.servers.size", "body", 1, false),
-			errors.InvalidType("spec.servers.services", "body", "array", "null"),
+			errors.Required("spec.servers.size", "body"),
+			errors.Required("spec.servers.name", "body"),
+			errors.Required("spec.servers.services", "body"),
 		),
 	},
 	{
@@ -303,14 +303,13 @@ var testDefs = []testDef{
 		path:        "tests/0035.yaml",
 		description: "Tests at least one servers definition has the data service",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required("at least on \"data\" service", "spec.servers[*].services"),
+			errors.Required("at least one \"data\" service", "spec.servers[*].services"),
 		),
 	},
 	{
 		name:        "TestMultipleServerSections",
 		path:        "tests/0036.yaml",
 		description: "Tests multiple servers definitions",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestMultipleServerSectionsWithoutUniqueNames",
@@ -324,7 +323,6 @@ var testDefs = []testDef{
 		name:        "TestValidIndexStorageSetting",
 		path:        "tests/0038.yaml",
 		description: "Tests setting indexStorageSetting to plasma",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestInvalidIndexStorageSetting",
@@ -335,69 +333,67 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:        "TestUpdateToAuthSecret",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0040.yaml",
-		description: "Tests updating the authSecret fails",
+		name:         "TestUpdateToAuthSecret",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0040.yaml",
+		description:  "Tests updating the authSecret fails",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.authSecret", "body"},
 		),
 	},
 	{
-		name:        "TestUpdateToBucketType",
-		path:        "tests/0030.yaml",
-		updatePath:  "tests/0041.yaml",
-		description: "Tests updating the bucket type fails",
+		name:         "TestUpdateToBucketType",
+		existingPath: "tests/0030.yaml",
+		path:         "tests/0041.yaml",
+		description:  "Tests updating the bucket type fails",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.buckets[0].type", "body"},
 		),
 	},
 	{
-		name:        "TestUpdateToBucketConflictResolution",
-		path:        "tests/0030.yaml",
-		updatePath:  "tests/0042.yaml",
-		description: "Tests updating the bucket conflict resolution fails",
+		name:         "TestUpdateToBucketConflictResolution",
+		existingPath: "tests/0030.yaml",
+		path:         "tests/0042.yaml",
+		description:  "Tests updating the bucket conflict resolution fails",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.buckets[0].conflictResolution", "body"},
 		),
 	},
 	{
-		name:        "TestInvalidUpdateToServices",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0043.yaml",
-		description: "Tests updating the services (with different services) fails",
+		name:         "TestInvalidUpdateToServices",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0043.yaml",
+		description:  "Tests updating the services (with different services) fails",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.servers[0].services", "body"},
 		),
 	},
 	{
-		name:        "TestUpdateToServicesDifferentOrder",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0044.yaml",
-		description: "Tests updating the services in a different order passes",
-		expectedErr: nil,
+		name:         "TestUpdateToServicesDifferentOrder",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0044.yaml",
+		description:  "Tests updating the services in a different order passes",
 	},
 	{
-		name:        "TestUpdateClusterSettings",
-		path:        "tests/0047.yaml",
-		updatePath:  "tests/0048.yaml",
-		expectedErr: nil,
+		name:         "TestUpdateClusterSettings",
+		existingPath: "tests/0047.yaml",
+		path:         "tests/0048.yaml",
 	},
 	{
-		name:        "TestUpdateClusterSettingsInvalidOld",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0048.yaml",
-		description: "Tests updating cluster settings when the old config has an index service",
+		name:         "TestUpdateClusterSettingsInvalidOld",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0048.yaml",
+		description:  "Tests updating cluster settings when the old config has an index service",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.servers[0].services", "body"},
 			&UpdateError{"spec.cluster.indexStorageSetting", "body"},
 		),
 	},
 	{
-		name:        "TestUpdateClusterSettingsInvalidNew",
-		path:        "tests/0048.yaml",
-		updatePath:  "tests/0001.yaml",
-		description: "Tests updating cluster settings when the new config has an index service",
+		name:         "TestUpdateClusterSettingsInvalidNew",
+		existingPath: "tests/0048.yaml",
+		path:         "tests/0001.yaml",
+		description:  "Tests updating cluster settings when the new config has an index service",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.servers[0].services", "body"},
 			&UpdateError{"spec.cluster.indexStorageSetting", "body"},
@@ -415,7 +411,6 @@ var testDefs = []testDef{
 		name:        "TestSpecWithVolumes",
 		path:        "tests/0050.yaml",
 		description: "Tests that spec with volume mounts is valid",
-		expectedErr: nil,
 	},
 	{
 		name:        "TestMissingClaimTemplate",
@@ -426,74 +421,74 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:        "TestUpdateAddedVolumeMountSpec",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0050.yaml",
-		description: "Tests that VolumeMounts cannot be added after pod creation",
+		name:         "TestUpdateAddedVolumeMountSpec",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0050.yaml",
+		description:  "Tests that VolumeMounts cannot be added after pod creation",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.servers[*].Pod.VolumeMounts", "body"},
 		),
 	},
 	{
-		name:        "TestUpdateAddIndexVolumeMount",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0053.yaml",
-		description: "Tests that index volume mount cannot be added to list of VolumeMounts",
+		name:         "TestUpdateAddIndexVolumeMount",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0053.yaml",
+		description:  "Tests that index volume mount cannot be added to list of VolumeMounts",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"index", "spec.servers[*].Pod.VolumeMounts"},
 		),
 	},
 	{
-		name:        "TestUpdateRemoveVolumeMountSpec",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0001.yaml",
-		description: "Tests that VolumeMounts cannot be removed after pod creation",
+		name:         "TestUpdateRemoveVolumeMountSpec",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0001.yaml",
+		description:  "Tests that VolumeMounts cannot be removed after pod creation",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.servers[*].Pod.VolumeMounts", "body"},
 		),
 	},
 	{
-		name:        "TestUpdateRemoveDataVolumeMount",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0054.yaml",
-		description: "Tests that data volume mount cannot be removed from list of VolumeMounts",
+		name:         "TestUpdateRemoveDataVolumeMount",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0054.yaml",
+		description:  "Tests that data volume mount cannot be removed from list of VolumeMounts",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"},
 		),
 	},
 	{
-		name:        "TestChangeVolumeMountClaimTemplate",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0055.yaml",
-		description: "Tests that name of claim template of a volume cannot be changed",
+		name:         "TestChangeVolumeMountClaimTemplate",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0055.yaml",
+		description:  "Tests that name of claim template of a volume cannot be changed",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"data", "spec.servers[*].Pod.VolumeMounts"},
 		),
 	},
 	{
-		name:        "TestChangeClaimTemplateName",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0056.yaml",
-		description: "Tests that name of claim template cannot be changed",
+		name:         "TestChangeClaimTemplateName",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0056.yaml",
+		description:  "Tests that name of claim template cannot be changed",
 		expectedErr: errors.CompositeValidationError(
 			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
 			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
 		),
 	},
 	{
-		name:        "TestChangeStorageClass",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0057.yaml",
-		description: "Tests that storage class cannot be changed",
+		name:         "TestChangeStorageClass",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0057.yaml",
+		description:  "Tests that storage class cannot be changed",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{`"storageClassName"`, "spec.volumeClaimTemplates[*]"},
 		),
 	},
 	{
-		name:        "TestChangeStorageSize",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0058.yaml",
-		description: "Tests that storage size cannot be changed",
+		name:         "TestChangeStorageSize",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0058.yaml",
+		description:  "Tests that storage size cannot be changed",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{`"storage"`, "spec.volumeClaimTemplates[*].resources.requests"},
 		),
@@ -507,12 +502,12 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:        "TestClaimTemplateRequiresStorageRequests",
-		path:        "tests/0050.yaml",
-		updatePath:  "tests/0060.yaml",
-		description: "Tests that storage request size is specified",
+		name:         "TestClaimTemplateRequiresStorageRequests",
+		existingPath: "tests/0050.yaml",
+		path:         "tests/0060.yaml",
+		description:  "Tests that storage request size is specified",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits"),
+			errors.Required("spec.volumeClaimTemplates.spec.resources", "body"),
 		),
 	},
 	{
@@ -532,10 +527,10 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:        "TestVersionUpgrade",
-		path:        "tests/0001.yaml",
-		updatePath:  "tests/0063.yaml",
-		description: "Tests version upgrades are rejected",
+		name:         "TestVersionUpgrade",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0063.yaml",
+		description:  "Tests version upgrades are rejected",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.version", "body"},
 		),
@@ -556,19 +551,19 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:        "TestUpdateAnalyticsVolumes",
-		path:        "tests/0065.yaml",
-		updatePath:  "tests/0066.yaml",
-		description: "Tests updating analytics volumes",
+		name:         "TestUpdateAnalyticsVolumes",
+		existingPath: "tests/0065.yaml",
+		path:         "tests/0066.yaml",
+		description:  "Tests updating analytics volumes",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"analytics", "spec.servers[*].Pod.VolumeMounts"},
 		),
 	},
 	{
-		name:        "TestUpdateAntiAffinity",
-		path:        "tests/0007.yaml",
-		updatePath:  "tests/0067.yaml",
-		description: "Tests anti affinity is immutable",
+		name:         "TestUpdateAntiAffinity",
+		existingPath: "tests/0007.yaml",
+		path:         "tests/0067.yaml",
+		description:  "Tests anti affinity is immutable",
 		expectedErr: errors.CompositeValidationError(
 			&UpdateError{"spec.antiAffinity", "body"},
 		),
@@ -585,13 +580,17 @@ var testDefs = []testDef{
 		name:        "TestPodEnvironmentIsArray",
 		path:        "tests/0069.yaml",
 		description: "Tests pod environment is specified as an array",
-		typeFail:    true,
+		expectedErr: errors.CompositeValidationError(
+			errors.InvalidType("spec.servers.pod.couchbaseEnv", "body", "array", "object"),
+		),
 	},
 	{
 		name:        "TestPodEnvironmentValueIsString",
 		path:        "tests/0070.yaml",
 		description: "Tests pod environment values are strings",
-		typeFail:    true,
+		expectedErr: errors.CompositeValidationError(
+			errors.InvalidType("spec.servers.pod.couchbaseEnv.value", "body", "string", "number"),
+		),
 	},
 	{
 		name:        "TestPodEnvironmentValid",
@@ -672,6 +671,26 @@ var testDefs = []testDef{
 	},
 }
 
+// loadCustomResource loads a custom resource.  If the load failed we check against
+// expected errors that may be triggered by CRD validation.  The return bool indicates
+// whether we need to continue (e.g. a CRD validation failure that was expected, we can
+// just stop the test now).
+func loadCustomResource(t *testing.T, tc testDef, path string) (*api.CouchbaseCluster, bool) {
+	raw, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The decode does an unstructured CRD validation before decoding, as such if we
+	// encounter an error this may be expected and we should check this.
+	resource, err := decoder.DecodeCouchbaseCluster(raw)
+	if err != nil {
+		checkErrors(t, tc, err)
+		return nil, false
+	}
+	return resource, true
+
+}
+
 func TestValiation(t *testing.T) {
 	err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
@@ -684,78 +703,65 @@ func TestValiation(t *testing.T) {
 	}
 
 	for _, tc := range testDefs {
-		raw, err := ioutil.ReadFile(tc.path)
-		if err != nil {
-			t.Fatalf("%s failed due to %v", tc.name, err)
-		}
-
-		resource, err := decoder.DecodeCouchbaseCluster(raw)
-		if err != nil {
-			if !tc.typeFail {
-				t.Fatalf("Failed: %s %T\n", tc.name, err)
-			}
-			continue
-		}
-
-		if tc.typeFail {
-			fmt.Printf("Name: %s\nFile: %s\nDesc: %s\n", tc.name, tc.path, tc.description)
-			fmt.Printf("Expected decoding to fail due to invalid type\n")
-			t.Fail()
-			continue
-		}
-
-		if tc.updatePath == "" {
-			err = Create(resource)
-			if !checkErrors(tc, err) {
-				t.Fail()
-			}
-		} else {
-			raw, err = ioutil.ReadFile(tc.updatePath)
-			if err != nil {
-				t.Fatalf("%s failed due to %v", tc.name, err)
+		t.Run(tc.name, func(t *testing.T) {
+			// Load the inbound YAML file.
+			current, cont := loadCustomResource(t, tc, tc.path)
+			if !cont {
+				return
 			}
 
-			updated, err := decoder.DecodeCouchbaseCluster(raw)
-			if err != nil {
-				if !tc.typeFail {
-					t.Fatalf("Failed: %s %T\n", tc.name, err)
-				}
-				continue
+			// If this is a pure input test run a Create command.
+			if tc.existingPath == "" {
+				checkErrors(t, tc, Create(current))
+				return
 			}
 
-			err, _ = Update(resource, updated)
-			if !checkErrors(tc, err) {
-				t.Fail()
+			// Othewise it's an update test, load the existing resource and run an Update command.
+			previous, cont := loadCustomResource(t, tc, tc.existingPath)
+			if !cont {
+				t.Fatal("unexpected load failure of existing resource")
 			}
-		}
+			err, _ = Update(previous, current)
+			checkErrors(t, tc, err)
+		})
 	}
 }
 
-func printError(name, file, description string, expected, actual *errors.CompositeError) {
-	fmt.Printf("----\n")
-	fmt.Printf("Name: %s\nFile: %s\nDesc: %s\n", name, file, description)
-	fmt.Printf("Expected:\n%v\n", expected)
-	fmt.Printf("Actual:\n%v\n", actual)
-	fmt.Printf("----\n")
+func printError(tc testDef, actual *errors.CompositeError) {
+	fmt.Println("Description:", tc.description)
+	if tc.existingPath != "" {
+		fmt.Println("Existing CR:", tc.existingPath)
+	}
+	fmt.Println("Current CR:", tc.path)
+	fmt.Println("Expected Errors:")
+	fmt.Println(tc.expectedErr)
+	fmt.Println("Actual Errors:")
+	fmt.Println(actual)
 }
 
-func checkErrors(tc testDef, err error) bool {
-	if actual, ok := err.(*errors.CompositeError); ok {
-		if !compositeErrorEqual(tc.expectedErr, actual) {
-			printError(tc.name, tc.path, tc.description, tc.expectedErr, actual)
-			return false
-		}
-	} else if err != nil {
-		fmt.Printf("%s failed due to %v\n", tc.name, err)
-		return false
-	} else {
+func checkErrors(t *testing.T, tc testDef, err error) {
+	// If there are no errors and some are expected, then raise an error.
+	if err == nil {
 		if tc.expectedErr != nil {
-			printError(tc.name, tc.path, tc.description, tc.expectedErr, actual)
-			return false
+			printError(tc, nil)
+			t.FailNow()
 		}
+		return
 	}
 
-	return true
+	// All of our expected error types are composite errors, either from
+	// CRD validation, Create or Delete operations.  Anything else is
+	// unexpected.
+	switch typed := err.(type) {
+	case *errors.CompositeError:
+		if !compositeErrorEqual(tc.expectedErr, typed) {
+			printError(tc, typed)
+			t.FailNow()
+		}
+	default:
+		printError(tc, errors.CompositeValidationError(err))
+		t.FailNow()
+	}
 }
 
 func compositeErrorEqual(e1, e2 *errors.CompositeError) bool {

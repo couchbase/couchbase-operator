@@ -58,10 +58,6 @@ func BoundedErrorUint(name, in string, value, min, max uint64) error {
 func Create(resource *api.CouchbaseCluster) error {
 	applyDefaults(resource)
 
-	if err := k8sutil.ValidateCRD(resource); err != nil {
-		return err
-	}
-
 	if err := checkConstraints(resource); err != nil {
 		return err
 	}
@@ -74,10 +70,6 @@ func Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
 
 	err, warn := checkImmutableFields(current, updated)
 	if err != nil {
-		return err, warn
-	}
-
-	if err := k8sutil.ValidateCRD(updated); err != nil {
 		return err, warn
 	}
 
@@ -303,7 +295,7 @@ func checkConstraints(customResource *api.CouchbaseCluster) error {
 	}
 
 	if !hasDataService {
-		err := errors.Required("at least on \"data\" service", "spec.servers[*].services")
+		err := errors.Required("at least one \"data\" service", "spec.servers[*].services")
 		errs = append(errs, err)
 	}
 
