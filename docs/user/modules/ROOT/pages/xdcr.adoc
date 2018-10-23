@@ -24,7 +24,7 @@ NOTE: The XDCR exposed feature exposes pod ports as node ports. Clients that are
 
 === Using DNS
 
-As the pods from one network are routable from the other and you have dynamic DNS, establishing an XDCR connection with the target is as easy as specifying something similar to `http://cb-example-0000.cb-example.default.svc:8091` as per usual.
+As the pods from one network are routable from the other and you have dynamic DNS, establishing an XDCR connection with the target is as easy as specifying something similar to `cb-example-0000.cb-example.default.svc:8091` as per usual.
 
 === Using IP and Exposed Features
 
@@ -64,4 +64,4 @@ NAME                            TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S
 cb-example-0000-exposed-ports   NodePort   10.106.194.132   <none>        8091:31202/TCP,18091:30641/TCP,8092:31515/TCP,18092:30362/TCP,11210:30065/TCP,11207:32093/TCP   1h
 ----
 
-When establishing the XDCR connection from the Couchbase UI console in cluster 1 to cluster 2 we'd use the connection string `http://172.16.1.2:31202`.
+When establishing the XDCR connection from the Couchbase UI console in cluster 1 to cluster 2 we'd use the connection string `172.16.1.2:31202`.
