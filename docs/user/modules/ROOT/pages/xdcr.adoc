@@ -34,6 +34,8 @@ image:xdcr_user_docs.png["XDCR between overlay networks"]
 
 This assumes two nodes in sepparate Kubernetes clusters can communicate with each other.  The router depicted could be a switch, router, VPN connection or any other infrastructure which allows layer 3 communication.
 
+NOTE: The server ports used for communication between clusters for XDCR may need explicitly allowing depending on your environment.  By default these ports will be in the range 30000-32767 but it may differ between cloud providers or depending on your cluster configuration.  If a connection fails to establish please ensure this port range is allowed by firewall and security group rules.  This applies to all Kubernetes nodes that can host Couchbase server pods.
+
 The pod in cluster 1 is only able to connect to the node port exposed in cluster 2.  Further more that port is only exposed on the node on which the pod is running.  To determine the correct connection string on the XDCR target cluster:
 
 . List all pods and select one
