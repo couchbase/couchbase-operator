@@ -512,7 +512,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}

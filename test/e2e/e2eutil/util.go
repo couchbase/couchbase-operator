@@ -98,6 +98,12 @@ var (
 		Service: constants.Retries20,
 	}
 
+	azureRetries = &ClusterReadyRetries{
+		Size:    constants.Retries120 * GetPlatformTimingMultiplier("azure"),
+		Bucket:  constants.Retries60 * GetPlatformTimingMultiplier("azure"),
+		Service: constants.Retries20 * GetPlatformTimingMultiplier("azure"),
+	}
+
 	systemTestRetries = &ClusterReadyRetries{
 		Size:    constants.Retries120,
 		Bucket:  constants.Retries120,
@@ -252,10 +258,26 @@ func CreateClusterSpec(secretName string, config map[string]map[string]string) a
 	return e2espec.CreateClusterSpec(constants.ClusterNamePrefix, secretName, config)
 }
 
+func GetRetriesForPlatform(platformType string) *ClusterReadyRetries {
+	if platformType == "azure" {
+		return azureRetries
+	} else {
+		return defaultRetries
+	}
+}
+
+func GetPlatformTimingMultiplier(platformType string) int {
+	if platformType == "azure" {
+		return 5
+	} else {
+		return 1
+	}
+}
+
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, defaultRetries)
+	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, GetRetriesForPlatform(platformType))
 }
 
 // Creates Couchbase cluster object and returns it

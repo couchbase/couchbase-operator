@@ -49,7 +49,7 @@ func createPodSecurityContext(fsGroup int, clusterSpec *v1.ClusterSpec) {
 }
 
 // Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user
-func VerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, namespace string, expectedPvcMap map[string]int) (errToReturn error) {
+func VerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, namespace string, expectedPvcMap map[string]int, platformType string) (errToReturn error) {
 	pvcMappingVerify := func() error {
 		for memberName, pvcCount := range expectedPvcMap {
 			pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
@@ -64,6 +64,9 @@ func VerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, name
 	}
 
 	maxRetires := constants.Retries5
+	if platformType == "azure" {
+		maxRetires = constants.Retries30
+	}
 	for retryCount := 0; retryCount < maxRetires; retryCount++ {
 		// Sleep before next poll
 		time.Sleep(time.Second * 5)
@@ -104,7 +107,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,6 +195,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	f := framework.Global
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
+	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	autofailoverTimeout := 30
 	totalTimeToRecover := 0
@@ -202,8 +206,8 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	clusterConfig["autoFailoverTimeout"] = "30"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	serviceConfig1["defaultVolMnt"] = pvcName
-	//serviceConfig1["dataVolMnt"] = pvcName
-	//serviceConfig1["indexVolMnt"] = pvcName
+	serviceConfig1["dataVolMnt"] = pvcName
+	serviceConfig1["indexVolMnt"] = pvcName
 
 	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
@@ -217,12 +221,18 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
 	expectedEvents := e2eutil.EventValidator{}
+	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
@@ -281,12 +291,12 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	}
 
 	event := e2eutil.RebalanceStartedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, totalTimeToRecover+60); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, totalTimeToRecover+(60*platformTimingMultiplier)); err != nil {
 		t.Fatal(err)
 	}
 
 	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300*platformTimingMultiplier); err != nil {
 		t.Fatal(err)
 	}
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
@@ -303,6 +313,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	f := framework.Global
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
+	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSizeWithOutPvc, _ := strconv.Atoi(serviceConfig1["size"])
 	clusterSizeWithPvc1, _ := strconv.Atoi(serviceConfig2["size"])
@@ -335,9 +346,14 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1, pvcTemplate2}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
@@ -383,17 +399,17 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberIdToKill)
 
 	event := e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, autofailoverTimeout+90); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, autofailoverTimeout+(90*platformTimingMultiplier)); err != nil {
 		t.Fatalf("Pod %s not recovered: %v", podMemberNameToKill, err)
 	}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberIdToKill)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries5); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries5*platformTimingMultiplier); err != nil {
 		t.Fatal(err)
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -409,11 +425,6 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 
 	// Sleep for autofailover to occur
 	time.Sleep(time.Second*time.Duration(autofailoverTimeout) + 120)
-
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("Unable to get Client for cluster: %v", err)
-	}
 
 	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, constants.Size1); err != nil {
 		t.Fatalf("Mismatch in unhealthy nodes count: %v", err)
@@ -492,7 +503,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +530,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
@@ -557,6 +568,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	f := framework.Global
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
+	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 4
 	podMembersToKill := []int{0, 1, 2, 3}
@@ -568,8 +580,8 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	clusterConfig["autoFailoverTimeout"] = "30"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	serviceConfig1["defaultVolMnt"] = pvcName
-	//serviceConfig1["dataVolMnt"] = pvcName
-	//serviceConfig1["indexVolMnt"] = pvcName
+	serviceConfig1["dataVolMnt"] = pvcName
+	serviceConfig1["indexVolMnt"] = pvcName
 
 	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
@@ -583,12 +595,18 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
+	}
+
 	expectedEvents := e2eutil.EventValidator{}
+	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
@@ -628,12 +646,12 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	clusterBalancedErr := make(chan error)
 	go func() {
 		// Wait for cluster balanced condition after recovering the cluster pods
-		clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300)
+		clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300*platformTimingMultiplier)
 	}()
 
 	time.Sleep(timeToSleep)
 
-	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300); err != nil {
+	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300*platformTimingMultiplier); err != nil {
 		t.Error(err)
 	}
 
@@ -668,12 +686,12 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		clusterBalancedErr := make(chan error)
 		go func() {
 			// Wait for cluster balanced condition after recovering the cluster pods
-			clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300)
+			clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300*platformTimingMultiplier)
 		}()
 
 		time.Sleep(timeToSleep)
 
-		if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300); err != nil {
+		if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300*platformTimingMultiplier); err != nil {
 			t.Error(err)
 		}
 
@@ -730,7 +748,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -803,7 +821,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -839,6 +857,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	f := framework.Global
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
+	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 9
 	pvcName := "couchbase"
@@ -870,9 +889,14 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
 	}
 
 	expectedEvents := e2eutil.EventList{}
@@ -930,13 +954,13 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	}
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600)
+	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600*platformTimingMultiplier)
 
 	for _, recEvent := range receivedEvents {
 		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30*platformTimingMultiplier); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 
@@ -962,6 +986,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	f := framework.Global
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
+	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 9
 	pvcName := "couchbase"
@@ -993,9 +1018,14 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	if err != nil {
+		t.Fatalf("failed to create cluster client %v", err)
 	}
 
 	expectedEvents := e2eutil.EventList{}
@@ -1055,13 +1085,13 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	}
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600)
+	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600*platformTimingMultiplier)
 
 	for _, recEvent := range receivedEvents {
 		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30*platformTimingMultiplier); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 
@@ -1176,7 +1206,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1199,7 +1229,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -1215,6 +1245,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	f := framework.Global
 	kubeName := "NewCluster1"
 	targetKube := f.ClusterSpec[kubeName]
+	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 3
 	bucketName := "PVBucket"
@@ -1237,7 +1268,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	testCouchbase, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1259,7 +1290,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, 60, testCouchbase)
+		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, 60*platformTimingMultiplier, testCouchbase)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1307,7 +1338,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 
 		// To cross check number of persistent vol claims matches the defined spec
-		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 			t.Error(err)
 		}
 	}

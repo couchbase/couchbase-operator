@@ -1,16 +1,17 @@
 ---
-suite: TestCustom
-timeout: 1h
+suite: TestSanity
+timeout: 4h
 tcGroups:
-  - name: Group1
+  - name: PersistentVolumeTests
     clusters:
       - NewCluster1
     testcases:
-        - name: TestPersistentVolumeRzaNodesKilled
-          decorators:
-            - portworxProvisioner
-            - rzaNodeLabeller
-        - name: TestPersistentVolumeRzaFailover
-          decorators:
-            - portworxProvisioner
-            - rzaNodeLabeller
+      #- name: TestPersistentVolumeKillAllPods
+      #- name: TestPersistentVolumeKillPodAndOperator
+      #- name: TestPersistentVolumeKillAllPodsAndOperator
+      - name: TestPersistentVolumeRzaNodesKilled
+        decorators:
+          - rzaNodeLabeller
+
+
+

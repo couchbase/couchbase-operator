@@ -1,0 +1,182 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualNetworks_qe_west_1_vnet_name": {
+            "defaultValue": "qe-west-1-vnet",
+            "type": "String"
+        },
+        "managedClusters_k8s_west_1_name": {
+            "defaultValue": "k8s-west-1",
+            "type": "String"
+        },
+        "subnets_default_name": {
+            "defaultValue": "default",
+            "type": "String"
+        },
+        "virtualNetworkPeerings_qe_west_east_name": {
+            "defaultValue": "qe-west-east",
+            "type": "String"
+        },
+        "managedClusters_k8s_west_1_loganalyticsworkspaceresourceid": {
+            "defaultValue": "/subscriptions/a5c0936c-5cec-4c8c-85e1-97f5cab644d9/resourcegroups/defaultresourcegroup-eus/providers/microsoft.operationalinsights/workspaces/defaultworkspace-a5c0936c-5cec-4c8c-85e1-97f5cab644d9-eus",
+            "type": "String"
+        },
+        "virtualNetworks_qe_west_1_vnet_id": {
+            "defaultValue": "/subscriptions/a5c0936c-5cec-4c8c-85e1-97f5cab644d9/resourceGroups/qe-east-1/providers/Microsoft.Network/virtualNetworks/qe-east-1-vnet",
+            "type": "String"
+        },
+        "virtualNetworkPeerings_qe_west_east_id": {
+            "defaultValue": "/subscriptions/a5c0936c-5cec-4c8c-85e1-97f5cab644d9/resourceGroups/qe-east-1/providers/Microsoft.Network/virtualNetworks/qe-east-1-vnet",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "comments": "Generalized from resource: '/subscriptions/a5c0936c-5cec-4c8c-85e1-97f5cab644d9/resourcegroups/qe-west-1/providers/Microsoft.ContainerService/managedClusters/k8s-west-1'.",
+            "type": "Microsoft.ContainerService/managedClusters",
+            "name": "[parameters('managedClusters_k8s_west_1_name')]",
+            "apiVersion": "2018-03-31",
+            "location": "westus",
+            "scale": null,
+            "properties": {
+                "kubernetesVersion": "1.11.3",
+                "dnsPrefix": "west-1",
+                "agentPoolProfiles": [
+                    {
+                        "name": "agentpool",
+                        "count": 4,
+                        "vmSize": "Standard_B2s",
+                        "osDiskSizeGB": 30,
+                        "storageProfile": "ManagedDisks",
+                        "vnetSubnetID": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_qe_west_1_vnet_name'), parameters('subnets_default_name'))]",
+                        "maxPods": 30,
+                        "osType": "Linux"
+                    }
+                ],
+                "servicePrincipalProfile": {
+                    "clientId": "da0190bc-a6a1-4ea4-8f58-516042230224"
+                },
+                "addonProfiles": {
+                    "httpapplicationrouting": {
+                        "enabled": true,
+                        "config": {
+                            "HTTPApplicationRoutingZoneName": "bbfc073c44514d889d4b.westus.aksapp.io",
+                            "httpapplicationroutingzonename": "bbfc073c44514d889d4b.westus.aksapp.io"
+                        }
+                    },
+                    "omsagent": {
+                        "enabled": true,
+                        "config": {
+                            "loganalyticsworkspaceresourceid": "[parameters('managedClusters_k8s_west_1_loganalyticsworkspaceresourceid')]"
+                        }
+                    }
+                },
+                "enableRBAC": false,
+                "networkProfile": {
+                    "networkPlugin": "azure",
+                    "serviceCidr": "10.16.0.0/16",
+                    "dnsServiceIP": "10.16.0.10",
+                    "dockerBridgeCidr": "172.17.0.1/16"
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_qe_west_1_vnet_name'), parameters('subnets_default_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/a5c0936c-5cec-4c8c-85e1-97f5cab644d9/resourceGroups/qe-west-1/providers/Microsoft.Network/virtualNetworks/qe-west-1-vnet'.",
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[parameters('virtualNetworks_qe_west_1_vnet_name')]",
+            "apiVersion": "2018-02-01",
+            "location": "westus",
+            "tags": {},
+            "scale": null,
+            "properties": {
+                "provisioningState": "Succeeded",
+                "resourceGuid": "80bb6fe1-df72-424b-98a3-0401365982ae",
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.16.0.0/12"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "etag": "W/\"53b5fa15-2206-4605-acf4-e607f0b63a09\"",
+                        "properties": {
+                            "provisioningState": "Succeeded",
+                            "addressPrefix": "10.24.0.0/16"
+                        }
+                    }
+                ],
+                "virtualNetworkPeerings": [
+                    {
+                        "name": "qe-west-east",
+                        "etag": "W/\"53b5fa15-2206-4605-acf4-e607f0b63a09\"",
+                        "properties": {
+                            "provisioningState": "Succeeded",
+                            "peeringState": "Connected",
+                            "remoteVirtualNetwork": {
+                                "id": "[parameters('virtualNetworks_qe_west_1_vnet_id')]"
+                            },
+                            "allowVirtualNetworkAccess": true,
+                            "allowForwardedTraffic": false,
+                            "allowGatewayTransit": false,
+                            "useRemoteGateways": false,
+                            "remoteAddressSpace": {
+                                "addressPrefixes": [
+                                    "10.0.0.0/12"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "enableDdosProtection": false,
+                "enableVmProtection": false
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/a5c0936c-5cec-4c8c-85e1-97f5cab644d9/resourceGroups/qe-west-1/providers/Microsoft.Network/virtualNetworks/qe-west-1-vnet/subnets/default'.",
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "name": "[concat(parameters('virtualNetworks_qe_west_1_vnet_name'), '/', parameters('subnets_default_name'))]",
+            "apiVersion": "2018-02-01",
+            "scale": null,
+            "properties": {
+                "provisioningState": "Succeeded",
+                "addressPrefix": "10.24.0.0/16"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_qe_west_1_vnet_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/a5c0936c-5cec-4c8c-85e1-97f5cab644d9/resourceGroups/qe-west-1/providers/Microsoft.Network/virtualNetworks/qe-west-1-vnet/virtualNetworkPeerings/qe-west-east'.",
+            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+            "name": "[concat(parameters('virtualNetworks_qe_west_1_vnet_name'), '/', parameters('virtualNetworkPeerings_qe_west_east_name'))]",
+            "apiVersion": "2018-02-01",
+            "scale": null,
+            "properties": {
+                "provisioningState": "Succeeded",
+                "peeringState": "Connected",
+                "remoteVirtualNetwork": {
+                    "id": "[parameters('virtualNetworkPeerings_qe_west_east_id')]"
+                },
+                "allowVirtualNetworkAccess": true,
+                "allowForwardedTraffic": false,
+                "allowGatewayTransit": false,
+                "useRemoteGateways": false,
+                "remoteAddressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/12"
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_qe_west_1_vnet_name'))]"
+            ]
+        }
+    ]
+}

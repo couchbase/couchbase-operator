@@ -1159,6 +1159,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	kubeName := "BasicCluster"
 	targetKube := f.ClusterSpec[kubeName]
 	svcAccName := "rbac-test"
+
 	kubeConfPath := targetKube.KubeConfPath
 
 	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
@@ -1563,8 +1564,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	// Create Couchbase cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1593,7 +1593,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -1669,7 +1669,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
@@ -1712,7 +1712,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Cb cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1741,7 +1741,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -1792,7 +1792,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, clusterSize-1)] = 0
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
@@ -1869,7 +1869,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1898,7 +1898,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -1923,7 +1923,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -1948,7 +1948,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -1973,7 +1973,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
@@ -2026,7 +2026,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2053,7 +2053,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -2095,7 +2095,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
@@ -2140,7 +2140,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2167,7 +2167,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 
@@ -2217,7 +2217,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		}
 
 		// Verifying the persistence of log PVs are preserved by operator
-		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 			t.Error(err)
 		}
 
@@ -2234,7 +2234,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap); err != nil {
+	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
@@ -2274,8 +2274,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, kubeName string, serverMembe
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	// Create Couchbase cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2521,7 +2520,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
