@@ -157,6 +157,6 @@ tcGroups:
       - name: TestCollectLogFromEphemeralPodsWithOperatorKilled
       - name: TestEphemeralLogCollectResizeCluster
       - name: TestLogCollectWithClusterResizeAndServerPodKilled
-      - name: TestLogCollectWithClusterResizeAndOperatorPodKilled
-      - name: TestCollectLogFromPvPodAndOperatorRecovered
-      - name: TestLogCollectWithCustomRetentionAndSize
+      #- name: TestLogCollectWithClusterResizeAndOperatorPodKilled
+      #- name: TestCollectLogFromPvPodAndOperatorRecovered
+      #- name: TestLogCollectWithCustomRetentionAndSize
