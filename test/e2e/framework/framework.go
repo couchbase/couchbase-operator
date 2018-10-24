@@ -460,6 +460,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName string, dockerImages []string) error {
 	yamlFilePath := "./resources/ansible"
 	pullDockerImageFile := yamlFilePath + "/generic/pullDockerImage.yaml"
+	tagDockerImageFile := yamlFilePath + "/generic/tagDockerImage.yaml"
 	inventoryFile := yamlFilePath + "DockerHosts"
 
 	logrus.Infof("Pulling docker images for %s", kubeName)
@@ -487,6 +488,17 @@ func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName s
 	if err := ansibleCmd.Run(); err != nil {
 		logrus.Info(stdout.String())
 		return errors.New("Error during ansible execution: " + err.Error())
+	}
+
+	// To tag operator image will default operator image name for testing with default name
+	if f.OpImage != constants.DefOperatorImgTag {
+		ansibleExtraVarParam := "srcImg=" + f.OpImage + " destImg=" + constants.DefOperatorImgTag
+		ansibleCmd := exec.Command("ansible-playbook", "-i", inventoryFile, tagDockerImageFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
+		ansibleCmd.Stdout = &stdout
+		if err := ansibleCmd.Run(); err != nil {
+			logrus.Info(stdout.String())
+			return errors.New("Error during ansible execution: " + err.Error())
+		}
 	}
 	return nil
 }

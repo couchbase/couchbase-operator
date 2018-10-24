@@ -226,8 +226,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		t.Fatal(err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
@@ -276,12 +275,11 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 
 	podMembersToKillLen := len(podMembersToKill)
 	if podMembersToKillLen == clusterSize {
-		// All cluster pods are killed, should get one less than all events since
-		// first pod recovered will not have the repective event for it
+		// All cluster pods are killed, should get one less than all events since first pod
+		// event will not have the repective event, but recovered event will be registered
+		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 		for index := 1; index < podMembersToKillLen; index++ {
 			expectedEvents.AddAnyOfEvents(memberDownEvents)
-		}
-		for index := 1; index < podMembersToKillLen; index++ {
 			expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 		}
 	} else {
@@ -600,8 +598,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
@@ -894,8 +891,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
@@ -1023,8 +1019,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
