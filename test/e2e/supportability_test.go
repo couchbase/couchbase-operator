@@ -1661,7 +1661,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 		}
 
 		event := e2eutil.RebalanceCompletedEvent(cbCluster)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")

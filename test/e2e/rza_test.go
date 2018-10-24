@@ -556,7 +556,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 
 	// Cross check it matches the expected values
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
+		t.Errorf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
 	deployedRzaPodMap, err := GetDeployedRzaPodMap(targetKube.KubeClient, f.Namespace)
@@ -564,11 +564,9 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 		t.Fatalf("Failed to get deployed Rza map: %v", err)
 	}
 
-	t.Log(deployedRzaPodMap)
-
 	// Cross check it matches the expected values
 	if reflect.DeepEqual(expectedRzaPodNodeSelectorMap, deployedRzaPodMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaPodNodeSelectorMap, deployedRzaPodMap)
+		t.Errorf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaPodNodeSelectorMap, deployedRzaPodMap)
 	}
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }

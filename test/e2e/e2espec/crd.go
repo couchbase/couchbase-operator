@@ -1,6 +1,7 @@
 package e2espec
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -244,6 +245,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 	for key := range config {
 		keys = append(keys, key)
 	}
+	sort.Strings(keys)
 
 	// Spec object to return
 	spec := api.ClusterSpec{
