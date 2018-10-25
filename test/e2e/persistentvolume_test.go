@@ -280,6 +280,8 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 		for index := 1; index < podMembersToKillLen; index++ {
 			expectedEvents.AddAnyOfEvents(memberDownEvents)
+		}
+		for index := 1; index < podMembersToKillLen; index++ {
 			expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 		}
 	} else {
@@ -616,6 +618,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 
 	//For event validation
 	memDownEventsValidator := e2eutil.EventValidator{}
+	memRecoveredEventsValidator := e2eutil.EventValidator{}
 
 	// For event tracking
 	allMemberDownEvents := e2eutil.EventList{}
@@ -630,7 +633,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 
 		// Saving both events in same validator, since it can occur in any order in real time
 		memDownEventsValidator.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
-		memDownEventsValidator.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
+		memRecoveredEventsValidator.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
 
 		allMemberDownEvents = append(allMemberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
 		allMemberRecoveredEvents = append(allMemberRecoveredEvents, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
@@ -652,8 +655,13 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Error(err)
 	}
 
-	for index := 0; index < (clusterSize-1)*2; index++ {
-		expectedEvents.AddParallelEvents(memDownEventsValidator)
+	// First any one pod will be recovered, followed by member down & recovery events
+	expectedEvents.AddAnyOfEvents(memRecoveredEventsValidator)
+	for index := 1; index < clusterSize; index++ {
+		expectedEvents.AddAnyOfEvents(memDownEventsValidator)
+	}
+	for index := 1; index < clusterSize; index++ {
+		expectedEvents.AddAnyOfEvents(memRecoveredEventsValidator)
 	}
 
 	if err := <-clusterBalancedErr; err != nil {
@@ -676,29 +684,11 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 
 		time.Sleep(timeToSleep)
 
-		if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberDownEvents, clusterSize-1, 120); err != nil {
-			t.Error(err)
-		}
-
-		clusterBalancedErr := make(chan error)
-		go func() {
-			// Wait for cluster balanced condition after recovering the cluster pods
-			clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300*platformTimingMultiplier)
-		}()
-
-		time.Sleep(timeToSleep)
-
-		if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300*platformTimingMultiplier); err != nil {
-			t.Error(err)
-		}
-
-		for index := 0; index < (clusterSize-1)*2; index++ {
-			expectedEvents.AddParallelEvents(memDownEventsValidator)
-		}
-
-		if err := <-clusterBalancedErr; err != nil {
+		// Wait for cluster balanced condition after recovering the cluster pods
+		if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300*platformTimingMultiplier); err != nil {
 			t.Fatal(err)
 		}
+
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}

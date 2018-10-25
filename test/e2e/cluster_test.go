@@ -767,8 +767,8 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	if err := e2eutil.WaitForClusterScalingCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
 		t.Fatal(err)
 	}
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
+	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	if f.KubeType == "kubernetes" {
 		if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
 			t.Fatal(err)
@@ -778,6 +778,10 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceIncomplete")
+	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", 0)
+	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", 0)
 
 	// Add possible outcomes for this scenario into new event list
 	multipleOutcomeEvents := e2eutil.EventValidator{}

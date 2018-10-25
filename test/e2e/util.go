@@ -217,7 +217,6 @@ func ValidateEvents(t *testing.T, kubeClient kubernetes.Interface, namespace, cb
 	v := &eventschema.Validator{Events: clusterEvents, Schema: eventSeq}
 	if err := v.Validate(os.Stdout); err != nil {
 		t.Error(err)
-		t.Logf("Cluster events:\n%v", clusterEvents)
 	}
 }
 
