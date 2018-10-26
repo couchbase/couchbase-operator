@@ -24,6 +24,7 @@ types:
             label: RzaGroup-3
 
       - name: AuxillaryCluster1
+        storageClassType: portworx
         master:
           - ip: 172.23.104.132
         worker:

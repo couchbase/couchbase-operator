@@ -225,7 +225,7 @@ func NewBucket(name string) map[string]string {
 // runs a system test based on a sysTestDef
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
-	kubeName := "AuxillaryCluster1"
+	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
 
 	// cluster configuration, 10 buckets, 4 nodes, all services

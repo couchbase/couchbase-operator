@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-)
-
-const (
-	nodeRoleMasterLabel    = "node-role.kubernetes.io/master"
-	failureDomainZoneLabel = "failure-domain.beta.kubernetes.io/zone"
 )
 
 // ZoneList is a list of availability zones.
@@ -58,7 +55,7 @@ func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 	}
 
 	// Is the first node labelled as having a failure domain?
-	if _, ok := nodes.Items[0].Labels[failureDomainZoneLabel]; !ok {
+	if _, ok := nodes.Items[0].Labels[constants.FailureDomainZoneLabel]; !ok {
 		return &Capabilities{}, nil
 	}
 
@@ -67,14 +64,14 @@ func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 	availabilityZones := zoneSet{}
 	for _, node := range nodes.Items {
 		// All nodes must have a zone
-		zone, ok := node.Labels[failureDomainZoneLabel]
+		zone, ok := node.Labels[constants.FailureDomainZoneLabel]
 		if !ok {
-			return nil, fmt.Errorf("node %s missing label %s", node.Name, failureDomainZoneLabel)
+			return nil, fmt.Errorf("node %s missing label %s", node.Name, constants.FailureDomainZoneLabel)
 		}
 		availabilityZones.add(zone)
 
 		// Check if this node is a master
-		if _, ok := node.Labels[nodeRoleMasterLabel]; ok {
+		if _, ok := node.Labels[constants.NodeRoleMasterLabel]; ok {
 			masterZones.add(zone)
 		}
 	}
@@ -85,7 +82,6 @@ func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 		MasterZones:       masterZones.toZoneList(),
 		AvailabilityZones: availabilityZones.toZoneList(),
 	}
-
 	return cluster, nil
 }
 

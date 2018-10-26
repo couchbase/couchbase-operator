@@ -50,6 +50,12 @@ var (
 	CbClusterPassword = "password"
 )
 
+var (
+	// Labels for K8S nodes
+	NodeRoleMasterLabel    = "node-role.kubernetes.io/master"
+	FailureDomainZoneLabel = util_const.ServerGroupLabel
+)
+
 const (
 	// Operator constants
 	OperatorRestPort  int32  = 8080

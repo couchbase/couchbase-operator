@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -55,7 +54,7 @@ func K8SNodesAddLabel(nodeLabelName string, kubeClient kubernetes.Interface, k8s
 		k8sNode.Spec.Unschedulable = false
 		k8sNode.Spec.Taints = []v1.Taint{}
 
-		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
+		if _, err := kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
 			return errors.New("Failed to update label for node " + nodeIpAddress + ": " + err.Error())
 		}
 	}
@@ -75,7 +74,7 @@ func UpdateServerGroupLabel(nodeLabelName, oldLabelVal, newLabelVal string, kube
 			nodeLabels[nodeLabelName] = newLabelVal
 		}
 		k8sNode.SetLabels(nodeLabels)
-		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
+		if _, err := kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
 			return errors.New("Failed to update label for node " + k8sNode.Name + ": " + err.Error())
 		}
 	}
@@ -119,7 +118,7 @@ func GetDeployedRzaMap(kubeClient kubernetes.Interface, namespace string) (map[s
 
 	deployedRzaGroupsMap := map[string]int{}
 	for _, cbPod := range couchbasePodList.Items {
-		currRzaGroup := cbPod.Spec.NodeSelector[pkg_constants.ServerGroupLabel]
+		currRzaGroup := cbPod.Spec.NodeSelector[constants.FailureDomainZoneLabel]
 		if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {
 			deployedRzaGroupsMap[currRzaGroup]++
 		} else {
@@ -139,7 +138,7 @@ func GetDeployedRzaPodMap(kubeClient kubernetes.Interface, namespace string) (ma
 
 	deployedRzaGroupsMap := map[string]string{}
 	for _, cbPod := range couchbasePodList.Items {
-		deployedRzaGroupsMap[cbPod.Name] = cbPod.Spec.NodeSelector[pkg_constants.ServerGroupLabel]
+		deployedRzaGroupsMap[cbPod.Name] = cbPod.Spec.NodeSelector[constants.FailureDomainZoneLabel]
 	}
 	return deployedRzaGroupsMap, err
 }
@@ -184,12 +183,12 @@ func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) 
 
 		// Adding retry loop because sometimes node label update is failing. On retry, it will succeed
 		if !f.SkipTeardown {
-			defer K8SNodesRemoveLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient)
+			defer K8SNodesRemoveLabel(constants.FailureDomainZoneLabel, targetKube.KubeClient)
 		}
 		for retryCount := 0; retryCount < 3; retryCount++ {
 			t.Logf("Retry node label update: %d", retryCount)
 			// Label K8S nodes based on the labels present in the cluster conf yaml file
-			err = K8SNodesAddLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0])
+			err = K8SNodesAddLabel(constants.FailureDomainZoneLabel, targetKube.KubeClient, k8sNodesData[0])
 			if err == nil {
 				break
 			}
@@ -233,13 +232,44 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 
+	getClusterSizeForAntiAffinity := func() int {
+		maxNodesPossibleforAaOn := 0
+		sort.Strings(availableServerGroupList)
+		k8sNodes, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		serverGroupNodeCountMap := map[string]int{}
+
+		// Populate the server-group node count map
+		for _, node := range k8sNodes.Items {
+			nodeLabels := node.GetLabels()
+			if serverGroup, zoneLabelOk := nodeLabels[constants.FailureDomainZoneLabel]; zoneLabelOk {
+				if _, mapKeyOk := serverGroupNodeCountMap[serverGroup]; mapKeyOk {
+					serverGroupNodeCountMap[serverGroup] += 1
+				}
+			}
+		}
+
+		// Simulate the nodes scheduling across server groups which is done in lexical order of group names
+		// When the next server group to be allocated from is empty then terminate
+		// and return the number of allocations that succeeded
+		for {
+			for _, serverGroup := range availableServerGroupList {
+				if serverGroupNodeCountMap[serverGroup] == 0 {
+					return maxNodesPossibleforAaOn
+				}
+				maxNodesPossibleforAaOn++
+				serverGroupNodeCountMap[serverGroup]--
+			}
+		}
+	}
+
 	// TODO: so while we do force removal taints at the moment, we cannot rely on
 	// this forever, perhaps the clustercapabilities can point out how many nodes
 	// are schedulable...
-	clusterSize, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
-	if err != nil {
-		t.Fatal(err)
-	}
+	clusterSize := getClusterSizeForAntiAffinity()
+	newPodsToAdd := constants.Size3
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
@@ -275,10 +305,11 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		t.Fatal(err.Error())
 	}
 
-	service := 0
-	if err := e2eutil.ResizeClusterNoWait(t, service, clusterSize+1, targetKube.CRClient, testCouchbase); err != nil {
+	serviceIndex := 0
+	if err := e2eutil.ResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal(err)
 	}
+
 	if antiAffinity == "on" {
 		event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
@@ -286,18 +317,21 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		}
 		expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
 		// Revert back to original cluster size
-		if err := e2eutil.ResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
+		if err := e2eutil.ResizeClusterNoWait(t, serviceIndex, clusterSize, targetKube.CRClient, testCouchbase); err != nil {
 			t.Fatal(err)
 		}
 	} else if antiAffinity == "off" {
-		event := e2eutil.NewMemberAddEvent(testCouchbase, clusterSize)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-			t.Fatal(err)
+		// Updated new clusterSize
+		clusterSize += newPodsToAdd
+		for memberIndex := clusterSize - newPodsToAdd; memberIndex < clusterSize; memberIndex++ {
+			event := e2eutil.NewMemberAddEvent(testCouchbase, memberIndex)
+			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
+				t.Fatal(err)
+			}
+			expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 		}
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
-		clusterSize++
 
-		event = e2eutil.RebalanceCompletedEvent(testCouchbase)
+		event := e2eutil.RebalanceCompletedEvent(testCouchbase)
 		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
 			t.Fatal(err)
 		}
@@ -378,7 +412,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	k8sNodeLabelUpdateFunc := func() {
 		// Rename node labels for particular server-group
 		// Node label get updated in both update / remove scenario
-		nodeUpdateErrChan <- UpdateServerGroupLabel(pkg_constants.ServerGroupLabel, availableServerGroupList[0], "NewRzaGroup-1", targetKube.KubeClient)
+		nodeUpdateErrChan <- UpdateServerGroupLabel(constants.FailureDomainZoneLabel, availableServerGroupList[0], "NewRzaGroup-1", targetKube.KubeClient)
 		// TODO: you MUST revert the label if you are changing it or any subsequent
 		// persistent volume tests will fail if using EBS for example.
 	}
