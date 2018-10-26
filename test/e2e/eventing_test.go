@@ -170,8 +170,9 @@ func TestEventingResizeCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-
+	// Provide the pod index for the eventing node
+	// Here nonEventingNodes will be equal to eventing pod's index
+	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
 	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
 	if err != nil {
 		t.Fatal(err)
@@ -340,8 +341,9 @@ func TestEventingKillEventingPods(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-
+	// Provide the pod index for the eventing node
+	// Here nonEventingNodes will be equal to eventing pod's index
+	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
 	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
 	if err != nil {
 		t.Fatal(err)
