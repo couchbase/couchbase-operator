@@ -97,14 +97,8 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestRzaCreateClusterWithStaticConfig
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaCreateClusterWithClassBasedConfig
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaResizeCluster
-        decorators:
-          - rzaNodeLabeller
 
   - name: PersistentVolumeTests
     clusters:
@@ -119,11 +113,7 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestServerGroupAutoFailover
-        decorators:
-          - rzaNodeLabeller
       - name: TestServerGroupWithSingleServiceNodeInFailoverGroup
-        decorators:
-          - rzaNodeLabeller
       - name: TestMultiNodeAutoFailover
       - name: TestDiskFailureAutoFailover
 

@@ -92,29 +92,13 @@ tcGroups:
     testcases:
       # K8S-393, Unsupported in 1.0
       #- name: TestRzaServerGroupRemoval
-      #  decorators:
-      #    - rzaNodeLabeller
       - name: TestRzaServerGroupAddition
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaKillServerPods
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaNegScaleupCluster
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaServerGroupDown
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaAntiAffinityOn
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaAntiAffinityOff
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaUpdateK8SNodeLabelAndCrd
-        decorators:
-          - rzaNodeLabeller
 
   - name: PersistentVolumeTests
     clusters:
@@ -124,21 +108,19 @@ tcGroups:
       - name: TestPersistentVolumeKillPodAndOperator
       - name: TestPersistentVolumeKillAllPodsAndOperator
       - name: TestPersistentVolumeRzaNodesKilled
-        decorators:
-          - rzaNodeLabeller
       - name: TestPersistentVolumeRzaFailover
-        decorators:
-          - rzaNodeLabeller
       - name: TestPersistentVolumeWithSingleNodeService
       - name: TestPersistentVolumeResizeCluster
-      - name: TestAnalyticsKillPodsWithPVC
+      # Works from server-6.0 version
+      #- name: TestAnalyticsKillPodsWithPVC
       - name: TestLogCollectClusterWithPVC
 
   - name: AnalyticsTests
     clusters:
       - BasicCluster
     testcases:
-      - name: TestAnalyticsKillPods
+      # Works from server-6.0 version
+      #- name: TestAnalyticsKillPods
 
   - name: EventingTests
     clusters:
@@ -157,6 +139,7 @@ tcGroups:
       - name: TestCollectLogFromEphemeralPodsWithOperatorKilled
       - name: TestEphemeralLogCollectResizeCluster
       - name: TestLogCollectWithClusterResizeAndServerPodKilled
+      - name: TestLogCollectWithCustomRetentionAndSize
+      # This cases will fail since it prompts for user input during cbopinfo
       #- name: TestLogCollectWithClusterResizeAndOperatorPodKilled
       #- name: TestCollectLogFromPvPodAndOperatorRecovered
-      #- name: TestLogCollectWithCustomRetentionAndSize

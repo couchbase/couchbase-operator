@@ -5,41 +5,15 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-        - name: TestPersistentVolumeCreateCluster
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeAutoFailover
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeNodeFailover
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeKillAllPods
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeKillPodAndOperator
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeKillAllPodsAndOperator
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeRzaNodesKilled
-          decorators:
-            - portworxProvisioner
-            - rzaNodeLabeller
-        - name: TestPersistentVolumeRzaFailover
-          decorators:
-            - portworxProvisioner
-            - rzaNodeLabeller
-        - name: TestPersistentVolumeWithSingleNodeService
-          decorators:
-            - portworxProvisioner
-        - name: TestPersistentVolumeResizeCluster
-          decorators:
-            - portworxProvisioner
-        - name: TestAnalyticsKillPodsWithPVC
-          decorators:
-            - portworxProvisioner
-        - name: TestLogCollectClusterWithPVC
-          decorators:
-            - portworxProvisioner
+      - name: TestPersistentVolumeCreateCluster
+      - name: TestPersistentVolumeAutoFailover
+      - name: TestPersistentVolumeNodeFailover
+      - name: TestPersistentVolumeKillAllPods
+      - name: TestPersistentVolumeKillPodAndOperator
+      - name: TestPersistentVolumeKillAllPodsAndOperator
+      - name: TestPersistentVolumeRzaNodesKilled
+      - name: TestPersistentVolumeRzaFailover
+      - name: TestPersistentVolumeWithSingleNodeService
+      - name: TestPersistentVolumeResizeCluster
+      - name: TestAnalyticsKillPodsWithPVC
+      - name: TestLogCollectClusterWithPVC

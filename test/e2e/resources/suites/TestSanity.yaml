@@ -49,11 +49,7 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestRzaCreateClusterWithStaticConfig
-        decorators:
-          - rzaNodeLabeller
       - name: TestRzaCreateClusterWithClassBasedConfig
-        decorators:
-          - rzaNodeLabeller
 
   - name: PersistentVolumeTests
     clusters:

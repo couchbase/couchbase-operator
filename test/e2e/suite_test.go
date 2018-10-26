@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -133,6 +134,25 @@ func runSuite(t *testing.T) {
 				t.Error(err)
 				// Remove the map entry and break the loop
 				delete(f.ClusterSpec, kubeName)
+				break
+			}
+
+			// Add required K8S node labels
+			for retryCount := 0; retryCount < constants.Retries5; retryCount++ {
+				t.Logf("Retry node label update: %d", retryCount)
+				// Label K8S nodes based on the labels present in the cluster conf yaml file
+				if err := K8SNodesAddLabel(constants.FailureDomainZoneLabel, clusterSpec.KubeClient, kubeCluster); err == nil {
+					break
+				} else if retryCount == 2 {
+					skipCurrTestGroup = true
+					t.Errorf("Failed to label the nodes: %v", err)
+					// Remove the map entry and break the loop
+					delete(f.ClusterSpec, kubeName)
+					break
+				}
+			}
+
+			if skipCurrTestGroup {
 				break
 			}
 		}

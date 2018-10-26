@@ -163,55 +163,6 @@ func GetAvailableServerGroupsFromYmlData(k8sNodesData framework.ClusterInfo) []s
 	return serverGroups
 }
 
-// Wrapper function to Label the K8S nodes and
-// remove the labels after the test case execution
-func rzaNodeLabeller(testFunc framework.TestFunc, args framework.DecoratorArgs) framework.TestFunc {
-	wrapperFunc := func(t *testing.T) {
-		if os.Getenv(envParallelTest) == envParallelTestTrue {
-			t.Parallel()
-		}
-
-		f := framework.Global
-		targetKubeName := f.TestClusters[0]
-		targetKube := f.ClusterSpec[targetKubeName]
-
-		k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{targetKubeName})
-		if err != nil {
-			t.Fatalf("Failed to read cluster yaml data: %v", err)
-		}
-		t.Logf("k8 nodes to label: %+v \n", k8sNodesData)
-
-		// Adding retry loop because sometimes node label update is failing. On retry, it will succeed
-		if !f.SkipTeardown {
-			defer K8SNodesRemoveLabel(constants.FailureDomainZoneLabel, targetKube.KubeClient)
-		}
-		for retryCount := 0; retryCount < 3; retryCount++ {
-			t.Logf("Retry node label update: %d", retryCount)
-			// Label K8S nodes based on the labels present in the cluster conf yaml file
-			err = K8SNodesAddLabel(constants.FailureDomainZoneLabel, targetKube.KubeClient, k8sNodesData[0])
-			if err == nil {
-				break
-			}
-			if err != nil && retryCount == 2 {
-				t.Fatal(err)
-			}
-		}
-
-		k8sNodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil {
-			t.Fatal("Failed to get k8s nodes " + err.Error())
-		}
-		for _, k8sNode := range k8sNodeList.Items {
-			nodeName := k8sNode.Name
-			nodeLabels := k8sNode.GetLabels()
-			t.Logf("Labels for node (%v): %v \n", nodeName, nodeLabels)
-		}
-
-		testFunc(t)
-	}
-	return wrapperFunc
-}
-
 // GetAvailabilityZones returns a sorted list of configured availability zones from the cluster.
 // These zones will be pre-provisioned by Kops etc. or added via a cluster decorator.
 func GetAvailabilityZones(t *testing.T, cluster *framework.Cluster) clustercapabilities.ZoneList {
@@ -422,6 +373,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	} else {
 		k8sNodeLabelUpdateFunc()
 	}
+	defer UpdateServerGroupLabel(constants.FailureDomainZoneLabel, "NewRzaGroup-1", availableServerGroupList[0], targetKube.KubeClient)
 
 	newAvailableServerGroupList := []string{}
 	if strings.Contains(editType, "update") {
@@ -476,6 +428,9 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 // Define Static ServersGroups in the CRD
 // Deploy the cluster through operator and verify the server groups are balanced
 func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	f := framework.Global
 	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
@@ -528,6 +483,9 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 // Define Class based ServersGroups config in the CRD
 // Deploy the cb cluster and verify the server groups are balanced as specified in the CRD
 func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	f := framework.Global
 	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
@@ -608,6 +566,9 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 // Deploy couchbase cluster over multiple server-groups
 // Scale up the couchbase nodes both general scalling and service based scalling
 func TestRzaResizeCluster(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	f := framework.Global
 	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
@@ -729,6 +690,9 @@ func TestRzaResizeCluster(t *testing.T) {
 // Remove one of the rack zones from the CRD definition
 // Expects pods to redistribute to available groups
 func TestRzaServerGroupRemoval(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	f := framework.Global
 	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
@@ -805,6 +769,9 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 // Add a new server group using the CRD update
 // Expected new pods scaled up is added to new groups to balance the pods
 func TestRzaServerGroupAddition(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	f := framework.Global
 	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
@@ -896,6 +863,9 @@ func TestRzaServerGroupAddition(t *testing.T) {
 // Update CRD to scale up nodes using invalid server-group name
 // New pod creation should fail because of unavailable server group
 func TestRzaNegScaleupCluster(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	f := framework.Global
 	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
@@ -993,6 +963,9 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 // Server-group is brought down so the communication with K8S node is down
 // Expects recration of new pods should fail due to the server group down
 func TestRzaServerGroupDown(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	f := framework.Global
 	targetKubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[targetKubeName]
@@ -1113,6 +1086,9 @@ func TestRzaServerGroupDown(t *testing.T) {
 // Add nodes beyond the number of available cluster nodes
 // Expects pod creation beyond k8s cluster size should fail
 func TestRzaAntiAffinityOn(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	RzaAntiAffinity(t, "on")
 }
 
@@ -1120,6 +1096,9 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 // Add nodes beyond the number of available cluster nodes
 // Expects pod creation beyond k8s cluster size should succeed
 func TestRzaAntiAffinityOff(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	RzaAntiAffinity(t, "off")
 }
 
@@ -1128,6 +1107,9 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 // in parallel with CRD update
 // Expects, the new nodes to get spawed in new group
 func TestRzaUpdateK8SNodeLabelAndCrd(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	RzaK8SNodeLabelEdit(t, "updateNodeCrdInParallel")
 }
 
@@ -1136,6 +1118,9 @@ func TestRzaUpdateK8SNodeLabelAndCrd(t *testing.T) {
 // And update the CRD with some delay
 // Expects, the new nodes to get spawed in new group only after CRD update
 func TestRzaUpdateK8SNodeLabelAndCrdWithDelay(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	RzaK8SNodeLabelEdit(t, "updateNodeCrdWithDelay")
 }
 
@@ -1144,5 +1129,8 @@ func TestRzaUpdateK8SNodeLabelAndCrdWithDelay(t *testing.T) {
 // Operator should kill the pods in the removed server group and redistribute
 // to other groups uniformly
 func TestRzaRemoveK8SNodeLabel(t *testing.T) {
+	if os.Getenv(envParallelTest) == envParallelTestTrue {
+		t.Parallel()
+	}
 	RzaK8SNodeLabelEdit(t, "remove")
 }
