@@ -196,9 +196,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		for _, node := range k8sNodes.Items {
 			nodeLabels := node.GetLabels()
 			if serverGroup, zoneLabelOk := nodeLabels[constants.FailureDomainZoneLabel]; zoneLabelOk {
-				if _, mapKeyOk := serverGroupNodeCountMap[serverGroup]; mapKeyOk {
-					serverGroupNodeCountMap[serverGroup] += 1
-				}
+				serverGroupNodeCountMap[serverGroup] += 1
 			}
 		}
 
