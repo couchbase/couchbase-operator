@@ -25,6 +25,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	v1beta1 "k8s.io/api/extensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
@@ -104,6 +105,10 @@ func CreateDeploymentObject(operatorImageName string, restPort int32) (deploymen
 	}
 
 	if err = api.AddToScheme(scheme.Scheme); err != nil {
+		return
+	}
+
+	if err = apiextensionsv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
 		return
 	}
 
