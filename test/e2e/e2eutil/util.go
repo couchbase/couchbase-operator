@@ -921,15 +921,14 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace, claimName, memberName
 }
 
 func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace, clusterName string, ca *CertificateAuthority) error {
-	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + clusterName})
 	if err != nil {
 		return fmt.Errorf("Unable to get couchbase pods: %v", err)
 	}
 
 	// TLS handshake with pods
 	for _, pod := range pods.Items {
-		err = TlsCheckForPod(t, namespace, pod.GetName(), restConfig, ca)
-		if err != nil {
+		if err := TlsCheckForPod(t, namespace, pod.GetName(), restConfig, ca); err != nil {
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}
 	}

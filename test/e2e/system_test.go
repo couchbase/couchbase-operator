@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -322,13 +323,23 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		ctx2 = nil
 	}
 
-	testCouchbase1, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec1, ctx1)
+	var testCouchbase1 *api.CouchbaseCluster
+	errChan := make(chan error)
+	// Create Cluster1 in async manner
+	go func() {
+		var err error
+		testCouchbase1, err = e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec1, ctx1)
+		errChan <- err
+	}()
+
+	// Create Cluster2 and wait for cluster creation to succeed
+	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec2, ctx2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec2, ctx2)
-	if err != nil {
+	// Wait for Cluster1 creation to complete
+	if err := <-errChan; err != nil {
 		t.Fatal(err)
 	}
 
