@@ -1013,12 +1013,12 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 
 	// Set taint to
-	podTaint := v1.Taint{
+	nodeTaint := v1.Taint{
 		Key:    "noExecKey",
 		Value:  "noExecVal",
 		Effect: "NoExecute",
 	}
-	podTaintList := []v1.Taint{podTaint}
+	nodeTaintList := []v1.Taint{nodeTaint}
 
 	operatorPodName, err := e2eutil.GetOperatorName(targetKube.KubeClient, f.Namespace)
 	if err != nil {
@@ -1042,15 +1042,20 @@ func TestRzaServerGroupDown(t *testing.T) {
 		}
 	}
 
-	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
+	t.Logf("Selected member id %d running on node %d\n", memberIdToGoDown, nodeIndex)
+	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, nodeTaintList, nodeIndex); err != nil {
 		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
 	}
 	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
 
-	event := e2eutil.NewMemberDownEvent(testCouchbase, memberIdToGoDown)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
+	// Wait till pod creation fail due to the Server Group unavailable to schedule a new pod
+	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize)
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
 		t.Fatalf("Requested node didn't go down as expected: %v", event)
 	}
+	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", memberIdToGoDown)
+	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", memberIdToGoDown)
+	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
 
 	// Remove the taint from the node to allow pod schedulling
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
@@ -1069,13 +1074,11 @@ func TestRzaServerGroupDown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedAddNode", memberIdToGoDown)
-
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
 		t.Fatalf("Cluster failed to become healthy: %v", err)
 	}
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
+	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberIdToGoDown)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }

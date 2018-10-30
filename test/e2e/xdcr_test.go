@@ -440,26 +440,11 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	//defKubeHost, err := f.GetKubeHostname(defKubeName)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-
-	//xdcrKubeHost, err := f.GetKubeHostname(xdcrKubeName)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-
-	//hostUrl := defKubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
-	//destUrl := xdcrKubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
-
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(defKubeName), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
-	if err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(defKubeName), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcrKubeName), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
-	if err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcrKubeName), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
