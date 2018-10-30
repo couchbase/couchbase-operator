@@ -19,3 +19,7 @@ import:
   version: dbeda68bf448ce8e85e52a3216f3b031ef18a4b7
 - package: github.com/google/uuid
   version: d460ce9f8df2e77fb1ba55ca87fafed96c607494 # v1.0.0
+- package: github.com/Azure/go-autorest
+  version: d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab
+- package: golang.org/x/oauth2
+  version: a6bd8cefa1811bd24b86f8902872e4e8225f74c4

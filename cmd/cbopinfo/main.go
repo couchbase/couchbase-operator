@@ -15,6 +15,9 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 var (
