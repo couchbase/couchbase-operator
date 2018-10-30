@@ -172,17 +172,6 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	//xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//xdcr2KubeHost, err := f.GetKubeHostname(xdcr2KubeName)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//hostUrl := xdcr1KubeHost + ":" + xdcrCluster1.Status.AdminConsolePort
-	//destUrl := xdcr2KubeHost + ":" + xdcrCluster2.Status.AdminConsolePort
-
 	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcr1KubeName), f.Namespace, f.PlatformType, xdcr1Kube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)

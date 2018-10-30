@@ -605,6 +605,19 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 		DeleteCbCluster(t, kubeClient, crClient, namespace, &cluster)
 	}
 	WaitUntilPodDeleted(t, kubeClient, namespace)
+
+	// Remove all PVC for the CB clusters
+	for _, cluster := range clusters.Items {
+		pvcSelectorLabel := constants.CouchbaseServerClusterKey + "=" + cluster.Name
+		pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: pvcSelectorLabel})
+		if err != nil {
+			t.Logf("Failed to list pvcs for %s: %v", err, cluster.Name)
+		} else {
+			for _, pvc := range pvcList.Items {
+				kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
+			}
+		}
+	}
 }
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName string, names ...string) error {

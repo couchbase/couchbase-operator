@@ -284,7 +284,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 			if !test.shouldFail {
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries60); err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)
 					continue
@@ -378,7 +378,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				}
 
 				clusterSize := ExpectedClusterSize(testCouchbase)
-				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries60); err != nil {
 					t.Logf("error: %v", err)
 					failures.AppendFailure(test.name, err)
 					continue
@@ -444,7 +444,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ExposedFeatures"},
 					fieldType:  "array",
-					fieldValue: "[\"admin\", \"cleint\", \"xdcr\"]",
+					fieldValue: `["admin", "cleint", "xdcr"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -457,7 +457,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ExposedFeatures"},
 					fieldType:  "array",
-					fieldValue: "[\"admin\", \"client\", \"xdcr\", \"admin\"]",
+					fieldValue: `["admin", "client", "xdcr", "admin"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -756,7 +756,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "0", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
+					fieldValue: `["data", "indxe", "query", "search"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -782,7 +782,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "AdminConsoleServices"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"index\", \"index\", \"search\"]",
+					fieldValue: `["data", "index", "index", "search"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -795,7 +795,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "0", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"index\", \"data\"]",
+					fieldValue: `["data", "index", "data"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -810,7 +810,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerGroups"},
 					fieldType:  "array",
-					fieldValue: "[\"NewGroupUpdate-1\", \"NewGroupUpdate-1\"]",
+					fieldValue: `["NewGroupUpdate-1", "NewGroupUpdate-1"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -823,7 +823,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "2", "ServerGroups"},
 					fieldType:  "array",
-					fieldValue: "[\"us-east-1a\", \"us-east-1b\", \"us-east-1a\"]",
+					fieldValue: `["us-east-1a", "us-east-1b", "us-east-1a"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -838,7 +838,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "AdminConsoleServices"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"indxe\", \"query\", \"search\"]",
+					fieldValue: `["data", "indxe", "query", "search"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -890,7 +890,7 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"default|data|index|analytics in spec.volumeMounts.logs can't have additional items"},
+			expectedMessages: []string{"spec.servers[0].pod.volumeMounts.default is a forbidden property"},
 		},
 		{
 			name: "default volume defined on top of log volume mounts specified in spec.servers.pod.volumeMounts.properties",
@@ -903,7 +903,7 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"default|data|index|analytics in spec.volumeMounts.logs can't have additional items"},
+			expectedMessages: []string{"spec.servers[3].pod.volumeMounts.default is a forbidden property"},
 		},
 		{
 			name: "Create with data service on top of stateless services",
@@ -911,7 +911,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "3", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"query\", \"search\", \"eventing\", \"analytics\"]",
+					fieldValue: `["data", "query", "search", "eventing", "analytics"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1091,7 +1091,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "1", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"" + strings.Join(fieldValueToUse, "\",\"") + "\"]",
+					fieldValue: `["` + strings.Join(fieldValueToUse, `","`) + `"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1109,7 +1109,7 @@ func TestNegValidationCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "3", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"query\", \"search\", \"eventing\", \"" + statefulService + "\"]",
+					fieldValue: `["query", "search", "eventing", "` + statefulService + `"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1120,9 +1120,9 @@ func TestNegValidationCreate(t *testing.T) {
 	}
 
 	// Cases for defining Stateful claims without specifying Default volume mounts
-	claimFieldNames := []string{"DataClaim", "IndexClaim", "AnalyticsClaims"}
+	claimFieldNames := []string{"DataClaim", "IndexClaim"}
 	for _, claimField := range claimFieldNames {
-		temTestDefCase := testDef{
+		testCase := testDef{
 			name: "Validate by defining " + claimField + " without Default volume mount",
 			paramsIn: []parameter{
 				{
@@ -1130,19 +1130,39 @@ func TestNegValidationCreate(t *testing.T) {
 					fieldType:  "string",
 					fieldValue: "couchbase",
 				},
-			},
-			paramsOut: []parameter{
 				{
 					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "DefaultClaim"},
 					fieldType:  "string",
-					fieldValue: "couchbase",
+					fieldValue: "",
 				},
 			},
+			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{"default in spec.servers[0].pod.volumeMounts is required"},
 		}
-		testDefs = append(testDefs, temTestDefCase)
+		testDefs = append(testDefs, testCase)
 	}
+	// AnalyticsClaims is an array value
+	testCase := testDef{
+		name: "Validate by defining AnalyticsClaims without Default volume mount",
+		paramsIn: []parameter{
+			{
+				field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "AnalyticsClaims"},
+				fieldType:  "array",
+				fieldValue: `["couchbase"]`,
+			},
+			{
+				field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "DefaultClaim"},
+				fieldType:  "string",
+				fieldValue: "",
+			},
+		},
+		paramsOut:        []parameter{},
+		shouldFail:       true,
+		expectedMessages: []string{"default in spec.servers[0].pod.volumeMounts is required"},
+	}
+	testDefs = append(testDefs, testCase)
+
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
@@ -1218,7 +1238,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 				},
 			},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
+			expectedMessages: []string{"spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1236,7 +1256,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "AdminConsoleServices"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"index\", \"query\", \"search\", \"data\"]",
+					fieldValue: `["data", "index", "query", "search", "data"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1250,7 +1270,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 				{
 					field:      []string{"Spec", "AdminConsoleServices"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"index\", \"query\", \"xxxxx\"]",
+					fieldValue: `["data", "index", "query", "xxxxx"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1347,7 +1367,6 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 }
 
 // cbopctl apply tests
-
 func TestValidationApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1357,7 +1376,7 @@ func TestValidationApply(t *testing.T) {
 
 	testDefs := []testDef{
 		{
-			name:             "apply:",
+			name:             "Apply without any changes in cluster yaml",
 			paramsIn:         []parameter{},
 			paramsOut:        []parameter{},
 			shouldFail:       false,
@@ -1365,7 +1384,7 @@ func TestValidationApply(t *testing.T) {
 		},
 
 		{
-			name: "apply:",
+			name: "Apply: update the bucket[0].name",
 			paramsIn: []parameter{
 				{
 					field:      []string{"Spec", "BucketSettings", "0", "BucketName"},
@@ -1437,7 +1456,7 @@ func TestNegValidationApply(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets[0].type in body cannot be updated"},
+			expectedMessages: []string{"spec.buckets.type in body should be one of [couchbase ephemeral memcached]"},
 		},
 
 		{
@@ -1539,7 +1558,7 @@ func TestNegValidationApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "1", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"" + strings.Join(fieldValueToUse, "\",\"") + "\"]",
+					fieldValue: `["` + strings.Join(fieldValueToUse, `","`) + `"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1559,7 +1578,7 @@ func TestNegValidationApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "3", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"" + strings.Join(fieldValueToUse, "\",\"") + "\"]",
+					fieldValue: `["` + strings.Join(fieldValueToUse, `","`) + `"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1571,9 +1590,8 @@ func TestNegValidationApply(t *testing.T) {
 
 	// Cases to validate by defining Stateful volumes without defining DefaultClaim
 	volMountsMap := map[string]string{
-		"DataClaim":       "data",
-		"IndexClaim":      "index",
-		"AnalyticsClaims": "analytics",
+		"DataClaim":  "data",
+		"IndexClaim": "index",
 	}
 	for mntField, mntName := range volMountsMap {
 		testCase := testDef{
@@ -1584,19 +1602,39 @@ func TestNegValidationApply(t *testing.T) {
 					fieldType:  "string",
 					fieldValue: "couchbase",
 				},
-			},
-			paramsOut: []parameter{
 				{
 					field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "DefaultClaim"},
 					fieldType:  "string",
-					fieldValue: "couchbase",
+					fieldValue: "",
 				},
 			},
+			paramsOut:        []parameter{},
 			shouldFail:       true,
 			expectedMessages: []string{mntName + " in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		}
 		testDefs = append(testDefs, testCase)
 	}
+	// AnalyticsClaims in an array parameter
+	testCase := testDef{
+		name: "Validate by defining AnalyticsClaims without Default volume mount",
+		paramsIn: []parameter{
+			{
+				field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "AnalyticsClaims"},
+				fieldType:  "array",
+				fieldValue: `["couchbase"]`,
+			},
+			{
+				field:      []string{"Spec", "ServerSettings", "0", "Pod", "VolumeMounts", "DefaultClaim"},
+				fieldType:  "string",
+				fieldValue: "",
+			},
+		},
+		paramsOut:        []parameter{},
+		shouldFail:       true,
+		expectedMessages: []string{"analytics in spec.servers[*].Pod.VolumeMounts cannot be updated"},
+	}
+	testDefs = append(testDefs, testCase)
+
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
@@ -1706,7 +1744,7 @@ func TestNegValidationDefaultApply(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
+			expectedMessages: []string{"spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1724,7 +1762,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "AdminConsoleServices"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"index\", \"query\", \"search\", \"data\"]",
+					fieldValue: `["data", "index", "query", "search", "data"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1738,7 +1776,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "AdminConsoleServices"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"index\", \"query\", \"xxxxx\"]",
+					fieldValue: `["data", "index", "query", "xxxxx"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1773,7 +1811,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			shouldFail:       true,
 			expectedMessages: []string{"spec.buckets.ioPriority in body should be one of [high low]"},
 			shouldWarn:       true,
-			expectedWarn:     "Changing the IO Priority will cause the bucket default1 to be temporarily unavailable",
+			expectedWarn:     "spec.buckets.ioPriority in body should be one of [high low]",
 		},
 
 		{
@@ -1855,7 +1893,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			},
 			paramsOut:        []parameter{},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.buckets[0].conflictResolution in body cannot be updated"},
+			expectedMessages: []string{"spec.buckets.conflictResolution in body should be one of [seqno lww]"},
 		},
 		{
 			name: "Update spec.buckets.type value",
@@ -1921,7 +1959,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "0", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"index\", \"search\"]",
+					fieldValue: `["data", "index", "search"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -1934,7 +1972,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "0", "Services"},
 					fieldType:  "v1.ServiceList",
-					fieldValue: "[\"data\", \"data\"]",
+					fieldValue: `["data", "data"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -2003,7 +2041,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerGroups"},
 					fieldType:  "array",
-					fieldValue: "[\"NewGroupUpdate-1\", \"NewGroupUpdate-2\"]",
+					fieldValue: `["NewGroupUpdate-1", "NewGroupUpdate-2"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -2016,7 +2054,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerSettings", "2", "ServerGroups"},
 					fieldType:  "array",
-					fieldValue: "[\"us-east-1a\", \"us-east-1b\", \"us-east-1c\"]",
+					fieldValue: `["us-east-1a", "us-east-1b", "us-east-1c"]`,
 				},
 			},
 			paramsOut:        []parameter{},
@@ -2190,7 +2228,7 @@ func TestRzaNegCreateCluster(t *testing.T) {
 				{
 					field:      []string{"Spec", "ServerGroups"},
 					fieldType:  "array",
-					fieldValue: "[\"InvalidGroup-1\", \"InvalidGroup-2\"]",
+					fieldValue: `["InvalidGroup-1", "InvalidGroup-2"]`,
 				},
 			},
 			paramsOut:        []parameter{},
