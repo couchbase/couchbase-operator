@@ -256,7 +256,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 
 	otherConfig1 := map[string]string{
-		"antiAffinity": "off",
+		"antiAffinity": "on",
 	}
 	exposedFeaturesConfig := map[string]string{
 		"featureNames": "xdcr",
@@ -729,7 +729,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"couchbase-cli", "rebalance", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "--server-remove", "{{SECOND_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password"},
 				wait:     true,
-				timeout:  120,
+				timeout:  240,
 				duration: 121,
 			},
 
