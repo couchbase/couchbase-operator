@@ -26,6 +26,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	corev1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -283,8 +284,14 @@ func verifyLogRedaction(kubeClient kubernetes.Interface, namespace, cbClusterNam
 }
 
 // Function to populate deployment file list
-func getDeployementFileList(kubeClient kubernetes.Interface, namespace, deploymentDir string, fileList *[]string) error {
-	deployments, err := kubeClient.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
+func getDeployementFileList(kubeClient kubernetes.Interface, namespace, deploymentDir string, fileList *[]string, allFlag bool) error {
+	var err error
+	var deployments *v1beta1.DeploymentList
+	if allFlag {
+		deployments, err = kubeClient.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
+	} else {
+		deployments, err = kubeClient.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	}
 	if err != nil {
 		return errors.New("Failed to list deployments: " + err.Error())
 	}
@@ -346,7 +353,7 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 	}
 
 	// deployment dir contents
-	if err := getDeployementFileList(kubeClient, namespace, deploymentDir, reqFileList); err != nil {
+	if err := getDeployementFileList(kubeClient, namespace, deploymentDir, reqFileList, allFlag); err != nil {
 		return err
 	}
 
@@ -1368,6 +1375,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	invalidPortVal := "32080"
 	clusterSize := constants.Size1
 	kubeConfPath := targetKube.KubeConfPath
+	cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
 	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
@@ -1399,7 +1407,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 		excludedFileList := []string{}
 		deploymentDir := logFileDir + "/" + f.Namespace + "/deployment"
 
-		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &excludedFileList); err != nil {
+		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &excludedFileList, cbopinfoAllFlag); err != nil {
 			t.Error(err)
 		}
 		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
@@ -1436,7 +1444,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 		deploymentDir := logFileDir + "/" + f.Namespace + "/deployment"
 
 		// In invalid rest-port case, deployment yaml, logs will exists. Only rest-port files will be missing
-		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &reqFileList); err != nil {
+		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &reqFileList, cbopinfoAllFlag); err != nil {
 			t.Error(err)
 		}
 		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
@@ -2111,6 +2119,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	clusterSize := 5
 	newPodMemberId := clusterSize
 	logRetentionCount := 2
+	logRetentionTimeInMin := 15
 	bucketName := "PVBucket"
 	pvcName := "couchbase-log-pv"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -2124,7 +2133,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	otherConfig1 := map[string]string{
-		"logRetentionTime":  "15m",
+		"logRetentionTime":  strconv.Itoa(logRetentionTimeInMin) + "m",
 		"logRetentionCount": strconv.Itoa(logRetentionCount),
 	}
 	configMap := map[string]map[string]string{
@@ -2173,6 +2182,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 	memberIdsToKill := []int{2, 3, 4, 5, 6, 7}
 	for index, memberIdToKill := range memberIdsToKill {
+		t.Logf("Killing Cb pod index '%d'", memberIdToKill)
 		memberNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, memberIdToKill)
 		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, memberNameToKill, metav1.NewDeleteOptions(0)); err != nil {
 			t.Fatal(err)
@@ -2181,7 +2191,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 		// Wait for failover event
 		event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
+		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 90); err != nil {
 			t.Fatal(err)
 		}
 		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIdToKill)
@@ -2210,7 +2220,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 		// Mark all other then logRetention count PV pods to ZERO for verification
 		if index >= logRetentionCount {
-			for temMemId := 2; temMemId < len(memberIdsToKill)-logRetentionCount; temMemId++ {
+			for temMemId := 2; temMemId <= index; temMemId++ {
 				temMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, temMemId)
 				expectedPvcMap[temMemberName] = 0
 			}
@@ -2220,12 +2230,11 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 			t.Error(err)
 		}
-
 		newPodMemberId++
 	}
 
 	// Sleep for log retention time feature to delete all old logs
-	time.Sleep(time.Minute * 10)
+	time.Sleep(time.Minute * time.Duration(logRetentionTimeInMin))
 
 	// Updating expecter PVC for final verification
 	for memberIndex := newPodMemberId - 4; memberIndex > 1; memberIndex-- {
