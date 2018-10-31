@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: sdk-sanity
-        image: sdk-s435.sc.couchbase.com/sdkd-java-client:test
+        image: dockerhub.build.couchbase.com/sdkd-java-client:test
         env:
           - name: NODE1
             value: "cb-example-0000.cb-example.default.svc"
