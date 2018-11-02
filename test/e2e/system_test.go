@@ -831,7 +831,7 @@ func TestFeaturesAll(t *testing.T) {
 				image:    "sequoiatools/couchbase-cli:v5.0.1",
 				cmd:      []string{"couchbase-cli", "server-add", "-c", "couchbase://{{FIRST_NODE_CLUSTER1}}", "--server-add", "{{SECOND_NODE_CLUSTER1}}", "-u", "Administrator", "-p", "password", "--server-add-username", "Administrator", "--server-add-password", "password", "--services", "data,index,query,fts,eventing,analytics"},
 				wait:     true,
-				timeout:  120,
+				timeout:  240,
 				duration: 121,
 			},
 
