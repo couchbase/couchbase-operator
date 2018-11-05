@@ -45,6 +45,6 @@ esac
 mkdir -p ${BUILD_DIR}/${NAME}
 cp $WORKSPACE_DIR/docs/user/modules/ROOT/examples/${PLATFORM}/* ${BUILD_DIR}/${NAME}
 cp -r $BUILD_DIR/$OS/* ${BUILD_DIR}/${NAME}
-tar -C ${BUILD_DIR} -czf ${BUILD_DIR}/${NAME}.zip ${NAME}
+tar -C ${BUILD_DIR} -czf ${BUILD_DIR}/${NAME}.tar.gz ${NAME}
 rm -rf ${BUILD_DIR}/${NAME}
 
