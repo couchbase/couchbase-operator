@@ -48,13 +48,15 @@ type Controller struct {
 }
 
 type Config struct {
-	MasterHost     string
-	Namespace      string
-	ServiceAccount string
-	CreateCrd      bool
-	KubeCli        kubernetes.Interface
-	CouchbaseCRCli versioned.Interface
-	VerifyVersion  bool
+	MasterHost       string
+	Namespace        string
+	ServiceAccount   string
+	CreateCrd        bool
+	EnableUpgrades   bool
+	KubeCli          kubernetes.Interface
+	CouchbaseCRCli   versioned.Interface
+	VerifyVersion    bool
+	PodCreateTimeout string
 }
 
 func New(cfg Config) *Controller {
@@ -196,10 +198,12 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
-		ServiceAccount: c.Config.ServiceAccount,
-		KubeCli:        c.Config.KubeCli,
-		CouchbaseCRCli: c.Config.CouchbaseCRCli,
-		LogLevel:       logutil.LogLevel(),
+		ServiceAccount:   c.Config.ServiceAccount,
+		KubeCli:          c.Config.KubeCli,
+		CouchbaseCRCli:   c.Config.CouchbaseCRCli,
+		LogLevel:         logutil.LogLevel(),
+		EnableUpgrades:   c.Config.EnableUpgrades,
+		PodCreateTimeout: c.Config.PodCreateTimeout,
 	}
 }
 

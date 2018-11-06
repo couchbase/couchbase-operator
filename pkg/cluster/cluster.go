@@ -54,10 +54,12 @@ type clusterEvent struct {
 }
 
 type Config struct {
-	ServiceAccount string
-	KubeCli        kubernetes.Interface
-	CouchbaseCRCli versioned.Interface
-	LogLevel       logrus.Level
+	ServiceAccount   string
+	KubeCli          kubernetes.Interface
+	CouchbaseCRCli   versioned.Interface
+	LogLevel         logrus.Level
+	EnableUpgrades   bool
+	PodCreateTimeout string
 }
 
 type ClusterStats struct {
@@ -519,12 +521,16 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 	if err != nil {
 		return err
 	}
-	return c.waitForCreatePod(m, 120)
+	return c.waitForCreatePod(m)
 }
 
 // wait with context
-func (c *Cluster) waitForCreatePod(member *couchbaseutil.Member, timeout int64) error {
-	ctx, cancel := context.WithTimeout(c.ctx, time.Duration(timeout)*time.Second)
+func (c *Cluster) waitForCreatePod(member *couchbaseutil.Member) error {
+	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
+	if err != nil {
+		return fmt.Errorf("PodCreateTimeout improperly formatted: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
 	defer cancel()
 	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
 		return err

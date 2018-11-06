@@ -963,11 +963,10 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 		// Process K8S events for our chosen pod
 		case ev := <-events:
 			if ev.Object == nil {
-				continue
+				return WaitForPod(ctx, kubeCli, namespace, podName, hostURL)
 			}
 			obj := ev.Object.(*v1.Pod)
 			status := obj.Status
-
 			switch ev.Type {
 
 			// check if any error occurred creating pod

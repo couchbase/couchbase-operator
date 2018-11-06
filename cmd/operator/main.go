@@ -32,15 +32,16 @@ import (
 )
 
 var (
-	listenAddr    string
-	name          string
-	namespace     string
-	logLevel      string
-	createCrd     bool
-	printVersion  bool
-	verifyVersion bool
-
-	chaosLevel int
+	listenAddr       string
+	name             string
+	namespace        string
+	logLevel         string
+	createCrd        bool
+	printVersion     bool
+	verifyVersion    bool
+	enableUpgrades   bool
+	podCreateTimeout string
+	chaosLevel       int
 
 	mainLogger *logrus.Entry
 )
@@ -53,6 +54,7 @@ func init() {
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.BoolVar(&verifyVersion, "verify-version", true, "Skip verification of required couchbase min version")
 	flag.StringVar(&logLevel, "log-level", "info", "Sets the logging level (panic, fatal, error, warn, info, debug)")
+	flag.StringVar(&podCreateTimeout, "pod-create-timeout", "5m", "Sets the amount of time to wait for Pod creation to complete")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
 	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
@@ -144,12 +146,14 @@ func newControllerConfig() controller.Config {
 	}
 
 	cfg := controller.Config{
-		Namespace:      namespace,
-		ServiceAccount: serviceAccount,
-		KubeCli:        kubecli,
-		CouchbaseCRCli: client.MustNewInCluster(),
-		CreateCrd:      createCrd,
-		VerifyVersion:  verifyVersion,
+		Namespace:        namespace,
+		ServiceAccount:   serviceAccount,
+		KubeCli:          kubecli,
+		CouchbaseCRCli:   client.MustNewInCluster(),
+		CreateCrd:        createCrd,
+		VerifyVersion:    verifyVersion,
+		EnableUpgrades:   enableUpgrades,
+		PodCreateTimeout: podCreateTimeout,
 	}
 
 	return cfg

@@ -145,9 +145,7 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 	}
 
 	// Synchronize on pod creation and service availability
-	ctx, cancel := context.WithTimeout(c.ctx, 300*time.Second)
-	defer cancel()
-	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, newMember.Name, newMember.HostURL()); err != nil {
+	if err := c.waitForCreatePod(newMember); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		return nil, err
 	}
