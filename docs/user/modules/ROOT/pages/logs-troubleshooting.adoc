@@ -166,7 +166,7 @@ spec:
   restartPolicy: never
   containers:
   - name: couchbase-server
-    image: couchbase/server:enterprise-5.5.1
+    image: couchbase/server:enterprise-5.5.2
     command: '/bin/sleep'
     args:
     - '86400'

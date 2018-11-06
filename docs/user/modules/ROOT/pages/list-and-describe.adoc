@@ -155,7 +155,7 @@ Labels:		app=couchbase
 Containers:
   couchbase-server:
     Container ID:	docker://6b7aeb66cb540c6904b8e514776c180f7fbbea25656e6175972c408042db5713
-    Image:		couchbase/server:enterprise-5.5.1
+    Image:		couchbase/server:enterprise-5.5.2
 ----
 
 On OpenShift, use the following command:

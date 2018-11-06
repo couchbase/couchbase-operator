@@ -30,7 +30,7 @@ metadata:
   name: cb-example
 spec:
   baseImage: couchbase/server
-  version: enterprise-5.5.1
+  version: enterprise-5.5.2
   authSecret: cb-example-auth
   exposeAdminConsole: true
   adminConsoleServices:
@@ -72,7 +72,7 @@ spec:
 By taking a quick look at this configuration file, you can see that it defines a cluster by specifying the following:
 
 * Cluster name: cb-example (`metadata.name`)
-* Couchbase version: enterprise-5.5.1 (`spec.version`)
+* Couchbase version: enterprise-5.5.2 (`spec.version`)
 * Buckets: 1 bucket named default (`spec.buckets`)
 * Size: 3 node cluster with all services on each node (`spec.servers`)
 * Secret: cb-example-auth (`authSecret`)
