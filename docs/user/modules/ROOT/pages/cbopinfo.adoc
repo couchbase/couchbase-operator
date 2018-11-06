@@ -102,7 +102,7 @@ If specified, this points to a Kubernetes configuration file used to locate and 
 If specified, this selects which namespace to collect resources and logs from. If not set, it will default to `default`.
 
 --operator-image::
-If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:1.0.0`.
+If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:1.1.0`.
 
 --operator-rest-port::
 If specified this sets the Operator rest port.  It is used for collection of runtime information.  If not set it will default to _8080_.
@@ -149,7 +149,7 @@ You have access to the following projects and can switch between them with 'oc p
 
 Using project "myproject".
 
-$ cbopinfo --namespace myproject --operator-image couchbase/operator:1.0.0-1
+$ cbopinfo --namespace myproject --operator-image couchbase/operator:1.1.0-1
 Wrote cluster information to cbopinfo-20180801T141838+0100.tar.gz
 ----
 
