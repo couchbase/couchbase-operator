@@ -954,7 +954,7 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 
 		ctx := tlsContexts[kubeName]
 		for _, pod := range pods.Items {
-			if err := e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), targetKube.Config, ctx.CA); err != nil {
+			if err := e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), targetKube.Config, ctx); err != nil {
 				t.Fatal("TLS verification failed:", err)
 			}
 		}

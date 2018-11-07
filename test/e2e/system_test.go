@@ -345,10 +345,10 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// check tls
 	if withTls {
-		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx1.ClusterName, ctx1.CA); err != nil {
+		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx1); err != nil {
 			t.Fatal("TLS check for cluster failed: ", err)
 		}
-		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx2.ClusterName, ctx2.CA); err != nil {
+		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx2); err != nil {
 			t.Fatal("TLS check for cluster failed: ", err)
 		}
 	}

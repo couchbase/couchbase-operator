@@ -350,6 +350,14 @@ func NewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient 
 	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
 }
 
+func MustNewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
+	cluster, err := NewTLSClusterBasic(t, kubeClient, crClient, namespace, secretName, size, withBucket, exposed, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
+}
+
 // NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
 func NewTLSClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
@@ -363,6 +371,13 @@ func NewTLSClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crC
 		},
 	}
 	return CreateCluster(t, crClient, namespace, clusterSpec)
+}
+
+// MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification
+func MustNotNewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) {
+	if _, err := NewTLSClusterBasicNoWait(t, kubeClient, crClient, namespace, secretName, size, withBucket, exposed, ctx); err == nil {
+		t.Fatal("cluster created unexpectedly")
+	}
 }
 
 // NewTlsXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
@@ -790,6 +805,12 @@ func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versione
 	return nil
 }
 
+func MustResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) {
+	if err := ResizeCluster(t, service, clusterSize, crClient, cl); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
 	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 	if err != nil {
@@ -857,6 +878,12 @@ func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) err
 		return err
 	}
 	return kubeCli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
+}
+
+func MustDeleteCouchbaseOperator(t *testing.T, kubeCli kubernetes.Interface, namespace string) {
+	if err := DeleteCouchbaseOperator(kubeCli, namespace); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func KillOperatorAndWaitForRecovery(t *testing.T, kubeClient kubernetes.Interface, namespace string) error {
@@ -1008,19 +1035,25 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace, claimName, memberName
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }
 
-func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace, clusterName string, ca *CertificateAuthority) error {
-	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + clusterName})
+func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string, ctx *TlsContext) error {
+	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
 	if err != nil {
 		return fmt.Errorf("Unable to get couchbase pods: %v", err)
 	}
 
 	// TLS handshake with pods
 	for _, pod := range pods.Items {
-		if err := TlsCheckForPod(t, namespace, pod.GetName(), restConfig, ca); err != nil {
+		if err := TlsCheckForPod(t, namespace, pod.GetName(), restConfig, ctx); err != nil {
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}
 	}
 	return nil
+}
+
+func MustCheckClusterTLS(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string, ctx *TlsContext) {
+	if err := TlsCheckForCluster(t, kubeCli, restConfig, namespace, ctx); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {

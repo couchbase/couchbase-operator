@@ -601,6 +601,10 @@ func (f *Framework) PodClient(kubeName string) typedv1.PodInterface {
 	return f.ClusterSpec[kubeName].KubeClient.CoreV1().Pods(f.Namespace)
 }
 
+func (f *Framework) GetCluster(index int) *Cluster {
+	return f.ClusterSpec[f.TestClusters[index]]
+}
+
 func makeLogDir() (string, error) {
 	dir, err := GenerateLogDir()
 	if err != nil {

@@ -40,20 +40,6 @@ var (
 	}
 )
 
-// clusterCreateSequence is a common function for generating cluster creation events.
-func clusterCreateSequence(size int) eventschema.Validatable {
-	return eventschema.Sequence{
-		Validators: []eventschema.Validatable{
-			eventschema.Repeat{
-				Times:     size,
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-		},
-	}
-}
-
 // TestUpgrade upgrades a three node cluster.
 func TestUpgrade(t *testing.T) {
 	// Platform configuration.
@@ -82,7 +68,7 @@ func TestUpgrade(t *testing.T) {
 	// * Each node is upgraded
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
-		clusterCreateSequence(clusterSize),
+		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
@@ -123,7 +109,7 @@ func TestUpgradeRollback(t *testing.T) {
 	// * One node is rolled back
 	// * Rollback completes
 	expectedEvents := []eventschema.Validatable{
-		clusterCreateSequence(clusterSize),
+		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		upgradeSequence,
 		eventschema.Event{Reason: k8sutil.EventReasonRollbackStarted},
@@ -171,7 +157,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// * For the remaining iterations upgrades nodes upgrade
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
-		clusterCreateSequence(clusterSize),
+		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},

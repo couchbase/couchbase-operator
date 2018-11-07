@@ -23,6 +23,11 @@ func GetSecret(kubeClient kubernetes.Interface, namespace string, secretName str
 	return kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 }
 
+func UpdateSecret(kubeClient kubernetes.Interface, namespace string, secret *v1.Secret) error {
+	_, err := kubeClient.CoreV1().Secrets(namespace).Update(secret)
+	return err
+}
+
 // Use username and password from secret store
 func GetClusterAuth(t *testing.T, kubeClient kubernetes.Interface, namespace string, secretName string) (error, string, string) {
 

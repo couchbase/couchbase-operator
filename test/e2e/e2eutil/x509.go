@@ -14,7 +14,10 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"net"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
@@ -221,6 +224,44 @@ func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, 
 	return ca, nil
 }
 
+// NewIntermediateCertificateAuthority creates a new CA signed by another.
+func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyType, commonName string, certValidFrom, certValidTo time.Time) (*CertificateAuthority, error) {
+	key, err := GeneratePrivateKey(keyType)
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate CA key: %v", err)
+	}
+
+	intermediate := &CertificateAuthority{
+		key: key,
+	}
+
+	req := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+	}
+
+	req, err = CreateCertificateRequest(req, key)
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate CA req: %v", err)
+	}
+
+	pem, err := ca.SignCertificateRequest(req, CertTypeCA, certValidFrom, certValidTo)
+	if err != nil {
+		return nil, fmt.Errorf("unable to sign CA cert: %v", err)
+	}
+
+	cert, err := ParseCertificate(pem)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse CA cert: %v", err)
+	}
+
+	intermediate.certificate = cert
+	intermediate.Certificate = pem
+
+	return intermediate, nil
+}
+
 // generateSerial creates a unique certificate serial number as defined
 // in RFC 3280.  It is upto 20 octets in length and non-negative
 func generateSerial() (*big.Int, error) {
@@ -329,6 +370,14 @@ func CreateClusterCertReq(commonName string, dnsNames []string) *x509.Certificat
 	}
 }
 
+func CreateIntermedateCACertReq(commonName string) *x509.CertificateRequest {
+	return &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+	}
+}
+
 func CreateKeyPairReqData(keyType KeyType, certType CertType, certReq *x509.CertificateRequest) *keyPairRequest {
 	return &keyPairRequest{
 		keyType:  keyType,
@@ -337,6 +386,12 @@ func CreateKeyPairReqData(keyType KeyType, certType CertType, certReq *x509.Cert
 	}
 }
 
+const (
+	operatorTLSSecretCA   = "ca.crt"
+	clusterTLSSecretKey   = "pkey.key"
+	clusterTLSSecretChain = "chain.pem"
+)
+
 func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, certPEM, keyPEM []byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -344,7 +399,7 @@ func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, 
 			Name:      secretName,
 		},
 		Data: map[string][]byte{
-			"ca.crt":                 caCertData,
+			operatorTLSSecretCA:      caCertData,
 			"couchbase-operator.crt": certPEM,
 			"couchbase-operator.key": keyPEM,
 		},
@@ -358,25 +413,32 @@ func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byt
 			Name:      secretName,
 		},
 		Data: map[string][]byte{
-			"chain.pem": certPEM,
-			"pkey.key":  keyPEM,
+			clusterTLSSecretChain: certPEM,
+			clusterTLSSecretKey:   keyPEM,
 		},
 	}
 }
 
-var (
-	caCN       = "Couchbase CA"
-	operatorCN = "Couchbase Operator"
-	clusterCN  = "Couchbase Cluster"
+const (
+	caCN             = "Couchbase CA"
+	intermediateCACN = "Couchbase Intermediate CA"
+	operatorCN       = "Couchbase Operator"
+	clusterCN        = "Couchbase Cluster"
 )
 
 // tlsContext is generated per test, it contains certificates to be injected into
 // the cluster and the CA used to test they have been correctly installed.
 type TlsContext struct {
+	// Client is the kubernetes client
+	Client kubernetes.Interface
+	// Namespace is the namespace the cluster lives in.
+	Namespace string
 	// ClusterName is used to explicitly set the cluster name
 	ClusterName string
-	// ca is the certificate authority used to sign the certificates.
+	// CA is the certificate authority used to sign the certificates.
 	CA *CertificateAuthority
+	// ServerCert is the server certifcate at the leaf of the chain
+	ServerCert *x509.Certificate
 	// operatorSecretName is the name of the secret created for operator certificates.
 	OperatorSecretName string
 	// clusterSecretName is the name of the secret created for cluster certificates.
@@ -400,21 +462,30 @@ type TlsOpts struct {
 	ClusterCertType *CertType
 }
 
+// clusterSANs generates a valid set of SANs for a cluster.
+func (ctx *TlsContext) clusterSANs() []string {
+	return []string{
+		// Required for the Operator to connect to the cluster.
+		fmt.Sprintf("*.%s.%s.svc", ctx.ClusterName, ctx.Namespace),
+		// Required for e2e tests to connect over a port-forward.
+		"localhost",
+	}
+}
+
 // InitClusterTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
 func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func(), err error) {
 	// Create the context
-	ctx = &TlsContext{}
+	ctx = &TlsContext{
+		Client:    client,
+		Namespace: namespace,
+	}
 
 	// Generate an explicit cluster name to use
 	ctx.ClusterName = "test-couchbase-" + RandomSuffix()
 
-	// Generate alt names.  We **need** localhost in here to check the TLS is valid
-	// over a port forward from within the cluster.
-	altNames := []string{
-		fmt.Sprintf("*.%s.%s.svc", ctx.ClusterName, namespace),
-		"localhost",
-	}
+	// Generate alt names.
+	altNames := ctx.clusterSANs()
 	if len(opts.AltNames) > 0 {
 		altNames = opts.AltNames
 	}
@@ -477,6 +548,9 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 		DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 		return
 	}
+	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+		return
+	}
 
 	ctx.ClusterSecretName = "cluster-secret-tls-" + RandomSuffix()
 	clusterSecretData := CreateClusterSecretData(namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
@@ -493,7 +567,158 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 	return
 }
 
-func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restclient.Config, ca *CertificateAuthority) error {
+// MustInitClusterTLS does the same as InitClusterTLS, dying on failure
+func MustInitClusterTLS(t *testing.T, client kubernetes.Interface, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func()) {
+	ctx, teardown, err := InitClusterTLS(client, namespace, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ctx, teardown
+}
+
+// MustRotateServerCertificate generates a new server certificate and updates the existing secret.
+func MustRotateServerCertificate(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Generate a new server certificate
+	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the existing server secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret.Data[clusterTLSSecretKey] = clusterKey
+	secret.Data[clusterTLSSecretChain] = clusterCert
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// MustRotateServerCertificateChain generates a new intermediate CA and server certificate and updates the existing secret.
+func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Create an intermediate CA
+	intermediate, err := ctx.CA.NewIntermediateCertificateAuthority(KeyTypeRSA, intermediateCACN, validFrom, validTo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate a new server certificate
+	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the existing server secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := append(clusterCert, intermediate.Certificate...)
+
+	secret.Data[clusterTLSSecretKey] = clusterKey
+	secret.Data[clusterTLSSecretChain] = chain
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// MustRotateServerCertificateAndCA generates a new CA and server certificate and updates the existing secret.
+func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Create a new CA
+	var err error
+	if ctx.CA, err = NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA); err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate a new server certificate
+	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the exising operator secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the existing server secret
+	if secret, err = GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName); err != nil {
+		t.Fatal(err)
+	}
+	secret.Data[clusterTLSSecretKey] = clusterKey
+	secret.Data[clusterTLSSecretChain] = clusterCert
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// MustRotateServerCertificateWrongCA generates a new CA and server certificate, but only updates the server cert.
+func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Create a new CA, don't add to the context
+	ca, err := NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate a new server certificate
+	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ca, validFrom, validTo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the existing server secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret.Data[clusterTLSSecretKey] = clusterKey
+	secret.Data[clusterTLSSecretChain] = clusterCert
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restclient.Config, ctx *TlsContext) error {
 	// Start the port forwarder
 	pf := PortForwarder{
 		Config:    kubeConfig,
@@ -506,24 +731,66 @@ func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restcli
 	}
 	defer pf.Close(t)
 
-	// Get the server certificate
+	// Validate that the server certificate is valid for the context's CA.
 	tlsConfig := &tls.Config{
 		RootCAs: x509.NewCertPool(),
 	}
-	tlsConfig.RootCAs.AddCert(ca.certificate)
+	tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
 
 	conn, err := tls.Dial("tcp", "localhost:18091", tlsConfig)
 	if err != nil {
 		return err
 	}
-	podCert := conn.ConnectionState().PeerCertificates[0]
 
-	t.Logf("Serial:     %v\n", podCert.SerialNumber)
-	t.Logf("Subject CN: %v\n", podCert.Subject.CommonName)
-	t.Logf("Not Before: %v\n", podCert.NotBefore)
-	t.Logf("Not After:  %v\n", podCert.NotAfter)
-	for _, dnsAltName := range podCert.DNSNames {
-		t.Logf("DNS Alt Name: %v\n", dnsAltName)
+	// Verify the certificate is as the context expects.
+	podCert := conn.ConnectionState().PeerCertificates[0]
+	if !podCert.Equal(ctx.ServerCert) {
+		t.Logf("Unexpected server certificate!\n")
+		t.Logf("Expected:\n")
+		t.Logf("  Issuer: %v\n", ctx.ServerCert.Issuer.String())
+		t.Logf("  Serial: %v\n", ctx.ServerCert.SerialNumber)
+		t.Logf("Actual:\n")
+		t.Logf("  Issuer: %v\n", podCert.Issuer.String())
+		t.Logf("  Serial: %v\n", podCert.SerialNumber)
+		return fmt.Errorf("certificate mismatch")
 	}
+
+	// Get the cluster CA and verify it matches the context's CA.
+	dialer := func(network, addr string) (net.Conn, error) {
+		return tls.DialWithDialer(&net.Dialer{}, network, addr, tlsConfig)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialTLS: dialer,
+		},
+	}
+	request, err := http.NewRequest("GET", "https://localhost:18091/pools/default/certificate", nil)
+	if err != nil {
+		return err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	raw, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+	cacert, err := ParseCertificate(raw)
+	if err != nil {
+		return err
+	}
+	if !cacert.Equal(ctx.CA.certificate) {
+		t.Logf("Unexpected CA certificate!\n")
+		t.Logf("Expected:\n")
+		t.Logf("  Issuer: %v\n", ctx.CA.certificate.Issuer.String())
+		t.Logf("  Serial: %v\n", ctx.CA.certificate.SerialNumber)
+		t.Logf("Actual:\n")
+		t.Logf("  Issuer: %v\n", cacert.Issuer.String())
+		t.Logf("  Serial: %v\n", cacert.SerialNumber)
+		return fmt.Errorf("certificate mismatch")
+	}
+
 	return nil
 }

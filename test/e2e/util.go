@@ -107,6 +107,12 @@ var (
 		"TestTlsNegCertificateExpiredBeforeDeployment":     TestTlsNegCertificateExpiredBeforeDeployment,
 		"TestTlsCertificateDeployedBeforeValidity":         TestTlsCertificateDeployedBeforeValidity,
 		"TestTlsGenerateWrongCACertType":                   TestTlsGenerateWrongCACertType,
+		"TestTLSRotate":                                    TestTLSRotate,
+		"TestTLSRotateChain":                               TestTLSRotateChain,
+		"TestTLSRotateCA":                                  TestTLSRotateCA,
+		"TestTLSRotateCAAndScale":                          TestTLSRotateCAAndScale,
+		"TestTLSRotateCAAndKillOperator":                   TestTLSRotateCAAndKillOperator,
+		"TestTLSRotateInvalid":                             TestTLSRotateInvalid,
 
 		// XDCR cases
 		"TestXdcrCreateCluster":                      TestXdcrCreateCluster,

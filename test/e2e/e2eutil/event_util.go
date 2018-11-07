@@ -333,3 +333,31 @@ func (eventsequence *EventValidator) AddMemberVolumeUnhealthyEvent(cbCluster *ap
 	eventToAppend := *k8sutil.MemberVolumeUnhealthyEvent(cbMemberName, reason, cbCluster)
 	*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
 }
+
+// ClusterCreateSequence is a common function for generating cluster creation events.
+func ClusterCreateSequence(size int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Repeat{
+				Times:     size,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
+
+// ClusterScaleUpSequence is a common function for generating cluster scaling up events.
+func ClusterScaleUpSequence(size int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Repeat{
+				Times:     size,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
