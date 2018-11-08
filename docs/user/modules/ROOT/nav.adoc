@@ -1,4 +1,5 @@
 * xref:overview.adoc[Introduction]
+* xref:whats-new.adoc[What's New?]
 * Getting Started
  ** xref:prerequisite-and-setup.adoc[System Requirements]
  ** xref:best-practices.adoc[Guidelines and Best Practices]
