@@ -5,11 +5,11 @@ Take a look at the xref:release-notes.adoc[release notes] for a list of known an
 
 == Logs Support for Ephemeral Pods
 
-To improve supportability in the case of node failure, the Operator now has the ability to persist just the Couchbase logs. By only persisting the log volumes, storage space can be used more efficiently. New options are also available to restrict the size and retention of logs.
+To improve supportability in the case of Kubernetes node failure, the Operator now has the ability to persist just the Couchbase logs. By only persisting the log volumes, storage space can be used more efficiently. New options are also available to restrict the size and retention of logs.
 
-This functionality requires a persistent volume to be attached to Couchbase pods. To restrict the default volume mount to only persist the log subdirectory, add the `logs` tag under `volumeMounts` in the CouchbaseCluster xref:couchbase-cluster-config.adoc[configuration].
+This new functionality requires a persistent volume to be attached to Couchbase pods. To restrict the default volume mount to only persist the log subdirectory, add the `logs` tag under `volumeMounts` in the CouchbaseCluster xref:couchbase-cluster-config.adoc[configuration].
 
-As a result of these changes, the Operator now supports certain stateless Couchbase node deployments in production, so long as a persistent logs volumes are attached to those pods. Review the xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for persistent volumes for more information about cluster supportability requirements.
+As a result of these changes, the Operator now supports certain stateless Couchbase node deployments in production, so long as persistent log volumes are attached to those pods. Review the xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for more information about cluster supportability requirements.
 
 == Log Redaction and Extended Debugging
 

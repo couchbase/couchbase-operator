@@ -26,7 +26,7 @@ For the latest platform support information, see xref:prerequisite-and-setup.ado
 * Production clusters may now be deployed as combination of _Production Stateful_ and _Production Stateless_ node deployments, depending on the services running on the individual server class configurations.
 The `default` and `logs` mounts in the CouchbaseCluster configuration are mutually exclusive — if any server class is detected by the cluster validation to be supportable (e.g. `default` or `logs` is specified under `volumeMounts`), then all other server classes must also have supportable configurations in order for the validation check to pass.
 +
-Review the xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for persistent volumes for more information about cluster supportability requirements.
+Review the xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for more information about cluster supportability requirements.
 
 * Logs collected with xref:cbopinfo.adoc[cbopinfo] are automatically redacted of sensitive information by default.
 
