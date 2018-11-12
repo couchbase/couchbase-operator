@@ -92,7 +92,6 @@ type Cluster struct {
 	lastLoopSt time.Time
 	lastLoopEn time.Time
 	loopStatus string
-	memberTs   map[string]time.Time // Member timestamps to mark availability
 }
 
 func New(config Config, cl *api.CouchbaseCluster) *Cluster {
@@ -107,7 +106,6 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		eventCh:   make(chan *clusterEvent, 100),
 		stopCh:    make(chan struct{}),
 		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
-		memberTs:  make(map[string]time.Time),
 	}
 
 	c.logger.Logger.SetLevel(c.config.LogLevel)
@@ -611,31 +609,14 @@ func (c *Cluster) updateMemberStatus() {
 		}
 	}
 	c.updateMemberStatusWithClusterInfo(info)
-	c.updateMemberTimestamps()
 }
 
 // use cluster info to set ready members from active nodes
 // and all remaining nodes as unready
 func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) {
-	ready := cs.ActiveNodes.Names()
-	unready := c.members.Diff(cs.ActiveNodes).Names()
-	c.status.Members.SetReadiness(ready, unready)
+	c.status.Members.SetReady(cs.ActiveNodes.Names())
+	c.status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
 	c.updateCRStatus()
-}
-
-// Update timestamps for all ready nodes
-func (c *Cluster) updateMemberTimestamps() {
-
-	for _, n := range c.status.Members.Ready {
-		c.memberTs[n] = time.Now()
-	}
-
-	// purge any old member no longer being tracked
-	for memberName, _ := range c.memberTs {
-		if _, ok := c.members[memberName]; !ok {
-			delete(c.memberTs, memberName)
-		}
-	}
 }
 
 // Use username and password from secret store
@@ -783,7 +764,7 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 // according to status readiness.  Otherwise, fallback to cluster members
 func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
-	readyNodes := c.status.Members.Ready
+	readyNodes := c.status.Members.Ready.Names()
 
 	// Get running pods to ensure ready nodes exists
 	running, _, err := c.pollPods()

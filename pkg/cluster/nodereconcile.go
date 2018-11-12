@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -132,9 +131,8 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 		needsReconcile = true
 	}
 
-	// Update ready and unready members along with their timestamps
-	c.updateMemberStatusWithClusterInfo(r.couchbase)
-	c.updateMemberTimestamps()
+	// Update ready and unready members at end of reconciliation
+	defer c.updateMemberStatusWithClusterInfo(r.couchbase)
 
 	// If we have any server specs that are not properly sized then we need to
 	// reconcile the nodes.
@@ -282,13 +280,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			}
 			if c.status.Members.Unready.Contains(m.Name) {
 				if c.isPodRecoverable(m) {
-					ts, ok := c.memberTs[m.Name]
-					if !ok {
-						// member was never timestamped, let's set it now
-						// so that it can be recovered if necessary
-						c.memberTs[m.Name] = time.Now()
-						continue
-					}
+					ts := c.status.Members.Unready.GetMember(m.Name).Ts()
 
 					// Recover node if it has been down longer than auto-failover time
 					elapsed, remainingTs := c.elapsedRecoveryDuration(ts)
