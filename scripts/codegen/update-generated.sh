@@ -9,7 +9,7 @@ go get k8s.io/code-generator/...
 
 # Version control is important here!!  Update with the client libraries in glide.yaml
 pushd ${GOPATH}/src/k8s.io/code-generator
-git checkout kubernetes-1.9.2
+git checkout kubernetes-1.11.4
 popd
 
 go install k8s.io/code-generator/cmd/...

@@ -8,9 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	sdk "github.com/coreos/operator-sdk/pkg/sdk"
-	"github.com/coreos/operator-sdk/pkg/sdk/handler"
-	"github.com/coreos/operator-sdk/pkg/sdk/types"
+	sdk "github.com/operator-framework/operator-sdk/pkg/sdk"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
@@ -89,15 +87,14 @@ func (c *Controller) Start() {
 	}
 	probe.SetReady()
 
-	sdk.Initialize()
 	sdk.Watch(cbapi.SchemeGroupVersion.String(), cbapi.CRDResourceKind, c.Config.Namespace, 0)
-	sdk.Handle((handler.Handler)(c))
+	sdk.Handle((sdk.Handler)(c))
 	sdk.Run(context.TODO())
 
 	panic("unreachable")
 }
 
-func (c *Controller) Handle(ctx types.Context, event types.Event) error {
+func (c *Controller) Handle(ctx context.Context, event sdk.Event) error {
 	if cluster, ok := event.Object.(*cbapi.CouchbaseCluster); ok {
 		cluster.Initialize()
 		ev := &Event{

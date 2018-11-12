@@ -3,14 +3,13 @@ import:
 # NOTE: Update the code generator with the client libraries in
 #       scripts/codegen/update-generated.sh
 - package: k8s.io/client-go
-  version: 745ca830039794f7b927b8a2c2a58dcc1e8a0a72 #v1.10.7
+  version: 3db8bfc8858dc9a5d6e7ef5817f58a7ca30b0c6a   # v1.11.4
 - package: k8s.io/apimachinery
-  version: e386b2658ed20923da8cc9250e552f082899a1ee #v1.10.7
+  version: 8ee1a638bafa4ae9691077e690cb45dd54f45111   # v1.11.4
 - package: k8s.io/apiextensions-apiserver
-  version: f775fcd59f5c64e13850b231ea55132cfd5707c6 #v1.10.7
-- package: github.com/coreos/operator-sdk
-  version: eb7defde99b268e4f1b0c50e40b29b4703494526 #v0.0.4 (+1 Couchbase change)
-  repo:    git@github.com:couchbaselabs/operator-sdk.git
+  version: 67bb9d92aa024a38a3e323cbb9e115e82c0d50b3   # v1.11.4
+- package: github.com/operator-framework/operator-sdk
+  version: e5a0ab096e1a7c0e6b937d2b41707eccb82c3c77   # v0.0.7
 - package: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - package: github.com/couchbase/gocbmgr
@@ -18,8 +17,8 @@ import:
 - package: github.com/couchbase/cbflag
   version: dbeda68bf448ce8e85e52a3216f3b031ef18a4b7
 - package: github.com/google/uuid
-  version: d460ce9f8df2e77fb1ba55ca87fafed96c607494 # v1.0.0
+  version: d460ce9f8df2e77fb1ba55ca87fafed96c607494   # v1.0.0
 - package: github.com/Azure/go-autorest
-  version: d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab
+  version: 1ff28809256a84bb6966640ff3d0371af82ccba4
 - package: golang.org/x/oauth2
   version: a6bd8cefa1811bd24b86f8902872e4e8225f74c4
