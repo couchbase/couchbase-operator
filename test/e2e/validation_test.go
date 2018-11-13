@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -81,24 +82,6 @@ func YAMLToCluster(yamlPath string) (*api.CouchbaseCluster, error) {
 		return nil, err
 	}
 	return cluster, nil
-}
-
-func ClusterToYAML(cluster *api.CouchbaseCluster, yamlPath string) error {
-	cbyaml, err := decoder.EncodeCouchbaseCluster(cluster)
-	if err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(yamlPath, cbyaml, 0644); err != nil {
-		return err
-	}
-	return nil
-}
-
-func RunCBOPCTL(cmd string) ([]byte, error) {
-	cmdName := os.Getenv("TESTDIR") + "/build/bin/cbopctl"
-	cmdArgs := []string{cmd, "-f", os.Getenv("TESTDIR") + "/test/e2e/resources/validation/temp.yaml"}
-	return exec.Command(cmdName, cmdArgs...).Output()
 }
 
 func SetClusterParameter(cluster *api.CouchbaseCluster, param parameter) error {
@@ -248,150 +231,136 @@ func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
 	return clusterSize
 }
 
+// camelify turns plan english names into more standard looking test names.
+// TODO: Just make the names sensible to start with...
+func camelify(name string) string {
+	// Replace non text characters with white space
+	re := regexp.MustCompile(`[^\w]`)
+	name = re.ReplaceAllString(name, " ")
+
+	// Transform each word into bumpy caps
+	words := strings.Split(name, " ")
+	for i, word := range words {
+		if len(word) != 0 {
+			words[i] = strings.ToUpper(string(word[0])) + word[1:]
+		}
+	}
+
+	// And for the sake of convention tack on a test prefix
+	return "Test" + strings.Join(words, "")
+}
+
 func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command string) {
 	f := framework.Global
-	failures := failureList{}
 	targetKube := f.ClusterSpec[kubeName]
-	os.Setenv("KUBECONFIG", targetKube.KubeConfPath)
 	for _, test := range testDefs {
-		t.Logf("Running test: %s", test.name)
-
-		testCouchbase, err := YAMLToCluster("./resources/validation/validation.yaml")
-		if err != nil {
-			t.Logf("error: %v", err)
-			failures.AppendFailure(test.name, err)
-			continue
-		}
-
-		testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
-		testCouchbase.ObjectMeta.Namespace = f.Namespace
-
-		// Removing previous deployment if any
-		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
-
-		if command == "apply" || command == "delete" {
-			if err := ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml"); err != nil {
-				t.Logf("error: %v", err)
-				failures.AppendFailure(test.name, err)
-				continue
-			}
-			cmdOut, err := RunCBOPCTL("create")
-			t.Logf("Returned: %s", string(cmdOut))
-			if err != nil && !test.shouldFail {
-				failures.AppendFailure(test.name, err)
-				continue
+		// Run each test case defined as a separate test so we have a way
+		// of running them individually.
+		name := camelify(test.name)
+		t.Run(name, func(t *testing.T) {
+			testCouchbase, err := YAMLToCluster("./resources/validation/validation.yaml")
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			if !test.shouldFail {
+			testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
+			testCouchbase.ObjectMeta.Namespace = f.Namespace
+
+			// Removing previous deployment if any
+			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
+
+			// If we are applying a change or deleting a cluster we first need to create it...
+			if command == "apply" || command == "delete" {
+				if _, err := k8sutil.CreateCouchbaseCluster(targetKube.CRClient, testCouchbase); err != nil && !test.shouldFail {
+					t.Fatal(err)
+				}
+
 				clusterSize := ExpectedClusterSize(testCouchbase)
 				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries60); err != nil {
-					t.Logf("error: %v", err)
-					failures.AppendFailure(test.name, err)
-					continue
+					t.Fatal(err)
+				}
+
+				// Update to the latest revision so and update is less likely to fail with a CAS collision
+				var err error
+				if testCouchbase, err = k8sutil.GetCouchbaseCluster(targetKube.CRClient, f.Namespace, testCouchbase.Name); err != nil {
+					t.Fatal(err)
 				}
 			}
 
-			testCouchbase, err = YAMLToCluster("./resources/validation/temp.yaml")
-			if err != nil {
-				t.Logf("error: %v", err)
-				failures.AppendFailure(test.name, err)
-				continue
-			}
-		}
-
-		for _, param := range test.paramsIn {
-			t.Logf("setting parameter: %+v", param)
-			if err := SetClusterParameter(testCouchbase, param); err != nil {
-				t.Logf("error: %v", err)
-				failures.AppendFailure(test.name, err)
-				continue
-			}
-		}
-
-		if err := ClusterToYAML(testCouchbase, "./resources/validation/temp.yaml"); err != nil {
-			t.Logf("error: %v", err)
-			failures.AppendFailure(test.name, err)
-			continue
-		}
-
-		cmdOut, err := RunCBOPCTL(command)
-		t.Logf("Returned: %s", string(cmdOut))
-		if err != nil && !test.shouldFail {
-			failures.AppendFailure(test.name, err)
-			continue
-		}
-
-		if test.shouldWarn {
-			if !strings.Contains(string(cmdOut), test.expectedWarn) || test.expectedWarn == "" {
-				t.Logf("expected warning: %+v \n returned message: %+v \n", test.expectedWarn, string(cmdOut))
-				failures.AppendFailure(test.name, errors.New("incorrect warning"))
-				continue
-			}
-		}
-
-		for _, message := range test.expectedMessages {
-			if !strings.Contains(string(cmdOut), message) || message == "" {
-				t.Logf("expected message: %+v \n returned message: %+v \n", message, string(cmdOut))
-				failures.AppendFailure(test.name, errors.New("incorrect message"))
-				continue
-			}
-		}
-
-		clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
-		if test.shouldFail {
-			if command == "delete" || command == "apply" {
-				if len(clusters.Items) != 1 {
-					failures.AppendFailure(test.name, errors.New("cluster deletion should fail"))
-					continue
+			// Patch the cluster specification
+			for _, param := range test.paramsIn {
+				t.Logf("setting parameter: %+v", param)
+				if err := SetClusterParameter(testCouchbase, param); err != nil {
+					t.Fatal(err)
 				}
 			}
 
-			if command == "create" {
-				if len(clusters.Items) != 0 {
-					failures.AppendFailure(test.name, errors.New("cluster creation should fail"))
-					continue
+			// Execute the main test
+			switch command {
+			case "create":
+				_, err = k8sutil.CreateCouchbaseCluster(targetKube.CRClient, testCouchbase)
+			case "apply":
+				_, err = k8sutil.UpdateCouchbaseCluster(targetKube.CRClient, testCouchbase)
+			case "delete":
+				err = k8sutil.DeleteCouchbaseCluster(targetKube.CRClient, testCouchbase)
+			}
+			if err != nil && !test.shouldFail {
+				t.Fatal(err)
+			}
+
+			for _, message := range test.expectedMessages {
+				if !strings.Contains(err.Error(), message) || message == "" {
+					t.Fatalf("expected message: %+v \n returned message: %v \n", message, err)
 				}
 			}
-		} else {
-			if command == "delete" {
-				if len(clusters.Items) != 0 {
-					failures.AppendFailure(test.name, errors.New("cluster deletion should work"))
-					continue
-				}
-				if _, err := e2eutil.WaitPodsDeleted(targetKube.KubeClient, f.Namespace, constants.Retries30, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel}); err != nil {
-					failures.AppendFailure(test.name, err)
-					continue
-				}
-				t.Logf("deleted couchbase cluster: \n%+v", testCouchbase)
-			} else {
-				if len(clusters.Items) != 1 {
-					failures.AppendFailure(test.name, errors.New("only one cluster should be created"))
-					continue
-				}
-				testCouchbase = &clusters.Items[0]
-				for _, param := range test.paramsOut {
-					t.Logf("verifying parameter: %+v", param)
-					if err := VerifyClusterParameter(testCouchbase, param); err != nil {
-						failures.AppendFailure(test.name, err)
-						continue
+
+			clusters, err := targetKube.CRClient.CouchbaseV1().CouchbaseClusters(f.Namespace).List(metav1.ListOptions{})
+			if test.shouldFail {
+				if command == "delete" || command == "apply" {
+					if len(clusters.Items) != 1 {
+						t.Fatal("cluster deletion should fail")
 					}
 				}
 
-				clusterSize := ExpectedClusterSize(testCouchbase)
-				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries60); err != nil {
-					t.Logf("error: %v", err)
-					failures.AppendFailure(test.name, err)
-					continue
+				if command == "create" {
+					if len(clusters.Items) != 0 {
+						t.Fatal("cluster deletion should fail")
+					}
 				}
-				t.Logf("created couchbase cluster: \n%+v", testCouchbase)
+			} else {
+				if command == "delete" {
+					if len(clusters.Items) != 0 {
+						t.Fatal("cluster deletion should fail")
+					}
+					if _, err := e2eutil.WaitPodsDeleted(targetKube.KubeClient, f.Namespace, constants.Retries30, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel}); err != nil {
+						t.Fatal(err)
+					}
+					t.Logf("deleted couchbase cluster: \n%+v", testCouchbase)
+				} else {
+					if len(clusters.Items) != 1 {
+						t.Fatal("only one cluster should be created")
+					}
+					testCouchbase = &clusters.Items[0]
+					for _, param := range test.paramsOut {
+						t.Logf("verifying parameter: %+v", param)
+						if err := VerifyClusterParameter(testCouchbase, param); err != nil {
+							t.Fatal(err)
+						}
+					}
+
+					clusterSize := ExpectedClusterSize(testCouchbase)
+					if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries60); err != nil {
+						t.Fatal(err)
+					}
+					t.Logf("created couchbase cluster: \n%+v", testCouchbase)
+				}
 			}
-		}
+		})
 	}
 	// Removing deployment if any
 	if !f.SkipTeardown {
 		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
 	}
-	failures.CheckFailures(t)
 }
 
 func TestValidationCreate(t *testing.T) {
@@ -403,11 +372,10 @@ func TestValidationCreate(t *testing.T) {
 
 	testDefs := []testDef{
 		{
-			name:             "create default yaml",
-			paramsIn:         []parameter{},
-			paramsOut:        []parameter{},
-			shouldFail:       false,
-			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
+			name:       "create default yaml",
+			paramsIn:   []parameter{},
+			paramsOut:  []parameter{},
+			shouldFail: false,
 		},
 	}
 
@@ -422,9 +390,8 @@ func TestValidationCreate(t *testing.T) {
 					fieldValue: "1" + timeUnit,
 				},
 			},
-			paramsOut:        []parameter{},
-			shouldFail:       false,
-			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
+			paramsOut:  []parameter{},
+			shouldFail: false,
 		}
 		testDefs = append(testDefs, testDefCase)
 	}
@@ -1188,8 +1155,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 					fieldValue: "couchbase/server",
 				},
 			},
-			shouldFail:       false,
-			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
+			shouldFail: false,
 		},
 
 		{
@@ -1208,8 +1174,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 					fieldValue: "256",
 				},
 			},
-			shouldFail:       false,
-			expectedMessages: []string{"couchbaseclusters \"cb-example\" created"},
+			shouldFail: false,
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1222,6 +1187,8 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 	}
 	testDefs := []testDef{
 		{
+			// DataServiceMemQuota will get mutated to the default of 256, but we have
+			// 500 worth of buckets defined.
 			name: "create:default:Spec.ClusterSettings.DataServiceMemQuota",
 			paramsIn: []parameter{
 				{
@@ -1238,7 +1205,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 				},
 			},
 			shouldFail:       true,
-			expectedMessages: []string{"spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256"},
+			expectedMessages: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

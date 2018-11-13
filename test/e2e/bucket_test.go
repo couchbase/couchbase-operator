@@ -293,9 +293,6 @@ func TestNegBucketAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
 	bucketSettings := api.BucketConfig{
 		BucketName:         "default",
 		BucketType:         pkg_constants.BucketTypeEphemeral,
@@ -314,25 +311,16 @@ func TestNegBucketAdd(t *testing.T) {
 	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = bucketConfig }
 	t.Logf("Adding Bucket To Cluster \n")
 	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("Waiting For Bucket To Be Created \n")
-	err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{bucketSettings.BucketName}, constants.Retries10, testCouchbase)
 	if err == nil {
-		t.Fatalf("failed to NOT create bucket %v", err)
-	}
-
-	message := "[evictionPolicy - Eviction policy must be either 'noEviction' or 'nruEviction' for ephemeral buckets replicaNumber - Warning: you do not have enough data servers to support this number of replicas."
-	err = e2eutil.WaitForConditionMessage(t, targetKube.CRClient, 10, testCouchbase, api.ClusterConditionManageBuckets, message)
-	if err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
+		t.Fatal("successful update to bucket with invalid eviction settings")
 	}
 
 	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
+
+	expectedEvents := e2eutil.EventList{}
 	if !expectedEvents.Compare(events) {
 		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
 	}
@@ -571,53 +559,8 @@ func TestNegBucketEdit(t *testing.T) {
 		cl.Spec.BucketSettings[0].BucketType = "ephemeral"
 	}
 
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err != nil {
-		t.Fatalf("failed to post updated cluster spec: %v", err)
-	}
-
-	// verify type did not change
-	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketType == "ephemeral"
-		}
-		return false
-	}
-	err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc)
-	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
-		t.Fatalf("failed to prevent changing bucket type: %v", err)
-	}
-
-	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketType", "ephemeral", e2eutil.BucketInfoVerifier); err == nil {
-		t.Fatalf("failed to verify prevent changing bucket type: %v", err)
-	}
-
-	message := "Bucket: default cannot change (default) bucket param='type' from 'couchbase' to 'ephemeral'"
-	if err := e2eutil.WaitForConditionMessage(t, targetKube.CRClient, 10, testCouchbase, api.ClusterConditionManageBuckets, message); err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
-	}
-
-	// revert edit bucket type
-	t.Logf("reverting bucket type edit")
-	updateFunc = func(cl *api.CouchbaseCluster) {
-		cl.Spec.BucketSettings[0].BucketType = "couchbase"
-	}
-
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err != nil {
-		t.Fatalf("failed to post updated cluster spec: %v", err)
-	}
-
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketType == "couchbase"
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to revert failed bucket edit: %v", err)
-	}
-
-	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketType", "membase", e2eutil.BucketInfoVerifier); err != nil {
-		t.Fatalf("failed to verify bucket type: %v", err)
+	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err == nil {
+		t.Fatal("successful update to bucket type")
 	}
 
 	// edit memory quota
@@ -625,57 +568,8 @@ func TestNegBucketEdit(t *testing.T) {
 		cl.Spec.BucketSettings[0].BucketMemoryQuota = 9999
 	}
 
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err != nil {
-		t.Fatalf("failed to post updated cluster spec: %v", err)
-	}
-
-	// verify type did not change
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketMemoryQuota == 9999
-		}
-		return false
-	}
-	err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc)
-	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
-		t.Fatalf("failed to prevent changing bucket memory quota: %v", err)
-	}
-
-	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", "9999", e2eutil.BucketInfoVerifier); err == nil {
-		t.Fatalf("failed to verify prevent changing bucket memory quota: %v", err)
-	}
-
-	message = "ramQuotaMB - RAM quota specified is too large to be provisioned into this cluster"
-	if err := e2eutil.WaitForConditionMessage(t, targetKube.CRClient, 20, testCouchbase, api.ClusterConditionManageBuckets, message); err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
-	}
-
-	// revert edit memory quota
-	t.Logf("reverting memory quota edit")
-	updateFunc = func(cl *api.CouchbaseCluster) {
-		cl.Spec.BucketSettings[0].BucketMemoryQuota = constants.Mem256Mb
-	}
-
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err != nil {
-		t.Fatalf("failed to post updated cluster spec: %v", err)
-	}
-
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketMemoryQuota == constants.Mem256Mb
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to revert bucket edit: %c", err)
-	}
-
-	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
-		t.Fatalf("failed to verify bucket: %v", err)
-	}
-
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
+	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err == nil {
+		t.Fatal("successful update to bucket memory quota")
 	}
 
 	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)

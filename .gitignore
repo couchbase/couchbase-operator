@@ -17,4 +17,5 @@
 /test/e2e/resources/ansible/*Cluster*
 /test/e2e/resources/ansible/generic/*.retry
 /test/e2e/resources/ansible/kubernetes/*.retry
+/test/e2e/resources/validation/temp.yaml
 example/crd.yaml

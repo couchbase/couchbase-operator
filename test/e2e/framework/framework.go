@@ -263,6 +263,16 @@ func DeleteCouchbaseClusters(kubeClient kubernetes.Interface, crClient versioned
 	return nil
 }
 
+func CreateAdmissionController(client kubernetes.Interface) error {
+	logrus.Infof("Creating admission controller")
+	return createAdmissionController(client)
+}
+
+func DeleteAdmissionController(client kubernetes.Interface) error {
+	logrus.Info("Deleting admission controller")
+	return deleteAdmissionController(client)
+}
+
 func cleanUpNamespace() (err error) {
 	logrus.Infof("Cleaning up namespace: %s", Global.Namespace)
 	for _, targetKube := range Global.ClusterSpec {
@@ -386,6 +396,10 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("Deployment deleted: %v", Global.Deployment.Name)
 	}
 
+	if err := DeleteAdmissionController(targetKube.KubeClient); err != nil {
+		return err
+	}
+
 	if err := DeleteCouchbaseClusters(targetKube.KubeClient, targetKube.CRClient); err != nil {
 		return err
 	}
@@ -451,6 +465,10 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		if err = f.PullDockerImages(targetKube.KubeClient, kubeName, dockerImgList); err != nil {
 			return err
 		}
+	}
+
+	if err := CreateAdmissionController(targetKube.KubeClient); err != nil {
+		return err
 	}
 
 	logrus.Info("Setting up operator")

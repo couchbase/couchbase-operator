@@ -232,12 +232,6 @@ func TestEditClusterSettings(t *testing.T) {
 }
 
 // Tests invalid editing of cluster settings (setting changes should not take hold)
-// 1. Create a 1 node cluster
-// 2. Change data service memory quota from 256 to 0 (verify via rest call to cluster)
-// 3. Change index service memory quota from 256 to 0 (verify via rest call to cluster)
-// 4. Change search service memory quota from 256 to 0 ( verify via rest call to cluster)
-// 5. Change indexer storage mode from gsi to moi (verify via rest call to cluster)
-// 6. Change autofailover timeout from 30 to 0 ( verify via rest call to cluster)
 func TestNegEditClusterSettings(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -261,144 +255,13 @@ func TestNegEditClusterSettings(t *testing.T) {
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	// edit cluster dataServiceMemQuota
-	newDataServiceMemQuota := "0"
-	t.Log("Changing cluster data service mem quota")
-	if _, err := e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	} else {
-		if !strings.Contains(err.Error(), "spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256") {
-			t.Fatalf("failed to see expected error message: %v \n", err)
-		}
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier); err == nil {
-		t.Fatalf("failed to reject change for cluster data service mem quota: %v", err)
-	}
-
-	// revert edit cluster dataServiceMemQuota
-	newDataServiceMemQuota = strconv.Itoa(constants.Mem256Mb)
-	t.Log("Changing cluster data service mem quota")
-	if _, err := e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier); err != nil {
-		t.Fatalf("failed to revert change for cluster data service mem quota: %v", err)
-	}
-
-	// edit cluster indexServiceMemQuota
-	newIndexServiceMemQuota := "0"
-	t.Log("Changing cluster index service mem quota")
-	if _, err := e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	} else {
-		if !strings.Contains(err.Error(), "spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256") {
-			t.Fatalf("failed to see expected error message: %v \n", err)
-		}
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier); err == nil {
-		t.Fatalf("failed to reject change for cluster index service mem quota: %v", err)
-	}
-
-	// revert edit cluster indexServiceMemQuota
-	newIndexServiceMemQuota = strconv.Itoa(constants.Mem256Mb)
-	t.Log("Changing cluster index service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier); err != nil {
-		t.Fatalf("failed to revert change for cluster index service mem quota: %v", err)
-	}
-
-	// edit cluster searchServiceMemQuota
-	newSearchServiceMemQuota := "0"
-	t.Log("Changing cluster search service mem quota")
-	if _, err := e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	} else {
-		if !strings.Contains(err.Error(), "spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256") {
-			t.Fatalf("failed to see expected error message: %v \n", err)
-		}
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier); err == nil {
-		t.Fatalf("failed to reject change cluster for search service mem quota: %v", err)
-	}
-
-	// revert edit cluster searchServiceMemQuota
-	newSearchServiceMemQuota = strconv.Itoa(constants.Mem256Mb)
-	t.Log("Changing cluster search service mem quota")
-	if _, err := e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, 6, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier); err != nil {
-		t.Fatalf("failed to revert change cluster for search service mem quota: %v", err)
-	}
-
-	// edit cluster autoFailoverTimeout
-	newAutoFailoverTimeout := "0"
-	t.Log("Changing cluster autofailover timeout")
-	if _, err := e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	} else {
-		if !strings.Contains(err.Error(), "spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5") {
-			t.Fatalf("failed to see expected error message: %v \n", err)
-		}
-	}
-	if err := e2eutil.VerifyAutoFailoverInfo(t, client, constants.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier); err == nil {
-		t.Fatalf("failed to reject change for cluster autofailover timeout: %v", err)
-	}
-
-	// revert edit cluster autoFailoverTimeout
-	newAutoFailoverTimeout = e2eutil.BasicClusterConfig["autoFailoverTimeout"]
-	t.Log("Changing cluster autofailover timeout")
-	if _, err := e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := e2eutil.VerifyAutoFailoverInfo(t, client, constants.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier); err != nil {
-		t.Fatalf("failed to revert change for cluster autofailover timeout: %v", err)
-	}
-
 	// edit cluster indexStorageSetting
 	newIndexStorageSetting := "plasma"
 	t.Log("Changing cluster index storage setting")
-	if _, err := e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
+	if _, err := e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
+		t.Fatal("successful update to index storage mode when index service enabled")
 	}
 
-	if err := e2eutil.VerifyIndexSettingInfo(t, client, constants.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier); err == nil {
-		t.Fatalf("failed to reject change for cluster indexer storage setting: %v", err)
-	}
-
-	message := "storageMode - Changing the optimization mode of global indexes is not supported when index service nodes are present in the cluster"
-	if err := e2eutil.WaitForConditionMessage(t, targetKube.CRClient, constants.Retries10, testCouchbase, api.ClusterConditionManageConfig, message); err != nil {
-		t.Fatalf("failed to verify condition: %v", err)
-	}
-
-	// revert edit cluster indexStorageSetting
-	newIndexStorageSetting = "memory_optimized"
-	t.Log("Changing cluster index storage setting")
-	if _, err := e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyIndexSettingInfo(t, client, constants.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier); err != nil {
-		t.Fatalf("failed to revert change for cluster indexer storage setting: %v", err)
-	}
-
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -1374,12 +1237,9 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 		Bucket:  constants.Retries1,
 		Service: constants.Retries1,
 	}
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden, retries)
-	if err == nil {
+	if _, err := e2eutil.NewClusterMultiQuick(t, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden, retries); err == nil {
 		t.Fatalf("failed to reject cluster creation: %v", err)
 	}
-
-	t.Logf("status: %+v", testCouchbase.Status.Conditions)
 }
 
 // Tests creating a cluster where the data service is the second service listed in the spec
