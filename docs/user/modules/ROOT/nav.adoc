@@ -8,6 +8,7 @@
  ** xref:install-openshift.adoc[Installing on OpenShift]
  ** xref:operator-config.adoc[About the Operator Deployment Settings]
  ** xref:kubernetes-rbac.adoc[About Kubernetes RBAC]
+ ** xref:upgrading-the-operator.adoc[Upgrading the Operator]
 * Managing the Operator
  ** xref:list-and-describe.adoc[Monitoring Kubernetes Resources]
  ** xref:services.adoc[Monitoring Services]
@@ -27,7 +28,6 @@
  ** xref:scaling-couchbase.adoc[Scaling a Couchbase Deployment]
  ** xref:node-recovery.adoc[Recovering From a Node Failure]
  ** xref:delete-couchbase-cluster.adoc[Deleting a Couchbase Deployment]
- ** xref:upgrading-the-operator.adoc[Upgrading the Operator]
  ** xref:upgrading-kubernetes.adoc[Upgrading the Kubernetes Cluster]
  ** xref:backup-and-restore.adoc[Backing up and Restoring a Couchbase Deployment]
  ** xref:conditions-and-events.adoc[Monitoring Couchbase Events]

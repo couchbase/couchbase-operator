@@ -2,7 +2,7 @@
 
 Couchbase Autonomous Operator 1.1 introduces a number of supportability features and enhancements.
 
-Take a look at the xref:introduction:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
+Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
 == Release 1.1.0
 

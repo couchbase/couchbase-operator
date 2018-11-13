@@ -2,8 +2,9 @@
 
 This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on a Red Hat OpenShift project.
 
-.This guide assumes the following:
+If you are looking to upgrade an existing installation of the Operator, see xref:upgrading-the-operator.adoc[Upgrading the Autonomous Operator].
 
+.This guide assumes the following:
 * You have a working knowledge of OpenShift and Kubernetes
 * You are installing on a new OpenShift cluster
 * You have access to an OpenShift user that has cluster-admin privileges (`system:admin` in this guide)
