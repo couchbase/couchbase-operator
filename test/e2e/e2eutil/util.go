@@ -10,13 +10,16 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -518,6 +521,48 @@ func ScaleServices(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRe
 	}
 	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = newServiceConfig }
 	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+}
+
+// PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster
+func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, retries int) (*api.CouchbaseCluster, error) {
+	return cluster, retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+		// Get the current cluster resource
+		before, err := client.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		// Apply the patch set to the cluster
+		after := before.DeepCopy()
+		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
+			//t.Log(err)
+			return false, nil
+		}
+
+		// If we are not modifiying e.g. just testing, then return ok
+		if reflect.DeepEqual(before, after) {
+			return true, nil
+		}
+
+		// Attempt to post the update, updating the cluster
+		updated, err := client.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Update(after)
+		if err != nil {
+			return false, nil
+		}
+
+		// Everything successful
+		cluster = updated
+		return true, nil
+	})
+}
+
+// MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error
+func MustPatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, retries int) *api.CouchbaseCluster {
+	cluster, err := PatchCluster(t, client, cluster, patches, retries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
 }
 
 func UpdateBucketSpec(bucketName string, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {

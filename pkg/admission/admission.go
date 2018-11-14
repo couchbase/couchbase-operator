@@ -205,8 +205,8 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 	mutatedCouchbaseCluster := couchbaseCluster.DeepCopy()
 	validator.ApplyDefaults(mutatedCouchbaseCluster)
 	if !reflect.DeepEqual(couchbaseCluster.Spec, mutatedCouchbaseCluster.Spec) {
-		patch := jsonpatch.JsonPatchList{
-			jsonpatch.JsonPatch{
+		patch := jsonpatch.PatchList{
+			jsonpatch.Patch{
 				Op:    jsonpatch.Replace,
 				Path:  "/spec",
 				Value: mutatedCouchbaseCluster.Spec,
