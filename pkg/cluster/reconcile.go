@@ -760,6 +760,43 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 	return false, nil
 }
 
+// createAlternateAddressesExternal calculates what the current state of the node's alternate
+// addresses should be. For public addresses we maintain the default ports, however set the
+// alternate address to the DDNS name.  For private addresses these will be an IP based on the
+// node address and node ports in the 30000 range.
+func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
+	// Lookup the node IP the pod is running on.
+	hostname, err := k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	addresses := &cbmgr.AlternateAddressesExternal{
+		Hostname: hostname,
+	}
+
+	// If any exposed ports are defined then add them to the external addresses.
+	if ports, ok := c.status.ExposedPorts[member.Name]; ok {
+		addresses.Ports = &cbmgr.AlternateAddressesExternalPorts{
+			AdminServicePort:    ports.AdminServicePort,
+			AdminServicePortTLS: ports.AdminServicePortTLS,
+			// TODO: rename the library for consistency
+			ViewServicePort:         ports.IndexServicePort,
+			ViewServicePortTLS:      ports.IndexServicePortTLS,
+			QueryServicePort:        ports.QueryServicePort,
+			QueryServicePortTLS:     ports.QueryServicePortTLS,
+			FtsServicePort:          ports.SearchServicePort,
+			FtsServicePortTLS:       ports.SearchServicePortTLS,
+			AnalyticsServicePort:    ports.AnalyticsServicePort,
+			AnalyticsServicePortTLS: ports.AnalyticsServicePortTLS,
+			DataServicePort:         ports.DataServicePort,
+			DataServicePortTLS:      ports.DataServicePortTLS,
+		}
+	}
+
+	return addresses, nil
+}
+
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate
 // ports into the requested member.  Clients may use these addresses/ports to
 // connect to the cluster if there is no direct L3 connectivity into the pod
@@ -768,7 +805,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// Examine each member in turn as they will have different node
 	// addresses (i.e. you must be using anti affinity or kubernetes
 	// has no way of addressing individual cluster nodes).
-	for memberName, member := range c.members {
+	for _, member := range c.members {
 		// Grab the current configuration
 		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
 		if err != nil {
@@ -777,62 +814,21 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 			return nil
 		}
 
-		// Calculate what the current state of the node's alternate addresses
-		// should be.
-		//
-		// Unfortunately clients outside of the pod network are not able to access
-		// all services, so we need to moderate what we set as externally available.
-		//
-		// See the following for guidance:
-		// https://github.com/couchbase/ns_server/blob/6071474b0bd8d625955b60e0ee94802d66e47cfc/src/menelaus_web_node.erl#L281
-		hostname, err := k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
-		if err != nil {
-			return err
-		}
-
-		// Marshal status data into manager library format taking note if any
-		// ports are actually set
-		addresses := &cbmgr.AlternateAddressesExternal{}
-		anyPortSet := false
-		if ports, ok := c.status.ExposedPorts[memberName]; ok {
-			addresses = &cbmgr.AlternateAddressesExternal{
-				Hostname: hostname,
-				Ports: cbmgr.AlternateAddressesExternalPorts{
-					AdminServicePort:    ports.AdminServicePort,
-					AdminServicePortTLS: ports.AdminServicePortTLS,
-					// TODO: rename the library for consistency
-					ViewServicePort:    ports.IndexServicePort,
-					ViewServicePortTLS: ports.IndexServicePortTLS,
-					//QueryServicePort:        ports.QueryServicePort,
-					//QueryServicePortTLS:     ports.QueryServicePortTLS,
-					//FtsServicePort:          ports.SearchServicePort,
-					//FtsServicePortTLS:       ports.SearchServicePortTLS,
-					//AnalyticsServicePort:    ports.AnalyticsServicePort,
-					//AnalyticsServicePortTLS: ports.AnalyticsServicePortTLS,
-					DataServicePort: ports.DataServicePort,
-					//DataServicePortTLS:      ports.DataServicePortTLS,
-				},
-			}
-			ports := reflect.ValueOf(addresses.Ports)
-			for i := 0; i < ports.NumField(); i++ {
-				value := ports.Field(i)
-				if value.Int() != 0 {
-					anyPortSet = true
-					break
-				}
-			}
-		}
-
-		// If no ports are set, but the server reports the hostname is set we have
-		// existing configuration which needs to be deleted.  If the hostname is
-		// not set then there is no configuration to worry about
-		if !anyPortSet {
-			if existingAddresses.Hostname != "" {
+		// If we don't have any exposed ports, but the node reports it is configured so
+		// then remove the configuration.
+		if !c.cluster.Spec.HasExposedFeatures() {
+			if existingAddresses != nil {
 				if err := c.client.DeleteAlternateAddressesExternal(member); err != nil {
 					return err
 				}
 			}
 			continue
+		}
+
+		// Get the requested alternate address specification.
+		addresses, err := c.createAlternateAddressesExternal(member)
+		if err != nil {
+			return err
 		}
 
 		// Check to see if we need to perform any updates, ignoring if not
@@ -854,74 +850,37 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 	// Examine each member in turn as they will have different node
 	// addresses (i.e. you must be using anti affinity or kubernetes
 	// has no way of addressing individual cluster nodes).
-	for memberName, member := range c.members {
+	for _, member := range c.members {
 		// Grab the current configuration
 		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
+			c.logger.Warnf("unable to poll external addresses for pod %s", member.Name)
 			return false, nil
 		}
 
-		// Calculate what the current state of the node's alternate addresses
-		// should be.
-		//
-		// Unfortunately clients outside of the pod network are not able to access
-		// all services, so we need to moderate what we set as externally available.
-		//
-		// See the following for guidance:
-		// https://github.com/couchbase/ns_server/blob/6071474b0bd8d625955b60e0ee94802d66e47cfc/src/menelaus_web_node.erl#L281
-		hostname, err := k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
-		if err != nil {
-			return false, err
-		}
-
-		// Marshal status data into manager library format taking note if any
-		// ports are actually set
-		addresses := &cbmgr.AlternateAddressesExternal{}
-		anyPortSet := false
-		if ports, ok := c.status.ExposedPorts[memberName]; ok {
-			addresses = &cbmgr.AlternateAddressesExternal{
-				Hostname: hostname,
-				Ports: cbmgr.AlternateAddressesExternalPorts{
-					AdminServicePort:    ports.AdminServicePort,
-					AdminServicePortTLS: ports.AdminServicePortTLS,
-					// TODO: rename the library for consistency
-					ViewServicePort:    ports.IndexServicePort,
-					ViewServicePortTLS: ports.IndexServicePortTLS,
-					//QueryServicePort:        ports.QueryServicePort,
-					//QueryServicePortTLS:     ports.QueryServicePortTLS,
-					//FtsServicePort:          ports.SearchServicePort,
-					//FtsServicePortTLS:       ports.SearchServicePortTLS,
-					//AnalyticsServicePort:    ports.AnalyticsServicePort,
-					//AnalyticsServicePortTLS: ports.AnalyticsServicePortTLS,
-					DataServicePort: ports.DataServicePort,
-					//DataServicePortTLS:      ports.DataServicePortTLS,
-				},
-			}
-			ports := reflect.ValueOf(addresses.Ports)
-			for i := 0; i < ports.NumField(); i++ {
-				value := ports.Field(i)
-				if value.Int() != 0 {
-					anyPortSet = true
-					break
-				}
-			}
-		}
-
-		// If no ports are set, but the server reports the hostname is set we have
-		// existing configuration which needs to be deleted.  If the hostname is
-		// not set then there is no configuration to worry about
-		if !anyPortSet {
-			if existingAddresses.Hostname != "" {
-				return true, nil
+		// If we don't have any exposed ports, but the node reports it is configured so
+		// then remove the configuration.
+		if !c.cluster.Spec.HasExposedFeatures() {
+			if existingAddresses != nil {
+				return true, err
 			}
 			continue
 		}
 
-		// Check to see if we need to perform any updates, ignoring if not
-		if !reflect.DeepEqual(addresses, existingAddresses) {
-			return true, nil
+		// Get the requested alternate address specification.
+		addresses, err := c.createAlternateAddressesExternal(member)
+		if err != nil {
+			return false, err
 		}
+
+		// Check to see if we need to perform any updates, ignoring if not
+		if reflect.DeepEqual(addresses, existingAddresses) {
+			continue
+		}
+
+		// Perform the update
+		return true, nil
 	}
 	return false, nil
 }

@@ -550,3 +550,9 @@ func intPtrEquals(p1, p2 *int) bool {
 func boolPtrEquals(p1, p2 *bool) bool {
 	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
 }
+
+// HasExposedFeatures returns whether we need to expose ports and update the
+// alternate addresses in server.
+func (cs *ClusterSpec) HasExposedFeatures() bool {
+	return len(cs.ExposedFeatures) != 0
+}

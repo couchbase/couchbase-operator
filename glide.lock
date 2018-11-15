@@ -1,5 +1,5 @@
-hash: c5fb3ec511bbc32e5a70e2bc1196f52315dc60d6d54242bb72f79ad5fe497671
-updated: 2018-11-12T16:28:32.866899-08:00
+hash: 2ec0dd098b5c686221c420c6665c8d2d38f3c9e31b56b519f660fe89a4412407
+updated: 2018-11-15T15:46:39.10952729Z
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -25,7 +25,7 @@ imports:
   - man
   - pwd
 - name: github.com/couchbase/gocbmgr
-  version: 87d1b9eadcc458c8e2087bf60a5f7699e8ec77a0
+  version: 2c88509237659f3d0931b347fb2e49567ba77ee4
   subpackages:
   - urlencoding
 - name: github.com/davecgh/go-spew
@@ -205,7 +205,7 @@ imports:
   subpackages:
   - rate
 - name: google.golang.org/appengine
-  version: 80663353cf07ea09bdc45f5cddbb05f93bf16433
+  version: 4a4468ece617fc8205e99368fa2200e9d1fad421
   subpackages:
   - internal
   - internal/app_identity
