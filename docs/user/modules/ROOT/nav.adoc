@@ -1,4 +1,5 @@
 * xref:overview.adoc[Introduction]
+* xref:whats-new.adoc[What's New?]
 * Getting Started
  ** xref:prerequisite-and-setup.adoc[System Requirements]
  ** xref:best-practices.adoc[Guidelines and Best Practices]
@@ -7,6 +8,7 @@
  ** xref:install-openshift.adoc[Installing on OpenShift]
  ** xref:operator-config.adoc[About the Operator Deployment Settings]
  ** xref:kubernetes-rbac.adoc[About Kubernetes RBAC]
+ ** xref:upgrading-the-operator.adoc[Upgrading the Operator]
 * Managing the Operator
  ** xref:list-and-describe.adoc[Monitoring Kubernetes Resources]
  ** xref:services.adoc[Monitoring Services]

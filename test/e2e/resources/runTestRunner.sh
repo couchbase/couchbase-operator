@@ -121,6 +121,7 @@ case "$runType" in
     "sdk-sanity")
         cbClusterFile="./sdk/sanity/cb-cluster-${numNodes}node.yaml"
         testRunnerYamlFileName="./sdk/sanity/sdk-sanity.yaml"
+        jobName="sdk-sanity"
         ;;
     "*")
         echo "Error: Invalid runType '$runType'"
@@ -134,13 +135,18 @@ clusterName=$(grep "name:" $cbClusterFile | head -1 | xargs | cut -d' ' -f 2)
 
 cbOperatorDockerImageName="couchbase/couchbase-operator-internal:$operatorVersion"
 cbServerDockerImageName="couchbase/server:${serverVersion}-test"
-testRunnerDockerImageName="${dockerAccount}/testrunner-cloud:$testRunnerImgTag"
 
 # Build required images #
 sh ./build-cb-server.sh "$serverVersion" "$serverBuildNum" "$serverBranchName" "${cbServerDockerImageName}"
 exitOnError $? "Unable to build cb server docker file"
-sh ./build-testrunner.sh "$testRunnerImgTag" "$testRunnerDockerImageName" "$numNodes"
-exitOnError $? "Unable to build testrunner $testRunnerImgTag docker file"
+if [ "$runType" == "sdk-sanity" ]; then
+    testRunnerDockerImageName="dockerhub.build.couchbase.com/sdkd-java-client:test"
+    sh ./build-sdk.sh "sanity" "${testRunnerDockerImageName}"
+else
+    testRunnerDockerImageName="${dockerAccount}/testrunner-cloud:$testRunnerImgTag"
+    sh ./build-testrunner.sh "$testRunnerImgTag" "$testRunnerDockerImageName" "$numNodes"
+fi
+exitOnError $? "Unable to build $jobName docker file"
 
 #ship the docker images to the nodes
 
@@ -154,11 +160,15 @@ exitOnError $? "Unable to create tar of cb server docker image"
 
 testrunnerImageName=$(echo $testRunnerDockerImageName | cut -d':' -f 1)
 testrunnerTagName=$(echo $testRunnerDockerImageName | cut -d':' -f 2)
-testrunnerTarFileName="testrunnerDockerImage.tar"
+if [ "$runType" == "sdk-sanity" ]; then
+    testrunnerTarFileName="sdkDockerImage.tar"
+else
+    testrunnerTarFileName="testrunnerDockerImage.tar"
+fi
 rm -f $testrunnerTarFileName
 echo "Creating docker image tar file '$testrunnerTarFileName'"
 docker save -o $testrunnerTarFileName $testRunnerDockerImageName
-exitOnError $? "Unable to create tar of testrunner $testRunnerImgTag docker image"
+exitOnError $? "Unable to create tar of $testRunnerDockerImageName docker image"
 
 for nodeIp in $cloudClusterNodeIpList
 do
@@ -232,49 +242,50 @@ sleep 10
 
 showFileContent $testRunnerYamlFileName
 kubectl --namespace=$namespace create -f $testRunnerYamlFileName
-exitOnError $? "Unable to create testrunner"
+exitOnError $? "Unable to create job '$jobName'"
 
 echo "############################## Using couchbase-server '$serverVersion' ##############################"
 
-# wait for testrunner pod to be running
+# wait for job pod to start running
 while true
-    do
-        testrunnerPodName=$(kubectl --namespace=$namespace get -l job-name=$jobName pods | tail -1 | awk '{print $1}')
-        if [ "$testrunnerPodName" != "" ] ; then
-            echo "Initializing pod '$testrunnerPodName'"
-            for i in {1..300}
-            do
-                podRunning=$(kubectl --namespace=$namespace describe pod $testrunnerPodName | grep "State:" | grep "Running" | wc -l | xargs )
-                if [ $podRunning -eq 1 ] ; then
-                    break
-                fi
-                sleep 1
-            done
-
-            if [ $podRunning -ne 1 ] ; then
-                exitOnError 1 "Pod '$testrunnerPodName' not started running even after 5mins"
+do
+    jobPodName=$(kubectl --namespace=$namespace get -l job-name=$jobName pods | tail -1 | awk '{print $1}')
+    if [ "$jobPodName" != "" ] ; then
+        echo "Initializing pod '$jobPodName'"
+        for i in {1..300}
+        do
+            podRunning=$(kubectl --namespace=$namespace describe pod $jobPodName | grep "State:" | grep "Running" | wc -l | xargs )
+            if [ $podRunning -eq 1 ] ; then
+                break
             fi
-            unset podRunning
-            break
+            sleep 1
+        done
+
+        if [ $podRunning -ne 1 ] ; then
+            exitOnError 1 "Pod '$jobPodName' not started running even after 5mins"
         fi
+        unset podRunning
+        break
+    fi
+    sleep 2
 done
 
 # Redirect logs from testrunner pod
-echo "----------- Logs from testrunner pod '$testrunnerPodName' -----------"
-kubectl --namespace=$namespace logs --follow=true $testrunnerPodName &
+echo "----------- Logs from job pod '$jobPodName' -----------"
+kubectl --namespace=$namespace logs --follow=true $jobPodName &
 
-# Wait for testrunner job to complete
+# Wait for job to complete
 while true
 do
     currTestrunnerPod=$(kubectl --namespace=$namespace get -l job-name=$jobName pods | tail -1 | awk '{print $1}')
-    if [ "$currTestrunnerPod" != "$testrunnerPodName" ] ; then
+    if [ "$currTestrunnerPod" != "$jobPodName" ] ; then
         echo "job pod failed"
         kill %1
         kubectl --namespace=$namespace delete job --all
         break
     fi
 
-    isJobCompleted=$(kubectl --namespace=$namespace logs $testrunnerPodName --tail=10 | grep "Testrunner: command completed" | wc -l)
+    isJobCompleted=$(kubectl --namespace=$namespace logs $jobPodName --tail=10 | grep "Testrunner: command completed" | wc -l)
     if [ $isJobCompleted -eq 1 ] ; then
         kill %1
         break
@@ -283,23 +294,23 @@ do
 done
 
 echo ""
-echo "Copying logs from testrunner pod for archiving"
-masterNodeIp=$(echo $cloudClusterNodeIpList | cut -d" " -f 1)
-testrunnerNodeIp=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl --namespace=$namespace get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$6\}\')
-workerNodeName=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl --namespace=$namespace get pods -o wide \| grep "$testrunnerPodName" \| awk \'\{print \$7\}\')
+echo "Copying logs from $jobName pod for archiving"
+masterNodeIp=$(echo "$cloudClusterNodeIpList" | cut -d" " -f 1)
+jobPodNodeIp=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl --namespace=$namespace get pods -o wide \| grep "$jobPodName" \| awk \'\{print \$6\}\')
+workerNodeName=$(sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$masterNodeIp kubectl --namespace=$namespace get pods -o wide \| grep "$jobPodName" \| awk \'\{print \$7\}\')
 workerNodeIpIndex=$(expr $(getWorkerNodeNum $workerNodeName) + 1)
 targetWorkerIp=$(echo $cloudClusterNodeIpList | cut -d" " -f $workerNodeIpIndex)
 
-echo "testrunnerNodeIp=$testrunnerNodeIp"
+echo "jobPodNodeIp=$jobPodNodeIp"
 echo "workerNodeName=$workerNodeName"
 echo "workerNodeIpIndex=$workerNodeIpIndex"
 echo "masterNodeIp=$masterNodeIp"
 echo "targetWorkerIp=$targetWorkerIp"
 
 # Safely remove Ips from Known hosts file #
-sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "sed -i '/$testrunnerNodeIp /d' ~/.ssh/known_hosts"
+sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "sed -i '/$jobPodNodeIp /d' ~/.ssh/known_hosts"
 
-sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "sshpass -p '$sshPassword' scp -o StrictHostKeyChecking=no -r $sshUser@$testrunnerNodeIp:/testrunner/logs ~/testrunnerLogs"
+sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "sshpass -p '$sshPassword' scp -o StrictHostKeyChecking=no -r $sshUser@$jobPodNodeIp:/testrunner/logs ~/testrunnerLogs"
 sshpass -p "$sshPassword" scp $sshArgs -r $sshUser@$targetWorkerIp:~/testrunnerLogs ${WORKSPACE}/logs
 sshpass -p "$sshPassword" ssh $sshArgs -t $sshUser@$targetWorkerIp "rm -rf ~/testrunnerLogs"
 

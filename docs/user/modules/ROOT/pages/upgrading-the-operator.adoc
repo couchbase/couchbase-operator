@@ -1,0 +1,108 @@
+= Upgrading the Autonomous Operator
+
+Upgrading the Couchbase Autonomous Operator is a three-step process:
+
+. <<download-operator, Download and unpack the Operator package>>
+. <<update-crd, Update the CRD>>
+. <<update-operator-version, Change the version in the Operator Deployment>>
+
+[#download-operator]
+== Download the Operator Package
+
+Download the Operator https://www.couchbase.com/downloads[package] for the version that you want to upgrade to, and unpack it on the same computer where you normally run `kubectl` or `oc`.
+
+The Operator package contains the YAML configuration files and command-line tools that you will use to upgrade and manage the Operator.
+
+IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
+
+[#update-crd]
+== Update the CRD
+
+In the Operator package, you'll find the updated version of the CRD: `crd.yaml`. For minor releases of the Operator, the CRD (which defines acceptable CouchbaseCluster configurations) may undergo small changes that don't affect backward compatibility, but may add new fields or make changes to the validation code that ensures valid CouchbaseCluster configurations.
+
+To update the CRD, run the following command:
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+kubectl apply -f crd.yaml
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+oc apply -f crd.yaml
+----
+--
+====
+
+[#update-operator-version]
+== Change the Operator Version
+
+After <<update-crd, updating>> the CRD, you can move on to upgrading the Operator itself.
+To upgrade the Operator, all you need to do is change the version field in the Operator Deployment to the version that you're upgrading to.
+Once you edit this field and submit the new Deployment configuration, Kubernetes will automatically stop the old Operator pod and then start a new pod running the new version of the Operator software.
+
+Run the following command to open the Operator Deployment in a text editor:
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+kubectl edit deployment couchbase-operator
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+oc edit deployment couchbase-operator
+----
+--
+====
+
+Change the Operator container image version to the version that you want to upgrade to.
+If you're upgrading to version 1.1, the Deployment configuration should look like the following:
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,yaml]
+----
+...
+      containers:
+      - name: couchbase-operator
+        image: couchbase/operator:1.1.0
+...
+----
+--
+
+OpenShift::
++
+--
+[source,yaml]
+----
+...
+      containers:
+      - name: couchbase-operator
+        image: registry.connect.redhat.com/couchbase/operator:1.1.0-1
+...
+----
+--
+====
+
+Once you save and close the text editor, the changes are sent to Kubernetes and the upgrade process begins.

@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: couchbase-operator
@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: registry.connect.redhat.com/couchbase/operator:1.0.0-1
+        image: registry.connect.redhat.com/couchbase/operator:1.1.0-1
         command:
         - couchbase-operator
         args:

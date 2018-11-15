@@ -85,7 +85,7 @@ dist: artifacts image-artifacts
 	rm -rf dist
 	mkdir dist
 	cp build/couchbase-autonomous-operator-image_*.tgz dist
-	cp build/couchbase-autonomous-operator-*.zip dist
+	cp build/couchbase-autonomous-operator-*.tar.gz dist
 
 prod: container tools artifacts
 

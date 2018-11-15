@@ -40,6 +40,7 @@ For more information, refer to xref:server-groups.adoc[About Using Couchbase Ser
 
 Storage options may have both beneficial and detrimental impacts on your clusters.
 
+[#persistent-volumes-best-practices]
 === Persistent Volumes
 
 Persistent volumes are mandatory for production deployments. This allows for the quick recovery of a failed pod by warming up from existing data and allowing quicker back-filling via delta-recovery, rather than a full re-balance. By having some of the pod's file system persisted, logging data can be extracted from failed pods where this would normally be lost with a fully ephemeral file system. It also aids in data recovery situations which cannot be rectified by the Operator.
@@ -77,7 +78,8 @@ These deployments require the `logs` volume mount to be defined.  This covers th
 Evaluation::
 These deployments do not use any volume mounts.  They will not survive a total power failure.  As Couchbase Server logs cannot be recovered in the event of a pod failure we cannot provide support for the Couchbase Server product.
 
-IMPORTANT: Production clusters may be deployed as combination of _Production Stateful_ or _Production Stateless_ deployments depending on the services running on the individual server class configurations.  The `default` and `logs` mounts are mutually exclusive.  If any server class is detected by the cluster validation to be supportable, then it will also enforced that all other server classes are supportable too.
+IMPORTANT: Production clusters may now be deployed as combination of _Production Stateful_ and _Production Stateless_ node deployments, depending on the services running on the individual server class configurations.
+The `default` and `logs` mounts in the CouchbaseCluster configuration are mutually exclusive — if any server class is detected by the cluster validation to be supportable (e.g. `default` or `logs` is specified under `volumeMounts`), then all other server classes must also have supportable configurations in order for the validation check to pass.
 
 It is also highly recommended that in cloud deployments, storage be located in the same data center as the pods that are running in that server group. If a data center were to suffer an outage with storage randomly distributed across a virtual private cloud, not only would you lose all the pods that are resident in the availability zone, but also any pods with backing storage provided by the availability zone.
 

@@ -1,44 +1,40 @@
-= Release Notes
+= Release Notes for Couchbase Autonomous Operator 1.1
 
-Couchbase Autonomous Operator 1.0 provides the first native integration of Couchbase Server with Kubernetes platforms.
+Couchbase Autonomous Operator 1.1 introduces a number of supportability features and enhancements.
 
-The goal of the Operator is to fully manage one or more Couchbase Server deployments so that you don’t need to worry about the operational complexities of running Couchbase. The following is a summary of the Couchbase features and management tasks that are currently supported:
+Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
-* Cluster configuration
+== Release 1.1.0
 
-* Cluster provisioning
+Couchbase Autonomous Operator 1.1.0 was released in November 2018.
 
-* Ad-hoc scalability
+[#install-upgrade-v110]
+=== Installation and Upgrade
 
-* Auto-recovery
+For installation instructions, see xref:install-kubernetes.adoc[Installing on Kubernetes] and xref:install-openshift.adoc[Installing on OpenShift].
 
-* Configuration validation
+For upgrade instructions, see xref:upgrading-the-operator.adoc[Upgrading the Operator].
 
-* XDCR
-
-* Server groups
-
-* TLS
-
-* Persistent volume support
-
-Couchbase Autonomous Operator 1.0 was released in August 2018.
-
-== Platform Support
+[#supported-platforms-v110]
+=== Platform Support
 
 For the latest platform support information, see xref:prerequisite-and-setup.adoc[Prerequisites].
 
-== Known Issues and Limitations
+[#changes-in-behavior-v110]
+=== Major Behavior Changes
 
-.Known Limitations
-* Upgrading Couchbase Server using the Operator is not currently supported.
-
-* The Operator manages the state of the Couchbase Server cluster. Therefore, at this time, all cluster configuration changes must be made by modifying the CouchbaseCluster configuration file and pushing it to Kubernetes. Any manual changes to the configuration that are made using the Couchbase Server Web Console, CLI, REST API, or SDK will be reverted by the Operator. This includes things like adding a node or creating a server group.
+* Production clusters may now be deployed as combination of _Production Stateful_ and _Production Stateless_ node deployments, depending on the services running on the individual server class configurations.
+The `default` and `logs` mounts in the CouchbaseCluster configuration are mutually exclusive — if any server class is detected by the cluster validation to be supportable (e.g. `default` or `logs` is specified under `volumeMounts`), then all other server classes must also have supportable configurations in order for the validation check to pass.
 +
-The one exception is when `disableBucketManagement` is set to `true` in the CouchbaseCluster configuration (the default is `false`). If this is the case, the creation and deletion of Couchbase buckets must be done manually. Refer to the CouchbaseCluster xref:couchbase-cluster-config.adoc[documentation] for more information.
+Review the xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for more information about cluster supportability requirements.
 
-.Known Issues
-[#table_knownissues_v1,cols="25,66"]
+* Logs collected with xref:cbopinfo.adoc[cbopinfo] are automatically redacted of sensitive information by default.
+
+[#fixed-issues-v110]
+=== Fixed Issues
+
+.Issues Fixed in Version 1.1.0
+[#table_fixednissues_v110,cols="25,66"]
 |===
 | Issue | Description
 
@@ -55,32 +51,61 @@ This means that important debugging information may be unavailable during failur
 
 *Workaround*: You should always deploy Couchbase clusters in production with persistent volumes.
 
-| https://issues.couchbase.com/browse/K8S-556[K8S-556]
-| *Summary*: Only dynamic volume provisioning via storage classes is supported.
-
-| https://issues.couchbase.com/browse/K8S-389[K8S-389]
-| *Summary*: Kubernetes doesn't allow the setting of ulimit parameters on individual containers.
-
-*Workaround*: You can set ulimits on the physical machine that Kubernetes is running on; the ulimit parameters will be inherited by the containers.
-
 | https://issues.couchbase.com/browse/K8S-531[K8S-531]
 | *Summary*: When the same event occurs on different Couchbase nodes, the event order is not reported consistently.
 This may affect applications that rely on the event order to be consistent when checking the status of a Couchbase cluster.
+
+| https://issues.couchbase.com/browse/K8S-537[K8S-537]
+| *Summary*: In rare cases, Kubernetes can drop events that are logged by the Operator.
+|===
+
+[#known-issues-v110]
+=== Known Issues and Limitations
+
+.Known Issues and Limitations
+[#table_knownissues_v110,cols="25,66"]
+|===
+| Issue | Description
+
+| General
+| Upgrading Couchbase Server using the Operator is not currently supported.
+
+| General
+| The Operator manages the state of the Couchbase Server cluster.
+Therefore, at this time, all cluster configuration changes must be made by modifying the CouchbaseCluster configuration file and pushing it to Kubernetes.
+Any manual changes to the configuration that are made using the Couchbase Server Web Console, CLI, REST API, or SDK will be reverted by the Operator.
+This includes things like adding a node or creating a server group.
+
+The one exception is when `disableBucketManagement` is set to `true` in the CouchbaseCluster configuration (the default is `false`).
+If this is the case, the creation and deletion of Couchbase buckets must be done manually.
+Refer to the CouchbaseCluster xref:couchbase-cluster-config.adoc[documentation] for more
+
+| https://issues.couchbase.com/browse/K8S-640[K8S-640]
+| *Summary*: The node disk storage statistic that is displayed in the Couchbase Server Web Console may appear to be inaccurate when using persistent volumes.
+This is because the calculation that formulates this statistic does not properly support persistent volumes.
+
+| https://issues.couchbase.com/browse/K8S-622[K8S-622]
+| *Summary*: Clusters without persistent volumes require manual failover when nodes are down and auto-failover cannot be performed.
+In the event that the Operator also crashes before nodes have been failed over, the Operator will require manual failover of down nodes before proceeding to reconcile any changes made to the cluster.
+
+| https://issues.couchbase.com/browse/K8S-556[K8S-556]
+| *Summary*: Only dynamic volume provisioning via storage classes is supported.
 
 | https://issues.couchbase.com/browse/K8S-421[K8S-421]
 | *Summary*: If a cluster is scaling up when not enough nodes are present, the Operator will not rebalance the cluster even if some nodes can be added.
 
 *Workaround*: You should ensure that sufficient resources are present in the Kubernetes cluster before scaling a Couchbase cluster.
 
+| https://issues.couchbase.com/browse/K8S-389[K8S-389]
+| *Summary*: Kubernetes doesn't allow the setting of ulimit parameters on individual containers.
+
+*Workaround*: You can set ulimits on the physical machine that Kubernetes is running on; the ulimit parameters will be inherited by the containers.
+
 | https://issues.couchbase.com/browse/K8S-89[K8S-89]
 | *Summary*: If you manually increase the number of replicas of a bucket, then the Operator may rebalance the cluster before reverting the bucket's changes.
 
 *Workaround*: You should always change the CouchbaseCluster configuration through the Operator.
 If you change the CouchbaseCluster configuration directly on the cluster (such as through the Couchbase Server Web Console), then the Operator will revert those changes.
-
-| https://issues.couchbase.com/browse/K8S-537[K8S-537]
-| *Summary*: In rare cases, Kubernetes can drop events that are logged by the Operator.
-
 |===
 
 == Feedback

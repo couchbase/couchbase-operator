@@ -38,7 +38,7 @@ Get the operator logs:
 [source,console]
 ----
 $ kubectl logs couchbase-operator-1917615544-h20bm
-time="2018-01-23T22:56:34Z" level=info msg="couchbase-operator v1.0.0 (release)" module=main
+time="2018-01-23T22:56:34Z" level=info msg="couchbase-operator v1.1.0 (release)" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Obtaining resource lock" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Starting event recorder" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
@@ -68,7 +68,7 @@ Get the operator logs:
 [source,console]
 ----
 $ oc logs couchbase-operator-1917615544-h20bm
-time="2018-01-23T22:56:34Z" level=info msg="couchbase-operator v1.0.0 (release)" module=main
+time="2018-01-23T22:56:34Z" level=info msg="couchbase-operator v1.1.0 (release)" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Obtaining resource lock" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Starting event recorder" module=main
 time="2018-01-23T22:56:34Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
@@ -166,7 +166,7 @@ spec:
   restartPolicy: never
   containers:
   - name: couchbase-server
-    image: couchbase/server:enterprise-5.5.1
+    image: couchbase/server:enterprise-5.5.2
     command: '/bin/sleep'
     args:
     - '86400'

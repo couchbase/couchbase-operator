@@ -1,51 +1,64 @@
-= Prerequisites
-:chk: ✔
+= Prerequisites and System Requirements
 
 To install the Couchbase Autonomous Operator, all you need is a running Kubernetes or OpenShift cluster.
 
-If you don't have access to a Kubernetes cluster, but still want to use the Operator for development, https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube] (single-node Kubernetes cluster) and https://docs.openshift.org/latest/minishift/getting-started/installing.html[Minishift] (single-node OpenShift cluster) make great alternatives. Both of these products are much easier to install and deploy when compared to setting up and running an actual Kubernetes or OpenShift cluster.
+If you don't have access to a Kubernetes cluster, but still want to use the Operator for development, https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube] (single-node Kubernetes cluster) and https://docs.openshift.org/latest/minishift/getting-started/installing.html[Minishift] (single-node OpenShift cluster) make great alternatives.
+Both of these products are much easier to install and deploy when compared to setting up and running an actual Kubernetes or OpenShift cluster.
 
 == Platform Compatibility
 
-.Support Definitions:
+.Support Level Definitions:
 Certified:: Couchbase has performed an extensive testing and review process to make sure that the Operator runs well out of the box on the specified platform.
 
-Supported:: Couchbase believes that the Operator will run well out of the box on the specified platform, but extensive testing has not been performed. Couchbase will make a best effort to investigate issues on a Supported platform version, but it is recommended that you run the Operator on a Certified platform version.
+Supported:: Couchbase believes that the Operator will run well out of the box on the specified platform, but extensive testing has not been performed.
+Couchbase will make a best effort to investigate issues on a Supported platform version, but it is recommended that you run the Operator on a Certified platform version.
 
 Developer Preview:: Couchbase is still developing functionality for the specified platform, but you are encouraged to start your own testing and provide early feedback.
 
-.Platform Compatibility List
-[#table-operator-compatibility,cols="1,1,1,1",options="header"]
+.Couchbase Software Compatibility
+[#table-operator-compatibility-couchbase,cols="1,1",options="header"]
 |===
-| |Couchbase Server | Open Source Kubernetes | Red Hat OpenShift
+| Software | Version
 
-| *Operator 1.0*
-|Certified 5.5.x
-|Certified 1.9
-
-Supported 1.10+
-|Certified 3.9
-
-Supported 3.10+
+| Couchbase Server Enterprise Edition
+| Certified 5.5, 5.5.x
 |===
 
-.Public Container Service Compatibility List
-[#table-operator-compatibility-public,cols="1,1,1,1",options="header"]
+.Kubernetes Platform Compatibility List
+[#table-operator-compatibility,cols="1,1",options="header"]
 |===
-| | Amazon EKS | Google GKE | Microsoft AKS
+| Platform | Version
 
-| *Operator 1.0*
-^| Developer Preview
-^| Developer Preview
-^| Developer Preview
+| Open Source Kubernetes
+| Certified 1.9, 1.10
+
+Supported 1.11+
+
+| Red Hat OpenShift
+| Certified 3.9, 3.10
+
+Supported 3.11+
+|===
+
+.Public Kubernetes Service Compatibility List
+[#table-operator-compatibility-public,cols="1,1,1",options="header"]
+|===
+| Amazon EKS | Google GKE | Microsoft AKS
+
+| Developer Preview
+| Developer Preview
+| Developer Preview
 |===
 
 === Persistent Volume Compatibility
 
+Persistent volumes are mandatory for production deployments.
+Review the xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for more information about cluster supportability requirements.
+
 .Persistent Volume Compatibility List
-[#table-operator-compatibility-pv,cols="2,1,1,1,1,1,1",options="header"]
+[#table-operator-compatibility-pv,cols="1,1,1,1,1,1",options="header"]
 |===
-|
+
 ^| https://kubernetes.io/docs/concepts/storage/storage-classes/#aws[AWS]
 ^| https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Azure Disk]
 ^| https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD]
@@ -53,29 +66,29 @@ Supported 3.10+
 ^| https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[Glusterfs]
 ^| https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx Volume]
 
-| *Operator 1.0*
-^| {chk}
-^| {chk}
-^| {chk}
-^| {chk}
-^| {chk}
-^| {chk}
+^| Certified
+^| Certified
+^| Certified
+^| Certified
+^| Certified
+^| Certified
 |===
 
-Only dynamic volume provisioning using storage classes is currently supported.
+NOTE: Only dynamic volume provisioning using storage classes is currently supported.
 
 == RBAC and Networking Requirements
 
-Preparing the Kubernetes cluster to run the Operator may require setting up proper RBAC and network settings in your Kubernetes cluster. Before moving forward, review the following documentation:
+Preparing the Kubernetes cluster to run the Operator may require setting up proper RBAC and network settings in your Kubernetes cluster.
+Before moving forward, review the following documentation:
 
 * xref:kubernetes-rbac.adoc[RBAC]
 * xref:networking.adoc[Networking]
 
 == Next Steps
 
+As you're setting up your Kubernetes environment, make sure that you're following the recommended xref:best-practices.adoc[best practices].
+
 Once your Kubernetes environment is set up, you can move on to installing the Operator.
 
 * xref:install-kubernetes.adoc[Installing on Open Source Kubernetes]
 * xref:install-openshift.adoc[Installing on OpenShift]
-
-For information about how the Operator deployment is defined, as well as documentation about the fields that you might want to customize, see xref:operator-config.adoc[Couchbase Operator Configuration].
