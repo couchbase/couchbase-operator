@@ -4,8 +4,10 @@
 
 To use the Couchbase Autonomous Operator to deploy a Couchbase Server cluster, you need to create a CouchbaseCluster configuration file that describes how the cluster should be configured and maintained by the Operator. Like all Kubernetes configurations, Couchbase Server clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes.
 
-.The following sample CouchbaseCluster configuration file lists all of the available configuration parameters:
+The following CouchbaseCluster configuration shows all of the available parameters.
+(Note that this configuration is not valid and is meant for example purposes only.)
 
+.All available CouchbaseCluster configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v1

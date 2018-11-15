@@ -91,9 +91,40 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 If specified, this flag ignores any scoping rules for a particular resource type, and collects all instances within the namespace.
 
 --collectinfo::
-If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. The logs are left in situ as they may be relatively large. The `cbopinfo` command will report how to extract the logs from each pod.  Logs are automatically redacted of sensitive information, `cbopinfo` will provide a choice of download options.
+If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster.
+The logs are left in situ as they may be relatively large.
+The `cbopinfo` command will report how to extract the logs from each pod.
+Logs are automatically redacted of sensitive information, and `cbopinfo` will provide a choice of download options.
++
+For log volumes which were previously attached to ephemeral pods, it will display a table of available logs that are available for collection.
+Once you select which logs to collect, `cbopinfo` will create a temporary pod (as defined by `--server-image`), run `cbcollect_info`, and download the logs before finally deleting the temporary pod.
++
+.Example Output of --collectinfo
+[source,console]
+----
+./cbopinfo -namespace operator-example-namespace  --collectinfo
+Plain text server logs accessible with the following commands (use 'oc' command for OpenShift deployments):
+  kubectl cp operator-example-namespace/cb-example-0003:/tmp/cbinfo-operator-example-namespace-cb-example-0003-20181115T194919+0000.zip .
+  kubectl cp operator-example-namespace/cb-example-0001:/tmp/cbinfo-operator-example-namespace-cb-example-0001-20181115T194919+0000.zip .
+  kubectl cp operator-example-namespace/cb-example-0000:/tmp/cbinfo-operator-example-namespace-cb-example-0000-20181115T194919+0000.zip .
+  Redacted server logs accessible with the following commands (use 'oc' command for OpenShift deployments):
+  kubectl cp operator-example-namespace/cb-example-0003:/tmp/cbinfo-operator-example-namespace-cb-example-0003-20181115T194919+0000-redacted... .
+  kubectl cp operator-example-namespace/cb-example-0001:/tmp/cbinfo-operator-example-namespace-cb-example-0001-20181115T194919+0000-redacted... .
+  kubectl cp operator-example-namespace/cb-example-0000:/tmp/cbinfo-operator-example-namespace-cb-example-0000-20181115T194919+0000-redacted... .
 
-For log volumes which were previously attached to ephemeral pods it will display a table of available logs that are available for collection.  The user is able to interactively select which logs to collect.  `cbopinfo` will create a temporary pod (as defined by `--server-image`), run `cbcollect_info` and download the logs before finally deleting the temporary pod.
+Detected detached log volumes:
+┌────┬─────────────────┬──────────────────────┐
+│ ID │ Pod             │ Detached             │
+├────┼─────────────────┼──────────────────────┤
+│ 0  │ cb-example-0002 │ 2018-11-15T19:42:48Z │
+└────┴─────────────────┴──────────────────────┘
+Please select volumes to collect [e.g. 1,2,5-6 or leave blank for none]: 0
+Plain text server logs downloaded to the following locations:
+  cbinfo-operator-example-namespace-cb-example-0002-20181115T194919+0000.zip
+Redacted server logs downloaded to the following locations:
+  cbinfo-operator-example-namespace-cb-example-0002-20181115T194919+0000-redacted.zip
+Wrote cluster information to cbopinfo-20181115T194919+0000.tar.gz
+----
 
 --kubeconfig <config>::
 If specified, this points to a Kubernetes configuration file used to locate and poll the cluster API. If not set, it will default to `~/.kube/config`.
