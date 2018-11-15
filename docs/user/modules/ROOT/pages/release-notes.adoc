@@ -71,6 +71,11 @@ This may affect applications that rely on the event order to be consistent when 
 | Upgrading Couchbase Server using the Operator is not currently supported.
 
 | General
+| Couchbase client access is only supported locally within the Kubernetes cluster or where cluster DNS can be accessed by, or replicated to, a remote network.
+
+For more information, see xref:networking.adoc[About Kubernetes Networking and Couchbase].
+
+| General
 | The Operator manages the state of the Couchbase Server cluster.
 Therefore, at this time, all cluster configuration changes must be made by modifying the CouchbaseCluster configuration file and pushing it to Kubernetes.
 Any manual changes to the configuration that are made using the Couchbase Server Web Console, CLI, REST API, or SDK will be reverted by the Operator.
