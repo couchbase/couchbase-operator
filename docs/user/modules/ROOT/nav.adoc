@@ -6,6 +6,7 @@
 * Deploying the Operator
  ** xref:install-kubernetes.adoc[Installing on Kubernetes]
  ** xref:install-openshift.adoc[Installing on OpenShift]
+ ** xref:install-aks.adoc[Installing on AKS]
  ** xref:operator-config.adoc[About the Operator Deployment Settings]
  ** xref:kubernetes-rbac.adoc[About Kubernetes RBAC]
  ** xref:upgrading-the-operator.adoc[Upgrading the Operator]

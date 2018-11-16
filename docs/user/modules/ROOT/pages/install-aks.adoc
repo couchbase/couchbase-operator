@@ -1,0 +1,112 @@
+= Installing on AKS
+
+This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on AKS (Azure Kubernetes Service).
+
+===  Prerequisites
+
+Install the https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest[azure-cli] and login to the Azure portal
+[source,console]
+----
+az login
+----
+Get a list of your subscriptions
+[source,console]
+----
+az account list --output table
+----
+Set the subscription ID or name you want to use
+[source,console]
+----
+az account set --subscription "My Subscription"
+----
+
+== Create a resource group
+
+Resource groups allow administrators to co-locate and coordinate operations across a group of resources such as VMs, disks, and networks.  All resources created by AKS will belong to this group.
+[source,console]
+----
+az group create --name myResourceGroup --location eastus
+----
+
+== Create a network
+
+In order for XDCR to work currently we need a layer 3 tunnel between the two cluster networks.  This is so that nodes on one network can talk to nodes on the other which are in turn port forwarded onto your Couchbase nodes.  As such these must be non-overlapping.  If we used the default setting the first cluster would get the prefix 10.0.0.0/8 as would the second.
+
+[source,console]
+----
+az network vnet create -g myResourceGroup -n myAKSVnet  --address-prefix 10.0.0.0/12  --subnet-name myAKSSubnet --subnet-prefix 10.8.0.0/16
+----
+
+
+== Create AKS cluster
+
+Create an AKS cluster within the allocated resource group on the subnet created in the previous step.  Note monitoring is enabled and ssh-keys are being auto-generated.  Also, the default virtual machine type is 'Standard_DS2_v2' which supports a maximum of 4 disks per VM.  See link:#known-issues[Best Practices] for recommended VM size based on the requirements of your deployment.
+[source,console]
+----
+subnet_id=$(az network vnet show -g myResourceGroup -n myAKSVnet --query subnets[].id -o tsv)
+
+az aks create -g myResourceGroup -n myAKSCluster --node-count 3  --vnet-subnet-id $subnet_id --service-cidr 10.0.0.0/16 --enable-addons monitoring --generate-ssh-keys  --kubernetes-version 1.11.4
+----
+
+== Deploying Couchbase Cluster
+
+If you do not already have kubectl installed in your CLI, run the following command:
+[source,console]
+----
+az aks install-cli
+----
+
+Get the credentials for your cluster by running the following command:
+[source,console]
+----
+az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+----
+
+==== Install operator
+* Refer to guide for xref:install-kubernetes.adoc[installing on kubernetes]
+
+==== Deploy cluster
+* Refer to guide for xref:deploying-couchbase.adoc[deploying couchbase]
+
+
+== Upgrading AKS cluster
+An AKS cluster can be upgraded to a new version if applicable.
+
+NOTE: The following steps outline how to perform an upgrade using the `az-cli` tool, but the same steps can be performed through the azure portal. 
+
+To check if a new version is available for your cluster, use the `get-upgrades` command:
+[source,console]
+----
+ az aks get-upgrades -g myResourceGroup -n myAKSCluster --query agentPoolProfiles[].upgrades -o tsv
+----
+
+To proceed with an upgrade, simply run the `upgrade` command with the desirable version:
+
+[source,console]
+----
+ az aks upgrade -g myResourceGroup -n myAKSCluster --kubernetes-version 1.11.4
+----
+
+
+[[best-practices]]
+== Best Practices
+
+*Disk limits:* AKS nodes have a maximum disk limit.  This will restrict the number of Persistent volumes that can be created within a cluster.  The limits apply on a per-node bases.  For example,an AKS cluster with 4 nodes (E4sv3) can support 32 Volumes.
+image::https://gist.githubusercontent.com/tahmmee/81128ecc553e4e22929fc1644eefe42e/raw/fb980d19ece83237878e8de5e90025715f4b6266/AKS_MaxDisks.png[AKSMaxDisks,640,480]
+
+*Single disk per Pod:* Given the slow mount time it’s best to limit each Pod to 1 disk (excluding the default disk).   For example, a separate server classes should be created for data, index, and analytics pods.
+
+*Consider limitations of Azure Disks for consideration of alternates*: Azure Disks are attached to VMs when Pods are created.  There are several link:#known-issues[Known Issues] related to this behavior, most notably manual intervention required on node failure, and failures related to slow detach/attach times when Pods are moved.   Third-Party storage providers like Portworx decouples volume to node attachment by instead creating a replicating Pool of storage.  Storage nodes may also be run separately from compute nodes.  Most issues with persistent volumes AKS are the result of nodes being attached and moved between nodes.
+
+
+[[known-issues]]
+== Known Issues
+
+*Failed Nodes require manual volume failover:* When an azure node is down and has volumes attached, a forced detached is required.  This has to be done using the azure cli.  If a recovery or upgrade is happening at time of node failover then it will fail. *On delta recovery create new PVC
+
+
+*Slow Volume Mounts:* AKS volume mounts may cause Pod creation to timeout while waiting for the availability of its underlying disks.   The main reason for this is due to the time it takes to attach a disk to the VM vs the time the attach controller expects the disk to be attached.  When the latter exceeds the former, failed mount events are gernerated and the attach controller enters into a state of high backoff wait time:
+
+* https://github.com/Azure/AKS/issues/719
+* https://github.com/kubernetes/cloud-provider-azure/blob/master/docs/azuredisk-issues.md
+* https://portworx.com/understand-resolve-warning-failed-attach-volume-warning-failed-mount-errors-kubernetes-azure/
