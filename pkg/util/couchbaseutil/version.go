@@ -75,6 +75,11 @@ func (v *Version) Patch() int {
 	return v.semver[2]
 }
 
+// Semver gets the semver string
+func (v *Version) Semver() string {
+	return fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch())
+}
+
 // Compare semantic versions
 // Returns -1 if a < b, 0 if a == b and 1 if a > b
 func (a *Version) Compare(b *Version) int {
@@ -87,6 +92,11 @@ func (a *Version) Compare(b *Version) int {
 		}
 	}
 	return 0
+}
+
+// Less returns true if a < b
+func (a *Version) Less(b *Version) bool {
+	return a.Compare(b) < 0
 }
 
 func VerifyVersion(version string) error {

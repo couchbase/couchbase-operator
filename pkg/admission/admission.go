@@ -150,7 +150,7 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 			return errorResponse(err)
 		}
 		// Note: the we cannot raise warnings as the Result field is only consulted if Allowed is false
-		if err, _ := validator.CheckImmutableFields(&couchbaseCluster, existingCouchbaseCluser); err != nil {
+		if err, _ := validator.CheckImmutableFields(existingCouchbaseCluser, &couchbaseCluster); err != nil {
 			glog.Error(err)
 			return errorResponse(err)
 		}

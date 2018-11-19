@@ -523,10 +523,6 @@ func CheckImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 	warns := []Warning{}
 	errs := []error{}
 
-	if current.Spec.Version != updated.Spec.Version {
-		errs = append(errs, &UpdateError{"spec.version", "body"})
-	}
-
 	if current.Spec.AntiAffinity != updated.Spec.AntiAffinity {
 		errs = append(errs, &UpdateError{"spec.antiAffinity", "body"})
 	}
@@ -676,6 +672,34 @@ func CheckImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 					}
 				}
 			}
+		}
+	}
+
+	// Upgrade validation
+	// * Deny downgrades if no upgrade in progress
+	// * Deny upgrade if across major versions
+	// * Deny rollback if it doesn't match the current version
+	upgradeCondition := current.Status.GetCondition(api.ClusterConditionUpgrading)
+	if upgradeCondition == nil && current.Spec.Version != updated.Spec.Version {
+		src, err := couchbaseutil.NewVersion(current.Spec.Version)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		dst, err := couchbaseutil.NewVersion(updated.Spec.Version)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if dst.Less(src) {
+			errs = append(errs, fmt.Errorf("spec.Version in body should be greater than %s", src.Semver()))
+		}
+		if dst.Major() > src.Major()+1 {
+			max, _ := couchbaseutil.NewVersion(fmt.Sprintf("%d.0.0", src.Major()+2))
+			errs = append(errs, fmt.Errorf("spec.Version in body should be less than %s", max.Semver()))
+		}
+	}
+	if upgradeCondition != nil && current.Spec.Version != updated.Spec.Version {
+		if updated.Spec.Version != current.Status.CurrentVersion {
+			errs = append(errs, &UpdateError{"spec.version", "body"})
 		}
 	}
 

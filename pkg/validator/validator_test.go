@@ -531,15 +531,6 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:         "TestVersionUpgrade",
-		existingPath: "tests/0001.yaml",
-		path:         "tests/0063.yaml",
-		description:  "Tests version upgrades are rejected",
-		expectedErr: errors.CompositeValidationError(
-			&UpdateError{"spec.version", "body"},
-		),
-	},
-	{
 		name:        "TestAnalyticsMounts",
 		path:        "tests/0064.yaml",
 		description: "Tests mounts with analytics claims",
@@ -697,6 +688,39 @@ var testDefs = []testDef{
 		description: "Tests a config where two volume claims have the same metadata.name",
 		expectedErr: errors.CompositeValidationError(
 			errors.DuplicateItems("spec.volumeClaimTemplates[1].metadata.name", "body"),
+		),
+	},
+	{
+		name:         "TestIllegalDowngrade",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0082.yaml",
+		description:  "Tests downgrades are rejected",
+		expectedErr: errors.CompositeValidationError(
+			fmt.Errorf("spec.Version in body should be greater than 5.5.0"),
+		),
+	},
+	{
+		name:         "TestillegalUpgrade",
+		existingPath: "tests/0001.yaml",
+		path:         "tests/0083.yaml",
+		description:  "Tests illegal upgrades are rejected",
+		expectedErr: errors.CompositeValidationError(
+			fmt.Errorf("spec.Version in body should be less than 7.0.0"),
+		),
+	},
+	{
+		name:         "TestRollback",
+		existingPath: "tests/0084.yaml",
+		path:         "tests/0001.yaml",
+		description:  "Tests rollback",
+	},
+	{
+		name:         "TestIllegalRollback",
+		existingPath: "tests/0084.yaml",
+		path:         "tests/0085.yaml",
+		description:  "Tests rollback to an illegal version is rejected",
+		expectedErr: errors.CompositeValidationError(
+			&UpdateError{"spec.version", "body"},
 		),
 	},
 }
