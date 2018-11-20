@@ -98,14 +98,15 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 				// Label and Annotate so that volumes
 				// can be easily targeted when recovering pods
 				claim.Labels = map[string]string{
-					"app":               "couchbase",
-					"couchbase_node":    pod.Name,
-					"couchbase_cluster": clusterName,
-					"couchbase_volume":  claimName,
+					constants.LabelApp:        constants.App,
+					constants.LabelNode:       pod.Name,
+					constants.LabelCluster:    clusterName,
+					constants.LabelVolumeName: claimName,
 				}
 				claim.SetAnnotations(map[string]string{
-					"path":         mountPath,
-					"serverConfig": config.Name,
+					constants.AnnotationVolumeMountPath:     mountPath,
+					constants.AnnotationVolumeNodeConf:      config.Name,
+					constants.CouchbaseVersionAnnotationKey: version,
 				})
 				if gid := cs.GetFSGroup(); gid != nil {
 					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
@@ -778,7 +779,7 @@ func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namesp
 		return nil, err
 	}
 	for _, pvc := range pvcList.Items {
-		if pvcPath, ok := pvc.Annotations["path"]; ok {
+		if pvcPath, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; ok {
 			if pvcPath == path {
 				phase := pvc.Status.Phase
 				switch phase {
@@ -816,7 +817,7 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 			continue
 		}
 
-		if path, ok := pvc.Annotations["path"]; ok {
+		if path, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; ok {
 			if path != couchbaseVolumeDefaultConfigDir {
 				// members can only be recovered from
 				// claims representing default volume
@@ -827,19 +828,20 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 			continue
 		}
 
-		m := couchbaseutil.Member{}
-		if config, ok := pvc.Annotations["serverConfig"]; ok {
-			m.ServerConfig = config
-		} else {
+		m := couchbaseutil.Member{
+			Namespace:    namespace,
+			SecureClient: secure,
+		}
+		var ok bool
+		if m.Name, ok = pvc.Labels[constants.LabelNode]; !ok {
 			continue
 		}
-		if name, ok := pvc.Labels["couchbase_node"]; ok {
-			m.Name = name
-		} else {
+		if m.ServerConfig, ok = pvc.Annotations[constants.AnnotationVolumeNodeConf]; !ok {
 			continue
 		}
-		m.Namespace = namespace
-		m.SecureClient = secure
+		if m.Version, ok = pvc.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok {
+			continue
+		}
 		ms.Add(&m)
 	}
 	return ms, nil
@@ -886,7 +888,7 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 
 // IsLogPVC returns whether this is a volume containing Couchbase logs.
 func IsLogPVC(pvc *v1.PersistentVolumeClaim) (bool, error) {
-	path, ok := pvc.Annotations["path"]
+	path, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]
 	if !ok {
 		return false, fmt.Errorf("path annotation missing for pvc %s", pvc.Name)
 	}

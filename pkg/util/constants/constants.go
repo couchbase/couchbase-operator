@@ -56,10 +56,14 @@ var (
 const (
 	App = "couchbase"
 
-	LabelApp      = "app"
-	LabelCluster  = "couchbase_cluster"
-	LabelNode     = "couchbase_node"
-	LabelNodeConf = "couchbase_node_conf"
+	LabelApp        = "app"
+	LabelCluster    = "couchbase_cluster"
+	LabelNode       = "couchbase_node"
+	LabelNodeConf   = "couchbase_node_conf"
+	LabelVolumeName = "couchbase_volume"
+
+	AnnotationVolumeNodeConf  = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
+	AnnotationVolumeMountPath = "path"
 
 	ServerGroupLabel = "failure-domain.beta.kubernetes.io/zone"
 )
