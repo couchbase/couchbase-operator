@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-openapi/errors"
 
+	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -749,12 +751,18 @@ type kubeAbstractionTestImpl struct {
 	testCase *testDef
 }
 
-func (ab *kubeAbstractionTestImpl) secretExists(string, string) (bool, error) {
-	return !ab.testCase.secretMissing, nil
+func (ab *kubeAbstractionTestImpl) getSecret(string, string) (*corev1.Secret, error) {
+	if ab.testCase.secretMissing {
+		return nil, nil
+	}
+	return &corev1.Secret{}, nil
 }
 
-func (ab *kubeAbstractionTestImpl) storageClassExists(string) (bool, error) {
-	return !ab.testCase.storageClassMissing, nil
+func (ab *kubeAbstractionTestImpl) getStorageClass(string) (*storagev1.StorageClass, error) {
+	if ab.testCase.storageClassMissing {
+		return nil, nil
+	}
+	return &storagev1.StorageClass{}, nil
 }
 
 func newTestValidator(testCase *testDef) Validator {

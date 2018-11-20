@@ -140,6 +140,10 @@ func (e *EventList) AddMemberVolumeUnhealthyEvent(cl *api.CouchbaseCluster, memb
 	*e = append(*e, *k8sutil.MemberVolumeUnhealthyEvent(name, reason, cl))
 }
 
+func (e *EventList) AddTLSInvalidEvent(cl *api.CouchbaseCluster) {
+	*e = append(*e, *TLSInvalidEvent(cl))
+}
+
 func (e EventList) String() string {
 	s := ""
 	for _, c := range e {
@@ -198,6 +202,18 @@ func RebalanceIncompleteEvent(cl *api.CouchbaseCluster) *v1.Event {
 func MemberRecoveredEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberRecoveredEvent(name, cl)
+}
+
+func TLSUpdatedEvent(cl *api.CouchbaseCluster) *v1.Event {
+	return k8sutil.TLSUpdatedEvent(cl)
+}
+
+func TLSInvalidEvent(cl *api.CouchbaseCluster) *v1.Event {
+	return k8sutil.TLSInvalidEvent(cl)
+}
+
+func TLSUpdateFailedEvent(cl *api.CouchbaseCluster) *v1.Event {
+	return k8sutil.TLSUpdateFailedEvent(cl)
 }
 
 // New Event schema code

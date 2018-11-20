@@ -188,7 +188,8 @@ func TestTlsResizeCluster(t *testing.T) {
 }
 
 // Remove Operator certificate after cluster deployment
-// Kill a node from cluster and new node addition should fail
+// Delete the operator secret and kill a node from cluster.  The cluster should
+// raise an invalid TLS event.
 // Add the operator certificate back and check new node addition is successful
 func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
@@ -238,6 +239,18 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddTLSInvalidEvent(testCouchbase)
+
+	// Recreating the operator certificate with old data
+	operatorSecretData := e2eutil.CreateOperatorSecretData(f.Namespace, ctx.OperatorSecretName, operatorSecret.Data["ca.crt"], operatorSecret.Data["couchbase-operator.crt"], operatorSecret.Data["couchbase-operator.key"])
+	_, err = e2eutil.CreateSecret(targetKube.KubeClient, f.Namespace, operatorSecretData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	event := e2eutil.NewMemberDownEvent(testCouchbase, podToKillMemberId)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 30); err != nil {
 		t.Fatal(err)
@@ -249,20 +262,6 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
-
-	event = e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
-
-	// Recreating the operator certificate with old data
-	operatorSecretData := e2eutil.CreateOperatorSecretData(f.Namespace, ctx.OperatorSecretName, operatorSecret.Data["ca.crt"], operatorSecret.Data["couchbase-operator.crt"], operatorSecret.Data["couchbase-operator.key"])
-	_, err = e2eutil.CreateSecret(targetKube.KubeClient, f.Namespace, operatorSecretData)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	event = e2eutil.NewMemberAddEvent(testCouchbase, 3)
 	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
@@ -284,7 +283,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 
 // Deploy cluster using valid TLS certificates
 // Remove the operator certificate from the cluster and try to scale up the cluster
-// New pods will be removed the operator since it cannot communicate with the new pods
+// The cluster should raise a TLS invalid event.
 // Add back the operator certificate back to ensure scaling up succeeds
 func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
@@ -342,13 +341,11 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 		resizeErr <- e2eutil.ResizeCluster(t, service, constants.Size5, targetKube.CRClient, testCouchbase)
 	}()
 
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
-	err = e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60)
-	if err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30); err != nil {
 		t.Fatal(err)
 	}
+	expectedEvents.AddTLSInvalidEvent(testCouchbase)
 
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
 
@@ -376,7 +373,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 
 // Deploy cluster using valid TLS certificates
 // Remove the cluster certificate from the cluster and kill one of the cluster pod
-// New pod creation with fail unless the valid cluster certificate is available
+// The cluster should raise a TLS invalid event, then reconcile once the valid cluster certificate is available
 func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -424,16 +421,10 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// This will take an absolute eternity as we need to allow a large leeway for a
-	// node to pull container images down before timing out
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 360); err != nil {
-		t.Fatal("Failed to observe member fail addition")
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30); err != nil {
+		t.Fatal(err)
 	}
-
-	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+	expectedEvents.AddTLSInvalidEvent(testCouchbase)
 
 	// Recreate the cluster certificate with old data
 	clusterSecretData := e2eutil.CreateClusterSecretData(f.Namespace, ctx.ClusterSecretName, clusterSecret.Data["chain.pem"], clusterSecret.Data["pkey.key"])
@@ -441,6 +432,13 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 360); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
+	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -457,7 +455,6 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 
 // Deploy cluster using valid TLS certificates
 // Remove the cluster certificate from the cluster and scale up the cluster
-// New pod creation with fail due to the missing certificate data
 func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -486,25 +483,23 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	err = e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("Couchbase Cluster certificate deleted")
-
 	// Set the resize off
 	service := 0
 	if err := e2eutil.ResizeClusterNoWait(t, service, constants.Size4, targetKube.CRClient, testCouchbase); err != nil {
 		t.Fatal(err)
 	}
 
-	// This will take an absolute eternity as we need to allow a large leeway for a
-	// node to pull container images down before timing out
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 360); err != nil {
-		t.Fatal("Failed to observe member fail addition")
+	err = e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
 	}
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+	t.Log("Couchbase Cluster certificate deleted")
+
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30); err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents.AddTLSInvalidEvent(testCouchbase)
+
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -530,14 +525,8 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 	defer teardown()
 
 	// Actual Test case function
-	cluster, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
-	if err != nil {
-		t.Fatal("Cluster creation failed:", err)
-	}
-
-	// Expect the cluster to enter a failed state
-	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {
-		t.Fatalf("cluster failed to enter failed state: %v\n", err)
+	if _, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx); err == nil {
+		t.Fatal("Cluster creation succeeded")
 	}
 }
 
@@ -595,18 +584,11 @@ func TestTlsCertificateExpiry(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	go func() {
-		service := 0
-		if err := e2eutil.ResizeCluster(t, service, constants.Size4, targetKube.CRClient, testCouchbase); err == nil {
-			t.Fatalf("Resize cluster successful with expired certificates")
-		}
-	}()
-
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, 3)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
+	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30); err != nil {
 		t.Fatal(err)
 	}
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, 3)
+	expectedEvents.AddTLSInvalidEvent(testCouchbase)
+
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -634,14 +616,8 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	defer teardown()
 
 	// Actual Test case function
-	cluster, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
-	if err != nil {
-		t.Fatalf("Cluster creation failed: %v\n", err)
-	}
-
-	// Expect the cluster to enter a failed state
-	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {
-		t.Fatalf("cluster failed to enter failed state: %v\n", err)
+	if _, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx); err == nil {
+		t.Fatal("Cluster creation succeeded\n")
 	}
 }
 
@@ -665,32 +641,8 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	}
 	defer teardown()
 
-	createClusterErrChan := make(chan error)
-	go func(ctx *e2eutil.TlsContext) {
-		_, err := e2eutil.NewTLSClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
-		createClusterErrChan <- err
-	}(ctx)
-	time.Sleep(time.Second)
-
-	t.Log("Retrying to deploy operator on valid TLS time-slot")
-	for {
-		currTime := time.Now().In(time.UTC)
-		if currTime.After(validFrom) {
-			break
-		}
-
-		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "app=couchbase"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(pods.Items) > 1 {
-			t.Fatal("Cluster initialized before certificate activation period")
-		}
-		time.Sleep(time.Second)
-	}
-
-	if err := <-createClusterErrChan; err != nil {
-		t.Fatal("Cluster creation failed:", err)
+	if _, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx); err == nil {
+		t.Fatal("Cluster creation succeeded\n")
 	}
 }
 
@@ -715,16 +667,9 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 	defer teardown()
 
 	// Create cluster
-	testCouchbase, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
-	if err != nil {
-		t.Fatalf("Error while creating cluster: %v\n", err)
+	if _, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx); err == nil {
+		t.Fatal("Cluster creation succeeded\n")
 	}
-
-	// Expect the cluster to enter a failed state
-	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, 10); err != nil {
-		t.Fatalf("cluster failed to enter failed state: %v\n", err)
-	}
-	t.Log(err)
 }
 
 // Create a couchbase cluster using the wrong certificate type
@@ -747,13 +692,7 @@ func TestTlsGenerateWrongCertType(t *testing.T) {
 	}
 	defer teardown()
 
-	cluster, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
-	if err != nil {
-		t.Fatalf("Cluster creation failed: %v\n", err)
-	}
-
-	// Expect the cluster to enter a failed state
-	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {
-		t.Fatalf("cluster failed to enter failed state: %v\n", err)
+	if _, err := e2eutil.NewTLSClusterBasicNoWait(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx); err == nil {
+		t.Fatal("Cluster creation succeeded\n")
 	}
 }

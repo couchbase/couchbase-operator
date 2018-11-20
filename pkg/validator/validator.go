@@ -7,6 +7,10 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/x509"
+
+	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/go-openapi/errors"
@@ -62,9 +66,9 @@ func BoundedErrorUint(name, in string, value, min, max uint64) error {
 // that may or may not exist before being accepted by K8s itself.
 type KubeAbstraction interface {
 	// secretExists checks whether the named secret exists in the specified namespace.
-	secretExists(string, string) (bool, error)
+	getSecret(string, string) (*corev1.Secret, error)
 	// storageClassExists checks whether the named stoage class exists.
-	storageClassExists(string) (bool, error)
+	getStorageClass(string) (*storagev1.StorageClass, error)
 }
 
 // kubeAbstractionImpl Implements KubeAbstraction, operating on a real kubernetes cluster.
@@ -73,27 +77,29 @@ type kubeAbstractionImpl struct {
 }
 
 // secretExists checks whether the named secret exists in the specified namespace.
-func (ab *kubeAbstractionImpl) secretExists(namespace, name string) (bool, error) {
-	_, err := k8sutil.GetSecret(ab.client, name, namespace, nil)
+func (ab *kubeAbstractionImpl) getSecret(namespace, name string) (*corev1.Secret, error) {
+	// Warning, this returns a valid pointer on error
+	secret, err := k8sutil.GetSecret(ab.client, name, namespace, nil)
 	if err != nil {
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
-	return true, nil
+	return secret, nil
 }
 
 // storageClassExists checks whether the named stoage class exists.
-func (ab *kubeAbstractionImpl) storageClassExists(name string) (bool, error) {
-	_, err := k8sutil.GetStorageClass(ab.client, name)
+func (ab *kubeAbstractionImpl) getStorageClass(name string) (*storagev1.StorageClass, error) {
+	// Warning, this returns a valid pointer on error
+	storageClass, err := k8sutil.GetStorageClass(ab.client, name)
 	if err != nil {
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
-	return true, nil
+	return storageClass, nil
 }
 
 // Validator is an abstraction layer for communicating with kubernetes
@@ -200,9 +206,9 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 	errs := []error{}
 
 	// Ensure secret exists
-	if exists, err := v.abstraction.secretExists(customResource.Namespace, customResource.Spec.AuthSecret); err != nil {
+	if secret, err := v.abstraction.getSecret(customResource.Namespace, customResource.Spec.AuthSecret); err != nil {
 		errs = append(errs, err)
-	} else if !exists {
+	} else if secret == nil {
 		errs = append(errs, fmt.Errorf("secret %s must exist", customResource.Spec.AuthSecret))
 	}
 
@@ -489,9 +495,9 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 
 		// Ensure storageClass exists
 		if pvc.Spec.StorageClassName != nil {
-			if exists, err := v.abstraction.storageClassExists(*pvc.Spec.StorageClassName); err != nil {
+			if storageClass, err := v.abstraction.getStorageClass(*pvc.Spec.StorageClassName); err != nil {
 				errs = append(errs, err)
-			} else if !exists {
+			} else if storageClass == nil {
 				errs = append(errs, fmt.Errorf("storage class %s must exist", *pvc.Spec.StorageClassName))
 			}
 		}
@@ -503,11 +509,74 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 		errs = append(errs, err)
 	}
 
+	// Check TLS
+	errs = append(errs, v.validateTLS(customResource)...)
+
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
+}
+
+// validateTLS checks TLS configuration exists and is valid
+// * correct secrets exist
+// * correct keys exist in the secrets
+// * cerificate chain validates with the CA
+// * certificates are
+//   * in date
+//   * have the correct attributes
+// * leaf certificate has the correct SANs
+func (v *Validator) validateTLS(cluster *api.CouchbaseCluster) (errs []error) {
+	if cluster.Spec.TLS != nil {
+		if cluster.Spec.TLS.Static != nil {
+			// CRD validation requires all the necessary fields are populated
+			operatorSecretName := cluster.Spec.TLS.Static.OperatorSecret
+			serverSecretName := cluster.Spec.TLS.Static.Member.ServerSecret
+
+			var key []byte
+			var chain []byte
+			var ca []byte
+			var ok bool
+
+			// Check the operator secret exists and has the correct keys
+			operatorSecret, err := v.abstraction.getSecret(cluster.Namespace, operatorSecretName)
+			if err != nil {
+				errs = append(errs, err)
+			} else if operatorSecret == nil {
+				errs = append(errs, fmt.Errorf("tls operator secret %s must exist", operatorSecretName))
+			} else {
+				if ca, ok = operatorSecret.Data["ca.crt"]; !ok {
+					errs = append(errs, fmt.Errorf("tls operator secret %s must contain ca.crt", operatorSecretName))
+				}
+			}
+
+			// Check the server secret exists and has the correct keys
+			serverSecret, err := v.abstraction.getSecret(cluster.Namespace, serverSecretName)
+			if err != nil {
+				errs = append(errs, err)
+			} else if serverSecret == nil {
+				errs = append(errs, fmt.Errorf("tls server secret %s must exist", serverSecretName))
+			} else {
+				if chain, ok = serverSecret.Data["chain.pem"]; !ok {
+					errs = append(errs, fmt.Errorf("tls server secret %s must contain chain.pem", serverSecretName))
+				}
+				if key, ok = serverSecret.Data["pkey.key"]; !ok {
+					errs = append(errs, fmt.Errorf("tls server secret %s must contain pkey.key", serverSecretName))
+				}
+			}
+
+			// Something is wrong, bomb out now
+			if len(errs) > 0 {
+				return
+			}
+
+			// Validate the TLS configuration is going to work
+			errs = x509.Verify(ca, chain, key, cluster.Name, cluster.Namespace)
+			return
+		}
+	}
+	return
 }
 
 type UpdateError struct {

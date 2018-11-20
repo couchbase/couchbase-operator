@@ -3,28 +3,18 @@ package cluster
 import (
 	"context"
 	"crypto/x509"
-	"encoding/pem"
+	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/gocbmgr"
 )
-
-// decodePEM takes a raw blob of data and tries to decode PEM encoded data.
-func decodePEM(data []byte) (blocks []*pem.Block) {
-	for len(data) != 0 {
-		var block *pem.Block
-		if block, data = pem.Decode(data); block == nil {
-			break
-		}
-		blocks = append(blocks, block)
-	}
-	return
-}
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
 func tlsValid(member *couchbaseutil.Member, ca []byte, cert *x509.Certificate) bool {
@@ -96,6 +86,38 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []by
 	})
 }
 
+// getTLSData gets the TLS data from kubernetes and performs some error checking.
+func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) {
+	// Load the TLS data from kubernetes.
+	operatorSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
+	if err != nil {
+		return
+	}
+	serverSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.TLS.Static.Member.ServerSecret, c.cluster.Namespace, nil)
+	if err != nil {
+		return
+	}
+
+	// Ensure that the secrets are correctly formatted.
+	var ok bool
+	ca, ok = operatorSecret.Data["ca.crt"]
+	if !ok {
+		err = fmt.Errorf("operator secret missing ca.crt")
+		return
+	}
+	key, ok = serverSecret.Data["pkey.key"]
+	if !ok {
+		err = fmt.Errorf("server secret missing pkey.key")
+		return
+	}
+	chain, ok = serverSecret.Data["chain.pem"]
+	if !ok {
+		err = fmt.Errorf("server secret missing chain.pem")
+		return
+	}
+	return
+}
+
 // reconcileTLS performs any certificate rotations that are necessary.
 func (c *Cluster) reconcileTLS() error {
 	// Insecure cluster, ignore.
@@ -103,25 +125,31 @@ func (c *Cluster) reconcileTLS() error {
 		return nil
 	}
 
-	// Load the TLS data from kubernetes to extract the server certificate and CA.
-	operatorSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
+	// Load the TLS data from kubernetes.
+	cacert, chain, key, err := c.getTLSData()
 	if err != nil {
-		return err
-	}
-	cacert := operatorSecret.Data["ca.crt"]
-
-	serverSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.TLS.Static.Member.ServerSecret, c.cluster.Namespace, nil)
-	if err != nil {
+		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 		return err
 	}
 
-	chainPem := decodePEM(serverSecret.Data["chain.pem"])
+	// Verify that the configuration is valid.
+	if errs := util_x509.Verify(cacert, chain, key, c.cluster.Name, c.cluster.Namespace); len(errs) != 0 {
+		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
+
+		errStrings := []string{}
+		for _, err := range errs {
+			errStrings = append(errStrings, err.Error())
+		}
+		errString := strings.Join(errStrings, ", ")
+		return fmt.Errorf(errString)
+	}
+
+	// Parse the certificate chain.
+	chainPem := util_x509.DecodePEM(chain)
 	cert, err := x509.ParseCertificate(chainPem[0].Bytes)
 	if err != nil {
 		return err
 	}
-
-	// VERIFY CONFIGURATION IS SANE HERE BEFORE BREAKING THE CLUSTER
 
 	// Update the client to use the new CA certificate for verification.
 	tls := c.client.GetTLS()

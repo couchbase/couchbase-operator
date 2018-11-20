@@ -32,6 +32,7 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 		OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 			Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 				"spec": apiextensionsv1beta1.JSONSchemaProps{
+					Type: "object",
 					Required: []string{
 						"baseImage",
 						"version",
@@ -58,9 +59,16 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"static": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "object",
+									Required: []string{
+										"member",
+										"operatorSecret",
+									},
 									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 										"member": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "object",
+											Required: []string{
+												"serverSecret",
+											},
 											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 												"serverSecret": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "string",
