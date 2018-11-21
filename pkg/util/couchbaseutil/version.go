@@ -99,6 +99,11 @@ func (a *Version) Less(b *Version) bool {
 	return a.Compare(b) < 0
 }
 
+// GreaterEqual returns true if a >= b
+func (a *Version) GreaterEqual(b *Version) bool {
+	return !a.Less(b)
+}
+
 func VerifyVersion(version string) error {
 	v, err := NewVersion(version)
 	if err != nil {

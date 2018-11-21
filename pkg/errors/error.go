@@ -94,6 +94,11 @@ func (e ErrVolumeMissingGroup) Error() string {
 	return fmt.Sprintf("volume `%s` is not labeled with a server group", e.VolumeName)
 }
 
+func IsErrVolumeMissingGroup(err error) bool {
+	_, ok := err.(*ErrVolumeMissingGroup)
+	return ok
+}
+
 // ErrUnknownMember is used when mapping a pod to a member and the
 // member is unknown
 type ErrUnknownMember struct {

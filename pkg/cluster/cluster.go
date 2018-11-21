@@ -227,6 +227,11 @@ func (c *Cluster) setup() error {
 			return err
 		}
 		c.members = nil
+
+		// Perform any necessary upgrades to the cluster and kubernetes resources.
+		if err := c.operatorUpgrade(); err != nil {
+			return err
+		}
 	}
 
 	// Once the cluster is guaranteed to exist, extract the UUID and inject

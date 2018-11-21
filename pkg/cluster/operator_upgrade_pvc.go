@@ -1,0 +1,121 @@
+package cluster
+
+import (
+	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+
+	corev1 "k8s.io/api/core/v1"
+)
+
+// pvcUpgradeFunc is a function that applies an upgrade to a pvc resource.
+type pvcUpgradeFunc func(*Cluster, *corev1.PersistentVolumeClaim) error
+
+// pvcUpgradeAction is an action to perform on a pvc resource when its version
+// is within the specified upgrade range.
+type pvcUpgradeAction struct {
+	upgradeRange upgradeRange
+	action       pvcUpgradeFunc
+}
+
+// pvcUpgradeActionList is an ordered list of actions to try performing on a
+// pvc resource.
+type pvcUpgradeActionList []pvcUpgradeAction
+
+// pvcUpgradableResource implments the upgradableResource interface for pvcs.
+type pvcUpgradableResource struct {
+	// cluster is a reference to the cluster for client and namespace access.
+	cluster *Cluster
+	// pvcs is a local cache of fetched resource items.
+	pvcs *corev1.PersistentVolumeClaimList
+	// actions is the list of possible upgrade actions to perform on a resource item.
+	actions pvcUpgradeActionList
+}
+
+func newPVCUpgradableResource(c *Cluster) upgradableResource {
+	return &pvcUpgradableResource{
+		cluster: c,
+		actions: pvcUpgradeActionList{
+			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePVC_000000_010200},
+		},
+	}
+}
+
+func (r *pvcUpgradableResource) kind() string {
+	return "pvc"
+}
+
+func (r *pvcUpgradableResource) name(item int) string {
+	return r.pvcs.Items[item].Name
+}
+
+func (r *pvcUpgradableResource) fetch() error {
+	var err error
+	r.pvcs, err = r.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).List(k8sutil.ClusterListOpt(r.cluster.cluster.Name))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *pvcUpgradableResource) lenItems() int {
+	return len(r.pvcs.Items)
+}
+
+func (r *pvcUpgradableResource) itemVersion(item int) string {
+	version := "0.0.0"
+	if v, ok := r.pvcs.Items[item].Annotations[resourceVersionAnnotation]; ok {
+		version = v
+	}
+	return version
+}
+
+func (r *pvcUpgradableResource) lenActions() int {
+	return len(r.actions)
+}
+
+func (r *pvcUpgradableResource) actionVersionRange(action int) upgradeRange {
+	return r.actions[action].upgradeRange
+}
+
+func (r *pvcUpgradableResource) perform(item, action int) error {
+	pvc := &r.pvcs.Items[item]
+	upgrade := r.actions[action].action
+	if err := upgrade(r.cluster, pvc); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *pvcUpgradableResource) commit(item int) error {
+	pvc := &r.pvcs.Items[item]
+	if _, err := r.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(pvc); err != nil {
+		return err
+	}
+	return nil
+}
+
+// upgradePVC_000000_010200 performs pvc upgrades to 1.2.0 from all prior versions.
+// * The "server.couchbase.com/version" annotation was added.
+// * The "failure-domain.beta.kubernetes.io/zone" annotation was added.
+func upgradePVC_000000_010200(cluster *Cluster, pvc *corev1.PersistentVolumeClaim) error {
+	// Update the version annotation
+	pvc.Annotations[resourceVersionAnnotation] = "1.2.0"
+
+	// Add the server version annotation from the cluster's current version.
+	pvc.Annotations[constants.CouchbaseVersionAnnotationKey] = cluster.cluster.Status.CurrentVersion
+
+	// Add in the PVC zone from the associated PV.  While we could derive this from the
+	// pod, it may not be alive by the time we run the upgrade actions, using the PV
+	// seems less fraught with errors.
+	group, err := k8sutil.GetPersistentVolumeGroup(cluster.config.KubeCli, pvc.Spec.VolumeName)
+	if err != nil {
+		if !errors.IsErrVolumeMissingGroup(err) {
+			return err
+		}
+	} else {
+		pvc.Annotations[constants.ServerGroupLabel] = group
+	}
+
+	return nil
+}
