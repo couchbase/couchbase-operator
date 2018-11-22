@@ -839,10 +839,10 @@ func (c *Cluster) logStatus(status *couchbaseutil.ClusterStatus) {
 	// We are performing an action log the cluster status
 	b := &bytes.Buffer{}
 	if err := status.LogStatus(b); err != nil {
-		c.logger.Warn("failed to log cluster status: %v", err)
+		c.logger.Warnf("failed to log cluster status: %v", err)
 	}
 	if err := c.scheduler.LogStatus(b); err != nil {
-		c.logger.Warn("failed to log scheduler status: %v", err)
+		c.logger.Warnf("failed to log scheduler status: %v", err)
 	}
 	for _, line := range strings.Split(b.String(), "\n") {
 		c.logger.Info(line)

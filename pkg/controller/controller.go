@@ -123,7 +123,7 @@ func (c *Controller) Handle(ctx context.Context, event sdk.Event) error {
 func (c *Controller) initResource() error {
 	version, err := k8sutil.GetKubernetesVersion(c.Config.KubeCli)
 	if err != nil {
-		c.logger.Logger.Warn("Unable to get server version due to %v, skipping validation registration", err)
+		c.logger.Logger.Warnf("Unable to get server version due to %v, skipping validation registration", err)
 	}
 
 	if version < constants.KubernetesVersion1_8 {
