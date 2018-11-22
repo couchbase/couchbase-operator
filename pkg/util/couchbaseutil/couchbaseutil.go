@@ -161,6 +161,11 @@ func (c *CouchbaseClient) SetTLS(tls *cbmgr.TLSAuth) {
 	c.client.SetTLS(tls)
 }
 
+// GetTLS returns the TLS configuration for the client.
+func (c *CouchbaseClient) GetTLS() *cbmgr.TLSAuth {
+	return c.client.GetTLS()
+}
+
 // SetUUID sets or updates the cluster UUID to be checked by new persistant
 // connections being dialed
 func (c *CouchbaseClient) SetUUID(uuid string) {
@@ -749,10 +754,17 @@ func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
 		})
 }
 
+func (c *CouchbaseClient) GetClusterCACert(m *Member) ([]byte, error) {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetClusterCACert()
+}
+
 func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "reload server cert", c.clusterName,
+	// This may take ages if the CA was previously updated.
+	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "reload server cert", c.clusterName,
 		func() error {
 			return c.client.ReloadNodeCert()
 		})

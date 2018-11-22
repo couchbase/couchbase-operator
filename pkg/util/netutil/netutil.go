@@ -70,3 +70,24 @@ func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) err
 		}
 	}
 }
+
+// GetTLSState dials the target host returning an error if normal X.509 verification
+// fails.  On success it returns the certificate chain presented by the server.
+func GetTLSState(hostport string, cacert []byte) ([]*x509.Certificate, error) {
+	// Configure TLS with our CA certificate
+	tlsClientConfig := tls.Config{
+		RootCAs: x509.NewCertPool(),
+	}
+	if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(cacert); !ok {
+		return nil, fmt.Errorf("failed to append CA certificate")
+	}
+
+	conn, err := tls.Dial("tcp", hostport, &tlsClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	state := conn.ConnectionState()
+	return state.VerifiedChains[0], nil
+}

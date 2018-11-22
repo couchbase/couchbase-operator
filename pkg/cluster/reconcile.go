@@ -25,6 +25,12 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	c.logger.Debug("Start reconciling")
 	defer c.logger.Debug("Finish reconciling")
 
+	// First thing we must do is fix up TLS or we may not be able to talk to the
+	// cluster for anything else.
+	if err := c.reconcileTLS(); err != nil {
+		return err
+	}
+
 	// Initialize the scheduler each time around, this saves us having to update
 	// internal state in all the cases when a pod fails to be created, deleted,
 	// or disappears

@@ -76,7 +76,7 @@ func RetryOnErr(ctx context.Context, interval time.Duration, maxRetries int, tas
 
 			// failed, log attempt
 			logger := ctx.Value("logger").(*logrus.Entry)
-			logger.Warningf("%s: failed with error %v ...retrying", task, err)
+			logger.Debugf("%s: failed with error %v ...retrying", task, err)
 			return false, RetryOkError(err)
 		}
 

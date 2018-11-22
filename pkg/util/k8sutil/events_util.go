@@ -37,6 +37,11 @@ const (
 	EventReasonRollbackFinished      = "RollbackFinished"
 	EventReasonClusterSettingsEdited = "ClusterSettingsEdited"
 	EventReasonVolumeUnhealthy       = "VolumeUnhealthy"
+	EventReasonTLSUpdated            = "TLSUpdated"
+	EventReasonTLSInvalid            = "TLSInvalid"
+	EventReasonTLSUpdateFailed       = "TLSUpdateFailed"
+
+	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
 
 func MemberCreationFailedEvent(memberName string, cl *api.CouchbaseCluster) *v1.Event {
@@ -228,6 +233,30 @@ func MemberVolumeUnhealthyEvent(memberName string, reason string, cl *api.Couchb
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonVolumeUnhealthy
 	event.Message = fmt.Sprintf("Member %s volumes are unhealthy.  Failover is recommended: %s", memberName, reason)
+	return event
+}
+
+func TLSUpdatedEvent(cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonTLSUpdated
+	event.Message = "TLS configuration was updated"
+	return event
+}
+
+func TLSInvalidEvent(cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonTLSInvalid
+	event.Message = EventReasonTLSInvalidMessage
+	return event
+}
+
+func TLSUpdateFailedEvent(cl *api.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonTLSUpdateFailed
+	event.Message = "TLS configuration was unable to be updated"
 	return event
 }
 
