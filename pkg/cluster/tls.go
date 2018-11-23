@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"reflect"
@@ -130,6 +131,14 @@ func (c *Cluster) reconcileTLS() error {
 
 	changed := false
 	for _, member := range c.members {
+		// Try connect to the target node, if it doesn't respond we assume it's
+		// deleted or the admin service has gone down and needs a reconcile to fix it.
+		ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+		defer cancel()
+		if err := netutil.WaitForHostPort(ctx, member.HostURL()); err != nil {
+			continue
+		}
+
 		// If the server is correctly configured, ignore it.
 		if tlsValid(member, cacert, cert) {
 			continue
