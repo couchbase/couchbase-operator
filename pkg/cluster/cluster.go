@@ -209,6 +209,21 @@ func (c *Cluster) setup() error {
 		}
 	} else {
 		c.logger.Infof("Cluster already exists, the operator will now manage it")
+
+		// TLS may have updated across the restart, so the client CA is valid
+		// but the rest of the cluster is uncontactable.  For this we need a
+		// set of members to iterate over, however the normal updateMembers()
+		// tries to contact Couchbase server to verify membership, that will
+		// fail as TLS invalid.  We need to just take what we are given before
+		// making any calls to Couchbase server.
+		running, _, err := c.pollPods()
+		if err != nil {
+			return err
+		}
+		c.members = podsToMemberSet(running, c.isSecureClient())
+		if err := c.reconcileTLS(); err != nil {
+			return err
+		}
 	}
 
 	// Once the cluster is guaranteed to exist, extract the UUID and inject
