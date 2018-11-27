@@ -31,6 +31,21 @@ A rebalance operation has terminated abnormally; nodes may have not been added o
 RebalanceCompleted::
 A rebalance operation has successfully completed.
 
+=== Cluster Upgrade Lifecycle
+
+UpgradeStarted::
+An upgrade operation has started.
+UpgradeFinished::
+An upgrade operation has successfully completed.
+RollbackStarted::
+A rollback operation during a partial upgrade has started.
+RollbackFinished::
+A rollback operation during a partial upgrade has successfully completed.
+
+[NOTE]
+Upgrade events are raised in relation to an upgrade of the entire cluster and not individual nodes.
+Individual node upgrades will raise `NewMemberAdded`, `RebalanceStarted`, `MemberRemoved` and `RebalanceCompleted` member lifecycle events as members are swapped out for upgraded replacements.
+
 === Bucket Lifecycle
 
 BucketCreated::
@@ -55,6 +70,13 @@ A node service was deleted.
 
 ClusterSettingsEdited::
 The cluster specification was modified.
+
+=== TLS Lifecycle
+
+TLSUpdated::
+TLS certificates and keys were updated across the cluster.
+TLSInvalid::
+TLS configuration invalid.  Consult the Operator logs for details.
 
 == Conditions
 
@@ -98,3 +120,10 @@ False::
 A configuration change failed.
 
 NOTE: This condition is undefined when a configuration was successfully applied.
+
+=== Upgrading
+
+True::
+The cluster is upgrading or rolling back from one version to another.
+
+NOTE: This condition is undefined when an upgrade or rollback is not in progress.
