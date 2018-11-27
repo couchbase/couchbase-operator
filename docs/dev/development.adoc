@@ -33,8 +33,8 @@ eval $(minikube docker-env -u)
 
 You will need the following from your favorite package manager:
 
-* go (1.10.0+ is recommended)
-* glide (golang package dependencies)
+* go (1.10.0+)
+* dep (0.5.0+)
 * git
 * git-review
 * make
@@ -115,6 +115,30 @@ busybox                                               1.27                6ad733
 ----
 
 NOTE: Make sure you tag your Docker image with something other than '`latest`' and use that tag while you pull the image. Otherwise, if you do not specify version of your image, it will be assumed as :latest, with pull image policy of Always correspondingly, which may eventually result in ErrImagePull as you may not have any versions of your Docker image out there in the default docker registry (usually DockerHub) yet.
+
+== Adding Dependencies
+
+Add a source specifying the lower bound of supported version.  Go mandates backwards compatibility for later versions within the same major.
+
+[source,bash]
+----
+dep ensure -add gihub.com/organization/repo@v1.0.0
+----
+
+See the `dep` documentation for full instructions.
+
+== Updating Dependencies
+
+Update a source specifying the new lower bound of supported version.
+
+[source,bash]
+----
+dep ensure -update gihub.com/organization/repo@v1.1.0
+----
+
+This command will create a new `Gopkg.lock` and then checkout code into the `vendor` directory.
+
+See the `dep` documentation for full instructions.
 
 == Next Steps
 

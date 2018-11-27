@@ -1,0 +1,106 @@
+# Gopkg.toml example
+#
+# Refer to https://golang.github.io/dep/docs/Gopkg.toml.html
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#   name = "github.com/x/y"
+#   version = "2.4.0"
+#
+# [prune]
+#   non-go = false
+#   go-tests = true
+#   unused-packages = true
+
+required = [
+  "k8s.io/code-generator/cmd/client-gen",
+  "k8s.io/code-generator/cmd/conversion-gen",
+  "k8s.io/code-generator/cmd/deepcopy-gen",
+  "k8s.io/code-generator/cmd/defaulter-gen",
+  "k8s.io/code-generator/cmd/informer-gen",
+  "k8s.io/code-generator/cmd/lister-gen",
+]
+
+[[constraint]]
+  name = "github.com/couchbase/cbflag"
+  revision = "dbeda68bf448ce8e85e52a3216f3b031ef18a4b7"
+
+[[constraint]]
+  name = "github.com/couchbase/gocbmgr"
+  revision = "2286a07550c77fc8b14bcdc81c92bcddfceed418"
+
+[[constraint]]
+  name = "github.com/ghodss/yaml"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/go-openapi/errors"
+  version = "0.17.2"
+
+[[constraint]]
+  name = "github.com/golang/glog"
+  branch = "master"
+
+[[constraint]]
+  name = "github.com/google/uuid"
+  version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/operator-framework/operator-sdk"
+  version = "0.0.7"
+
+[[constraint]]
+  name = "github.com/sirupsen/logrus"
+  version = "1.2.0"
+
+[[constraint]]
+  name = "golang.org/x/time"
+  branch = "master"
+
+[[constraint]]
+  name = "gopkg.in/ini.v1"
+  version = "1.39.0"
+
+[[constraint]]
+  name = "gopkg.in/yaml.v2"
+  version = "2.2.1"
+
+[[constraint]]
+  name = "k8s.io/api"
+  version = "kubernetes-1.11.4"
+
+[[constraint]]
+  name = "k8s.io/apiextensions-apiserver"
+  version = "kubernetes-1.11.4"
+
+[[constraint]]
+  name = "k8s.io/apimachinery"
+  version = "kubernetes-1.11.4"
+
+[[constraint]]
+  name = "k8s.io/client-go"
+  version = "kubernetes-1.11.4"
+
+[[constraint]]
+  name = "k8s.io/code-generator"
+  version = "kubernetes-1.11.4"
+
+[[override]]
+  name = "github.com/Azure/go-autorest"
+  version = "v10.6.2"
+
+[prune]
+  go-tests = true
+  unused-packages = true

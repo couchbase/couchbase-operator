@@ -30,7 +30,7 @@ if [[ $BRANCH == "1" && $(deps_updated ${PREV} ${CURR}) == "true" ]]; then
     pushd $(git rev-parse --show-toplevel)
     # ... but only if there is something to update
     if [[ -d vendor ]]; then
-      GOPATH=${PWD%/src/*} glide update --strip-vendor
+      GOPATH=${PWD%/src/*} dep ensure -vendor-only
     fi
     popd
 fi

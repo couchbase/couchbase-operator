@@ -20,7 +20,7 @@ all: build
 dep: vendor
 
 vendor:
-	GOPATH=$(GOPATH) glide install --strip-vendor
+	GOPATH=$(GOPATH) dep ensure -vendor-only
 
 build: dep $(BINARY)
 
