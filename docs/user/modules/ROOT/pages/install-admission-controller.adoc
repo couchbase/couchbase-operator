@@ -1,0 +1,139 @@
+= Installing and Using the Admission Controller
+:tabs:
+
+[abstract]
+The admission controller is a required component of the Couchbase Autonomous Operator and needs to be installed separately.
+The primary purpose of the admission controller is to validate Couchbase cluster configuration changes before the Operator acts on them, thus protecting your Couchbase deployment (and the Operator) from any accidental damage that might arise from an invalid configuration.
+
+[NOTE]
+====
+The admission controller replaces the `cbopctl` command line client that was distributed in Operator releases prior to version 1.2.
+Errors raised by the admission controller are exactly the same as would have been raised by `cbopctl`.
+====
+
+== Overview
+
+The Operator itself monitors `CouchbaseCluster` custom resources and ensures that the cluster exists in Kubernetes as specified.
+If a configuration error is detected at run time, it manifests as xref:conditions-and-events.adoc[events, conditions], or xref:logs-troubleshooting.adoc[log entries].
+
+The admission controller, on the other hand, intercepts a configuration change that you make to a `CouchbaseCluster` resource as it's submitted to the Kubernetes API and verifies that the resource is valid.
+Kubernetes and OpenShift native commands such as `kubectl create`, `kubectl edit`, and `kubectl apply` are all caught and handled by the admission controller.
+
+When the admission controller detects an invalid cluster configuration, it notifies you via the same `kubectl` or `oc` command that you used to submit the resource update.
+The invalid resource update is never seen or processed by the Operator.
+This makes the Operator far simpler to use because configuration errors are reported interactively, rather than requiring you to examine cluster events and Operator logs to detect misconfigurations.
+
+The admission controller is not just responsible for catching errors specific to the `CouchbaseCluster` resource.
+It also examines references to other resources defined in the `CouchbaseCluster` and ensures they exist and are valid.
+For example, if the cluster is deployed with TLS enabled, the admission controller checks that the private key is correctly formatted for Couchbase server, that the certificate chain validates correctly, and that the DNS Subject Alternative Names (SANs) are correctly configured for the cluster name and namespace.
+
+== Architecture
+
+The following is a simplified illustration of how the admission controller works:
+
+image:admission.png["Admission Controller Architecture"]
+
+1. A client connects to the Kubernetes API and sends a request to create a resource.
+The resource specification is encoded as JSON.
+2. The API forwards the JSON to the _mutating_ endpoint of the admission controller.
+A mutating webhook is responsible for altering the resource (applying default values, for example).
+It may optionally choose to accept or reject the create request.
+3. The API forwards the JSON to the _validating_ endpoint of the admission controller.
+A validating webhook is responsible for validating specification constraints above and beyond those offered by JSON schema validation provided by the custom resource definition.
+It may optionally choose to accept or reject the create request.
+4. Once all admission checks have passed, the resource is persisted in the database (etcd).
+5. The API responds to the client that the create request has been accepted.
+
+If either of the admission checks in stages 2 and 3 respond that the resource is not acceptable, the API will go directly to stage 5 and return any errors returned by the admission controller.
+
+=== API to Admission Controller Interface
+
+The admission controller is implemented as a simple web server.
+The application layer protocol is HTTP over TLS.
+The admission controller is usually deployed using Kubernetes native primitives, such as a `Deployment`, providing high availability and fault tolerance.
+The admission controller is stateless so it can be deployed multiple times.
+
+The admission controller `Deployment` is associated with a service account that grants the admission controller permissions to access other resources with a role.
+Access to resource types allows the admission controller to check that any resources, such as `Secrets`, are present for the Operator to access and use.
+It also allows the admission controller to poll for existing `CouchbaseCluster` resources to check for invariance of certain specification attributes.
+For a list of the required permissions, see <<rbac-considerations,RBAC Considerations>>
+
+A service endpoint is exposed with a Kubernetes `Service` resource that provides a stable DNS name, fault tolerance, and load balancing.
+The service endpoint is finally bound to the Kubernetes API with `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration` resources.
+The webhooks identify the resource type and version, and the types of operation to respond to.
+They also define the TLS CA certificate to use for validation of the service endpoint and the HTTP path to route requests to.
+
+== Platform Compatibility
+
+The admission controller is supported on Kubernetes 1.11.0+ and OpenShift 3.11.0+.
+
+== Deploying the Admission Controller
+
+Before you can deploy the admission controller, you must download and unpack the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package] on the same computer where you normally run `kubectl` or `oc`. Contained in this package are a set of YAML files that define the admission controller.
+
+To begin using the admission controller there are YAML files defined in the Operator https://www.couchbase.com/downloads[package].
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+. Open a Terminal window and go to the directory where you unpacked the Operator package. For example:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/
+----
+
+. Run the following command to create the admission controller:
++
+[source,console]
+----
+kubectl create -f admission.yaml
+----
+--
+
+OpenShift::
++
+--
+. Open a Terminal window and go to the directory where you unpacked the Operator package. For example:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-openshift_x.x.x-linux_x86_64/
+----
+
+. Run the following command to create the admission controller:
++
+[source,console]
+----
+oc create -f admission.yaml
+----
+--
+====
+
+[IMPORTANT]
+====
+The provided YAML definitions will only work in the `default` namespace.
+In order to run in a different namespace you must first regenerate TLS certificates to contain the correct DNS Subject Alternative Name (SAN).
+The DNS alternate name must be in the form `${service-name}.${namespace}.svc`.
+The admission controller certificate and key pair are defined in the admission controller secret.
+The admission controller certificate issuer's CA certificate is defined in each of the webhooks.
+All certificates and keys are base64 encoded in the YAML definitions.
+====
+
+[#rbac-considerations]
+== RBAC Considerations
+
+The admission controller requires read-only access to several resource types in order to function.
+
+couchbase.com/couchbaseclusters::
+Used by the admission controller to look for existing instances of a resource.
+If present, it will validate immutable attributes that have not been modified.
+secrets::
+Used by the admission controller to look for secrets references in the `CouchbaseCluster` specification.
+It will ensure that the cluster admin username and password secrets exist.
+It will ensure that, if specified, the cluster TLS secrets are present and correct, and are valid for the cluster.
+storage.k8s.io/storageclasses::
+Used by the admission controller to look for storage class references in the `CouchbaseCluster` specification.
+It will ensure that, if present, any storage class templates reference existing storage classes.

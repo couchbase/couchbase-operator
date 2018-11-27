@@ -4,6 +4,7 @@
  ** xref:prerequisite-and-setup.adoc[System Requirements]
  ** xref:best-practices.adoc[Guidelines and Best Practices]
 * Deploying the Operator
+ ** xref:install-admission-controller.adoc[Installing the Admission Controller]
  ** xref:install-kubernetes.adoc[Installing on Kubernetes]
  ** xref:install-openshift.adoc[Installing on OpenShift]
  ** xref:install-aks.adoc[Installing on AKS]
