@@ -15,8 +15,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
@@ -125,16 +123,21 @@ func main() {
 
 	// Check we have at least access to the couchbase clusters.  This will test
 	// TLS and RBAC settings are correct
-	clusters, err := context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(context.Config.Namespace).List(metav1.ListOptions{})
+	clusters, err := k8s.GetCouchbaseClusters(context)
 	if err != nil {
-		fmt.Println("unable to poll CouchbaseCluster resources:", err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// This is set to true if there is anything worth collecting
+	anythingToCollect := false
 
 	// Check there is something to collect, warn if not but continue so we get
 	// debug information about the operator itself
 	if len(clusters.Items) == 0 {
 		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Config.Namespace)
+	} else {
+		anythingToCollect = true
 	}
 
 	// Finally check to see if any requested CouchbaseClusters exist
@@ -143,6 +146,22 @@ func main() {
 			fmt.Println("requested cluster", name, "not found in namespace", context.Config.Namespace)
 			os.Exit(1)
 		}
+	}
+
+	// Check that there is an operator deployment running
+	if deployment, err := k8s.GetOperatorDeployment(context); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	} else if deployment == nil {
+		fmt.Println("no Couchbase Operator Deployment resource discovered in name space", context.Config.Namespace)
+	} else {
+		anythingToCollect = true
+	}
+
+	// Bomb out if there is nothing of interest to collect from
+	if !anythingToCollect {
+		fmt.Println("nothing to collect in name space", context.Config.Namespace)
+		os.Exit(1)
 	}
 
 	// Collect logs first, this supports reporting which logs are available to be collected

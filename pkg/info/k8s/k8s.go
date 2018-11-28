@@ -3,12 +3,13 @@ package k8s
 import (
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +22,7 @@ import (
 // a context
 func InitContext(context *context.Context) error {
 	// Add our CRD to the global scheme
-	if err := v1.AddToScheme(scheme.Scheme); err != nil {
+	if err := couchbasev1.AddToScheme(scheme.Scheme); err != nil {
 		return err
 	}
 
@@ -92,4 +93,40 @@ func GetPod(context *context.Context, resource resource.ResourceReference) (*cor
 	}
 
 	return nil, nil
+}
+
+// GetDeployments returns all Deployments in the namespace.
+func GetDeployments(context *context.Context) (*appsv1.DeploymentList, error) {
+	deployments, err := context.KubeClient.AppsV1().Deployments(context.Config.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to poll Deployment resources: %v", err)
+	}
+	return deployments, nil
+}
+
+// GetOperatorDeployment returns the Couchbase Operator deployment in the namespace.
+func GetOperatorDeployment(context *context.Context) (*appsv1.Deployment, error) {
+	deployments, err := GetDeployments(context)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, deployment := range deployments.Items {
+		for _, container := range deployment.Spec.Template.Spec.Containers {
+			if container.Image == context.Config.OperatorImage {
+				return &deployment, nil
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+// GetCouchbaseClusters returns all Couchbase Clusters in the namespace.
+func GetCouchbaseClusters(context *context.Context) (*couchbasev1.CouchbaseClusterList, error) {
+	clusters, err := context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(context.Config.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to poll CouchbaseCluster resources: %v", err)
+	}
+	return clusters, nil
 }
