@@ -21,6 +21,10 @@ const (
 	sourceVersion = "enterprise-5.5.0"
 	// This is the required target server version
 	targetVersion = "enterprise-5.5.2"
+	// This is an illegal target version
+	targetVersionIllegalUpgrade = "enterprise-10.0.0"
+	// This is an illegal target version
+	targetVersionIllegalDowngrade = "enterprise-5.0.0"
 )
 
 var (
@@ -181,4 +185,68 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+}
+
+// TestUpgradeInvalidUpgrade ensures an upgrade cannot happen across major versions.
+func TestUpgradeInvalidUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	if cluster.Spec.Version != sourceVersion {
+		t.Skip("Skipping test as version is not as expected")
+	}
+
+	// When the cluster is ready, start the upgrade.  Expect the update to be rejected.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster.Name, f.Namespace, clusterSize, constants.Retries10)
+	e2eutil.MustNotUpdateClusterSpec(t, "Version", targetVersionIllegalUpgrade, kubernetes.CRClient, cluster)
+}
+
+// TestUpgradeInvalidDowngrade ensures you cannot downgrade.
+func TestUpgradeInvalidDowngrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	if cluster.Spec.Version != sourceVersion {
+		t.Skip("Skipping test as version is not as expected")
+	}
+
+	// When the cluster is ready, start the downgrade.  Expect the update to be rejected.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster.Name, f.Namespace, clusterSize, constants.Retries10)
+	e2eutil.MustNotUpdateClusterSpec(t, "Version", targetVersionIllegalDowngrade, kubernetes.CRClient, cluster)
+}
+
+// TestUpgradeInvalidRollback ensures you cannot rollback to a different version.
+func TestUpgradeInvalidRollback(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	if cluster.Spec.Version != sourceVersion {
+		t.Skip("Skipping test as version is not as expected")
+	}
+
+	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
+	// this will happen as the first upgrade begins, at which point try rollabck to an illegal version.
+	// Expect the update to be rejected.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster.Name, f.Namespace, clusterSize, constants.Retries10)
+	e2eutil.MustUpdateClusterSpec(t, "Version", targetVersion, kubernetes.CRClient, cluster, constants.Retries10)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
+	e2eutil.MustNotUpdateClusterSpec(t, "Version", targetVersionIllegalDowngrade, kubernetes.CRClient, cluster)
 }

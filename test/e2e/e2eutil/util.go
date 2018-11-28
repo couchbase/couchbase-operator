@@ -438,6 +438,12 @@ func MustUpdateClusterSpec(t *testing.T, field string, value string, crClient ve
 	return cluster
 }
 
+func MustNotUpdateClusterSpec(t *testing.T, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster) {
+	if _, err := UpdateClusterSpec(field, value, crClient, cl, 1); err == nil {
+		t.Fatal("cluster spec update succeeded unexpectedly")
+	}
+}
+
 func UpdateClusterSettings(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
 
 	updateFunc := func(cl *api.CouchbaseCluster) {}

@@ -196,9 +196,12 @@ var (
 		"TestLogRedactionWithPvVerify": TestLogRedactionWithPvVerify,
 
 		// Upgrade tests
-		"TestUpgrade":                TestUpgrade,
-		"TestUpgradeRollback":        TestUpgradeRollback,
-		"TestUpgradeKillPodOnCreate": TestUpgradeKillPodOnCreate,
+		"TestUpgrade":                 TestUpgrade,
+		"TestUpgradeRollback":         TestUpgradeRollback,
+		"TestUpgradeKillPodOnCreate":  TestUpgradeKillPodOnCreate,
+		"TestUpgradeInvalidUpgrade":   TestUpgradeInvalidUpgrade,
+		"TestUpgradeInvalidDowngrade": TestUpgradeInvalidDowngrade,
+		"TestUpgradeInvalidRollback":  TestUpgradeInvalidRollback,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{
