@@ -3,8 +3,6 @@ package e2e
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -16,45 +14,39 @@ import (
 )
 
 func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInfo, namespace, testName, logDir string) {
-	for _, kubeCluster := range kubeClustersToSetup {
-		if err := os.MkdirAll(logDir, 0755); err != nil {
-			t.Errorf("Failed to create dir %s: %v", logDir, err)
-			continue
-		}
+	// Create and move to the log directory.
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Errorf("Failed to create dir %s: %v", logDir, err)
+		return
+	}
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Errorf("Failed to get pwd: %v", err)
+		return
+	}
+	if err := os.Chdir(logDir); err != nil {
+		t.Errorf("Failed to change directory: %v", err)
+	}
 
+	// Move back to where we were regardless of outcome.
+	defer os.Chdir(pwd)
+
+	// Collect logs from all clusters defined.
+	for _, kubeCluster := range kubeClustersToSetup {
 		kubeConfPath := e2eutil.GetKubeConfigToUse(framework.Global.KubeType, kubeCluster.ClusterName)
-		cmdArgs := []string{"-operator-image", framework.Global.OpImage, "-kubeconfig", kubeConfPath, "-namespace", namespace, "-collectinfo", "-system"}
+		cmdArgs := []string{
+			"-operator-image", framework.Global.OpImage,
+			"-kubeconfig", kubeConfPath,
+			"-namespace", namespace,
+			"-collectinfo",
+			"-collectinfo-collect", "all",
+			"-system",
+		}
 		execOut, err := runCbopinfoCmd(cmdArgs)
 		execOutStr := strings.TrimSpace(string(execOut))
 		if err != nil {
 			t.Logf("cbopinfo returned: %s", execOutStr)
 			t.Errorf("cbopinfo command failed: %v", err)
-		}
-
-		logFileName := getLogFileNameFromExecOutput(execOutStr)
-		if err := os.Rename(logFileName, logDir+"/"+logFileName); err != nil {
-			t.Errorf("Failed to move log file: %v", err)
-		}
-
-		collectInfoOutputPattern := regexp.MustCompile("(kubectl cp [-+:/a-zA-Z0-9 ]+\\.zip \\.)")
-		cbCollectCmdList := collectInfoOutputPattern.FindAllString(execOutStr, -1)
-		for _, cbCollectCmd := range cbCollectCmdList {
-			cmdArgs := strings.Split(cbCollectCmd, " ")
-			cmdArgs = append(cmdArgs, "--kubeconfig")
-			cmdArgs = append(cmdArgs, kubeConfPath)
-			cmdArgs = append(cmdArgs, "--namespace")
-			cmdArgs = append(cmdArgs, namespace)
-			cmdOutput, err := exec.Command(cmdArgs[0], cmdArgs[1:]...).CombinedOutput()
-			cmdOutputStr := strings.TrimSpace(string(cmdOutput))
-			if err != nil {
-				t.Logf("kubectl returned: %s", cmdOutputStr)
-				t.Errorf("Failed to fetch couchbase log: %v", err)
-			}
-			cbFileNamePath := strings.Split(cmdArgs[len(cmdArgs)-6], "/")
-			cbFileName := cbFileNamePath[len(cbFileNamePath)-1]
-			if err := os.Rename(cbFileName, logDir+"/"+cbFileName); err != nil {
-				t.Errorf("Failed to move cb log file: %v", err)
-			}
 		}
 	}
 }
