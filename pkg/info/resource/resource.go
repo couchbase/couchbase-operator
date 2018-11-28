@@ -37,11 +37,11 @@ type Resource interface {
 // ResourceInitializer is a function signature used to get resource handlers
 type ResourceInitializer func(*context.Context) Resource
 
-// GetResourceSelector returns a label selector which will scope the resources we
-// can collect in the requested namespace based on configuration directives
-func GetResourceSelector(c *config.Configuration) (labels.Selector, error) {
+// getResourceSelector returns a label selector which will scope the resources we
+// can collect in the requested namespace based on configuration directives.
+func getResourceSelector(c *config.Configuration, all bool) (labels.Selector, error) {
 	// Collect everything we can
-	if c.All {
+	if all {
 		return labels.Everything(), nil
 	}
 
@@ -67,4 +67,17 @@ func GetResourceSelector(c *config.Configuration) (labels.Selector, error) {
 	// Create and return the selector
 	selector := labels.NewSelector()
 	return selector.Add(requirements...), nil
+}
+
+// GetResourceSelector returns a label selector which will scope the resources we
+// can collect in the requested namespace based on configuration directives.
+func GetResourceSelector(c *config.Configuration) (labels.Selector, error) {
+	return getResourceSelector(c, c.All)
+}
+
+// GetResourceSelectorForCluster returns a label selector which will scope the resources we
+// can collect in the requested namespace based on configuration directives.  Explicitly
+// limits scope to the cluster and ignores the --all flag.
+func GetResourceSelectorForCluster(c *config.Configuration) (labels.Selector, error) {
+	return getResourceSelector(c, false)
 }

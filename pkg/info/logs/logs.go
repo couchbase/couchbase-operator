@@ -57,7 +57,7 @@ type LogList struct {
 // as being mounted as couchbase logs and also have been marked as detached
 // from their pods.
 func listDetachedLogPVCs(context *context.Context) ([]*v1.PersistentVolumeClaim, error) {
-	selector, err := resource.GetResourceSelector(&context.Config)
+	selector, err := resource.GetResourceSelectorForCluster(&context.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func listDetachedLogPVCs(context *context.Context) ([]*v1.PersistentVolumeClaim,
 
 // listRunningPods returns an array of all pods.
 func listRunningPods(context *context.Context) ([]*v1.Pod, error) {
-	selector, err := resource.GetResourceSelector(&context.Config)
+	selector, err := resource.GetResourceSelectorForCluster(&context.Config)
 	if err != nil {
 		return nil, err
 	}
