@@ -5,13 +5,15 @@
 
 By default, `cbopinfo` will collect resources for all Couchbase clusters defined in the selected namespace. Certain resource types such as services, pods, and persistent volume claims are scoped to those created by the Operator. The scope can be further restricted to only the clusters specified on the command line.
 
-Other unscoped resources are collected without any filtering, such as roles, role bindings, and service accounts, as they cannot be distinguished as belonging to a particular cluster.
+Other unscoped resources are collected without any filtering, such as roles, role bindings, and service accounts, as they cannot be distinguished as belonging to a particular Couchbase cluster.
 
 Any secrets that are collected have their data redacted so only the presence of a secret or a key within it are visible.
 
 The output is a compressed archive of resource YAML manifests organized by namespace, resource type, and name. Logs and events are also collected and collated with resource configuration where relevant.
 
-IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deplyoments, pods, couchbaseclusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:kubernetes-rbac.adoc#operator-role-requirements[required by the operator] but read-only.
+The `cbopinfo` command can also collect and download Couchbase server logs from running pods and orphaned persistent log volumes.
+
+IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deployments, pods, couchbaseclusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:kubernetes-rbac.adoc#operator-role-requirements[required by the operator] but read-only.
 
 == Installation
 
@@ -91,9 +93,63 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 If specified, this flag ignores any scoping rules for a particular resource type, and collects all instances within the namespace.
 
 --collectinfo::
-If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. The logs are left in situ as they may be relatively large. The `cbopinfo` command will report how to extract the logs from each pod.  Logs are automatically redacted of sensitive information, `cbopinfo` will provide a choice of download options.
+If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. By default an interactive menu allows selection of logs to collect and also allows the user to specify whether the logs should be redacted of sensitive information.  The logs will be downloaded to the current working directory once collection is complete.
 
-For log volumes which were previously attached to ephemeral pods it will display a table of available logs that are available for collection.  The user is able to interactively select which logs to collect.  `cbopinfo` will create a temporary pod (as defined by `--server-image`), run `cbcollect_info` and download the logs before finally deleting the temporary pod.
+For log volumes that were previously attached to ephemeral pods, `cbopinfo` will create a temporary pod (as defined by the `--server-image` option), run `cbcollect_info` and download the logs before finally deleting the temporary pod.
+
+--collectinfo-list::
+If specified with the `--collectinfo` option, this will write out the list of available collections to the console and exit.  It is designed to be used with automated tooling to poll for and select logs for later collection with the `--collectinfo-collect` option.
++
+The format of the `--collectinfo-list` option is as follows:
++
+[source,json]
+----
+{
+    "items": [
+        {
+            "name": "cb-example-0001",
+            "type": "pod"
+        },
+        {
+            "name": "cb-example-0003",
+            "type": "pod"
+        },
+        {
+            "name": "cb-example-0004",
+            "type": "pod"
+        },
+        {
+            "detached": "2018-10-16T11:27:45Z",
+            "name": "cb-example-0000",
+            "type": "persistentVolumeClaim"
+        },
+        {
+            "detached": "2018-10-16T10:58:34Z",
+            "name": "cb-example-0002",
+            "type": "persistentVolumeClaim"
+        }
+    ]
+}
+----
++
+The `name` is the name of the `Pod` that either can be collected from, or the `Pod` that a log volume was attached to.  The `type` specifies whether the logs are from a running `pod` or a log `persistentVolumeClaim`.  The `detached` field is only specified for collections of type `persistentVolumeClaim` and records when the log volume was detected as orphaned from its `Pod`.
+
+--collectinfo-collect <collection>::
+If specified with the `--collectinfo` option, this will define the set of Couchbase server logs to collect.  This option will override and not display the interactive menu shown by default with the `--collectinfo` option.
++
+The collection is specified as a comma separated list of log indices, indexed from zero.  For example to collect the logs for `cb-example-0004` in the example for the `--collectinfo-list` option this would be index 2.  You may specify ranges of indices, for example `1-2`.  You may also specify `all` to collect all available logs.  Valid collection specifications could be:
++
+[source,console]
+----
+1             # Collect log index 1 only
+1,2,4         # Collect log indices 1, 2 & 4
+6-8           # Collect log indices 6, 7 & 8
+1,3,6-8,12    # Collect log indices 1, 3, 6, 7, 8 & 12
+all           # Collect all available logs
+----
+
+--collectinfo-redact::
+If specified with the `--collectinfo` option, this will indicate that only redacted logs should be collected and downloaded.
 
 --kubeconfig <config>::
 If specified, this points to a Kubernetes configuration file used to locate and poll the cluster API. If not set, it will default to `~/.kube/config`.
@@ -101,13 +157,13 @@ If specified, this points to a Kubernetes configuration file used to locate and 
 --namespace <namespace>::
 If specified, this selects which namespace to collect resources and logs from. If not set, it will default to `default`.
 
---operator-image::
+--operator-image <image>::
 If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:1.1.0`.
 
---operator-rest-port::
-If specified this sets the Operator rest port.  It is used for collection of runtime information.  If not set it will default to _8080_.
+--operator-rest-port <port>::
+If specified this sets the Operator REST API port.  It is used for collection of runtime information.  If not set it will default to _8080_.
 
---server-image::
+--server-image <image>::
 If specified this defines the Couchbase Server image to use when collecting logs from detached log volumes.  If not set, it will default to `couchbase/server:enterprise-5.5.2`
 
 --system::
@@ -115,7 +171,7 @@ If specified, this flag will additionally collect all resources from the `kube-s
 
 [TIP]
 --
-All options may also be specified as environment variables, with the command line arguments taking precendence.  For example:
+All options may also be specified as environment variables, with the command line arguments taking precedence.  For example:
 [source,console]
 ----
 $ KUBECONFIG=/etc/kube/config SYSTEM=1 ALL=TRUE cbopinfo
@@ -157,14 +213,33 @@ To collect all Couchbase clusters, their associated resources within a namespace
 
 [source,console]
 ----
-$ cbopinfo --collectinfo --system
-Plain text server logs accessible with the following commands (use 'oc' command for OpenShift deployments):
-    kubectl cp default/cb-example-0001:/tmp/cbinfo-default-cb-example-0001-20180919T092607+0100.zip .
-    kubectl cp default/cb-example-0002:/tmp/cbinfo-default-cb-example-0002-20180919T092607+0100.zip .
-    kubectl cp default/cb-example-0000:/tmp/cbinfo-default-cb-example-0000-20180919T092607+0100.zip .
-Redacted server logs accessible with the following commands (use 'oc' command for OpenShift deployments):
-    kubectl cp default/cb-example-0001:/tmp/cbinfo-default-cb-example-0001-20180919T092607+0100-redacted.zip .
-    kubectl cp default/cb-example-0002:/tmp/cbinfo-default-cb-example-0002-20180919T092607+0100-redacted.zip .
-    kubectl cp default/cb-example-0000:/tmp/cbinfo-default-cb-example-0000-20180919T092607+0100-redacted.zip .
-Wrote cluster information to cbopinfo-20180919T092607+0100.tar.gz
+$ cbopinfo --collectinfo --collectinfo-collect all --system
+Server logs downloaded to the following files:
+    cbinfo-default-cb-example-0002-20181016T145816+0100.zip
+    cbinfo-default-cb-example-0000-20181016T145816+0100.zip
+    cbinfo-default-cb-example-0004-20181016T145816+0100.zip
+    cbinfo-default-cb-example-0003-20181016T145816+0100.zip
+    cbinfo-default-cb-example-0001-20181016T145816+0100.zip
+Wrote cluster information to cbopinfo-20181016T145816+0100.tar.gz
+----
+
+To interactively collect server logs:
+
+[source,console]
+----
+$ ./build/bin/cbopinfo --collectinfo
+Detected resources for log collection:
+┌────┬─────────────────┬──────┬──────────┐
+│ ID │ Pod             │ Type │ Detached │
+├────┼─────────────────┼──────┼──────────┤
+│ 0  │ cb-example-0001 │ pod  │          │
+│ 1  │ cb-example-0003 │ pod  │          │
+│ 2  │ cb-example-0004 │ pod  │          │
+└────┴─────────────────┴──────┴──────────┘
+Please select volumes to collect [e.g. 1,2,5-6 or leave blank for all]: 1-2
+Please select whether to enable log redaction [Y/n]:
+Server logs downloaded to the following files:
+    cbinfo-default-cb-example-0002-20181016T131730+0100-redacted.zip
+    cbinfo-default-cb-example-0001-20181016T131730+0100-redacted.zip
+Wrote cluster information to cbopinfo-20181016T131730+0100.tar.gz
 ----
