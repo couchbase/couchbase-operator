@@ -2,6 +2,7 @@ PREFIX ?= $(shell pwd)
 GOPATH = $(shell echo $${PWD%/src/*})
 SOURCE = $(shell find . -name *.go -type f)
 BINARY = build/bin/couchbase-operator
+BINARY_ADMISSION = build/bin/couchbase-operator-admission
 ARTIFACTS = build/artifacts
 
 kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
@@ -9,7 +10,7 @@ operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-ope
 namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
 deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
 bldNum = $(if $(BLD_NUM),$(BLD_NUM),999)
-productVersion = $(if $(VERSION),$(VERSION)-$(bldNum),1.1.0-999)
+productVersion = $(if $(VERSION),$(VERSION)-$(bldNum),1.2.0-999)
 testname = $(E2E_TEST)
 
 .PHONY: all dep build container dist test test-indv
@@ -69,15 +70,25 @@ artifacts: tools
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(productVersion)
 
 image-artifacts: build
-	mkdir -p build/image-artifacts/docs
-	mkdir -p build/image-artifacts/build/bin
-	cp docs/License.txt build/image-artifacts/docs/License.txt
-	cp docs/README.txt build/image-artifacts/docs/README.txt
-	cp $(BINARY) build/image-artifacts/$(BINARY)
-	cp Dockerfile build/image-artifacts/Dockerfile
-	cp Dockerfile.rhel build/image-artifacts/Dockerfile.rhel
-	tar -C build/image-artifacts -czf build/couchbase-autonomous-operator-image_$(productVersion).tgz .
-	rm -rf build/image-artifacts
+	# Create a subdirectory for the operator docker build
+	mkdir -p $(ARTIFACTS)/operator/docs
+	mkdir -p $(ARTIFACTS)/operator/build/bin
+	cp docs/License.txt $(ARTIFACTS)/operator/docs/License.txt
+	cp docs/README.txt $(ARTIFACTS)/operator/docs/README.txt
+	cp $(BINARY) $(ARTIFACTS)/operator/$(BINARY)
+	cp Dockerfile $(ARTIFACTS)/operator/Dockerfile
+	cp Dockerfile.rhel $(ARTIFACTS)/operator/Dockerfile.rhel
+	# Create a subdirectory for the admission controller docker build
+	mkdir -p $(ARTIFACTS)/admission/docs
+	mkdir -p $(ARTIFACTS)/admission/build/bin
+	cp docs/License.txt $(ARTIFACTS)/admission/docs/License.txt
+	cp docs/README.txt $(ARTIFACTS)/admission/docs/README.txt
+	cp $(BINARY_ADMISSION) $(ARTIFACTS)/admission/$(BINARY_ADMISSION)
+	cp Dockerfile.admission $(ARTIFACTS)/admission/Dockerfile
+	cp Dockerfile.admission-rhel $(ARTIFACTS)/admission/Dockerfile.rhel
+	# Create the archive
+	tar -C $(ARTIFACTS) -czf build/couchbase-autonomous-operator-image_$(productVersion).tgz .
+	rm -rf $(ARTIFACTS)
 
 # This target (and only this target) is invoked by the production build job.
 # This job will archive all files that end up in the dist/ directory.
