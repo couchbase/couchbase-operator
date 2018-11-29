@@ -357,6 +357,9 @@ type PodPolicy struct {
 	// By default, kubernetes will mount a service account token into the couchbase pods.
 	// AutomountServiceAccountToken indicates whether pods running with the service account should have an API token automatically mounted.
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
+
+	// ImagePullSecrets allows users to pull Couchbase Server images from private repos.
+	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 type VolumeMountName string

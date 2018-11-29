@@ -675,6 +675,9 @@ func applyPodPolicy(clusterName string, pod *v1.Pod, policy *cbapi.PodPolicy) {
 	if policy.AutomountServiceAccountToken != nil {
 		pod.Spec.AutomountServiceAccountToken = policy.AutomountServiceAccountToken
 	}
+	if len(policy.ImagePullSecrets) != 0 {
+		pod.Spec.ImagePullSecrets = policy.ImagePullSecrets
+	}
 
 	mergeLabels(pod.Labels, policy.Labels)
 

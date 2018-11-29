@@ -98,6 +98,8 @@ spec:
             value: cbapp
             effect: NoSchedule
         automountServiceAccountToken: false
+        imagePullSecrets:
+          - name: my-pull-secret
         volumeMounts:
           default: couchbase
           data:  couchbase
@@ -593,6 +595,8 @@ spec:
           operator: Equal
           value: cbapp
           effect: NoSchedule
+      imagePullSecrets:
+        - name: my-pull-secret
 ----
 
 _Specification rules:_ The `servers` portion of the specification is required and must always contain at least one server definition. There must also be at least one definition that contains the data service.
@@ -655,6 +659,8 @@ spec:
           operator: Equal
           value: cbapp
           effect: NoSchedule
+      imagePullSecrets:
+        - name: my-pull-secret
       volumeMounts:
         default: couchbase
         data:  couchbase
@@ -734,6 +740,14 @@ This field specifies conditions upon which a node should not be selected when de
 
 ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
+____
+
+=== imagePullSecrets
+
+This field specifies a list of secrets that can be used to authorize Couchbase server containers to be pulled from a private docker registry.
+
+____
+_Field rules:_ The value of this field is optional.  If specified it must be a list of objects mapping `name` to an existing pull `secret` resource.
 ____
 
 == spec.servers.pod.volumeMounts
