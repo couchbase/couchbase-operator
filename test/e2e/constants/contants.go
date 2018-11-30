@@ -1,6 +1,7 @@
 package constants
 
 import (
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	util_const "github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
@@ -36,8 +37,16 @@ var (
 	CouchbaseServerPodLabelStr = CouchbaseLabel + "," + CouchbaseServerClusterKey + "="
 
 	// List of Couchbase-cluster services
-	StatefulCbServiceList  = []string{"data", "index", "analytics"}
-	StatelessCbServiceList = []string{"query", "search", "eventing"}
+	StatefulCbServiceList = couchbasev1.ServiceList{
+		couchbasev1.DataService,
+		couchbasev1.IndexService,
+		couchbasev1.AnalyticsService,
+	}
+	StatelessCbServiceList = couchbasev1.ServiceList{
+		couchbasev1.QueryService,
+		couchbasev1.SearchService,
+		couchbasev1.EventingService,
+	}
 )
 
 var (
