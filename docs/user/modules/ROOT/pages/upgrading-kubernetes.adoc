@@ -49,6 +49,41 @@ For clusters deployed with server group support, this would require another node
 
 == Performing the Upgrade
 
+There are two supported methods for upgrading a Kubernetes cluster: Automatic and manual.
+
+=== Automatic Upgrade
+
+To prevent downtime or a data loss scenario, the Operator provides controls for how automated Kubernetes upgrades proceed.
+
+A `PodDisruptionBudget` is created for each `CouchbaseCluster` resource created.
+The `PodDisruptionBudget` specifies that at least the cluster size minus one node (N-1) be ready at any time.
+This constraint allows, at most, one node to be evicted at a time.
+As a result, it's recommended that to support an automatic Kubernetes upgrade, the cluster be deployed with anti-affinity enabled to guarantee only a single eviction at a time.
+
+To ensure Couchbase Server nodes report that they are ready once they are added to the cluster and balanced in, the Couchbase server pods are created with an _exec_-based https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#define-readiness-probes[readiness probe].
+The probe simply polls a file on the pod's file system.
+The file is created by the Operator only when all of the pods are balanced in and the cluster is in a stable condition.
+
+[IMPORTANT]
+.About Automatically Upgrading Kubernetes Clusters Running Couchbase Clusters That Were Created Prior to Operator 1.2.0
+====
+Couchbase clusters that were created with Operator versions prior to 1.2.0 cannot have their underlying Kubernetes nodes automatically upgraded until they (the Couchbase clusters) are updated to use _exec_-based readiness checks.
+
+.To upgrade the Couchbase cluster to use the new readiness checks, first ensure the Operator has been upgraded to version 1.2.0, then choose one of the following options:
+* Change the name of all server classes (the `spec.servers[].name` attribute).
+This will swap the pods that are using old specifications with new ones, all in a single operation.
+This is an online upgrade.
+* Perform an xref:upgrading-couchbase.adoc[upgrade] of Couchbase server.
+This will upgrade the pods that are using old specifications with new ones via the rolling upgrade mechanism.
+This is an online upgrade.
+This is the preferred method to perform this upgrade action.
+An upgrade cannot be be performed if you are already running the latest version of Couchbase server.
+* Create a new Couchbase cluster and migrate existing data over to the new one with XDCR.
+This will require a maintenance window in order to ensure that all data is replicated successfully and to update clients to connect to the new Couchbase cluster.
+====
+
+=== Manual Upgrade
+
 When you drain a Kubernetes node containing a Couchbase pod, the following sequence of events will occur:
 
 * The Operator will detect that a cluster member is down.
