@@ -78,9 +78,13 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 		"stats.cluster":      "/v1/stats/cluster",
 	}
 
+	// The port-forwarder is a bit chatty on error, but we can shut it up
+	restorer := portforward.Silent()
+	defer restorer()
+
 	for name, path := range paths {
 		// Get the debug info, we need debug=1 here or it spits out binary
-		uri := fmt.Sprintf("http://localhost:%s/%s", r.context.Config.OperatorRestPort, path)
+		uri := fmt.Sprintf("http://localhost:%s%s", r.context.Config.OperatorRestPort, path)
 		resp, err := http.Get(uri)
 		if err != nil {
 			fmt.Printf("unable to collect %s for pod %s\n", uri, pod.Name)

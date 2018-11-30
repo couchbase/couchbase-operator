@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
@@ -79,4 +80,12 @@ func (pf *PortForwarder) ForwardPorts() error {
 func (pf *PortForwarder) Close() error {
 	close(pf.stopChan)
 	return <-pf.errorChan
+}
+
+// Silent makes any runtime print statements go away.  Returns a restorer function that should
+// be called once silence is no longer needed.
+func Silent() func() {
+	handlers := runtime.ErrorHandlers
+	runtime.ErrorHandlers = []func(error){}
+	return func() { runtime.ErrorHandlers = handlers }
 }
