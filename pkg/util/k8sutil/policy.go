@@ -46,7 +46,10 @@ func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev1.CouchbaseClu
 		return nil
 	}
 
-	actual.Spec = required.Spec
-	_, err = client.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Update(actual)
+	// Delete and recreate as the spec is immutable.
+	if err := client.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Delete(name, nil); err != nil {
+		return err
+	}
+	_, err = client.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required)
 	return err
 }
