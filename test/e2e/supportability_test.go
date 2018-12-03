@@ -594,7 +594,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 
 	// Deploy cb server for cbopinfo validation
-	if _, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithoutBucket, constants.AdminHidden); err != nil {
+	if _, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden); err != nil {
 		t.Fatal(err)
 	}
 
@@ -731,19 +731,19 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 
 	go func() {
 		var err error
-		cluster1, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster1Size, constants.WithoutBucket, constants.AdminHidden)
+		cluster1, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster1Size, constants.WithoutBucket, constants.AdminHidden)
 		cluster1Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster2, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster2Size, constants.WithoutBucket, constants.AdminHidden)
+		cluster2, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster2Size, constants.WithoutBucket, constants.AdminHidden)
 		cluster2Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster3, err = e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, cluster3Size, constants.WithoutBucket, constants.AdminHidden)
+		cluster3, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster3Size, constants.WithoutBucket, constants.AdminHidden)
 		cluster3Err <- err
 	}()
 
@@ -1033,7 +1033,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 
 	kubeConfPath := targetKube.KubeConfPath
 
-	cluster1, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
+	cluster1, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1149,7 +1149,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, kubeName, opImageName string, 
 	}
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1242,7 +1242,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1332,7 +1332,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	kubeConfPath := targetKube.KubeConfPath
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1436,7 +1436,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1584,7 +1584,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Cb cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1742,7 +1742,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1902,7 +1902,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2017,7 +2017,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2151,7 +2151,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, kubeName string, serverMembe
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2321,7 +2321,7 @@ func TestLogRedactionVerify(t *testing.T) {
 	}
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminExposed)
+	cbCluster, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2396,7 +2396,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	if err != nil {
 		t.Fatal(err)
 	}

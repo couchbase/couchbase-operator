@@ -23,6 +23,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
@@ -187,10 +188,10 @@ func GetBucketConfigMap(bucketName, bucketType, ioPriority string, memQuotaInMB,
 
 // newClusterFromSpecQuick creates a cluster and waits for various ready conditions.
 // Returns the cluster object regardless so we can test for error conditions
-func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
+func newClusterFromSpecQuick(t *testing.T, k8s *types.Cluster, namespace string, cluster *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
 	// Create the cluster
 	var err error
-	if cluster, err = CreateCluster(t, crClient, namespace, cluster); err != nil {
+	if cluster, err = CreateCluster(t, k8s.CRClient, namespace, cluster); err != nil {
 		t.Logf("failed to create cluster")
 		return nil, err
 	}
@@ -198,14 +199,14 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 	errChan := make(chan error)
 	go func() {
 		// Expect the cluster to enter a failed state
-		if err := WaitClusterPhaseFailed(t, crClient, cluster, constants.Retries20); err == nil {
+		if err := WaitClusterPhaseFailed(t, k8s.CRClient, cluster, constants.Retries20); err == nil {
 			errChan <- errors.New("Cluster entered failed state")
 		}
 	}()
 
 	go func() {
 		// Wait for the cluster to reach the correct size
-		_, err := WaitUntilSizeReached(t, crClient, cluster.Spec.TotalSize(), retries.Size, cluster)
+		_, err := WaitUntilSizeReached(t, k8s.CRClient, cluster.Spec.TotalSize(), retries.Size, cluster)
 		errChan <- err
 	}()
 
@@ -217,14 +218,14 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 	// If any buckets are specified wait for these to become active
 	buckets := cluster.Spec.BucketNames()
 	if len(buckets) > 0 {
-		err := WaitUntilBucketsExists(t, crClient, buckets, retries.Bucket, cluster)
+		err := WaitUntilBucketsExists(t, k8s.CRClient, buckets, retries.Bucket, cluster)
 		if err != nil {
 			t.Logf("failed to wait for bucket to exist")
 			return cluster, err
 		}
 	}
 	// Update the cluster status
-	updatedCluster, err := GetClusterCRD(crClient, cluster)
+	updatedCluster, err := GetClusterCRD(k8s.CRClient, cluster)
 	if err != nil {
 		t.Logf("failed to get updated cluster spec")
 		return cluster, err
@@ -234,19 +235,19 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 
 // newClusterFromSpec creates a cluster and waits for various ready conditions.
 // Performs retries and garbage collection in the event of transient failure
-func newClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, clusterSpec *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
+func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
 	var err error
 	for i := 0; i < 1; i++ {
 		time.Sleep(10 * time.Second)
 
 		// Ensure we set the err variable in the main scope
 		var cluster *api.CouchbaseCluster
-		cluster, err = newClusterFromSpecQuick(t, crClient, namespace, clusterSpec, retries)
+		cluster, err = newClusterFromSpecQuick(t, k8s, namespace, clusterSpec, retries)
 		if err != nil {
 			t.Logf("failed to create cluster from spec")
 			if cluster != nil {
 				t.Logf("deleting failed cluster")
-				DeleteCluster(t, crClient, kubeClient, cluster, 5)
+				DeleteCluster(t, k8s.CRClient, k8s.KubeClient, cluster, 5)
 			}
 			continue
 		}
@@ -278,13 +279,13 @@ func GetPlatformTimingMultiplier(platformType string) int {
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpec(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, GetRetriesForPlatform(platformType))
+	return newClusterFromSpec(t, k8s, namespace, crd, GetRetriesForPlatform(platformType))
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpecSystemTest(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, ctx *TlsContext) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	if ctx != nil {
 		crd.Name = ctx.ClusterName
@@ -297,38 +298,38 @@ func CreateClusterFromSpecSystemTest(t *testing.T, kubeClient kubernetes.Interfa
 			},
 		}
 	}
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, crd, systemTestRetries)
+	return newClusterFromSpec(t, k8s, namespace, crd, systemTestRetries)
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpecNoWait(t *testing.T, crClient versioned.Interface, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpecNoWait(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
-	return CreateCluster(t, crClient, namespace, crd)
+	return CreateCluster(t, k8s.CRClient, namespace, crd)
 }
 
 // NewClusterBasicQuick attempts to create a basic cluster only once.  The returned
 // cluster object may still be valid upon error
-func NewClusterBasicQuick(t *testing.T, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", secretName, size, withBucket, exposed)
-	return newClusterFromSpecQuick(t, crClient, namespace, clusterSpec, retries)
+func NewClusterBasicQuick(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", k8s.DefaultSecret.Name, size, withBucket, exposed)
+	return newClusterFromSpecQuick(t, k8s, namespace, clusterSpec, retries)
 }
 
 // NewClusterMultiQuick attempts to create a multi cluster only once.  The returned
 // cluster object may still be valid upon error
-func NewClusterMultiQuick(t *testing.T, crClient versioned.Interface, namespace, secretName string, config map[string]map[string]string, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, secretName, config, exposed)
-	return newClusterFromSpecQuick(t, crClient, namespace, clusterSpec, retries)
+func NewClusterMultiQuick(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, exposed)
+	return newClusterFromSpecQuick(t, k8s, namespace, clusterSpec, retries)
 }
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
-func MustNewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
-	cluster, err := NewClusterBasic(t, kubeClient, crClient, namespace, secretName, size, withBucket, exposed)
+func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+	cluster, err := NewClusterBasic(t, k8s, namespace, size, withBucket, exposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,8 +337,8 @@ func MustNewClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient
 }
 
 // NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
-func NewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
+func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.TLS = &api.TLSPolicy{
 		Static: &api.StaticTLS{
@@ -347,11 +348,11 @@ func NewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient 
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
-func MustNewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
-	cluster, err := NewTLSClusterBasic(t, kubeClient, crClient, namespace, secretName, size, withBucket, exposed, ctx)
+func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
+	cluster, err := NewTLSClusterBasic(t, k8s, namespace, size, withBucket, exposed, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,8 +360,8 @@ func MustNewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crCli
 }
 
 // NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
-func NewTLSClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
+func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.TLS = &api.TLSPolicy{
 		Static: &api.StaticTLS{
@@ -370,19 +371,19 @@ func NewTLSClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crC
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	return CreateCluster(t, crClient, namespace, clusterSpec)
+	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
 // MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification
-func MustNotNewTLSClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) {
-	if _, err := NewTLSClusterBasicNoWait(t, kubeClient, crClient, namespace, secretName, size, withBucket, exposed, ctx); err == nil {
+func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) {
+	if _, err := NewTLSClusterBasicNoWait(t, k8s, namespace, size, withBucket, exposed, ctx); err == nil {
 		t.Fatal("cluster created unexpectedly")
 	}
 }
 
 // NewTlsXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
-func NewTlsXdcrClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
+func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.TLS = &api.TLSPolicy{
 		Static: &api.StaticTLS{
@@ -392,40 +393,40 @@ func NewTlsXdcrClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crCli
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
-// NewClusterBasic creates a basic cluster, retrying if an error is encountered and
+// NewXdcrClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewXdcrClusterBasic(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
-func NewClusterBasicNoWait(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
-	return CreateCluster(t, crClient, namespace, clusterSpec)
+func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
+	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an
 // error is encountered and performing garbage collection
-func NewStatefulCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewStatefulCluster(constants.ClusterNamePrefix, secretName, size, withBucket, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewStatefulCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
 // NewClusterMulti creates a multi cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewClusterMulti(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, secretName string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, secretName, config, exposed)
-	return newClusterFromSpec(t, kubeClient, crClient, namespace, clusterSpec, defaultRetries)
+func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, exposed)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
 // NewClusterMultiNoWait creates a multi cluster, but doesn't wait for any events.
 // Used in cases where the cluster is expected to fail
-func NewClusterMultiNoWait(t *testing.T, crClient versioned.Interface, namespace, secretName string, config map[string]map[string]string) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, secretName, config, false)
-	return CreateCluster(t, crClient, namespace, clusterSpec)
+func NewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) (*api.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, false)
+	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
 func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {

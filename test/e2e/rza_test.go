@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,7 +166,7 @@ func GetAvailableServerGroupsFromYmlData(k8sNodesData framework.ClusterInfo) []s
 
 // GetAvailabilityZones returns a sorted list of configured availability zones from the cluster.
 // These zones will be pre-provisioned by Kops etc. or added via a cluster decorator.
-func GetAvailabilityZones(t *testing.T, cluster *framework.Cluster) clustercapabilities.ZoneList {
+func GetAvailabilityZones(t *testing.T, cluster *types.Cluster) clustercapabilities.ZoneList {
 	capabilities := clustercapabilities.MustNewCapabilities(t, cluster.KubeClient)
 	if !capabilities.ZonesSet {
 		t.Skip("cluster availability zones unset")
@@ -236,7 +237,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	}
 
 	t.Logf("AntiAffinity=%s ... \n attempting to create %d pod cluster with %d nodes", antiAffinity, clusterSize, clusterSize)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, false)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
@@ -335,7 +336,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +456,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +512,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	}
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -593,7 +594,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -718,7 +719,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -799,7 +800,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, serverGroupsUsed)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminHidden)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -892,7 +893,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -993,7 +994,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, configMap, constants.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}

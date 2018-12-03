@@ -23,6 +23,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -156,7 +157,7 @@ func CreateDeploymentObject(operatorImageName string, restPort int32) (deploymen
 
 // Setup setups a test framework and points "Global" to it.
 func Setup(t *testing.T) error {
-	clusterSpecMap := make(ClusterMap)
+	clusterSpecMap := types.ClusterMap{}
 
 	deployment, err := CreateDeploymentObject(runtimeParams.OperatorImage, constants.OperatorRestPort)
 	if err != nil {
@@ -327,8 +328,8 @@ func Teardown() error {
 	return nil
 }
 
-func CreateKubeClusterObject(kubeConfPath string) (Cluster, error) {
-	clusterSpec := Cluster{}
+func CreateKubeClusterObject(kubeConfPath string) (types.Cluster, error) {
+	clusterSpec := types.Cluster{}
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfPath)
 	if err != nil {
 		return clusterSpec, err
@@ -532,7 +533,7 @@ func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName s
 	return nil
 }
 
-func (f *Framework) SetupCouchbaseOperator(targetKube *Cluster) error {
+func (f *Framework) SetupCouchbaseOperator(targetKube *types.Cluster) error {
 	if _, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(f.Deployment); err != nil {
 		return err
 	}
@@ -601,7 +602,7 @@ func (f *Framework) PodClient(kubeName string) typedv1.PodInterface {
 	return f.ClusterSpec[kubeName].KubeClient.CoreV1().Pods(f.Namespace)
 }
 
-func (f *Framework) GetCluster(index int) *Cluster {
+func (f *Framework) GetCluster(index int) *types.Cluster {
 	return f.ClusterSpec[f.TestClusters[index]]
 }
 

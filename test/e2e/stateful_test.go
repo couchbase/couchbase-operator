@@ -23,7 +23,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 
 	clusterSize := constants.Size3
-	testCouchbase, err := e2eutil.NewStatefulCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, targetKube.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase, err := e2eutil.NewStatefulCluster(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
 		t.Fatal(err)
 	}

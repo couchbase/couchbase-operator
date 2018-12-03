@@ -141,12 +141,12 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	go func() {
 		// Cluster 1
 		var err error
-		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, xdcr1Kube.KubeClient, xdcr1Kube.CRClient, f.Namespace, xdcr1Kube.DefaultSecret.Name, clusterSize, constants.WithBucket, constants.AdminExposed)
+		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, xdcr1Kube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 		errChan <- err
 	}()
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcr2Kube.KubeClient, xdcr2Kube.CRClient, f.Namespace, xdcr2Kube.DefaultSecret.Name, clusterSize, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcr2Kube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,12 +303,12 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	go func() {
 		var err error
 		// Cluster 1
-		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, xdcr1Kube.KubeClient, xdcr1Kube.CRClient, f.Namespace, xdcr1Kube.DefaultSecret.Name, clusterSize, constants.WithBucket, constants.AdminExposed)
+		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, xdcr1Kube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 		errChan <- err
 	}()
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcr2Kube.KubeClient, xdcr2Kube.CRClient, f.Namespace, xdcr2Kube.DefaultSecret.Name, clusterSize, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcr2Kube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -411,12 +411,12 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	go func() {
 		var err error
 		// Cluster 1
-		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, xdcrCluster1Size, constants.WithBucket, constants.AdminExposed)
+		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, defKube, f.Namespace, xdcrCluster1Size, constants.WithBucket, constants.AdminExposed)
 		errChan <- err
 	}()
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, xdcrCluster2Size, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube, f.Namespace, xdcrCluster2Size, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,12 +566,12 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	go func() {
 		var err error
 		// Cluster 1
-		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
+		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, defKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 		errChan <- err
 	}()
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -711,12 +711,12 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 	go func() {
 		var err error
 		// Cluster 1
-		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
+		xdcrCluster1, err = e2eutil.NewXdcrClusterBasic(t, defKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 		errChan <- err
 	}()
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster2, err := e2eutil.NewXdcrClusterBasic(t, xdcrKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -874,13 +874,13 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	}
 
 	// Cluster 1
-	xdcrCluster1, err := e2eutil.NewTlsXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName1])
+	xdcrCluster1, err := e2eutil.NewTlsXdcrClusterBasic(t, defKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName1])
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewTlsXdcrClusterBasic(t, xdcrKube.KubeClient, xdcrKube.CRClient, f.Namespace, xdcrKube.DefaultSecret.Name, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName2])
+	xdcrCluster2, err := e2eutil.NewTlsXdcrClusterBasic(t, xdcrKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName2])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -981,7 +981,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 
 	// Cluster 1
 	clusterSize := constants.Size2
-	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, defKube.KubeClient, defKube.CRClient, f.Namespace, defKube.DefaultSecret.Name, clusterSize, constants.WithBucket, constants.AdminExposed)
+	xdcrCluster1, err := e2eutil.NewXdcrClusterBasic(t, defKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
 		t.Fatal(err)
 	}

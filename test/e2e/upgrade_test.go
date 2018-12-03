@@ -50,7 +50,7 @@ func TestUpgrade(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if cluster.Spec.Version != sourceVersion {
 		t.Skip("Skipping test as version is not as expected")
 	}
@@ -87,7 +87,7 @@ func TestUpgradeRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if cluster.Spec.Version != sourceVersion {
 		t.Skip("Skipping test as version is not as expected")
 	}
@@ -133,7 +133,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if cluster.Spec.Version != sourceVersion {
 		t.Skip("Skipping test as version is not as expected")
 	}
@@ -183,7 +183,7 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if cluster.Spec.Version != sourceVersion {
 		t.Skip("Skipping test as version is not as expected")
 	}
@@ -203,7 +203,7 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if cluster.Spec.Version != sourceVersion {
 		t.Skip("Skipping test as version is not as expected")
 	}
@@ -223,7 +223,7 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes.KubeClient, kubernetes.CRClient, f.Namespace, kubernetes.DefaultSecret.Name, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	if cluster.Spec.Version != sourceVersion {
 		t.Skip("Skipping test as version is not as expected")
 	}

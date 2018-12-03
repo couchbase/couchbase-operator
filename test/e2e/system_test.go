@@ -328,12 +328,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	// Create Cluster1 in async manner
 	go func() {
 		var err error
-		testCouchbase1, err = e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec1, ctx1)
+		testCouchbase1, err = e2eutil.CreateClusterFromSpecSystemTest(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec1, ctx1)
 		errChan <- err
 	}()
 
 	// Create Cluster2 and wait for cluster creation to succeed
-	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, constants.AdminExposed, clusterSpec2, ctx2)
+	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec2, ctx2)
 	if err != nil {
 		t.Fatal(err)
 	}

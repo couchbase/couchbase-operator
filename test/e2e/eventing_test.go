@@ -63,7 +63,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	}
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, "basic-test-secret", configMap, constants.AdminExposed)
+	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 	if err != nil {
 		t.Fatalf("cluster creation failed: %v", err)
 	}

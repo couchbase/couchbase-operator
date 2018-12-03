@@ -4,26 +4,10 @@ import (
 	"io"
 	"testing"
 
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-
-	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
-
-// Represent Kube cluster specific variables
-type Cluster struct {
-	KubeClient    kubernetes.Interface
-	CRClient      versioned.Interface
-	DefaultSecret *v1.Secret
-	Config        *rest.Config
-	KubeConfPath  string
-}
-
-// To store each Cluster object denoted by it's Kube name
-type ClusterMap map[string]*Cluster
 
 // Main framework structure
 type Framework struct {
@@ -32,7 +16,7 @@ type Framework struct {
 	Namespace       string
 	KubeType        string
 	KubeVersion     string
-	ClusterSpec     ClusterMap
+	ClusterSpec     types.ClusterMap
 	LogDir          string
 	SkipTeardown    bool
 	SuiteYmlData    SuiteData
