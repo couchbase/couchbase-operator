@@ -18,8 +18,7 @@ func TestCreateCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
@@ -46,8 +45,7 @@ func TestCreateBucketCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden)
 	if err != nil {

@@ -178,8 +178,7 @@ func GetAvailabilityZones(t *testing.T, cluster *types.Cluster) clustercapabilit
 // Generic function to test AntiAffinity test case with values on / off
 func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
@@ -314,8 +313,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 // Generic test cases to update K8S node's server group labels
 func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -434,8 +432,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -489,8 +486,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 7
@@ -572,8 +568,7 @@ func TestRzaResizeCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -697,8 +692,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -776,8 +770,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -871,8 +864,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
@@ -972,8 +964,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[targetKubeName]
+	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3

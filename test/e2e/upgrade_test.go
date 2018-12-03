@@ -44,7 +44,7 @@ var (
 func TestUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+	kubernetes := f.GetCluster(0)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -81,7 +81,7 @@ func TestUpgrade(t *testing.T) {
 func TestUpgradeRollback(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+	kubernetes := f.GetCluster(0)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -125,7 +125,7 @@ func TestUpgradeRollback(t *testing.T) {
 func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+	kubernetes := f.GetCluster(0)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -177,7 +177,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 func TestUpgradeInvalidUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+	kubernetes := f.GetCluster(0)
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -197,7 +197,7 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 func TestUpgradeInvalidDowngrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+	kubernetes := f.GetCluster(0)
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -217,7 +217,7 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 func TestUpgradeInvalidRollback(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.ClusterSpec[f.TestClusters[0]]
+	kubernetes := f.GetCluster(0)
 
 	// Static configuration.
 	clusterSize := constants.Size3

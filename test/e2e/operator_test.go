@@ -19,8 +19,7 @@ func TestPauseOperator(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	memberIdToKill := 0
 
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
@@ -93,8 +92,7 @@ func TestKillOperator(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 	if err != nil {
@@ -127,8 +125,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 	if err != nil {
@@ -141,7 +138,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}

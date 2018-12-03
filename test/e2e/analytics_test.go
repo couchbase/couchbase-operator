@@ -24,8 +24,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := 3
 	numOfDocs := 50
@@ -57,7 +56,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -102,8 +101,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := 1
 	numOfDocs := 10
@@ -133,7 +131,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -280,8 +278,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSizeWoAnalytics := 3
 	clusterSizeOfAnalytics := 3
@@ -319,7 +316,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -485,8 +482,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	numOfDocs := 100
 	clusterSize := 3
@@ -529,7 +525,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}

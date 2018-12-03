@@ -26,8 +26,7 @@ func TestResizeCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	t.Logf("Creating New Couchbase Cluster...\n")
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
@@ -81,8 +80,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	t.Logf("Creating New Couchbase Cluster...\n")
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminHidden)
@@ -137,8 +135,7 @@ func TestEditClusterSettings(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
@@ -156,7 +153,7 @@ func TestEditClusterSettings(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -239,8 +236,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
@@ -274,8 +270,7 @@ func TestInvalidAuthSecret(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
@@ -311,8 +306,7 @@ func TestInvalidBaseImage(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	couchbaseBaseImage := "basecouch/123"
 	couchbaseVerString := "enterprise-5.5.0"
@@ -380,8 +374,7 @@ func TestInvalidVersion(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	couchbaseBaseImage := "couchbase/server"
 	couchbaseVerString := "enterprise-9.9.9"
@@ -452,8 +445,7 @@ func TestNodeUnschedulable(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	clusterSize := constants.Size1
 
 	// create 1 node cluster
@@ -538,8 +530,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	}
 	f := framework.Global
 	removePodMemberId := 0
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	// create 3 node cluster
 	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden)
@@ -559,7 +550,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	if f.KubeType == "kubernetes" {
-		if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
+		if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
 			t.Fatal(err)
 		}
 	} else {
@@ -603,8 +594,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	// create 5 node cluster
 	clusterSize := constants.Size5
@@ -636,7 +626,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	if f.KubeType == "kubernetes" {
-		if _, err := f.ExecShellInPod(kubeName, memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
+		if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
 			t.Fatal(err)
 		}
 	} else {
@@ -678,8 +668,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	removePodMemberId := 1
 	newPodMemberId := 2
 
@@ -716,7 +705,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	}
 	defer e2eutil.DeleteService(targetKube.KubeClient, f.Namespace, service.Name, nil)
 
-	serviceUrl, err := e2eutil.NodePortServiceClient(f.ApiServerHost(kubeName), service)
+	serviceUrl, err := e2eutil.NodePortServiceClient(targetKube.APIHost(), service)
 	if err != nil {
 		t.Fatalf("failed to get cluster url %v", err)
 	}
@@ -775,8 +764,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
@@ -793,7 +781,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -984,8 +972,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
 
@@ -1004,7 +991,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1226,8 +1213,7 @@ func TestCreateClusterWithoutDataService(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"query", "index", "search"})
@@ -1253,8 +1239,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"query", "index", "search"})
@@ -1277,7 +1262,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1308,8 +1293,7 @@ func TestRemoveLastDataService(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
@@ -1332,7 +1316,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1380,8 +1364,7 @@ func TestManageMultipleClusters(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	t.Logf("Creating New Couchbase Cluster-1...\n")
 	testCouchbase1, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size2, constants.WithoutBucket, constants.AdminExposed)
@@ -1423,7 +1406,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	expectedEvents3.AddRebalanceCompletedEvent(testCouchbase3)
 
 	// create connection to couchbase nodes
-	client1, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase1)
+	client1, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1435,7 +1418,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo1)
 
 	// create connection to couchbase nodes
-	client2, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase2)
+	client2, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
@@ -1447,7 +1430,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo2)
 
 	// create connection to couchbase nodes
-	client3, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase3)
+	client3, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase3)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}

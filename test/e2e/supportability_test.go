@@ -24,6 +24,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -510,8 +511,7 @@ func createClusterRoles(kubeClient kubernetes.Interface, roleName string) error 
 // and validate the exit status of the commands
 func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
 	t.Logf("KubeConfPath: %+v", kubeConfPath)
 	errMsgList := failureList{}
@@ -717,8 +717,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	failureExists := false
 	cluster1Size := constants.Size3
@@ -1027,8 +1026,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	svcAccName := "rbac-test"
 
 	kubeConfPath := targetKube.KubeConfPath
@@ -1138,9 +1136,9 @@ func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName s
 
 // Generic function to re-deploy the operator with given image name and rest-port
 // Collect logs with appropiate cbopinfo arguments and verify the collected info
-func CollectExtendedDebugLogGeneric(t *testing.T, kubeName, opImageName string, testPort, defPort int32, cmdArgs []string) {
+func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, opImageName string, testPort, defPort int32, cmdArgs []string) {
 	f := framework.Global
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := k8s
 	clusterSize := 3
 
 	defer ReDeployOperator(t, targetKube.KubeClient, f.OpImage, defPort)
@@ -1153,7 +1151,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, kubeName, opImageName string, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
+	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
 	execOut, err := runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
@@ -1201,20 +1199,18 @@ func CollectExtendedDebugLogGeneric(t *testing.T, kubeName, opImageName string, 
 // with default values and validate the logs collected
 func TestExtendedDebugWithDefaultValues(t *testing.T) {
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
 	defPort := constants.OperatorRestPort
 	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-all"}
-	CollectExtendedDebugLogGeneric(t, kubeName, constants.DefOperatorImgTag, defPort, defPort, cmdArgs)
+	CollectExtendedDebugLogGeneric(t, targetKube, constants.DefOperatorImgTag, defPort, defPort, cmdArgs)
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
 // with custom values and validate the logs collected
 func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
 	var defPort int32
 	var testPort int32
@@ -1226,15 +1222,14 @@ func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 		}
 	}
 	cmdArgs := []string{"-operator-image", f.OpImage, "-operator-rest-port", strconv.Itoa(int(testPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-all"}
-	CollectExtendedDebugLogGeneric(t, kubeName, f.OpImage, testPort, defPort, cmdArgs)
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, defPort, cmdArgs)
 }
 
 // Collect cbopinfo with '--operator-image' & '-operator-rest-port'
 // with invalid values and validate the log collection
 func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	invalidImgName := "couchbase/couchbase-operator:invalidversion"
 	invalidPortVal := "32080"
 	clusterSize := constants.Size1
@@ -1325,8 +1320,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 // and kill the operator pod during log collection in parallel
 func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	clusterSize := constants.Size1
 	execOut := []byte{}
 	kubeConfPath := targetKube.KubeConfPath
@@ -1398,9 +1392,9 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 
 // Generic function to kill couchbase server pod and operator with log PVs defined for server pods
 // 'podDownMethod' argument with either one of ['deletePod', 'killServerProcess']
-func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod string, isOperatorKilledWithServerPod bool) {
+func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podDownMethod string, isOperatorKilledWithServerPod bool) {
 	f := framework.Global
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := k8s
 
 	clusterSize := 5
 	newMemberIndex := clusterSize
@@ -1441,7 +1435,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 		t.Fatal(err)
 	}
 	// Cleanup cluster after test execution
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
+	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
 		t.Fatal(err)
@@ -1487,7 +1481,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 				t.Fatal(err)
 			}
 		case "killServerProcess":
-			if _, err := f.ExecShellInPod(kubeName, podNameToKill, "pkill beam.smp"); err != nil {
+			if _, err := f.ExecShellInPod(f.TestClusters[0], podNameToKill, "pkill beam.smp"); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -1551,8 +1545,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 // and check how operator handles the log retention as expected
 func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperatorKilledWithServerPod bool) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	operatorKilledErrChan := make(chan error)
 	clusterSize := 6
@@ -1675,15 +1668,15 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 // even after abnormal pod removal
 func TestCollectLogFromEphemeralPodsUsingLogPV(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
+	targetKube := f.GetCluster(0)
 	isOperatorKilledWithServerPod := false
 
 	// Pods brought down using DeletePod method
-	EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "deletePod", isOperatorKilledWithServerPod)
+	EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "deletePod", isOperatorKilledWithServerPod)
 
 	// Pods brought down by killing cb-server process
 	if f.KubeType == "kubernetes" {
-		EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "killServerProcess", isOperatorKilledWithServerPod)
+		EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "killServerProcess", isOperatorKilledWithServerPod)
 	}
 }
 
@@ -1691,15 +1684,15 @@ func TestCollectLogFromEphemeralPodsUsingLogPV(t *testing.T) {
 // even after abnormal pod removal
 func TestCollectLogFromEphemeralPodsWithOperatorKilled(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
+	targetKube := f.GetCluster(0)
 	isOperatorKilledWithServerPod := true
 
 	// Pods brought down using DeletePod method
-	EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "deletePod", isOperatorKilledWithServerPod)
+	EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "deletePod", isOperatorKilledWithServerPod)
 
 	// Pods brought down by killing cb-server process
 	if f.KubeType == "kubernetes" {
-		EphemeralLogCollectUsingLogPVGeneric(t, kubeName, "killServerProcess", isOperatorKilledWithServerPod)
+		EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "killServerProcess", isOperatorKilledWithServerPod)
 	}
 }
 
@@ -1707,8 +1700,7 @@ func TestCollectLogFromEphemeralPodsWithOperatorKilled(t *testing.T) {
 // Scale down the couchbase cluster and check log PVs cleanup has happened
 func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := 7
 	bucketName := "PVBucket"
@@ -1873,8 +1865,7 @@ func TestLogCollectWithClusterResizeAndOperatorPodKilled(t *testing.T) {
 // using default log retention time and size values
 func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := 5
 	newPodMemberId := clusterSize
@@ -1981,8 +1972,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 // using custom log retention time and size values
 func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := 5
 	newPodMemberId := clusterSize
@@ -2124,9 +2114,9 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 // Generic function to deploy Couchbase server with default persistent volumes mounts
 // Argument 'serverMemberIdsToKill' will kill those pod members and wait for recovery before log collection
 // Argument 'isOperatorKilledWithServerPod' tells whether operator needs to be killed along with server pods
-func LogCollectionWithDefaultPvcMount(t *testing.T, kubeName string, serverMemberIdToKill map[int]string, isOperatorKilledWithServerPod bool) {
+func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMemberIdToKill map[int]string, isOperatorKilledWithServerPod bool) {
 	f := framework.Global
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := k8s
 	kubeConfPath := targetKube.KubeConfPath
 
 	clusterSize := constants.Size2
@@ -2175,7 +2165,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, kubeName string, serverMembe
 				t.Fatal(err)
 			}
 		case "killServerProcess":
-			if _, err := f.ExecShellInPod(kubeName, podNameToKill, "pkill beam.smp"); err != nil {
+			if _, err := f.ExecShellInPod(f.TestClusters[0], podNameToKill, "pkill beam.smp"); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -2241,10 +2231,10 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := f.TestClusters[0]
+	targetKube := f.GetCluster(0)
 	serverPodsToKill := map[int]string{}
 	isOperatorKilledWithServerPod := false
-	LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+	LogCollectionWithDefaultPvcMount(t, targetKube, serverPodsToKill, isOperatorKilledWithServerPod)
 }
 
 // Create couchbase cluster with persistent volume claim
@@ -2254,21 +2244,22 @@ func TestCollectLogFromPvPodRecovered(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := f.TestClusters[0]
+	targetKube := f.GetCluster(0)
+
 	isOperatorKilledWithServerPod := false
 
 	// Pods brought down by DeletePod API
 	serverPodsToKill := map[int]string{
 		1: "deletePod",
 	}
-	LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+	LogCollectionWithDefaultPvcMount(t, targetKube, serverPodsToKill, isOperatorKilledWithServerPod)
 
 	// Pods brought down by killing cb-server process
 	if f.KubeType == "kubernetes" {
 		serverPodsToKill := map[int]string{
 			1: "killServerProcess",
 		}
-		LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+		LogCollectionWithDefaultPvcMount(t, targetKube, serverPodsToKill, isOperatorKilledWithServerPod)
 	}
 }
 
@@ -2280,21 +2271,22 @@ func TestCollectLogFromPvPodAndOperatorRecovered(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := f.TestClusters[0]
+	targetKube := f.GetCluster(0)
+
 	isOperatorKilledWithServerPod := true
 
 	// Pods brought down by DeletePod API
 	serverPodsToKill := map[int]string{
 		1: "deletePod",
 	}
-	LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+	LogCollectionWithDefaultPvcMount(t, targetKube, serverPodsToKill, isOperatorKilledWithServerPod)
 
 	// Pods brought down by killing cb-server process
 	if f.KubeType == "kubernetes" {
 		serverPodsToKill := map[int]string{
 			1: "killServerProcess",
 		}
-		LogCollectionWithDefaultPvcMount(t, kubeName, serverPodsToKill, isOperatorKilledWithServerPod)
+		LogCollectionWithDefaultPvcMount(t, targetKube, serverPodsToKill, isOperatorKilledWithServerPod)
 	}
 }
 
@@ -2304,8 +2296,7 @@ func TestCollectLogFromPvPodAndOperatorRecovered(t *testing.T) {
 
 func TestLogRedactionVerify(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
 
 	bucketName := "default"
@@ -2370,8 +2361,7 @@ func TestLogRedactionVerify(t *testing.T) {
 
 func TestLogRedactionWithPvVerify(t *testing.T) {
 	f := framework.Global
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
 
 	clusterSize := constants.Size3

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -579,23 +578,6 @@ func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace s
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
 	return kubeClient.ExtensionsV1beta1().Deployments(namespace).Delete(deploymentName, deleteOpts)
-}
-
-func (f *Framework) ApiServerHost(kubeName string) string {
-	return f.ClusterSpec[kubeName].Config.Host
-}
-
-func (f *Framework) GetHostNameFromUrl(hostUrl string) (string, error) {
-	u, err := url.Parse(hostUrl)
-	if err != nil {
-		return "", err
-	}
-	return u.Hostname(), nil
-}
-
-func (f *Framework) GetKubeHostname(kubeName string) (string, error) {
-	targetHost := f.ClusterSpec[kubeName].Config.Host
-	return f.GetHostNameFromUrl(targetHost)
 }
 
 func (f *Framework) PodClient(kubeName string) typedv1.PodInterface {

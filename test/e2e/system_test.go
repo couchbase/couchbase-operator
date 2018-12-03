@@ -355,7 +355,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
-	consoleURL1, err := e2eutil.AdminConsoleURL(f.ApiServerHost(kubeName), testCouchbase1.Status.AdminConsolePort)
+	consoleURL1, err := e2eutil.AdminConsoleURL(targetKube.APIHost(), testCouchbase1.Status.AdminConsolePort)
 	if err != nil {
 		t.Fatalf("failed to get cluster url %v", err)
 	}
@@ -363,7 +363,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
-	consoleURL2, err := e2eutil.AdminConsoleURL(f.ApiServerHost(kubeName), testCouchbase2.Status.AdminConsolePort)
+	consoleURL2, err := e2eutil.AdminConsoleURL(targetKube.APIHost(), testCouchbase2.Status.AdminConsolePort)
 	if err != nil {
 		t.Fatalf("failed to get cluster url %v", err)
 	}

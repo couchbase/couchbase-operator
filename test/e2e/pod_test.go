@@ -15,8 +15,7 @@ func TestPodResourcesBasic(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	maxMem, err := e2eutil.GetMaxNodeMem(targetKube.KubeClient)
 	if err != nil {
@@ -59,8 +58,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	maxMem, err := e2eutil.GetMaxNodeMem(targetKube.KubeClient)
 	if err != nil {
@@ -112,8 +110,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	minMem, err := e2eutil.GetMinNodeMem(targetKube.KubeClient)
 	if err != nil {
@@ -176,8 +173,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	maxMem, err := e2eutil.GetMaxNodeMem(targetKube.KubeClient)
 	if err != nil {
@@ -216,8 +212,7 @@ func TestAntiAffinityOn(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
 	if err != nil {
@@ -262,8 +257,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
 	if err != nil {
@@ -313,8 +307,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
 	if err != nil {
@@ -381,8 +374,7 @@ func TestAntiAffinityOff(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
 	if err != nil {

@@ -76,6 +76,13 @@ tcGroups:
       - name: TestTlsKillClusterNode
       - name: TestTlsResizeCluster
 
+  - name: XdcrCasesIntraCluster
+    clusters:
+      - BasicCluster
+      - BasicCluster
+    testcases:
+      - name: TestXdcrCreateCluster
+
   - name: XdcrCases
     clusters:
       - BasicCluster
@@ -83,7 +90,6 @@ tcGroups:
     testcases:
       - name: TestXdcrCreateCluster
       - name: TestXdcrCreateTlsCluster
-      - name: TestXdcrCreateInterCluster
       - name: TestXdcrCreateK8SVMCluster
       - name: TestXdcrNodeDownDuringSetupDuringConfigure
       - name: TestXdcrNodeDownDuringSetupAfterConfigure

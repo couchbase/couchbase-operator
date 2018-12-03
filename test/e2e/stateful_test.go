@@ -19,8 +19,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "BasicCluster"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := constants.Size3
 	testCouchbase, err := e2eutil.NewStatefulCluster(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)

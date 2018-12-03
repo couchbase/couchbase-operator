@@ -24,10 +24,9 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{kubeName})
+	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{f.TestClusters[0]})
 	if err != nil {
 		t.Fatalf("Failed to read cluster yaml data: %v", err)
 	}
@@ -158,10 +157,9 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{kubeName})
+	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{f.TestClusters[0]})
 	if err != nil {
 		t.Fatalf("Failed to read cluster yaml data: %v", err)
 	}
@@ -274,8 +272,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := 9
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 3, true)
@@ -322,7 +319,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	expectedEvents.AddParallelEvents(memDownParallelEvents)
 	expectedEvents.AddParallelEvents(memFailoverParallelEvents)
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
 	if err != nil {
 		t.Fatalf("Unable to get Client for cluster: %v", err)
 	}
@@ -356,8 +353,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	kubeName := "NewCluster1"
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.GetCluster(0)
 
 	clusterSize := 6
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -392,7 +388,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 
 	// Get pod object for reading container name
 	podName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	pod, err := f.PodClient(kubeName).Get(podName, metav1.GetOptions{})
+	pod, err := f.PodClient(f.TestClusters[0]).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod data: %v", err)
 	}
@@ -411,7 +407,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 		}
 
 		// start loading data
-		stdOut, _, err := f.ExecWithOptions(kubeName, podCmdOptions)
+		stdOut, _, err := f.ExecWithOptions(f.TestClusters[0], podCmdOptions)
 		if err != nil {
 			t.Logf("Stdout: %v", stdOut)
 			t.Logf("Execution failed: %v", err)
@@ -427,7 +423,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 		t.Log("Entering sleep to load data")
 		time.Sleep(time.Second * 20)
 
-		stdOut, err := f.ExecShellInPod(kubeName, podName, podCmdStr)
+		stdOut, err := f.ExecShellInPod(f.TestClusters[0], podName, podCmdStr)
 		if err != nil {
 			t.Logf("Stdout: %v", stdOut)
 		}

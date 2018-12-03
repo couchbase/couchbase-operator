@@ -116,7 +116,6 @@ var (
 		// XDCR cases
 		"TestXdcrCreateCluster":                      TestXdcrCreateCluster,
 		"TestXdcrCreateTlsCluster":                   TestXdcrCreateTlsCluster,
-		"TestXdcrCreateInterCluster":                 TestXdcrCreateInterCluster,
 		"TestXdcrCreateK8SVMCluster":                 TestXdcrCreateK8SVMCluster,
 		"TestXdcrNodeDownDuringSetupDuringConfigure": TestXdcrNodeDownDuringSetupDuringConfigure,
 		"TestXdcrNodeDownDuringSetupAfterConfigure":  TestXdcrNodeDownDuringSetupAfterConfigure,

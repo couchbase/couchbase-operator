@@ -14,16 +14,17 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 )
 
 // Generic function to run rebalance out test case
 // Rebalance out xdcrCluster nodes one by one for the provided clustersize
-func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string, expectedEvents *e2eutil.EventValidator) error {
+func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, k8s *types.Cluster, expectedEvents *e2eutil.EventValidator) error {
 	f := framework.Global
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := k8s
 	nextNodeToBeAdded := clusterSize
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName), f.Namespace, f.PlatformType, targetKube.KubeClient, cbCluster)
+	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, cbCluster)
 	if err != nil {
 		return errors.New("Failed to create cluster client: " + err.Error())
 	}
@@ -66,9 +67,9 @@ func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, cluste
 
 // Generic function to kill xdcrCluster nodes
 // Will kill all the nodes one by one for the given clusterSize number and wait for the new pod to get replaced
-func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string, expectedEvents *e2eutil.EventValidator) error {
+func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, k8s *types.Cluster, expectedEvents *e2eutil.EventValidator) error {
 	f := framework.Global
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := k8s
 	nextNodeToBeAdded := clusterSize
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		memberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberIndex)
@@ -106,10 +107,9 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 }
 
 // Generic function to resize the xdcrCluster to the given clusterSize value and wait for healthy cluster
-func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string) (*api.CouchbaseCluster, error) {
-	f := framework.Global
+func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, k8s *types.Cluster) (*api.CouchbaseCluster, error) {
 	service := 0
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := k8s
 
 	var err error
 	cbCluster, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, cbCluster)
@@ -127,12 +127,10 @@ func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSiz
 // Remove nodes using diff ways based on operationType value
 // This will in-turn call rebalanceOutXdcrNodes / killXdcrNodes / resizeXdcrCluster function appropiately
 // targetClusterNodes will be source / destination to decide target cluster from xdcrCluster1 / xdccrCluster2
-func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNodes, operationType string) {
+func XdcrClusterRemoveNode(t *testing.T, cluster1, cluster2 *types.Cluster, targetClusterNodes, operationType string) {
 	f := framework.Global
-	xdcr1KubeName := kubeNameList[0]
-	xdcr2KubeName := kubeNameList[1]
-	xdcr1Kube := f.ClusterSpec[xdcr1KubeName]
-	xdcr2Kube := f.ClusterSpec[xdcr2KubeName]
+	xdcr1Kube := cluster1
+	xdcr2Kube := cluster2
 
 	var xdcrCluster1 *api.CouchbaseCluster
 	errChan := make(chan error)
@@ -175,17 +173,17 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcr1KubeName), f.Namespace, f.PlatformType, xdcr1Kube.KubeClient, xdcrCluster1)
+	_, err = e2eutil.CreateAdminConsoleClient(t, xdcr1Kube.APIHost(), f.Namespace, f.PlatformType, xdcr1Kube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcr2KubeName), f.Namespace, f.PlatformType, xdcr2Kube.KubeClient, xdcrCluster2)
+	_, err = e2eutil.CreateAdminConsoleClient(t, xdcr2Kube.APIHost(), f.Namespace, f.PlatformType, xdcr2Kube.KubeClient, xdcrCluster2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
+	xdcr1KubeHost, err := xdcr1Kube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +193,7 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 		t.Fatal(err)
 	}
 
-	xdcr2KubeHost, err := f.GetKubeHostname(xdcr2KubeName)
+	xdcr2KubeHost, err := xdcr2Kube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,27 +228,27 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 	switch operationType {
 	case "rebalanceOutNodes":
 		if targetClusterNodes == "source" {
-			if err := rebalanceOutXdcrNodes(t, xdcrCluster1, clusterSize, xdcr1KubeName, &expectedCluster1Events); err != nil {
+			if err := rebalanceOutXdcrNodes(t, xdcrCluster1, clusterSize, xdcr1Kube, &expectedCluster1Events); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			if err := rebalanceOutXdcrNodes(t, xdcrCluster2, clusterSize, xdcr2KubeName, &expectedCluster2Events); err != nil {
+			if err := rebalanceOutXdcrNodes(t, xdcrCluster2, clusterSize, xdcr2Kube, &expectedCluster2Events); err != nil {
 				t.Fatal(err)
 			}
 		}
 	case "killNodes":
 		if targetClusterNodes == "source" {
-			if err := killXdcrNodes(t, xdcrCluster1, clusterSize, xdcr1KubeName, &expectedCluster1Events); err != nil {
+			if err := killXdcrNodes(t, xdcrCluster1, clusterSize, xdcr1Kube, &expectedCluster1Events); err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			if err := killXdcrNodes(t, xdcrCluster2, clusterSize, xdcr2KubeName, &expectedCluster2Events); err != nil {
+			if err := killXdcrNodes(t, xdcrCluster2, clusterSize, xdcr2Kube, &expectedCluster2Events); err != nil {
 				t.Fatal(err)
 			}
 		}
 	case "resizeOut":
 		if targetClusterNodes == "source" {
-			xdcrCluster1, err = resizeXdcrCluster(t, xdcrCluster1, constants.Size1, xdcr1KubeName)
+			xdcrCluster1, err = resizeXdcrCluster(t, xdcrCluster1, constants.Size1, xdcr1Kube)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -259,7 +257,7 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 			expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "MemberRemoved", 2)
 			expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
 		} else {
-			xdcrCluster2, err = resizeXdcrCluster(t, xdcrCluster2, constants.Size1, xdcr2KubeName)
+			xdcrCluster2, err = resizeXdcrCluster(t, xdcrCluster2, constants.Size1, xdcr2Kube)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -289,12 +287,10 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 // Generic test case for creating Xdcr clusters
 // Can support 2 clusters within same K8S kube or
 // different kube based on the kubeNames provided in kubeNameList
-func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
+func CreateXdcrCluster(t *testing.T, cluster1, cluster2 *types.Cluster) {
 	f := framework.Global
-	xdcr1KubeName := kubeNameList[0]
-	xdcr2KubeName := kubeNameList[1]
-	xdcr1Kube := f.ClusterSpec[xdcr1KubeName]
-	xdcr2Kube := f.ClusterSpec[xdcr2KubeName]
+	xdcr1Kube := cluster1
+	xdcr2Kube := cluster2
 
 	var xdcrCluster1 *api.CouchbaseCluster
 	errChan := make(chan error)
@@ -337,17 +333,17 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcr1KubeName), f.Namespace, f.PlatformType, xdcr1Kube.KubeClient, xdcrCluster1)
+	_, err = e2eutil.CreateAdminConsoleClient(t, xdcr1Kube.APIHost(), f.Namespace, f.PlatformType, xdcr1Kube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcr2KubeName), f.Namespace, f.PlatformType, xdcr2Kube.KubeClient, xdcrCluster2)
+	_, err = e2eutil.CreateAdminConsoleClient(t, xdcr2Kube.APIHost(), f.Namespace, f.PlatformType, xdcr2Kube.KubeClient, xdcrCluster2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	xdcr1KubeHost, err := f.GetKubeHostname(xdcr1KubeName)
+	xdcr1KubeHost, err := xdcr1Kube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +353,7 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 		t.Fatal(err)
 	}
 
-	xdcr2KubeHost, err := f.GetKubeHostname(xdcr2KubeName)
+	xdcr2KubeHost, err := xdcr2Kube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,13 +390,10 @@ func CreateXdcrCluster(t *testing.T, kubeNameList []string) {
 
 // Generic testcase to run NodeDown test cases on kubeNames given by kubeNameList
 // This can support bringing down a cluster node either during XDCR configration / post XDCR configuration
-func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []string) {
+func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, cluster1, cluster2 *types.Cluster) {
 	f := framework.Global
-	defKubeName := kubeNameList[0]
-	defKube := f.ClusterSpec[defKubeName]
-
-	xdcrKubeName := kubeNameList[1]
-	xdcrKube := f.ClusterSpec[xdcrKubeName]
+	defKube := cluster1
+	xdcrKube := cluster2
 
 	xdcrCluster1Size := constants.Size5
 	xdcrCluster2Size := constants.Size2
@@ -445,15 +438,15 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(defKubeName), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1); err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, defKube.APIHost(), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	if _, err := e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcrKubeName), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2); err != nil {
+	if _, err := e2eutil.CreateAdminConsoleClient(t, xdcrKube.APIHost(), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2); err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	xdcr1KubeHost, err := f.GetKubeHostname(defKubeName)
+	xdcr1KubeHost, err := defKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,7 +456,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 		t.Fatal(err)
 	}
 
-	xdcr2KubeHost, err := f.GetKubeHostname(xdcrKubeName)
+	xdcr2KubeHost, err := xdcrKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -549,16 +542,13 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, kubeNameList []
 
 // Generic testcase to run AddNode test cases on kubeNames given by kubeNameList
 // This can support adding new node to the cluster either during XDCR configration / post XDCR configuration
-func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []string) {
+func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, cluster1, cluster2 *types.Cluster) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
-	defKubeName := kubeNameList[0]
-	defKube := f.ClusterSpec[defKubeName]
-
-	xdcrKubeName := kubeNameList[1]
-	xdcrKube := f.ClusterSpec[xdcrKubeName]
+	defKube := cluster1
+	xdcrKube := cluster2
 
 	var xdcrCluster1 *api.CouchbaseCluster
 	errChan := make(chan error)
@@ -619,17 +609,17 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		go resizeFunction()
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(defKubeName), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
+	_, err = e2eutil.CreateAdminConsoleClient(t, defKube.APIHost(), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcrKubeName), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
+	_, err = e2eutil.CreateAdminConsoleClient(t, xdcrKube.APIHost(), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	xdcr1KubeHost, err := f.GetKubeHostname(defKubeName)
+	xdcr1KubeHost, err := defKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -639,7 +629,7 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 		t.Fatal(err)
 	}
 
-	xdcr2KubeHost, err := f.GetKubeHostname(xdcrKubeName)
+	xdcr2KubeHost, err := xdcrKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -694,16 +684,13 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 
 // Generic testcase to kill the XDCR exposed service test cases on kubeNames given by kubeNameList
 // This supports killing the xdcr port service either during XDCR configration / post XDCR configuration
-func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList []string) {
+func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, cluster1, cluster2 *types.Cluster) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
-	defKubeName := kubeNameList[0]
-	defKube := f.ClusterSpec[defKubeName]
-
-	xdcrKubeName := kubeNameList[1]
-	xdcrKube := f.ClusterSpec[xdcrKubeName]
+	defKube := cluster1
+	xdcrKube := cluster2
 
 	var xdcrCluster1 *api.CouchbaseCluster
 	errChan := make(chan error)
@@ -759,17 +746,17 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		go serviceKillFunc()
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(defKubeName), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
+	_, err = e2eutil.CreateAdminConsoleClient(t, defKube.APIHost(), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(xdcrKubeName), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
+	_, err = e2eutil.CreateAdminConsoleClient(t, xdcrKube.APIHost(), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	xdcr1KubeHost, err := f.GetKubeHostname(defKubeName)
+	xdcr1KubeHost, err := defKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -779,7 +766,7 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, kubeNameList
 		t.Fatal(err)
 	}
 
-	xdcr2KubeHost, err := f.GetKubeHostname(xdcrKubeName)
+	xdcr2KubeHost, err := xdcrKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -834,16 +821,17 @@ func TestXdcrCreateCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
-	// Create Intra XDCR clusters
-	CreateXdcrCluster(t, []string{"BasicCluster", "BasicCluster"})
+
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	CreateXdcrCluster(t, cluster1, cluster2)
 }
 
-// Create XDCR cluster using two distinct k8s clusters
-func TestXdcrCreateInterCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	CreateXdcrCluster(t, []string{"BasicCluster", "NewCluster1"})
+// TLSClusterMap maps the Kubernetes cluster to its TLS configuration.
+type TLSClusterMap struct {
+	cluster *types.Cluster
+	context *e2eutil.TlsContext
 }
 
 // Create cb clusters on top of TLS certificates
@@ -853,34 +841,31 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	}
 
 	f := framework.Global
-	kubeName1 := "BasicCluster"
-	kubeName2 := "NewCluster1"
-	defKube := f.ClusterSpec[kubeName1]
-	xdcrKube := f.ClusterSpec[kubeName2]
 
-	tlsContexts := map[string]*e2eutil.TlsContext{}
+	tlsMap := []TLSClusterMap{}
+
+	defKube := f.GetCluster(0)
+	xdcrKube := f.GetCluster(1)
 
 	// Create secrets in all k8s clusters
-	// TODO: This test is pointless unless you are going to specify the encrytionType=full parameter in
-	// the remote cluster definition.  Additionally as the clusters are in separate kubernetes clusters
-	// then TLS will not work as you'll be connecting via IP address and not DNS.
-	for _, kubeName := range []string{kubeName1, kubeName2} {
-		ctx, teardown, err := e2eutil.InitClusterTLS(f.ClusterSpec[kubeName].KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	for index := 0; index < 2; index++ {
+		cluster := f.GetCluster(index)
+		ctx, teardown, err := e2eutil.InitClusterTLS(cluster.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer teardown()
-		tlsContexts[kubeName] = ctx
+		tlsMap = append(tlsMap, TLSClusterMap{cluster: cluster, context: ctx})
 	}
 
 	// Cluster 1
-	xdcrCluster1, err := e2eutil.NewTlsXdcrClusterBasic(t, defKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName1])
+	xdcrCluster1, err := e2eutil.NewTlsXdcrClusterBasic(t, defKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsMap[0].context)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Cluster 2
-	xdcrCluster2, err := e2eutil.NewTlsXdcrClusterBasic(t, xdcrKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsContexts[kubeName2])
+	xdcrCluster2, err := e2eutil.NewTlsXdcrClusterBasic(t, xdcrKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed, tlsMap[1].context)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -897,17 +882,17 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", api.AdminService, api.DataService, api.IndexService)
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName1), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
+	_, err = e2eutil.CreateAdminConsoleClient(t, defKube.APIHost(), f.Namespace, f.PlatformType, defKube.KubeClient, xdcrCluster1)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	_, err = e2eutil.CreateAdminConsoleClient(t, f.ApiServerHost(kubeName2), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
+	_, err = e2eutil.CreateAdminConsoleClient(t, xdcrKube.APIHost(), f.Namespace, f.PlatformType, xdcrKube.KubeClient, xdcrCluster2)
 	if err != nil {
 		t.Fatalf("failed to create cluster client %v", err)
 	}
 
-	xdcr1KubeHost, err := f.GetKubeHostname(kubeName1)
+	xdcr1KubeHost, err := defKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -917,7 +902,7 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	xdcr2KubeHost, err := f.GetKubeHostname(kubeName2)
+	xdcr2KubeHost, err := xdcrKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -950,17 +935,15 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	}
 
 	// TLS handshake with pods
-	for _, kubeName := range []string{kubeName1, kubeName2} {
-		t.Logf("Verifying TLS for kube: %s", kubeName)
-		targetKube := f.ClusterSpec[kubeName]
-		pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	for index, tlsMapping := range tlsMap {
+		t.Logf("Verifying TLS for cluster %d", index)
+		pods, err := tlsMapping.cluster.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 		if err != nil {
 			t.Fatal("Unable to get couchbase pods:", err)
 		}
 
-		ctx := tlsContexts[kubeName]
 		for _, pod := range pods.Items {
-			if err := e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), targetKube.Config, ctx); err != nil {
+			if err := e2eutil.TlsCheckForPod(t, f.Namespace, pod.GetName(), tlsMapping.cluster.Config, tlsMapping.context); err != nil {
 				t.Fatal("TLS verification failed:", err)
 			}
 		}
@@ -976,8 +959,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 		t.Parallel()
 	}
 	f := framework.Global
-	defKubeName := "BasicCluster"
-	defKube := f.ClusterSpec[defKubeName]
+	defKube := f.GetCluster(0)
 
 	// Cluster 1
 	clusterSize := constants.Size2
@@ -996,7 +978,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
 	expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")
 
-	defKubeHost, err := f.GetKubeHostname(defKubeName)
+	defKubeHost, err := defKube.APIHostname()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1083,8 +1065,10 @@ func TestXdcrNodeDownDuringSetupDuringConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	ClusterNodeDownWithXdcr(t, "duringXdcrSetup", kubeNameList)
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	ClusterNodeDownWithXdcr(t, "duringXdcrSetup", cluster1, cluster2)
 }
 
 // Create two clusters and XDCR is configured between the two clusters
@@ -1094,8 +1078,10 @@ func TestXdcrNodeDownDuringSetupAfterConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	ClusterNodeDownWithXdcr(t, "afterXdcrSetup", kubeNameList)
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	ClusterNodeDownWithXdcr(t, "afterXdcrSetup", cluster1, cluster2)
 }
 
 // Create two clusters and while trying to configure XDCR,
@@ -1105,8 +1091,10 @@ func TestXdcrNodeAddDuringSetupDuringConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	ClusterAddNodeWithXdcr(t, "duringXdcrSetup", kubeNameList)
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	ClusterAddNodeWithXdcr(t, "duringXdcrSetup", cluster1, cluster2)
 }
 
 // Create two clusters and XDCR is configured between the two clusters
@@ -1116,8 +1104,10 @@ func TestXdcrNodeAddDuringSetupAfterConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	ClusterAddNodeWithXdcr(t, "afterXdcrSetup", kubeNameList)
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	ClusterAddNodeWithXdcr(t, "afterXdcrSetup", cluster1, cluster2)
 }
 
 // Create two clusters and while trying to configure XDCR,
@@ -1127,8 +1117,10 @@ func TestXdcrNodeServiceKilledDuringConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	ClusterNodeXdcrServiceKill(t, "duringXdcrSetup", kubeNameList)
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	ClusterNodeXdcrServiceKill(t, "duringXdcrSetup", cluster1, cluster2)
 }
 
 // Create two clusters and XDCR is configured between the two clusters
@@ -1138,8 +1130,10 @@ func TestXdcrNodeServiceKilledAfterConfigure(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	ClusterNodeXdcrServiceKill(t, "afterXdcrSetup", kubeNameList)
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	ClusterNodeXdcrServiceKill(t, "afterXdcrSetup", cluster1, cluster2)
 }
 
 // Create two clusters and while trying to configure XDCR
@@ -1150,8 +1144,10 @@ func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	XdcrClusterRemoveNode(t, kubeNameList, "source", "rebalanceOutNodes")
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	XdcrClusterRemoveNode(t, cluster1, cluster2, "source", "rebalanceOutNodes")
 }
 
 // Create two clusters and while trying to configure XDCR
@@ -1162,8 +1158,10 @@ func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	XdcrClusterRemoveNode(t, kubeNameList, "remote", "rebalanceOutNodes")
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	XdcrClusterRemoveNode(t, cluster1, cluster2, "remote", "rebalanceOutNodes")
 }
 
 // Create two clusters and while trying to configure XDCR
@@ -1174,8 +1172,10 @@ func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	XdcrClusterRemoveNode(t, kubeNameList, "source", "killNodes")
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	XdcrClusterRemoveNode(t, cluster1, cluster2, "source", "killNodes")
 }
 
 // Create two clusters and while trying to configure XDCR
@@ -1186,8 +1186,10 @@ func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	XdcrClusterRemoveNode(t, kubeNameList, "remote", "killNodes")
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	XdcrClusterRemoveNode(t, cluster1, cluster2, "remote", "killNodes")
 }
 
 // Create two clusters and while trying to configure XDCR
@@ -1197,8 +1199,10 @@ func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	XdcrClusterRemoveNode(t, kubeNameList, "source", "resizeOut")
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	XdcrClusterRemoveNode(t, cluster1, cluster2, "source", "resizeOut")
 }
 
 // Create two clusters and while trying to configure XDCR
@@ -1208,6 +1212,8 @@ func TestXdcrResizedOutTargetClusterNodes(t *testing.T) {
 		t.Parallel()
 	}
 
-	kubeNameList := []string{"BasicCluster", "NewCluster1"}
-	XdcrClusterRemoveNode(t, kubeNameList, "remote", "resizeOut")
+	f := framework.Global
+	cluster1 := f.GetCluster(0)
+	cluster2 := f.GetCluster(1)
+	XdcrClusterRemoveNode(t, cluster1, cluster2, "remote", "resizeOut")
 }
