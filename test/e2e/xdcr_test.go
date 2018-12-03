@@ -56,7 +56,7 @@ func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, cluste
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries5); err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries5); err != nil {
 			return errors.New("Cluster unhealthy: " + err.Error())
 		}
 		nextNodeToBeAdded++
@@ -97,7 +97,7 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIndex)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries5); err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries5); err != nil {
 			return err
 		}
 		nextNodeToBeAdded++
@@ -106,18 +106,21 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 }
 
 // Generic function to resize the xdcrCluster to the given clusterSize value and wait for healthy cluster
-func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string) error {
+func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, kubeName string) (*api.CouchbaseCluster, error) {
 	f := framework.Global
 	service := 0
 	targetKube := f.ClusterSpec[kubeName]
-	if err := e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, cbCluster); err != nil {
-		return err
+
+	var err error
+	cbCluster, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, cbCluster)
+	if err != nil {
+		return cbCluster, err
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
-		return err
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10); err != nil {
+		return cbCluster, err
 	}
-	return nil
+	return cbCluster, nil
 }
 
 // Generic function to run all pod removal/resize tests
@@ -247,7 +250,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 		}
 	case "resizeOut":
 		if targetClusterNodes == "source" {
-			if err := resizeXdcrCluster(t, xdcrCluster1, constants.Size1, xdcr1KubeName); err != nil {
+			xdcrCluster1, err = resizeXdcrCluster(t, xdcrCluster1, constants.Size1, xdcr1KubeName)
+			if err != nil {
 				t.Fatal(err)
 			}
 			expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceStarted")
@@ -255,7 +259,8 @@ func XdcrClusterRemoveNode(t *testing.T, kubeNameList []string, targetClusterNod
 			expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "MemberRemoved", 2)
 			expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
 		} else {
-			if err := resizeXdcrCluster(t, xdcrCluster2, constants.Size1, xdcr2KubeName); err != nil {
+			xdcrCluster2, err = resizeXdcrCluster(t, xdcrCluster2, constants.Size1, xdcr2KubeName)
+			if err != nil {
 				t.Fatal(err)
 			}
 			expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceStarted")
@@ -591,12 +596,13 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, kubeNameList []s
 	resizeFunction := func() {
 		service := 0
 		clusterSize := constants.Size3
-		if err := e2eutil.ResizeCluster(t, service, clusterSize, defKube.CRClient, xdcrCluster1); err != nil {
+		xdcrCluster1, err = e2eutil.ResizeCluster(t, service, clusterSize, defKube.CRClient, xdcrCluster1)
+		if err != nil {
 			errChan <- err
 			return
 		}
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, defKube.CRClient, xdcrCluster1.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, defKube.CRClient, xdcrCluster1, constants.Retries10); err != nil {
 			errChan <- err
 			return
 		}

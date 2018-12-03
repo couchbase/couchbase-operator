@@ -1443,7 +1443,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, kubeName, podDownMethod 
 	// Cleanup cluster after test execution
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1589,7 +1589,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 		t.Fatal(err)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1618,7 +1618,8 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 
 	// Trigger async Cluster's service config resize
-	if err := e2eutil.ResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube.CRClient, cbCluster); err != nil {
+	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube.CRClient, cbCluster)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1746,7 +1747,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1776,7 +1777,8 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 2 node service
 	serviceSize := constants.Size2
-	if err := e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster); err != nil {
+	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	if err != nil {
 		t.Fatal(err)
 	}
 	event := e2eutil.RebalanceCompletedEvent(cbCluster)
@@ -1801,7 +1803,8 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size4
-	if err := e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster); err != nil {
+	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	if err != nil {
 		t.Fatal(err)
 	}
 	event = e2eutil.RebalanceCompletedEvent(cbCluster)
@@ -1826,7 +1829,8 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size1
-	if err := e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster); err != nil {
+	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	if err != nil {
 		t.Fatal(err)
 	}
 	event = e2eutil.RebalanceCompletedEvent(cbCluster)
@@ -1903,7 +1907,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2018,7 +2022,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries30); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2151,7 +2155,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, kubeName string, serverMembe
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -2304,7 +2308,6 @@ func TestLogRedactionVerify(t *testing.T) {
 	targetKube := f.ClusterSpec[kubeName]
 	kubeConfPath := targetKube.KubeConfPath
 
-	clusterSize := constants.Size3
 	bucketName := "default"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size1, "test_config_1", []string{"data"})
@@ -2322,7 +2325,7 @@ func TestLogRedactionVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2397,7 +2400,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 

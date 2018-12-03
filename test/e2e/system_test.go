@@ -537,11 +537,11 @@ outerLoop:
 			}
 		}
 		// make sure cluster is healthy before running next cycle
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1.Name, f.Namespace, constants.Size4, constants.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1, constants.Retries10)
 		if err != nil {
 			t.Fatalf("failed to wait for cluster to be healthy %v", err)
 		}
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2.Name, f.Namespace, constants.Size4, constants.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2, constants.Retries10)
 		if err != nil {
 			t.Fatalf("failed to wait for cluster to be healthy %v", err)
 		}

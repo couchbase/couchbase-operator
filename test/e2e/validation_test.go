@@ -73,14 +73,6 @@ func YAMLToCluster(yamlPath string) (*api.CouchbaseCluster, error) {
 	return cluster, nil
 }
 
-func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
-	clusterSize := 0
-	for _, server := range cluster.Spec.ServerSettings {
-		clusterSize = clusterSize + server.Size
-	}
-	return clusterSize
-}
-
 func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command string) {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]

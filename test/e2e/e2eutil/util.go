@@ -198,7 +198,7 @@ func newClusterFromSpecQuick(t *testing.T, crClient versioned.Interface, namespa
 	errChan := make(chan error)
 	go func() {
 		// Expect the cluster to enter a failed state
-		if err := WaitClusterPhaseFailed(t, crClient, cluster.Name, namespace, constants.Retries20); err == nil {
+		if err := WaitClusterPhaseFailed(t, crClient, cluster, constants.Retries20); err == nil {
 			errChan <- errors.New("Cluster entered failed state")
 		}
 	}()
@@ -786,29 +786,32 @@ func isMasterNode(nodeMap map[string]string) bool {
 	return false
 }
 
-func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
+func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	_, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), crClient, cl, 10)
-	return err
+	cluster, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), crClient, cl, 10)
+	return cluster, err
 }
 
-func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) error {
-	if err := ResizeClusterNoWait(t, service, clusterSize, crClient, cl); err != nil {
-		return err
+func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+	cluster, err := ResizeClusterNoWait(t, service, clusterSize, crClient, cl)
+	if err != nil {
+		return cl, err
 	}
 	t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
 	names, err := WaitUntilSizeReached(t, crClient, clusterSize, 30, cl)
 	if err != nil {
-		return err
+		return cluster, err
 	}
 	t.Logf("Resize Success: %v...\n", names)
-	return nil
+	return cluster, nil
 }
 
-func MustResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) {
-	if err := ResizeCluster(t, service, clusterSize, crClient, cl); err != nil {
+func MustResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
+	cluster, err := ResizeCluster(t, service, clusterSize, crClient, cl)
+	if err != nil {
 		t.Fatal(err)
 	}
+	return cluster
 }
 
 func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {

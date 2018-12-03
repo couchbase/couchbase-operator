@@ -50,7 +50,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 		}
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

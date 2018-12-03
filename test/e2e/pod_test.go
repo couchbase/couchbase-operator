@@ -48,7 +48,7 @@ func TestPodResourcesBasic(t *testing.T) {
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -147,7 +147,8 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	}
 
 	// Add in a new node which should cause a memory allocation error
-	if err := e2eutil.ResizeClusterNoWait(t, 0, scaleNum+1, targetKube.CRClient, testCouchbase); err != nil {
+	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, 0, scaleNum+1, targetKube.CRClient, testCouchbase)
+	if err != nil {
 		t.Fatalf("failed to scale cluster")
 	}
 
@@ -204,7 +205,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	}
 
 	// Expect the cluster to enter a failed state
-	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster.Name, f.Namespace, 10); err != nil {
+	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster, 10); err != nil {
 		t.Fatalf("cluster failed to enter failed state")
 	}
 	t.Logf("Cluster failed, pod not scheduled")
@@ -250,7 +251,7 @@ func TestAntiAffinityOn(t *testing.T) {
 
 	t.Logf("cluster created")
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, numNodes, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -351,7 +352,8 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	}
 
 	t.Logf("Attempting to add a node")
-	if err = e2eutil.ResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase); err != nil {
+	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -363,11 +365,12 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	t.Logf("Node not added")
 
 	t.Logf("Reverting add")
-	if err := e2eutil.ResizeCluster(t, 0, numNodes, targetKube.CRClient, testCouchbase); err != nil {
+	testCouchbase, err = e2eutil.ResizeCluster(t, 0, numNodes, targetKube.CRClient, testCouchbase)
+	if err != nil {
 		t.Fatalf("cluster failed to revert, fail: %v", err)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, numNodes, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -415,7 +418,8 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("Attempting to add a node")
-	if err := e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube.CRClient, testCouchbase); err != nil {
+	testCouchbase, err = e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube.CRClient, testCouchbase)
+	if err != nil {
 		t.Fatalf("cluster failed to scale to 5 nodes: %v", err)
 	}
 	t.Logf("Node added")
@@ -424,7 +428,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, scaleToNum+1, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)

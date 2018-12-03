@@ -122,7 +122,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 
 		expectedEvents.AddBucketCreateEvent(testCouchbase, bucketSetting.BucketName)
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -149,7 +149,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default3")
 	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default4")
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -224,7 +224,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 		expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -254,7 +254,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 		expectedEvents.AddBucketDeleteEvent(testCouchbase, "default")
 
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size3, constants.Retries10)
+		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -509,7 +509,7 @@ func TestEditBucket(t *testing.T) {
 		t.Fatalf("failed to verify default bucket flush policy back: %v", err)
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -639,7 +639,7 @@ func TestRevertExternalBucketAdd(t *testing.T) {
 
 	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default")
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -832,7 +832,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, constants.Size1, constants.Retries10)
+	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

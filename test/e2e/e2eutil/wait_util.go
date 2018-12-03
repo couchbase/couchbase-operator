@@ -176,9 +176,9 @@ func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, bucke
 
 // WaitClusterPhaseFailed expects the cluster to enter a failed state, useful for passing
 // quickly rather than wating for a cluster to not become healthy
-func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, name, namespace string, retries int) error {
+func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, retries int) error {
 	err := retryutil.Retry(Context, retryInterval, retries, func() (bool, error) {
-		cluster, err := GetCouchbaseCluster(crClient, name, namespace)
+		cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
 		if err != nil {
 			return false, err
 		}
@@ -187,9 +187,13 @@ func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, name, na
 	return err
 }
 
-func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, namespace string, expectedNodes, retries int) error {
+func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, cluster *api.CouchbaseCluster, retries int) error {
+	expectedNodes := 0
+	for _, class := range cluster.Spec.ServerSettings {
+		expectedNodes += class.Size
+	}
 	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		cl, err := GetCouchbaseCluster(crClient, name, namespace)
+		cl, err := GetCouchbaseCluster(crClient, cluster.Name, cluster.Namespace)
 		if err != nil {
 			LogfWithTimestamp(t, "could not get cluster: (%v)", err)
 			return false, err
@@ -245,8 +249,8 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, 
 	return nil
 }
 
-func MustWaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, name, namespace string, expectedNodes, retries int) {
-	if err := WaitClusterStatusHealthy(t, crClient, name, namespace, expectedNodes, retries); err != nil {
+func MustWaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, cluster *api.CouchbaseCluster, retries int) {
+	if err := WaitClusterStatusHealthy(t, crClient, cluster, retries); err != nil {
 		t.Fatal(err)
 	}
 }

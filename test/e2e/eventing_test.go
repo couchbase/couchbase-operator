@@ -247,7 +247,8 @@ func TestEventingResizeCluster(t *testing.T) {
 
 		// Resize cluster and wait for healthy cluster
 		service := 1
-		if err := e2eutil.ResizeClusterNoWait(t, service, eventingNodes, targetKube.CRClient, testCouchbase); err != nil {
+		testCouchbase, err = e2eutil.ResizeClusterNoWait(t, service, eventingNodes, targetKube.CRClient, testCouchbase)
+		if err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
@@ -257,7 +258,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
 			t.Fatal(err.Error())
 		}
 
@@ -279,7 +280,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries10); err != nil {
+	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
 		t.Fatal(err.Error())
 	}
 
