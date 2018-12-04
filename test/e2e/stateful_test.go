@@ -22,10 +22,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	clusterSize := constants.Size3
-	testCouchbase, err := e2eutil.NewStatefulCluster(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewStatefulCluster(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
@@ -33,11 +30,6 @@ func TestCreateStatefulCluster(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	testCouchbase, err = e2eutil.GetClusterCRD(targetKube.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
 
 	// Volumes should exist for each pods
 	claimTemplate := testCouchbase.Spec.VolumeClaimTemplates[0].Name
@@ -49,10 +41,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 		}
 	}
 
-	err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
 	events, err := e2eutil.GetCouchbaseEvents(targetKube.KubeClient, testCouchbase.Name, f.Namespace)
 	if err != nil {

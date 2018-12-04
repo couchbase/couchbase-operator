@@ -20,19 +20,14 @@ func TestCreateCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", 0, 1, 2)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
@@ -47,10 +42,7 @@ func TestCreateBucketCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	testCouchbase, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", 0, 1, 2)
@@ -58,8 +50,6 @@ func TestCreateBucketCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }

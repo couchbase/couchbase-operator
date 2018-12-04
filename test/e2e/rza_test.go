@@ -236,10 +236,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	}
 
 	t.Logf("AntiAffinity=%s ... \n attempting to create %d pod cluster with %d nodes", antiAffinity, clusterSize, clusterSize)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	if err != nil {
-		t.Fatalf("cluster creation failed: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -250,49 +247,30 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
 	serviceIndex := 0
-	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube.CRClient, testCouchbase)
 
 	if antiAffinity == "on" {
-		event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 120)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
 		// Revert back to original cluster size
-		testCouchbase, err = e2eutil.ResizeClusterNoWait(t, serviceIndex, clusterSize, targetKube.CRClient, testCouchbase)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize, targetKube.CRClient, testCouchbase)
 	} else if antiAffinity == "off" {
 		// Updated new clusterSize
 		clusterSize += newPodsToAdd
 		for memberIndex := clusterSize - newPodsToAdd; memberIndex < clusterSize; memberIndex++ {
-			event := e2eutil.NewMemberAddEvent(testCouchbase, memberIndex)
-			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberIndex), 120)
 			expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 		}
 
-		event := e2eutil.RebalanceCompletedEvent(testCouchbase)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries5)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -334,10 +312,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -383,10 +358,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 		// Updating CRD to add new server-group in CRD
 		newAvailableServerGroupList = append(availableServerGroupList, "NewRzaGroup-1")
 		newAvailableServerGroups := strings.Join(newAvailableServerGroupList, ",")
-		testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
-		if err != nil {
-			t.Fatalf("Failed to update server groups: %v", err)
-		}
+		testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 	}
 
 	if err := <-nodeUpdateErrChan; err != nil {
@@ -400,9 +372,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
 	for memberId := prevClusterSize; memberId < clusterSize; memberId++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
@@ -453,10 +423,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -508,10 +475,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	}
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// Creating expected RZA server groups pod maps
 	expectedRzaResultMap := map[string]int{
@@ -589,10 +553,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -638,10 +599,7 @@ func TestRzaResizeCluster(t *testing.T) {
 		expectedRzaResultMap = GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 		// Resize cluster and wait for healthy cluster
-		testCouchbase, err = e2eutil.ResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase)
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
 		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
 		if err != nil {
@@ -649,9 +607,7 @@ func TestRzaResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-			t.Fatal(err.Error())
-		}
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
 		// Update deployed server-groups based on new cluster size
 		deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -713,10 +669,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -739,26 +692,18 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 
 	availableServerGroupList = []string{availableServerGroupList[0], availableServerGroupList[2]}
 	availableServerGroups = strings.Join(availableServerGroupList, ",")
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
+	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 	if err != nil {
 		t.Fatalf("Failed to update server groups: %v", err)
 	}
 
-	event := e2eutil.NewMemberRemoveEvent(testCouchbase, 1)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatalf("Failed to remove pod from removed server-group failed: %v", err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 1), 300)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", 1)
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, clusterSize)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatalf("Failed to add new pods to replace removed server group node: %v", err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 300)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
@@ -793,10 +738,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, serverGroupsUsed)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -818,10 +760,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	}
 
 	availableServerGroups = strings.Join(availableServerGroupList, ",")
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatalf("Failed to update server groups: %v", err)
-	}
+	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 
 	clusterSize = clusterSize + 1
 	service := 0
@@ -836,9 +775,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap = GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -885,10 +822,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
@@ -902,41 +836,23 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	newAvailableServerGroupList := append(availableServerGroupList, "InvalidGroup-1")
 	newAvailableServerGroups := strings.Join(newAvailableServerGroupList, ",")
 
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatalf("Failed to update server groups: %v", err)
-	}
+	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 
 	service := 0
 	clusterSize++
 	// Add one more node to cluster
-	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("Cluster update for server size spec failed")
-	}
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase)
 
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 120)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize-1)
 
 	// Revert server group addition
-	testCouchbase, err = e2eutil.UpdateClusterSpec("ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatalf("Failed to update server groups: %v", err)
-	}
+	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
 
-	event = e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 120); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1), 120)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize-1)
 
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
@@ -985,10 +901,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
@@ -1047,10 +960,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
 
 	// Wait till pod creation fail due to the Server Group unavailable to schedule a new pod
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
-		t.Fatalf("Requested node didn't go down as expected: %v", event)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 180)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", memberIdToGoDown)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", memberIdToGoDown)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
@@ -1061,20 +971,12 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 
 	// Wait for pod member to add back to the cluster
-	event = e2eutil.NewMemberAddEvent(testCouchbase, clusterSize)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatalf("Failed to add pod after removing the taint: %v", err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 300)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
 
-	event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries30); err != nil {
-		t.Fatalf("Cluster failed to become healthy: %v", err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries30)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberIdToGoDown)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")

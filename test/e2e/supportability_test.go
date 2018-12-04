@@ -594,9 +594,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 
 	// Deploy cb server for cbopinfo validation
-	if _, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 
 	for _, arg := range validArgumentList {
 		t.Log(arg.Name)
@@ -1031,10 +1029,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 
 	kubeConfPath := targetKube.KubeConfPath
 
-	cluster1, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cluster1 := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 
 	// Code to backup current config and replace after test execution
 	configData, err := ioutil.ReadFile(kubeConfPath)
@@ -1147,10 +1142,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, opImageNam
 	}
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
@@ -1237,10 +1229,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 
 	// Collect logs with invalid operator-image-name
 	t.Log("Collecting logs using invalid -operator-image arg value")
@@ -1326,10 +1315,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	kubeConfPath := targetKube.KubeConfPath
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 
 	t.Log("Collecting logs using invalid operator-image value")
 	cmdArgs := []string{"-operator-image", f.OpImage, "-operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-all"}
@@ -1338,9 +1324,11 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	go func() {
 		// Collect logs when operator pod goes down in parallel
 		t.Log("Starting log collection")
+		var err error
 		execOut, err = runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
 		execOutStr := strings.TrimSpace(string(execOut))
 		t.Logf("Returned: %s\n", execOutStr)
+		// TODO: This is broken, you cannot call Fatal() in a go routine :/
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1430,16 +1418,11 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 	// Cleanup cluster after test execution
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1498,16 +1481,10 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 		switch podDownMethod {
 		case "deletePod":
 			// Only in DeletePod, FailOver and NewMemberAdd is triggered
-			event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill)
-			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill), 60)
 			expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberToKill)
 
-			event = e2eutil.NewMemberAddEvent(cbCluster, newMemberIndex)
-			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 180); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newMemberIndex), 180)
 			expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newMemberIndex)
 			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 
@@ -1515,10 +1492,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			newMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, newMemberIndex)
 			expectedPvcMap[newMemberName] = 1
 
-			event = e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill)
-			if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill), 300)
 			expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberToKill)
 
 		case "killServerProcess":
@@ -1526,10 +1500,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 		}
 
-		event := e2eutil.RebalanceCompletedEvent(cbCluster)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 		newMemberIndex++
 	}
@@ -1577,14 +1548,9 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Cb cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
 
 	// Add expected kube events for verification
 	expectedEvents := e2eutil.EventValidator{}
@@ -1611,10 +1577,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 
 	// Trigger async Cluster's service config resize
-	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube.CRClient, cbCluster)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube.CRClient, cbCluster)
 
 	// Kill operator if flag is enabled
 	if isOperatorKilledWithServerPod {
@@ -1638,17 +1601,11 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 
 	// Wait for failover of killed server pod
-	event := e2eutil.NewMemberFailedOverEvent(cbCluster, podMemberToKill)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 90); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, podMemberToKill), 90)
 	expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", podMemberToKill)
 
 	// Wait for rebalance complete event
-	event = e2eutil.RebalanceCompletedEvent(cbCluster)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", podMemberToKill)
 	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", clusterSize-1)
@@ -1734,14 +1691,9 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1769,14 +1721,8 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 2 node service
 	serviceSize := constants.Size2
-	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
-	if err != nil {
-		t.Fatal(err)
-	}
-	event := e2eutil.RebalanceCompletedEvent(cbCluster)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -1795,14 +1741,8 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size4
-	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
-	if err != nil {
-		t.Fatal(err)
-	}
-	event = e2eutil.RebalanceCompletedEvent(cbCluster)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
 	for memberIndex := 7; memberIndex <= 8; memberIndex++ {
@@ -1821,14 +1761,8 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size1
-	cbCluster, err = e2eutil.ResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
-	if err != nil {
-		t.Fatal(err)
-	}
-	event = e2eutil.RebalanceCompletedEvent(cbCluster)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -1893,14 +1827,9 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1932,24 +1861,15 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberIdToKill)
 
 		// Wait for failover event
-		event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 60); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill), 60)
 		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIdToKill)
 
 		// Wait for new pod add event
-		event = e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 180); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId), 180)
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newPodMemberId)
 
 		// Wait for rebalance complete event
-		event = e2eutil.RebalanceCompletedEvent(cbCluster)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 		// Add expected events for cluster for verification
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -2007,14 +1927,9 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -2048,24 +1963,15 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberIdToKill)
 
 		// Wait for failover event
-		event := e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 90); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill), 90)
 		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIdToKill)
 
 		// Wait for new pod add event
-		event = e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 180); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId), 180)
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newPodMemberId)
 
 		// Wait for rebalance complete event
-		event = e2eutil.RebalanceCompletedEvent(cbCluster)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 		// Add expected events for cluster for verification
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -2141,13 +2047,8 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10)
 
 	// Kills operator pod in async way
 	if isOperatorKilledWithServerPod {
@@ -2180,15 +2081,8 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 
 	if len(serverMemberIdToKill) != 0 {
 		// Wait for cluster to be rebalanced before log collection and verification
-		event := e2eutil.RebalanceStartedEvent(cbCluster)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-			t.Fatal(err)
-		}
-
-		event = e2eutil.RebalanceCompletedEvent(cbCluster)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, cbCluster, event, 300); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceStartedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 	}
 
 	// Collect logs
@@ -2312,13 +2206,8 @@ func TestLogRedactionVerify(t *testing.T) {
 	}
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10)
 
 	// Collect logs
 	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-collectinfo-redact", "-all", cbCluster.Name}
@@ -2386,13 +2275,8 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Couchbase cluster
-	cbCluster, err := e2eutil.CreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10)
 
 	// Collect logs
 	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-collectinfo-redact", "-all", cbCluster.Name}

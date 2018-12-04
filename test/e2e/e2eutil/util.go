@@ -225,7 +225,7 @@ func newClusterFromSpecQuick(t *testing.T, k8s *types.Cluster, namespace string,
 		}
 	}
 	// Update the cluster status
-	updatedCluster, err := GetClusterCRD(k8s.CRClient, cluster)
+	updatedCluster, err := getClusterCRD(k8s.CRClient, cluster)
 	if err != nil {
 		t.Logf("failed to get updated cluster spec")
 		return cluster, err
@@ -282,6 +282,14 @@ func GetPlatformTimingMultiplier(platformType string) int {
 func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	return newClusterFromSpec(t, k8s, namespace, crd, GetRetriesForPlatform(platformType))
+}
+
+func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) *api.CouchbaseCluster {
+	cluster, err := CreateClusterFromSpec(t, k8s, namespace, adminConsoleExposed, spec, platformType)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
 }
 
 // Creates Couchbase cluster object and returns it
@@ -396,11 +404,27 @@ func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
+func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
+	cluster, err := NewTlsXdcrClusterBasic(t, k8s, namespace, size, withBucket, exposed, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
+}
+
 // NewXdcrClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+}
+
+func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+	cluster, err := NewXdcrClusterBasic(t, k8s, namespace, size, withBucket, exposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
 }
 
 func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
@@ -415,11 +439,27 @@ func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
 }
 
+func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+	cluster, err := NewStatefulCluster(t, k8s, namespace, size, withBucket, exposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
+}
+
 // NewClusterMulti creates a multi cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, exposed)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+}
+
+func MustNewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) *api.CouchbaseCluster {
+	cluster, err := NewClusterMulti(t, k8s, namespace, config, exposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
 }
 
 // NewClusterMultiNoWait creates a multi cluster, but doesn't wait for any events.
@@ -791,6 +831,14 @@ func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient ve
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
 	cluster, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), crClient, cl, 10)
 	return cluster, err
+}
+
+func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
+	cluster, err := ResizeClusterNoWait(t, service, clusterSize, crClient, cl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
 }
 
 func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {

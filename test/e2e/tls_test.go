@@ -64,26 +64,17 @@ func TestTlsKillClusterNode(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// async scale up to 3 node cluster
-	var err error
-	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, 0, constants.Size3, targetKube.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatal("Failed to trigger cluster resize")
-	}
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube.CRClient, testCouchbase)
 
 	// wait for add member event
-	event := e2eutil.NewMemberAddEvent(testCouchbase, 2)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 300)
 
 	for nodeIndex := 1; nodeIndex < constants.Size3; nodeIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 	}
 
 	// kill pod 1
-	if err := e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podToKillMemberId); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
@@ -122,11 +113,7 @@ func TestTlsResizeCluster(t *testing.T) {
 
 	for _, clusterSize := range clusterSizes {
 		service := 0
-		var err error
-		testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
 
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
@@ -188,10 +175,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	t.Log("Couchbase operator certificate deleted")
 
 	// kill pod 1
-	err = e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podToKillMemberId)
-	if err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
@@ -258,10 +242,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	}
 	t.Log("Couchbase operator certificate deleted")
 
-	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, 0, constants.Size5, targetKube.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size5, targetKube.CRClient, testCouchbase)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
@@ -321,10 +302,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	t.Log("Couchbase Cluster certificate deleted")
 
 	// kill pod 1
-	err = e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, podToKillMemberId)
-	if err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)

@@ -623,6 +623,12 @@ func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType
 	}
 }
 
+func MustWaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType string, statusValue string, cl *api.CouchbaseCluster, wait int) {
+	if err := WaitForClusterStatus(t, crClient, statusType, statusValue, cl, wait); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func WaitUntilAccepts(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
 	interval := 5 * time.Second
 	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {

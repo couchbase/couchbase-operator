@@ -47,6 +47,14 @@ func UpdateCluster(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRe
 	return AtomicUpdateClusterCR(crClient, cl.Name, cl.Namespace, maxRetries, updateFunc)
 }
 
+func MustUpdateCluster(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int, updateFunc k8sutil.CouchbaseClusterCRUpdateFunc) *api.CouchbaseCluster {
+	cluster, err := UpdateCluster(crClient, cl, maxRetries, updateFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
+}
+
 func AtomicUpdateClusterCR(crClient versioned.Interface, name, namespace string, maxRetries int, updateFunc k8sutil.CouchbaseClusterCRUpdateFunc) (*api.CouchbaseCluster, error) {
 	result := &api.CouchbaseCluster{}
 	err := retryutil.Retry(Context, 1*time.Second, maxRetries, func() (done bool, err error) {
@@ -78,7 +86,7 @@ func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubern
 	return waitResourcesDeleted(t, kubeClient, cl, retries)
 }
 
-func GetClusterCRD(crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+func getClusterCRD(crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	return crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 }
 

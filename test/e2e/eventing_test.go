@@ -62,10 +62,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	}
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	if err != nil {
-		t.Fatalf("cluster creation failed: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
@@ -140,10 +137,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	if err != nil {
-		t.Fatalf("cluster creation failed: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
@@ -245,10 +239,7 @@ func TestEventingResizeCluster(t *testing.T) {
 
 		// Resize cluster and wait for healthy cluster
 		service := 1
-		testCouchbase, err = e2eutil.ResizeClusterNoWait(t, service, eventingNodes, targetKube.CRClient, testCouchbase)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, eventingNodes, targetKube.CRClient, testCouchbase)
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
 		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
 		if err != nil {
@@ -256,9 +247,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-			t.Fatal(err.Error())
-		}
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -278,9 +267,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 
 	// Stop the insertion and wait for it to exit, checking for any errors encountered
 	stopDataInsertion <- true
@@ -311,10 +298,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	if err != nil {
-		t.Fatalf("cluster creation failed: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
@@ -394,26 +378,15 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	newMemberToBeAdded := clusterSize
 	for _, memberId := range []int{2, 3, 4} {
-		if err := e2eutil.KillPodForMember(targetKube.KubeClient, testCouchbase, memberId); err != nil {
-			t.Fatal(err)
-		}
-		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 30); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId)
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 30)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", memberId)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", memberId)
 
-		event = e2eutil.NewMemberAddEvent(testCouchbase, newMemberToBeAdded)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 150); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberToBeAdded), 150)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", newMemberToBeAdded)
 
-		event = e2eutil.RebalanceCompletedEvent(testCouchbase)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberId)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")

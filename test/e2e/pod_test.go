@@ -39,17 +39,12 @@ func TestPodResourcesBasic(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 	t.Logf("Pod Policy Resource Memory Request=%sMB... \n Pod Policy Resource Memory Limit=%sMB... \n attempting to create 1 node cluster", memReq, memLimit)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	if err != nil {
-		t.Fatalf("failed to place first pod: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -83,9 +78,14 @@ func TestNegPodResourcesBasic(t *testing.T) {
 		"service1": serviceConfig1,
 	}
 	t.Logf("Pod Policy Resource Memory Request=%sMB... \n Pod Policy Resource Memory Limit=%sMB... \n attempting to create 1 node cluster", memReq, memLimit)
-	_, err = e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	if err == nil {
-		t.Fatalf("pod placed with invalid resource list, fail: %v", err)
+	cluster, err := e2eutil.NewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
+	if err != nil {
+		t.Fatalf("failed to create cluster")
+	}
+
+	// Expect the cluster to enter a failed state
+	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster, 10); err != nil {
+		t.Fatalf("cluster failed to enter failed state")
 	}
 	t.Logf("Pod not placed")
 }
@@ -138,22 +138,13 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 
 	// Scale the cluster up to just below the memory threshold
 	t.Logf("Pod Policy Resource Memory Request=%s MB...\n Cluster Capacity=%d  \n scaling until pods cannot be placed", memReq, scaleNum)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	if err != nil {
-		t.Fatalf("failed to place first pod: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
 	// Add in a new node which should cause a memory allocation error
-	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, 0, scaleNum+1, targetKube.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to scale cluster")
-	}
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleNum+1, targetKube.CRClient, testCouchbase)
 
 	// Wait for the creation failure event to be raised
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, scaleNum)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 60); err != nil {
-		t.Fatalf("failed to raise member creation failed event")
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, scaleNum), 60)
 
 	// Check the event stream is as expected
 	expectedEvents := e2eutil.EventList{}
@@ -232,10 +223,7 @@ func TestAntiAffinityOn(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 	t.Logf("AntiAffinity=on... \n attempting to create %d pod cluster with %d nodes", numNodes, numNodes)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	if err != nil {
-		t.Fatalf("cluster creation failed: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
 	expectedEvents := e2eutil.EventList{}
 	for i := 0; i < numNodes; i++ {
@@ -246,9 +234,7 @@ func TestAntiAffinityOn(t *testing.T) {
 
 	t.Logf("cluster created")
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -286,17 +272,11 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 
 	var memberId int
 	for memberId = 0; memberId < numNodes; memberId++ {
-		event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
-			t.Fatalf("Failed to create cluster member %d: %v", memberId, err)
-		}
+		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
-	event := e2eutil.NewMemberAddEvent(testCouchbase, memberId)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err == nil {
-		t.Fatalf("Member %d added despite anti-affinity", memberId)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 300)
 	t.Logf("Failed to add extra cluster node: %v", err)
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, memberId)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -327,10 +307,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 	t.Logf("AntiAffinity=on... \n attempting to create %d pod cluster with %d nodes", numNodes, numNodes)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	if err != nil {
-		t.Fatalf("cluster creation failed: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 	t.Logf("Cluster created")
 
 	expectedEvents := e2eutil.EventList{}
@@ -345,15 +322,9 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	}
 
 	t.Logf("Attempting to add a node")
-	testCouchbase, err = e2eutil.ResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase)
 
-	event := e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes)
-	if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 300); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes), 300)
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, numNodes)
 	t.Logf("Node not added")
 
@@ -363,9 +334,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 		t.Fatalf("cluster failed to revert, fail: %v", err)
 	}
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -396,10 +365,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	}
 
 	t.Logf("AntiAffinity=off... \n attempting to create %d pod cluster with %d nodes", scaleToNum, numNodes)
-	testCouchbase, err := e2eutil.NewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	if err != nil {
-		t.Fatalf("cluster creation failed: %v", err)
-	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 	t.Logf("cluster created")
 
 	expectedEvents := e2eutil.EventList{}
@@ -420,8 +386,6 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10); err != nil {
-		t.Fatal(err.Error())
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
