@@ -265,7 +265,13 @@ func DeleteCouchbaseClusters(kubeClient kubernetes.Interface, crClient versioned
 
 func CreateAdmissionController(client kubernetes.Interface) error {
 	logrus.Infof("Creating admission controller")
-	return createAdmissionController(client)
+	if err := createAdmissionController(client); err != nil {
+		return err
+	}
+	if err := waitAdmissionController(client); err != nil {
+		return err
+	}
+	return nil
 }
 
 func DeleteAdmissionController(client kubernetes.Interface) error {

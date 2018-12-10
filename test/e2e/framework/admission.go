@@ -1,7 +1,12 @@
 package framework
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -373,4 +378,20 @@ func deleteAdmissionController(client kubernetes.Interface) error {
 		return err
 	}
 	return nil
+}
+
+// waitAdmissionController polls the Kubernetes API for the admission controller deployment
+// and waits for it to become ready.
+func waitAdmissionController(client kubernetes.Interface) error {
+	callback := func() (bool, error) {
+		deployment, err := client.AppsV1().Deployments(Global.Namespace).Get(admissionControllerName, metav1.GetOptions{})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
+			return false, retryutil.RetryOkError(fmt.Errorf("requested %d replicas, ready replicas %d", deployment.Status.Replicas, deployment.Status.ReadyReplicas))
+		}
+		return true, nil
+	}
+	return retryutil.Retry(context.Background(), time.Second, 30, callback)
 }
