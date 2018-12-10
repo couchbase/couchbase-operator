@@ -426,10 +426,15 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 				errs = append(errs, errors.Required(string(api.AnalyticsService), fmt.Sprintf("spec.servers[%d].services", index)))
 			}
 
+			templateNames := customResource.Spec.GetVolumeClaimTemplateNames()
+			templateNamesEnum := []interface{}{}
+			for _, name := range templateNames {
+				templateNamesEnum = append(templateNamesEnum, name)
+			}
+
 			if mounts.LogsOnly() {
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.LogsClaim); template == nil {
-					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.LogsClaim), "spec.volumeClaimTemplates[*].metadata.name")
-					errs = append(errs, err)
+					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].logs", index), "", mounts.LogsClaim, templateNamesEnum))
 				}
 				if mounts.DefaultClaim != "" || hasSecondaryMounts {
 					if mounts.DefaultClaim != "" {
@@ -441,26 +446,22 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 				}
 			} else if mounts.DefaultClaim != "" {
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
-					err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DefaultClaim), "spec.volumeClaimTemplates[*].metadata.name")
-					errs = append(errs, err)
+					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].default", index), "", mounts.DefaultClaim, templateNamesEnum))
 				}
 				if mounts.DataClaim != "" {
 					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DataClaim); template == nil {
-						err := errors.Required(fmt.Sprintf(`"%s"`, mounts.DataClaim), "spec.volumeClaimTemplates[*].metadata.name")
-						errs = append(errs, err)
+						errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].data", index), "", mounts.DataClaim, templateNamesEnum))
 					}
 				}
 				if mounts.IndexClaim != "" {
 					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.IndexClaim); template == nil {
-						err := errors.Required(fmt.Sprintf(`"%s"`, mounts.IndexClaim), "spec.volumeClaimTemplates[*].metadata.name")
-						errs = append(errs, err)
+						errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].index", index), "", mounts.IndexClaim, templateNamesEnum))
 					}
 				}
 				if len(mounts.AnalyticsClaims) > 0 {
-					for _, claim := range mounts.AnalyticsClaims {
+					for analyticsIndex, claim := range mounts.AnalyticsClaims {
 						if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
-							err := errors.Required(fmt.Sprintf(`"%s"`, claim), "spec.volumeClaimTemplates[*].metadata.name")
-							errs = append(errs, err)
+							errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].analytics[%d]", index, analyticsIndex), "", claim, templateNamesEnum))
 						}
 					}
 				}

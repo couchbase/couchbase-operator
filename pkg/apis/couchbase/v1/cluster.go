@@ -482,6 +482,15 @@ func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeC
 	return nil
 }
 
+// Get GetVolumeClaimTemplateNames returns all template names defined.
+func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
+	names := []string{}
+	for _, template := range cs.VolumeClaimTemplates {
+		names = append(names, template.Name)
+	}
+	return names
+}
+
 // diff spec and existing buckets to determine
 // which should be added and which removed
 func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string) {

@@ -423,7 +423,7 @@ var testDefs = []testDef{
 		path:        "tests/0052.yaml",
 		description: "Tests that template for volume mount is specified",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
+			errors.EnumFail("spec.servers[0].default", "", nil, []interface{}{"somethingelse"}),
 		),
 	},
 	{
@@ -477,8 +477,8 @@ var testDefs = []testDef{
 		path:         "tests/0056.yaml",
 		description:  "Tests that name of claim template cannot be changed",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
-			errors.Required(`"couchbase"`, "spec.volumeClaimTemplates[*].metadata.name"),
+			errors.EnumFail("spec.servers[0].default", "", nil, []interface{}{"other"}),
+			errors.EnumFail("spec.servers[0].data", "", nil, []interface{}{"other"}),
 		),
 	},
 	{
@@ -543,8 +543,8 @@ var testDefs = []testDef{
 		path:        "tests/0065.yaml",
 		description: "Tests analytics specify missing claim",
 		expectedErr: errors.CompositeValidationError(
-			errors.Required(`"couchbase2"`, "spec.volumeClaimTemplates[*].metadata.name"),
-			errors.Required(`"couchbase2"`, "spec.volumeClaimTemplates[*].metadata.name"),
+			errors.EnumFail("spec.servers[0].analytics[0]", "", nil, []interface{}{"couchbase"}),
+			errors.EnumFail("spec.servers[0].analytics[1]", "", nil, []interface{}{"couchbase"}),
 		),
 	},
 	{

@@ -411,11 +411,14 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:  jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/ObjectMeta/Name", "InvalidVolumeClaim"),
 			shouldFail: true,
 			expectedErrors: []string{
-				`"couchbase" in spec.volumeClaimTemplates[*].metadata.name is required`,
-				`"couchbase" in spec.volumeClaimTemplates[*].metadata.name is required`,
-				`"couchbase" in spec.volumeClaimTemplates[*].metadata.name is required`,
-				`"couchbase" in spec.volumeClaimTemplates[*].metadata.name is required`,
-				`"couchbase" in spec.volumeClaimTemplates[*].metadata.name is required`,
+				"spec.servers[0].default should be one of [InvalidVolumeClaim couchbase-log-pv]",
+				"spec.servers[1].default should be one of [InvalidVolumeClaim couchbase-log-pv]",
+				"spec.servers[1].data should be one of [InvalidVolumeClaim couchbase-log-pv]",
+				"spec.servers[1].index should be one of [InvalidVolumeClaim couchbase-log-pv]",
+				"spec.servers[1].analytics[0] should be one of [InvalidVolumeClaim couchbase-log-pv]",
+				"spec.servers[1].analytics[1] should be one of [InvalidVolumeClaim couchbase-log-pv]",
+				"spec.servers[2].default should be one of [InvalidVolumeClaim couchbase-log-pv]",
+				"spec.servers[4].default should be one of [InvalidVolumeClaim couchbase-log-pv]",
 			},
 		},
 
@@ -483,7 +486,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateVolumeClaimTemplateMustExist_" + mntName,
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Pod/VolumeMounts/"+mntField, "invalidClaim"),
 			shouldFail:     true,
-			expectedErrors: []string{`"invalidClaim" in spec.volumeClaimTemplates[*].metadata.name is required`},
+			expectedErrors: []string{"spec.servers[1]." + mntName + " should be one of [couchbase couchbase-log-pv]"},
 		}
 		testDefs = append(testDefs, testCase)
 	}
