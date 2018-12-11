@@ -3,7 +3,6 @@ package e2e
 import (
 	"io/ioutil"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
+	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -81,33 +81,18 @@ func ExpectedClusterSize(cluster *api.CouchbaseCluster) int {
 	return clusterSize
 }
 
-// camelify turns plan english names into more standard looking test names.
-// TODO: Just make the names sensible to start with...
-func camelify(name string) string {
-	// Replace non text characters with white space
-	re := regexp.MustCompile(`[^\w]`)
-	name = re.ReplaceAllString(name, " ")
-
-	// Transform each word into bumpy caps
-	words := strings.Split(name, " ")
-	for i, word := range words {
-		if len(word) != 0 {
-			words[i] = strings.ToUpper(string(word[0])) + word[1:]
-		}
-	}
-
-	// And for the sake of convention tack on a test prefix
-	return "Test" + strings.Join(words, "")
-}
-
 func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command string) {
 	f := framework.Global
 	targetKube := f.ClusterSpec[kubeName]
+
+	// Stop the operator, we don't actually need it to validate the API and the tests will take forever.
+	framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, f.Namespace)
+	defer f.SetupCouchbaseOperator(targetKube)
+
 	for _, test := range testDefs {
 		// Run each test case defined as a separate test so we have a way
 		// of running them individually.
-		name := camelify(test.name)
-		t.Run(name, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			testCouchbase, err := YAMLToCluster("./resources/validation/validation.yaml")
 			if err != nil {
 				t.Fatal(err)
@@ -121,25 +106,17 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 			// If we are applying a change or deleting a cluster we first need to create it...
 			if command == "apply" || command == "delete" {
-				if _, err := k8sutil.CreateCouchbaseCluster(targetKube.CRClient, testCouchbase); err != nil && !test.shouldFail {
-					t.Fatal(err)
-				}
-
-				clusterSize := ExpectedClusterSize(testCouchbase)
-				if err := e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase.Name, f.Namespace, clusterSize, constants.Retries60); err != nil {
-					t.Fatal(err)
-				}
-
-				// Update to the latest revision so and update is less likely to fail with a CAS collision
-				var err error
-				if testCouchbase, err = k8sutil.GetCouchbaseCluster(targetKube.CRClient, f.Namespace, testCouchbase.Name); err != nil {
+				testCouchbase, err = k8sutil.CreateCouchbaseCluster(targetKube.CRClient, testCouchbase)
+				if err != nil && !test.shouldFail {
 					t.Fatal(err)
 				}
 			}
 
 			// Patch the cluster specification
-			if err := jsonpatch.Apply(testCouchbase, test.mutations.Patches()); err != nil {
-				t.Fatal(err)
+			if test.mutations != nil {
+				if err := jsonpatch.Apply(testCouchbase, test.mutations.Patches()); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			// Execute the main test, update the new resource for verification.
@@ -153,12 +130,12 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			}
 
 			// Handle successes when it shoud have failed.
-			// If the command was a create of apply ensure that any validation checks pass.
+			// Also if any validations are defined then ensure the updated CR matches.
 			if err == nil {
 				if test.shouldFail {
 					t.Fatal("test unexpectedly succeeded")
 				}
-				if command == "create" || command == "apply" {
+				if test.validations != nil {
 					if err := jsonpatch.Apply(testCouchbase, test.validations.Patches()); err != nil {
 						t.Fatal(err)
 					}
@@ -181,6 +158,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			}
 		})
 	}
+
 	// Removing deployment if any
 	if !f.SkipTeardown {
 		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
@@ -196,14 +174,14 @@ func TestValidationCreate(t *testing.T) {
 
 	testDefs := []testDef{
 		{
-			name: "create default yaml",
+			name: "TestValidateDefault",
 		},
 	}
 
 	// Cases to verify supported time units for Spec.LogRetentionTime
 	for _, timeUnit := range supportedTimeUnits {
 		testDefCase := testDef{
-			name:      "Apply spec.logRetentionTime with time duration in '" + timeUnit + "'",
+			name:      "TestValidateLogRetentionTime_" + timeUnit,
 			mutations: jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1"+timeUnit),
 		}
 		testDefs = append(testDefs, testDefCase)
@@ -219,13 +197,13 @@ func TestNegValidationCreate(t *testing.T) {
 	testDefs := []testDef{
 		// Spec.ExposedFeatures list validation
 		{
-			name:           "Validate spec.exposedFeatures field values",
+			name:           "TestValidateExposedFeaturesEnumInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatures", api.ExposedFeatureList{api.FeatureAdmin, "cleint", api.FeatureXDCR}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.exposedFeatures in body should be one of [admin xdcr client]"},
 		},
 		{
-			name:           "Validate spec.exposedFeatures fields uniqueness",
+			name:           "TestValidateExposedFeaturesUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatures", api.ExposedFeatureList{api.FeatureAdmin, api.FeatureClient, api.FeatureXDCR, api.FeatureAdmin}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.exposedFeatures in body shouldn't contain duplicates"},
@@ -233,20 +211,22 @@ func TestNegValidationCreate(t *testing.T) {
 
 		// Bucket validation test
 		{
-			name:           "create invalid bucket name",
+			name:           "TestValidateBucketNameInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketName", "invalid!bucket!name"),
 			shouldFail:     true,
 			expectedErrors: []string{`spec.buckets.name in body should match '^[a-zA-Z0-9._\-%]*$'`},
 		},
 		{
-			name:           "create invalid bucket type",
+			name:           "TestValidateBucketTypeEnumInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketType", "invalid-bucket-type"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets.type in body should be one of [couchbase ephemeral memcached]"},
 		},
 		{
-			name:       "create invalid bucket name and bucket type",
-			mutations:  jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketName", "invalid!bucket!name").Replace("/Spec/BucketSettings/0/BucketType", "invalid-bucket-type"),
+			name: "TestValidateBucketNameInvalidBucketTypeEnumInvalid",
+			mutations: jsonpatch.NewPatchSet().
+				Replace("/Spec/BucketSettings/0/BucketName", "invalid!bucket!name").
+				Replace("/Spec/BucketSettings/0/BucketType", "invalid-bucket-type"),
 			shouldFail: true,
 			expectedErrors: []string{
 				`spec.buckets.type in body should be one of [couchbase ephemeral memcached]`,
@@ -254,68 +234,70 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 		},
 		{
-			name:           "Validate spec.bucket.enableIndexReplica with memcached bucket",
+			name:           "TestValidateBucketIndexReplicaInvalidForMemcached",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/EnableIndexReplica", true),
 			shouldFail:     true,
 			expectedErrors: []string{`enableReplicaIndex in spec.buckets[2] must be of type nil: "Bucket type is memcached"`},
 		},
 		{
-			name:           "Validate spec.bucket.enableIndexReplica with ephemeral bucket",
+			name:           "TestValidateBucketIndexReplicaInvalidForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/EnableIndexReplica", true),
 			shouldFail:     true,
 			expectedErrors: []string{`enableReplicaIndex in spec.buckets[3] must be of type nil: "Bucket type is ephemeral"`},
 		},
 		{
-			name:           "Validate spec.bucket.replicas with memcached bucket",
+			name:           "TestValidateBucketReplicasInvalidForMemcached",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/BucketReplicas", 1),
 			shouldFail:     true,
 			expectedErrors: []string{`replicas in spec.buckets[2] must be of type nil: "Bucket type is memcached"`},
 		},
 		{
-			name:           "Validate spec.bucket.conflictResolution with memcached bucket",
+			name:           "TestValidateBucketConflictResolutionInvalidForMemcached",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/ConflictResolution", "seqno"),
 			shouldFail:     true,
 			expectedErrors: []string{`conflictResolution in spec.buckets[2] must be of type nil: "Bucket type is memcached"`},
 		},
 		{
-			name:           "Validate spec.bucket.evictionPolicy with memcached bucket",
+			name:           "TestValidateBucketEvictionPolicyInvalidForMemcached",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/EvictionPolicy", "valueOnly"),
 			shouldFail:     true,
 			expectedErrors: []string{`evictionPolicy in spec.buckets[2] must be of type nil: "Bucket type is memcached"`},
 		},
 		{
-			name:           "Validate spec.bucket.ioPriority with memcached bucket",
+			name:           "TestValidateBucketIOPriorityInvalidForMemcached",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/IoPriority", "low"),
 			shouldFail:     true,
 			expectedErrors: []string{`ioPriority in spec.buckets[2] must be of type nil: "Bucket type is memcached"`},
 		},
 		{
-			name:           "Validate spec.bucket.conflictResolution with couchbase bucket",
+			name:           "TestValidateBucketConflictResolutionRequiredForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/0/ConflictResolution"),
 			shouldFail:     true,
 			expectedErrors: []string{"conflictResolution in spec.buckets[0] is required"},
 		},
 		{
-			name:       "Validate spec.bucket.evictionPolicy with couchbase bucket",
+			name:       "TestValidateBucketEvictionPolicyRequiredForCouchbase",
 			mutations:  jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/0/EvictionPolicy"),
 			shouldFail: true,
-			expectedErrors: []string{"evictionPolicy in spec.buckets[0] is required",
-				"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
+			expectedErrors: []string{
+				"evictionPolicy in spec.buckets[0] is required",
+				"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]",
+			},
 		},
 		{
-			name:           "Validate spec.bucket.ioPriority with couchbase bucket",
+			name:           "TestValidateBucketIOPriorityRequiredForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/0/IoPriority"),
 			shouldFail:     true,
 			expectedErrors: []string{"ioPriority in spec.buckets[0] is required"},
 		},
 		{
-			name:           "Validate spec.bucket.conflictResolution with ephemeral bucket",
+			name:           "TestValidateBucketConflictResolutionRequiredForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/3/ConflictResolution"),
 			shouldFail:     true,
 			expectedErrors: []string{"conflictResolution in spec.buckets[3] is required"},
 		},
 		{
-			name:       "Validate spec.bucket.evictionPolicy with ephemeral bucket",
+			name:       "TestValidateBucketEvictionPolicyRequiredForEphemeral",
 			mutations:  jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/3/EvictionPolicy"),
 			shouldFail: true,
 			expectedErrors: []string{
@@ -324,43 +306,43 @@ func TestNegValidationCreate(t *testing.T) {
 			},
 		},
 		{
-			name:           "Validate spec.bucket.ioPriority with ephemeral bucket",
+			name:           "TestValidateBucketIOPriorityRequiredForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/3/IoPriority"),
 			shouldFail:     true,
 			expectedErrors: []string{"ioPriority in spec.buckets[3] is required"},
 		},
 		{
-			name:           "Validate spec.buckets.evictionPolicy as valueOnly for ephemeral bucket",
+			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_1",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/EvictionPolicy", "valueOnly"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
 		},
 		{
-			name:           "Validate spec.buckets.evictionPolicy as fullEviction for ephemeral bucket",
+			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_2",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/EvictionPolicy", "fullEviction"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
 		},
 		{
-			name:           "Validate spec.buckets.evictionPolicy as noEviction for couchbase bucket",
+			name:           "TestValidateBucketEvictionPolicyEnumInvalidInvalidForCouchbase_1",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EvictionPolicy", "noEviction"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
 		},
 		{
-			name:           "Validate spec.buckets.evictionPolicy as nruEviction for couchbase bucket",
+			name:           "TestValidateBucketEvictionPolicyEnumInvalidInvalidForCouchbase_2",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EvictionPolicy", "nruEviction"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
 		},
 		{
-			name:           "Validate spec.buckets.name for duplicate values",
+			name:           "TestValidateBucketNameUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketName", "default3"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets.name in body shouldn't contain duplicates"},
 		},
 		{
-			name:           "Validate spec.buckets.quota with more than declared",
+			name:           "TestValidateBucketQuotaOverflow",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketMemoryQuota", 601),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 600"},
@@ -368,25 +350,25 @@ func TestNegValidationCreate(t *testing.T) {
 
 		// Server settings validation
 		{
-			name:           "Validate server-settings services fields",
+			name:           "TestValidateServerServicesEnumInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.Service("indxe"), api.QueryService, api.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers.services in body should be one of [data index query search eventing analytics]"},
 		},
 		{
-			name:           "create invalid server name",
+			name:           "TestValidateServerNameUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Name", "data_only"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers.name in body shouldn't contain duplicates"},
 		},
 		{
-			name:           "Validate spec.adminConsoleServices fields uniqueness",
+			name:           "TestValidateAdminConsoleServicesUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.IndexService, api.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 		{
-			name:           "Validate spec.serverSettings.services fields for uniqueness",
+			name:           "TestValidateServerServicesUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.IndexService, api.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body shouldn't contain duplicates"},
@@ -394,13 +376,13 @@ func TestNegValidationCreate(t *testing.T) {
 
 		// ServerGroups list validation
 		{
-			name:           "Validate spec.serverGroups uniqueness",
+			name:           "TestValidateServerGroupsUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", []string{"NewGroupUpdate-1", "NewGroupUpdate-1"}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.serverGroups in body shouldn't contain duplicates"},
 		},
 		{
-			name:           "Validate spec.servers.serverGroups list uniqueness",
+			name:           "TestValidateServerServerGroupsUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/2/ServerGroups", []string{"us-east-1a", "us-east-1b", "us-east-1a"}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[2].serverGroups in body shouldn't contain duplicates"},
@@ -408,7 +390,7 @@ func TestNegValidationCreate(t *testing.T) {
 
 		// Admin console services field validation
 		{
-			name:           "Validate AdminConsoleService fields",
+			name:           "TestValidateAdminConsoleServicesEnumInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.Service("indxe"), api.QueryService, api.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
@@ -416,13 +398,13 @@ func TestNegValidationCreate(t *testing.T) {
 
 		// Persistent volume claim cases
 		{
-			name:           "Validate spec.volumeClaimTemplates.Spec.storageClassName to be defined",
+			name:           "TestValidateVolumeClaimTemplatesStorageClassMustExist",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/Spec/StorageClassName", &unavailableStorageClass),
 			shouldFail:     true,
 			expectedErrors: []string{"storage class unavailableStorageClass must exist"},
 		},
 		{
-			name:       "Create PVC cluster with unavailable volume claim template defined in spec",
+			name:       "TestValidateVolumeClaimTemplateMustExist",
 			mutations:  jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/ObjectMeta/Name", "InvalidVolumeClaim"),
 			shouldFail: true,
 			expectedErrors: []string{
@@ -436,32 +418,32 @@ func TestNegValidationCreate(t *testing.T) {
 
 		// Verify for Default/Log volume mounts mutual exclusion
 		{
-			name:           "Log volume defined on top of default volume mount in spec.servers.pod.volumeMounts.properties",
+			name:           "TestValidateLogsVolumeMountMutuallyExclusive_1",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/LogsClaim", "couchbase"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].pod.volumeMounts.default is a forbidden property"},
 		},
 		{
-			name:           "default volume defined on top of log volume mounts specified in spec.servers.pod.volumeMounts.properties",
+			name:           "TestValidateLogsVolumeMountMutuallyExclusive_2",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Pod/VolumeMounts/DefaultClaim", "couchbase-log-pv"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[3].pod.volumeMounts.default is a forbidden property"},
 		},
 		{
-			name:           "Create with data service on top of stateless services",
+			name:           "TestValidateDefaultVolumeMountRequiredForStatefulServices",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Services", api.ServiceList{api.DataService, api.QueryService, api.SearchService, api.EventingService, api.AnalyticsService}),
 			shouldFail:     true,
 			expectedErrors: []string{"default in spec.servers[3].pod.volumeMounts is required"},
 		},
 		// Validation for logRetentionTime and logRetentionCount field
 		{
-			name:           "Invalid value for spec.logRetentionTime",
+			name:           "TestValidateLogRetentionTimeInvalidPattern",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1"),
 			shouldFail:     true,
 			expectedErrors: []string{`spec.logRetentionTime in body should match '^\d+(ns|us|ms|s|m|h)$'`},
 		},
 		{
-			name:           "Negative value for spec.logRetentionCount",
+			name:           "TestValidateLogRetentionCountInvalidRange",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionCount", -1),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.logRetentionCount in body should be greater than or equal to 0"},
@@ -476,7 +458,7 @@ func TestNegValidationCreate(t *testing.T) {
 	}
 	for mntField, mntName := range volMountsMap {
 		testCase := testDef{
-			name:           "Validate spec.servers.pod.volumeMounts.properties." + mntName + " values to be defined",
+			name:           "TestValidateVolumeClaimTemplateMustExist_" + mntName,
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Pod/VolumeMounts/"+mntField, "invalidClaim"),
 			shouldFail:     true,
 			expectedErrors: []string{`"invalidClaim" in spec.volumeClaimTemplates[*].metadata.name is required`},
@@ -494,7 +476,7 @@ func TestNegValidationCreate(t *testing.T) {
 			fieldValueToUse = append(fieldValueToUse, statefulService)
 		}
 		testCase := testDef{
-			name:           "Validate spec.servers.services with all persistent mount defined, but " + string(serviceToSkip) + "service missing in config",
+			name:           "TestValidateServerServicesRequiredForVolumeMount_" + string(serviceToSkip),
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Services", fieldValueToUse),
 			shouldFail:     true,
 			expectedErrors: []string{string(serviceToSkip) + " in spec.servers[1].services is required"},
@@ -505,7 +487,7 @@ func TestNegValidationCreate(t *testing.T) {
 	// Cases to validate with Log PV only defined,but one of stateful service is included
 	for _, statefulService := range constants.StatefulCbServiceList {
 		testCase := testDef{
-			name:           "Validate spec.servers.services with only log volume mount defined, with " + string(statefulService) + " service included",
+			name:           "TestValidateDefaultVolumeMountRequiredForStatefulService_" + string(statefulService),
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Services", api.ServiceList{api.QueryService, api.SearchService, api.EventingService, statefulService}),
 			shouldFail:     true,
 			expectedErrors: []string{"default in spec.servers[3].pod.volumeMounts is required"},
@@ -517,8 +499,10 @@ func TestNegValidationCreate(t *testing.T) {
 	claimFieldNames := []string{"DataClaim", "IndexClaim"}
 	for _, claimField := range claimFieldNames {
 		testCase := testDef{
-			name:           "Validate by defining " + claimField + " without Default volume mount",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/"+claimField, "couchbase").Remove("/Spec/ServerSettings/0/Pod/VolumeMounts/DefaultClaim"),
+			name: "TestValidateDefaultVolumeMountRequiredForServiceClaim_" + claimField,
+			mutations: jsonpatch.NewPatchSet().
+				Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/"+claimField, "couchbase").
+				Remove("/Spec/ServerSettings/0/Pod/VolumeMounts/DefaultClaim"),
 			shouldFail:     true,
 			expectedErrors: []string{"default in spec.servers[0].pod.volumeMounts is required"},
 		}
@@ -526,8 +510,10 @@ func TestNegValidationCreate(t *testing.T) {
 	}
 	// AnalyticsClaims is an array value
 	testCase := testDef{
-		name:           "Validate by defining AnalyticsClaims without Default volume mount",
-		mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/AnalyticsClaims", []string{"couchbase"}).Remove("/Spec/ServerSettings/0/Pod/VolumeMounts/DefaultClaim"),
+		name: "TestValidateDefaultVolumeMountRequiredForAnalyticsClaim",
+		mutations: jsonpatch.NewPatchSet().
+			Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/AnalyticsClaims", []string{"couchbase"}).
+			Remove("/Spec/ServerSettings/0/Pod/VolumeMounts/DefaultClaim"),
 		shouldFail:     true,
 		expectedErrors: []string{"default in spec.servers[0].pod.volumeMounts is required"},
 	}
@@ -543,14 +529,14 @@ func TestValidationDefaultCreate(t *testing.T) {
 	}
 	testDefs := []testDef{
 		{
-			name:        "create:default:Spec.BaseImage",
+			name:        "TestValidateBaseImageDefault",
 			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/BaseImage"),
 			validations: jsonpatch.NewPatchSet().Test("/Spec/BaseImage", "couchbase/server"),
 		},
 		{
-			name:        "create:default:Spec.ClusterSettings.IndexServiceMemQuota",
-			mutations:   jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", 0),
-			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/IndexServiceMemQuota", 256),
+			name:        "TestValidateIndexServiceMemoryQuotaDefault",
+			mutations:   jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", uint64(0)),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/IndexServiceMemQuota", uint64(256)),
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -565,7 +551,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 		{
 			// DataServiceMemQuota will get mutated to the default of 256, but we have
 			// 500 worth of buckets defined.
-			name:           "create:default:Spec.ClusterSettings.DataServiceMemQuota",
+			name:           "TestValidateDataServiceMemoryQuotaDefault",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/DataServiceMemQuota", uint64(0)),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 256"},
@@ -581,49 +567,49 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 	}
 	testDefs := []testDef{
 		{
-			name:           "more than 4 adminConsoleServices",
+			name:           "TestValidateAdminConsoleServicesUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.SearchService, api.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 		{
-			name:           "invalid adminConsoleService",
+			name:           "TestValidateAdminConsoleServicesEnumInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.Service("xxxxx")}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
 		{
-			name:           "ephemeral bucket with index replicas enabled",
+			name:           "TestValidateBucketIndexReplicasInvalidForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/EnableIndexReplica", true),
 			shouldFail:     true,
 			expectedErrors: []string{`enableReplicaIndex in spec.buckets[3] must be of type nil: "Bucket type is ephemeral"`},
 		},
 		{
-			name:           "memcached bucket with seqno conflict resolution",
+			name:           "TestValidateBucketConflictResolutionInvalidForMemcached",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/ConflictResolution", "seqno"),
 			shouldFail:     true,
 			expectedErrors: []string{`conflictResolution in spec.buckets[2] must be of type nil: "Bucket type is memcached"`},
 		},
 		{
-			name:           "couchbase bucket with invalid io priority",
+			name:           "TestValidateBucketIOPriorityEnumInvalidForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/IoPriority", "lighow"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets.ioPriority in body should be one of [high low]"},
 		},
 		{
-			name:           "couchbase bucket with invalid conflict resolution",
+			name:           "TestValidateBucketConflictResolutionEnumInvalidForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/ConflictResolution", "selwwno"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets.conflictResolution in body should be one of [seqno lww]"},
 		},
 		{
-			name:           "ephemeral bucket with invalid eviction policy",
+			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/EvictionPolicy", "valueOnly"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
 		},
 		{
-			name:           "couchbase bucket with invalid eviction policy",
+			name:           "TestValidateBucketEvictionPolicyEnumInvalidForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EvictionPolicy", "nruEviction"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
@@ -643,10 +629,10 @@ func TestValidationApply(t *testing.T) {
 
 	testDefs := []testDef{
 		{
-			name: "Apply without any changes in cluster yaml",
+			name: "TestValidateDefault",
 		},
 		{
-			name:        "Apply: update the bucket[0].name",
+			name:        "TestValidateApplyBucketName",
 			mutations:   jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketName", "newNameForBucket"),
 			validations: jsonpatch.NewPatchSet().Test("/Spec/BucketSettings/0/BucketName", "newNameForBucket"),
 		},
@@ -655,7 +641,7 @@ func TestValidationApply(t *testing.T) {
 	// Cases to verify supported time units for Spec.LogRetentionTime
 	for _, timeUnit := range supportedTimeUnits {
 		testDefCase := testDef{
-			name:      "Apply spec.logRetentionTime with time duration in '" + timeUnit + "'",
+			name:      "TestValidateApplyLogRestentionTime_" + timeUnit,
 			mutations: jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "100"+timeUnit),
 		}
 		testDefs = append(testDefs, testDefCase)
@@ -671,51 +657,51 @@ func TestNegValidationApply(t *testing.T) {
 
 	testDefs := []testDef{
 		{
-			name:           "apply invalid changes to bucket name",
+			name:           "TestValidateApplyBucketNameInvalidPattern",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketName", "invalid!bucket!name"),
 			shouldFail:     true,
 			expectedErrors: []string{`spec.buckets.name in body should match '^[a-zA-Z0-9._\-%]*$'`},
 		},
 		{
-			name:           "apply invalid changes to bucket type",
+			name:           "TestValidateApplyBucketTypeEnumInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketType", "invalid-bucket-type"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets.type in body should be one of [couchbase ephemeral memcached]"},
 		},
 		{
-			name:           "apply invalid changes to server name",
+			name:           "TestValidateServerServicesImmutable",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Name", "data_only"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body cannot be updated"},
 		},
 		// Verify for Default/Log volume mounts mutual exclusion
 		{
-			name:           "Log volume defined on top of default volume mount in spec.servers.pod.volumeMounts.properties",
+			name:           "TestValidateVolumeMountsImmutable_1",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/LogsClaim", "couchbase"),
 			shouldFail:     true,
 			expectedErrors: []string{"logs in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:           "Default volume defined on top of log volume mount in spec.servers.pod.volumeMounts.properties",
+			name:           "TestValidateVolumeMountsImmutable_2",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Pod/VolumeMounts/DefaultClaim", "couchbase-log-pv"),
 			shouldFail:     true,
 			expectedErrors: []string{"default in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:           "Log volume defined on top of default volume mount in spec.servers.pod.volumeMounts.properties",
+			name:           "TestValidateVolumeMountsImmutable_3",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/2/Pod/VolumeMounts/LogsClaim", "couchbase-log-pv"),
 			shouldFail:     true,
 			expectedErrors: []string{"logs in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		// Validation for logRetentionTime and logRetentionCount field
 		{
-			name:           "Invalid value for spec.logRetentionTime",
+			name:           "TestValidateApplyLogRetentionTimeInvalidPattern",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1"),
 			shouldFail:     true,
 			expectedErrors: []string{`spec.logRetentionTime in body should match '^\d+(ns|us|ms|s|m|h)$'`},
 		},
 		{
-			name:           "Negative value for spec.logRetentionCount",
+			name:           "TestValidateApplyLogRetentionCountInvalidRange",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionCount", -1),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.logRetentionCount in body should be greater than or equal to 0"},
@@ -732,7 +718,7 @@ func TestNegValidationApply(t *testing.T) {
 			fieldValueToUse = append(fieldValueToUse, statefulService)
 		}
 		testCase := testDef{
-			name:           "Validate spec.servers.services with all persistent mount defined, but " + string(serviceToSkip) + "service missing in config",
+			name:           "TestValidateApplyServerServicesImmutable_" + string(serviceToSkip),
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Services", fieldValueToUse),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[1].services in body cannot be updated"},
@@ -745,7 +731,7 @@ func TestNegValidationApply(t *testing.T) {
 		fieldValueToUse := constants.StatelessCbServiceList
 		fieldValueToUse = append(fieldValueToUse, serviceName)
 		testCase := testDef{
-			name:           "Validate spec.servers.services with only log volume mount defined, with " + string(serviceName) + " service included",
+			name:           "TestValidateApplyServerServicesImmutable_" + string(serviceName),
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Services", fieldValueToUse),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[3].services in body cannot be updated"},
@@ -760,8 +746,10 @@ func TestNegValidationApply(t *testing.T) {
 	}
 	for mntField, mntName := range volMountsMap {
 		testCase := testDef{
-			name:           "Validate by defining " + mntField + " without Default volume mount",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/"+mntField, "couchbase").Remove("/Spec/ServerSettings/0/Pod/VolumeMounts/DefaultClaim"),
+			name: "TestValidateApplyServerVolumeMountsImmutable_" + mntName,
+			mutations: jsonpatch.NewPatchSet().
+				Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/"+mntField, "couchbase").
+				Remove("/Spec/ServerSettings/0/Pod/VolumeMounts/DefaultClaim"),
 			shouldFail:     true,
 			expectedErrors: []string{mntName + " in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		}
@@ -769,7 +757,7 @@ func TestNegValidationApply(t *testing.T) {
 	}
 	// AnalyticsClaims in an array parameter
 	testCase := testDef{
-		name:           "Validate by defining AnalyticsClaims without Default volume mount",
+		name:           "TestValidateApplyServerVolumeMountsImmutable_analytics",
 		mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Pod/VolumeMounts/AnalyticsClaims", []string{"couchbase"}).Remove("/Spec/ServerSettings/0/Pod/VolumeMounts/DefaultClaim"),
 		shouldFail:     true,
 		expectedErrors: []string{"analytics in spec.servers[*].Pod.VolumeMounts cannot be updated"},
@@ -786,44 +774,28 @@ func TestValidationDefaultApply(t *testing.T) {
 	}
 	testDefs := []testDef{
 		{
-			name:        "apply defaults to base image",
+			name:        "TestValidateApplyBaseImageDefault",
 			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/BaseImage"),
 			validations: jsonpatch.NewPatchSet().Test("/Spec/BaseImage", "couchbase/server"),
 		},
 		{
-			name:        "apply defaults to indexServiceMemQuota",
+			name:        "TestValidateApplyIndexServiceMemoryQuotaDefault",
 			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/IndexServiceMemQuota"),
-			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/IndexServiceMemQuota", 256),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/IndexServiceMemQuota", uint64(256)),
 		},
 		{
-			name:        "apply defaults to searchServiceMemQuota",
+			name:        "TestValidateApplySearchServiceMemoryQuotaDefault",
 			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/SearchServiceMemQuota"),
-			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/SearchServiceMemQuota", 256),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/SearchServiceMemQuota", uint64(256)),
 		},
 		{
-			name:        "apply defaults to autofailover timeout",
+			name:        "TestValidateApplyAutoFailoverTimeoutDefault",
 			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoFailoverTimeout"),
-			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoFailoverTimeout", 120),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoFailoverTimeout", uint64(120)),
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
-}
-
-func TestNegValidationDefaultApply(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	testDefs := []testDef{
-		{
-			name:           "create:default:Spec.ClusterSettings.DataServiceMemQuota",
-			mutations:      jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/DataServiceMemQuota"),
-			shouldFail:     true,
-			expectedErrors: []string{"spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256"},
-		},
-	}
-	kubeName := framework.Global.TestClusters[0]
-	runValidationTest(t, testDefs, kubeName, "create")
 }
 
 func TestNegValidationConstraintsApply(t *testing.T) {
@@ -832,38 +804,38 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 	}
 	testDefs := []testDef{
 		{
-			name:           "more than 4 adminConsoleServices",
+			name:           "TestValidateApplyAdminConsoleServicesUnique",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.SearchService, api.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 		{
-			name:           "invalid adminConsoleService",
+			name:           "TestValidateApplyAdminConsoleServicesEnumInvalid",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.Service("xxxxx")}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
 		{
-			name:           "ephemeral bucket with index replicas enabled",
+			name:           "TestValidateApplyBucketIndexReplicasInvalidForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/EnableIndexReplica", true),
 			shouldFail:     true,
 			expectedErrors: []string{`enableReplicaIndex in spec.buckets[3] must be of type nil: "Bucket type is ephemeral"`},
 		},
 		{
-			name:           "couchbase bucket with invalid io priority",
+			name:           "TestValidateApplyBucketIOPriorityEnumInvalidForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/IoPriority", "lighow"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets.ioPriority in body should be one of [high low]"},
 		},
 		{
-			name:           "ephemeral bucket with invalid eviction policy",
+			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/EvictionPolicy", "valueOnly"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[3] should be one of [noEviction nruEviction]"},
 		},
 
 		{
-			name:           "couchbase bucket with invalid eviction policy",
+			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EvictionPolicy", "nruEviction"),
 			shouldFail:     true,
 			expectedErrors: []string{"evictionPolicy in spec.buckets[0] should be one of [valueOnly fullEviction]"},
@@ -880,127 +852,119 @@ func TestNegValidationImmutableApply(t *testing.T) {
 	testDefs := []testDef{
 		// Bucket spec updation
 		{
-			name:           "ephemeral bucket with seqno conflict resolution",
+			name:           "TestValidateApplyBucketConflictResolutionImmutableForEphemeral",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/4/ConflictResolution", "seqno"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets[4].conflictResolution in body cannot be updated"},
 		},
 		{
-			name:           "memcached bucket with seqno conflict resolution",
+			name:           "TestValidateApplyBucketConflictResolutionImmutableForMemcached",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/ConflictResolution", "seqno"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets[2].conflictResolution in body cannot be updated"},
 		},
 		{
-			name:           "couchbase bucket with invalid conflict resolution",
+			name:           "TestValidateApplyBucketConflictResolutionEnumInvalidForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/ConflictResolution", "selwwno"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets.conflictResolution in body should be one of [seqno lww]"},
 		},
 		{
-			name:           "Update spec.buckets.type value",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/Type", "memcached"),
+			name:           "TestValidateApplyBucketTypeImmutable",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketType", "memcached"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets[0].type in body cannot be updated"},
 		},
 		{
-			name:           "Update spec.buckets.conflictResolution value",
+			name:           "TestValidateApplyBucketConflictResolutionImmutableForCouchbase",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/ConflictResolution", "lww"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets[0].conflictResolution in body cannot be updated"},
 		},
-		{
-			name:      "Update spec.buckets.ioPriority value",
-			mutations: jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/IoPriority", "low"),
-		},
-		{
-			name:      "Update spec.buckets.evictionPolicy value",
-			mutations: jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EvictionPolicy", "valueOnly"),
-		},
 		// ServerSettings service update
 		{
-			name:           "Update spec.servers.services list",
+			name:           "TestValidateApplyServerServicesImmutable_1",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.IndexService, api.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body cannot be updated"},
 		},
 		{
-			name:           "Update spec.serverSettings.services values for uniqueness",
+			name:           "TestValidateApplyServerServicesImmutable_2",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body cannot be updated"},
 		},
 		{
-			name:           "Update AntiAffinity settings",
+			name:           "TestValidateApplyAntiAffinityImmutable",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AntiAffinity", true),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.antiAffinity in body cannot be updated"},
 		},
 		{
-			name:           "Update AuthSecret value",
+			name:           "TestValidateApplyAuthSecretImmutable",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AuthSecret", "auth-secret-update"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.authSecret in body cannot be updated"},
 		},
 		{
-			name:           "change index storage mode",
+			name:           "TestValidateApplyIndexStorageSettingsImmutable",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexStorageSetting", "plasma"),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.cluster.indexStorageSetting in body cannot be updated"},
 		},
 		// Server groups updates
 		{
-			name:           "Update server groups value",
+			name:           "TestValidateApplyServerGroupsImmutable",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", []string{"NewGroupUpdate-1", "NewGroupUpdate-2"}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.serverGroups in body cannot be updated"},
 		},
 		{
-			name:           "Update spec.servers.serverGroups list",
+			name:           "TestValidateApplyServersServerGroupsImmutable",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/2/ServerGroups", []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[2].serverGroups in body cannot be updated"},
 		},
 		// Persistent volume spec updation
 		{
-			name:           "Update spec.servers.pod.volumeMounts.properties.data value",
+			name:           "TestValidateApplyVolumeMountsImmutable_data",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Pod/VolumeMounts/DataClaim", "newVolumeMount"),
 			shouldFail:     true,
 			expectedErrors: []string{"data in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:           "Update spec.servers.pod.volumeMounts.properties.default value",
+			name:           "TestValidateApplyVolumeMountsImmutable_default",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Pod/VolumeMounts/DefaultClaim", "newVolumeMount"),
 			shouldFail:     true,
 			expectedErrors: []string{"default in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:           "Update spec.servers.pod.volumeMounts.properties.index value",
+			name:           "TestValidateApplyVolumeMountsImmutable_index",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Pod/VolumeMounts/IndexClaim", "newVolumeMount"),
 			shouldFail:     true,
 			expectedErrors: []string{"index in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:           "Update spec.servers.pod.volumeMounts.properties.analytics value",
+			name:           "TestValidateApplyVolumeMountsImmutable_analytics",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/1/Pod/VolumeMounts/AnalyticsClaims/0", "newVolumeMount"),
 			shouldFail:     true,
 			expectedErrors: []string{"analytics in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
-			name:           "Apply: Remove default volume claim template name",
+			name:           "TestValidateApplyVolumeTemplatesStorageClassImmutable",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/Spec/StorageClassName", &unavailableStorageClass),
 			shouldFail:     true,
 			expectedErrors: []string{`"storageClassName" in spec.volumeClaimTemplates[*] cannot be updated`},
 		},
 		{
-			name:           "Update spec.volumeClaimTemplates.spec.resources.requests.storage value",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/Spec/Resources/Requests", 10),
+			name:           "TestValidateApplyVolumeTemplatesResourcesRequestsImmutable",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/Spec/Resources/Requests", corev1.ResourceList{corev1.ResourceStorage: *apiresource.NewScaledQuantity(10, 30)}),
 			shouldFail:     true,
 			expectedErrors: []string{`"storage" in spec.volumeClaimTemplates[*].resources.requests cannot be updated`},
 		},
 		{
-			name:           "Update spec.volumeClaimTemplates.spec.resources.limits.storage value",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/Spec/Resources/Limits", apiresource.NewQuantity(int64(6)*1024*1024*1024, apiresource.BinarySI)),
+			name:           "TestValidateApplyVolumeTemplatesResourcesLimitsImmutable",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/VolumeClaimTemplates/0/Spec/Resources/Limits", corev1.ResourceList{corev1.ResourceStorage: *apiresource.NewScaledQuantity(10, 30)}),
 			shouldFail:     true,
 			expectedErrors: []string{`"storage" in spec.volumeClaimTemplates[*].resources.limits cannot be updated`},
 		},
@@ -1016,11 +980,11 @@ func TestValidationDelete(t *testing.T) {
 	}
 	testDefs := []testDef{
 		{
-			name:      "delete after modifying",
+			name:      "TestValidateDeleteAfterApplyBucketName",
 			mutations: jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketName", "newBucketName"),
 		},
 		{
-			name: "delete",
+			name: "TestValidateDelete",
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1032,9 +996,8 @@ func TestNegValidationDelete(t *testing.T) {
 		t.Parallel()
 	}
 	testDefs := []testDef{
-		// SM: This is testing kubernetes, not anything to do with us, delete me
 		{
-			name:           "delete",
+			name:           "TestValidateDeleteRenamedCluster",
 			mutations:      jsonpatch.NewPatchSet().Replace("/ObjectMeta/Name", "cb-example1"),
 			shouldFail:     true,
 			expectedErrors: []string{`couchbaseclusters.couchbase.com "cb-example1" not found`},
@@ -1052,13 +1015,13 @@ func TestNegValidationDelete(t *testing.T) {
 func TestRzaNegCreateCluster(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:           "Creating cluster with incorrect server-group in static config",
+			name:           "TestValidateServerGroupsInvalid_1",
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", []string{"InvalidGroup-1", "InvalidGroup-2"}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servergroups in body is invalid"},
 		},
 		{
-			name:           "Create cluster with server-group missing in default and class specific config",
+			name:           "TestValidateServerGroupsInvalid_2",
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servergroups missing for "},
 		},

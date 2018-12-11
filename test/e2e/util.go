@@ -84,7 +84,6 @@ var (
 		"TestValidationApply":                                 TestValidationApply,
 		"TestNegValidationApply":                              TestNegValidationApply,
 		"TestValidationDefaultApply":                          TestValidationDefaultApply,
-		"TestNegValidationDefaultApply":                       TestNegValidationDefaultApply,
 		"TestNegValidationConstraintsApply":                   TestNegValidationConstraintsApply,
 		"TestNegValidationImmutableApply":                     TestNegValidationImmutableApply,
 		"TestValidationDelete":                                TestValidationDelete,
