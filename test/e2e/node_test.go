@@ -243,7 +243,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 
 		if memberId == clusterSize-2 {
 			// kill pod 1
-			e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId)
+			e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId, true)
 		}
 	}
 
@@ -300,7 +300,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 
 	// kill pod that was just added
-	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId)
+	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId, true)
 	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
@@ -365,7 +365,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
 	// kill 3rd member being rebalanced in
-	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, newPodMemberId)
+	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, newPodMemberId, true)
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 	expectedEvents.AddFailedAddNodeEvent(testCouchbase, newPodMemberId)
 
@@ -374,7 +374,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), 180)
 	expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
 
-	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, newPodMemberId)
+	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, newPodMemberId, true)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 	expectedEvents.AddFailedAddNodeEvent(testCouchbase, newPodMemberId)
@@ -448,7 +448,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	if _, err := e2eutil.CreateMemberPod(targetKube.KubeClient, m, testCouchbase, testCouchbase.Name, f.Namespace); err != nil {
 		t.Fatal(err)
 	}
-	defer e2eutil.KillMember(targetKube.KubeClient, f.Namespace, testCouchbase.Name, foreignNodeName)
+	defer e2eutil.KillMember(targetKube.KubeClient, f.Namespace, testCouchbase.Name, foreignNodeName, true)
 
 	if err := e2eutil.AddNode(t, client, serverConfig.Services, username, password, m.ClientURLPlaintext()); err != nil {
 		t.Fatal(err)
@@ -601,7 +601,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	t.Logf("killing 2 pods...")
 	memberIdsToKill := []int{0, 1}
 	for _, memberId := range memberIdsToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId)
+		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId, true)
 
 		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 60)
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
@@ -674,7 +674,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries20)
 
 	t.Logf("killing 1 pod...")
-	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberIdToKill)
+	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberIdToKill, true)
 	/*
 		e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 1)
 		if err != nil {
@@ -765,7 +765,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	memberIdsToKill := []int{0, 1}
 	memberIdsToKillLen := len(memberIdsToKill)
 	for _, memberId := range memberIdsToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId)
+		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId, true)
 
 		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 60)
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)

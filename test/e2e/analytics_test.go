@@ -401,7 +401,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	newMemberIdToBeAdded := clusterSize
 	for _, podMemberId := range podMemberIdsToKill {
 		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		if err := e2eutil.KillMember(targetKube.KubeClient, f.Namespace, testCouchbase.Name, podMemberName); err != nil {
+		if err := e2eutil.KillMember(targetKube.KubeClient, f.Namespace, testCouchbase.Name, podMemberName, true); err != nil {
 			t.Fatal(err)
 		}
 

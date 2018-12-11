@@ -447,6 +447,24 @@ func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, 
 	return cluster
 }
 
+// NewSupportableCluster creates a cluster with two MDS groups of 'size'.  The first is
+// a stateful group with data and index enabled.  The second is a stateless group with
+// query enabled.
+func NewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*api.CouchbaseCluster, error) {
+	spec := e2espec.NewSupportableCluster(size)
+	return newClusterFromSpec(t, k8s, namespace, spec, defaultRetries)
+}
+
+// MustNewSupportableCluster creates a supportable cluster as described by NewSupportableCluster
+// but dies on error.
+func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) *api.CouchbaseCluster {
+	cluster, err := NewSupportableCluster(t, k8s, namespace, size)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
+}
+
 // NewClusterMulti creates a multi cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
@@ -627,6 +645,13 @@ func MustPatchCluster(t *testing.T, client versioned.Interface, cluster *api.Cou
 	return cluster
 }
 
+// MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
+func MustNotPatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet) {
+	if _, err := PatchCluster(t, client, cluster, patches, 1); err == nil {
+		t.Fatal("cluster patch applied unexpectedly")
+	}
+}
+
 func UpdateBucketSpec(bucketName string, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
 	bucketIndex := 0
 	for i, bucket := range cl.Spec.BucketSettings {
@@ -747,18 +772,16 @@ func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName string, names ...string) error {
 	for _, name := range names {
-		if err := KillMember(kubecli, namespace, clusterName, name); err != nil {
+		if err := KillMember(kubecli, namespace, clusterName, name, true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Kill member deletes Pod and checks for any associated Volume to delete
-// TODO: removePod is set to 'true' which maintains current behavior, but
-//       in the future we will be able to override this in the Spec
-func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string) error {
-	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0), true)
+// Kill member deletes Pod and optionally checks for any associated Volume to delete
+func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string, removeVolumes bool) error {
+	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0), removeVolumes)
 }
 
 func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberId int) error {
@@ -889,11 +912,12 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 
 func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) error {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
-	return KillMember(kubeCli, cl.Namespace, cl.Name, name)
+	return KillMember(kubeCli, cl.Namespace, cl.Name, name, true)
 }
 
-func MustKillPodForMember(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) {
-	if err := KillPodForMember(kubeCli, cl, memberId); err != nil {
+func MustKillPodForMember(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int, removeVolumes bool) {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+	if err := KillMember(kubeCli, cl.Namespace, cl.Name, name, removeVolumes); err != nil {
 		t.Fatal(err)
 	}
 }

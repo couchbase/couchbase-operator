@@ -378,7 +378,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	newMemberToBeAdded := clusterSize
 	for _, memberId := range []int{2, 3, 4} {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId)
+		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId, true)
 		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 30)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", memberId)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", memberId)

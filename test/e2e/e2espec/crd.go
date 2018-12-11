@@ -202,6 +202,64 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 	return crd
 }
 
+// NewSupportableCluster returns a basic supportable cluster with a stateful and stateless
+// MDS groups of the defined size.  They use default and logs volume mounts respectively.
+func NewSupportableCluster(size int) *api.CouchbaseCluster {
+	storageClass := "standard"
+	spec := api.ClusterSpec{
+		BaseImage:       e2e_constants.CbServerBaseImage,
+		Version:         e2e_constants.CbServerVersion,
+		AuthSecret:      e2e_constants.KubeTestSecretName,
+		ClusterSettings: defaultClusterSettings,
+		BucketSettings: []api.BucketConfig{
+			DefaultBucketSettings,
+		},
+		ServerSettings: []api.ServerConfig{
+			{
+				Name: "stateful",
+				Size: size,
+				Services: api.ServiceList{
+					api.DataService,
+					api.IndexService,
+				},
+				Pod: &api.PodPolicy{
+					VolumeMounts: &api.VolumeMounts{
+						DefaultClaim: "couchbase",
+					},
+				},
+			},
+			{
+				Name: "stateless",
+				Size: size,
+				Services: api.ServiceList{
+					api.QueryService,
+				},
+				Pod: &api.PodPolicy{
+					VolumeMounts: &api.VolumeMounts{
+						LogsClaim: "couchbase",
+					},
+				},
+			},
+		},
+		VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "couchbase",
+				},
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: &storageClass,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: *resource.NewScaledQuantity(1, 30),
+						},
+					},
+				},
+			},
+		},
+	}
+	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
+}
+
 // basic 3 node cluster with Xdcr cluster
 func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, exposed bool) *api.CouchbaseCluster {
 	bucketConfig := []api.BucketConfig{}

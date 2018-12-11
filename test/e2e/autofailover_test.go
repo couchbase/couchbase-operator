@@ -87,7 +87,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range podMembersToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill)
+		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill, true)
 		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
 		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
 
@@ -233,7 +233,7 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 
 	memDownParallelEvents := e2eutil.EventValidator{}
 	for _, podMemberToKill := range podMembersToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill)
+		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill, true)
 		memDownParallelEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberToKill)
 	}
 	expectedEvents.AddParallelEvents(memDownParallelEvents)
@@ -280,7 +280,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	podMembersToKill := []int{2, 3, 4}
 	podMembersToKillLen := len(podMembersToKill)
 	for _, podMemberToKill := range podMembersToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill)
+		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill, true)
 		memDownParallelEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberToKill)
 		memFailoverParallelEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberToKill)
 		memRemoveParallelEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberToKill)

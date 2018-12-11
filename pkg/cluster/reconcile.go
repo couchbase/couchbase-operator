@@ -1100,13 +1100,14 @@ func getServiceDataPaths(mounts *api.VolumeMounts) (string, string, []string) {
 // counts of members in the various versions.
 func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int) {
 	version := c.cluster.Spec.Version
-	for _, member := range c.members {
+	// Names returns a sorted list for determinism.
+	for _, member := range c.members.Names() {
 		// Book keep the target version count for status reporting and
 		// update the candidate with the first we find
-		if member.Version == version {
+		if c.members[member].Version == version {
 			target++
 		} else if candidate == nil {
-			candidate = member
+			candidate = c.members[member]
 		}
 	}
 	return
