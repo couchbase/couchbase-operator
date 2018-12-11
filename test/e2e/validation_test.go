@@ -98,7 +98,18 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				t.Fatal(err)
 			}
 
+			ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+			defer teardown()
+
 			testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
+			testCouchbase.Spec.TLS = &api.TLSPolicy{
+				Static: &api.StaticTLS{
+					Member: &api.MemberSecret{
+						ServerSecret: ctx.ClusterSecretName,
+					},
+					OperatorSecret: ctx.OperatorSecretName,
+				},
+			}
 			testCouchbase.ObjectMeta.Namespace = f.Namespace
 
 			// Removing previous deployment if any
@@ -447,6 +458,25 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionCount", -1),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.logRetentionCount in body should be greater than or equal to 0"},
+		},
+		// Missing referenced resources
+		{
+			name:           "TestValidateAuthSecretMissing",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AuthSecret", "does-not-exist"),
+			shouldFail:     true,
+			expectedErrors: []string{"secret does-not-exist must exist"},
+		},
+		{
+			name:           "TestValidateTLSServerSecretMissing",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/TLS/Static/Member/ServerSecret", "does-not-exist"),
+			shouldFail:     true,
+			expectedErrors: []string{"secret does-not-exist must exist"},
+		},
+		{
+			name:           "TestValidateTLSOperatorSecretMissing",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/TLS/Static/OperatorSecret", "does-not-exist"),
+			shouldFail:     true,
+			expectedErrors: []string{"secret does-not-exist must exist"},
 		},
 	}
 
