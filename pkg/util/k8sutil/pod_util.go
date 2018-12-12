@@ -680,10 +680,12 @@ func applyPodPolicy(clusterName string, pod *v1.Pod, policy *cbapi.PodPolicy) {
 	}
 
 	mergeLabels(pod.Labels, policy.Labels)
+	mergeLabels(pod.Annotations, policy.Annotations)
 
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name == couchbaseContainerName {
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, policy.CouchbaseEnv...)
+			pod.Spec.Containers[i].EnvFrom = append(pod.Spec.Containers[i].EnvFrom, policy.EnvFrom...)
 		}
 	}
 }

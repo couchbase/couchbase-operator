@@ -331,6 +331,10 @@ type PodPolicy struct {
 	// Do not overwrite them.
 	Labels map[string]string `json:"labels,omitempty"`
 
+	// Annotations allow custom annotations of Couchbase Server pods.  We reserve the right
+	// to overwrite anything in the couchbase.com namespace.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// NodeSelector specifies a map of key-value pairs. For the pod to be eligible
 	// to run on a node, the node must have each of the indicated key-value pairs as
 	// labels.
@@ -349,6 +353,10 @@ type PodPolicy struct {
 	// any flags used to bootstrap the cluster (for example `--initial-cluster`
 	// flag). This field cannot be updated.
 	CouchbaseEnv []v1.EnvVar `json:"couchbaseEnv,omitempty"`
+
+	// EnvFrom allows the setting of environment variables from things like
+	// Secrets and ConfigMaps.
+	EnvFrom []v1.EnvFromSource `json:"envFrom,omitempty"`
 
 	// Volume mounts represent persistent volume claims to attach to pod.
 	// If defined new pods will use persistent volumes.

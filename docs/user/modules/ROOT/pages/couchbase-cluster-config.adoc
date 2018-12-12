@@ -79,6 +79,9 @@ spec:
         couchbaseEnv:
           - name: ENV1
             value: value
+        envFrom:
+          - secretRef:
+              name: environment-secret
         resources:
           limits:
             cpu: 4
@@ -90,6 +93,8 @@ spec:
             storage: 50Gi
         labels:
           couchbase_services: all
+        annotations:
+          couchbase.acme.com: production
         nodeSelector:
           instanceType: large
         tolerations:
@@ -577,6 +582,9 @@ spec:
       couchbaseEnv:
         - name: CB_ENV_VAR
           value: value
+      envFrom:
+        - secretRef:
+            name: environment-secret
       resources:
         limits:
           cpu: 4
@@ -588,6 +596,8 @@ spec:
           storage: 50Gi
       labels:
         couchbase_services: all
+      annotations:
+        couchbase.acme.com: production
       nodeSelector:
         instanceType: large
       tolerations:
@@ -641,6 +651,9 @@ spec:
       couchbaseEnv:
         - name: CB_ENV_VAR
           value: value
+      envFrom:
+        - secretRef:
+            name: environment-secret
       resources:
         limits:
           cpu: 4
@@ -652,6 +665,8 @@ spec:
           storage: 50Gi
       labels:
         couchbase_services: all
+      annotations:
+        couchbase.acme.com: production
       nodeSelector:
         instanceType: large
       tolerations:
@@ -678,6 +693,13 @@ This field specifies the environment variables (as key-values pairs) that should
 ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
 ____
+
+=== envFrom
+
+This field specifies a reference to either a `Secret` or `ConfigMap` which is used to create environment variables when the pod is started.
+
+____
+_Field rules:_ The value of this field must be an array of Kubernetes `EnvFromSource` types.  This field is optional and immutable.
 
 === resources
 
@@ -725,6 +747,15 @@ For more information, see the Kubernetes documentation about https://kubernetes.
 ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
 ____
+
+=== annotations
+
+Annotations are similar to labels but cannot be used for resource selection.  User supplied annotations should not use the `couchbase.com` key namespace.
+
+For more information, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/[annotations].
+
+____
+_Field rules:_ The value of this field must be a map of key value pairs.  This field is optional and immutable.
 
 === nodeSelector
 
