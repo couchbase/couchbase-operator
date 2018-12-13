@@ -93,9 +93,31 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 If specified, this flag ignores any scoping rules for a particular resource type, and collects all instances within the namespace.
 
 --collectinfo::
-If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster. By default an interactive menu allows selection of logs to collect and also allows the user to specify whether the logs should be redacted of sensitive information.  The logs will be downloaded to the current working directory once collection is complete.
-
+If specified, this flag will trigger collection of Couchbase logs via the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster.
+By default an interactive menu allows selection of logs to collect and also allows the user to specify whether the logs should be redacted of sensitive information.
+The logs will be downloaded to the current working directory once collection is complete.
++
 For log volumes that were previously attached to ephemeral pods, `cbopinfo` will create a temporary pod (as defined by the `--server-image` option), run `cbcollect_info` and download the logs before finally deleting the temporary pod.
++
+.Example Output of --collectinfo
+[source,console]
+----
+$ ./build/bin/cbopinfo --collectinfo
+Detected resources for log collection:
+┌────┬─────────────────┬──────┬──────────┐
+│ ID │ Pod             │ Type │ Detached │
+├────┼─────────────────┼──────┼──────────┤
+│ 0  │ cb-example-0001 │ pod  │          │
+│ 1  │ cb-example-0003 │ pod  │          │
+│ 2  │ cb-example-0004 │ pod  │          │
+└────┴─────────────────┴──────┴──────────┘
+Please select volumes to collect [e.g. 1,2,5-6 or leave blank for all]: 1-2
+Please select whether to enable log redaction [Y/n]:
+Server logs downloaded to the following files:
+    cbinfo-default-cb-example-0002-20181016T131730+0100-redacted.zip
+    cbinfo-default-cb-example-0001-20181016T131730+0100-redacted.zip
+Wrote cluster information to cbopinfo-20181016T131730+0100.tar.gz
+----
 
 --collectinfo-list::
 If specified with the `--collectinfo` option, this will write out the list of available collections to the console and exit.  It is designed to be used with automated tooling to poll for and select logs for later collection with the `--collectinfo-collect` option.
