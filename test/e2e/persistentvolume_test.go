@@ -77,6 +77,12 @@ func VerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, name
 	return
 }
 
+func MustVerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, namespace string, expectedPvcMap map[string]int, platformType string) {
+	if err := VerifyPvcMappingForPods(t, kubeClient, namespace, expectedPvcMap, platformType); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // Generic function to test the cb-server down and pod remove scenarios
 func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembersToKill []int, autoFailoverWillOccur bool) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {

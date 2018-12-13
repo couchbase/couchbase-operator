@@ -20,6 +20,7 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -2315,4 +2316,40 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	if testHasErrors {
 		t.Fail()
 	}
+}
+
+// TestLogRetentionMultiCluster ensures that one cluster's retention settings do not affect anothers
+// running in the same namespace.
+func TestLogRetentionMultiCluster(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Static configuration.
+	mdsGroupSize := 2
+	clusterSize := mdsGroupSize * 2
+
+	// Create two clusters.
+	cluster1 := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
+	cluster2 := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
+
+	// Ensure cluster 1 is healthy and update the retention period to be 1m.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster1, constants.Retries10)
+	cluster1 = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), constants.Retries10)
+
+	// Ensure cluster2 is healthy then kill the first stateless pod in cluster 2.  Wait for the recovery to
+	// start and complete.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster2, constants.Retries10)
+	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster2, mdsGroupSize, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster2, e2eutil.RebalanceStartedEvent(cluster2), 300)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster2, constants.Retries10)
+
+	// We expect that after 3 minutes (1m to flag as orphaned and 1m retention period) the
+	// persistent log volume should still be present.
+	time.Sleep(3 * time.Minute)
+	pvcMapping := map[string]int{}
+	for i := 0; i < clusterSize+1; i++ {
+		pvcMapping[couchbaseutil.CreateMemberName(cluster2.Name, i)] = 1
+	}
+	MustVerifyPvcMappingForPods(t, kubernetes.KubeClient, f.Namespace, pvcMapping, f.PlatformType)
 }

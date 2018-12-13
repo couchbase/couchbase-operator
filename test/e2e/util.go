@@ -199,6 +199,9 @@ var (
 		"TestLogRedactionVerify":       TestLogRedactionVerify,
 		"TestLogRedactionWithPvVerify": TestLogRedactionWithPvVerify,
 
+		// Log retention regression tests
+		"TestLogRetentionMultiCluster": TestLogRetentionMultiCluster,
+
 		// Upgrade tests
 		"TestUpgrade":                                       TestUpgrade,
 		"TestUpgradeRollback":                               TestUpgradeRollback,

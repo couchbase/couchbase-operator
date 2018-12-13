@@ -609,14 +609,13 @@ func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.Couchba
 		// Get the current cluster resource
 		before, err := client.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, nil
+			return false, retryutil.RetryOkError(err)
 		}
 
 		// Apply the patch set to the cluster
 		after := before.DeepCopy()
 		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-			//t.Log(err)
-			return false, nil
+			return false, retryutil.RetryOkError(err)
 		}
 
 		// If we are not modifiying e.g. just testing, then return ok
@@ -627,7 +626,7 @@ func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.Couchba
 		// Attempt to post the update, updating the cluster
 		updated, err := client.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Update(after)
 		if err != nil {
-			return false, nil
+			return false, retryutil.RetryOkError(err)
 		}
 
 		// Everything successful
