@@ -50,7 +50,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 		return nil, err
 	}
 	selector := labels.NewSelector()
-	selector.Add(*appRequirement, *clusterRequirement)
+	selector = selector.Add(*appRequirement, *clusterRequirement)
 
 	// Fetch the list of PVCs.
 	pvcs, err := j.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
