@@ -18,7 +18,7 @@ import (
 
 const (
 	DefaultBaseImage                              = "couchbase/server"
-	DefaultIndexStorageSetting                    = "default"
+	DefaultIndexStorageSetting                    = "memory_optimized"
 	DefaultAutoFailoverTimeout                    = 120
 	DefaultAutoFailoverMaxCount                   = 3
 	DefaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
@@ -146,14 +146,6 @@ func (v *Validator) Update(current, updated *api.CouchbaseCluster) (error, []War
 func ApplyDefaults(customResource *api.CouchbaseCluster) {
 	if customResource.Spec.BaseImage == "" {
 		customResource.Spec.BaseImage = DefaultBaseImage
-	}
-
-	if customResource.Spec.ExposedFeatures == nil {
-		customResource.Spec.ExposedFeatures = []string{}
-	}
-
-	if customResource.Spec.AdminConsoleServices == nil {
-		customResource.Spec.AdminConsoleServices = api.ServiceList{}
 	}
 
 	if customResource.Spec.ClusterSettings.DataServiceMemQuota == 0 {

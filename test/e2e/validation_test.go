@@ -102,6 +102,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 					OperatorSecret: ctx.OperatorSecretName,
 				},
 			}
+			testCouchbase.ObjectMeta.Name = ctx.ClusterName
 			testCouchbase.ObjectMeta.Namespace = f.Namespace
 
 			// Removing previous deployment if any
@@ -562,6 +563,41 @@ func TestValidationDefaultCreate(t *testing.T) {
 			name:        "TestValidateIndexServiceMemoryQuotaDefault",
 			mutations:   jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", uint64(0)),
 			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/IndexServiceMemQuota", uint64(256)),
+		},
+		{
+			name:        "TestValidateSearchServiceMemoryQuotaDefault",
+			mutations:   jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/SearchServiceMemQuota", uint64(0)),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/SearchServiceMemQuota", uint64(256)),
+		},
+		{
+			name:        "TestValidateEventingServiceMemoryQuotaDefault",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/EventingServiceMemQuota"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/EventingServiceMemQuota", uint64(256)),
+		},
+		{
+			name:        "TestValidateAnalyticsServiceMemoryQuotaDefault",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AnalyticsServiceMemQuota"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AnalyticsServiceMemQuota", uint64(1024)),
+		},
+		{
+			name:        "TestValidateIndexStorageSetting",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/IndexStorageSetting"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/IndexStorageSetting", "memory_optimized"),
+		},
+		{
+			name:        "TestValidateAutoFailoverTimeoutDefault",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoFailoverTimeout"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoFailoverTimeout", uint64(120)),
+		},
+		{
+			name:        "TestValidateAutoFailoverMaxCountDefault",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoFailoverMaxCount"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoFailoverMaxCount", uint64(3)),
+		},
+		{
+			name:        "TestValidateAutoFailoverOnDataDiskIssuesPeriodDefault",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoFailoverOnDataDiskIssuesTimePeriod"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoFailoverOnDataDiskIssuesTimePeriod", uint64(120)),
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
