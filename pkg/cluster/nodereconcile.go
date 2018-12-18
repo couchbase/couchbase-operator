@@ -648,8 +648,6 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 			// If rebalance error occured due to a node that could not be delta
 			// recovered then it should be reconciled with FailedAddBack nodes
 			if c.didDeltaRecoveryFail(err) {
-				// TODO: K8S-530: verify that it is not actually possible add nodes
-				//       or change server groups while nodes are in delta recovery
 				c.logger.Errorf("Could not Rebalance because requested delta recovery is not possible. You probably added more nodes to the cluster or changed server groups configuration: %v", err)
 				r.transitionState(ReconcileFailedAddBackNodes)
 				return nil
