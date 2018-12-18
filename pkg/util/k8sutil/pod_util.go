@@ -925,13 +925,13 @@ func exec(client kubernetes.Interface, pod *v1.Pod, command []string) error {
 	// Create an executor running over HTTP2
 	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
-		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		return fmt.Errorf("remote command on %s failed: %v", pod.Name, err)
 	}
 
 	// Finally run the command
 	stdout := &bytes.Buffer{}
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
-		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		return fmt.Errorf("remote command on %s failed: %v", pod.Name, err)
 	}
 
 	return nil
