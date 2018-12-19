@@ -114,7 +114,6 @@ spec:
           analytics:
             - couchbase
             - couchbase
-          logs: couchbase
   volumeClaimTemplates:
     - metadata:
         name: couchbase
@@ -685,7 +684,6 @@ spec:
         analytics:
           - couchbase
           - couchbase
-        logs: couchbase
 ----
 
 === couchbaseEnv
@@ -797,7 +795,6 @@ spec:
         analytics:
           - couchbase
           - couchbase
-        logs: couchbase
 ----
 
 The `VolumeMounts` configuration specifies the claims to use for the storage that is used by the Couchbase Server cluster.

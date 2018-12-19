@@ -1,8 +1,9 @@
 = Setting up Persistent Volumes
 
-This topic outlines how to set up Kubernetes for the https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/[dynamic provisioning] of Persistent Volumes. Only dynamic volume provisioning using storage classes is currently supported.
+This topic outlines how to set up Kubernetes to support Persistent Volumes. Only dynamic volume provisioning using storage classes is currently supported.
 
-== Create Storage Class
+
+== Dynamic Storage Class
 
 https://kubernetes.io/docs/concepts/storage/storage-classes/[Storage classes] define how physical volumes are created through the provided storage backend. For instance, the AWS storage class is used to create volumes through the `aws-ebs` provisioner:
 
@@ -42,17 +43,50 @@ If you do not see your storage class listed in the above command, then you will 
 ** https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Storage class]
 ** https://docs.portworx.com/scheduler/kubernetes/install.html[Documentation]
 
+== Local Storage Class (experimental)
+
+When using local storage or manually created persistent volumes, create a storage class with the `local` provisioner.
+[source,yaml]
+----
+kind: StorageClass
+metadata:
+  name: myssd
+provisioner: local
+----
+
+This storage class will is able to claim any Persistent Volume with the same `storageClassName` from its spec.  For example, if you want your storage class named `myssd` to claim 10Gi volumes then you should create the following persistent volume:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+ name: couchbase-data
+spec:
+ capacity:
+  storage: 10Gi
+ accessModes:
+  - ReadWriteOnce
+ storageClassName: myssd
+ local:
+  path: /dev/sc
+  fsType: ext4
+----
+
+When creating a couchbase cluster, the storageClass will claim this volume and attach it to your Pod.  *Be aware* that you will need to create at least the minimum number of volumes you expect your cluster to use when using local volumes.  Therefore, local volumes should be reserved for development deployments since auto-scaling and recovery will have undefined behavior when the expected number of volumes are not available or Pods are being restarted across nodes.
+
+Manually created volumes can also use cloud storage.  Refer to the following list of  https://godoc.org/k8s.io/api/core/v1#PersistentVolumeSource[Persistent Volume Sources] that can be used in placed of local sources.
 
 == Verify Storage Class
 
-Once you've created a storage class, you can verify its ability to provide volumes by creating a https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims[Persistent Volume Claim (PVC)]. The following example creates a claim that will use your storage class to provide persistent volumes:
+Once you've created a storage class, you can verify its ability to claim or request volumes by creating a https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims[Persistent Volume Claim (PVC)]. The following example creates a claim that will use your storage class to provide persistent volumes:
 
 [source,yaml]
 ----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: my_test_claim
+  name: my-test-claim
 spec:
   accessModes:
     - ReadWriteOnce
@@ -83,7 +117,7 @@ If no persistent volume is created, it's very likely that the storage class' pro
 
 [source,console]
 ----
-kubectl describe pvc my_test_claim
+kubectl describe pvc my-test-claim
 ----
 
 
