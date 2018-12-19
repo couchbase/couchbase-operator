@@ -18,7 +18,8 @@ func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev1.CouchbaseClu
 
 	required := &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:   name,
+			Labels: LabelsForCluster(cluster.Name),
 		},
 		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{

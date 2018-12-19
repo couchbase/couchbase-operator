@@ -29,6 +29,7 @@ var (
 		resource.NewDeploymentResource,
 		resource.NewEndpointResource,
 		resource.NewPersistentVolumeClaimResource,
+		resource.NewPodDisruptionBudgetResource,
 		resource.NewPodResource,
 		resource.NewRoleResource,
 		resource.NewRoleBindingResource,
