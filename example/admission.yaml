@@ -73,6 +73,8 @@ spec:
           - "--logtostderr"
           - "--stderrthreshold"
           - "0"
+          - "-v"
+          - "1"
           - "--tls-cert-file"
           - "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-cert-file"
           - "--tls-private-key-file"

@@ -114,7 +114,9 @@ func errorResponse(err error) *admissionv1beta1.AdmissionResponse {
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the
 // operator.  This is for things which cannot be acheived with JSON schema v3 only.
 func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
-	glog.Info("validating couchbasecluster")
+	if glog.V(1) {
+		glog.Info("validating couchbasecluster")
+	}
 
 	// Check the resource is valid
 	couchbaseClustersResource := metav1.GroupVersionResource{
@@ -170,7 +172,9 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 // couchbaseClustersMutate mutates a CouchbaseCluster object before validation.  This allows
 // us to set sensible default values for various properties.
 func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
-	glog.Info("mutating couchbasecluster")
+	if glog.V(1) {
+		glog.Info("mutating couchbasecluster")
+	}
 
 	// Check the resource is valid
 	couchbaseClustersResource := metav1.GroupVersionResource{
