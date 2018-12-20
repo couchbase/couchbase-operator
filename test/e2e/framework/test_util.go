@@ -81,12 +81,12 @@ func ElementExistsInArr(itemToSearch string, itemList []string) bool {
 func ReadRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err error) {
 	ymlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = errors.New("Unable to read test config file:" + err.Error())
+		err = fmt.Errorf("Unable to read cluster config file `%s`: %v", ymlFilePath, err)
 		return
 	}
 
 	if err = yaml.Unmarshal(ymlFileContent, &runTimeConfig); err != nil {
-		err = errors.New("Unable to decode test config:" + err.Error())
+		err = fmt.Errorf("Unable to decode test config: %v", err)
 		return
 	}
 	for i, kubeConf := range runTimeConfig.KubeConfig {
@@ -103,7 +103,7 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = errors.New("Unable to read cluster config file: " + err.Error())
+		err = fmt.Errorf("Unable to read cluster config file `%s`: %v", ymlFilePath, err)
 		return
 	}
 
