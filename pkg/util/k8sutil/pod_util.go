@@ -114,7 +114,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 				if gid := cs.GetFSGroup(); gid != nil {
 					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
 				}
-				claim.Name = NameForPersistentVolumeClaim(claimName, pod.Name, claimUsageCnt[claimName], mountName)
+				claim.Name = NameForPersistentVolumeClaim(pod.Name, claimUsageCnt[claimName], mountName)
 				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner, ctx)
 				if err != nil {
 					return nil, err
@@ -349,11 +349,10 @@ func listPersistentVolumeClaims(kubeCli kubernetes.Interface, namespace string, 
 }
 
 // Names of persistent volume claims are combinations of
-// claim template, cluster name, and member.  An additional suffix
-// is added to identify the claim as the member's Nth volume along with it's mount name.
-// ie...: pvc-data-cb-example-0000-00-default, pvc-data-cb-example-0000-01-index
-func NameForPersistentVolumeClaim(claimName string, memberName string, index int, mountName cbapi.VolumeMountName) string {
-	return fmt.Sprintf("pvc-%s-%s-%02d-%s", claimName, memberName, index, mountName)
+// Member name, mount type, and mount index.
+// ie...: cb-example-0000-default-00, pvc-data-cb-example-0000-01-index
+func NameForPersistentVolumeClaim(memberName string, index int, mountName cbapi.VolumeMountName) string {
+	return fmt.Sprintf("%s-%s-%02d", memberName, mountName, index)
 }
 
 // Couchbase pod spec with default configuration

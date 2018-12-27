@@ -31,11 +31,10 @@ func TestCreateStatefulCluster(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	// Volumes should exist for each pods
-	claimTemplate := testCouchbase.Spec.VolumeClaimTemplates[0].Name
+	// Volumes should exist for each member
 	for i := 0; i < clusterSize; i++ {
 		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, i)
-		_, err := e2eutil.GetMemberPVC(targetKube.KubeClient, f.Namespace, claimTemplate, memberName, 0, "default")
+		_, err := e2eutil.GetMemberPVC(targetKube.KubeClient, f.Namespace, memberName, 0, "default")
 		if err != nil {
 			t.Fatalf("could not find persistent volume for member: %s, %v", memberName, err)
 		}

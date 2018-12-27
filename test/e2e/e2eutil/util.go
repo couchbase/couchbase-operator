@@ -1096,8 +1096,8 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 // Construct expected name for the PersistentVolumeClaim which belongs to member
 // where 'index' specifies the Nth claim generated from the specs template.
 // Only specs with multiple VolumeMounts should return volumes with index > 0
-func GetMemberPVC(kubeCli kubernetes.Interface, namespace, claimName, memberName string, index int, mountName api.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
-	name := k8sutil.NameForPersistentVolumeClaim(claimName, memberName, index, mountName)
+func GetMemberPVC(kubeCli kubernetes.Interface, namespace, memberName string, index int, mountName api.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
+	name := k8sutil.NameForPersistentVolumeClaim(memberName, index, mountName)
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }
 
