@@ -22,7 +22,7 @@ type UnderflowError struct{}
 
 // Error implements the error interface on UnderflowError.
 func (e UnderflowError) Error() string {
-	return fmt.Sprintf("schema undeflowed event stream")
+	return fmt.Sprintf("schema underflowed event stream")
 }
 
 // newUnderflowError creates a new underflow error.
