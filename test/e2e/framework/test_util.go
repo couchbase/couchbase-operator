@@ -237,7 +237,7 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 
 	policyRule4 := rbacv1.PolicyRule{
 		APIGroups: []string{""},
-		Resources: []string{"pods", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes", "events", "secrets"},
+		Resources: []string{"pods", "pods/exec", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes", "events", "secrets"},
 		Verbs:     []string{"*"},
 	}
 
@@ -247,10 +247,16 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 		Verbs:     []string{"*"},
 	}
 
+	policyRule6 := rbacv1.PolicyRule{
+		APIGroups: []string{"policy"},
+		Resources: []string{"poddisruptionbudgets"},
+		Verbs:     []string{"*"},
+	}
+
 	clusterRoleSpec := &rbacv1.ClusterRole{
 		TypeMeta:   metav1.TypeMeta{Kind: "ClusterRole", APIVersion: "rbac.authorization.k8s.io/v1beta1"},
 		ObjectMeta: metav1.ObjectMeta{Name: roleName},
-		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3, policyRule4, policyRule5},
+		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3, policyRule4, policyRule5, policyRule6},
 	}
 	_, err := kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
 	return err
