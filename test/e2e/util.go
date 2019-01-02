@@ -111,6 +111,7 @@ var (
 		"TestTLSRotateCA":                                  TestTLSRotateCA,
 		"TestTLSRotateCAAndScale":                          TestTLSRotateCAAndScale,
 		"TestTLSRotateCAAndKillOperator":                   TestTLSRotateCAAndKillOperator,
+		"TestTLSRotateCAKillPodAndKillOperator":            TestTLSRotateCAKillPodAndKillOperator,
 		"TestTLSRotateInvalid":                             TestTLSRotateInvalid,
 
 		// XDCR cases

@@ -465,6 +465,33 @@ func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace strin
 	return cluster
 }
 
+// NewSupportableTLSCluster creates a cluster with two MDS groups of 'size'.  The first is
+// a stateful group with data and index enabled.  The second is a stateless group with
+// query enabled.
+func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+	cluster := e2espec.NewClusterCRD("", e2espec.NewSupportableClusterSpec(size))
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.TLS = &api.TLSPolicy{
+		Static: &api.StaticTLS{
+			Member: &api.MemberSecret{
+				ServerSecret: ctx.ClusterSecretName,
+			},
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+	}
+	return newClusterFromSpec(t, k8s, namespace, cluster, defaultRetries)
+}
+
+// MustNewSupportableTLSCluster creates a supportable cluster as described by NewSupportableTLSCluster
+// but dies on error.
+func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *api.CouchbaseCluster {
+	cluster, err := NewSupportableTLSCluster(t, k8s, namespace, size, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster
+}
+
 // NewClusterMulti creates a multi cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {

@@ -226,6 +226,7 @@ func (c *Cluster) setup() error {
 		if err := c.reconcileTLS(); err != nil {
 			return err
 		}
+		c.members = nil
 	}
 
 	// Once the cluster is guaranteed to exist, extract the UUID and inject

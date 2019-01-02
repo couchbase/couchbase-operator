@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -671,6 +672,56 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+	}
+
+	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+}
+
+// TestTLSRotateCAKillPodAndKillOperator tests a certificate and CA can be reissued while
+// the operator is being restarted with a stateful pod down.
+func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Static configuration.
+	mdsGroupSize := constants.Size2
+	clusterSize := mdsGroupSize * 2
+	victimIndex := 0
+
+	// Create the cluster with a valid 1 deep certificate chain.
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	defer teardown()
+	cluster := e2eutil.MustNewSupportableTLSCluster(t, kubernetes, f.Namespace, mdsGroupSize, ctx)
+
+	// Runtime configuration.
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
+
+	// When the cluster is ready, kill a stateful pod,  restart the operator and swap out the all certificates for new ones and verify
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
+	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
+	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes.KubeClient, cluster.Namespace)
+	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 300)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries20)
+	e2eutil.MustCheckClusterTLS(t, kubernetes.KubeClient, kubernetes.Config, cluster.Namespace, ctx)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * TLS update event occurred for live nodes
+	// * Down member is recovered
+	// * TLS update exent occurred for recovered node
+	// * Cluster recovered
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
 	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)

@@ -222,7 +222,7 @@ func createAdmissionController(client kubernetes.Interface) error {
 								"--tls-cert-file", "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-cert-file",
 								"--tls-private-key-file", "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-private-key-file",
 							},
-							ImagePullPolicy: "Always",
+							//ImagePullPolicy: "Always",
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "https",
