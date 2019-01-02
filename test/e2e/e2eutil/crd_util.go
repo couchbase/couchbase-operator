@@ -50,7 +50,7 @@ func UpdateCluster(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRe
 func MustUpdateCluster(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int, updateFunc k8sutil.CouchbaseClusterCRUpdateFunc) *api.CouchbaseCluster {
 	cluster, err := UpdateCluster(crClient, cl, maxRetries, updateFunc)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }

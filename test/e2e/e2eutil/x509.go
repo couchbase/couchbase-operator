@@ -571,7 +571,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 func MustInitClusterTLS(t *testing.T, client kubernetes.Interface, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func()) {
 	ctx, teardown, err := InitClusterTLS(client, namespace, opts)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return ctx, teardown
 }
@@ -586,21 +586,21 @@ func MustRotateServerCertificate(t *testing.T, ctx *TlsContext) {
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Update the existing server secret
 	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = clusterCert
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 }
 
@@ -612,7 +612,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
 	// Create an intermediate CA
 	intermediate, err := ctx.CA.NewIntermediateCertificateAuthority(KeyTypeRSA, intermediateCACN, validFrom, validTo)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Generate a new server certificate
@@ -620,16 +620,16 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Update the existing server secret
 	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	chain := append(clusterCert, intermediate.Certificate...)
@@ -637,7 +637,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = chain
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 }
 
@@ -649,7 +649,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
 	// Create a new CA
 	var err error
 	if ctx.CA, err = NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Generate a new server certificate
@@ -657,30 +657,30 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Update the exising operator secret
 	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Update the existing server secret
 	if secret, err = GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = clusterCert
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 }
 
@@ -692,7 +692,7 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 	// Create a new CA, don't add to the context
 	ca, err := NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Generate a new server certificate
@@ -700,21 +700,21 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	// Update the existing server secret
 	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = clusterCert
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 }
 

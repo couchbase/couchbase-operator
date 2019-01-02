@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"testing"
@@ -287,7 +288,7 @@ func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, a
 func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) *api.CouchbaseCluster {
 	cluster, err := CreateClusterFromSpec(t, k8s, namespace, adminConsoleExposed, spec, platformType)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -339,7 +340,7 @@ func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size in
 func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 	cluster, err := NewClusterBasic(t, k8s, namespace, size, withBucket, exposed)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -362,7 +363,7 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
 	cluster, err := NewTLSClusterBasic(t, k8s, namespace, size, withBucket, exposed, ctx)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -385,7 +386,7 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 // MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification
 func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) {
 	if _, err := NewTLSClusterBasicNoWait(t, k8s, namespace, size, withBucket, exposed, ctx); err == nil {
-		t.Fatal("cluster created unexpectedly")
+		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
 }
 
@@ -407,7 +408,7 @@ func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
 	cluster, err := NewTlsXdcrClusterBasic(t, k8s, namespace, size, withBucket, exposed, ctx)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -422,7 +423,7 @@ func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 	cluster, err := NewXdcrClusterBasic(t, k8s, namespace, size, withBucket, exposed)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -442,7 +443,7 @@ func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size
 func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 	cluster, err := NewStatefulCluster(t, k8s, namespace, size, withBucket, exposed)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -460,7 +461,7 @@ func NewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, s
 func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) *api.CouchbaseCluster {
 	cluster, err := NewSupportableCluster(t, k8s, namespace, size)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -487,7 +488,7 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *api.CouchbaseCluster {
 	cluster, err := NewSupportableTLSCluster(t, k8s, namespace, size, ctx)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -502,7 +503,7 @@ func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config 
 func MustNewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) *api.CouchbaseCluster {
 	cluster, err := NewClusterMulti(t, k8s, namespace, config, exposed)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -534,14 +535,14 @@ func UpdateClusterSpec(field string, value string, crClient versioned.Interface,
 func MustUpdateClusterSpec(t *testing.T, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) *api.CouchbaseCluster {
 	cluster, err := UpdateClusterSpec(field, value, crClient, cl, maxRetries)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
 
 func MustNotUpdateClusterSpec(t *testing.T, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster) {
 	if _, err := UpdateClusterSpec(field, value, crClient, cl, 1); err == nil {
-		t.Fatal("cluster spec update succeeded unexpectedly")
+		Die(t, fmt.Errorf("cluster spec update succeeded unexpectedly"))
 	}
 }
 
@@ -666,7 +667,7 @@ func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.Couchba
 func MustPatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, retries int) *api.CouchbaseCluster {
 	cluster, err := PatchCluster(t, client, cluster, patches, retries)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -674,7 +675,7 @@ func MustPatchCluster(t *testing.T, client versioned.Interface, cluster *api.Cou
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
 func MustNotPatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet) {
 	if _, err := PatchCluster(t, client, cluster, patches, 1); err == nil {
-		t.Fatal("cluster patch applied unexpectedly")
+		Die(t, fmt.Errorf("cluster patch applied unexpectedly"))
 	}
 }
 
@@ -885,7 +886,7 @@ func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient ve
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
 	cluster, err := ResizeClusterNoWait(t, service, clusterSize, crClient, cl)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -907,7 +908,7 @@ func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versione
 func MustResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
 	cluster, err := ResizeCluster(t, service, clusterSize, crClient, cl)
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 	return cluster
 }
@@ -944,7 +945,7 @@ func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, me
 func MustKillPodForMember(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int, removeVolumes bool) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	if err := KillMember(kubeCli, cl.Namespace, cl.Name, name, removeVolumes); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 }
 
@@ -984,7 +985,7 @@ func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) err
 
 func MustDeleteCouchbaseOperator(t *testing.T, kubeCli kubernetes.Interface, namespace string) {
 	if err := DeleteCouchbaseOperator(kubeCli, namespace); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 }
 
@@ -1154,7 +1155,7 @@ func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *
 
 func MustCheckClusterTLS(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string, ctx *TlsContext) {
 	if err := TlsCheckForCluster(t, kubeCli, restConfig, namespace, ctx); err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 }
 
@@ -1245,4 +1246,10 @@ func GetKubeConfigToUse(kubeType, kubeName string) string {
 		kubeConfPath = os.Getenv("HOME") + "/.kube/config"
 	}
 	return kubeConfPath
+}
+
+func Die(t *testing.T, err error) {
+	t.Log(err)
+	t.Log(string(debug.Stack()))
+	t.FailNow()
 }
