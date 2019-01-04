@@ -214,7 +214,7 @@ func createAdmissionController(client kubernetes.Interface) error {
 					Containers: []corev1.Container{
 						{
 							Name:    admissionControllerName,
-							Image:   "couchbase/couchbase-operator-admission:v1",
+							Image:   runtimeParams.AdmissionControllerImage,
 							Command: []string{"couchbase-operator-admission"},
 							Args: []string{
 								"--logtostderr",
@@ -252,6 +252,11 @@ func createAdmissionController(client kubernetes.Interface) error {
 				},
 			},
 		},
+	}
+	if runtimeParams.DockerServer != "" {
+		deployment.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+			{Name: dockerPullSecretName},
+		}
 	}
 	if _, err := client.AppsV1().Deployments(Global.Namespace).Create(deployment); err != nil {
 		return err

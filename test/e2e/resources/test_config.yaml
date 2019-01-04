@@ -1,5 +1,15 @@
 ---
-operator-image: couchbase/couchbase-operator:v1  # Operator image to use for testing
+# If specified this specifies credentials to access a private docker registry.
+# This will attach a "pull secret" to operator and admission controller depoyment
+# specs that allow the images to be pulled.
+#docker-server: "https://index.docker.io/v1/"
+#docker-username: "couchbase-test"
+#docker-password: "password"
+
+# Container images to use for testing
+operator-image: couchbase/couchbase-operator:v1
+admission-controller-image: couchbase/couchbase-operator-admission:v1
+
 namespace: default                               # Cluster namespace to run the tests
 deployment-spec: ../../example/deployment.yaml   # Deployment yaml file path
 cluster-config: resources/cluster_conf.yaml      # cluster config file path

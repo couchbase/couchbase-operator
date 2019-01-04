@@ -21,7 +21,6 @@ type Framework struct {
 	SkipTeardown    bool
 	SuiteYmlData    SuiteData
 	ClusterConfFile string
-	PullDockerImage bool
 	CollectLogs     bool
 	PlatformType    string
 	// TestClusters is the current set of clusters to use for a test. This
@@ -61,13 +60,14 @@ type KubeConfData struct {
 
 // Struct to read and store test_config yaml passed by the user during testing
 type TestRunParam struct {
-	KubeType          string `yaml:"kube-type"`
-	Namespace         string `yaml:"namespace"`
-	OperatorImage     string `yaml:"operator-image"`
-	CbServerBaseImage string `yaml:"cbServerBaseImage"`
-	CbServerImgVer    string `yaml:"cbServerImageVersion"`
-	SuiteToRun        string `yaml:"suite"`
-	DeploymentSpec    string `yaml:"deployment-spec"`
+	KubeType                 string `yaml:"kube-type"`
+	Namespace                string `yaml:"namespace"`
+	OperatorImage            string `yaml:"operator-image"`
+	AdmissionControllerImage string `yaml:"admission-controller-image"`
+	CbServerBaseImage        string `yaml:"cbServerBaseImage"`
+	CbServerImgVer           string `yaml:"cbServerImageVersion"`
+	SuiteToRun               string `yaml:"suite"`
+	DeploymentSpec           string `yaml:"deployment-spec"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`
@@ -78,9 +78,18 @@ type TestRunParam struct {
 	KubeConfig  []KubeConfData `yaml:"kube-config"`
 
 	ForceKubeCreation    bool `yaml:"forceKubeCreation"`
-	PullDockerImages     bool `yaml:"pullDockerImages"`
 	SkipTearDown         bool `yaml:"skip-tear-down"`
 	CollectLogsOnFailure bool `yaml:"collectLogsOnFailure"`
+
+	// DockerServer, if defined, creates a pull secret and associates
+	// it with Operator and Admission Controller deployments.
+	DockerServer string `yaml:"docker-server"`
+	// DockerUsername is the docker registry username to use, required when
+	// DockerServer is specified.
+	DockerUsername string `yaml:"docker-username"`
+	// DockerPassword is the docker registry password to use, required when
+	// DockerServer is specified.
+	DockerPassword string `yaml:"docker-password"`
 }
 
 // ExecOptions passed to ExecWithOptions

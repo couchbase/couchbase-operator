@@ -140,6 +140,13 @@ func CreateDeploymentObject(operatorImageName string, restPort int32) (deploymen
 		deployment.Spec.Template.Spec.ServiceAccountName = runtimeParams.ServiceAccountName
 	}
 
+	// If using private repos add in the pull secret
+	if runtimeParams.DockerServer != "" {
+		deployment.Spec.Template.Spec.ImagePullSecrets = []v1.LocalObjectReference{
+			{Name: dockerPullSecretName},
+		}
+	}
+
 	// set given rest port as the readiness-port in deployment spec
 	for index, containers := range deployment.Spec.Template.Spec.Containers {
 		if containers.Image == operatorImageName {
@@ -181,10 +188,18 @@ func Setup(t *testing.T) error {
 	e2espec.SetCbBaseImage(runtimeParams.CbServerBaseImage)
 	e2espec.SetCbImageVersion(runtimeParams.CbServerImgVer)
 
-	logrus.Info("Using couchbase-operator: " + deployment.Spec.Template.Spec.Containers[0].Image)
-	logrus.Info("Using couchbase-server: " + e2espec.GetCouchbaseDockerImgName())
-	logrus.Info("Using storage class: " + constants.StorageClassName)
-	logrus.Info("Logs will be stored in: " + logDir)
+	logrus.Info("Docker Registry")
+	logrus.Info(" →  server: " + runtimeParams.DockerServer)
+	logrus.Info(" →  username: " + runtimeParams.DockerUsername)
+	logrus.Info(" →  password: " + strings.Repeat("*", len(runtimeParams.DockerPassword)))
+	logrus.Info("Container Images")
+	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
+	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
+	logrus.Info(" →  couchbase server: " + e2espec.GetCouchbaseDockerImgName())
+	logrus.Info("Kubernetes")
+	logrus.Info(" →  storage class: " + constants.StorageClassName)
+	logrus.Info("Logs")
+	logrus.Info(" →  directory: " + logDir)
 
 	Global = &Framework{
 		Deployment:      deployment,
@@ -198,7 +213,6 @@ func Setup(t *testing.T) error {
 		ClusterSpec:     clusterSpecMap,
 		SuiteYmlData:    suiteData,
 		ClusterConfFile: runtimeParams.ClusterConfFile,
-		PullDockerImage: runtimeParams.PullDockerImages,
 		PlatformType:    runtimeParams.PlatformType,
 	}
 	for kubeName, _ := range Global.ClusterSpec {
@@ -449,6 +463,11 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
+	logrus.Info("Recreating docker auth secret")
+	if err := RecreateDockerAuthSecret(targetKube.KubeClient); err != nil {
+		return err
+	}
+
 	logrus.Info("Recreating cluster role")
 	if err := RecreateClusterRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
@@ -466,13 +485,6 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	if Global.PullDockerImage {
-		dockerImgList := []string{f.OpImage, e2espec.GetCouchbaseDockerImgName()}
-		if err = f.PullDockerImages(targetKube.KubeClient, kubeName, dockerImgList); err != nil {
-			return err
-		}
-	}
-
 	if err := CreateAdmissionController(targetKube.KubeClient); err != nil {
 		return err
 	}
@@ -483,52 +495,6 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 	logrus.Info("Couchbase operator created successfully")
 	logrus.Info("E2E setup successfully")
-	return nil
-}
-
-func (f *Framework) PullDockerImages(kubeClient kubernetes.Interface, kubeName string, dockerImages []string) error {
-	yamlFilePath := "./resources/ansible"
-	pullDockerImageFile := yamlFilePath + "/generic/pullDockerImage.yaml"
-	tagDockerImageFile := yamlFilePath + "/generic/tagDockerImage.yaml"
-	inventoryFile := yamlFilePath + "DockerHosts"
-
-	logrus.Infof("Pulling docker images for %s", kubeName)
-	k8sNodes, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list K8S nodes for cluster " + kubeName + ": " + err.Error())
-	}
-	ansibleIpList := []string{}
-	for _, node := range k8sNodes.Items {
-		ansibleIpList = append(ansibleIpList, node.Status.Addresses[0].Address)
-	}
-
-	if err := createAnsibleHostFileFromHosts(inventoryFile, ansibleIpList); err != nil {
-		return err
-	}
-
-	ansibleExtraVarParam := "dockerImgName="
-	for _, imgName := range dockerImages {
-		ansibleExtraVarParam += imgName + ","
-	}
-	ansibleExtraVarParam = strings.TrimRight(ansibleExtraVarParam, ",")
-	ansibleCmd := exec.Command("ansible-playbook", "-i", inventoryFile, pullDockerImageFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
-	var stdout bytes.Buffer
-	ansibleCmd.Stdout = &stdout
-	if err := ansibleCmd.Run(); err != nil {
-		logrus.Info(stdout.String())
-		return errors.New("Error during ansible execution: " + err.Error())
-	}
-
-	// To tag operator image will default operator image name for testing with default name
-	if f.OpImage != constants.DefOperatorImgTag {
-		ansibleExtraVarParam := "srcImg=" + f.OpImage + " destImg=" + constants.DefOperatorImgTag
-		ansibleCmd := exec.Command("ansible-playbook", "-i", inventoryFile, tagDockerImageFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
-		ansibleCmd.Stdout = &stdout
-		if err := ansibleCmd.Run(); err != nil {
-			logrus.Info(stdout.String())
-			return errors.New("Error during ansible execution: " + err.Error())
-		}
-	}
 	return nil
 }
 

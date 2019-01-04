@@ -1,4 +1,0 @@
-- hosts: all
-  tasks:
-    - name: Docker tag image
-      shell: "docker tag {{ srcImg }} {{ destImg }}"

@@ -1,7 +1,9 @@
 package framework
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -19,11 +21,16 @@ import (
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	dockerPullSecretName = "test-docker-pull-secret"
 )
 
 // Variable to store the results globally
@@ -209,6 +216,50 @@ func RemoveClusterRoleBinding(kubeClient kubernetes.Interface, namespace, cluste
 			break
 		}
 	}
+	return nil
+}
+
+// RecreateDockerAuthSecret deletes existing secrets and creates a new one if specified.
+// This secret, if defined, will be added to the operator and admission controllers in
+// order to pull from a private repository.
+func RecreateDockerAuthSecret(client kubernetes.Interface) error {
+	// Clean up the old authentication secret if it exists
+	if err := client.CoreV1().Secrets(runtimeParams.Namespace).Delete(dockerPullSecretName, nil); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// If specified create the authentication secret
+	if runtimeParams.DockerServer != "" {
+		// Check all the necessary bits are there
+		if runtimeParams.DockerUsername == "" {
+			return fmt.Errorf("docker username must be specified with docker server")
+		}
+		if runtimeParams.DockerPassword == "" {
+			return fmt.Errorf("docker password must be specified with docker server")
+		}
+
+		// auth string is simply "username:password" base64 encoded
+		auth := runtimeParams.DockerUsername + ":" + runtimeParams.DockerPassword
+		auth = base64.StdEncoding.EncodeToString([]byte(auth))
+
+		// authentication data is encoded as per "~/.docker/config.json", and created by "docker login"
+		data := `{"auths":{"` + runtimeParams.DockerServer + `":{"auth":"` + auth + `"}}}`
+
+		// create the new secret
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: dockerPullSecretName,
+			},
+			Type: v1.SecretTypeDockerConfigJson,
+			Data: map[string][]byte{
+				".dockerconfigjson": []byte(data),
+			},
+		}
+		if _, err := client.CoreV1().Secrets(runtimeParams.Namespace).Create(secret); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
