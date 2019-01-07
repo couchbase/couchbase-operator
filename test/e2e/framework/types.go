@@ -11,6 +11,8 @@ import (
 
 // Main framework structure
 type Framework struct {
+	// CbopinfoPath is the absolute path to the cbopinfo binary
+	CbopinfoPath    string
 	OpImage         string
 	Deployment      *v1beta1.Deployment
 	Namespace       string

@@ -442,8 +442,7 @@ func untarGzFile(tarGzFilePath string) error {
 
 // Generic function to run cbopinfo command
 func runCbopinfoCmd(cmdArgs []string) ([]byte, error) {
-	cmdName := "../../build/bin/cbopinfo"
-	return exec.Command(cmdName, cmdArgs...).CombinedOutput()
+	return exec.Command(framework.Global.CbopinfoPath, cmdArgs...).CombinedOutput()
 }
 
 func getLogFileNameFromExecOutput(outputStr string) string {

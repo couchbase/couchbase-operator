@@ -201,7 +201,15 @@ func Setup(t *testing.T) error {
 	logrus.Info("Logs")
 	logrus.Info(" →  directory: " + logDir)
 
+	// Setup the cbopinfo absolute path so it will not change if we move directories
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	cbopinfo := wd + "/../../build/bin/cbopinfo"
+
 	Global = &Framework{
+		CbopinfoPath:    cbopinfo,
 		Deployment:      deployment,
 		Namespace:       runtimeParams.Namespace,
 		KubeType:        runtimeParams.KubeType,
