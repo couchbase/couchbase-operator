@@ -12,6 +12,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -437,68 +438,42 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 }
 
 // Create multi-node couchbase cluster with volumeClaimTemplates
-// Configure few nodes without PV and few with PV claims
 // Create test bucket and verify
 func TestPersistentVolumeCreateCluster(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+	kubernetes := f.GetCluster(0)
 
-	clusterSize := 5
-	bucketName := "PVBucket"
-	pvcName := "couchbase"
-	clusterConfig := e2eutil.BasicClusterConfig
-	clusterConfig["autoFailoverOnDiskIssues"] = "true"
-	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
-	serviceConfig1 := e2eutil.GetServiceConfigMap(2, "test_config_1", []string{"data", "query", "index"})
+	// Static configuration.
+	mdsGroupSize := 2
+	clusterSize := mdsGroupSize * 2
 
-	serviceConfig2 := e2eutil.GetServiceConfigMap(3, "test_config_2", []string{"data", "query", "index"})
-	serviceConfig2["defaultVolMnt"] = pvcName
-	serviceConfig2["dataVolMnt"] = pvcName
-	serviceConfig2["indexVolMnt"] = pvcName
-	serviceConfig2["analyticsVolMnt"] = pvcName + "," + pvcName
+	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries30)
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
-	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-	createPodSecurityContext(1000, &clusterSpec)
+	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries30)
-
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
-
-	// To cross check number of persistent vol claims matches the defined spec
+	// Check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
-		couchbaseutil.CreateMemberName(testCouchbase.Name, 0): 0,
-		couchbaseutil.CreateMemberName(testCouchbase.Name, 1): 0,
-		couchbaseutil.CreateMemberName(testCouchbase.Name, 2): 5,
-		couchbaseutil.CreateMemberName(testCouchbase.Name, 3): 5,
-		couchbaseutil.CreateMemberName(testCouchbase.Name, 4): 5,
+		couchbaseutil.CreateMemberName(cluster.Name, 0): 1,
+		couchbaseutil.CreateMemberName(cluster.Name, 1): 1,
+		couchbaseutil.CreateMemberName(cluster.Name, 2): 1,
+		couchbaseutil.CreateMemberName(cluster.Name, 3): 1,
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
+	if err := VerifyPvcMappingForPods(t, kubernetes.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create PV enabled couchbase cluster
