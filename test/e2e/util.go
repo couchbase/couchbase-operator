@@ -55,7 +55,6 @@ var (
 		"TestKillOperatorAndUpdateClusterConfig":              TestKillOperatorAndUpdateClusterConfig,
 		"TestBucketAddRemoveExtended":                         TestBucketAddRemoveExtended,
 		"TestRevertExternalBucketUpdates":                     TestRevertExternalBucketUpdates,
-		"TestInvalidAuthSecret":                               TestInvalidAuthSecret,
 		"TestInvalidBaseImage":                                TestInvalidBaseImage,
 		"TestInvalidVersion":                                  TestInvalidVersion,
 		"TestNodeUnschedulable":                               TestNodeUnschedulable,

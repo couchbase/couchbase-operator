@@ -6,7 +6,6 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-      - name: TestInvalidAuthSecret
       - name: TestInvalidBaseImage
       - name: TestInvalidVersion
       - name: TestManageMultipleClusters

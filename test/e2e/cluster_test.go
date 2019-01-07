@@ -232,42 +232,6 @@ func TestNegEditClusterSettings(t *testing.T) {
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
-// Tests if specs with invalid auth secrets will create a cluster (they should not)
-// 1. Attempt to create a cluster with invalid auth secret
-// 2. Wait until cluster creation fails
-func TestInvalidAuthSecret(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-	}
-
-	retries := &e2eutil.ClusterReadyRetries{
-		Size:    constants.Retries5,
-		Bucket:  constants.Retries1,
-		Service: constants.Retries1,
-	}
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, targetKube, f.Namespace, configMap, constants.AdminHidden, retries)
-	if err == nil {
-		t.Fatalf("failed to reject cluster creation: %v", err)
-	}
-
-	expectedEvents := e2eutil.EventList{}
-
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	if len(pods.Items) != 0 {
-		t.Fatalf("more than zero pods: %+v", pods.Items)
-	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
-}
-
 // Tests if specs with invalid base image will create a cluster (they should not)
 // 1. Attempt to create a cluster with invalid base image
 // 2. Wait until cluster creation fails
