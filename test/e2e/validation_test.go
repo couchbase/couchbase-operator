@@ -111,7 +111,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			// If we are applying a change or deleting a cluster we first need to create it...
 			if command == "apply" || command == "delete" {
 				testCouchbase, err = k8sutil.CreateCouchbaseCluster(targetKube.CRClient, testCouchbase)
-				if err != nil && !test.shouldFail {
+				if err != nil {
 					t.Fatal(err)
 				}
 			}
