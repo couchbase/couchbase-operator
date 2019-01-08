@@ -527,125 +527,95 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	// Validate all other arguments
 	validArgumentList := []cbopinfoArg{
 		{
-			Name:     "Validating '-all' argument",
+			Name:     "TestValidateCbopinfoAll",
 			Arg:      "-all",
 			ArgValue: "",
 		},
 		{
-			Name:        "Validating '-kubeconfig' argument",
+			Name:        "TestValidateCbopinfoKubeconfig",
 			Arg:         "-kubeconfig",
 			ArgValue:    kubeConfPath,
 			ExpectedErr: "flag needs an argument: -kubeconfig",
 		},
 		{
-			Name:        "Validating '-namespace' argument",
+			Name:        "TestValidateCbopinfoNamespace",
 			Arg:         "-namespace",
 			ArgValue:    f.Namespace,
 			ExpectedErr: "flag needs an argument: -namespace",
 		},
 		{
-			Name:     "Validating '-system' argument",
+			Name:     "TestValidateCbopinfoSystem",
 			Arg:      "-system",
 			ArgValue: "",
 		},
 		{
-			Name:        "Validating '-operator-image' argument",
+			Name:        "TestValidateCbopinfoOperatorImage",
 			Arg:         "-operator-image",
 			ArgValue:    f.OpImage,
 			ExpectedErr: "flag needs an argument: -operator-image",
 		},
 		{
-			Name:        "Validating '-operator-rest-port' argument",
+			Name:        "TestValidateCbopinfoOperatorRestPort",
 			Arg:         "-operator-rest-port",
 			ArgValue:    operatorRestPort,
 			ExpectedErr: "flag needs an argument: -operator-rest-port",
 		},
 	}
 
-	for _, arg := range validArgumentList {
-		t.Log(arg.Name)
-		cmdArgs := []string{}
-
-		// If arg is 'namespace' or 'kubeconfig', verify with namespace arg only
-		if arg.Arg == "-namespace" {
-			cmdArgs = []string{"-kubeconfig", kubeConfPath, arg.Arg}
-		} else {
-			cmdArgs = []string{"-namespace", f.Namespace, "-kubeconfig", kubeConfPath, arg.Arg}
-		}
-		if arg.ArgValue != "" {
-			cmdArgs = append(cmdArgs, arg.ArgValue)
-		}
-
-		execOut, err := runCbopinfoCmd(cmdArgs)
-		execOutStr := strings.TrimSpace(string(execOut))
-		errMsgForNoCbCluster := "no CouchbaseCluster resources discovered in name space " + f.Namespace
-		t.Logf("Returned: %s\n", execOutStr)
-		if err != nil {
-			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Command failed without cb cluster"))
-		} else {
-			if !strings.Contains(execOutStr, errMsgForNoCbCluster) {
-				errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("Invalid error message"))
-			}
-		}
-		if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName == "" {
-			errMsgList.AppendFailure("cbopinfo "+arg.Arg, errors.New("No logs generated without cb cluster"))
-			defer os.Remove(logFileName)
-		}
-	}
-
 	// Deploy cb server for cbopinfo validation
 	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 
 	for _, arg := range validArgumentList {
-		t.Log(arg.Name)
-		cmdArgs := []string{}
+		t.Run(arg.Name, func(t *testing.T) {
+			cmdArgs := []string{}
 
-		// If arg is '-namespace', verify with namespace arg only
-		if arg.Arg == "-namespace" {
-			cmdArgs = []string{"-kubeconfig", kubeConfPath, arg.Arg}
-		} else {
-			cmdArgs = []string{"-namespace", f.Namespace, "-kubeconfig", kubeConfPath, arg.Arg}
-		}
-		if arg.ArgValue != "" {
-			cmdArgs = append(cmdArgs, arg.ArgValue)
-		}
+			// If arg is '-namespace', verify with namespace arg only
+			if arg.Arg == "-namespace" {
+				cmdArgs = []string{"-kubeconfig", kubeConfPath, arg.Arg}
+			} else {
+				cmdArgs = []string{"-namespace", f.Namespace, "-kubeconfig", kubeConfPath, arg.Arg}
+			}
+			if arg.ArgValue != "" {
+				cmdArgs = append(cmdArgs, arg.ArgValue)
+			}
 
-		execOut, err := runCbopinfoCmd(cmdArgs)
-		execOutStr := strings.TrimSpace(string(execOut))
-		t.Logf("Returned: %s\n", execOutStr)
-		if err != nil {
-			errMsgList.AppendFailure("Failed while providing arg "+arg.Arg, err)
-		}
-		logFileName := getLogFileNameFromExecOutput(execOutStr)
-		defer os.Remove(logFileName)
-
-		logFileDir := strings.Split(logFileName, ".")[0]
-		defer os.RemoveAll(logFileDir)
-		if err := untarGzFile(logFileName); err != nil {
-			errMsgList.AppendFailure("Failed to untar file ", err)
-		}
-
-		// Check command fails with missing argument value
-		if arg.ArgValue != "" {
-			cmdArgs := []string{arg.Arg}
 			execOut, err := runCbopinfoCmd(cmdArgs)
 			execOutStr := strings.TrimSpace(string(execOut))
 			t.Logf("Returned: %s\n", execOutStr)
-			if err == nil {
-				errMsgList.AppendFailure("Command executed successfully without providing value for "+arg.Arg, nil)
+			if err != nil {
+				errMsgList.AppendFailure("Failed while providing arg "+arg.Arg, err)
+			}
+			logFileName := getLogFileNameFromExecOutput(execOutStr)
+			defer os.Remove(logFileName)
+
+			logFileDir := strings.Split(logFileName, ".")[0]
+			defer os.RemoveAll(logFileDir)
+			if err := untarGzFile(logFileName); err != nil {
+				errMsgList.AppendFailure("Failed to untar file ", err)
 			}
 
-			// Verify valid error message
-			if !strings.Contains(execOutStr, arg.ExpectedErr) {
-				errMsgList.AppendFailure("Invalid error for missing arg value "+arg.Arg+", \nExpected: "+arg.ExpectedErr+"\nReceived: "+execOutStr, nil)
-			}
+			// Check command fails with missing argument value
+			if arg.ArgValue != "" {
+				cmdArgs := []string{arg.Arg}
+				execOut, err := runCbopinfoCmd(cmdArgs)
+				execOutStr := strings.TrimSpace(string(execOut))
+				t.Logf("Returned: %s\n", execOutStr)
+				if err == nil {
+					errMsgList.AppendFailure("Command executed successfully without providing value for "+arg.Arg, nil)
+				}
 
-			// Check no output file is generated
-			if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
-				errMsgList.AppendFailure("File created with missing argument for "+arg.Arg, nil)
-				os.Remove(logFileName)
+				// Verify valid error message
+				if !strings.Contains(execOutStr, arg.ExpectedErr) {
+					errMsgList.AppendFailure("Invalid error for missing arg value "+arg.Arg+", \nExpected: "+arg.ExpectedErr+"\nReceived: "+execOutStr, nil)
+				}
+
+				// Check no output file is generated
+				if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
+					errMsgList.AppendFailure("File created with missing argument for "+arg.Arg, nil)
+					os.Remove(logFileName)
+				}
 			}
-		}
+		})
 	}
 	errMsgList.CheckFailures(t)
 }
