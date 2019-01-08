@@ -75,6 +75,10 @@ tcGroups:
       - name: TestTlsCreateCluster
       - name: TestTlsKillClusterNode
       - name: TestTlsResizeCluster
+      - name: TestTLSRotate
+      - name: TestTLSRotateChain
+      - name: TestTLSRotateCA
+      - name: TestTLSRotateInvalid
 
   - name: XdcrCasesIntraCluster
     clusters:
@@ -150,3 +154,13 @@ tcGroups:
       - name: TestLogCollectWithDefaultRetentionAndSize
       - name: TestLogRedactionVerify
       - name: TestLogRedactionWithPvVerify
+
+- name: UpgradeTests
+  clusters:
+    - BasicCluster
+  testcases:
+    - name: TestUpgradeInvalidDowngrade
+    - name: TestUpgradeInvalidUpgrade
+    - name: TestUpgrade
+    - name: TestUpgradeSupportableKillStatefulPodOnCreate
+    - name: TestUpgradeSupportableKillStatefulPodOnRebalance

@@ -72,6 +72,9 @@ tcGroups:
       - name: TestTlsNegCertificateExpiredBeforeDeployment
       - name: TestTlsCertificateDeployedBeforeValidity
       - name: TestTlsGenerateWrongCACertType
+      - name: TestTLSRotateCAAndScale
+      - name: TestTLSRotateCAAndKillOperator
+      - name: TestTLSRotateCAKillPodAndKillOperator
 
   - name: XdcrCases
     clusters:
@@ -98,6 +101,7 @@ tcGroups:
       - name: TestRzaAntiAffinityOn
       - name: TestRzaAntiAffinityOff
       - name: TestRzaUpdateK8SNodeLabelAndCrd
+      - name: TestRzaNegCreateCluster
 
   - name: PersistentVolumeTests
     clusters:
@@ -142,3 +146,14 @@ tcGroups:
       # This cases will fail since it prompts for user input during cbopinfo
       #- name: TestLogCollectWithClusterResizeAndOperatorPodKilled
       #- name: TestCollectLogFromPvPodAndOperatorRecovered
+
+- name: UpgradeTests
+  clusters:
+    - BasicCluster
+  testcases:
+    - name: TestUpgradeSupportableKillStatelessPodOnCreate
+    - name: TestUpgradeSupportableKillStatelessPodOnRebalance
+    - name: TestUpgradeRollback
+    - name: TestUpgradeKillPodOnCreate
+    - name: TestUpgradeInvalidRollback
+    - name: TestUpgradeSupportable
