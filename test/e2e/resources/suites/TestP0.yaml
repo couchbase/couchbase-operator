@@ -155,12 +155,12 @@ tcGroups:
       - name: TestLogRedactionVerify
       - name: TestLogRedactionWithPvVerify
 
-- name: UpgradeTests
-  clusters:
-    - BasicCluster
-  testcases:
-    - name: TestUpgradeInvalidDowngrade
-    - name: TestUpgradeInvalidUpgrade
-    - name: TestUpgrade
-    - name: TestUpgradeSupportableKillStatefulPodOnCreate
-    - name: TestUpgradeSupportableKillStatefulPodOnRebalance
+  - name: UpgradeTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestUpgradeInvalidDowngrade
+      - name: TestUpgradeInvalidUpgrade
+      - name: TestUpgrade
+      - name: TestUpgradeSupportableKillStatefulPodOnCreate
+      - name: TestUpgradeSupportableKillStatefulPodOnRebalance

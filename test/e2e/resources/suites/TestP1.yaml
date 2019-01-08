@@ -147,13 +147,13 @@ tcGroups:
       #- name: TestLogCollectWithClusterResizeAndOperatorPodKilled
       #- name: TestCollectLogFromPvPodAndOperatorRecovered
 
-- name: UpgradeTests
-  clusters:
-    - BasicCluster
-  testcases:
-    - name: TestUpgradeSupportableKillStatelessPodOnCreate
-    - name: TestUpgradeSupportableKillStatelessPodOnRebalance
-    - name: TestUpgradeRollback
-    - name: TestUpgradeKillPodOnCreate
-    - name: TestUpgradeInvalidRollback
-    - name: TestUpgradeSupportable
+  - name: UpgradeTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestUpgradeSupportableKillStatelessPodOnCreate
+      - name: TestUpgradeSupportableKillStatelessPodOnRebalance
+      - name: TestUpgradeRollback
+      - name: TestUpgradeKillPodOnCreate
+      - name: TestUpgradeInvalidRollback
+      - name: TestUpgradeSupportable
