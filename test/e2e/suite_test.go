@@ -61,6 +61,10 @@ func runSuite(t *testing.T) {
 	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
 
 	for _, testGroup := range f.SuiteYmlData.TestCaseGroup {
+		// Add the cluster names to the global test clusters so the
+		// individual tests can reference them.
+		f.TestClusters = testGroup.ClusterName
+
 		skipCurrTestGroup := false
 		requiredClusters := []string{}
 		for _, currClusterName := range testGroup.ClusterName {
@@ -75,12 +79,7 @@ func runSuite(t *testing.T) {
 			break
 		}
 
-		// Buffer up the cluster names to use for this specific invokation of the
-		// test, so as not to hard code them
-		f.TestClusters = []string{}
 		for _, kubeCluster := range kubeClustersToSetup {
-			f.TestClusters = append(f.TestClusters, kubeCluster.ClusterName)
-
 			if _, ok := f.ClusterSpec[kubeCluster.ClusterName]; ok {
 				continue
 			}
