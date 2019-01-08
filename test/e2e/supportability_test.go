@@ -1159,13 +1159,25 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, opImageNam
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
 // with default values and validate the logs collected
+//
+// SM: Given the default is the build we are working on, you need to
+// either push to the public repo with an unreleased build, or do some
+// raw docker nastiness to install the "default" image.  As neither are
+// sane just sanitise this code with the tested operator image.
 func TestExtendedDebugWithDefaultValues(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
 	defPort := constants.OperatorRestPort
-	cmdArgs := []string{"-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-all"}
-	CollectExtendedDebugLogGeneric(t, targetKube, constants.DefOperatorImgTag, defPort, defPort, cmdArgs)
+	cmdArgs := []string{
+		"-operator-image", f.OpImage,
+		"-kubeconfig", kubeConfPath,
+		"-namespace", f.Namespace,
+		"-collectinfo",
+		"-collectinfo-collect", "all",
+		"-all",
+	}
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, defPort, defPort, cmdArgs)
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
@@ -1183,7 +1195,15 @@ func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 			defPort = temPort.ContainerPort
 		}
 	}
-	cmdArgs := []string{"-operator-image", f.OpImage, "-operator-rest-port", strconv.Itoa(int(testPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-all"}
+	cmdArgs := []string{
+		"-operator-image", f.OpImage,
+		"-operator-rest-port", strconv.Itoa(int(testPort)),
+		"-kubeconfig", kubeConfPath,
+		"-namespace", f.Namespace,
+		"-collectinfo",
+		"-collectinfo-collect", "all",
+		"-all",
+	}
 	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, defPort, cmdArgs)
 }
 
