@@ -176,11 +176,11 @@ func Setup(t *testing.T) error {
 	}
 
 	for _, kubeConf := range runtimeParams.KubeConfig {
-		clusterSpec, err := CreateKubeClusterObject(kubeConf.ClusterConfig)
+		clusterSpec, err := CreateKubeClusterObject(kubeConf.ClusterConfig, kubeConf.Context)
 		if err != nil {
 			return err
 		}
-		clusterSpecMap[kubeConf.ClusterName] = &clusterSpec
+		clusterSpecMap[kubeConf.ClusterName] = clusterSpec
 	}
 
 	// Setting required spec values from test_config yaml
@@ -349,22 +349,21 @@ func Teardown() error {
 	return nil
 }
 
-func CreateKubeClusterObject(kubeConfPath string) (types.Cluster, error) {
-	clusterSpec := types.Cluster{}
-	config, err := clientcmd.BuildConfigFromFlags("", kubeConfPath)
+func CreateKubeClusterObject(kubeConfPath, context string) (*types.Cluster, error) {
+	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfPath},
+		&clientcmd.ConfigOverrides{CurrentContext: context},
+	).ClientConfig()
 	if err != nil {
-		return clusterSpec, err
-	}
-	cli, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return clusterSpec, err
+		return nil, err
 	}
 
-	clusterSpec.Config = config
-	clusterSpec.CRClient = client.MustNew(config)
-	clusterSpec.KubeClient = cli
-	clusterSpec.KubeConfPath = kubeConfPath
-	return clusterSpec, err
+	return &types.Cluster{
+		Config:       config,
+		CRClient:     client.MustNew(config),
+		KubeClient:   kubernetes.NewForConfigOrDie(config),
+		KubeConfPath: kubeConfPath,
+	}, nil
 }
 
 func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {

@@ -58,6 +58,7 @@ type ClusterConfig struct {
 type KubeConfData struct {
 	ClusterName   string `yaml:"name"`
 	ClusterConfig string `yaml:"config"`
+	Context       string `yaml:"context"`
 }
 
 // Struct to read and store test_config yaml passed by the user during testing

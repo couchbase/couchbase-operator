@@ -92,14 +92,14 @@ func runSuite(t *testing.T) {
 			}
 
 			kubeConfigPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeCluster.ClusterName)
-			clusterSpec, err := framework.CreateKubeClusterObject(kubeConfigPath)
+			clusterSpec, err := framework.CreateKubeClusterObject(kubeConfigPath, "")
 			if err != nil {
 				skipCurrTestGroup = true
 				t.Error(err)
 				break
 			}
 
-			f.ClusterSpec[kubeName] = &clusterSpec
+			f.ClusterSpec[kubeName] = clusterSpec
 
 			totalNodes := len(kubeCluster.MasterNodeList) + len(kubeCluster.WorkerNodeList)
 			logrus.Infof("Waiting for '%d' nodes to become available", totalNodes)
