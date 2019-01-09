@@ -162,25 +162,38 @@ func CreateDeploymentObject(operatorImageName string, restPort int32) (deploymen
 }
 
 // Setup setups a test framework and points "Global" to it.
-func Setup(t *testing.T) error {
-	clusterSpecMap := types.ClusterMap{}
+func Setup(t *testing.T) (err error) {
 
-	deployment, err := CreateDeploymentObject(runtimeParams.OperatorImage, constants.OperatorRestPort)
+	// Initialize Global from runtime info
+	Global = &Framework{
+		Namespace:       runtimeParams.Namespace,
+		KubeType:        runtimeParams.KubeType,
+		KubeVersion:     runtimeParams.KubeVersion,
+		OpImage:         runtimeParams.OperatorImage,
+		SkipTeardown:    runtimeParams.SkipTearDown,
+		CollectLogs:     runtimeParams.CollectLogsOnFailure,
+		SuiteYmlData:    suiteData,
+		ClusterConfFile: runtimeParams.ClusterConfFile,
+		PlatformType:    runtimeParams.PlatformType,
+		ClusterSpec:     types.ClusterMap{},
+	}
+
+	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, constants.OperatorRestPort)
 	if err != nil {
 		return err
 	}
 
-	logDir, err := makeLogDir()
+	Global.LogDir, err = makeLogDir()
 	if err != nil {
 		return err
 	}
 
 	for _, kubeConf := range runtimeParams.KubeConfig {
-		clusterSpec, err := CreateKubeClusterObject(kubeConf.ClusterConfig, kubeConf.Context)
-		if err != nil {
-			return err
+		clusterSpec, cerr := CreateKubeClusterObject(kubeConf.ClusterConfig, kubeConf.Context)
+		if cerr != nil {
+			return cerr
 		}
-		clusterSpecMap[kubeConf.ClusterName] = clusterSpec
+		Global.ClusterSpec[kubeConf.ClusterName] = clusterSpec
 	}
 
 	// Setting required spec values from test_config yaml
@@ -199,30 +212,15 @@ func Setup(t *testing.T) error {
 	logrus.Info("Kubernetes")
 	logrus.Info(" →  storage class: " + constants.StorageClassName)
 	logrus.Info("Logs")
-	logrus.Info(" →  directory: " + logDir)
+	logrus.Info(" →  directory: " + Global.LogDir)
 
 	// Setup the cbopinfo absolute path so it will not change if we move directories
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
+	wd, oserr := os.Getwd()
+	if oserr != nil {
+		return oserr
 	}
-	cbopinfo := wd + "/../../build/bin/cbopinfo"
+	Global.CbopinfoPath = wd + "/../../build/bin/cbopinfo"
 
-	Global = &Framework{
-		CbopinfoPath:    cbopinfo,
-		Deployment:      deployment,
-		Namespace:       runtimeParams.Namespace,
-		KubeType:        runtimeParams.KubeType,
-		KubeVersion:     runtimeParams.KubeVersion,
-		OpImage:         runtimeParams.OperatorImage,
-		LogDir:          logDir,
-		SkipTeardown:    runtimeParams.SkipTearDown,
-		CollectLogs:     runtimeParams.CollectLogsOnFailure,
-		ClusterSpec:     clusterSpecMap,
-		SuiteYmlData:    suiteData,
-		ClusterConfFile: runtimeParams.ClusterConfFile,
-		PlatformType:    runtimeParams.PlatformType,
-	}
 	for kubeName, _ := range Global.ClusterSpec {
 		if err = Global.SetupFramework(kubeName); err != nil {
 			return err
@@ -340,6 +338,10 @@ func cleanUpNamespace() (err error) {
 }
 
 func Teardown() error {
+	if Global == nil {
+		return errors.New("Framework is uninitialized")
+	}
+
 	if Global.SkipTeardown {
 		return nil
 	}
