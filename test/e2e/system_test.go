@@ -345,32 +345,20 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// check tls
 	if withTls {
-		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx1); err != nil {
+		if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx1); err != nil {
 			t.Fatal("TLS check for cluster failed: ", err)
 		}
-		if err := e2eutil.TlsCheckForCluster(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx2); err != nil {
+		if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx2); err != nil {
 			t.Fatal("TLS check for cluster failed: ", err)
 		}
 	}
 
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
-	consoleURL1, err := e2eutil.AdminConsoleURL(targetKube.APIHost(), testCouchbase1.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client1, err := e2eutil.NewClient(t, targetKube.KubeClient, testCouchbase1, []string{consoleURL1})
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
-	consoleURL2, err := e2eutil.AdminConsoleURL(targetKube.APIHost(), testCouchbase2.Status.AdminConsolePort)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client2, err := e2eutil.NewClient(t, targetKube.KubeClient, testCouchbase2, []string{consoleURL2})
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client1, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase1)
+	defer cleanup()
+	client2, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase2)
+	defer cleanup()
 
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")

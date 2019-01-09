@@ -222,10 +222,6 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 
-	if _, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
-
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -337,10 +333,8 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	// To cross check number of persistent vol claims matches the defined spec
 	var expectedPvcMap map[string]int
@@ -535,10 +529,6 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	createPodSecurityContext(1000, &clusterSpec)
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
-
-	if _, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
@@ -795,10 +785,6 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 
-	if _, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
-
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -912,10 +898,6 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	createPodSecurityContext(1000, &clusterSpec)
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
-
-	if _, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase); err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
 
 	expectedEvents := e2eutil.EventList{}
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)

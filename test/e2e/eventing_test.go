@@ -78,10 +78,8 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket3["bucketName"])
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
@@ -104,14 +102,8 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	k8sMasterIp, err := targetKube.APIHostname()
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl, err := e2eutil.GetAdminConsoleHostURL(k8sMasterIp, f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
@@ -151,10 +143,8 @@ func TestEventingResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
@@ -179,14 +169,8 @@ func TestEventingResizeCluster(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	k8sMasterIp, err := targetKube.APIHostname()
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl, err := e2eutil.GetAdminConsoleHostURL(k8sMasterIp, f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, targetKube, testCouchbase)
+	defer cleanup()
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
@@ -310,10 +294,8 @@ func TestEventingKillEventingPods(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
@@ -337,14 +319,8 @@ func TestEventingKillEventingPods(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	k8sMasterIp, err := targetKube.APIHostname()
-	if err != nil {
-		t.Fatal(err)
-	}
-	hostUrl, err := e2eutil.GetAdminConsoleHostURL(k8sMasterIp, f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, targetKube, testCouchbase)
+	defer cleanup()
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}

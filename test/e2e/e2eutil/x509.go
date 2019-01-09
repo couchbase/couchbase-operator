@@ -23,11 +23,11 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 )
 
 // KeyType defines the supported types of private key that can be used with
@@ -720,10 +720,11 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 	}
 }
 
-func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restclient.Config, ctx *TlsContext) error {
+func TlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TlsContext) error {
 	// Start the port forwarder
 	pf := portforward.PortForwarder{
-		Config:    kubeConfig,
+		Config:    k8s.Config,
+		Client:    k8s.KubeClient,
 		Namespace: namespace,
 		Pod:       podName,
 		Port:      "18091",

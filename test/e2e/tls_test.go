@@ -37,7 +37,7 @@ func TestTlsCreateCluster(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	e2eutil.MustCheckClusterTLS(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -231,7 +231,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	e2eutil.MustCheckClusterTLS(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
 
 	operatorSecret, err := e2eutil.GetSecret(targetKube.KubeClient, f.Namespace, ctx.OperatorSecretName)
 	if err != nil {
@@ -412,7 +412,7 @@ func TestTlsCertificateExpiry(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustCheckClusterTLS(t, targetKube.KubeClient, targetKube.Config, f.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
 
 	t.Log("Waiting for certificate to expire")
 	for {
@@ -529,7 +529,7 @@ func TestTLSRotate(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificate(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
-	e2eutil.MustCheckClusterTLS(t, kubernetes.KubeClient, kubernetes.Config, cluster.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -561,7 +561,7 @@ func TestTLSRotateChain(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificateChain(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
-	e2eutil.MustCheckClusterTLS(t, kubernetes.KubeClient, kubernetes.Config, cluster.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -593,7 +593,7 @@ func TestTLSRotateCA(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
-	e2eutil.MustCheckClusterTLS(t, kubernetes.KubeClient, kubernetes.Config, cluster.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -627,7 +627,7 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
-	e2eutil.MustCheckClusterTLS(t, kubernetes.KubeClient, kubernetes.Config, cluster.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 	e2eutil.MustResizeCluster(t, 0, clusterSize+clusterScaleUpSize, kubernetes.CRClient, cluster)
 
 	// Check the events match what we expect:
@@ -664,7 +664,7 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes.KubeClient, cluster.Namespace)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
-	e2eutil.MustCheckClusterTLS(t, kubernetes.KubeClient, kubernetes.Config, cluster.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -705,7 +705,7 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 300)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries20)
-	e2eutil.MustCheckClusterTLS(t, kubernetes.KubeClient, kubernetes.Config, cluster.Namespace, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
 	// * Cluster created

@@ -128,10 +128,9 @@ func TestEditClusterSettings(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
+
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
@@ -593,23 +592,8 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	})
 
 	// create node port service for node 0
-	clusterNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	nodePortService := e2espec.NewNodePortService(f.Namespace)
-	nodePortService.Spec.Selector["couchbase_node"] = clusterNodeName
-	service, err := e2eutil.CreateService(targetKube.KubeClient, f.Namespace, nodePortService)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer e2eutil.DeleteService(targetKube.KubeClient, f.Namespace, service.Name, nil)
-
-	serviceUrl, err := e2eutil.NodePortServiceClient(targetKube.APIHost(), service)
-	if err != nil {
-		t.Fatalf("failed to get cluster url %v", err)
-	}
-	client, err := e2eutil.NewClient(t, targetKube.KubeClient, testCouchbase, []string{serviceUrl})
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	// remove node
 	if err := e2eutil.RebalanceOutMember(t, client, testCouchbase.Name, testCouchbase.Namespace, removePodMemberId, true); err != nil {
@@ -617,6 +601,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	}
 
 	// resume operator
+	var err error
 	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, func(cl *api.CouchbaseCluster) {
 		cl.Spec.Paused = false
 	})
@@ -672,10 +657,9 @@ func TestBasicMDSScaling(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
+
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
@@ -877,10 +861,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
+
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
@@ -1136,10 +1119,9 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
+
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)
@@ -1185,10 +1167,8 @@ func TestRemoveLastDataService(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
@@ -1264,10 +1244,8 @@ func TestManageMultipleClusters(t *testing.T) {
 	expectedEvents3.AddRebalanceCompletedEvent(testCouchbase3)
 
 	// create connection to couchbase nodes
-	client1, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase1)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client1, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase1)
+	defer cleanup()
 
 	clusterInfo1, err := e2eutil.GetClusterInfo(t, client1, constants.Retries5)
 	if err != nil {
@@ -1276,10 +1254,8 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo1)
 
 	// create connection to couchbase nodes
-	client2, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase2)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client2, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase2)
+	defer cleanup()
 
 	clusterInfo2, err := e2eutil.GetClusterInfo(t, client2, constants.Retries5)
 	if err != nil {
@@ -1288,10 +1264,8 @@ func TestManageMultipleClusters(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo2)
 
 	// create connection to couchbase nodes
-	client3, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase3)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client3, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase3)
+	defer cleanup()
 
 	clusterInfo3, err := e2eutil.GetClusterInfo(t, client3, constants.Retries5)
 	if err != nil {

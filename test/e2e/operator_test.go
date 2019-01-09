@@ -107,10 +107,9 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create connection to couchbase nodes
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
+
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
 	if err != nil {
 		t.Fatalf("failed to get cluster info %v", err)

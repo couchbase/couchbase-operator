@@ -282,10 +282,9 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	expectedEvents.AddParallelEvents(memDownParallelEvents)
 	expectedEvents.AddParallelEvents(memFailoverParallelEvents)
 
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("Unable to get Client for cluster: %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
+
 	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries10, podMembersToKillLen); err != nil {
 		t.Fatal(err)
 	}

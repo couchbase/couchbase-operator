@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -14,11 +15,15 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	"github.com/couchbase/gocbmgr"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -30,7 +35,8 @@ type autoFailoverVerifier func(t *testing.T, ci *cbmgr.AutoFailoverSettings, val
 type indexSettingVerifier func(t *testing.T, ci *cbmgr.IndexSettings, value string) bool
 type bucketInfoVerifier func(t *testing.T, bs *cbmgr.Bucket, bucketKey string, bucketValue string) bool
 
-func NewClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
+// newClient returns a new Couchbase management client (internal not go SDK)
+func newClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
 	err, username, password := GetClusterAuth(t, kubeClient, cl.Namespace, cl.Spec.AuthSecret)
 	if err != nil {
 		return nil, err
@@ -41,44 +47,91 @@ func NewClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseC
 	return client, nil
 }
 
-// Creates client for interacting with admin console of crd
-// TODO: testing arg is not needed and will be removed, but has depends here
-func CreateAdminConsoleClient(t *testing.T, apiServerHost string, namespace string, platformType string, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) (*cbmgr.Couchbase, error) {
-	t.Logf("Creating AdminConsoleClient \n")
-	if cl.Spec.ExposeAdminConsole == false {
-		return nil, NewErrConsoleNotExposed()
-	}
-	consoleURL := ""
-	if platformType == "azure" {
-		serviceName := cl.Name + "-ui"
-		service, _ := GetService(kubeClient, namespace, serviceName)
-		service.Spec.Type = "LoadBalancer"
-		service, _ = UpdateService(kubeClient, namespace, service)
-		_ = WaitForExternalLoadBalancer(t, kubeClient, namespace, service.Name, 300)
-		service, _ = GetService(kubeClient, namespace, serviceName)
-		consoleURL = "http://" + service.Status.LoadBalancer.Ingress[0].IP + ":8091"
-	} else {
-		consoleURL, _ = AdminConsoleURL(apiServerHost, cl.Status.AdminConsolePort)
-	}
-	t.Logf("Admin console url: %s", consoleURL)
-	client, err := NewClient(t, kubeClient, cl, []string{consoleURL})
+// getFreePort probes the kernel for a randomly allocated port to use for port forwarding.
+func getFreePort() (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	t.Logf("Client created \n")
-	return client, nil
+	defer listener.Close()
+
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		return "", err
+	}
+
+	return port, nil
 }
 
-func GetAdminConsoleHostURL(k8sMasterIp string, namespace string, platformType string, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster) (string, error) {
-	if platformType == "azure" {
-		serviceName := cl.Name + "-ui"
-		service, _ := GetService(kubeClient, namespace, serviceName)
-		hostUrl := service.Status.LoadBalancer.Ingress[0].IP + ":8091"
-		return hostUrl, nil
-	} else {
-		hostUrl := k8sMasterIp + ":" + cl.Status.AdminConsolePort
-		return hostUrl, nil
+// forwardPort creates a local listener that forwards connections on to the specified
+// pod.  It returns a network adddress/port and a clean up function.  The port is random
+// so that multiple forwards can be active for the target port.
+func forwardPort(t *testing.T, k8s *types.Cluster, namespace, pod, port string) (string, func()) {
+	// Allocate a free port to use
+	sport, err := getFreePort()
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	pf := &portforward.PortForwarder{
+		Config:    k8s.Config,
+		Client:    k8s.KubeClient,
+		Namespace: namespace,
+		Pod:       pod,
+		Port:      sport + ":" + port,
+	}
+	if err := pf.ForwardPorts(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Analytics and eventing don't support persistent connections so we get a
+	// lot of "connection reset by peer" spam on the console.
+	portforward.Silent()
+
+	return sport, func() { pf.Close() }
+}
+
+// CreateAdminConsoleClient returns a client for interacting with the admin service of a cluster.
+// Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
+// If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
+// the cleanup callback must be invoked first.
+func CreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (*cbmgr.Couchbase, func()) {
+	// Create a port forward and get a host connection string
+	host, cleanup := GetAdminConsoleHostURL(t, k8s, cluster)
+
+	// Return a client proxying through the port forwarder.
+	client, err := newClient(t, k8s.KubeClient, cluster, []string{"http://" + host})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return client, cleanup
+}
+
+// GetAdminConsoleHostURL returns a URL for interacting with the admin service of a cluster.
+// Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
+// If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
+// the cleanup callback must be invoked first.
+func GetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func()) {
+	// Grab the Couchbase service and use it to select the set of pods to connect to.
+	svc, err := k8s.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	selector := labels.SelectorFromSet(svc.Spec.Selector).String()
+	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pods.Items) == 0 {
+		t.Fatal("no pods selected for connection to port 8091")
+	}
+
+	// Forward port to the first pod to the local host.
+	port, cleanup := forwardPort(t, k8s, cluster.Namespace, pods.Items[0].Name, "8091")
+	return "127.0.0.1:" + port, cleanup
 }
 
 func EditBucket(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket) error {

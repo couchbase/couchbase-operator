@@ -34,8 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-
-	"k8s.io/client-go/rest"
 )
 
 var (
@@ -1138,23 +1136,23 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace, claimName, memberName
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }
 
-func TlsCheckForCluster(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string, ctx *TlsContext) error {
-	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
+func TlsCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx *TlsContext) error {
+	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
 	if err != nil {
 		return fmt.Errorf("Unable to get couchbase pods: %v", err)
 	}
 
 	// TLS handshake with pods
 	for _, pod := range pods.Items {
-		if err := TlsCheckForPod(t, namespace, pod.GetName(), restConfig, ctx); err != nil {
+		if err := TlsCheckForPod(t, k8s, namespace, pod.GetName(), ctx); err != nil {
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}
 	}
 	return nil
 }
 
-func MustCheckClusterTLS(t *testing.T, kubeCli kubernetes.Interface, restConfig *rest.Config, namespace string, ctx *TlsContext) {
-	if err := TlsCheckForCluster(t, kubeCli, restConfig, namespace, ctx); err != nil {
+func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, ctx *TlsContext) {
+	if err := TlsCheckForCluster(t, k8s, namespace, ctx); err != nil {
 		Die(t, err)
 	}
 }

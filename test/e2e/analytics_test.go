@@ -53,10 +53,8 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
@@ -123,10 +121,8 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
@@ -216,6 +212,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	prevClusterSize := clusterSize
 	for _, clusterSize = range clusterSizes {
 		service := 0
+		var err error
 		testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
 		if err != nil {
 			t.Fatal(err)
@@ -298,10 +295,8 @@ func TestAnalyticsKillPods(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	// Load default data set into couchbase bucket
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
@@ -487,10 +482,8 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, err := e2eutil.CreateAdminConsoleClient(t, targetKube.APIHost(), f.Namespace, f.PlatformType, targetKube.KubeClient, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create cluster client %v", err)
-	}
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 
 	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
