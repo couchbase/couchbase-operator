@@ -1,7 +1,7 @@
 package portforward
 
 import (
-	"bytes"
+	"io/ioutil"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -14,24 +14,13 @@ import (
 // PortForwarder forwards a pod port to localhost in the background
 type PortForwarder struct {
 	Config    *rest.Config
-	Client    *kubernetes.Clientset
+	Client    kubernetes.Interface
 	Namespace string
 	Pod       string
 	Port      string
 	stopChan  chan struct{}
 	readyChan chan struct{}
 	errorChan chan error
-	out       *bytes.Buffer
-	errOut    *bytes.Buffer
-}
-
-// NodePort creates the service from pod with matching selectors to k8s cluster node
-type NodePortService struct {
-	ServiceName        string
-	RemotePortToExpose int32
-	Labels             map[string]string
-	Selectors          map[string]string
-	Namespace          string
 }
 
 // ForwardPorts accepts a Kubernetes configuration, pod and port and forwards
@@ -54,10 +43,8 @@ func (pf *PortForwarder) ForwardPorts() error {
 	// Finally do the actual work
 	pf.stopChan = make(chan struct{})
 	pf.readyChan = make(chan struct{})
-	pf.out = &bytes.Buffer{}
-	pf.errOut = &bytes.Buffer{}
 
-	portForwarder, err := portforward.New(dialer, []string{pf.Port}, pf.stopChan, pf.readyChan, pf.out, pf.errOut)
+	portForwarder, err := portforward.New(dialer, []string{pf.Port}, pf.stopChan, pf.readyChan, ioutil.Discard, ioutil.Discard)
 	if err != nil {
 		return err
 	}

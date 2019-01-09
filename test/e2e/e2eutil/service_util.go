@@ -2,12 +2,12 @@ package e2eutil
 
 import (
 	"fmt"
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -72,50 +72,30 @@ func AdminConsoleURL(apiServerHost, port string) (string, error) {
 	return consoleURL, nil
 }
 
-func GetEventingIpAndPort(t *testing.T, eventingNodeName string, kubeClient kubernetes.Interface, namespace string, platformType string, cl *api.CouchbaseCluster) (string, string, error) {
-	if platformType == "azure" {
-		// need to create load balancer to forward this port to public ip
-		serviceName := eventingNodeName + "-exposed-ports"
-		service, _ := GetService(kubeClient, namespace, serviceName)
-		service.Spec.Type = "LoadBalancer"
-		service, _ = UpdateService(kubeClient, namespace, service)
-		_ = WaitForExternalLoadBalancer(t, kubeClient, namespace, service.Name, 300)
-		service, _ = GetService(kubeClient, namespace, serviceName)
-		eventingHostUrl := service.Status.LoadBalancer.Ingress[0].IP
-		eventingPortStr := "8096"
-		return eventingHostUrl, eventingPortStr, nil
-	} else {
-		pod, err := kubeClient.CoreV1().Pods(namespace).Get(eventingNodeName, metav1.GetOptions{})
-		if err != nil {
-			return "", "", err
-		}
-		eventingHostUrl := pod.Status.HostIP
-		eventingPortStr := strconv.Itoa(int(cl.Status.ExposedPorts[eventingNodeName].EventingServicePort))
-		return eventingHostUrl, eventingPortStr, nil
+func GetEventingIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
+	pf := &portforward.PortForwarder{
+		Config:    k8s.Config,
+		Client:    k8s.KubeClient,
+		Namespace: namespace,
+		Pod:       pod,
+		Port:      "8096",
 	}
-
+	if err := pf.ForwardPorts(); err != nil {
+		t.Fatal(err)
+	}
+	return "127.0.0.1", "8096", func() { pf.Close() }
 }
 
-func GetAnalyticsIpAndPort(t *testing.T, analyticsNodeName string, kubeClient kubernetes.Interface, namespace string, platformType string, cl *api.CouchbaseCluster) (string, string, error) {
-	if platformType == "azure" {
-		// need to create load balancer to forward this port to public ip
-		serviceName := analyticsNodeName + "-exposed-ports"
-		service, _ := GetService(kubeClient, namespace, serviceName)
-		service.Spec.Type = "LoadBalancer"
-		service, _ = UpdateService(kubeClient, namespace, service)
-		_ = WaitForExternalLoadBalancer(t, kubeClient, namespace, service.Name, 300)
-		service, _ = GetService(kubeClient, namespace, serviceName)
-		analyticsHostUrl := service.Status.LoadBalancer.Ingress[0].IP
-		analyticsNodePortStr := "8095"
-		return analyticsHostUrl, analyticsNodePortStr, nil
-	} else {
-		pod, err := kubeClient.CoreV1().Pods(namespace).Get(analyticsNodeName, metav1.GetOptions{})
-		if err != nil {
-			return "", "", err
-		}
-		analyticsHostUrl := pod.Status.HostIP
-		analyticsNodePortStr := strconv.Itoa(int(cl.Status.ExposedPorts[analyticsNodeName].AnalyticsServicePort))
-		return analyticsHostUrl, analyticsNodePortStr, nil
+func GetAnalyticsIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
+	pf := &portforward.PortForwarder{
+		Config:    k8s.Config,
+		Client:    k8s.KubeClient,
+		Namespace: namespace,
+		Pod:       pod,
+		Port:      "8095",
 	}
-
+	if err := pf.ForwardPorts(); err != nil {
+		t.Fatal(err)
+	}
+	return "127.0.0.1", "8095", func() { pf.Close() }
 }

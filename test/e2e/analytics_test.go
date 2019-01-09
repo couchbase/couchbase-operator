@@ -63,10 +63,8 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset := "testDataset1"
@@ -136,10 +134,8 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset1 := "testDataset1"
@@ -314,10 +310,8 @@ func TestAnalyticsKillPods(t *testing.T) {
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset1 := "testDataset1"
@@ -504,10 +498,8 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, err := e2eutil.GetAnalyticsIpAndPort(t, analyticsNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset1 := "testDataset1"

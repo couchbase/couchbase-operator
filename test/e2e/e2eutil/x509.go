@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -720,7 +722,7 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 
 func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restclient.Config, ctx *TlsContext) error {
 	// Start the port forwarder
-	pf := PortForwarder{
+	pf := portforward.PortForwarder{
 		Config:    kubeConfig,
 		Namespace: namespace,
 		Pod:       podName,
@@ -729,7 +731,7 @@ func TlsCheckForPod(t *testing.T, namespace, podName string, kubeConfig *restcli
 	if err := pf.ForwardPorts(); err != nil {
 		return err
 	}
-	defer pf.Close(t)
+	defer pf.Close()
 
 	// Validate that the server certificate is valid for the context's CA.
 	tlsConfig := &tls.Config{

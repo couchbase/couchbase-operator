@@ -89,10 +89,8 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
+	defer cleanup()
 
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
@@ -165,10 +163,8 @@ func TestEventingResizeCluster(t *testing.T) {
 	// Provide the pod index for the eventing node
 	// Here nonEventingNodes will be equal to eventing pod's index
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
-	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
+	defer cleanup()
 
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
@@ -326,10 +322,8 @@ func TestEventingKillEventingPods(t *testing.T) {
 	// Provide the pod index for the eventing node
 	// Here nonEventingNodes will be equal to eventing pod's index
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
-	eventingHostUrl, eventingPortStr, err := e2eutil.GetEventingIpAndPort(t, eventingNodeName, targetKube.KubeClient, f.Namespace, f.PlatformType, testCouchbase)
-	if err != nil {
-		t.Fatal(err)
-	}
+	eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
+	defer cleanup()
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
 	eventingMetaBucketName := "eventingMetaBucket"
