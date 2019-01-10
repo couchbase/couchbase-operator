@@ -8,11 +8,12 @@ If you are looking to upgrade an existing installation of the Operator, see xref
 * You have a working knowledge of Kubernetes
 * You have reviewed the xref:prerequisite-and-setup.adoc[prerequisites]
 * You are installing on a new Kubernetes cluster that has RBAC enabled
+**  See the setup documentation for xref:cloud-intro.adoc[public Kubernetes services] if you are using services like EKS, AKS, and GKE.
 * You have administrative privileges for the Kubernetes cluster
 
 If you have a Kubernetes environment that already has a custom setup (non-default), you should be able to modify a few of the parameters in the various commands and configuration files mentioned in this guide to fit your requirements.
 
-IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your Kubernetes environment. Refer to the  xref:kubernetes-rbac.adoc[RBAC doumentation] before you install the Operator, as your Kubernetes environment may differ from the environment upon which this guide is based.
+IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your Kubernetes environment. Refer to the xref:kubernetes-rbac.adoc[RBAC doumentation] before you install the Operator, as your Kubernetes environment may differ from the environment upon which this guide is based.
 
 == Prerequisites
 

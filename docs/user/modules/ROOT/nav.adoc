@@ -5,6 +5,7 @@
  ** xref:best-practices.adoc[Guidelines and Best Practices]
 * xref:cloud-intro.adoc[Cloud Environment Setup]
  ** xref:install-aks.adoc[Installing on AKS]
+ ** xref:install-eks.adoc[Installing on EKS]
  ** xref:install-gke.adoc[Installing on GKE]
 * Helm
  ** xref:helm-setup-guide.adoc[Helm Guide]

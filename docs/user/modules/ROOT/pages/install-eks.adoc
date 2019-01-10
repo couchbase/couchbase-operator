@@ -1,0 +1,224 @@
+= Installing on EKS
+
+[abstract]
+Install the Couchbase Autonomous Operator on the Amazon Elastic Kubernetes Service (EKS).
+
+== Configuring Your EKS Deployment
+
+This guide is meant to supplement the regular Amazon EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html[setup documentation^], and provides recommendations up to setting up worker nodes.
+
+=== Prerequisites
+
+In addition to the standard EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-prereqs[prerequisites^], you must also do the following:
+
+* Install `aws-iam-authenticator` when you install `kubectl`.
+* Install the latest version of the AWS CLI.
+
+=== Create the Cluster and Configure kubectl
+
+Create the EKS cluster(s) according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-create-cluster[documentation^].
+Actual cluster creation in EKS can take some time (around 10-15 minutes per cluster).
+
+When configuring `kubectl`, pay particular attention to the following command:
+
+[source,console]
+----
+aws eks update-kubeconfig --name clusterName
+----
+
+This command is vital as it sets the relevant Amazon Resource Name (ARN) variables in `~/.kube/config`.
+Optionally, you can add `--region regionName` to specify a cluster in a region that is different than the default.
+(Your default region should have been specified when you first setup the AWS CLI through `aws configure` command.)
+
+View the config at `~/.kube/config` to ensure that all variables look correct:
+
+[source,console]
+----
+kubectl config view
+----
+
+The following example shows two AWS context configurations appended to an existing minikube one:
+
+[source,yaml]
+----
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: <REDACTED>
+    server: https://E8A3753F682B8098CAFFAEDCF1339471.yl4.eu-west-1.eks.amazonaws.com
+  name: arn:aws:eks:eu-west-1:705067739613:cluster/test1
+- cluster:
+    certificate-authority-data: <REDACTED>
+    server: https://1B9C893E96EAA59350290F34D41A417E.yl4.us-west-2.eks.amazonaws.com
+  name: arn:aws:eks:us-west-2:705067739613:cluster/oregon
+- cluster:
+    certificate-authority: /Users/.../.minikube/ca.crt
+    server: https://192.168.99.100:8443
+  name: minikube
+contexts:
+- context:
+    cluster: arn:aws:eks:eu-west-1:705067739613:cluster/test1
+    user: arn:aws:eks:eu-west-1:705067739613:cluster/test1
+  name: arn:aws:eks:eu-west-1:705067739613:cluster/test1
+- context:
+    cluster: arn:aws:eks:us-west-2:705067739613:cluster/oregon
+    user: arn:aws:eks:us-west-2:705067739613:cluster/oregon
+  name: arn:aws:eks:us-west-2:705067739613:cluster/oregon
+- context:
+    cluster: minikube
+    user: minikube
+  name: minikube
+current-context: arn:aws:eks:us-west-2:705067739613:cluster/oregon
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:eu-west-1:705067739613:cluster/test1
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1alpha1
+      args:
+      - token
+      - -i
+      - test1
+      command: aws-iam-authenticator
+      env: null
+- name: arn:aws:eks:us-west-2:705067739613:cluster/oregon
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1alpha1
+      args:
+      - token
+      - -i
+      - oregon
+      command: aws-iam-authenticator
+      env: null
+- name: minikube
+  user:
+    client-certificate: /Users/.../.minikube/client.crt
+    client-key: /Users/.../.minikube/client.key
+----
+
+To switch between Kubernetes contexts, use `kubectl config use-context <context-name>`. For example:
+
+[source,console]
+----
+kubectl config use-context arn:aws:eks:eu-west-1:705067739613:cluster/test1
+----
+
+[#worker-nodes]
+=== Set up Worker Nodes
+
+Launch and configure the worker nodes according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-launch-workers[documentation^].
+Note that it's important to wait for your EKS cluster status to show as ACTIVE before launching worker nodes.
+If you launch your worker nodes before the cluster is active, the worker nodes will fail to register with the cluster and you'll have to relaunch them.
+
+To enable worker nodes to join your cluster, select the CloudFormation stack for your worker nodes, go to the Resources tab and then click on the link in the Physical ID column for Logical ID *NodeInstanceRole*.
+This should then take you to an IAM Management page with the Role ARN displayed.
+Copy this value and replace the _<ARN of instance role (not instance profile)>_ portion of the `aws-auth-cm.yaml` file.
+
+Now it's important to apply the `aws-auth-cm.yaml` file so that the worker nodes can be discovered by the control plane, otherwise the process will hang as there are no nodes to deploy onto.
+
+== Installing the Operator and Couchbase
+
+Once you've properly deployed the Kubernetes cluster with Amazon EKS, you can xref:install-kubernetes.adoc[install the Operator] and use it to xref:deploying-couchbase.adoc[deploy a Couchbase cluster] as normal.
+
+== Configuring XDCR
+
+If you wish to take advantage of XDCR capabilities using the Operator, there are a few extra steps to complete.
+
+=== Create the Peering Connection
+
+Follow the Amazon https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html[documentation^] to create a peering connection between two VPCs in the availability zones of your choosing.
+Bear in mind that each cluster needs to have different CIDR ranges, in the private ranges of 192.168.0.0/16, 172.16.0.0/12, or 10.0.0.0/8 as per RFC 1918.
+
+You will need to then accept the connection request in the region of the _Accepter_ VPC to establish the connection.
+
+=== Configure Route Tables and Security Groups
+
+Once the peering connection is accepted, you must https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html[add a route] to the route tables of each of the VPCs so that they can send and receive traffic across the VPC peering connection.
+To do this, go to *Route Tables* and select the route table associated with the public subnet of one of your VPCs.
+Select *Routes* and then *Edit*. Add the other VPC's CIDR block as the *Destination*, and add the `pcx-` (peering connection) as the *Target*.
+Repeat these steps for the other VPC *Public Subnet*.
+
+Next, find the security groups for the worker node CloudFormation stacks and edit their Inbound Rules.
+
+* Allow TCP traffic from ports 30000 - 32767 from the other cluster's CIDR.
+Do this for both clusters.
+This will allow nodes in each cluster to talk to each other.
+* Allow ICMP from the same cluster's CIDR to be able to ping the other cluster’s nodes to see if it has the desired network setup.
+
+=== Setup XDCR in the Admin Dashboard
+
+The last step is to xref:accessing-couchbase.adoc[access the Couchbase Server Web Console] on each Couchbase cluster to set up and test XDCR.
+An alternative way is to access the Admin Dashboard UI as outlined in the xref:best-practices[Best Practises] section.
+
+Take note of which cluster you are opening the XDCR connection on and its CIDR block.
+Switch to the context of the Accepter EKS cluster and run the following command to find the external IP of a pod of your choice to connect to:
+
+[source,console]
+----
+kubectl get pod -o wide
+----
+
+In this case, it would be 192.168.87.250 and _not_ the value in the IP field:
+
+[source,console]
+----
+NAME                       READY   STATUS    RESTARTS   AGE   IP                NODE
+cb-example-0000    	1/1     Running   0          1d    192.168.84.42     ip-192-168-87-250.us-west-2.compute.internal
+----
+
+Next, run the following command to find the pod’s port that is being mapped to port 8091 (Web Console port):
+
+[source,console]
+----
+kubectl get svc
+----
+[source,console]
+----
+cb-example-0000-exposed-ports   NodePort    10.100.49.245    <none>    11210:31245/TCP,11207:31978/TCP,8091:30247/TCP,18091:30425/TCP,8092:30286/TCP,18092:31408/TCP   22h
+----
+
+Append this port to the external IP of the pod to use for the IP/Hostname field. Based on the above example, you would enter 192.168.87.250:30247 into the IP/Hostname field when adding the remote cluster.
+
+[#best-practices]
+== Best Practices
+
+* To access the Couchbase Admin Dashboard we can expose it as a LoadBalancer as outlined through Exposed Features.
+Alternatively we can simply port-forward port 8091 from a pod to our local machine.
+e.g.
++
+[source,console]
+----
+kubectl port-forward cb-example-0000 8096:8091
+----
+
+* EBS volume type `io1` recommended with the desired IOPS over `gp2` for any Storage Classes.
+The https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html[official AWS user guide^] itself recommends `io1` for “Large database workloads”.
+
+* Using `kubectl exec` is preferred to using SSH on the public IPv4 addresses of the corresponding instances in the EC2 dashboard.
+
+[#known-issues]
+== Known Issues
+
+.Setup error due to absence of default subnets
+You may encounter subnet errors similar to the following when creating the CloudFormation Stack in the first step:
+
+[source,console]
+----
+CREATE_FAILED	AWS::EC2::Subnet	Subnet03	Template error: Fn::Select cannot select nonexistent value at index 2
+----
+
+If this occurs, you will then need to create a default subnet for each availability zone in one of the three EKS-enabled regions you selected.
+These default subnets need to be associated with the default VPC.
+You can create subnets through the Amazon VPC console, however, using the following command is much simpler:
+
+[source,console]
+----
+aws ec2 create-default-subnet --availability-zone <zone_name>
+----
+
+Resources:
+
+* https://forums.aws.amazon.com/thread.jspa?threadID=284810
+* https://stackoverflow.com/a/40658335/3401979
