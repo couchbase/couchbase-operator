@@ -124,10 +124,10 @@ func TestUpgrade(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries120)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -141,7 +141,7 @@ func TestUpgrade(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestUpgradeRollback begins an upgrade then rolls it back to the previous version.
@@ -164,11 +164,11 @@ func TestUpgradeRollback(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point revert.  The cluster will
 	// healthy after rollback has completed.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerVersion), constants.Retries10)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerVersion), constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries120)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -186,7 +186,7 @@ func TestUpgradeRollback(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRollbackFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestUpgradeKillPodOnCreate begins an upgrade then kills a pod to be added to the
@@ -214,11 +214,11 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 120)
-	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 120)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries120)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -236,7 +236,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestUpgradeInvalidUpgrade ensures an upgrade cannot happen across major versions.
@@ -257,8 +257,8 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 
 	// When the cluster is ready, start the upgrade.  Expect the update to be rejected.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	e2eutil.MustNotPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersionIllegalUpgrade))
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersionIllegalUpgrade))
 }
 
 // TestUpgradeInvalidDowngrade ensures you cannot downgrade.
@@ -279,8 +279,8 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 
 	// When the cluster is ready, start the downgrade.  Expect the update to be rejected.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	e2eutil.MustNotPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersionIllegalDowngrade))
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersionIllegalDowngrade))
 }
 
 // TestUpgradeInvalidRollback ensures you cannot rollback to a different version.
@@ -303,10 +303,10 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point try rollabck to an illegal version.
 	// Expect the update to be rejected.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
-	e2eutil.MustNotPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersionIllegalDowngrade))
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersionIllegalDowngrade))
 }
 
 // TestUpgradeSupportable tests that upgrades work for a supportable cluster.
@@ -329,10 +329,10 @@ func TestUpgradeSupportable(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -347,7 +347,7 @@ func TestUpgradeSupportable(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatefulPodOnCreate tests that upgrades work for a supportable cluster
@@ -376,11 +376,11 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
-	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -399,7 +399,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatefulPodOnRebalance tests that upgrades work for a supportable cluster
@@ -428,13 +428,13 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
 	time.Sleep(5 * time.Second)
-	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -453,7 +453,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatelessPodOnCreate tests that upgrades work for a supportable cluster
@@ -482,11 +482,11 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
-	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -505,7 +505,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatelessPodOnRebalance tests that upgrades work for a supportable cluster
@@ -534,13 +534,13 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
 	time.Sleep(5 * time.Second)
-	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -559,5 +559,5 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }

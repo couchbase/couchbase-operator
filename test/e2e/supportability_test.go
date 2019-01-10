@@ -1450,7 +1450,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	// Cleanup cluster after test execution
 	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1509,10 +1509,10 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 		switch podDownMethod {
 		case "deletePod":
 			// Only in DeletePod, FailOver and NewMemberAdd is triggered
-			e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill), 60)
+			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill), 60)
 			expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberToKill)
 
-			e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newMemberIndex), 180)
+			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newMemberIndex), 180)
 			expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newMemberIndex)
 			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 
@@ -1520,7 +1520,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			newMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, newMemberIndex)
 			expectedPvcMap[newMemberName] = 1
 
-			e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill), 300)
+			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill), 300)
 			expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberToKill)
 
 		case "killServerProcess":
@@ -1528,7 +1528,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 		newMemberIndex++
 	}
@@ -1537,7 +1537,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
 // Generic function to kill Cb server pod and update the server class in parallel
@@ -1578,7 +1578,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	// Create Cb cluster
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
 
 	// Add expected kube events for verification
 	expectedEvents := e2eutil.EventValidator{}
@@ -1629,11 +1629,11 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 
 	// Wait for failover of killed server pod
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, podMemberToKill), 90)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, podMemberToKill), 90)
 	expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", podMemberToKill)
 
 	// Wait for rebalance complete event
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", podMemberToKill)
 	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", clusterSize-1)
@@ -1646,7 +1646,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
 // Define log mount for ephemeral pods and validate the logs are preserved
@@ -1721,7 +1721,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1750,7 +1750,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	// Start resizing service config to 2 node service
 	serviceSize := constants.Size2
 	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -1770,7 +1770,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size4
 	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
 	for memberIndex := 7; memberIndex <= 8; memberIndex++ {
@@ -1790,7 +1790,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size1
 	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -1806,7 +1806,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
 // Kill Cb server pod and update the server class in parallel
@@ -1857,7 +1857,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1889,15 +1889,15 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberIdToKill)
 
 		// Wait for failover event
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill), 60)
 		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIdToKill)
 
 		// Wait for new pod add event
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId), 180)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId), 180)
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newPodMemberId)
 
 		// Wait for rebalance complete event
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 		// Add expected events for cluster for verification
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -1913,7 +1913,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
 // Collect logs from ephemeral log PVs
@@ -1957,7 +1957,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1991,15 +1991,15 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberIdToKill)
 
 		// Wait for failover event
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill), 90)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill), 90)
 		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIdToKill)
 
 		// Wait for new pod add event
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId), 180)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId), 180)
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newPodMemberId)
 
 		// Wait for rebalance complete event
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 		// Add expected events for cluster for verification
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -2038,7 +2038,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
 /**************************************
@@ -2076,7 +2076,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	createPodSecurityContext(1000, &clusterSpec)
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
 
 	// Kills operator pod in async way
 	if isOperatorKilledWithServerPod {
@@ -2109,8 +2109,8 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 
 	if len(serverMemberIdToKill) != 0 {
 		// Wait for cluster to be rebalanced before log collection and verification
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceStartedEvent(cbCluster), 300)
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceStartedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 	}
 
 	// Collect logs
@@ -2235,7 +2235,7 @@ func TestLogRedactionVerify(t *testing.T) {
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
 
 	// Collect logs
 	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-collectinfo-redact", "-all", cbCluster.Name}
@@ -2304,7 +2304,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
 
 	// Collect logs
 	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-collectinfo-redact", "-all", cbCluster.Name}
@@ -2361,15 +2361,15 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 	cluster2 := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
 
 	// Ensure cluster 1 is healthy and update the retention period to be 1m.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster1, constants.Retries10)
-	cluster1 = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, constants.Retries10)
+	cluster1 = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), constants.Retries10)
 
 	// Ensure cluster2 is healthy then kill the first stateless pod in cluster 2.  Wait for the recovery to
 	// start and complete.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster2, constants.Retries10)
-	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster2, mdsGroupSize, false)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster2, e2eutil.RebalanceStartedEvent(cluster2), 300)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster2, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster2, constants.Retries10)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster2, mdsGroupSize, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster2, e2eutil.RebalanceStartedEvent(cluster2), 300)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster2, constants.Retries10)
 
 	// We expect that after 3 minutes (1m to flag as orphaned and 1m retention period) the
 	// persistent log volume should still be present.

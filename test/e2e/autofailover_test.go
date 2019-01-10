@@ -82,7 +82,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range podMembersToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill, true)
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
 		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
 
@@ -104,17 +104,17 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	// Event check for new member add
 	for memberIndex := clusterSize; memberIndex < clusterSize+3; memberIndex++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberIndex), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberIndex), 120)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
 
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddParallelEvents(memRemovedParallelEvents)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -126,7 +126,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create 8 node couchbase server with default services over 3 server groups
@@ -226,13 +226,13 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 
 	memDownParallelEvents := e2eutil.EventValidator{}
 	for _, podMemberToKill := range podMembersToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill, true)
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 		memDownParallelEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberToKill)
 	}
 	expectedEvents.AddParallelEvents(memDownParallelEvents)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMembersToKill[0]), 120)
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMembersToKill[0]), 120)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create 9 node couchbase cluster
@@ -264,7 +264,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 	memDownParallelEvents := e2eutil.EventValidator{}
 	memFailoverParallelEvents := e2eutil.EventValidator{}
@@ -273,7 +273,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	podMembersToKill := []int{2, 3, 4}
 	podMembersToKillLen := len(podMembersToKill)
 	for _, podMemberToKill := range podMembersToKill {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podMemberToKill, true)
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 		memDownParallelEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberToKill)
 		memFailoverParallelEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberToKill)
 		memRemoveParallelEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberToKill)
@@ -290,7 +290,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	}
 
 	for memberId := clusterSize; memberId < clusterSize+podMembersToKillLen; memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
 	}
 
@@ -298,8 +298,8 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	expectedEvents.AddParallelEvents(memRemoveParallelEvents)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries60)
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries60)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create multinode couchbase cluster and bucket with replicas
@@ -336,7 +336,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 	// Get pod object for reading container name
 	podName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -389,11 +389,11 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 		t.Fatalf("Failed to delete bucket dir: %v", err)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }

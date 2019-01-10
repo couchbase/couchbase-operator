@@ -37,15 +37,15 @@ func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, cluste
 		}
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIndex)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 120)
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceStartedEvent(cbCluster), 60)
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceStartedEvent(cbCluster), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", nextNodeToBeAdded)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries5)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries5)
 		nextNodeToBeAdded++
 	}
 	return nil
@@ -64,9 +64,9 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 		}
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberIndex)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIndex), 90)
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 180)
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIndex), 90)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 180)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIndex)
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", nextNodeToBeAdded)
@@ -74,7 +74,7 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIndex)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries5)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries5)
 		nextNodeToBeAdded++
 	}
 	return nil
@@ -85,7 +85,7 @@ func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSiz
 	service := 0
 	targetKube := k8s
 	cbCluster = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, cbCluster)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
 	return cbCluster
 }
 
@@ -201,8 +201,8 @@ func XdcrClusterRemoveNode(t *testing.T, cluster1, cluster2 *types.Cluster, targ
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries60); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, xdcr1Kube.KubeClient, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcr2Kube.KubeClient, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, xdcr1Kube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+	ValidateEvents(t, xdcr2Kube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
 }
 
 // Generic test case for creating Xdcr clusters
@@ -266,8 +266,8 @@ func CreateXdcrCluster(t *testing.T, cluster1, cluster2 *types.Cluster) {
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, xdcr1Kube.KubeClient, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcr2Kube.KubeClient, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, xdcr1Kube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+	ValidateEvents(t, xdcr2Kube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
 }
 
 // Generic testcase to run NodeDown test cases on kubeNames given by kubeNameList
@@ -383,8 +383,8 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, cluster1, clust
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, defKube.KubeClient, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube.KubeClient, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
 }
 
 // Generic testcase to run AddNode test cases on kubeNames given by kubeNameList
@@ -487,8 +487,8 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, cluster1, cluste
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, defKube.KubeClient, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube.KubeClient, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
 }
 
 // Generic testcase to kill the XDCR exposed service test cases on kubeNames given by kubeNameList
@@ -582,8 +582,8 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, cluster1, cl
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, defKube.KubeClient, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube.KubeClient, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
 }
 
 // Create XDCR cluster within same k8s cluster
@@ -686,8 +686,8 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 			}
 		}
 	}
-	ValidateEvents(t, defKube.KubeClient, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube.KubeClient, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
 }
 
 // Create two clusters one on k8s using operator
@@ -790,7 +790,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 			if err := e2eutil.VerifyDocCountInBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 200, constants.Retries10); err != nil {
 				t.Fatal(err)
 			}
-		ValidateEvents(t, defKube.KubeClient, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+		ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
 	*/
 }
 

@@ -662,8 +662,8 @@ func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.Couchba
 }
 
 // MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error
-func MustPatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, retries int) *api.CouchbaseCluster {
-	cluster, err := PatchCluster(t, client, cluster, patches, retries)
+func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, retries int) *api.CouchbaseCluster {
+	cluster, err := PatchCluster(t, k8s.CRClient, cluster, patches, retries)
 	if err != nil {
 		Die(t, err)
 	}
@@ -671,8 +671,8 @@ func MustPatchCluster(t *testing.T, client versioned.Interface, cluster *api.Cou
 }
 
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
-func MustNotPatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet) {
-	if _, err := PatchCluster(t, client, cluster, patches, 1); err == nil {
+func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet) {
+	if _, err := PatchCluster(t, k8s.CRClient, cluster, patches, 1); err == nil {
 		Die(t, fmt.Errorf("cluster patch applied unexpectedly"))
 	}
 }
@@ -940,9 +940,9 @@ func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, me
 	return KillMember(kubeCli, cl.Namespace, cl.Name, name, true)
 }
 
-func MustKillPodForMember(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int, removeVolumes bool) {
+func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, memberId int, removeVolumes bool) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
-	if err := KillMember(kubeCli, cl.Namespace, cl.Name, name, removeVolumes); err != nil {
+	if err := KillMember(k8s.KubeClient, cl.Namespace, cl.Name, name, removeVolumes); err != nil {
 		Die(t, err)
 	}
 }
@@ -981,8 +981,8 @@ func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) err
 	return kubeCli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteCouchbaseOperator(t *testing.T, kubeCli kubernetes.Interface, namespace string) {
-	if err := DeleteCouchbaseOperator(kubeCli, namespace); err != nil {
+func MustDeleteCouchbaseOperator(t *testing.T, k8s *types.Cluster, namespace string) {
+	if err := DeleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
 		Die(t, err)
 	}
 }

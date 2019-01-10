@@ -39,7 +39,7 @@ func TestResizeCluster(t *testing.T) {
 	for _, clusterSize := range clusterSizes {
 		service := 0
 		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -55,8 +55,8 @@ func TestResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Test scaling a cluster with no buckets up and down
@@ -83,7 +83,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	for _, clusterSize := range clusterSizes {
 		service := 0
 		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -98,8 +98,8 @@ func TestResizeClusterWithBucket(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests editing of cluster settings
@@ -197,8 +197,8 @@ func TestEditClusterSettings(t *testing.T) {
 	}
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "index service")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 
 }
 
@@ -228,7 +228,7 @@ func TestNegEditClusterSettings(t *testing.T) {
 		t.Fatal("successful update to index storage mode when index service enabled")
 	}
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests if specs with invalid base image will create a cluster (they should not)
@@ -296,7 +296,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	if !correctMsg {
 		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
 }
 
 // Tests if specs with invalid version will create a cluster (they should not)
@@ -363,7 +363,7 @@ func TestInvalidVersion(t *testing.T) {
 	if !correctMsg {
 		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
 }
 
 // 1. create 1 node cluster
@@ -410,7 +410,7 @@ func TestNodeUnschedulable(t *testing.T) {
 
 	// Wait for each member add event
 	for memberId := 1; memberId < clusterSize-1; memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
@@ -428,14 +428,14 @@ func TestNodeUnschedulable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1), 180)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1), 180)
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
 
 	// Wait for cluster balanced condition
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Cluster recovers after node service goes down
@@ -479,7 +479,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 
 	// expect down node to be removed from cluster
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, removePodMemberId), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, removePodMemberId), 300)
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -487,8 +487,8 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// healthy 3 node cluster
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries30)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Node service goes down while scaling down cluster
@@ -553,8 +553,8 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	expectedEvents.AddAnyOfEvents(multipleOutcomeEvents)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, 50)
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 50)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Test that a node is added back when operator is resumed
@@ -610,7 +610,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	}
 
 	// expect an add member event to occur
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), 60)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
 	expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
 
@@ -627,7 +627,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	if numNodes != 2 {
 		t.Fatalf("expected 2 nodes, found: %d", numNodes)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests basic MDS Scaling
@@ -828,8 +828,8 @@ func TestBasicMDSScaling(t *testing.T) {
 		t.Fatalf("failed to remove query service: %v", err)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests swapping nodes between services
@@ -945,7 +945,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	for memeberId := 3; memeberId <= 4; memeberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memeberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memeberId), 120)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memeberId)
 	}
 
@@ -1049,7 +1049,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 6), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 6), 300)
 
 	serviceMap = map[string]int{
 		"Data":  2,
@@ -1061,8 +1061,8 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests creating a cluster without data service
@@ -1138,8 +1138,8 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestRemoveLastDataService(t *testing.T) {
@@ -1202,8 +1202,8 @@ func TestRemoveLastDataService(t *testing.T) {
 		t.Fatalf("failed to remove data service: %v", err)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestManageMultipleClusters(t *testing.T) {
@@ -1368,11 +1368,11 @@ func TestManageMultipleClusters(t *testing.T) {
 
 	expectedEvents3.AddBucketCreateEvent(testCouchbase3, "default3")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1, constants.Retries10)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2, constants.Retries10)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase3, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase1, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase2, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase3, constants.Retries10)
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase1.Name, f.Namespace, expectedEvents1)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase2.Name, f.Namespace, expectedEvents2)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase3.Name, f.Namespace, expectedEvents3)
+	ValidateClusterEvents(t, targetKube, testCouchbase1.Name, f.Namespace, expectedEvents1)
+	ValidateClusterEvents(t, targetKube, testCouchbase2.Name, f.Namespace, expectedEvents2)
+	ValidateClusterEvents(t, targetKube, testCouchbase3.Name, f.Namespace, expectedEvents3)
 }

@@ -90,7 +90,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				t.Fatal(err)
 			}
 
-			ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+			ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 			defer teardown()
 
 			testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name

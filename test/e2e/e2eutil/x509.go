@@ -570,8 +570,8 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 }
 
 // MustInitClusterTLS does the same as InitClusterTLS, dying on failure
-func MustInitClusterTLS(t *testing.T, client kubernetes.Interface, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func()) {
-	ctx, teardown, err := InitClusterTLS(client, namespace, opts)
+func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func()) {
+	ctx, teardown, err := InitClusterTLS(k8s.KubeClient, namespace, opts)
 	if err != nil {
 		Die(t, err)
 	}

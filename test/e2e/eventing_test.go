@@ -108,7 +108,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create eventing enabled couchbase cluster with eventing buckets
@@ -227,7 +227,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -247,7 +247,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 	// Stop the insertion and wait for it to exit, checking for any errors encountered
 	stopDataInsertion <- true
@@ -259,7 +259,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create couchbase cluster with eventing service and required buckets
@@ -348,15 +348,15 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	newMemberToBeAdded := clusterSize
 	for _, memberId := range []int{2, 3, 4} {
-		e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, memberId, true)
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 30)
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, memberId, true)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 30)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", memberId)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", memberId)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberToBeAdded), 150)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberToBeAdded), 150)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", newMemberToBeAdded)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberId)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -371,5 +371,5 @@ func TestEventingKillEventingPods(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }

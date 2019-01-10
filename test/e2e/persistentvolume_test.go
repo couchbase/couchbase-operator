@@ -176,14 +176,14 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		expectedEvents.AddParallelEvents(memberDownEvents)
 		expectedEvents.AddParallelEvents(memberRecoveredEvents)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 600)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 600)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries5)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5)
 	// K8S-537 - Will fail due to Pod recovery event not generated
-	//ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	//ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Generic function to kill pods with operator
@@ -282,12 +282,12 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), totalTimeToRecover+(60*platformTimingMultiplier))
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), totalTimeToRecover+(60*platformTimingMultiplier))
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300*platformTimingMultiplier)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300*platformTimingMultiplier)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Generic proc to create cluster given by server configs passed
@@ -378,10 +378,10 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberIdToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill), autofailoverTimeout+(90*platformTimingMultiplier))
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill), autofailoverTimeout+(90*platformTimingMultiplier))
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberIdToKill)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries5*platformTimingMultiplier)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5*platformTimingMultiplier)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
@@ -417,17 +417,17 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberIdToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 180)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 180)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberIdToKill), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberIdToKill), 300)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 400)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 400)
 
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberIdToKill)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 	e2eutil.DeleteCbCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, testCouchbase)
 }
 
@@ -446,7 +446,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries30)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
@@ -454,7 +454,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 
 	// Check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
@@ -618,7 +618,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create cb cluster with PVC enabled
@@ -690,7 +690,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	expectedEvents.AddMemberDownEvent(testCouchbase, podMemberToKill)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 60)
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
@@ -701,8 +701,8 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 	expectedEvents.AddFailedAddNodeEvent(testCouchbase, clusterSize)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 90)
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 90)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberToKill)
@@ -723,7 +723,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Create PVC enabled couchbase cluster
@@ -846,7 +846,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries30*platformTimingMultiplier)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30*platformTimingMultiplier)
 
 	// Cross check rza deployment matches the expected values
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -857,7 +857,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Create couchbase cluster with Persistent volumes and server groups
@@ -962,7 +962,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries30*platformTimingMultiplier)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30*platformTimingMultiplier)
 
 	// Cross check rza deployment matches the expected values
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -972,7 +972,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Create multiple Persistent volume claim definitions in spec
@@ -1097,7 +1097,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
 		t.Error(err)
 	}
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Create 3 node couchbase cluster initially
@@ -1155,7 +1155,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch clusterSize {
 		case 2:
@@ -1200,6 +1200,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }

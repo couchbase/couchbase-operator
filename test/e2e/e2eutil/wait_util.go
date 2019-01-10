@@ -14,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -249,8 +250,8 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, cluste
 	return nil
 }
 
-func MustWaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, cluster *api.CouchbaseCluster, retries int) {
-	if err := WaitClusterStatusHealthy(t, crClient, cluster, retries); err != nil {
+func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, retries int) {
+	if err := WaitClusterStatusHealthy(t, k8s.CRClient, cluster, retries); err != nil {
 		Die(t, err)
 	}
 }
@@ -464,8 +465,8 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
-func MustWaitForClusterEvent(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, seconds int) {
-	if err := WaitForClusterEvent(kubeClient, cl, event, seconds); err != nil {
+func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, event *v1.Event, seconds int) {
+	if err := WaitForClusterEvent(k8s.KubeClient, cl, event, seconds); err != nil {
 		Die(t, err)
 	}
 }
@@ -586,8 +587,8 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 	}
 }
 
-func MustWaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) {
-	if err := WaitForClusterCondition(t, crClient, conditionType, status, cl, after, wait); err != nil {
+func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, after time.Time, wait int) {
+	if err := WaitForClusterCondition(t, k8s.CRClient, conditionType, status, cl, after, wait); err != nil {
 		Die(t, err)
 	}
 }
@@ -623,8 +624,8 @@ func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType
 	}
 }
 
-func MustWaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType string, statusValue string, cl *api.CouchbaseCluster, wait int) {
-	if err := WaitForClusterStatus(t, crClient, statusType, statusValue, cl, wait); err != nil {
+func MustWaitForClusterStatus(t *testing.T, k8s *types.Cluster, statusType string, statusValue string, cl *api.CouchbaseCluster, wait int) {
+	if err := WaitForClusterStatus(t, k8s.CRClient, statusType, statusValue, cl, wait); err != nil {
 		Die(t, err)
 	}
 }

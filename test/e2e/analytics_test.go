@@ -83,7 +83,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Create analytics enabled couchbase cluster
@@ -218,7 +218,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -234,7 +234,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries120)
 
 	// To stop background data insertion and wait for function to complete
 	stopDataInsertionChan <- true
@@ -250,7 +250,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Deploy analyitcs enabled couchbase cluster and populate data
@@ -394,23 +394,23 @@ func TestAnalyticsKillPods(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), 60)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
 
 		if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, constants.Size1); err != nil {
 			t.Fatalf("Mismatch in unhealthy nodes count: %v", err)
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberId), 40)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberId), 40)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberId)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberIdToBeAdded), 90)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberIdToBeAdded), 90)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", newMemberIdToBeAdded)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberId)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
@@ -431,7 +431,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }
 
 // Deploy analyitcs enabled couchbase cluster over PVC and populate data
@@ -534,7 +534,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		if podMemberId == 0 {
 			continue
 		}
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), 120)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
 	}
 
@@ -543,18 +543,18 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		if podMemberId == 0 {
 			continue
 		}
-		e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId), 60)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
 	}
 
 	// Event checks for rebalance to start and complete successfully
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 60)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries5)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5)
 
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, 0, 0}
@@ -563,5 +563,5 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ValidateEvents(t, targetKube.KubeClient, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }

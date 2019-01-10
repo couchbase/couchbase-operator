@@ -24,7 +24,7 @@ func TestTlsCreateCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
@@ -36,9 +36,9 @@ func TestTlsCreateCluster(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests scenario where a third node is being added to a cluster, and a separate
@@ -52,7 +52,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 
 	podToKillMemberId := 1
@@ -68,14 +68,14 @@ func TestTlsKillClusterNode(t *testing.T) {
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube.CRClient, testCouchbase)
 
 	// wait for add member event
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 300)
 
 	for nodeIndex := 1; nodeIndex < constants.Size3; nodeIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
 	}
 
 	// kill pod 1
-	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId, true)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podToKillMemberId, true)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
@@ -85,8 +85,8 @@ func TestTlsKillClusterNode(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// cluster should also be balanced
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries20)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Create Couchbase cluster using certificates
@@ -99,7 +99,7 @@ func TestTlsResizeCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 
 	t.Logf("Creating New Couchbase Cluster...\n")
@@ -116,7 +116,7 @@ func TestTlsResizeCluster(t *testing.T) {
 		service := 0
 		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -132,8 +132,8 @@ func TestTlsResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Remove Operator certificate after cluster deployment
@@ -147,7 +147,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 
 	podToKillMemberId := 1
@@ -176,9 +176,9 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	t.Log("Couchbase operator certificate deleted")
 
 	// kill pod 1
-	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId, true)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podToKillMemberId, true)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
 
 	// Recreating the operator certificate with old data
@@ -188,22 +188,22 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podToKillMemberId), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podToKillMemberId), 30)
 	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podToKillMemberId), 40)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podToKillMemberId), 40)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 120)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates
@@ -217,7 +217,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 
 	// create 3 node cluster
@@ -245,7 +245,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size5, targetKube.CRClient, testCouchbase)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
@@ -258,11 +258,11 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates
@@ -275,7 +275,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 
 	podToKillMemberId := 1
@@ -303,9 +303,9 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	t.Log("Couchbase Cluster certificate deleted")
 
 	// kill pod 1
-	e2eutil.MustKillPodForMember(t, targetKube.KubeClient, testCouchbase, podToKillMemberId, true)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podToKillMemberId, true)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
 
 	// Recreate the cluster certificate with old data
@@ -315,7 +315,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 360)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 360)
 
 	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
@@ -325,9 +325,9 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates
@@ -339,7 +339,7 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 
 	// create 3 node cluster
@@ -358,10 +358,10 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	}
 	t.Log("Couchbase Cluster certificate deleted")
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy cluster using invalid DNS name value in the certificate
@@ -378,7 +378,7 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 			"*.test-couchbase-invalid-name." + f.Namespace + ".svc",
 		},
 	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, opts)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, opts)
 	defer teardown()
 
 	// Actual Test case function
@@ -400,7 +400,7 @@ func TestTlsCertificateExpiry(t *testing.T) {
 	opts := &e2eutil.TlsOpts{
 		ValidTo: &validTo,
 	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, opts)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, opts)
 	defer teardown()
 
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
@@ -423,10 +423,10 @@ func TestTlsCertificateExpiry(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
 
-	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Deploy a couchbase cluster using a expired TLS certificate
@@ -445,7 +445,7 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 		ValidFrom: &validFrom,
 		ValidTo:   &validTo,
 	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, opts)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, opts)
 	defer teardown()
 
 	// Actual Test case function
@@ -465,7 +465,7 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	opts := &e2eutil.TlsOpts{
 		ValidFrom: &validFrom,
 	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, opts)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, opts)
 	defer teardown()
 
 	e2eutil.MustNotNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
@@ -484,7 +484,7 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 	opts := &e2eutil.TlsOpts{
 		CaCertType: &caCertType,
 	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, opts)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, opts)
 	defer teardown()
 
 	// Create cluster
@@ -504,7 +504,7 @@ func TestTlsGenerateWrongCertType(t *testing.T) {
 	opts := &e2eutil.TlsOpts{
 		ClusterCertType: &clusterCertType,
 	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube.KubeClient, f.Namespace, opts)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, opts)
 	defer teardown()
 
 	e2eutil.MustNotNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
@@ -521,14 +521,14 @@ func TestTLSRotate(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the old certificate for a new one and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificate(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
@@ -539,7 +539,7 @@ func TestTLSRotate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestTLSRotateChain tests a certificate can be reissued by a CA with a new sub-CA.
@@ -553,14 +553,14 @@ func TestTLSRotateChain(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the old certificate for a new chain and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificateChain(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
@@ -571,7 +571,7 @@ func TestTLSRotateChain(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestTLSRotateCA tests a certificate and CA can be reissued.
@@ -585,14 +585,14 @@ func TestTLSRotateCA(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the all certificates for new ones and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
@@ -603,7 +603,7 @@ func TestTLSRotateCA(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestTLSRotateCAAndScale tests the operator can talk to a cluster after
@@ -618,15 +618,15 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 	clusterScaleUpSize := 1
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the all certificates for a new ones and verify,
 	// then make sure the operator can scale the cluster (e.g. talk to it with the new CA)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 	e2eutil.MustResizeCluster(t, 0, clusterSize+clusterScaleUpSize, kubernetes.CRClient, cluster)
 
@@ -640,7 +640,7 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(clusterScaleUpSize),
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestTLSRotateCAAndKillOperator tests a certificate and CA can be reissued while
@@ -655,15 +655,15 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, restart the operator and swap out the all certificates for new ones and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes.KubeClient, cluster.Namespace)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes, cluster.Namespace)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
@@ -674,7 +674,7 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestTLSRotateCAKillPodAndKillOperator tests a certificate and CA can be reissued while
@@ -690,7 +690,7 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 	cluster := e2eutil.MustNewSupportableTLSCluster(t, kubernetes, f.Namespace, mdsGroupSize, ctx)
 
@@ -698,13 +698,13 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is ready, kill a stateful pod,  restart the operator and swap out the all certificates for new ones and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes.KubeClient, cluster.Namespace)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes, cluster.Namespace)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 300)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries20)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 300)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries20)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
@@ -724,7 +724,7 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // TestTLSRotateInvalid tests the operator raises a TLSInvalid event when a certificate
@@ -738,15 +738,15 @@ func TestTLSRotateInvalid(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the server certificate for a new one from a new CA.
 	// Expect the operator to raise an event to alert that TLS has been misconfigured.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	e2eutil.MustRotateServerCertificateWrongCA(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.TLSInvalidEvent(cluster), 300)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSInvalidEvent(cluster), 300)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -756,5 +756,5 @@ func TestTLSRotateInvalid(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
 	}
 
-	ValidateEvents(t, kubernetes.KubeClient, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }

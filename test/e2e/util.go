@@ -10,6 +10,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -226,8 +227,8 @@ var (
 	}
 )
 
-func ValidateEvents(t *testing.T, kubeClient kubernetes.Interface, namespace, cbClusterName string, events e2eutil.EventValidator) {
-	clusterEvents, err := e2eutil.GetCouchbaseEvents(kubeClient, cbClusterName, namespace)
+func ValidateEvents(t *testing.T, k8s *types.Cluster, namespace, cbClusterName string, events e2eutil.EventValidator) {
+	clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, cbClusterName, namespace)
 	if err != nil {
 		t.Error(err)
 		return
@@ -239,8 +240,8 @@ func ValidateEvents(t *testing.T, kubeClient kubernetes.Interface, namespace, cb
 	}
 }
 
-func ValidateClusterEvents(t *testing.T, kubeClient kubernetes.Interface, clusterName, namespace string, expectedEvents e2eutil.EventList) {
-	events, err := e2eutil.GetCouchbaseEvents(kubeClient, clusterName, namespace)
+func ValidateClusterEvents(t *testing.T, k8s *types.Cluster, clusterName, namespace string, expectedEvents e2eutil.EventList) {
+	events, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, clusterName, namespace)
 	if err != nil {
 		t.Fatalf("failed to get coucbase cluster events: %v", err)
 	}
