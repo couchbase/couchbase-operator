@@ -157,7 +157,7 @@ tcGroups:
 
   - name: UpgradeTests
     clusters:
-      - BasicCluster
+      - NewCluster1
     testcases:
       - name: TestUpgradeInvalidDowngrade
       - name: TestUpgradeInvalidUpgrade

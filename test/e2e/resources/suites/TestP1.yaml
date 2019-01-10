@@ -149,7 +149,7 @@ tcGroups:
 
   - name: UpgradeTests
     clusters:
-      - BasicCluster
+      - NewCluster1
     testcases:
       - name: TestUpgradeSupportableKillStatelessPodOnCreate
       - name: TestUpgradeSupportableKillStatelessPodOnRebalance
