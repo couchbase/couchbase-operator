@@ -10,8 +10,3 @@ tcGroups:
       #- name: TestPersistentVolumeKillPodAndOperator
       #- name: TestPersistentVolumeKillAllPodsAndOperator
       - name: TestPersistentVolumeRzaNodesKilled
-        decorators:
-          - rzaNodeLabeller
-
-
-
