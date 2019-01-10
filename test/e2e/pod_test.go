@@ -276,7 +276,8 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube.KubeClient, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, memberId), 300)
+
 	t.Logf("Failed to add extra cluster node: %v", err)
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, memberId)
 	ValidateClusterEvents(t, targetKube.KubeClient, testCouchbase.Name, f.Namespace, expectedEvents)
