@@ -7,6 +7,9 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	"github.com/sirupsen/logrus"
+
+	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 func init() {
