@@ -84,7 +84,7 @@ To proceed with an upgrade, simply run the `upgrade` command with the desirable 
 
 [source,console]
 ----
- az aks upgrade -g myResourceGroup -n myAKSCluster --kubernetes-version 1.11.4
+ az aks upgrade -g myResourceGroup -n myAKSCluster --kubernetes-version 1.11.5
 ----
 
 
@@ -92,7 +92,8 @@ To proceed with an upgrade, simply run the `upgrade` command with the desirable 
 == Best Practices
 
 *Disk limits:* AKS nodes have a maximum disk limit.  This will restrict the number of Persistent volumes that can be created within a cluster.  The limits apply on a per-node bases.  For example,an AKS cluster with 4 nodes (E4sv3) can support 32 Volumes.
-image::https://gist.githubusercontent.com/tahmmee/81128ecc553e4e22929fc1644eefe42e/raw/fb980d19ece83237878e8de5e90025715f4b6266/AKS_MaxDisks.png[AKSMaxDisks,640,480]
+
+image:https://gist.githubusercontent.com/tahmmee/81128ecc553e4e22929fc1644eefe42e/raw/fb980d19ece83237878e8de5e90025715f4b6266/AKS_MaxDisks.png[AKSMaxDisks,640,480]
 
 *Single disk per Pod:* Given the slow mount time it’s best to limit each Pod to 1 disk (excluding the default disk).   For example, a separate server classes should be created for data, index, and analytics pods.
 
