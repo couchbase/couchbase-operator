@@ -506,18 +506,29 @@ func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) err
 			}
 
 			// Extract the CA's PEM data
-			pem, ok := secret.Data[tlsOperatorSecretCACert]
+			ca, ok := secret.Data[tlsOperatorSecretCACert]
 			if !ok {
 				return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCACert)
 			}
 
+			// Upgrade to a TLS connection.  Do these first few calls unverified as we haven't installed
+			// the server cert that corresponds with the cluster CA in the client yet.
+			m.SecureClient = true
+			tls := c.client.GetTLS()
+			c.client.SetTLS(&cbmgr.TLSAuth{CACert: ca, Insecure: true})
+			defer c.client.SetTLS(tls)
+
 			// Update Couchbase's TLS configuration
-			if err := c.client.UploadClusterCACert(m, pem); err != nil {
+			if err := c.client.UploadClusterCACert(m, ca); err != nil {
 				return err
 			}
 			if err := c.client.ReloadNodeCert(m); err != nil {
 				return err
 			}
+
+			// Enable TLS verification now the certs are installed for the benefit of the the
+			// TLS verification test.
+			c.client.SetTLS(tls)
 
 			// TODO: Not available until >=5.5.0, even then does authz which we don't want :(
 			//settings := &cbmgr.ClientCertAuth{
@@ -527,13 +538,10 @@ func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) err
 			//	return err
 			//}
 
-			// Indicate that comms with this member are now encrypted
-			m.SecureClient = true
-
 			// Wait for the port to come backup with the correct certificate chain
 			ctx, cancel := context.WithTimeout(c.ctx, 60*time.Second)
 			defer cancel()
-			if err := netutil.WaitForHostPortTLS(ctx, m.HostURL(), pem); err != nil {
+			if err := netutil.WaitForHostPortTLS(ctx, m.HostURL(), ca); err != nil {
 				return err
 			}
 		}
