@@ -29,8 +29,10 @@ type Framework struct {
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
 	TestClusters []string
-	//S3Cli         *s3.S3
-	//S3Bucket      string
+	// CouchbaseServerVersion is the version of Couchbase server we are running with
+	CouchbaseServerVersion string
+	// CouchbaseServerUpgradeVersion is the version of Couchbase server we are upgrading to
+	CouchbaseServerUpgradeVersion string
 }
 
 // To decode cluster yaml file
@@ -69,6 +71,7 @@ type TestRunParam struct {
 	AdmissionControllerImage string `yaml:"admission-controller-image"`
 	CbServerBaseImage        string `yaml:"cbServerBaseImage"`
 	CbServerImgVer           string `yaml:"cbServerImageVersion"`
+	CbServerImgVerUpgrade    string `yaml:"cbServerImageVersionUpgrade"`
 	SuiteToRun               string `yaml:"suite"`
 	DeploymentSpec           string `yaml:"deployment-spec"`
 

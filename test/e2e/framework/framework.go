@@ -166,16 +166,18 @@ func Setup(t *testing.T) (err error) {
 
 	// Initialize Global from runtime info
 	Global = &Framework{
-		Namespace:       runtimeParams.Namespace,
-		KubeType:        runtimeParams.KubeType,
-		KubeVersion:     runtimeParams.KubeVersion,
-		OpImage:         runtimeParams.OperatorImage,
-		SkipTeardown:    runtimeParams.SkipTearDown,
-		CollectLogs:     runtimeParams.CollectLogsOnFailure,
-		SuiteYmlData:    suiteData,
-		ClusterConfFile: runtimeParams.ClusterConfFile,
-		PlatformType:    runtimeParams.PlatformType,
-		ClusterSpec:     types.ClusterMap{},
+		Namespace:                     runtimeParams.Namespace,
+		KubeType:                      runtimeParams.KubeType,
+		KubeVersion:                   runtimeParams.KubeVersion,
+		OpImage:                       runtimeParams.OperatorImage,
+		SkipTeardown:                  runtimeParams.SkipTearDown,
+		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
+		SuiteYmlData:                  suiteData,
+		ClusterConfFile:               runtimeParams.ClusterConfFile,
+		PlatformType:                  runtimeParams.PlatformType,
+		ClusterSpec:                   types.ClusterMap{},
+		CouchbaseServerVersion:        runtimeParams.CbServerImgVer,
+		CouchbaseServerUpgradeVersion: runtimeParams.CbServerImgVerUpgrade,
 	}
 
 	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, constants.OperatorRestPort)

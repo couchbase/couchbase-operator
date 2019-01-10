@@ -10,26 +10,54 @@
 operator-image: couchbase/couchbase-operator:v1
 admission-controller-image: couchbase/couchbase-operator-admission:v1
 
-namespace: default                               # Cluster namespace to run the tests
-deployment-spec: ../../example/deployment.yaml   # Deployment yaml file path
-cluster-config: resources/cluster_conf.yaml      # cluster config file path
+# Cluster namespace to run the tests
+namespace: default
 
-kube-config:  # List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
+# Deployment yaml file path
+deployment-spec: ../../example/deployment.yaml
+
+# cluster config file path
+cluster-config: resources/cluster_conf.yaml
+
+# List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
+kube-config:
   #- name: Cluster1
   #  config: ~/.kube/config
   #- name: Cluster2
   #  config: ~/.kube/config_new
-collectLogsOnFailure: false   # Collect cluster logs when test case fails using cbopinfo tool
-pullDockerImages: false       # If true, operator and server images will be pulled to all k8s nodes
-skip-tear-down: true          # Leaves the operator running after tests
 
-suite: TestNone                         # Test suite to run. Same named yaml file should exists in resources/suites path
-cbServerBaseImage: couchbase/server     # Couchbase server docker image to use
-cbServerImageVersion: enterprise-5.5.0  # Couchbase server image docker version to use
+# Collect cluster logs when test case fails using cbopinfo tool
+collectLogsOnFailure: false
 
-kube-type: kubernetes       # Cluster type kubernetes | aws-openshift
-kube-version: 1.10.5-0      # KUBE version to install
-StorageClassName: standard  # Storage class defined in cluster to use for PV cases
+# If true, operator and server images will be pulled to all k8s nodes
+pullDockerImages: false
 
-serviceAccountName: default  # Service account to use while running Tests
-platformType: custom         # custom, azure
+# Leaves the operator running after tests
+skip-tear-down: true
+
+# Test suite to run. Same named yaml file should exists in resources/suites path
+suite: TestNone
+
+# Couchbase server docker image to use
+cbServerBaseImage: couchbase/server
+
+# Couchbase server image docker version to use
+cbServerImageVersion: enterprise-5.5.0
+
+# Couchbase server version to upgrade to
+cbServerImageVersionUpgrade: enterprise-6.0.0
+
+# Cluster type kubernetes | aws-openshift
+kube-type: kubernetes
+
+# KUBE version to install
+kube-version: 1.10.5-0
+
+# Storage class defined in cluster to use for PV cases
+StorageClassName: standard
+
+# Service account to use while running Tests
+serviceAccountName: default
+
+# custom, azure
+platformType: custom

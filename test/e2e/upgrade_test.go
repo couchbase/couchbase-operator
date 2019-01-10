@@ -18,10 +18,6 @@ import (
 )
 
 const (
-	// This is the required initial server version
-	sourceVersion = "enterprise-5.5.0"
-	// This is the required target server version
-	targetVersion = "enterprise-5.5.2"
 	// This is an illegal target version
 	targetVersionIllegalUpgrade = "enterprise-10.0.0"
 	// This is an illegal target version
@@ -115,19 +111,21 @@ func TestUpgrade(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
 
@@ -152,22 +150,24 @@ func TestUpgradeRollback(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point revert.  The cluster will
 	// healthy after rollback has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", sourceVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerVersion), constants.Retries10)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
 
 	// Check the events match what we expect:
@@ -196,6 +196,11 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	clusterSize := constants.Size3
 	victimCycle := 1
@@ -203,9 +208,6 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -213,7 +215,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 120)
 	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
@@ -243,14 +245,16 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// When the cluster is ready, start the upgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
@@ -263,14 +267,16 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// When the cluster is ready, start the downgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
@@ -283,20 +289,22 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point try rollabck to an illegal version.
 	// Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
 	e2eutil.MustNotPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersionIllegalDowngrade))
 }
@@ -307,20 +315,22 @@ func TestUpgradeSupportable(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
 
@@ -347,6 +357,11 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
@@ -355,9 +370,6 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -365,7 +377,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
 	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
@@ -397,6 +409,11 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
@@ -405,9 +422,6 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -415,7 +429,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
 	time.Sleep(5 * time.Second)
@@ -449,6 +463,11 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
@@ -457,9 +476,6 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -467,7 +483,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
 	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
@@ -499,6 +515,11 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
+	// Skip if not correctly configured
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
@@ -507,9 +528,6 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
-	if cluster.Spec.Version != sourceVersion {
-		t.Skip("Skipping test as version is not as expected")
-	}
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -517,7 +535,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", targetVersion), constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
 	time.Sleep(5 * time.Second)
