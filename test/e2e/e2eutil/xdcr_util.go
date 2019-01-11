@@ -5,9 +5,18 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
+
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type cbClusterInfo struct {
@@ -137,20 +146,31 @@ func GetRemoteUuid(hostUrl, cbUsername, cbPassword string) (uuid string, err err
 	return
 }
 
-func CreateDestClusterReference(hostUrl, hostUsername, hostPassword, destClusterUuid, destClusterName, destClusterHostUrl, destClusterUsername, destClusterPassword string) ([]byte, error) {
-	// curl -v -u Administrator:password http://192.168.99.100:32589/pools/default/remoteClusters -d 'uuid=08c5dc4ff21fdcda30ca5b1281f9fc0f'
-	// -d 'name=test-couchbase-zcrxp' -d 'hostname=192.168.99.100:31943' -d 'username=Administrator' -d 'password=password'
-	hostUrl = "http://" + hostUrl + "/pools/default/remoteClusters"
-	destClusterUuid = "uuid=" + destClusterUuid
-	destClusterName = "name=" + destClusterName
-	destClusterHostUrl = "hostname=" + destClusterHostUrl
-	destClusterUsername = "username=" + destClusterUsername
-	destClusterPassword = "password=" + destClusterPassword
+// CreateDestClusterReference polls the destination cluster to discover the node port of a pod and uses that to
+// initialize connection on the source cluster.
+func CreateDestClusterReference(t *testing.T, host string, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, username, password string) {
+	// List the pods on the remote cluster and pick one
+	selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster.Name)).String()
+	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pods.Items) == 0 {
+		t.Fatal("no pods listed")
+	}
+	pod := pods.Items[0]
 
-	reqParamList := []string{destClusterUuid, destClusterName, destClusterHostUrl, destClusterUsername, destClusterPassword}
-	reqParams := strings.NewReader(strings.Join(reqParamList, "&"))
+	// Make the request
+	values := url.Values{}
+	values.Add("uuid", cluster.Status.ClusterID)
+	values.Add("name", cluster.Name)
+	values.Add("hostname", pod.Status.HostIP+":"+strconv.Itoa(int(cluster.Status.ExposedPorts[pod.Name].AdminServicePort)))
+	values.Add("username", username)
+	values.Add("password", password)
 
-	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, reqParams)
+	if _, err := GenerateHttpRequest("POST", "http://"+host+"/pools/default/remoteClusters", username, password, strings.NewReader(values.Encode())); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func GetXdcrClusterReferences(hostUrl, hostUsername, hostPassword string) (xdcrClusterRefList []xdcrRemoteClusterReference, err error) {
