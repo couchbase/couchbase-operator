@@ -255,7 +255,7 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 		}
 		return !status.NeedsRebalance, nil
 	}
-	if err := retryutil.Retry(c.ctx, time.Second, 10, retryFunc); err != nil {
+	if err := retryutil.Retry(c.ctx, time.Second, 10, retryFunc); err != nil && !retryutil.IsRetryFailure(err) {
 		return err
 	}
 
