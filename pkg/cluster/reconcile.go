@@ -244,9 +244,18 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 		return err
 	}
 
-	// Error checking...
-	status, err := c.client.GetClusterStatus(c.members)
-	if err != nil {
+	// Error checking... perfom this a few times as there is a race between when
+	// we check and when Server reports rebalance is complete.
+	var status *couchbaseutil.ClusterStatus
+	retryFunc := func() (bool, error) {
+		var err error
+		status, err = c.client.GetClusterStatus(c.members)
+		if err != nil {
+			return false, err
+		}
+		return !status.NeedsRebalance, nil
+	}
+	if err := retryutil.Retry(c.ctx, time.Second, 10, retryFunc); err != nil {
 		return err
 	}
 
