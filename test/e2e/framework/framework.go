@@ -312,7 +312,9 @@ func cleanUpNamespace() (err error) {
 		// Remove secrets
 		if targetKube.DefaultSecret != nil {
 			if err := e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, targetKube.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
-				return errors.New("Unable to delete the default secret: " + err.Error())
+				if !k8sutil.IsKubernetesResourceNotFoundError(err) {
+					return errors.New("Unable to delete the default secret: " + err.Error())
+				}
 			}
 		}
 		e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
@@ -554,7 +556,12 @@ func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace s
 	deletePropagation := metav1.DeletePropagationForeground
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
-	return kubeClient.ExtensionsV1beta1().Deployments(namespace).Delete(deploymentName, deleteOpts)
+	if err := kubeClient.ExtensionsV1beta1().Deployments(namespace).Delete(deploymentName, deleteOpts); err != nil {
+		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (f *Framework) PodClient(kubeName string) typedv1.PodInterface {
