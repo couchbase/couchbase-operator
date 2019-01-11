@@ -69,7 +69,7 @@ tcGroups:
       - name: TestLogRedactionVerify
 
   - name: CouchbaseServerServiceTests
-    cluster:
+    clusters:
       - BasicCluster
     testcases:
       - name: TestAnalyticsCreateDataSet
