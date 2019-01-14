@@ -145,6 +145,8 @@ func GetDeployedRzaPodMap(kubeClient kubernetes.Interface, namespace string) (ma
 }
 
 // Returns the array of available server groups for the particular cluster given by k8sNodesData
+// TODO: depreciate this when cluster provisioning is fully decoupled from framework,
+//       since we'll rely fully on .kube/config to tell us what nodes we have.
 func GetAvailableServerGroupsFromYmlData(k8sNodesData framework.ClusterInfo) []string {
 	serverGroups := []string{}
 	for _, node := range k8sNodesData.MasterNodeList {

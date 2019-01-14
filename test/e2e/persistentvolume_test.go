@@ -769,13 +769,9 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	clusterSize := 9
 	pvcName := "couchbase"
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{f.TestClusters[0]})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 2, true)
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -891,13 +887,9 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	clusterSize := 9
 	pvcName := "couchbase"
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{f.TestClusters[0]})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
 
 	// Create cluster spec for RZA feature
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 2, true)
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
