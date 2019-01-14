@@ -370,6 +370,7 @@ func CreateKubeClusterObject(kubeConfPath, context string) (*types.Cluster, erro
 		CRClient:     client.MustNew(config),
 		KubeClient:   kubernetes.NewForConfigOrDie(config),
 		KubeConfPath: kubeConfPath,
+		Context:      context,
 	}, nil
 }
 

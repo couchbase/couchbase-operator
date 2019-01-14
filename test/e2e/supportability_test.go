@@ -507,20 +507,59 @@ func createClusterRoles(kubeClient kubernetes.Interface, roleName string) error 
 	return err
 }
 
+// argumentList represents parameters to cbopinfo.  They are modelled as a
+// map to support keys and values (an empty value is ignored) and to allow
+// simple overriding (uniqueness).
+type argumentList map[string]string
+
+// slice returns the flattened argumentList with empty values removed.
+func (a argumentList) slice() []string {
+	args := []string{}
+	for k, v := range a {
+		args = append(args, k)
+		if v != "" {
+			args = append(args, v)
+		}
+	}
+	return args
+}
+
+// add adds a new key and value to the argument list.
+func (a argumentList) add(k, v string) {
+	a[k] = v
+}
+
+// addClusterDefaults adds in configuration specific default arguments that must
+// be used for a successful run.
+func (a argumentList) addClusterDefaults(k8s *types.Cluster) {
+	a.add("--kubeconfig", k8s.KubeConfPath)
+	a.add("--namespace", framework.Global.Namespace)
+	if k8s.Context != "" {
+		a.add("--context", k8s.Context)
+	}
+}
+
+// addEnvironmentDefaults adds in configuration specific default arguments for deployments
+// that should be used for a successful run.
+func (a argumentList) addEnvironmentDefaults() {
+	a.add("--operator-image", framework.Global.OpImage)
+}
+
 // Run cbopinfo command with all valid arguments
 // and validate the exit status of the commands
 func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
+	context := targetKube.Context
 	t.Logf("KubeConfPath: %+v", kubeConfPath)
-	errMsgList := failureList{}
+	t.Logf("Context: %v", context)
 	operatorRestPort := strconv.Itoa(int(constants.OperatorRestPort))
 
 	// Validate args which won't produce output file
 	for _, arg := range []string{"-help", "-version"} {
 		if _, err := runCbopinfoCmd([]string{arg}); err != nil {
-			errMsgList.AppendFailure("Failed while providing arg "+arg, err)
+			t.Fatalf("Failed while providing arg %s: %v", arg, err)
 		}
 	}
 
@@ -567,23 +606,15 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 	for _, arg := range validArgumentList {
 		t.Run(arg.Name, func(t *testing.T) {
-			cmdArgs := []string{}
+			args := argumentList{}
+			args.addClusterDefaults(targetKube)
+			args.add(arg.Arg, arg.ArgValue)
 
-			// If arg is '-namespace', verify with namespace arg only
-			if arg.Arg == "-namespace" {
-				cmdArgs = []string{"-kubeconfig", kubeConfPath, arg.Arg}
-			} else {
-				cmdArgs = []string{"-namespace", f.Namespace, "-kubeconfig", kubeConfPath, arg.Arg}
-			}
-			if arg.ArgValue != "" {
-				cmdArgs = append(cmdArgs, arg.ArgValue)
-			}
-
-			execOut, err := runCbopinfoCmd(cmdArgs)
+			execOut, err := runCbopinfoCmd(args.slice())
 			execOutStr := strings.TrimSpace(string(execOut))
 			t.Logf("Returned: %s\n", execOutStr)
 			if err != nil {
-				errMsgList.AppendFailure("Failed while providing arg "+arg.Arg, err)
+				t.Fatalf("Failed while providing arg %s: %v", arg.Arg, err)
 			}
 			logFileName := getLogFileNameFromExecOutput(execOutStr)
 			defer os.Remove(logFileName)
@@ -591,33 +622,32 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			logFileDir := strings.Split(logFileName, ".")[0]
 			defer os.RemoveAll(logFileDir)
 			if err := untarGzFile(logFileName); err != nil {
-				errMsgList.AppendFailure("Failed to untar file ", err)
+				t.Fatalf("Failed to untar file %s: %v", logFileName, err)
 			}
 
 			// Check command fails with missing argument value
 			if arg.ArgValue != "" {
-				cmdArgs := []string{arg.Arg}
-				execOut, err := runCbopinfoCmd(cmdArgs)
+				args := argumentList{}
+				args.add(arg.Arg, "")
+				execOut, err := runCbopinfoCmd(args.slice())
 				execOutStr := strings.TrimSpace(string(execOut))
 				t.Logf("Returned: %s\n", execOutStr)
 				if err == nil {
-					errMsgList.AppendFailure("Command executed successfully without providing value for "+arg.Arg, nil)
+					t.Fatalf("Command executed successfully without providing value for %s: %v", arg.Arg, err)
 				}
 
 				// Verify valid error message
 				if !strings.Contains(execOutStr, arg.ExpectedErr) {
-					errMsgList.AppendFailure("Invalid error for missing arg value "+arg.Arg+", \nExpected: "+arg.ExpectedErr+"\nReceived: "+execOutStr, nil)
+					t.Fatalf("Invalid error for missing arg value %s\nExpected: %v\nReceived: %v", arg.Arg, arg.ExpectedErr, execOutStr)
 				}
 
 				// Check no output file is generated
 				if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
-					errMsgList.AppendFailure("File created with missing argument for "+arg.Arg, nil)
-					os.Remove(logFileName)
+					t.Fatalf("File created with missing argument for %s", arg.Arg)
 				}
 			}
 		})
 	}
-	errMsgList.CheckFailures(t)
 }
 
 // Negative test scenarios with command argument
@@ -720,7 +750,6 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		}
 	}
 
-	kubeConfPath := targetKube.KubeConfPath
 	isAllFlagSet := false
 
 	/////////////////////////////////////////////////////
@@ -729,7 +758,10 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs from single cluster")
 	reqFileList := []string{}
 	errMsgList := failureList{}
-	commonArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	commonArgs := args.slice()
 	cmdArgs := append(commonArgs, cluster1.Name)
 	execOut, err := runCbopinfoCmd(cmdArgs)
 	execOutStr := strings.TrimSpace(string(execOut))
@@ -1037,8 +1069,10 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	t.Log(string(execOut))
 
 	// Collect logs
-	cmdArgs = []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, cluster1.Name}
-	execOut, err = runCbopinfoCmd(cmdArgs)
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	execOut, err = runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Log(execOutStr)
 	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":rbac-test\" cannot list couchbaseclusters.couchbase.com in the namespace \"" + f.Namespace + "\""
@@ -1167,17 +1201,14 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, opImageNam
 func TestExtendedDebugWithDefaultValues(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	kubeConfPath := targetKube.KubeConfPath
 	defPort := constants.OperatorRestPort
-	cmdArgs := []string{
-		"-operator-image", f.OpImage,
-		"-kubeconfig", kubeConfPath,
-		"-namespace", f.Namespace,
-		"-collectinfo",
-		"-collectinfo-collect", "all",
-		"-all",
-	}
-	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, defPort, defPort, cmdArgs)
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--collectinfo", "")
+	args.add("--collectinfo-collect", "all")
+	args.add("--all", "")
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, defPort, defPort, args.slice())
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
@@ -1185,7 +1216,6 @@ func TestExtendedDebugWithDefaultValues(t *testing.T) {
 func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	kubeConfPath := targetKube.KubeConfPath
 	var defPort int32
 	var testPort int32
 	testPort = 32123
@@ -1195,16 +1225,14 @@ func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 			defPort = temPort.ContainerPort
 		}
 	}
-	cmdArgs := []string{
-		"-operator-image", f.OpImage,
-		"-operator-rest-port", strconv.Itoa(int(testPort)),
-		"-kubeconfig", kubeConfPath,
-		"-namespace", f.Namespace,
-		"-collectinfo",
-		"-collectinfo-collect", "all",
-		"-all",
-	}
-	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, defPort, cmdArgs)
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--operator-rest-port", strconv.Itoa(int(testPort)))
+	args.add("--collectinfo", "")
+	args.add("--collectinfo-collect", "all")
+	args.add("--all", "")
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, defPort, args.slice())
 }
 
 // Collect cbopinfo with '--operator-image' & '-operator-rest-port'
@@ -1215,7 +1243,6 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	invalidImgName := "couchbase/couchbase-operator:invalidversion"
 	invalidPortVal := "32080"
 	clusterSize := constants.Size1
-	kubeConfPath := targetKube.KubeConfPath
 	cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
@@ -1223,9 +1250,12 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 
 	// Collect logs with invalid operator-image-name
 	t.Log("Collecting logs using invalid -operator-image arg value")
-	cmdArgs := []string{"-operator-image", invalidImgName, "-operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.add("--operator-image", invalidImgName)
+	args.add("--operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)))
 
-	execOut, err := runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
+	execOut, err := runCbopinfoCmd(append(args.slice(), cbCluster.Name))
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
@@ -1258,9 +1288,12 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 
 	// Collect logs with invalid operator-rest-port
 	t.Log("Collecting logs using invalid -operator-rest-port arg value")
-	cmdArgs = []string{"-operator-image", f.OpImage, "-operator-rest-port", invalidPortVal, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace}
+	args = argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--operator-rest-port", invalidPortVal)
 
-	execOut, err = runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
+	execOut, err = runCbopinfoCmd(append(args.slice(), cbCluster.Name))
 	execOutStr = strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
@@ -1302,20 +1335,25 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	targetKube := f.GetCluster(0)
 	clusterSize := constants.Size1
 	execOut := []byte{}
-	kubeConfPath := targetKube.KubeConfPath
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 
 	t.Log("Collecting logs using invalid operator-image value")
-	cmdArgs := []string{"-operator-image", f.OpImage, "-operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)), "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-all"}
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)))
+	args.add("--collectinfo", "")
+	args.add("--collectinfo-collect", "all")
+	args.add("--all", "")
 
 	logFileNameChan := make(chan string)
 	go func() {
 		// Collect logs when operator pod goes down in parallel
 		t.Log("Starting log collection")
 		var err error
-		execOut, err = runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
+		execOut, err = runCbopinfoCmd(append(args.slice(), cbCluster.Name))
 		execOutStr := strings.TrimSpace(string(execOut))
 		t.Logf("Returned: %s\n", execOutStr)
 		// TODO: This is broken, you cannot call Fatal() in a go routine :/

@@ -23,6 +23,8 @@ type Cluster struct {
 	Config *rest.Config
 	// KubeConfPath is the path to use to get the Kubernetes client configuration.
 	KubeConfPath string
+	// Context is the context used in the Kubernetes config
+	Context string
 }
 
 // APIHost returns the Kubernetes endpoint.  If you are using this please reconsider why

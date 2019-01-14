@@ -30,6 +30,8 @@ type Configuration struct {
 	System bool
 	// Kubeconfig specifies a specific Kubernetes configuration file
 	KubeConfig string
+	// Context selects the kubectl context to use
+	Context string
 	// CollectInfo determines whether to collect Couchbase server logs
 	CollectInfo bool
 	// CollectInfoRedact determines whether to automatically redact logs
@@ -55,6 +57,7 @@ type Configuration struct {
 const (
 	namespaceFlag          = "namespace"
 	kubeconfigFlag         = "kubeconfig"
+	contextFlag            = "context"
 	operatorImageFlag      = "operator-image"
 	operatorRestPortFlag   = "operator-rest-port"
 	serverImageFlag        = "server-image"
@@ -113,6 +116,7 @@ func Parse() Configuration {
 	flagSet := flag.NewFlagSet("cbopinfo", flag.ExitOnError)
 	flagSet.StringVar(&c.Namespace, namespaceFlag, lookupFlagFromEnvString(namespaceFlag, "default"), "namespace to search for couchbase clusters")
 	flagSet.StringVar(&c.KubeConfig, kubeconfigFlag, lookupFlagFromEnvString(kubeconfigFlag, "~/.kube/config"), "kubernetes cluster configuration file")
+	flagSet.StringVar(&c.Context, contextFlag, lookupFlagFromEnvString(contextFlag, ""), "kubernetes cluster context")
 	flagSet.StringVar(&c.OperatorImage, operatorImageFlag, lookupFlagFromEnvString(operatorImageFlag, "couchbase/operator:"+version.Version), "operator image name")
 	flagSet.StringVar(&c.OperatorRestPort, operatorRestPortFlag, lookupFlagFromEnvString(operatorRestPortFlag, "8080"), "operator rest port")
 	flagSet.StringVar(&c.ServerImage, serverImageFlag, lookupFlagFromEnvString(serverImageFlag, "couchbase/server:enterprise-5.5.1"), "couchbase server image")

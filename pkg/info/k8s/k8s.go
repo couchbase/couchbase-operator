@@ -35,7 +35,10 @@ func InitContext(context *context.Context) error {
 	}
 
 	// Load the configuration and return a new client
-	context.KubeConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	context.KubeConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{CurrentContext: context.Config.Context},
+	).ClientConfig()
 	if err != nil {
 		return err
 	}
