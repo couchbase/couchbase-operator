@@ -98,6 +98,7 @@ const (
 	Retries30  = 30
 	Retries60  = 60
 	Retries120 = 120
+	Retries240 = 240
 )
 
 const (

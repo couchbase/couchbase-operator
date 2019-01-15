@@ -332,7 +332,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries10)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes.CRClient, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, time.Now(), 120)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -380,7 +380,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
 	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -434,7 +434,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
 	time.Sleep(5 * time.Second)
 	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -486,7 +486,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes.CRClient, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
 	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -540,7 +540,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, kubernetes.KubeClient, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
 	time.Sleep(5 * time.Second)
 	e2eutil.MustKillPodForMember(t, kubernetes.KubeClient, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes.CRClient, cluster, constants.Retries240)
 
 	// Check the events match what we expect:
 	// * Cluster created
