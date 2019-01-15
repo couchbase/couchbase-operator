@@ -1,16 +1,41 @@
 = Using Persistent Volumes
+:page-aliases: persisted-volumes-guide
 
-Persistent Volumes offer a way to create Couchbase Pods with data which resides outside of the actual Pod.
+[abstract]
+Kubernetes persistent volumes offer a way to create Couchbase pods with data that resides outside of the actual pod.
 
-This decoupling provides a higher degree of resilience for data within the Couchbase Cluster in the event that a node goes down or its associated Pod is terminated.  Refer to xref:node-recovery.adoc[Node Recovery] additional information about the recovery of Pods with Persistent Volumes.
+Decoupling the data from the pod provides a higher degree of resilience within the Couchbase cluster in the event that a node goes down or its associated pod is terminated.
+The Operator can then attach persistent volumes to a new pod during xref:node-recovery.adoc[node recovery].
 
-== Setup Persistent Volumes
+== Benefits of Using Persistent Volumes
 
-*Prerequisite:* Kubernetes must be set up to support clusters with persistent volumes, refer to the xref:persistent-volume-setup.adoc[Persistent Volume Setup Guide]
+Data Recoverability::
+Persistent volumes allow the data associated within pods to be recovered in the case that a pod is terminated.
+This helps to prevent data-loss and to avoid time-consuming index building when using the Data or Index services.
 
-To create a Couchbase Cluster with Persistent Volumes, volumeMounts need to be added to the `pod` within a group of `spec.servers`.  These volumeMounts will only be used by the pods within its `spec.servers` config.  See xref:couchbase-cluster-config.adoc[CouchbaseCluster Configuration] Guide to understand how to define a cluster with Persistent Volumes.  It is also recommended to have an overall understanding of kubernetes https://kubernetes.io/docs/concepts/storage/persistent-volumes/[Persistent Volumes] prior to creating a cluster with Persistent Volumes.
+Pod Relocation::
+Kubernetes may decide to evict pods that reach resource thresholds such as CPU and memory limits.
+Pods that are backed with persistent volumes can be terminated and restarted on different nodes without incurring any downtime or loss of data.
 
-The following example shows how to mount a volume to persist data for the data service.
+Dynamic Provisioning::
+The Operator will create persistent volumes on demand as your cluster scales, alleviating the need to pre-provision your cluster storage prior to deployment.
+
+Cloud Integration::
+Kubernetes integrates with native storage provisioners available on major cloud vendors such as AWS, GCP, and Azure.
+
+== Configuring the Operator to Use Persistent Volumes
+
+.Prerequisites:
+* An overall understanding of https://kubernetes.io/docs/concepts/storage/persistent-volumes/[Kubernetes persistent volumes^]
+* Your Kubernetes environment is set up to support clusters with persistent volumes.
+Refer to the persistent volume xref:persistent-volume-setup.adoc[setup guide] for more information.
+* You are using a supported xref:prerequisite-and-setup.adoc#compatibility-pv[storage provisioner].
+
+To create a Couchbase cluster that uses persistent volumes, you need to add `volumeMounts` under `pod` within a group of `spec.servers` in the xref:couchbase-cluster-config.adoc[CouchbaseCluster configuration].
+These `volumeMounts` will only be used by the pods within its `spec.servers` config.
+
+The following example shows how to mount a volume to persist data for the Data service:
+
 [source,yaml]
 ----
 apiVersion: couchbase.com/v1
@@ -36,29 +61,24 @@ spec:
           requests:
             storage: 1Gi
 ----
-This spec uses a StorageClass named `gp2` to request persistent volumes of size 1Gi for both the `default` and `data` mounts specified in `volumeMounts`. Claims can request volumes from various types of storage systems as identified by the storage class name.  It is also possibl to claim manually created volumes as outlined in the xref:persistent-volume-setup.adoc[Persistent Volume Setup Guide].
 
+The above spec uses a `StorageClass` named `gp2` to request persistent volumes of size 1Gi for both the `default` and `data` mounts specified in `volumeMounts`.
+Claims can request volumes from various types of storage systems as identified by the storage class name.
+It's also possible to claim manually-created volumes as outlined in the persistent volume xref:persistent-volume-setup.adoc[setup guide].
 
-== Benefits of using Persistent Volumes
+== Best Practices for Persistent Volumes
 
-* *Data Recoverability:* Persistent Volumes allow the data associated within Pods to be recovered in the case that a Pod is terminated.  This helps to prevent data-loss and to avoid time-consuming index building when using the data or index services.
-* *Pod Relocation:*  Kubernetes may decide to evict pods that reach resource thresholds such as Cpu and Memory Limits.  Pods that are backed with Persistent Volumes can be terminated and restarted on different nodes without incurring any downtime or data-loss.
-* *Dynamic Provisioning:* The Operator will create Persistent Volumes on-demand as your cluster scales, alleviating the need to pre-provision your cluster storage prior to deployment.g
-* *Cloud Integration:* Kubernetes integrates with native storage provisioners available on major cloud vendors such as AWS and GCE.
+* When persisting data for any Couchbase service, all other pods running the same service should also use persistent volumes.
+For example, configurations which spread Data service across multiple server configs (`spec.servers`) should also specify `spec.servers[*].pod.volumeMounts` for each server config.
++
+Also, ensure that consistent storage sizes are used across all pods for a given service.
+For example, it's not recommended to use a 10 GB template for one set of data nodes, and a 100 GB template for another.
 
+* It's easier to scale out a service's storage when services aren't all grouped into the same config (`spec.servers[*].services`).
+This is because when multiple services are defined within the same group of `servers`, you'll then have to scale out storage for all of the services within that group, along with the one that actually needs to be scaled. Note that  you can't resize volumes.
 
-== Best Practices when using Persistent Volumes
+* Configure storage classes based on service needs.
+For example, you may want to use faster storage for the Data service if write throughput will be high.
+In that case, you could use the AWS provisioner to produce EBS volumes of type `io1` (good for large database workloads), which are faster than `gp2` (the EKS default).
 
-* When persisting data for any service, then all other pods with same service should have Persistent Volumes.  For example, configurations which spread data service across multiple server configs (`spec.servers`), should also specify volumeMounts `spec.servers[*].pod.volumeMounts`  for each server config.
-** Also, ensure that each consistent storage sizes are used across all the Pods for a service service.  For example, it is not recommended to use a 10GB template for 1 set of data nodes and a 100GB template for another.
-* It is easier to scale out a service storage when services are not all grouped into the same config `spec.servers[*].services`.  This is because when multiple services are defined within the same group of `servers` then you will have to scale out storage for all of the services within that group along with the one that actually needs to be scaled.  Note: volume resizing is not possible
-* The following storage provisioners are supported for creating Persistent Volumes:
-** AWS
-** GCE
-** Glusterfs
-** Azure Disk
-** Ceph RBD
-** Portworx Volume
-** Refer to documentation about https://kubernetes.io/docs/concepts/storage/storage-classes/#provisioner[Storage Provisioners] for more information about storage classes.
-* Configure storage classes based on service needs. For example, the AWS provisioner can produce EBS volumes of type 'io1' which are faster than 'gp2', so you may want to use faster storage for data service if write throughput will be high.
-* For deployments in clouds with multiple availability zones see xref:persistent-volumes-zoning-guide.adoc[Persistent Volume Zoning Guide].
+* For deployments in clouds with multiple availability zones, refer to the xref:persistent-volumes-zoning-guide.adoc[Persistent Volume Zoning Guide].
