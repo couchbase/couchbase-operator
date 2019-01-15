@@ -69,9 +69,11 @@ func SetCbImageVersion(cbImgVer string) {
 	}
 }
 
-func SetStorageClassName(storageClassName string) {
-	if storageClassName = strings.TrimSpace(storageClassName); storageClassName != "" {
-		e2e_constants.StorageClassName = storageClassName
+var storageClassName string
+
+func SetStorageClassName(storageClassNameIn string) {
+	if storageClassNameIn = strings.TrimSpace(storageClassNameIn); storageClassNameIn != "" {
+		storageClassName = storageClassNameIn
 	}
 }
 
@@ -536,7 +538,7 @@ func NewStatefulCluster(genName, secretName string, size int, withBucket bool, e
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			StorageClassName: &e2e_constants.StorageClassName,
+			StorageClassName: &storageClassName,
 			Resources:        storagePolicy.Resources,
 		},
 	}

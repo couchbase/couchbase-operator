@@ -1403,7 +1403,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 		"other1":   otherConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -1532,7 +1532,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -1676,7 +1676,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -1812,7 +1812,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -1912,7 +1912,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -2032,7 +2032,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -2259,7 +2259,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)

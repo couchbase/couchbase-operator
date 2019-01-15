@@ -33,6 +33,7 @@ type Framework struct {
 	CouchbaseServerVersion string
 	// CouchbaseServerUpgradeVersion is the version of Couchbase server we are upgrading to
 	CouchbaseServerUpgradeVersion string
+	StorageClassName              string
 }
 
 // To decode cluster yaml file

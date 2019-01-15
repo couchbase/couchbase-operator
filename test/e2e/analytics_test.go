@@ -475,7 +475,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		"exposedFeatures": map[string]string{"featureNames": "client"},
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(constants.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 

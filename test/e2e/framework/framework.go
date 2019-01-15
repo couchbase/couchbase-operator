@@ -178,6 +178,7 @@ func Setup(t *testing.T) (err error) {
 		ClusterSpec:                   types.ClusterMap{},
 		CouchbaseServerVersion:        runtimeParams.CbServerImgVer,
 		CouchbaseServerUpgradeVersion: runtimeParams.CbServerImgVerUpgrade,
+		StorageClassName:              runtimeParams.StorageClassName,
 	}
 
 	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, constants.OperatorRestPort)
@@ -212,7 +213,7 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
 	logrus.Info(" →  couchbase server: " + e2espec.GetCouchbaseDockerImgName())
 	logrus.Info("Kubernetes")
-	logrus.Info(" →  storage class: " + constants.StorageClassName)
+	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
 	logrus.Info("Logs")
 	logrus.Info(" →  directory: " + Global.LogDir)
 

@@ -834,7 +834,8 @@ func RemoveStorageClass(kubeClient kubernetes.Interface, storageClassName string
 }
 
 func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
-	if err := RemoveStorageClass(kubeClient, constants.StorageClassName); err != nil {
+	f := Global
+	if err := RemoveStorageClass(kubeClient, f.StorageClassName); err != nil {
 		return err
 	}
 	parameters := make(map[string]string)
@@ -844,7 +845,7 @@ func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
 
 	storageClassSpec := &storagev1.StorageClass{
 		TypeMeta:    metav1.TypeMeta{Kind: "StorageClass", APIVersion: "storage.k8s.io/v1beta1"},
-		ObjectMeta:  metav1.ObjectMeta{Name: constants.StorageClassName},
+		ObjectMeta:  metav1.ObjectMeta{Name: f.StorageClassName},
 		Provisioner: "kubernetes.io/portworx-volume",
 		Parameters:  parameters,
 	}

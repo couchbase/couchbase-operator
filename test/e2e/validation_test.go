@@ -105,6 +105,10 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			testCouchbase.ObjectMeta.Name = ctx.ClusterName
 			testCouchbase.ObjectMeta.Namespace = f.Namespace
 
+			for i, _ := range testCouchbase.Spec.VolumeClaimTemplates {
+				testCouchbase.Spec.VolumeClaimTemplates[i].Spec.StorageClassName = &f.StorageClassName
+			}
+
 			// Removing previous deployment if any
 			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
 

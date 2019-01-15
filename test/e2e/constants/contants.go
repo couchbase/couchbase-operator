@@ -9,9 +9,6 @@ import (
 var (
 	CbServerBaseImage = "couchbase/server"
 	CbServerVersion   = "enterprise-5.5.0"
-
-	// Storage class defined in K8S cluster
-	StorageClassName = "standard"
 )
 
 // Const Ansible setting string
