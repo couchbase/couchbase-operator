@@ -127,6 +127,19 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					initContainer := couchbaseInitContainer(cs.BaseImage, version, claim.Name)
 					pod.Spec.InitContainers = []v1.Container{initContainer}
 				}
+			} else {
+				// Get availability zone of the Volumes and apply to Pod
+				// so that it is honored by the scheduler
+				group, err := GetPersistentVolumeGroup(kubeCli, pvc.Spec.VolumeName)
+				if err != nil {
+					// only address errors from cli here, if the volume is not
+					// labeled then allow scheduler to apply it instead
+					if _, ok := err.(cberrors.ErrVolumeMissingGroup); !ok {
+						return nil, err
+					}
+				} else {
+					pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
+				}
 			}
 
 			// Volumes will be added to Pod spec

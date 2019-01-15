@@ -105,9 +105,13 @@ func (sched *stripeSchedulerImpl) Create(pod *v1.Pod) error {
 		return fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, pod.Name, class)
 	}
 
-	// Find the smallest server group population and add the selected group to the
-	// pod's node selectors
-	group := sched.serverClasses[class].smallestGroup()
+	// Reuse the existing NodeSelector if already applied to a Pod,
+	// otherwise find the smallest server group population and add
+	// the selected group to the pod's node selectors
+	group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	if !ok {
+		group = sched.serverClasses[class].smallestGroup()
+	}
 	pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
 	sched.serverClasses[class][group].push(pod.Name)
 

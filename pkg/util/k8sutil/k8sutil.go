@@ -1173,6 +1173,20 @@ func GetPersistentVolume(kubeCli kubernetes.Interface, name string) (*v1.Persist
 	return kubeCli.CoreV1().PersistentVolumes().Get(name, metav1.GetOptions{})
 }
 
+// Get the server group associated with a Persistent volume
+// according to the standard zone labels
+func GetPersistentVolumeGroup(kubeCli kubernetes.Interface, name string) (string, error) {
+	volume, err := GetPersistentVolume(kubeCli, name)
+	if err != nil {
+		return "", err
+	}
+	group, ok := volume.Labels[constants.ServerGroupLabel]
+	if !ok {
+		return "", cberrors.ErrVolumeMissingGroup{VolumeName: name}
+	}
+	return group, nil
+}
+
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
 	version, err := kubeCli.Discovery().ServerVersion()
 	if err != nil {

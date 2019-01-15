@@ -85,6 +85,14 @@ type ErrVolumeUnexpectedPhase struct {
 	Phase v1.PersistentVolumePhase
 }
 
+type ErrVolumeMissingGroup struct {
+	VolumeName string
+}
+
+func (e ErrVolumeMissingGroup) Error() string {
+	return fmt.Sprintf("volume `%s` is not labeled with a server group", e.VolumeName)
+}
+
 // ErrUnknownMember is used when mapping a pod to a member and the
 // member is unknown
 type ErrUnknownMember struct {
