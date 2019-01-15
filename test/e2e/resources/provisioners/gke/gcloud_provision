@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+
+"""
+gcloud_provision
+
+Description:
+    This creates two regional kubernetes clusters for dynamic testing
+    of the Couchbase Operator.
+
+    This script expects the gcloud command to have be installed, initialized
+    and authenticated.  It will work with a normal user or service account.
+    The gcloud command must also have the project set:
+
+        gcloud init
+        gcloud config set core/project {project}
+
+    Upon successful completion two new contexts will be installed in
+    ~/.kube/config formatted as 'gke_{project}_{region}_{name}_{region}"
+
+Usage:
+    gcloud_provision start
+    gcloud_provision stop
+
+Options:
+    --name NAME         Specifies a unique name for the cluster so that tests
+                        can be run in parallel. [default: cao-test]
+    --version VERSION   Version of Kubernetes to deploy.  Versions can be polled
+                        with the 'gcloud container get-server-config --region us-east1'
+                        command. [default: 1.11.5-gke.5]
+"""
+
+import argparse
+import subprocess
+import sys
+
+# Default name for created resources.
+NAME = 'cao-test'
+
+# Default version of Kubernetes.
+VERSION = '1.11.5-gke.5'
+
+# Static RFC1918 prefix used to simplify firewall deployment.
+PREFIX = '10.0.0.0/8'
+
+# Each region defines the region name and other region specific configuration.
+# A Kubernetes cluster will be spawned in each region.
+REGIONS = {
+    'us-east1': {
+        'prefix': '10.0.0.0/12',
+    },
+    'us-west1': {
+        'prefix': '10.16.0.0/12',
+    }
+}
+
+def gcloud(*cmd):
+    """Runs a gcloud command raising an exception on error"""
+
+    return str(subprocess.check_output(['gcloud'] + list(cmd) + ['--quiet']), 'utf-8').strip()
+
+
+def kubectl(*cmd):
+    """Runs a kubectl command raising an exception on error"""
+
+    return str(subprocess.check_output(['kubectl'] + list(cmd)), 'utf-8').strip()
+
+
+def context_name(args, region):
+    """Returns the context name created for a cluster"""
+
+    return 'gke_' + args.project + '_' + region + '_' + args.name
+
+
+def start(args):
+    """Creates a virutal network and per region Kubernetes cluster"""
+
+    # Create the virtual network with custom subnets, this gives us control over
+    # the prefixes used for firewall configuration.
+    gcloud('compute', 'networks', 'create', args.name,
+           '--subnet-mode', 'custom')
+
+    # Add in a firewall rule to allow all ingress traffic from any region.
+    gcloud('compute', 'firewall-rules', 'create', args.name,
+           '--network', args.name,
+           '--direction', 'INGRESS',
+           '--source-ranges', PREFIX,
+           '--allow', 'all')
+
+    # First pass create the subnets.  We have to do this separately as GKE
+    # will allocate the pod overlay prefixes from the 10.0.0.0/8 range and
+    # may clash with our subnet settings.
+    for region, settings in REGIONS.items():
+        # Define this region's subnet.
+        gcloud('compute', 'networks', 'subnets', 'create', args.name,
+               '--network', args.name,
+               '--region', region,
+               '--range', settings['prefix'])
+
+    # Second pass create the clusters and configure Kubernetes clients.
+    for region, _ in REGIONS.items():
+        # Create this regions's Kubernetes cluster.
+        gcloud('container', 'clusters', 'create', args.name,
+               '--cluster-version', args.cluster_version,
+               '--region', region,
+               '--network', args.name,
+               '--subnetwork', args.name,
+               '--no-enable-ip-alias',
+               '--no-enable-basic-auth',
+               '--no-enable-legacy-authorization',
+               '--no-issue-client-certificate',
+               '--no-enable-cloud-logging',
+               '--no-enable-cloud-monitoring',
+               '--metadata', 'disable-legacy-endpoints=true')
+
+        # Install the cluster, user and context into ~/.kube/config.
+        gcloud('container', 'clusters', 'get-credentials', args.name,
+               '--region', region,
+               '--project', args.project)
+
+        # Allow the provisioning user to preform tasks requiring admin privileges.
+        kubectl('create', 'clusterrolebinding', 'user-admin-binding',
+                '--clusterrole', 'cluster-admin',
+                '--user', args.user,
+                '--context', context_name(args, region))
+
+
+def stop(args):
+    """Deletes dynamically provisioned Kubernetes clusters and virtual networks"""
+
+    for region, _ in REGIONS.items():
+        gcloud('container', 'clusters', 'delete', args.name,
+               '--region', region)
+        gcloud('compute', 'networks', 'subnets', 'delete', args.name,
+               '--region', region)
+
+    gcloud('compute', 'firewall-rules', 'delete', args.name)
+    gcloud('compute', 'networks', 'delete', args.name)
+
+
+def main():
+    """Main entry point"""
+
+    # Parse CLI arguments.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command')
+    parser.add_argument('-n', '--name', default=NAME)
+    parser.add_argument('-c', '--cluster-version', default=VERSION)
+    args = parser.parse_args()
+
+    # Parse gcloud configuration.
+    args.user = gcloud('config', 'get-value', 'account')
+    args.project = gcloud('config', 'get-value', 'project')
+
+    # Execute the specified command.
+    if args.command == 'start':
+        start(args)
+    elif args.command == 'stop':
+        stop(args)
+    else:
+        print(f'invalid command {args.command}')
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
+
+# vi: ts=4 et:
