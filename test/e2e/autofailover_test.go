@@ -26,15 +26,10 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{f.TestClusters[0]})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
-
 	// Create cluster spec for RZA feature
 	clusterSize := 9
 	bucketName := "testBucket"
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 2, true)
 	clusterConfig["autoFailoverTimeout"] = "10"
@@ -142,17 +137,15 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
+
+	t.Skip("Server will not failover a service with a single instance")
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{f.TestClusters[0]})
-	if err != nil {
-		t.Fatalf("Failed to read cluster yaml data: %v", err)
-	}
-
 	// Create cluster spec for RZA feature
 	clusterSize := 9
-	availableServerGroupList := GetAvailableServerGroupsFromYmlData(k8sNodesData[0])
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 2, true)
 	clusterConfig["autoFailoverTimeout"] = "30"
