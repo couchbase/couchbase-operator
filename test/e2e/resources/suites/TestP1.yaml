@@ -1,6 +1,6 @@
 ---
 suite: TestP1
-timeout: 10h
+timeout: 12h
 tcGroups:
   - name: ClusterTests
     clusters:
