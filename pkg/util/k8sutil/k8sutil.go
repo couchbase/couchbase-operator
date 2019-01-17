@@ -984,7 +984,12 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 					for _, cond := range status.Conditions {
 						if cond.Type == v1.PodScheduled {
 							if cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
-								return cberrors.ErrPodUnschedulable{Reason: cond.Message}
+								// Ignoring unbound errors because the scheduler will eventually
+								// resolve them and actually schedule the Pod
+								// as is the case with lazy binding
+								if !strings.Contains(cond.Message, cberrors.ErrUnboundPersistedVolumeClaims) {
+									return cberrors.ErrPodUnschedulable{Reason: cond.Message}
+								}
 							}
 						}
 					}

@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	ErrClusterCreating = E.New("existing cluster failed during prior initialization, state unknown")
-	ErrUnkownCreatePod = E.New("unkown error occurred creating pod")
+	ErrClusterCreating              = E.New("existing cluster failed during prior initialization, state unknown")
+	ErrUnkownCreatePod              = E.New("unkown error occurred creating pod")
+	ErrUnboundPersistedVolumeClaims = "unbound immediate PersistentVolumeClaims"
 )
 
 type ErrSecretMissingUsername struct {
