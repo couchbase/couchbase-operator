@@ -144,28 +144,6 @@ func GetDeployedRzaPodMap(kubeClient kubernetes.Interface, namespace string) (ma
 	return deployedRzaGroupsMap, err
 }
 
-// Returns the array of available server groups for the particular cluster given by k8sNodesData
-// TODO: depreciate this when cluster provisioning is fully decoupled from framework,
-//       since we'll rely fully on .kube/config to tell us what nodes we have.
-func GetAvailableServerGroupsFromYmlData(k8sNodesData framework.ClusterInfo) []string {
-	serverGroups := []string{}
-	for _, node := range k8sNodesData.MasterNodeList {
-		if node.NodeLabel != "" {
-			if !checkElementExists(node.NodeLabel, serverGroups) {
-				serverGroups = append(serverGroups, node.NodeLabel)
-			}
-		}
-	}
-	for _, node := range k8sNodesData.WorkerNodeList {
-		if node.NodeLabel != "" {
-			if !checkElementExists(node.NodeLabel, serverGroups) {
-				serverGroups = append(serverGroups, node.NodeLabel)
-			}
-		}
-	}
-	return serverGroups
-}
-
 // GetAvailabilityZones returns a sorted list of configured availability zones from the cluster.
 // These zones will be pre-provisioned by Kops etc. or added via a cluster decorator.
 func GetAvailabilityZones(t *testing.T, cluster *types.Cluster) clustercapabilities.ZoneList {
