@@ -56,13 +56,13 @@ REGIONS = {
 def gcloud(*cmd):
     """Runs a gcloud command raising an exception on error"""
 
-    return str(subprocess.check_output(['gcloud'] + list(cmd) + ['--quiet']), 'utf-8').strip()
+    return str(subprocess.check_output(['gcloud'] + list(cmd) + ['--quiet'])).strip()
 
 
 def kubectl(*cmd):
     """Runs a kubectl command raising an exception on error"""
 
-    return str(subprocess.check_output(['kubectl'] + list(cmd)), 'utf-8').strip()
+    return str(subprocess.check_output(['kubectl'] + list(cmd))).strip()
 
 
 def context_name(args, region):
