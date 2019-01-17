@@ -207,7 +207,6 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 // NewSupportableClusterSpec returns a basic supportable cluster spec with a stateful and stateless
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
 func NewSupportableClusterSpec(size int) api.ClusterSpec {
-	storageClass := "standard"
 	return api.ClusterSpec{
 		BaseImage:       e2e_constants.CbServerBaseImage,
 		Version:         e2e_constants.CbServerVersion,
@@ -249,7 +248,7 @@ func NewSupportableClusterSpec(size int) api.ClusterSpec {
 					Name: "couchbase",
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					StorageClassName: &storageClass,
+					StorageClassName: &storageClassName,
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: *resource.NewScaledQuantity(1, 30),
