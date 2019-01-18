@@ -36,7 +36,7 @@ func TestPauseOperator(t *testing.T) {
 	}
 
 	t.Logf("Pausing operator...")
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "Paused", "true", targetKube.CRClient, testCouchbase, constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), constants.Retries5)
 	e2eutil.MustWaitForClusterStatus(t, targetKube, "ControlPaused", "true", testCouchbase, 300)
 
 	t.Logf("Killing pod...")
@@ -50,7 +50,7 @@ func TestPauseOperator(t *testing.T) {
 	}
 
 	t.Logf("Resuming operator...")
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "Paused", "false", targetKube.CRClient, testCouchbase, constants.Retries10)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), constants.Retries5)
 	e2eutil.MustWaitForClusterStatus(t, targetKube, "ControlPaused", "false", testCouchbase, 300)
 
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToKill)

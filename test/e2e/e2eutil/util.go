@@ -514,80 +514,6 @@ func NewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, c
 	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
-func UpdateClusterSpec(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
-	updateFunc := func(cl *api.CouchbaseCluster) {}
-	switch {
-	case field == "Paused":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.Paused, _ = strconv.ParseBool(value) }
-	case field == "ExposedFeatures":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ExposedFeatures = strings.Split(value, ",") }
-	case field == "ServerGroups":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerGroups = strings.Split(value, ",") }
-	case field == "AntiAffinity":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.AntiAffinity, _ = strconv.ParseBool(value) }
-	case field == "Version":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.Version = value }
-	}
-	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
-}
-
-func MustUpdateClusterSpec(t *testing.T, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) *api.CouchbaseCluster {
-	cluster, err := UpdateClusterSpec(field, value, crClient, cl, maxRetries)
-	if err != nil {
-		Die(t, err)
-	}
-	return cluster
-}
-
-func MustNotUpdateClusterSpec(t *testing.T, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster) {
-	if _, err := UpdateClusterSpec(field, value, crClient, cl, 1); err == nil {
-		Die(t, fmt.Errorf("cluster spec update succeeded unexpectedly"))
-	}
-}
-
-func UpdateClusterSettings(field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
-
-	updateFunc := func(cl *api.CouchbaseCluster) {}
-
-	switch {
-	case field == "DataServiceMemQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			cl.Spec.ClusterSettings.DataServiceMemQuota, _ = strconv.ParseUint(value, 10, 64)
-		}
-	case field == "IndexServiceMemQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			cl.Spec.ClusterSettings.IndexServiceMemQuota, _ = strconv.ParseUint(value, 10, 64)
-		}
-	case field == "SearchServiceMemQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			cl.Spec.ClusterSettings.SearchServiceMemQuota, _ = strconv.ParseUint(value, 10, 64)
-		}
-	case field == "IndexStorageSetting":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ClusterSettings.IndexStorageSetting = value }
-	case field == "AutoFailoverTimeout":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			newTimeout, _ := strconv.Atoi(value)
-			cl.Spec.ClusterSettings.AutoFailoverTimeout = uint64(newTimeout)
-		}
-	}
-	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
-}
-
-func UpdateServiceSpec(service int, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
-	updateFunc := func(cl *api.CouchbaseCluster) {}
-	switch {
-	case field == "Size":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Size = ConvertToInt(value) }
-	case field == "Name":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings[service].Name = value }
-	case field == "Services":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			cl.Spec.ServerSettings[service].Services = api.NewServiceList(strings.Split(value, ","))
-		}
-	}
-	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
-}
-
 // convert interfaced value to int, note this can downcast i64
 func ConvertToInt(value interface{}) int {
 	switch value.(type) {
@@ -885,8 +811,7 @@ func isMasterNode(nodeMap map[string]string) bool {
 
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	cluster, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), k8s.CRClient, cl, 10)
-	return cluster, err
+	return PatchCluster(t, k8s.CRClient, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/ServerSettings/%d/Size", service), clusterSize), constants.Retries1)
 }
 
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) *api.CouchbaseCluster {

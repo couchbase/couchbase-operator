@@ -9,10 +9,12 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/gocbmgr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -138,97 +140,44 @@ func TestEditClusterSettings(t *testing.T) {
 	t.Logf("cluster info: %v", clusterInfo)
 
 	// edit cluster dataServiceMemQuota
-	newDataServiceMemQuota := "257"
+	newDataServiceMemQuota := uint64(257)
 	t.Log("Changing cluster data service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("DataServiceMemQuota", newDataServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newDataServiceMemQuota, e2eutil.DataServiceMemQuotaVerifier); err != nil {
-		t.Fatalf("failed to change cluster data service mem quota: %v", err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/DataServiceMemQuota", newDataServiceMemQuota), constants.Retries5)
+	e2eutil.MustPatchCouchbaseInfo(t, client, jsonpatch.NewPatchSet().Test("/DataMemoryQuotaMB", newDataServiceMemQuota), constants.Retries5)
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
 
 	// edit cluster indexServiceMemQuota
-	newIndexServiceMemQuota := "257"
+	newIndexServiceMemQuota := uint64(257)
 	t.Log("Changing cluster index service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexServiceMemQuota", newIndexServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newIndexServiceMemQuota, e2eutil.IndexServiceMemQuotaVerifier); err != nil {
-		t.Fatalf("failed to change cluster index service mem quota: %v", err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", newIndexServiceMemQuota), constants.Retries5)
+	e2eutil.MustPatchCouchbaseInfo(t, client, jsonpatch.NewPatchSet().Test("/IndexMemoryQuotaMB", newIndexServiceMemQuota), constants.Retries5)
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
 
 	// edit cluster searchServiceMemQuota
-	newSearchServiceMemQuota := "257"
+	newSearchServiceMemQuota := uint64(257)
 	t.Log("Changing cluster search service mem quota")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("SearchServiceMemQuota", newSearchServiceMemQuota, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newSearchServiceMemQuota, e2eutil.SearchServiceMemQuotaVerifier); err != nil {
-		t.Fatalf("failed to change cluster search service mem quota: %v", err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/SearchServiceMemQuota", newSearchServiceMemQuota), constants.Retries5)
+	e2eutil.MustPatchCouchbaseInfo(t, client, jsonpatch.NewPatchSet().Test("/SearchMemoryQuotaMB", newSearchServiceMemQuota), constants.Retries5)
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
 
 	// edit cluster autoFailoverTimeout
-	newAutoFailoverTimeout := "31"
+	newAutoFailoverTimeout := uint64(31)
 	t.Log("Changing cluster autofailover timeout")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("AutoFailoverTimeout", newAutoFailoverTimeout, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyAutoFailoverInfo(t, client, constants.Retries5, newAutoFailoverTimeout, e2eutil.AutoFailoverTimeoutVerifier); err != nil {
-		t.Fatalf("failed to change cluster autofailover timeout: %v", err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoFailoverTimeout", newAutoFailoverTimeout), constants.Retries5)
+	e2eutil.MustPatchAutoFailoverInfo(t, client, jsonpatch.NewPatchSet().Test("/Timeout", newAutoFailoverTimeout), constants.Retries5)
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "autofailover")
 
 	// edit cluster indexStorageSetting
+	// TODO: Need to make the API version typed on the underlying library
 	newIndexStorageSetting := "plasma"
 	t.Log("Changing cluster index storage setting")
-	testCouchbase, err = e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := e2eutil.VerifyIndexSettingInfo(t, client, constants.Retries5, newIndexStorageSetting, e2eutil.IndexSettingVerifier); err != nil {
-		t.Fatalf("failed to change cluster indexer storage setting: %v", err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexStorageSetting", newIndexStorageSetting), constants.Retries5)
+	e2eutil.MustPatchIndexSettingInfo(t, client, jsonpatch.NewPatchSet().Test("/StorageMode", cbmgr.IndexStoragePlasma), constants.Retries5)
 	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "index service")
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 
-}
-
-// Tests invalid editing of cluster settings (setting changes should not take hold)
-func TestNegEditClusterSettings(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1}
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	// edit cluster indexStorageSetting
-	newIndexStorageSetting := "plasma"
-	t.Log("Changing cluster index storage setting")
-	if _, err := e2eutil.UpdateClusterSettings("IndexStorageSetting", newIndexStorageSetting, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
-		t.Fatal("successful update to index storage mode when index service enabled")
-	}
-
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 // Tests if specs with invalid base image will create a cluster (they should not)

@@ -408,6 +408,12 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body shouldn't contain duplicates"},
 		},
+		{
+			name:           "TestServerSizeRangeInvalid",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Size", -2),
+			shouldFail:     true,
+			expectedErrors: []string{"spec.servers.size in body should be greater than or equal to 1"},
+		},
 
 		// ServerGroups list validation
 		{

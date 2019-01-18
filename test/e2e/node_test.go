@@ -3,13 +3,13 @@ package e2e
 import (
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -47,22 +47,13 @@ func TestEditServiceConfig(t *testing.T) {
 	}
 	t.Logf("cluster info: %v", clusterInfo)
 
-	serviceNum := 0
-
 	// edit service size
-	newSize := "2"
+	newSize := 2
 	t.Log("Changing cluster size")
-	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Size", newSize), constants.Retries10)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 1), 120)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newSize, e2eutil.NumNodesVerifier); err != nil {
-		t.Fatalf("failed to change service size: %v", err)
-	}
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
@@ -72,84 +63,6 @@ func TestEditServiceConfig(t *testing.T) {
 	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
 		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
 	}
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
-}
-
-// Tests invalid editing of service spec
-// 1. Create 1 node cluster
-// 2. Attempt to change service size from 1 to -2
-// 3. Verify change did not take hold via rest call
-// 4. Verify cluster size of 1 via rest call
-func TestNegEditServiceConfig(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
-	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1}
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	serviceNum := 0
-
-	// edit service size
-	newSize := "-2"
-	oldSize := "1"
-	t.Log("Changing cluster size to -2")
-	if _, err := e2eutil.UpdateServiceSpec(serviceNum, "Size", newSize, targetKube.CRClient, testCouchbase, constants.Retries5); err == nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	} else if !strings.Contains(err.Error(), "spec.servers.size in body should be greater than or equal to 1") {
-		t.Fatalf("failed to see expected error message: %v \n", err)
-	}
-
-	t.Log("Verify resize did not happen")
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, newSize, e2eutil.NumNodesVerifier); err == nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-
-	t.Log("Verify cluster size is 1")
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, oldSize, e2eutil.NumNodesVerifier); err != nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-
-	t.Log("Verify cluster balanced and healthy through rest api")
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
-		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
-	}
-
-	t.Log("Changing cluster size back to 1")
-	testCouchbase, err = e2eutil.UpdateServiceSpec(serviceNum, "Size", oldSize, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Log("Verify cluster size is 1")
-	if err := e2eutil.VerifyClusterInfo(t, client, constants.Retries5, oldSize, e2eutil.NumNodesVerifier); err != nil {
-		t.Fatalf("failed to reject invalid service size: %v", err)
-	}
-
-	t.Log("Verify cluster balanced and healthy through rest api")
-	if err := e2eutil.VerifyClusterBalancedAndHealthy(t, client, constants.Retries10); err != nil {
-		t.Fatalf("cluster failed to become healthy and balanced: %v", err)
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -433,7 +346,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	// Pause operator to avoid foreign pod deletion as soon as added
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "Paused", "true", targetKube.CRClient, testCouchbase, constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), constants.Retries5)
 
 	if _, err := e2eutil.CreateMemberPod(targetKube.KubeClient, m, testCouchbase, testCouchbase.Name, f.Namespace); err != nil {
 		t.Fatal(err)
@@ -459,7 +372,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	}
 
 	// Resuming operator
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "Paused", "false", targetKube.CRClient, testCouchbase, constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), constants.Retries5)
 
 	// resize to 2 member cluster
 	testCouchbase, err = e2eutil.ResizeCluster(t, 0, constants.Size2, targetKube, testCouchbase, constants.Retries30)

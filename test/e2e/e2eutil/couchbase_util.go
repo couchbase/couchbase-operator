@@ -421,21 +421,24 @@ func WaitForUnhealthyNodes(t *testing.T, client *cbmgr.Couchbase, tries int, num
 	return nil
 }
 
-func VerifyClusterInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value string, verifiers ...clusterVerifier) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "verify cluster info", "test-cluster",
-		func() error {
+// PatchCouchbaseInfo tries patching the cluster information returned directly from Couchbase server.
+func PatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) error {
+	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+		info, err := client.ClusterInfo()
+		if err != nil {
+			return false, err
+		}
+		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+}
 
-			info, err := client.ClusterInfo()
-			if err != nil {
-				return err
-			}
-			for _, verify := range verifiers {
-				if verify(t, info, value) == false {
-					return NewErrVerifyClusterInfo()
-				}
-			}
-			return nil
-		})
+func MustPatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) {
+	if err := PatchCouchbaseInfo(t, client, patches, retries); err != nil {
+		Die(t, err)
+	}
 }
 
 func VerifyBucketDeleted(t *testing.T, client *cbmgr.Couchbase, tries int, bucketName string) error {
@@ -524,38 +527,42 @@ func BucketInfoVerifier(t *testing.T, bucket *cbmgr.Bucket, bucketKey string, bu
 	return verified
 }
 
-func VerifyAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value string, verifiers ...autoFailoverVerifier) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "verify autofailover info", "test-cluster",
-		func() error {
-
-			info, err := client.GetAutoFailoverSettings()
-			if err != nil {
-				return err
-			}
-			for _, verify := range verifiers {
-				if verify(t, info, value) == false {
-					return NewErrAutoFailoverInfo()
-				}
-			}
-			return nil
-		})
+func PatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) error {
+	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+		info, err := client.GetAutoFailoverSettings()
+		if err != nil {
+			return false, err
+		}
+		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
 }
 
-func VerifyIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, tries int, value string, verifiers ...indexSettingVerifier) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "verify autofailover info", "test-cluster",
-		func() error {
+func MustPatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) {
+	if err := PatchAutoFailoverInfo(t, client, patches, retries); err != nil {
+		Die(t, err)
+	}
+}
 
-			info, err := client.GetIndexSettings()
-			if err != nil {
-				return err
-			}
-			for _, verify := range verifiers {
-				if verify(t, info, value) == false {
-					return NewErrIndexSettingInfo()
-				}
-			}
-			return nil
-		})
+func PatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) error {
+	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+		info, err := client.GetIndexSettings()
+		if err != nil {
+			return false, err
+		}
+		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+}
+
+func MustPatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) {
+	if err := PatchIndexSettingInfo(t, client, patches, retries); err != nil {
+		Die(t, err)
+	}
 }
 
 func VerifyServices(t *testing.T, client *cbmgr.Couchbase, tries int, value map[string]int, verifiers ...serviceVerifier) error {
@@ -595,34 +602,6 @@ func DefaultIoPriorityVerifier(t *testing.T, b *cbmgr.Bucket) bool {
 	return defaultIoPriority
 }
 
-func DataServiceMemQuotaVerifier(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool {
-	valueInt, _ := strconv.ParseUint(value, 10, 64)
-	dataServiceMemQuota := ci.DataMemoryQuotaMB == valueInt
-	t.Logf("data service mem quota: %v", ci.DataMemoryQuotaMB)
-	return dataServiceMemQuota
-}
-
-func IndexServiceMemQuotaVerifier(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool {
-	valueInt, _ := strconv.ParseUint(value, 10, 64)
-	indexServiceMemQuota := ci.IndexMemoryQuotaMB == valueInt
-	t.Logf("index service mem quota: %v", ci.IndexMemoryQuotaMB)
-	return indexServiceMemQuota
-}
-
-func SearchServiceMemQuotaVerifier(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool {
-	valueInt, _ := strconv.ParseUint(value, 10, 64)
-	searchServiceMemQuota := ci.SearchMemoryQuotaMB == valueInt
-	t.Logf("search service mem quota: %v", ci.SearchMemoryQuotaMB)
-	return searchServiceMemQuota
-}
-
-func NumNodesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool {
-	valueInt, _ := strconv.Atoi(value)
-	numNodes := len(ci.Nodes) == valueInt
-	t.Logf("number of nodes: %v", len(ci.Nodes))
-	return numNodes
-}
-
 func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[string]int) bool {
 	clusterServices := map[string]int{
 		"Data":  0,
@@ -650,26 +629,6 @@ func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[s
 	} else {
 		return false
 	}
-}
-
-func AutoFailoverEnabledVerifier(t *testing.T, afs *cbmgr.AutoFailoverSettings, value string) bool {
-	valueInt, _ := strconv.ParseBool(value)
-	autoFailoverEnabled := afs.Enabled == valueInt
-	t.Logf("autofailover enabled: %v", afs.Enabled)
-	return autoFailoverEnabled
-}
-
-func AutoFailoverTimeoutVerifier(t *testing.T, afs *cbmgr.AutoFailoverSettings, value string) bool {
-	valueInt, _ := strconv.Atoi(value)
-	autoFailoverEnabled := afs.Timeout == uint64(valueInt)
-	t.Logf("autofailover timeout: %v", afs.Timeout)
-	return autoFailoverEnabled
-}
-
-func IndexSettingVerifier(t *testing.T, is *cbmgr.IndexSettings, value string) bool {
-	indexSetting := string(is.StorageMode) == value
-	t.Logf("index setting: %v", is.StorageMode)
-	return indexSetting
 }
 
 func DeployEventingFunction(hostUrl, eventingPort, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) ([]byte, error) {

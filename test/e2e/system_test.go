@@ -9,6 +9,7 @@ import (
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -362,14 +363,8 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")
-	testCouchbase1, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase1, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to pause control: %v", err)
-	}
-	testCouchbase2, err = e2eutil.UpdateClusterSpec("Paused", "true", targetKube.CRClient, testCouchbase2, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to pause control: %v", err)
-	}
+	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), constants.Retries5)
+	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), constants.Retries5)
 
 	// make sure cluster is healthy before proceeding
 	err = e2eutil.WaitForClusterStatus(t, targetKube.CRClient, "ControlPaused", "true", testCouchbase1, 300)

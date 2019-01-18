@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -342,8 +343,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 		}
 		// Updating CRD to add new server-group in CRD
 		newAvailableServerGroupList = append(availableServerGroupList, "NewRzaGroup-1")
-		newAvailableServerGroups := strings.Join(newAvailableServerGroupList, ",")
-		testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
+		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), constants.Retries5)
 	}
 
 	if err := <-nodeUpdateErrChan; err != nil {
@@ -676,11 +676,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	}
 
 	availableServerGroupList = []string{availableServerGroupList[0], availableServerGroupList[2]}
-	availableServerGroups = strings.Join(availableServerGroupList, ",")
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
-	if err != nil {
-		t.Fatalf("Failed to update server groups: %v", err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", availableServerGroupList), constants.Retries5)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 1), 300)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", 1)
@@ -744,8 +740,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	availableServerGroups = strings.Join(availableServerGroupList, ",")
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", serverGroupsUsed), constants.Retries5)
 
 	clusterSize = clusterSize + 1
 	service := 0
@@ -819,9 +814,8 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	newAvailableServerGroupList := append(availableServerGroupList, "InvalidGroup-1")
-	newAvailableServerGroups := strings.Join(newAvailableServerGroupList, ",")
 
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", newAvailableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), constants.Retries5)
 
 	service := 0
 	clusterSize++
@@ -832,7 +826,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize-1)
 
 	// Revert server group addition
-	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "ServerGroups", availableServerGroups, targetKube.CRClient, testCouchbase, constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), constants.Retries5)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1), 120)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize-1)
