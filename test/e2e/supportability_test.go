@@ -2071,7 +2071,6 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMemberIdToKill map[int]string, isOperatorKilledWithServerPod bool) {
 	f := framework.Global
 	targetKube := k8s
-	kubeConfPath := targetKube.KubeConfPath
 
 	clusterSize := constants.Size2
 	operatorKilledErrChan := make(chan error)
@@ -2134,8 +2133,13 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	}
 
 	// Collect logs
-	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-all", cbCluster.Name}
-	execOut, err := runCbopinfoCmd(cmdArgs)
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--collectinfo", "")
+	args.add("--collectinfo-collect", "all")
+	args.add("--all", "")
+	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
@@ -2252,7 +2256,6 @@ func TestCollectLogFromPvPodAndOperatorRecovered(t *testing.T) {
 func TestLogRedactionVerify(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	kubeConfPath := targetKube.KubeConfPath
 
 	bucketName := "default"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -2271,8 +2274,14 @@ func TestLogRedactionVerify(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
 
 	// Collect logs
-	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-collectinfo-redact", "-all", cbCluster.Name}
-	execOut, err := runCbopinfoCmd(cmdArgs)
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--collectinfo", "")
+	args.add("--collectinfo-collect", "all")
+	args.add("--collectinfo-redact", "")
+	args.add("--all", "")
+	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {
@@ -2312,7 +2321,6 @@ func TestLogRedactionVerify(t *testing.T) {
 func TestLogRedactionWithPvVerify(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	kubeConfPath := targetKube.KubeConfPath
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -2344,8 +2352,14 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
 
 	// Collect logs
-	cmdArgs := []string{"-operator-image", f.OpImage, "-kubeconfig", kubeConfPath, "-namespace", f.Namespace, "-collectinfo", "-collectinfo-collect", "all", "-collectinfo-redact", "-all", cbCluster.Name}
-	execOut, err := runCbopinfoCmd(cmdArgs)
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--collectinfo", "")
+	args.add("--collectinfo-collect", "all")
+	args.add("--collectinfo-redact", "")
+	args.add("--all", "")
+	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
 	if err != nil {

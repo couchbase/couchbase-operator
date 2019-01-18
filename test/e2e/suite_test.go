@@ -13,7 +13,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInfo, namespace, testName, logDir string) {
+func collectClusterLogs(t *testing.T, testName, logDir string) {
+	f := framework.Global
+
 	// Create and move to the log directory.
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		t.Errorf("Failed to create dir %s: %v", logDir, err)
@@ -31,18 +33,18 @@ func collectClusterLogs(t *testing.T, kubeClustersToSetup []framework.ClusterInf
 	// Move back to where we were regardless of outcome.
 	defer os.Chdir(pwd)
 
-	// Collect logs from all clusters defined.
-	for _, kubeCluster := range kubeClustersToSetup {
-		kubeConfPath := e2eutil.GetKubeConfigToUse(framework.Global.KubeType, kubeCluster.ClusterName)
-		cmdArgs := []string{
-			"-operator-image", framework.Global.OpImage,
-			"-kubeconfig", kubeConfPath,
-			"-namespace", namespace,
-			"-collectinfo",
-			"-collectinfo-collect", "all",
-			"-system",
-		}
-		execOut, err := runCbopinfoCmd(cmdArgs)
+	// Collect logs from all clusters defined for this test.
+	for index, _ := range f.TestClusters {
+		cluster := f.GetCluster(index)
+
+		args := argumentList{}
+		args.addClusterDefaults(cluster)
+		args.addEnvironmentDefaults()
+		args.add("--collectinfo", "")
+		args.add("--collectinfo-collect", "all")
+		args.add("--system", "")
+
+		execOut, err := runCbopinfoCmd(args.slice())
 		execOutStr := strings.TrimSpace(string(execOut))
 		if err != nil {
 			t.Logf("cbopinfo returned: %s", execOutStr)
@@ -201,7 +203,7 @@ func runSuite(t *testing.T) {
 				// Collect logs if test fails
 				if !testPassed && f.CollectLogs {
 					logDir := f.LogDir + "/" + testName
-					collectClusterLogs(t, kubeClustersToSetup, f.Namespace, testName, logDir)
+					collectClusterLogs(t, testName, logDir)
 				}
 
 				// Clean up all known clusters if SkipTeardown is disabled
