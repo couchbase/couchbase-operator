@@ -92,6 +92,10 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -194,6 +198,11 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	autofailoverTimeout := 30
@@ -501,6 +510,11 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 4
@@ -632,6 +646,10 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	clusterSize := 5
 	podMemberToKill := 3
 	bucketName := "PVBucket"
@@ -755,6 +773,11 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 9
@@ -869,6 +892,11 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 9
@@ -1046,6 +1074,10 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	clusterSize := 5
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
@@ -1109,6 +1141,11 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSize := 3

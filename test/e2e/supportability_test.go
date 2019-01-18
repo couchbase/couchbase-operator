@@ -30,11 +30,31 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+// lazyBoundStorageClass examines the requested storage class and returns true if
+// the persistent volumes are bound when attached to a pod.
+func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
+	f := framework.Global
+	sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(f.StorageClassName, metav1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
+}
+
+// supportsMultipleVolumeClaims returns true if multiple PVCs can be supported by a test.
+// We can run the test if lazy binding is enabled (the PVCs will be scheduled in the same
+// zone as a pod), or all nodes are in the same zone (and thus all PVs will be scheduled
+// in that zone.
+func supportsMultipleVolumeClaims(t *testing.T, cluster *types.Cluster) bool {
+	return lazyBoundStorageClass(t, cluster) || len(GetAvailabilityZones(t, cluster)) == 1
+}
 
 // Removes first dir name present in the file path
 func parentDirStrRemover(fileList []string) {
@@ -2154,6 +2174,11 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	serverPodsToKill := map[int]string{}
 	isOperatorKilledWithServerPod := false
 	LogCollectionWithDefaultPvcMount(t, targetKube, serverPodsToKill, isOperatorKilledWithServerPod)
@@ -2167,6 +2192,10 @@ func TestCollectLogFromPvPodRecovered(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
 
 	isOperatorKilledWithServerPod := false
 
@@ -2194,6 +2223,10 @@ func TestCollectLogFromPvPodAndOperatorRecovered(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
 
 	isOperatorKilledWithServerPod := true
 
@@ -2280,6 +2313,10 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
 
 	clusterSize := constants.Size3
 	pvcName := "couchbase"
