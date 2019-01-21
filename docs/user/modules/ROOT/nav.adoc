@@ -6,6 +6,10 @@
 * xref:cloud-intro.adoc[Cloud Environment Setup]
  ** xref:install-aks.adoc[Installing on AKS]
  ** xref:install-gke.adoc[Installing on GKE]
+* Helm
+ ** xref:helm-setup-guide.adoc[Helm Guide]
+ ** xref:helm-operator-config.adoc[Operator Chart Spec]
+ ** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
 * Deploying the Operator
  ** xref:install-admission-controller.adoc[Installing the Admission Controller]
  ** xref:install-kubernetes.adoc[Installing on Kubernetes]
