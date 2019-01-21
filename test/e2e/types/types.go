@@ -25,6 +25,11 @@ type Cluster struct {
 	KubeConfPath string
 	// Context is the context used in the Kubernetes config
 	Context string
+
+	// Hacks - remove me
+
+	// SupportsMultipleVolumeClaims overrides dynamic checks of storage classes.
+	SupportsMultipleVolumeClaims bool
 }
 
 // APIHost returns the Kubernetes endpoint.  If you are using this please reconsider why

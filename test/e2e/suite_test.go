@@ -121,6 +121,9 @@ func runSuite(t *testing.T) {
 				break
 			}
 
+			// Override default storage class behaviour with special clusters.
+			f.ClusterSpec[kubeName].SupportsMultipleVolumeClaims = kubeCluster.SupportsMultipleVolumeClaims
+
 			if err := framework.SetupPersistentVolume(t, f.ClusterSpec[kubeName].KubeClient, f.Namespace, kubeCluster.ClusterName, kubeCluster.StorageClassType); err != nil {
 				skipCurrTestGroup = true
 				t.Error(err)

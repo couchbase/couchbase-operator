@@ -38,9 +38,10 @@ type Framework struct {
 
 // To decode cluster yaml file
 type ClusterInfo struct {
-	ClusterName      string `yaml:"name"`
-	StorageClassType string `yaml:"storageClassType"`
-	MasterNodeList   []struct {
+	ClusterName                  string `yaml:"name"`
+	StorageClassType             string `yaml:"storageClassType"`
+	SupportsMultipleVolumeClaims bool   `yaml:"supportsMultipleVolumeClaims"`
+	MasterNodeList               []struct {
 		Ip        string `yaml:"ip"`
 		NodeLabel string `yaml:"label"`
 	} `yaml:"master"`

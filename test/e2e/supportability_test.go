@@ -49,11 +49,15 @@ func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
 }
 
 // supportsMultipleVolumeClaims returns true if multiple PVCs can be supported by a test.
-// We can run the test if lazy binding is enabled (the PVCs will be scheduled in the same
-// zone as a pod), or all nodes are in the same zone (and thus all PVs will be scheduled
-// in that zone.
+// We can run the test if there is just a single node (minikube/minishift), all nodes are
+// in the same zone (and thus all PVs will be scheduled in that zone), or lazy binding is
+// enabled (the PVCs will be scheduled in the same zone as a pod).  Additionally for abnormal
+// clusters we allow them to be used if explicitly stated in the cluster definition.
 func supportsMultipleVolumeClaims(t *testing.T, cluster *types.Cluster) bool {
-	return lazyBoundStorageClass(t, cluster) || len(GetAvailabilityZones(t, cluster)) == 1
+	return cluster.SupportsMultipleVolumeClaims ||
+		e2eutil.MustNumNodes(t, cluster) == 1 ||
+		MustNumAvailabilityZones(t, cluster) == 1 ||
+		lazyBoundStorageClass(t, cluster)
 }
 
 // Removes first dir name present in the file path

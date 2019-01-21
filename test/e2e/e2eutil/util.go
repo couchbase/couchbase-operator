@@ -1042,6 +1042,15 @@ func NumK8Nodes(kubeCli kubernetes.Interface) (int, error) {
 	return len(nodeList.Items), nil
 }
 
+// MustNumNodes returns the number of nodes in the cluster.
+func MustNumNodes(t *testing.T, k8s *types.Cluster) int {
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+	return len(nodes.Items)
+}
+
 // memoryRequirementToFloat takes a memory requirement, scales it into MiB and
 // then casts to a floating point.
 func memoryRequirementToFloat(quantity resource.Quantity) float64 {

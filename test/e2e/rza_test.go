@@ -155,6 +155,11 @@ func GetAvailabilityZones(t *testing.T, cluster *types.Cluster) clustercapabilit
 	return capabilities.AvailabilityZones
 }
 
+// MustNumAvailabilityZones returns the number of availability zones defined in the target cluster.
+func MustNumAvailabilityZones(t *testing.T, cluster *types.Cluster) int {
+	return len(GetAvailabilityZones(t, cluster))
+}
+
 // Generic function to test AntiAffinity test case with values on / off
 func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	f := framework.Global
