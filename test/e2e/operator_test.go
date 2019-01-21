@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -92,85 +92,42 @@ func TestKillOperator(t *testing.T) {
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
+// TestKillOperatorAndUpdateClusterConfig ensures that manual changes to bucket
+// configuration are reverted by the operator during a restart.
 func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	// Static configuration.
+	clusterSize := constants.Size1
+	flush := false
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 
-	// create connection to couchbase nodes
+	// Ccreate a direct connection to a couchbase node.
 	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	// make a bucket spec with flush disabled
-	t.Logf("externally changing bucket flush to: false")
-	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.EnableFlush = constants.BucketFlushDisabled
-	})
-	if err != nil {
-		t.Fatalf("error occurred converting bucket spec %v", err)
-	}
-
-	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			t.Logf("enabled bucket flush: %t", bucket.EnableFlush)
-			return bucket.EnableFlush == constants.BucketFlushEnabled
-		}
-		return false
-	}
-
-	eventErrChan := make(chan error)
-	waitForBucketEditEventFunc := func() {
-		event := k8sutil.BucketEditEvent("default", testCouchbase)
-		if err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, event, 180); err != nil {
-			eventErrChan <- err
-		}
-		expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-		eventErrChan <- nil
-	}
-
-	t.Logf("Killing operator and changing bucket flush from enabled to disabled...")
-	if err := e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace); err != nil {
-		t.Fatalf("failed to kill couchbase operator: %v", err)
-	}
-
-	if err := e2eutil.EditBucketAndVerify(t, client, bucket, constants.Retries5, e2eutil.FlushDisabledVerifier); err != nil {
-		t.Fatalf("error occurred editing cluster bucket %v", err)
-	}
-	if _, allowed := err.(errors.ErrInvalidBucketParamChange); allowed {
-		t.Fatalf("failed to prevent changing bucket flush: %v", err)
-	}
-
-	t.Logf("Waiting for operator to recover...")
-	if err := e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, constants.CouchbaseOperatorLabel); err != nil {
-		t.Fatalf("failed to recover couchbase operator: %v", err)
-	}
-
-	go waitForBucketEditEventFunc()
-
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to enable bucket flush %v", err)
-	}
-	t.Logf("Bucket settings reverted...")
-
-	if err := <-eventErrChan; err != nil {
-		t.Fatal(err)
-	}
-
+	// When the cluster is ready, kill the operator, manually update the bucket.  Verify the
+	// bucket was updated and wait for it to revert as the operator regains mastership.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
+	e2eutil.MustPatchBucketInfo(t, client, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", &flush), constants.Retries1)
+	e2eutil.MustPatchBucketInfo(t, client, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", &flush), constants.Retries1)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 180)
+
+	// Check the events match what we expect:
+	// * Admin console service created
+	// * Cluster created
+	// * Bucket edited (reverted)
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+	}
+
+	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }

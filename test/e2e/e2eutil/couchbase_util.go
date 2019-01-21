@@ -15,6 +15,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -132,6 +133,37 @@ func GetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.Couch
 	// Forward port to the first pod to the local host.
 	port, cleanup := forwardPort(t, k8s, cluster.Namespace, pods.Items[0].Name, "8091")
 	return "127.0.0.1:" + port, cleanup
+}
+
+// PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
+func PatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, retries int) error {
+	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+		before, err := GetBucket(t, client, bucketName)
+		if err != nil {
+			return false, err
+		}
+
+		after := *before
+		if err := jsonpatch.Apply(&after, patches.Patches()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		if reflect.DeepEqual(before, after) {
+			return true, nil
+		}
+
+		if err := client.EditBucket(&after); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		return true, nil
+	})
+}
+
+func MustPatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, retries int) {
+	if err := PatchBucketInfo(t, client, bucketName, patches, retries); err != nil {
+		Die(t, err)
+	}
 }
 
 func EditBucket(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket) error {
