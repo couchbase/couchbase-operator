@@ -2,6 +2,7 @@ package k8sutil
 
 import (
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/gocbmgr"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
@@ -303,6 +304,14 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 										},
 										"enableIndexReplica": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "boolean",
+										},
+										"compressionMode": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+											Enum: []apiextensionsv1beta1.JSON{
+												{Raw: []byte(`"` + cbmgr.CompressionModeOff + `"`)},
+												{Raw: []byte(`"` + cbmgr.CompressionModePassive + `"`)},
+												{Raw: []byte(`"` + cbmgr.CompressionModeActive + `"`)},
+											},
 										},
 									},
 								},

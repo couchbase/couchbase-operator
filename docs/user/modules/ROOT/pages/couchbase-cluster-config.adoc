@@ -69,6 +69,7 @@ spec:
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
+      compressionMode: passive
   servers:
     - size: 1
       name: all_services
@@ -534,6 +535,7 @@ spec:
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
+      compressionMode: passive
 ----
 
 === name
@@ -617,6 +619,14 @@ This field specifies whether or not to enable view index replicas for this bucke
 
 ____
 _Field rules:_ The `enableIndexReplica` field is required for buckets with type `couchbase` and can be set to either `true` or `false`. Memcached and Ephemeral buckets will ignore values in this field.
+____
+
+=== compressionMode
+
+This field sets the compression mode for the specified bucket.
+
+____
+_Field rules:_ The `compressionMode` field is optional for buckets with type `couchbase` and `ephemeral` can be set to either `off`, `passive` or `active`.  If omitted it will default to `passive`.
 ____
 
 == spec.servers

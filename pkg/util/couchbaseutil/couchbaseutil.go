@@ -892,6 +892,7 @@ func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	rv.IoPriority = cbmgr.IoPriorityType(config.IoPriority)
 	rv.EvictionPolicy = &config.EvictionPolicy
 	rv.ConflictResolution = &config.ConflictResolution
+	rv.CompressionMode = config.CompressionMode
 
 	// Required couchbase only fields
 	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {
@@ -920,6 +921,7 @@ func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) *cbapi.BucketConfig {
 	rv.IoPriority = string(bucket.IoPriority)
 	rv.EvictionPolicy = *bucket.EvictionPolicy
 	rv.ConflictResolution = *bucket.ConflictResolution
+	rv.CompressionMode = bucket.CompressionMode
 
 	// Required couchbase only fields
 	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {

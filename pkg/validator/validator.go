@@ -8,6 +8,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/x509"
+	"github.com/couchbase/gocbmgr"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -199,6 +200,12 @@ func ApplyDefaults(customResource *api.CouchbaseCluster) {
 	if customResource.Spec.ExposedFeatureServiceType == "" {
 		customResource.Spec.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
 	}
+
+	for index, bucket := range customResource.Spec.BucketSettings {
+		if bucket.BucketType != constants.BucketTypeMemcached && customResource.Spec.BucketSettings[index].CompressionMode == "" {
+			customResource.Spec.BucketSettings[index].CompressionMode = cbmgr.CompressionModePassive
+		}
+	}
 }
 
 func uniqueString(strList []string) bool {
@@ -300,6 +307,12 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
 		}
+
+		if customResource.Spec.BucketSettings[i].CompressionMode != "" {
+			err := errors.InvalidType("compressionMode", fmt.Sprintf("spec.buckets[%d]", i),
+				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
+			errs = append(errs, err)
+		}
 	}
 
 	// Check bucket parameter constraints
@@ -318,6 +331,10 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 
 		if customResource.Spec.BucketSettings[i].IoPriority == "" {
 			errs = append(errs, errors.Required("ioPriority", fmt.Sprintf("spec.buckets[%d]", i)))
+		}
+
+		if customResource.Spec.BucketSettings[i].CompressionMode == "" {
+			errs = append(errs, errors.Required("compressionMode", fmt.Sprintf("spec.buckets[%d]", i)))
 		}
 
 		switch bucket.BucketType {

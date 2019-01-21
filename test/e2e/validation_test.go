@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/gocbmgr"
 
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
@@ -363,6 +364,24 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.buckets[*].memoryQuota in body should be less than or equal to 600"},
 		},
+		{
+			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionMode("invalid")),
+			shouldFail:     true,
+			expectedErrors: []string{`spec.buckets.compressionMode in body should be one of [off passive active]`},
+		},
+		{
+			name:           "TestValidateBucketCompressionModeInvalidForEphemeral",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/3/CompressionMode", cbmgr.CompressionMode("invalid")),
+			shouldFail:     true,
+			expectedErrors: []string{`spec.buckets.compressionMode in body should be one of [off passive active]`},
+		},
+		{
+			name:           "TestValidateBucketCompressionModeInvalidForMemcached",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/2/CompressionMode", cbmgr.CompressionModeOff),
+			shouldFail:     true,
+			expectedErrors: []string{`compressionMode in spec.buckets[2] must be of type nil: "Bucket type is memcached`},
+		},
 
 		// Server settings validation
 		{
@@ -659,6 +678,16 @@ func TestValidationDefaultCreate(t *testing.T) {
 			name:        "TestValidateExposedFeatureServiceTypeDefault",
 			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/ExposedFeatureServiceType"),
 			validations: jsonpatch.NewPatchSet().Test("/Spec/ExposedFeatureServiceType", corev1.ServiceTypeNodePort),
+		},
+		{
+			name:        "TestValidateBucketCompressionModeDefaultForCouchbase",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/0/CompressionMode"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionModePassive),
+		},
+		{
+			name:        "TestValidateBucketCompressionModeDefaultForEphemeral",
+			mutations:   jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings/3/CompressionMode"),
+			validations: jsonpatch.NewPatchSet().Test("/Spec/BucketSettings/3/CompressionMode", cbmgr.CompressionModePassive),
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

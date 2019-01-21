@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/couchbase/gocbmgr"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -326,6 +328,9 @@ type BucketConfig struct {
 
 	// Enable Index replica specifies whether or not to enable view index replicas for this bucket. This parameter defaults to false if it is not specified. This parameter only affects Couchbase buckets.
 	EnableIndexReplica bool `json:"enableIndexReplica,omitempty"`
+
+	// CompressionMode is the compression mode for the bucket to run in.
+	CompressionMode cbmgr.CompressionMode `json:"compressionMode,omitempty"`
 }
 
 type ServerConfig struct {

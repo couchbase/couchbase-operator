@@ -9,6 +9,8 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -279,186 +281,63 @@ func TestNegBucketAdd(t *testing.T) {
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
-// Tests editing a bucket by changing various bucket parameters
-// 1. Create a one node cluster with one bucket
-// 2. Change the bucket memory quota to 128MB
-// 3. Verify that the memory quota was in the describe output and in the actual cluster
-// 4. Change the bucket memory quota back to 256MB
-// 5. Change the bucket replicas to 2
-// 6. Verify that the bucket replicas was in the describe output and in the actual cluster
-// 7. Change the bucket replicas back to 1
-// 8. Change enable flush to true
-// 9. Verify that the memory quota was in the describe output and in the actual cluster
-// 10. Change enable flush back to false
+// TestEditBucket tests modifying various bucket parameters and reverting them.
 func TestEditBucket(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+	kubernetes := f.GetCluster(0)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	// Constants
+	bucketName := "default"
+	enabled := true
+	disabled := false
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	// Create the cluster.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 
-	t.Logf("Waiting For Bucket To Be Created \n")
-	err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to create bucket %v", err)
-	}
-
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	// Create a direct connection to a couchbase node.
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, kubernetes, cluster)
 	defer cleanup()
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
+	// When healthy change the memory quota, replicas, whether flushes are allowed and the compression mode.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketMemoryQuota", 128), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", 128), constants.Retries5)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketMemoryQuota", 256), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", 256), constants.Retries5)
 
-	// change memory quota
-	if _, err := e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", "128", targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketReplicas", 2), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 2), constants.Retries5)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketReplicas", 1), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), constants.Retries5)
 
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EnableFlush", disabled), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &disabled), constants.Retries5)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EnableFlush", enabled), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &enabled), constants.Retries5)
 
-	// verify
-	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketMemoryQuota == 128
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to change default bucket ram quota %v", err)
-	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionModeActive), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeActive), constants.Retries5)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionModeOff), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeOff), constants.Retries5)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionModePassive), constants.Retries5)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModePassive), constants.Retries5)
 
-	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", "128", e2eutil.BucketInfoVerifier)
-	if err != nil {
-		t.Fatalf("failed to verify default bucket ram quota: %v", err)
-	}
+	// Avoid a race where Couchbase has been updated but the event not raise yet.
+	time.Sleep(10 * time.Second)
 
-	// change memory quota back
-	if _, err := e2eutil.UpdateBucketSpec("default", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	// verify
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketMemoryQuota == constants.Mem256Mb
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to change default bucket ram quota back %v", err)
+	// Check the events match what we expect:
+	// * Admin console service created
+	// * Cluster created
+	// * Bucket edited N times
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: 9, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
 	}
 
-	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier)
-	if err != nil {
-		t.Fatalf("failed to verify default bucket ram quota: %v", err)
-	}
-
-	// change replica count
-	if _, err := e2eutil.UpdateBucketSpec("default", "BucketReplicas", "2", targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	// verify
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketReplicas == 2
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to change default bucket replica count %v", err)
-	}
-
-	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketReplicas", "2", e2eutil.BucketInfoVerifier)
-	if err != nil {
-		t.Fatalf("failed to verify default bucket replica count: %v", err)
-	}
-
-	// change replica count back
-	if _, err := e2eutil.UpdateBucketSpec("default", "BucketReplicas", "1", targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	// verify
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.BucketReplicas == 1
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to change default bucket replcia count back %v", err)
-	}
-
-	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketReplicas", "1", e2eutil.BucketInfoVerifier); err != nil {
-		t.Fatalf("failed to verify default bucket replcia count back: %v", err)
-	}
-
-	// change eviction policy
-	if _, err := e2eutil.UpdateBucketSpec("default", "EnableFlush", "false", targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	// verify
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.EnableFlush == constants.BucketFlushDisabled
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to change default bucket flush policy %v", err)
-	}
-
-	if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "EnableFlush", "false", e2eutil.BucketInfoVerifier); err != nil {
-		t.Fatalf("failed to verify default bucket flush policy: %v", err)
-	}
-
-	// change eviction policy back
-	if _, err := e2eutil.UpdateBucketSpec("default", "EnableFlush", "true", targetKube.CRClient, testCouchbase, constants.Retries5); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	// verify
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			return bucket.EnableFlush == constants.BucketFlushEnabled
-		}
-		return false
-	}
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries10, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to change default bucket flush policy back %v", err)
-	}
-
-	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "EnableFlush", "true", e2eutil.BucketInfoVerifier)
-	if err != nil {
-		t.Fatalf("failed to verify default bucket flush policy back: %v", err)
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
-
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
 }
 
 // attempt to change bucket type to ephemeral

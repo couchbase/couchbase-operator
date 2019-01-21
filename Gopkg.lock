@@ -68,14 +68,14 @@
   revision = "dbeda68bf448ce8e85e52a3216f3b031ef18a4b7"
 
 [[projects]]
-  digest = "1:a8eded4f80c5fe3a5387f0fff4bf92f3156ae112ce1d885201d534162e15f295"
+  digest = "1:3714227d8cd441d9bead4866a1568beac3682950ee356db7e287ef1d1c1869b9"
   name = "github.com/couchbase/gocbmgr"
   packages = [
     ".",
     "urlencoding",
   ]
   pruneopts = "UT"
-  revision = "2286a07550c77fc8b14bcdc81c92bcddfceed418"
+  revision = "73b07a014aae7b19f0607ca901b4d3bc572246b0"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -875,6 +875,7 @@
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/extensions/v1beta1",
+    "k8s.io/api/policy/v1beta1",
     "k8s.io/api/rbac/v1",
     "k8s.io/api/rbac/v1beta1",
     "k8s.io/api/storage/v1",
@@ -882,7 +883,6 @@
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
-    "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/api/resource",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -894,6 +894,7 @@
     "k8s.io/apimachinery/pkg/selection",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/intstr",
+    "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/discovery/fake",
