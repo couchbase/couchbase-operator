@@ -17,10 +17,7 @@ func TestPodResourcesBasic(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	maxMem, err := e2eutil.GetMaxNodeMem(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get max node memory: %s", err)
-	}
+	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
 	memReq := strconv.Itoa(int(0.7 * maxMem))
 	t.Logf("Mem Request: %s MB", memReq)
 	memLimit := strconv.Itoa(int(0.8 * maxMem))
@@ -55,10 +52,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	maxMem, err := e2eutil.GetMaxNodeMem(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get max node memory: %s", err)
-	}
+	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
 	memReq := strconv.Itoa(int(0.8 * maxMem))
 	t.Logf("Mem Request: %s MB", memReq)
 	memLimit := strconv.Itoa(int(0.7 * maxMem))
@@ -112,15 +106,9 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	minMem, err := e2eutil.GetMinNodeMem(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get min node memory: %s", err)
-	}
+	minMem := e2eutil.MustGetMinNodeMem(t, targetKube)
 	reqMem := minMem * 0.9
-	scaleNum, err := e2eutil.GetMaxScale(targetKube.KubeClient, reqMem)
-	if err != nil {
-		t.Fatalf("failed to get max scale: %s", err)
-	}
+	scaleNum := e2eutil.MustGetMaxScale(t, targetKube, reqMem)
 
 	memReq := strconv.Itoa(int(reqMem))
 	t.Logf("Mem Request: %s MB", memReq)
@@ -166,10 +154,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	maxMem, err := e2eutil.GetMaxNodeMem(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get max node memory: %s", err)
-	}
+	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
 	memReq := strconv.Itoa(2 * int(maxMem))
 	t.Logf("Mem Request: %s MB", memReq)
 	clusterConfig := e2eutil.BasicClusterConfig

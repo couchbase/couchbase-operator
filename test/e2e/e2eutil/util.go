@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -1041,91 +1042,103 @@ func NumK8Nodes(kubeCli kubernetes.Interface) (int, error) {
 	return len(nodeList.Items), nil
 }
 
-func GetMinNodeMem(kubeCli kubernetes.Interface) (float64, error) {
-	minMem := math.Inf(+1)
-	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return 0.0, err
-	}
-	if len(nodeList.Items) > 0 {
-		for _, value := range nodeList.Items {
-			node := &value
-			nodeMap := node.GetLabels()
-			if node.Name != "minikube" && isMasterNode(nodeMap) {
-				continue
-			}
-			//kilobytes
-			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
-			//megabytes
-			newMem := float64(memQuantity.Value() >> 20)
-			if newMem < minMem {
-				minMem = newMem
-			}
-		}
-		if minMem == math.Inf(+1) {
-			return 0.0, fmt.Errorf("no minimum found")
-		}
-
-	} else {
-		return 0.0, fmt.Errorf("no nodes in the cluster")
-	}
-	return minMem, nil
+// memoryRequirementToFloat takes a memory requirement, scales it into MiB and
+// then casts to a floating point.
+func memoryRequirementToFloat(quantity resource.Quantity) float64 {
+	return float64(quantity.Value() >> 20)
 }
 
-func GetMaxNodeMem(kubeCli kubernetes.Interface) (float64, error) {
-	maxMem := 0.0
-	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
+// getNodeAllocatableMemory creates a map from node name to available memory in MiB.
+// This uses the per node allocatable total and deducts any pod limits or requests
+// to determine what is left.
+func getNodeAllocatableMemory(t *testing.T, k8s *types.Cluster) map[string]float64 {
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		return 0.0, err
+		Die(t, err)
 	}
-	if len(nodeList.Items) > 0 {
-		for _, value := range nodeList.Items {
-			node := &value
-			nodeMap := node.GetLabels()
-			if node.Name != "minikube" && isMasterNode(nodeMap) {
+
+	pods, err := k8s.KubeClient.CoreV1().Pods("").List(metav1.ListOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	result := map[string]float64{}
+	for _, node := range nodes.Items {
+		// Master nodes aren't allowed to have normal pods scheduled on them.
+		if node.Name != "minikube" && isMasterNode(node.Labels) {
+			continue
+		}
+
+		// Begin with the allocatable amount of memory on the node.  This is fixed and
+		// doesn't take in to account the running pods.
+		allocatable := memoryRequirementToFloat(node.Status.Allocatable[v1.ResourceMemory])
+
+		// Next deduct any limits and requests, the former taking precedence.
+		for _, pod := range pods.Items {
+			if pod.Spec.NodeName != node.Name {
 				continue
 			}
-			//kilobytes
-			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
-			//megabytes
-			newMem := float64(memQuantity.Value() >> 20)
-			if newMem > maxMem {
-				maxMem = newMem
+			for _, container := range pod.Spec.Containers {
+				if quantity, ok := container.Resources.Limits[v1.ResourceMemory]; ok {
+					allocatable -= memoryRequirementToFloat(quantity)
+					continue
+				}
+				if quantity, ok := container.Resources.Requests[v1.ResourceMemory]; ok {
+					allocatable -= memoryRequirementToFloat(quantity)
+					continue
+				}
 			}
 		}
-		if maxMem == 0.0 {
-			return 0.0, fmt.Errorf("no maximum found")
-		}
 
-	} else {
-		return 0.0, fmt.Errorf("no nodes in the cluster")
+		result[node.Name] = allocatable
 	}
-	return maxMem, nil
+
+	return result
 }
 
-func GetMaxScale(kubeCli kubernetes.Interface, minMem float64) (int, error) {
-	scaleNum := 0
-	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return 0, err
-	}
-	if len(nodeList.Items) > 0 {
-		for _, value := range nodeList.Items {
-			node := &value
-			//kilobytes
-			memQuantity := node.Status.Allocatable[v1.ResourceMemory]
-			//megabytes
-			nodeMem := float64(memQuantity.Value() >> 20)
-			scaleNum = scaleNum + int(math.Floor(nodeMem/minMem))
-		}
-		if minMem == math.Inf(+1) {
-			return 0, fmt.Errorf("unable to calculate scale number")
-		}
+// MustGetMinNodeMem returns the smallest amount of allocatable memory available on any node.
+func MustGetMinNodeMem(t *testing.T, k8s *types.Cluster) float64 {
+	allocatable := getNodeAllocatableMemory(t, k8s)
 
-	} else {
-		return 0, fmt.Errorf("no nodes in the cluster")
+	result := math.Inf(+1)
+	for _, value := range allocatable {
+		result = math.Min(result, value)
 	}
-	return scaleNum, nil
+
+	if result == math.Inf(+1) {
+		Die(t, fmt.Errorf("no minimum found"))
+	}
+
+	return result
+}
+
+// MustGetMaxNodeMem returns the largest amount of allocatable memory available on any node.
+func MustGetMaxNodeMem(t *testing.T, k8s *types.Cluster) float64 {
+	allocatable := getNodeAllocatableMemory(t, k8s)
+
+	result := 0.0
+	for _, value := range allocatable {
+		result = math.Max(result, value)
+	}
+
+	if result == 0.0 {
+		Die(t, fmt.Errorf("no maximum found"))
+	}
+
+	return result
+}
+
+// MustGetMaxScale accepts a memory figure and returns the number of pods that can be deployed
+// across the cluster with that sized memory requirement.
+func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
+	allocatable := getNodeAllocatableMemory(t, k8s)
+
+	result := 0
+	for _, value := range allocatable {
+		result += int(math.Floor(value / memory))
+	}
+
+	return result
 }
 
 // Construct expected name for the PersistentVolumeClaim which belongs to member
