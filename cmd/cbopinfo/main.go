@@ -154,7 +154,7 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	} else if deployment == nil {
-		fmt.Println("no Couchbase Operator Deployment resource discovered in name space", context.Config.Namespace)
+		fmt.Println("no Couchbase Operator Deployment resource discovered in name space (check the -operator-image flag is correctly set)", context.Config.Namespace)
 	} else {
 		anythingToCollect = true
 	}
