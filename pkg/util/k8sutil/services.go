@@ -802,9 +802,11 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 		if err != nil {
 			switch {
 			case cberrors.IsErrUnknownServerClass(err):
+				err = nil
 				continue
 			case cberrors.IsErrUnknownMember(err):
 				deletions = append(deletions, service)
+				err = nil
 				continue
 			default:
 				return
