@@ -177,6 +177,22 @@ func verifyLogRedaction(kubeClient kubernetes.Interface, namespace, cbClusterNam
 	return nil
 }
 
+func verifyLogCollectListJson(kubeClient kubernetes.Interface, namespace, cbClusterName, collectInfoListJson string, errMsgList *failureList) error {
+	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+	if err != nil {
+		return errors.New("Failed to list pods: " + err.Error())
+	}
+
+	podPresent := true
+
+	for _, pod := range pods.Items {
+		if strings.Contains(collectInfoListJson, pod.Name) != podPresent {
+			errMsgList.AppendFailure("Pod missing from JSON output: "+pod.Name, errors.New("Pod missing in JSON output!"))
+		}
+	}
+	return nil
+}
+
 // Function to populate deployment file list
 func getDeployementFileList(kubeClient kubernetes.Interface, namespace, deploymentDir string, fileList *[]string, allFlag bool) error {
 	var err error
@@ -2434,4 +2450,50 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 		pvcMapping[couchbaseutil.CreateMemberName(cluster2.Name, i)] = 1
 	}
 	MustVerifyPvcMappingForPods(t, kubernetes.KubeClient, f.Namespace, pvcMapping, f.PlatformType)
+}
+
+func TestLogCollectListJson(t *testing.T) {
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	bucketName := "default"
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size1, "test_config_1", []string{"data"})
+	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_2", []string{"query", "index", "analytics"})
+	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"service2": serviceConfig2,
+		"bucket1":  bucketConfig1,
+	}
+
+	// Create Couchbase cluster
+	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
+
+	// Collect logs
+	args := argumentList{}
+	args.addClusterDefaults(targetKube)
+	args.addEnvironmentDefaults()
+	args.add("--collectinfo", "")
+	args.add("--collectinfo-list", "")
+	execOut, err := runCbopinfoCmd(args.slice())
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errMsgList := failureList{}
+	testHasErrors := false
+	if err := verifyLogCollectListJson(targetKube.KubeClient, f.Namespace, cbCluster.Name, execOutStr, &errMsgList); err != nil {
+		t.Error(err)
+	}
+
+	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
+
+	if testHasErrors {
+		t.Fail()
+	}
 }

@@ -184,6 +184,7 @@ var (
 		"TestExtendedDebugWithNonDefaultValues":            TestExtendedDebugWithNonDefaultValues,
 		"TestExtendedDebugWithInvalidValues":               TestExtendedDebugWithInvalidValues,
 		"TestExtendedDebugKillOperatorDuringLogCollection": TestExtendedDebugKillOperatorDuringLogCollection,
+		"TestLogCollectListJson":                           TestLogCollectListJson,
 
 		// Log collection from Ephmeral pods
 		"TestCollectLogFromEphemeralPodsUsingLogPV":           TestCollectLogFromEphemeralPodsUsingLogPV,
