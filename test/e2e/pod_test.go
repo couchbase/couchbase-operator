@@ -129,7 +129,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
 	// Add in a new node which should cause a memory allocation error
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleNum+1, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleNum+1, targetKube, testCouchbase)
 
 	// Wait for the creation failure event to be raised
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, scaleNum), 60)
@@ -308,14 +308,14 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	}
 
 	t.Logf("Attempting to add a node")
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, numNodes+1, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, numNodes+1, targetKube, testCouchbase)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes), 300)
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, numNodes)
 	t.Logf("Node not added")
 
 	t.Logf("Reverting add")
-	testCouchbase, err = e2eutil.ResizeCluster(t, 0, numNodes, targetKube.CRClient, testCouchbase)
+	testCouchbase, err = e2eutil.ResizeCluster(t, 0, numNodes, targetKube, testCouchbase, constants.Retries30)
 	if err != nil {
 		t.Fatalf("cluster failed to revert, fail: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("Attempting to add a node")
-	testCouchbase, err = e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube.CRClient, testCouchbase)
+	testCouchbase, err = e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube, testCouchbase, constants.Retries30)
 	if err != nil {
 		t.Fatalf("cluster failed to scale to 5 nodes: %v", err)
 	}

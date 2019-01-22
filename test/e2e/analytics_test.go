@@ -213,7 +213,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	for _, clusterSize = range clusterSizes {
 		service := 0
 		var err error
-		testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+		testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries120)
 		if err != nil {
 			t.Fatal(err)
 		}

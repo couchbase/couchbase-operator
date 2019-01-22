@@ -65,7 +65,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// async scale up to 3 node cluster
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube, testCouchbase)
 
 	// wait for add member event
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 300)
@@ -114,7 +114,7 @@ func TestTlsResizeCluster(t *testing.T) {
 
 	for _, clusterSize := range clusterSizes {
 		service := 0
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
 
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
@@ -243,7 +243,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	}
 	t.Log("Couchbase operator certificate deleted")
 
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size5, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size5, targetKube, testCouchbase)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30)
 	expectedEvents.AddTLSInvalidEvent(testCouchbase)
@@ -628,7 +628,7 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 300)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
-	e2eutil.MustResizeCluster(t, 0, clusterSize+clusterScaleUpSize, kubernetes.CRClient, cluster)
+	e2eutil.MustResizeCluster(t, 0, clusterSize+clusterScaleUpSize, kubernetes, cluster, constants.Retries30)
 
 	// Check the events match what we expect:
 	// * Cluster created

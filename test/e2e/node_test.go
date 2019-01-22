@@ -228,7 +228,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	clusterSize = constants.Size5
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
 
 	for memberId := 1; memberId < clusterSize; memberId++ {
 		// wait for add member event
@@ -282,7 +282,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// async scale up to 3 node cluster
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube, testCouchbase)
 
 	// wait for add member event
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 300)
@@ -342,7 +342,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 
 	// resize to 3 member cluster
 	clusterSize = constants.Size3
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
 
 	// detect 3rd member add event
 	newPodMemberId := clusterSize - 1
@@ -462,7 +462,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	testCouchbase = e2eutil.MustUpdateClusterSpec(t, "Paused", "false", targetKube.CRClient, testCouchbase, constants.Retries5)
 
 	// resize to 2 member cluster
-	testCouchbase, err = e2eutil.ResizeCluster(t, 0, constants.Size2, targetKube.CRClient, testCouchbase)
+	testCouchbase, err = e2eutil.ResizeCluster(t, 0, constants.Size2, targetKube, testCouchbase, constants.Retries30)
 	if err != nil {
 		t.Fatal(err)
 	}

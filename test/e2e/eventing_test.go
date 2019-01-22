@@ -219,7 +219,7 @@ func TestEventingResizeCluster(t *testing.T) {
 
 		// Resize cluster and wait for healthy cluster
 		service := 1
-		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, eventingNodes, targetKube.CRClient, testCouchbase)
+		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, eventingNodes, targetKube, testCouchbase)
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
 		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
 		if err != nil {

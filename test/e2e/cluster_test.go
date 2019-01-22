@@ -38,7 +38,7 @@ func TestResizeCluster(t *testing.T) {
 	prevClusterSize := constants.Size1
 	for _, clusterSize := range clusterSizes {
 		service := 0
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch {
@@ -82,7 +82,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	prevClusterSize := constants.Size1
 	for _, clusterSize := range clusterSizes {
 		service := 0
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 		switch {
@@ -406,7 +406,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	//first node wont change request and last node should be unschedulable and minus out the master node
 	clusterSize = len(nodeList.Items) + 1
 	serviceId := 0
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceId, clusterSize, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceId, clusterSize, targetKube, testCouchbase)
 
 	// Wait for each member add event
 	for memberId := 1; memberId < clusterSize-1; memberId++ {
@@ -522,7 +522,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 
 	clusterSize--
 	// scale down to a node in cluster
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
 
 	// when cluster starts scaling kill couchbase service on pod 0
 	if err := e2eutil.WaitForClusterScalingCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {

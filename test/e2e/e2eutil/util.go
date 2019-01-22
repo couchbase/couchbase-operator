@@ -876,27 +876,27 @@ func isMasterNode(nodeMap map[string]string) bool {
 	return false
 }
 
-func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	cluster, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), crClient, cl, 10)
+	cluster, err := UpdateServiceSpec(service, "Size", strconv.Itoa(clusterSize), k8s.CRClient, cl, 10)
 	return cluster, err
 }
 
-func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
-	cluster, err := ResizeClusterNoWait(t, service, clusterSize, crClient, cl)
+func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
+	cluster, err := ResizeClusterNoWait(t, service, clusterSize, k8s, cl)
 	if err != nil {
 		Die(t, err)
 	}
 	return cluster
 }
 
-func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
-	cluster, err := ResizeClusterNoWait(t, service, clusterSize, crClient, cl)
+func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, retries int) (*api.CouchbaseCluster, error) {
+	cluster, err := ResizeClusterNoWait(t, service, clusterSize, k8s, cl)
 	if err != nil {
 		return cl, err
 	}
 	t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-	names, err := WaitUntilSizeReached(t, crClient, clusterSize, 30, cl)
+	names, err := WaitUntilSizeReached(t, k8s.CRClient, clusterSize, retries, cl)
 	if err != nil {
 		return cluster, err
 	}
@@ -904,8 +904,8 @@ func ResizeCluster(t *testing.T, service int, clusterSize int, crClient versione
 	return cluster, nil
 }
 
-func MustResizeCluster(t *testing.T, service int, clusterSize int, crClient versioned.Interface, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
-	cluster, err := ResizeCluster(t, service, clusterSize, crClient, cl)
+func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, retries int) *api.CouchbaseCluster {
+	cluster, err := ResizeCluster(t, service, clusterSize, k8s, cl, retries)
 	if err != nil {
 		Die(t, err)
 	}

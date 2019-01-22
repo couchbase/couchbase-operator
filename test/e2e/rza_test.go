@@ -235,13 +235,13 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
 
 	serviceIndex := 0
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube, testCouchbase)
 
 	if antiAffinity == "on" {
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 120)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
 		// Revert back to original cluster size
-		testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize, targetKube.CRClient, testCouchbase)
+		testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize, targetKube, testCouchbase)
 	} else if antiAffinity == "off" {
 		// Updated new clusterSize
 		clusterSize += newPodsToAdd
@@ -353,7 +353,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	service := 0
 	prevClusterSize := clusterSize
 	clusterSize += 1
-	testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+	testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -584,7 +584,7 @@ func TestRzaResizeCluster(t *testing.T) {
 		expectedRzaResultMap = GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 		// Resize cluster and wait for healthy cluster
-		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube, testCouchbase)
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
 		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
 		if err != nil {
@@ -751,7 +751,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	service := 0
 
 	// Resize cluster and wait for healthy cluster
-	testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+	testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -826,7 +826,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	service := 0
 	clusterSize++
 	// Add one more node to cluster
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube.CRClient, testCouchbase)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube, testCouchbase)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 120)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize-1)

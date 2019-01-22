@@ -1645,7 +1645,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 
 	// Trigger async Cluster's service config resize
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube.CRClient, cbCluster)
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube, cbCluster)
 
 	// Kill operator if flag is enabled
 	if isOperatorKilledWithServerPod {
@@ -1789,7 +1789,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 2 node service
 	serviceSize := constants.Size2
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube, cbCluster)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
@@ -1809,7 +1809,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size4
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube, cbCluster)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
@@ -1829,7 +1829,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size1
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube.CRClient, cbCluster)
+	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube, cbCluster)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
 
 	// Add expected events
