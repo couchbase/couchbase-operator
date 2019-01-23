@@ -3,12 +3,22 @@ package portforward
 import (
 	"io/ioutil"
 	"net/http"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+)
+
+var (
+	// mutex is used for avoiding races where multiple instances are alive at once.
+	mutex = &sync.Mutex{}
+	// instances is a counter of how many instances are alive.
+	instances = 0
+	// handlers backs up port forward error handlers when in silent mode
+	handlers []func(error)
 )
 
 // PortForwarder forwards a pod port to localhost in the background
@@ -72,7 +82,21 @@ func (pf *PortForwarder) Close() error {
 // Silent makes any runtime print statements go away.  Returns a restorer function that should
 // be called once silence is no longer needed.
 func Silent() func() {
-	handlers := runtime.ErrorHandlers
-	runtime.ErrorHandlers = []func(error){}
-	return func() { runtime.ErrorHandlers = handlers }
+	// Only perform the backup on the first call.
+	mutex.Lock()
+	if instances == 0 {
+		handlers = runtime.ErrorHandlers
+		runtime.ErrorHandlers = []func(error){}
+	}
+	instances += 1
+	mutex.Unlock()
+	return func() {
+		// Only perform the restore on the last call.
+		mutex.Lock()
+		instances -= 1
+		if instances == 0 {
+			runtime.ErrorHandlers = handlers
+		}
+		mutex.Unlock()
+	}
 }
