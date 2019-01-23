@@ -1461,6 +1461,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverOnDiskIssues"] = "true"
 	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
+	clusterConfig["AutoFailoverTimeout"] = "5"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_1", []string{"data"})
 	serviceConfig1["defaultVolMnt"] = pvcName
 
@@ -1487,8 +1488,6 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	createPodSecurityContext(1000, &clusterSpec)
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	// Cleanup cluster after test execution
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
 
@@ -1510,9 +1509,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	// Kill PV log enabled pods and verify the logs are persisted after pod deletion
 	for _, memberToKill := range podMembersToKill {
@@ -1574,9 +1571,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
@@ -1640,9 +1635,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	// Trigger async Cluster's service config resize
 	cbCluster = e2eutil.MustResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube, cbCluster)
@@ -1683,9 +1676,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, clusterSize-1)] = 0
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
@@ -1698,11 +1689,19 @@ func TestCollectLogFromEphemeralPodsUsingLogPV(t *testing.T) {
 
 	// Pods brought down using DeletePod method
 	EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "deletePod", isOperatorKilledWithServerPod)
+}
+
+func TestCollectLogFromEphemeralPodsUsingLogPVKillProcess(t *testing.T) {
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+	isOperatorKilledWithServerPod := false
+
+	if f.KubeType != "kubernetes" {
+		t.Skip("unsupported platform")
+	}
 
 	// Pods brought down by killing cb-server process
-	if f.KubeType == "kubernetes" {
-		EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "killServerProcess", isOperatorKilledWithServerPod)
-	}
+	EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "killServerProcess", isOperatorKilledWithServerPod)
 }
 
 // Define log mount for ephemeral pods and validate the logs are preserved
@@ -1714,11 +1713,19 @@ func TestCollectLogFromEphemeralPodsWithOperatorKilled(t *testing.T) {
 
 	// Pods brought down using DeletePod method
 	EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "deletePod", isOperatorKilledWithServerPod)
+}
+
+func TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess(t *testing.T) {
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+	isOperatorKilledWithServerPod := true
+
+	if f.KubeType != "kubernetes" {
+		t.Skip("unsupported platform")
+	}
 
 	// Pods brought down by killing cb-server process
-	if f.KubeType == "kubernetes" {
-		EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "killServerProcess", isOperatorKilledWithServerPod)
-	}
+	EphemeralLogCollectUsingLogPVGeneric(t, targetKube, "killServerProcess", isOperatorKilledWithServerPod)
 }
 
 // Deploys Couchbase server with log PV defined for server pods
@@ -1783,9 +1790,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	// Start resizing service config to 2 node service
 	serviceSize := constants.Size2
@@ -1803,9 +1808,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size4
@@ -1823,9 +1826,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	// Start resizing service config to 4 node service
 	serviceSize = constants.Size1
@@ -1843,9 +1844,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
@@ -1917,9 +1916,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	for memberIdToKill := 2; memberIdToKill <= 7; memberIdToKill++ {
 		memberNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, memberIdToKill)
@@ -1950,9 +1947,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
@@ -2017,9 +2012,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	memberIdsToKill := []int{2, 3, 4, 5, 6, 7}
 	for index, memberIdToKill := range memberIdsToKill {
@@ -2059,9 +2052,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		}
 
 		// Verifying the persistence of log PVs are preserved by operator
-		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-			t.Error(err)
-		}
+		MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 		newPodMemberId++
 	}
 
@@ -2075,9 +2066,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
 }
 
@@ -2449,7 +2438,7 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 	for i := 0; i < clusterSize+1; i++ {
 		pvcMapping[couchbaseutil.CreateMemberName(cluster2.Name, i)] = 1
 	}
-	MustVerifyPvcMappingForPods(t, kubernetes.KubeClient, f.Namespace, pvcMapping, f.PlatformType)
+	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, pvcMapping, f.PlatformType)
 }
 
 func TestLogCollectListJson(t *testing.T) {

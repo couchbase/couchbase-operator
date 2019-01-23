@@ -187,13 +187,15 @@ var (
 		"TestLogCollectListJson":                           TestLogCollectListJson,
 
 		// Log collection from Ephmeral pods
-		"TestCollectLogFromEphemeralPodsUsingLogPV":           TestCollectLogFromEphemeralPodsUsingLogPV,
-		"TestCollectLogFromEphemeralPodsWithOperatorKilled":   TestCollectLogFromEphemeralPodsWithOperatorKilled,
-		"TestEphemeralLogCollectResizeCluster":                TestEphemeralLogCollectResizeCluster,
-		"TestLogCollectWithClusterResizeAndServerPodKilled":   TestLogCollectWithClusterResizeAndServerPodKilled,
-		"TestLogCollectWithClusterResizeAndOperatorPodKilled": TestLogCollectWithClusterResizeAndOperatorPodKilled,
-		"TestLogCollectWithDefaultRetentionAndSize":           TestLogCollectWithDefaultRetentionAndSize,
-		"TestLogCollectWithCustomRetentionAndSize":            TestLogCollectWithCustomRetentionAndSize,
+		"TestCollectLogFromEphemeralPodsUsingLogPV":                    TestCollectLogFromEphemeralPodsUsingLogPV,
+		"TestCollectLogFromEphemeralPodsUsingLogPVKillProcess":         TestCollectLogFromEphemeralPodsUsingLogPVKillProcess,
+		"TestCollectLogFromEphemeralPodsWithOperatorKilled":            TestCollectLogFromEphemeralPodsWithOperatorKilled,
+		"TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess": TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess,
+		"TestEphemeralLogCollectResizeCluster":                         TestEphemeralLogCollectResizeCluster,
+		"TestLogCollectWithClusterResizeAndServerPodKilled":            TestLogCollectWithClusterResizeAndServerPodKilled,
+		"TestLogCollectWithClusterResizeAndOperatorPodKilled":          TestLogCollectWithClusterResizeAndOperatorPodKilled,
+		"TestLogCollectWithDefaultRetentionAndSize":                    TestLogCollectWithDefaultRetentionAndSize,
+		"TestLogCollectWithCustomRetentionAndSize":                     TestLogCollectWithCustomRetentionAndSize,
 		// Log collection from Persistent pods
 		"TestLogCollectClusterWithPVC":     TestLogCollectClusterWithPVC,
 		"TestCollectLogFromPvPodRecovered": TestCollectLogFromPvPodRecovered,

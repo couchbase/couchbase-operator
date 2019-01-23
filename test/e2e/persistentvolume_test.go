@@ -17,11 +17,11 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // This will create a Persistent volume claim data
@@ -50,10 +50,10 @@ func createPodSecurityContext(fsGroup int, clusterSpec *v1.ClusterSpec) {
 }
 
 // Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user
-func VerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, namespace string, expectedPvcMap map[string]int, platformType string) (errToReturn error) {
+func VerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int, platformType string) (errToReturn error) {
 	pvcMappingVerify := func() error {
 		for memberName, pvcCount := range expectedPvcMap {
-			pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
+			pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
 			if err != nil {
 				return err
 			} else if len(pvcList.Items) != pvcCount {
@@ -78,9 +78,9 @@ func VerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, name
 	return
 }
 
-func MustVerifyPvcMappingForPods(t *testing.T, kubeClient kubernetes.Interface, namespace string, expectedPvcMap map[string]int, platformType string) {
-	if err := VerifyPvcMappingForPods(t, kubeClient, namespace, expectedPvcMap, platformType); err != nil {
-		t.Fatal(err)
+func MustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int, platformType string) {
+	if err := VerifyPvcMappingForPods(t, k8s, namespace, expectedPvcMap, platformType); err != nil {
+		e2eutil.Die(t, err)
 	}
 }
 
@@ -393,9 +393,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5*platformTimingMultiplier)
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 
 	// Kill pod along with its PVC
 	if err := e2eutil.RemovePersistentVolumesOfPod(targetKube.KubeClient, f.Namespace, testCouchbase.Name, podMemberIdToKill); err != nil {
@@ -474,9 +472,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, kubernetes.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap, f.PlatformType)
 }
 
 // Create PV enabled couchbase cluster
@@ -738,9 +734,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -1126,9 +1120,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-		t.Error(err)
-	}
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -1232,9 +1224,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 
 		// To cross check number of persistent vol claims matches the defined spec
-		if err := VerifyPvcMappingForPods(t, targetKube.KubeClient, f.Namespace, expectedPvcMap, f.PlatformType); err != nil {
-			t.Error(err)
-		}
+		MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)

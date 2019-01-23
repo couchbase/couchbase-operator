@@ -140,6 +140,7 @@ tcGroups:
       - name: TestExtendedDebugWithInvalidValues
       - name: TestExtendedDebugKillOperatorDuringLogCollection
       - name: TestCollectLogFromEphemeralPodsWithOperatorKilled
+      - name: TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess
       - name: TestEphemeralLogCollectResizeCluster
       - name: TestLogCollectWithClusterResizeAndServerPodKilled
       - name: TestLogCollectWithCustomRetentionAndSize
