@@ -190,10 +190,7 @@ func TestAntiAffinityOn(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
-	}
+	numNodes := e2eutil.MustNumNodes(t, targetKube)
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
 		"size":     strconv.Itoa(numNodes),
@@ -230,10 +227,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
-	}
+	numNodes := e2eutil.MustNumNodes(t, targetKube)
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
 		"size":     strconv.Itoa(numNodes + 1),
@@ -275,10 +269,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
-	}
+	numNodes := e2eutil.MustNumNodes(t, targetKube)
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
 		"size":     strconv.Itoa(numNodes),
@@ -315,6 +306,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	t.Logf("Node not added")
 
 	t.Logf("Reverting add")
+	var err error
 	testCouchbase, err = e2eutil.ResizeCluster(t, 0, numNodes, targetKube, testCouchbase, constants.Retries30)
 	if err != nil {
 		t.Fatalf("cluster failed to revert, fail: %v", err)
@@ -331,10 +323,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes, err := e2eutil.NumK8Nodes(targetKube.KubeClient)
-	if err != nil {
-		t.Fatalf("failed to get number of kubernetes nodes: %v", err)
-	}
+	numNodes := e2eutil.MustNumNodes(t, targetKube)
 	scaleToNum := numNodes + 1
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := map[string]string{
@@ -362,6 +351,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("Attempting to add a node")
+	var err error
 	testCouchbase, err = e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube, testCouchbase, constants.Retries30)
 	if err != nil {
 		t.Fatalf("cluster failed to scale to 5 nodes: %v", err)

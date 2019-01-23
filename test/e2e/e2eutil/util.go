@@ -1034,21 +1034,37 @@ func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error
 	return operatorPods[0], nil
 }
 
-func NumK8Nodes(kubeCli kubernetes.Interface) (int, error) {
-	nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
+// getSchedulableNodes returns a list of all nodes that can be scheduled onto.
+func getSchedulableNodes(k8s *types.Cluster) ([]*v1.Node, error) {
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
-	return len(nodeList.Items), nil
+
+	result := []*v1.Node{}
+	for index, _ := range nodes.Items {
+		schedulable := true
+		for _, taint := range nodes.Items[index].Spec.Taints {
+			if taint.Effect == v1.TaintEffectNoSchedule {
+				schedulable = false
+				break
+			}
+		}
+		if schedulable {
+			result = append(result, &nodes.Items[index])
+		}
+	}
+
+	return result, nil
 }
 
 // MustNumNodes returns the number of nodes in the cluster.
 func MustNumNodes(t *testing.T, k8s *types.Cluster) int {
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := getSchedulableNodes(k8s)
 	if err != nil {
 		Die(t, err)
 	}
-	return len(nodes.Items)
+	return len(nodes)
 }
 
 // memoryRequirementToFloat takes a memory requirement, scales it into MiB and
@@ -1061,7 +1077,7 @@ func memoryRequirementToFloat(quantity resource.Quantity) float64 {
 // This uses the per node allocatable total and deducts any pod limits or requests
 // to determine what is left.
 func getNodeAllocatableMemory(t *testing.T, k8s *types.Cluster) map[string]float64 {
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := getSchedulableNodes(k8s)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1072,12 +1088,7 @@ func getNodeAllocatableMemory(t *testing.T, k8s *types.Cluster) map[string]float
 	}
 
 	result := map[string]float64{}
-	for _, node := range nodes.Items {
-		// Master nodes aren't allowed to have normal pods scheduled on them.
-		if node.Name != "minikube" && isMasterNode(node.Labels) {
-			continue
-		}
-
+	for _, node := range nodes {
 		// Begin with the allocatable amount of memory on the node.  This is fixed and
 		// doesn't take in to account the running pods.
 		allocatable := memoryRequirementToFloat(node.Status.Allocatable[v1.ResourceMemory])
