@@ -3,84 +3,35 @@
 
 [abstract]
 When deploying on a cloud that spans multiple availability zones, certain steps are required in order to use persistent volumes.
+These steps will vary depending on the version of Kubernetes being provided by your cloud.
 
-* [ ] <<node-labels,Step 1:>> Label nodes with zone/region selectors
-* [ ] <<add-sg,Step 2:>> Add server groups to the cluster configuration
-* [ ] <<create-sc,Step 3:>> Create zoned storage classes for each zone
-* [ ] <<add-sc,Step 4:>> Add storage classes to the cluster configuration
+.Kubernetes 1.12+
+* [ ] <<create-sc,Step 1:>> Create a storage class with multi-zone binding
+* [ ] <<add-sc,Step 2:>> Add the storage class to the cluster configuration
 
-
-
-[#node-labels]
-== Label Nodes
-
-Kubernetes nodes must be labeled according to the zones where they are physically located.
-This ensures that persistent volumes are provisioned into the same zones as the nodes.
-
-The key `failure-domain.beta.kubernetes.io/zone` must be used when creating the label.
-For example, to label a node in Amazon EC2 within zone `us-east-1a`:
-
-[source,console]
-----
-kubectl label nodes ip-172-16-0-10 failure-domain.beta.kubernetes.io/zone=us-east-1a
-----
-
-For more information about labeling nodes, see the xref:server-groups.adoc[server groups documentation].
-
-[#add-sg]
-== Add Server Groups to the Configuration
-
-Once nodes are labeled according to their associating zones, these zones need to be added to the Couchbase cluster spec under `serverGroups`.
-Server groups will ensure that the Operator creates pods in a specific zone.
-The following snippet demonstrates configuring Couchbase to deploy pods across three zones:
-
-[source,yaml]
-----
-spec:
-  serverGroups:
-    - us-east-1a
-    - us-east-1b
-    - us-east-1c
-  servers:
-    - name: east-1a
-      size: 3
-      services:
-        - data
-        - index
-      serverGroups:
-        - us-east-1a
-    - name: east-1b
-      size: 3
-      services:
-        - data
-        - index
-      serverGroups:
-        - us-east-1b
-    - name: east-1c
-      size: 2
-      services:
-        - query
-        - search
-      serverGroups:
-        - us-east-1c
-----
+If your cloud provider is running Kubernetes 1.11.x, refer to the xref:persistent-volumes-zoning-guide-legacy.adoc[legacy zoning guide].
 
 [CAUTION]
 ====
-Only one server group should be used for each group of `spec.servers[*].serverGroups`.
-This is because later in the configuration you'll notice that there is a 1:1 ratio between storage class and server groups, and having multiple server groups would cause some pods to be created in a different zone than where the storage class is able to create volumes.
+There is no upgrade path from Kubernetes 1.11 to 1.12 configurations since the underlying `StorageClass` used by a pod cannot be changed.
+Therefore, consider using Kubernetes 1.12+ for easier long-term maintenance of your cluster since the configuration is less complex for deployments that use server groups.
 ====
 
 [#create-sc]
-== Create Zoned Storage Classes
+== Create a Multi-Zoned Storage Class
 
-While the previous steps dealt with deploying pods into specific availability zones, the next steps deal with deploying _persistent volumes_ into specific availability zones.
-This is necessary because the default behavior of a storage class is to create persistent volumes across zones in a round-robin fashion, which unfortunately leads to scheduling conflicts when a pod attempts to mount a volume that gets created outside of its availability zone.
-For example, a volume created in zone `us-east-1a` cannot be mounted by pods that are scheduled in zone `us-east-1b`.
-Therefore, a Kubernetes storage class must be created for each zone that is designated to host pods with persistent volumes.
+When creating volumes across multiple availability zones, we need to ensure that the volumes are bound in the same zone as the pod.
+This can be accomplished by creating a `StorageClass` with `volumeBindingMode` set to `WaitForFirstConsumer`.
+When volumes are created under this binding mode, it means that the pod will determine which node the volumes should bind to since the pod is considered its first consumer.
+Another reason why this is necessary is because the default binding mode of `Immediate` often results in scheduling conflicts when the pod is created in a different zone than its volumes.
 
-You may have to refer to the details of your https://kubernetes.io/docs/concepts/storage/storage-classes/[storage class] for information about how to constrain volume creation to a specific zone/region.
-The following snippet is an example of a storage class that uses the `aws-ebs` provisioner to restrict volume creation to zone `us-east-1a`:
+IMPORTANT
+====
+Even if you are not using server groups you will still need to set the binding mode to `WaitForFirstConsumer` when your cloud has multiple zones.
+Some cloud providers may not require this, but for performance, it's recommended that pods and volumes are always placed in the same zone.
+====
+
+The following snippet is an example of a storage class that uses the binding mode `WaitForFirstConsumer` to ensure volumes are bound to the proper zone:
 
 [source,yaml]
 ----
@@ -89,59 +40,59 @@ kind: StorageClass
 metadata:
   labels:
     k8s-addon: storage-aws.addons.k8s.io
-  name: us-east-1a
+  name: gp2-multi
 parameters:
   type: gp2
-  zone: us-east-1a
 provisioner: kubernetes.io/aws-ebs
 reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
 ----
+
+Notice here that `volumeBindingMode` is set to `WaitForFirstConsumer`.
+Everything else can be the exact same as your other storage classes.
 
 [#add-sc]
-== Add Storage Classes to the Configuration
+== Add the Storage Class to the Configuration
 
-Storage classes are used by the persistent volume claim templates to dynamically create volumes for the pods.
-Since there is a storage class for each zone, you'll also need to create a persistent volume claim template for each Zone.
-
-The following snippet is an example configuration that is required for using storage classes across three different zones:
-
-[source,yaml]
-----
-spec:
-  volumeClaimTemplates:
-    - metadata:
-        name: us-east-1a
-      spec:
-        storageClassName: "us-east-1a"
-        resources:
-          requests:
-            storage: 10Gi
-    - metadata:
-        name: us-east-1b
-      spec:
-        storageClassName: "us-east-1b"
-        resources:
-          requests:
-            storage: 10Gi
-    - metadata:
-        name: us-east-1c
-      spec:
-        storageClassName: "us-east-1c"
-        resources:
-          requests:
-            storage: 10Gi
-----
-
-Now that the templates are added, the final step is to pair the volume claim template with server groups according to the zones that they service.
-For instance, pods within a server group named `us-east-1a` should use the `volumeClaimTemplate` named `us-east-1a`, which itself is using the storage class named `us-east-1a`.
-
-For example, the following snippet shows the pairing of a server group and its associated `volumeClaimTemplate`:
+Storage classes are used by the persistent volume claim templates to dynamically create volumes for Pods.
+Therefore, the final step of configuration is to specify the storage class which should be used for creating volumes in the `volumeClaimTemplates.spec.storageClassName` section of the spec.
+In the example below the `gp2-multi` storage class we just created is specified as the storage class for provisioning volumes:
 
 [source,yaml]
 ----
 spec:
   servers:
-    - name: east-1a
+    - name: data-nodes
+      size: 3
+      services:
+        - data
+        - index
+      pod:
+        volumeMounts:
+          default: gp2-multi
+          data: gp2-multi
+  volumeClaimTemplates:
+    - metadata:
+        name: gp2-multi
+      spec:
+        storageClassName: gp2-multi
+        resources:
+          requests:
+            storage: 1Gi
+----
+
+=== Multi-Dimensional Scaling Across Zones
+
+The most practical use-case for deploying Kubernetes across multiple availability zones is to prevent data loss in the event a outage.
+Therefore, Couchbase server groups are often used in these environments, and when combined with persistent volumes, an even higher level of resiliance to disaster can be achieved.
+
+The following example shows the use of server groups with persistent volumes on a cloud that's configured with multiple availability groups:
+
+[source,yaml]
+----
+spec:
+  servers:
+    - name: zone-a
       size: 3
       services:
         - data
@@ -150,78 +101,40 @@ spec:
         - us-east-1a
       pod:
         volumeMounts:
-          default: us-east-1a
-          data: us-east-1a
+          default: gp2-multi
+          data: gp2-multi
+    - name: zone-b
+      size: 3
+      services:
+        - data
+        - index
+      serverGroups:
+        - us-east-1b
+      pod:
+        volumeMounts:
+          default: gp2-multi
+          data: gp2-multi
+    - name: zone-c
+      size: 3
+      services:
+        - data
+        - index
+      serverGroups:
+        - us-east-1c
+      pod:
+        volumeMounts:
+          default: gp2-multi
+          data: gp2-multi
   volumeClaimTemplates:
     - metadata:
-        name: us-east-1a
+        name: gp2-multi
       spec:
-        storageClassName: "us-east-1a"
+        storageClassName: gp2-multi
         resources:
           requests:
             storage: 1Gi
 ----
 
-Notice that the volume claim template is specified within `servers.pod.volumeMounts` (`us-east-1a`) and that this claim template uses a storage class `spec.volumeClaimTemplates.spec.storageClassName`  (`us-east-1a`) which matches the server group specified in `servers.serverGroups` (also `us-east-1a`).
-Namings are arbitrary, but naming claims, groups, and classes according to zones will make it easier to check that everything matches.
-
-Finally, the full spec for deploying across three different zones looks like this:
-
-[source,yaml]
-----
-spec:
-  servers:
-    - name: east-1a
-      size: 3
-      services:
-        - data
-        - index
-      pod:
-        volumeMounts:
-          default: us-east-1a
-          data: us-east-1a
-
-    - name: east-1b
-      size: 3
-      services:
-        - data
-        - index
-      pod:
-        volumeMounts:
-          default: us-east-1b
-          data: us-east-1b
-
-    - name: east-1c
-      size: 3
-      services:
-        - search
-        - query
-      pod:
-        volumeMounts:
-          default: us-east-1c
-
-  volumeClaimTemplates:
-    - metadata:
-        name: us-east-1a
-      spec:
-        storageClassName: "us-east-1a"
-        resources:
-          requests:
-            storage: 10Gi
-    - metadata:
-        name: us-east-1b
-      spec:
-        storageClassName: "us-east-1b"
-        resources:
-          requests:
-            storage: 10Gi
-    - metadata:
-        name: us-east-1c
-      spec:
-        storageClassName: "us-east-1c"
-        resources:
-          requests:
-            storage: 10Gi
-----
+Here we have three zones, each able to consume volumes provided by a single storage class named `gp2-multi`.
 
 See the xref:couchbase-cluster-config.adoc[CouchbaseCluster configuration documentation] for more detailed information about defining a cluster with persistent volumes.
