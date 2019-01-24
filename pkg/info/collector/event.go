@@ -1,17 +1,15 @@
 package collector
 
 import (
-	"sort"
-
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/ghodss/yaml"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // eventCollector represents a collection of events
@@ -36,41 +34,14 @@ func (r *eventCollector) Kind() string {
 
 // Fetch collects all events as defined for the resource
 func (r *eventCollector) Fetch(resource resource.ResourceReference) error {
-	events, err := r.context.KubeClient.CoreV1().Events(r.context.Config.Namespace).List(metav1.ListOptions{})
+	events, err := k8sutil.GetEventsForResource(r.context.KubeClient, r.context.Config.Namespace, resource.Kind(), resource.Name())
 	if err != nil {
 		return err
 	}
 
-	// Also build up data structures necessary for sorting
-	filteredEvents := []v1.Event{}
-	for _, event := range events.Items {
-		if event.InvolvedObject.Kind == resource.Kind() && event.InvolvedObject.Name == resource.Name() {
-			filteredEvents = append(filteredEvents, event)
-		}
-	}
-
-	// Sort the timestamps
-	sorter := eventSorter{events: filteredEvents}
-	sort.Sort(sorter)
-	r.events = sorter.events
+	r.events = events
 	r.resource = resource
 	return nil
-}
-
-type eventSorter struct {
-	events []v1.Event
-}
-
-func (s eventSorter) Len() int {
-	return len(s.events)
-}
-
-func (s eventSorter) Swap(i, j int) {
-	s.events[i], s.events[j] = s.events[j], s.events[i]
-}
-
-func (s eventSorter) Less(i, j int) bool {
-	return s.events[i].LastTimestamp.String() < s.events[j].LastTimestamp.String()
 }
 
 func (r *eventCollector) Write(b backend.Backend) error {

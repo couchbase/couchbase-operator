@@ -3,6 +3,7 @@ package k8sutil
 import (
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
@@ -10,6 +11,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -283,4 +285,46 @@ func newClusterEvent(cl *api.CouchbaseCluster) *v1.Event {
 		LastTimestamp:  metav1.Time{Time: t},
 		Count:          int32(1),
 	}
+}
+
+// GetEventsForResource returns a time ordered list of events for a specific resource.
+func GetEventsForResource(client kubernetes.Interface, namespace, kind, name string) ([]v1.Event, error) {
+
+	events, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Also build up data structures necessary for sorting
+	filteredEvents := []v1.Event{}
+	for _, event := range events.Items {
+		if event.InvolvedObject.Kind == kind && event.InvolvedObject.Name == name {
+			filteredEvents = append(filteredEvents, event)
+		}
+	}
+
+	// Sort the timestamps
+	sorter := eventSorter{events: filteredEvents}
+	sort.Sort(sorter)
+	return sorter.events, nil
+}
+
+// eventSorter is a type able to sort events by time.
+type eventSorter struct {
+	events []v1.Event
+}
+
+// Len returns the length of the events list to be sorted.
+func (s eventSorter) Len() int {
+	return len(s.events)
+}
+
+// Swap does an in-place swap of elements in a list.
+func (s eventSorter) Swap(i, j int) {
+	s.events[i], s.events[j] = s.events[j], s.events[i]
+}
+
+// Less does a numeric comparission of event time stamps.
+func (s eventSorter) Less(i, j int) bool {
+	return s.events[i].LastTimestamp.String() < s.events[j].LastTimestamp.String()
 }
