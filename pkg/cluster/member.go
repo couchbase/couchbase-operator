@@ -21,10 +21,8 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	// Establish initial members from running cluster Pods
 	members := known
 
-	// Sync additional members from available Persistent Volumes
-	if pvm := c.pvcMembers(); !pvm.Empty() {
-		members.Append(pvm)
-	}
+	// Collect additional members from available Persistent Volumes
+	members.Append(c.getManagedPersistedMembers(status.KnownNodes()))
 
 	// Return error in the case where cluster knows about nodes
 	// that aren't identifed as members since these are either:
@@ -34,7 +32,7 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	//
 	// In any of these cases nodes cannot be recovered and should
 	// be manually failed over before we allow reconcile since
-	// there's no way to determine which case we're dealing with.
+	// there's no way to determine if this node is managed by the operator.
 	for _, node := range status.KnownNodes() {
 		if !members.Contains(node) {
 			return fmt.Errorf("Cluster contains node `%s` which cannot be managed. Failover/Rebalance is recommended.", node)
@@ -80,6 +78,29 @@ func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 		members = pvcMembers
 	}
 	return members
+}
+
+// getManagedPersistedMembers gets list of members associated with
+// persisted volumes that are actually managed by active cluster
+func (c *Cluster) getManagedPersistedMembers(knownNodes []string) couchbaseutil.MemberSet {
+	managedMembers := couchbaseutil.MemberSet{}
+	pvcMembers := c.pvcMembers()
+
+	// When knownNodes are empty then we'll only rely on
+	// members that can be retrieved from persisted volumes
+	if len(knownNodes) == 0 {
+		return pvcMembers
+	}
+
+	if !pvcMembers.Empty() {
+		// Only include persisted members that are part of knownNodes
+		for _, node := range knownNodes {
+			if m, ok := pvcMembers[node]; ok {
+				managedMembers.Add(m)
+			}
+		}
+	}
+	return managedMembers
 }
 
 func podsToMemberSet(pods []*v1.Pod, sc bool) couchbaseutil.MemberSet {

@@ -138,7 +138,7 @@ func pcvFixture(name, pod string, detached *time.Time) *corev1.PersistentVolumeC
 	}
 	if detached != nil {
 		pvc.Annotations = map[string]string{
-			volumeDetachedAnnotation: detached.Format(time.RFC3339),
+			constants.VolumeDetachedAnnotation: detached.Format(time.RFC3339),
 		}
 	}
 	return pvc

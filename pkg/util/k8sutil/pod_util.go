@@ -834,19 +834,18 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 	}
 	for _, pvc := range pvcList.Items {
 
+		// claim must be bound to a volume
 		if pvc.Status.Phase != v1.ClaimBound {
-			// claim must be bound to a volume
 			continue
 		}
 
-		if path, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; ok {
-			if path != couchbaseVolumeDefaultConfigDir {
-				// members can only be recovered from
-				// claims representing default volume
-				continue
-			}
-		} else {
-			// require members to have path
+		// reject log volumes that have been marked as detached
+		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; ok {
+			continue
+		}
+
+		// require members to have path
+		if _, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; !ok {
 			continue
 		}
 

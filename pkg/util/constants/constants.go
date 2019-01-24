@@ -106,3 +106,9 @@ func (v KubernetesVersion) String() string {
 const (
 	CouchbaseVersionMin = "enterprise-5.5.0"
 )
+
+const (
+	// VolumeDetachedAnnotation is attached to a PVC to give an indication of
+	// when it was detected as not being attached to a pod.
+	VolumeDetachedAnnotation = "pv.couchbase.com/detached"
+)

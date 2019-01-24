@@ -14,12 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 )
 
-const (
-	// volumeDetachedAnnotation is attached to a PVC to give an indication of
-	// when it was detected as not being attached to a pod.
-	volumeDetachedAnnotation = "pv.couchbase.com/detached"
-)
-
 // janitorAbstractionInterface is an abstraction of PVCs for the benefit of unit testing.
 type janitorAbstractionInterface interface {
 	// LogPVCList returns a list of all logging PVCs for the specified cluster.
@@ -136,7 +130,7 @@ func (j *janitor) getDetachedLogPVCs() ([]*corev1.PersistentVolumeClaim, error) 
 
 	detachedPVCs := []*corev1.PersistentVolumeClaim{}
 	for _, pvc := range pvcs {
-		if _, ok := pvc.Annotations[volumeDetachedAnnotation]; !ok {
+		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; !ok {
 			continue
 		}
 		detachedPVCs = append(detachedPVCs, pvc)
@@ -164,20 +158,20 @@ func (j *janitor) updateDetachedAnnotation(pvc *corev1.PersistentVolumeClaim) er
 
 	// Manage the detached time annotation.
 	if attached {
-		if _, ok := pvc.Annotations[volumeDetachedAnnotation]; !ok {
+		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; !ok {
 			return nil
 		}
 		j.cluster.logger.Infof("janitor marking pvc %s as attached", pvc.Name)
-		delete(pvc.Annotations, volumeDetachedAnnotation)
+		delete(pvc.Annotations, constants.VolumeDetachedAnnotation)
 	} else {
-		if _, ok := pvc.Annotations[volumeDetachedAnnotation]; ok {
+		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; ok {
 			return nil
 		}
 		if pvc.Annotations == nil {
 			pvc.Annotations = map[string]string{}
 		}
 		j.cluster.logger.Infof("janitor marking pvc %s as detached", pvc.Name)
-		pvc.Annotations[volumeDetachedAnnotation] = time.Now().Format(time.RFC3339)
+		pvc.Annotations[constants.VolumeDetachedAnnotation] = time.Now().Format(time.RFC3339)
 	}
 
 	// Update the resource, may fail due to conflicts but we'll fix it up in a minute...
@@ -223,7 +217,7 @@ func (j *janitor) deleteTimedOutVolumes() error {
 		return err
 	}
 	for _, pvc := range pvcs {
-		detachedTime, err := time.Parse(time.RFC3339, pvc.Annotations[volumeDetachedAnnotation])
+		detachedTime, err := time.Parse(time.RFC3339, pvc.Annotations[constants.VolumeDetachedAnnotation])
 		if err != nil {
 			return err
 		}
@@ -259,8 +253,8 @@ func (j *janitor) deleteOverCapacityVolumes() error {
 
 	// Sort based on detached annotation, RFC3339 usefully is sortable as a string
 	sorter := func(i, j int) bool {
-		a, _ := pvcs[i].Annotations[volumeDetachedAnnotation]
-		b, _ := pvcs[j].Annotations[volumeDetachedAnnotation]
+		a, _ := pvcs[i].Annotations[constants.VolumeDetachedAnnotation]
+		b, _ := pvcs[j].Annotations[constants.VolumeDetachedAnnotation]
 		return a < b
 	}
 	sort.SliceStable(pvcs, sorter)
