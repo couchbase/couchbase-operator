@@ -1,47 +1,79 @@
 = About Kubernetes Networking and Couchbase
 
-Networking in a Kubernetes environment is complex. It's up to the end user to select a container network interface (CNI) compatible plugin to provide connectivity between pods and the wider world. The choice of plugin has effects on how Couchbase Server can be used and how it must be configured via the Operator.
+[abstract]
+Networking in a Kubernetes environment is complex.
+It's up to the end user to select a container network interface (CNI) compatible plugin to provide connectivity between pods and the wider world.
+The choice of plugin has effects on how Couchbase Server can be used and how it must be configured via the Operator.
 
 == Stateful vs Stateless Deployments
 
-Kubernetes was designed primarily to be used with stateless applications. An application can be horizontally scaled on demand, and the service discovery layer will automatically adapt and load balance across all instances of the deployment.
+Kubernetes was designed primarily to be used with stateless applications.
+An application can be horizontally scaled on demand, and the service discovery layer will automatically adapt and load balance across all instances of the deployment.
 
-The Couchbase data platform is a stateful application, and differs from the Kubernetes norms in a few key respects. Most notably is that the service cannot be load balanced — access to a document is controlled by the client software, which hashes the document identifier and maps it to a bucket shard to determine which cluster member contains the document. For a high performance database, this avoids having to perform hashing at the server layer, freeing up CPU resources, and also improves latency by not having to redirect the requests to the target server. Thus each server must be individually addressable.
+The Couchbase data platform is a stateful application, and differs from the Kubernetes norms in a few key respects.
+Most notably is that the service cannot be load balanced — access to a document is controlled by the client software, which hashes the document identifier and maps it to a bucket shard to determine which cluster member contains the document.
+For a high performance database, this avoids having to perform hashing at the server layer, freeing up CPU resources, and also improves latency by not having to redirect the requests to the target server.
+Thus each server must be individually addressable.
 
-If a pod instance of Couchbase Server were to be deleted, the goal would be to reuse the data that exists on a persistent volume, and perform minimal rebalancing to create a replacement and restore the cluster to full working order. That persistent data contains references to the node name, which is either an IP address or a DNS name, and cannot be changed. In Kubernetes, there is no concept of a fixed IP address, thus the only stable identifier the Operator can use is DNS.
+If a pod instance of Couchbase Server were to be deleted, the goal would be to reuse the data that exists on a persistent volume, and perform minimal rebalancing to create a replacement and restore the cluster to full working order.
+That persistent data contains references to the node name, which is either an IP address or a DNS name, and cannot be changed.
+In Kubernetes, there is no concept of a fixed IP address, thus the only stable identifier the Operator can use is DNS.
 
 == Network Options
 
-There are two types of network options to consider for your deployment: _Routed networking_ or _overlay networking_. The choice is entirely up to you unless it must be deployed on a particular container service.
+There are two types of network options that you can choose from for your deployment: _Routed networking_ or _overlay networking_.
+The choice is entirely up to you, unless you're deploying on a particular container service that limits these options.
 
 === Routed Networking
 
-Routed networking is by far the simplest approach. A Kubernetes deployment consists of a cluster of nodes in a node network. For example, consider `172.16.0.0/24`; the network router will receive address `172.16.0.1/24`, the first node will be on `172.16.0.2/24`, the second node on `172.16.0.3/24`, and so on.
+Routed networking is by far the simplest approach.
+A Kubernetes deployment consists of a cluster of nodes in a node network.
+For example, consider `172.16.0.0/24`; the network router will receive address `172.16.0.1/24`, the first node will be on `172.16.0.2/24`, the second node on `172.16.0.3/24`, and so on.
 
-The pod network is a network prefix which is split between Kubernetes nodes and used for the allocation of pod IP addresses. For example, consider `10.0.0.0/16`; the first Kubernetes node will receive the `10.0.0.0/24` prefix for pod allocation, the second `10.0.1.0/24`, and so on.
+The pod network is a network prefix which is split between Kubernetes nodes and used for the allocation of pod IP addresses.
+For example, consider `10.0.0.0/16`; the first Kubernetes node will receive the `10.0.0.0/24` prefix for pod allocation, the second `10.0.1.0/24`, and so on.
 
-In order for a pod on the first node to talk to the second, routing tables are needed to direct traffic. The packet will leave the first node via its default route and arrive at the upstream router, as it doesn't know about the location of the destination `10.0.1.0/24` network. The router, however, does have this information. It has a routing entry saying that to get to subnet `10.0.1.0/24`, send it to the node at `172.16.0.3/24`.
+In order for a pod on the first node to talk to the second, routing tables are needed to direct traffic.
+The packet will leave the first node via its default route and arrive at the upstream router, as it doesn't know about the location of the destination `10.0.1.0/24` network.
+The router, however, _does_ have this information.
+It has a routing entry saying that to get to subnet `10.0.1.0/24`, send it to the node at `172.16.0.3/24`.
 
-In order to establish a connection between two node networks, all you need to do is establish a VPN connection between the two routers. Remote network prefixes can be defined either statically or dynamically via a protocol such as Border Gateway Protocol (BGP).
+In order to establish a connection between two node networks, all you need to do is establish a VPN connection between the two routers.
+Remote network prefixes can be defined either statically or dynamically via a protocol such as Border Gateway Protocol (BGP).
 
 image:NetworkDocsRouted-Routed.png["Routed network architecture"]
 
-TIP: Some CNI plugins may use BGP peering between nodes to learn pod network prefixes. This has the benefit that routing can be performed at the node layer and not at a specialized router. This avoids an extra network hop, improving latency and throughput. However, unless those prefixes are also shared with the router, you will not be able to directly address pods over a VPN connection.
+TIP: Some CNI plugins may use BGP peering between nodes to learn pod network prefixes.
+This has the benefit that routing can be performed at the node layer and not at a specialized router.
+This avoids an extra network hop, improving latency and throughput.
+However, unless those prefixes are also shared with the router, you will not be able to directly address pods over a VPN connection.
 
-TIP: Some cloud providers may have CNI plugins which allow virtual network adapters to be directly attached to pods. These are allocated from the same IP address pool as the host nodes which provides even more simplicity, removing the need for separate node and pod network prefixes.
+TIP: Some cloud providers may have CNI plugins which allow virtual network adapters to be directly attached to pods.
+These are allocated from the same IP address pool as the host nodes which provides even more simplicity, removing the need for separate node and pod network prefixes.
 
 === Overlay Networking
 
-Like routed networking, overlay networking has the concept of a node network and a pod network. An individual node learns about the addresses of its peers, and their pod network allocations, via service discovery.
+Like routed networking, overlay networking has the concept of a node network and a pod network.
+An individual node learns about the addresses of its peers, and their pod network allocations, via service discovery.
 
-Using the addressing scheme from the routed example, if a packet from a pod on the first node was destined for a pod on the second node, the packet would be intercepted by the network layer on the first node. The packet will then be encapsulated as either Virtual Extensible LAN (VXLAN) or Generic Routing Encapsulation (GRE), and then forwarded directly on to the destination node. The destination would then decapsulate the packet and forward it on to the destination pod.
+Using the addressing scheme from the routed example, if a packet from a pod on the first node was destined for a pod on the second node, the packet would be intercepted by the network layer on the first node.
+The packet will then be encapsulated as either Virtual Extensible LAN (VXLAN) or Generic Routing Encapsulation (GRE), and then forwarded directly on to the destination node.
+The destination would then decapsulate the packet and forward it on to the destination pod.
 
-Like routed BGP networks, all the routing happens on the node, distributing load and reducing latency. However, the encapsulation and decapsulation process is not without cost, and will adversely affect network performance.
+Like routed BGP networks, all the routing happens on the node, distributing load and reducing latency.
+However, the encapsulation and decapsulation process is not without cost, and will adversely affect network performance.
 
-When establishing a tunnel between two Kubernetes clusters that are running overlay networks, by default, the pods from one cluster will not be able to talk to the pods in another. While it is possible, it is not easy relying on a node receiving traffic from the remote cluster, performing SNAT to avoid asymmetric routing, and then encapsulating it an putting it into the overlay.
+When establishing a tunnel between two Kubernetes clusters that are running overlay networks, by default, the pods from one cluster will not be able to talk to the pods in another.
+While it is possible, it is not easy relying on a node receiving traffic from the remote cluster, performing SNAT to avoid asymmetric routing, and then encapsulating it an putting it into the overlay.
 
 image:NetworkDocsRouted-Overlay.png["Overlay network architecture"]
 
 == Couchbase Clients
 
-Unlike XDCR, the Couchbase client libraries are currently unable to take advantage of exposed features. Therefore, client communication will only work if there is direct connectivity to the Couchbase cluster pods and working DNS. Client access is only supported locally within the Kubernetes cluster or where cluster DNS can be accessed by, or replicated to, a remote network.
+Couchbase SDKs are clients in exactly the same way as XDCR.
+Consult the xref:xdcr.adoc[XDCR documentation] for different deployment scenarios.
+
+== Service Meshes
+
+The use of the Operator with service meshes (such as Istio) is not supported and will not work.
+The Operator and Couchbase cluster must be deployed in a namespace with the service mesh disabled in Kubernetes clusters where these technologies are deployed.

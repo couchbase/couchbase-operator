@@ -1,12 +1,15 @@
-= Using Couchbase Clients
+= Connecting Couchbase Clients
 
-The Kubernetes networking model poses some challenges when interacting with a Couchbase cluster. This document outlines some of the ways that Couchbase clients can connect with the cluster.
+[abstract]
+The Kubernetes networking model poses some challenges when interacting with a Couchbase cluster that is running on Kubernetes.
+
+This page outlines some of the ways that Couchbase clients can connect with the cluster.
 
 == From a Pod in the Same Kubernetes Cluster
 
 The recommended network model also happens to be the simplest: Run the client from a pod in the same Kubernetes cluster.
 
-When a new Couchbase cluster is created, the operator also creates a headless service which creates _A records_ for each Couchbase node, and an _SRV record_ for the cluster as a whole.
+When a new Couchbase cluster is created, the Operator also creates a headless service which creates _A records_ for each Couchbase node, and an _SRV record_ for the cluster as a whole.
 
 See https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/[DNS for Services and Pods].
 
@@ -19,8 +22,10 @@ from couchbase.cluster import Cluster
 c = Cluster('couchbase://{}-srv.default.svc.cluster.local'.format(cluster_name))
 ----
 
-Where the domain is composed of `my-cluster`, which is the name of the `CouchbaseCluster` resource, the namespace and the domain of the cluster.  Note that we use a separate service record to only advertise nodes with the data service enabled, this provides optimal bootstrapping of Couchbase clients.
+Where the domain is composed of `my-cluster`, which is the name of the `CouchbaseCluster` resource, the namespace, and the domain of the cluster.
+Note that we use a separate service record to only advertise nodes with the Data Service enabled. This provides optimal bootstrapping of Couchbase clients.
 
-== Network Considerations
+== From Outside of the Kubernetes Cluster
 
-It may not be possible to connect clients to the cluster in all situations.  Please refer to the main xref:networking.adoc[network document].
+Couchbase SDKs are clients in exactly the same way as XDCR.
+Please refer to the xref:xdcr.adoc[XDCR documentation] for deployment scenarios and client configuration.
