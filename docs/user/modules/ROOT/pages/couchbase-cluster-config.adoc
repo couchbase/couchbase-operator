@@ -218,7 +218,7 @@ ____
 This field specifies the version number of Couchbase Server to install. This should match an available version number in the Couchbase Docker repository. It may never be changed to a lower version number than the version that is currently running.
 
 ____
-_Field rules:_ The `version` field is required and should be set to the version of Couchbase Server that should be used to build the cluster. The value of this field cannot be changed after the cluster is created.
+_Field rules:_ The `version` field is required and should be set to the version of Couchbase Server that should be used to build the cluster. The version must contain a semantic version string, e.g. `5.5.3` or `6.0.1`. Please consult the xref:upgrading-couchbase.adoc[upgrade documentation] for further constraints.
 ____
 
 === paused
