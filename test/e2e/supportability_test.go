@@ -297,6 +297,15 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 			}
 			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
 		}
+
+		// persistentvolumeclaims dir contents
+		persistentVolClaims, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
+		if err != nil {
+			return errors.New("Failed to list persistent volume claims: " + err.Error())
+		}
+		for _, pvc := range persistentVolClaims.Items {
+			*reqFileList = append(*reqFileList, pvcDir+"/"+pvc.Name+"/"+pvc.Name+".yaml")
+		}
 	}
 
 	// secret dir contents
@@ -315,15 +324,6 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versio
 	}
 	for _, pv := range persistentVols.Items {
 		*reqFileList = append(*reqFileList, pvDir+"/"+pv.Name+"/"+pv.Name+".yaml")
-	}
-
-	// persistentvolumeclaims dir contents
-	persistentVolClaims, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list persistent volume claims: " + err.Error())
-	}
-	for _, pvc := range persistentVolClaims.Items {
-		*reqFileList = append(*reqFileList, pvcDir+"/"+pvc.Name+"/"+pvc.Name+".yaml")
 	}
 	return nil
 }
@@ -346,6 +346,7 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 	podDir := namespaceDir + "/pod"
 	endpointsDir := namespaceDir + "/endpoints"
 	serviceDir := namespaceDir + "/service"
+	pvcDir := namespaceDir + "/persistentvolumeclaim"
 
 	// Cluster dependent file - couchbasecluster, endpoints, pods, secrets
 	clusters, err := crClient.CouchbaseV1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
@@ -384,6 +385,15 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 		}
 		for _, service := range services.Items {
 			*reqFileList = append(*reqFileList, serviceDir+"/"+service.Name+"/"+service.Name+".yaml")
+		}
+
+		// persistentvolumeclaims dir contents
+		persistentVolClaims, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
+		if err != nil {
+			return errors.New("Failed to list persistent volume claims: " + err.Error())
+		}
+		for _, pvc := range persistentVolClaims.Items {
+			*reqFileList = append(*reqFileList, pvcDir+"/"+pvc.Name+"/"+pvc.Name+".yaml")
 		}
 	}
 	return nil
@@ -1187,7 +1197,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, opImageNam
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	defer e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
+	defer e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
 	execOut, err := runCbopinfoCmd(append(cmdArgs, cbCluster.Name))

@@ -814,3 +814,24 @@ func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, 
 		}
 	}
 }
+
+// WaitForPVCDeletion is used as synchronization between runs, especially in the cloud
+// as PVC reclaim is not instant.
+func WaitForPVCDeletion(k8s *types.Cluster, namespace string, retries int) error {
+	return retryutil.Retry(Context, 10*time.Second, retries, func() (bool, error) {
+		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		if len(pvcs.Items) != 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
+func MustWaitForPVCDeletion(t *testing.T, k8s *types.Cluster, namespace string, retries int) {
+	if err := WaitForPVCDeletion(k8s, namespace, retries); err != nil {
+		Die(t, err)
+	}
+}

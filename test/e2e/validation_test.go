@@ -118,7 +118,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			}
 
 			// Removing previous deployment if any
-			e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
+			e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, kubeName, t.Name())
 
 			// If we are applying a change or deleting a cluster we first need to create it...
 			if command == "apply" || command == "delete" {
@@ -177,7 +177,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 	// Removing deployment if any
 	if !f.SkipTeardown {
-		e2eutil.CleanUpCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, f.LogDir, kubeName, t.Name())
+		e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, kubeName, t.Name())
 	}
 }
 

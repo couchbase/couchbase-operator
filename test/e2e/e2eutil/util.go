@@ -728,7 +728,7 @@ func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	}
 }
 
-func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, logDir, kubeName, testName string) {
+func CleanUpCluster(t *testing.T, k8s *types.Cluster, namespace, logDir, kubeName, testName string) {
 	// Creates dir for kubename
 	logDir = filepath.Join(logDir, kubeName)
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
@@ -737,11 +737,11 @@ func CleanUpCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 	}
 
 	// Pulls operator pod logs
-	if err := WriteLogs(kubeClient, namespace, logDir, testName); err != nil {
+	if err := WriteLogs(k8s.KubeClient, namespace, logDir, testName); err != nil {
 		t.Logf("Error: %v", err)
 	}
 
-	CleanK8Cluster(t, kubeClient, crClient, namespace)
+	CleanK8Cluster(t, k8s, namespace)
 }
 
 func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cbCluster *api.CouchbaseCluster) {
@@ -763,36 +763,43 @@ func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	KillMembers(kubeClient, namespace, cbCluster.Name, killPods...)
 }
 
-func CleanK8Cluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string) {
-	services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+func CleanK8Cluster(t *testing.T, k8s *types.Cluster, namespace string) {
+	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	for _, service := range services.Items {
-		kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+		k8s.KubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 	}
 
-	jobs, err := kubeClient.BatchV1().Jobs(namespace).List(metav1.ListOptions{})
+	jobs, err := k8s.KubeClient.BatchV1().Jobs(namespace).List(metav1.ListOptions{})
 	for _, job := range jobs.Items {
-		kubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+		k8s.KubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
 	}
-	clusters, err := crClient.CouchbaseV1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	clusters, err := k8s.CRClient.CouchbaseV1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Logf("Error: %v", err)
 	}
 	for _, cluster := range clusters.Items {
-		DeleteCbCluster(t, kubeClient, crClient, namespace, &cluster)
+		DeleteCbCluster(t, k8s.KubeClient, k8s.CRClient, namespace, &cluster)
 	}
-	WaitUntilPodDeleted(t, kubeClient, namespace)
+	WaitUntilPodDeleted(t, k8s.KubeClient, namespace)
 
 	// Remove all PVC for the CB clusters
 	for _, cluster := range clusters.Items {
 		pvcSelectorLabel := constants.CouchbaseServerClusterKey + "=" + cluster.Name
-		pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: pvcSelectorLabel})
+		pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: pvcSelectorLabel})
 		if err != nil {
 			t.Logf("Failed to list pvcs for %s: %v", err, cluster.Name)
 		} else {
 			for _, pvc := range pvcList.Items {
-				kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
+				k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 			}
 		}
+	}
+
+	// Ensure all existing PVCs are deleted before continuing.  In the cloud these may take a
+	// while to fully disappear, and may bleed through into other tests, especially ones that
+	// cover supportability.
+	if err := WaitForPVCDeletion(k8s, namespace, constants.Retries120); err != nil {
+		t.Logf("Warning - PVC deletion not complete")
 	}
 }
 
