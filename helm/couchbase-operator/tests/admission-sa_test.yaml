@@ -1,0 +1,38 @@
+suite: test ServiceAccount resource of admission controller
+templates:
+  - admission-service-account.yaml
+tests:
+  - it: should create ServiceAccount
+    asserts:
+      - hasDocuments:
+          count: 1
+  - it: should not create ServiceAccount when rbac is false 
+    set:
+      rbac:
+        create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: should use name of chart for Service Account
+    template: couchbase-service-accounts.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-couchbase-admission-controller
+  - it: should set SA name to value override
+    template: couchbase-service-accounts.yaml
+    set:
+      rbac:
+        admissionServiceAccountName: smooth-operator
+    asserts:
+      - equal:
+          path: metadata.name
+          value: smooth-operator
+  - it: should label according to operator name
+    set:
+      admissionController:
+        name: different-name
+    asserts:
+      - equal:
+          path: metadata.labels.app
+          value: different-name
