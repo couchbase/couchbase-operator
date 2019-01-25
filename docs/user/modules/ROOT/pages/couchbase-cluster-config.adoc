@@ -53,7 +53,7 @@ spec:
     searchServiceMemoryQuota: 256
     eventingServiceMemoryQuota: 256
     analyticsServiceMemoryQuota: 1024
-    indexStorageSetting: default
+    indexStorageSetting: memory_optimized
     autoFailoverTimeout: 120
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
@@ -420,7 +420,7 @@ spec:
     searchServiceMemoryQuota: 2048
     eventingServiceMemoryQuota: 256
     analyticsServiceMemoryQuota: 1024
-    indexStorageSetting: plasma
+    indexStorageSetting: memory_optimized
     autoFailoverTimeout: 120
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
@@ -473,7 +473,7 @@ ____
 Specifies the backend storage type to use for the index service. If the cluster already contains a Couchbase Server instance running the index service, then this parameter cannot be changed until all Couchbase instances running the index service are removed.
 
 ____
-_Field rules:_ The `indexStorageSetting` is required and must be set to either `plasma` or `memory-optimized`. The value of this field can only be changed if there are no index nodes in the cluster.
+_Field rules:_ The `indexStorageSetting` is optional and defaults to `memory_optimized`. Values allowed are `plasma` or `memory_optimized`. After the Couchbase cluster is deployed, the value of this field can only be changed if there are no Index nodes in the cluster.
 ____
 
 === autoFailoverTimeout
