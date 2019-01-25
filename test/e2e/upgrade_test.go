@@ -105,6 +105,28 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 	}
 }
 
+// skipUpgrade checks configuration and skips a test if illegal.
+func skipUpgrade(t *testing.T) {
+	f := framework.Global
+
+	if f.CouchbaseServerUpgradeVersion == "" {
+		t.Skip("Upgrade version not specified")
+	}
+
+	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	upgrade, err := couchbaseutil.NewVersion(f.CouchbaseServerUpgradeVersion)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if version.GreaterEqual(upgrade) {
+		t.Skip("Upgrade base version greater than or equal to upgrade version")
+	}
+}
+
 // TestUpgrade upgrades a three node cluster.
 func TestUpgrade(t *testing.T) {
 	// Platform configuration.
@@ -112,9 +134,7 @@ func TestUpgrade(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -151,9 +171,7 @@ func TestUpgradeRollback(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -197,9 +215,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -246,9 +262,7 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -268,9 +282,7 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -290,9 +302,7 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -316,9 +326,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -358,9 +366,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -410,9 +416,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -464,9 +468,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -516,9 +518,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	kubernetes := f.GetCluster(0)
 
 	// Skip if not correctly configured
-	if f.CouchbaseServerUpgradeVersion == "" {
-		t.Skip("Upgrade version not specified")
-	}
+	skipUpgrade(t)
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
