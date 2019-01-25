@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -832,6 +833,45 @@ func WaitForPVCDeletion(k8s *types.Cluster, namespace string, retries int) error
 
 func MustWaitForPVCDeletion(t *testing.T, k8s *types.Cluster, namespace string, retries int) {
 	if err := WaitForPVCDeletion(k8s, namespace, retries); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitForRebalanceProgress waits until a rebalance is running and the progress is greater
+// than or eual to the defined threshold.  This allows us to kill pods during a rebalance
+// with greater confidence that some vbuckets have migrated to the new master.
+func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, threshold float64, timeout time.Duration) error {
+	client, cleanup := CreateAdminConsoleClient(t, k8s, couchbase)
+	defer cleanup()
+
+	progress := client.NewRebalanceProgress()
+	defer progress.Close()
+
+	timeoutChan := time.After(timeout)
+	for {
+		select {
+		case <-timeoutChan:
+			return fmt.Errorf("timeout")
+		case status, ok := <-progress.Status():
+			if !ok {
+				return fmt.Errorf("rebalance terminated")
+			}
+			switch status.Status {
+			case cbmgr.RebalanceStatusUnknown:
+				return fmt.Errorf("rebalance status unknown")
+			case cbmgr.RebalanceStatusRunning:
+				if status.Progress >= threshold {
+					return nil
+				}
+			}
+		case err := <-progress.Error():
+			return err
+		}
+	}
+}
+
+func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, threshold float64, timeout time.Duration) {
+	if err := WaitForRebalanceProgress(t, k8s, couchbase, threshold, timeout); err != nil {
 		Die(t, err)
 	}
 }

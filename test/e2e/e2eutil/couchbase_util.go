@@ -264,11 +264,29 @@ func RebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, name
 
 	return retryutil.RetryOnErr(Context, 5*time.Second, 36, "rebalance", clusterName,
 		func() error {
-			status, err := client.Rebalance(nodesToRemove)
-			if wait && status != nil {
-				return status.Wait()
+			err := client.Rebalance(nodesToRemove)
+			if err != nil {
+				return err
 			}
-			return err
+
+			if wait {
+				progress := client.NewRebalanceProgress()
+
+			RebalanceWaitLoop:
+				for {
+					select {
+					case _, ok := <-progress.Status():
+						// Channel closed, rebalance complete.
+						if !ok {
+							break RebalanceWaitLoop
+						}
+					case err := <-progress.Error():
+						return err
+					}
+				}
+			}
+
+			return nil
 		})
 }
 

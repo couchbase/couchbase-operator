@@ -615,13 +615,38 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait b
 	c.client.SetEndpoints(ms.ClientURLs())
 	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "rebalance", c.clusterName,
 		func() error {
-			status, err := c.client.Rebalance(nodesToRemove)
-			if wait && status != nil {
-				logger := c.ctx.Value("logger").(*logrus.Entry)
-				status.SetLogger(logger)
-				return status.Wait()
+			err := c.client.Rebalance(nodesToRemove)
+			if err != nil {
+				return err
 			}
-			return err
+
+			if wait {
+				logger := c.ctx.Value("logger").(*logrus.Entry)
+
+				progress := c.client.NewRebalanceProgress()
+				defer progress.Close()
+
+			RebalanceWaitLoop:
+				for {
+					select {
+					case status, ok := <-progress.Status():
+						// Channel closed, rebalance complete.
+						if !ok {
+							break RebalanceWaitLoop
+						}
+						switch status.Status {
+						case cbmgr.RebalanceStatusUnknown:
+							logger.Infof("Rebalance progress: unknown")
+						case cbmgr.RebalanceStatusRunning:
+							logger.Infof("Rebalance progress: %f", status.Progress)
+						}
+					case err := <-progress.Error():
+						return err
+					}
+				}
+			}
+
+			return nil
 		})
 }
 

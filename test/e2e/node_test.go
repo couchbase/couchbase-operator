@@ -361,11 +361,26 @@ func TestRemoveForeignNode(t *testing.T) {
 	ctx := e2eutil.Context
 	err = retryutil.RetryOnErr(ctx, 5*time.Second, constants.Retries30, "rebalance", testCouchbase.GetName(),
 		func() error {
-			status, err := client.Rebalance([]string{""})
-			if true && status != nil {
-				return status.Wait()
+			err := client.Rebalance([]string{""})
+			if err != nil {
+				e2eutil.Die(t, err)
 			}
-			return err
+			progress := client.NewRebalanceProgress()
+
+		RebalanceWaitLoop:
+			for {
+				select {
+				case _, ok := <-progress.Status():
+					// Channel closed, rebalance complete.
+					if !ok {
+						break RebalanceWaitLoop
+					}
+				case err := <-progress.Error():
+					return err
+				}
+			}
+
+			return nil
 		})
 	if err != nil {
 		t.Fatal("Rebalance failed")
