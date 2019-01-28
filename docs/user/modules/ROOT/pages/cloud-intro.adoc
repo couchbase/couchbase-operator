@@ -1,0 +1,37 @@
+= Cloud Environment Setup
+
+This section documents guides for supported cloud platforms:
+
+* Amazon Elastic Kubernetes Service (EKS)
+* Google Kubernetes Engine (GKE)
+* Microsoft Azure Kubernetes Service (AKS)
+
+== Common Best Practices
+
+All supported cloud platforms will have their own subtle differences however there are some common behaviors to be aware of.
+
+=== Zoning and Persistent Volumes
+
+By default when provisioning https://kubernetes.io/docs/concepts/storage/persistent-volumes/[persistent volumes] in a cloud provider they will be scheduled across all possible availability zones in the Kubernetes cluster.
+The persistent volumes are scheduled before they are attached to a pod, and cannot be manually scheduled.
+When attached to pods, these persistent volumes must be located in the same availability zone as the pod.
+This poses a challenge when using multiple persistent volumes per pod, as they may be scheduled in different availability zones.
+When using the xref:server-groups.adoc[server group] feature of the Operator, the explicit pod scheduling may clash with that of the persistent volume.
+
+The first solution is to run the Kubernetes cluster in a single zone.
+In this scenario all pods and persistent volumes will be scheduled in a single availability zone.
+No scheduling conflicts can occur.
+The major downside with this approach is that the xref:server-groups.adoc[server group] feature of the Operator cannot be used so a data center failure cannot be tolerated.
+
+The second solution is only available on Kubernetes versions 1.12 and higher.
+Storage classes, from which persistent volumes are dynamically created, now support a `VolumeBindingMode` parameter with a `WaitForFirstConsumer` value.
+When set to `WaitForFirstConsumer`, persistent volumes will be scheduled only once attached to a pod.
+This allows the Operator to schedule pods explicitly to support xref:server-groups.adoc[server groups] and multiple volumes to be attached to a single pod.
+This is the recommended deployment method.
+
+NOTE: The `WaitForFirstConsumer` feature first appeared in Kubernetes in 1.12 however it is regarded as production ready in versions 1.13 and higher.
+
+=== Next Steps
+
+* xref:install-aks.adoc[Installing on AKS]
+* xref:install-gke.adoc[Installing on GKE]

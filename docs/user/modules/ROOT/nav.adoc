@@ -3,11 +3,13 @@
 * Getting Started
  ** xref:prerequisite-and-setup.adoc[System Requirements]
  ** xref:best-practices.adoc[Guidelines and Best Practices]
+* xref:cloud-intro.adoc[Cloud Environment Setup]
+ ** xref:install-aks.adoc[Installing on AKS]
+ ** xref:install-gke.adoc[Installing on GKE]
 * Deploying the Operator
  ** xref:install-admission-controller.adoc[Installing the Admission Controller]
  ** xref:install-kubernetes.adoc[Installing on Kubernetes]
  ** xref:install-openshift.adoc[Installing on OpenShift]
- ** xref:install-aks.adoc[Installing on AKS]
  ** xref:operator-config.adoc[About the Operator Deployment Settings]
  ** xref:kubernetes-rbac.adoc[About Kubernetes RBAC]
  ** xref:upgrading-the-operator.adoc[Upgrading the Operator]

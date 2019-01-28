@@ -1,0 +1,155 @@
+= Installing on GKE
+
+[abstract]
+Install the Couchbase Autonomous Operator on Google Kubernetes Engine (GKE).
+
+Examples will be illustrated with the Google Cloud SDK, however all steps can be completed via the https://console.cloud.google.com/[Google Cloud web console^].
+
+== Prerequisites
+
+* The https://cloud.google.com/sdk/[Google Cloud SDK^] is installed
+
+When the `gcloud` command has been installed and added to your PATH, log in with the following command:
+
+[source,console]
+----
+gcloud auth login
+----
+
+
+[TIP]
+====
+The `gcloud` command can support multiple logins.
+You can select the user to run as with:
+
+[source,console]
+----
+gcloud config set account john.doe@acme.com
+----
+
+You can also remove the login authentication locally with:
+
+[source,console]
+----
+gcloud auth revoke john.doe@acme.com
+----
+====
+
+The project must also be set so that resources are provisioned into it:
+
+[source,console]
+----
+gcloud config set project my-project
+----
+
+== GKE Setup
+
+Like all cloud providers there are two main steps in configuring your cloud environment - the virtual network provisioning then the Kubernetes cluster provisioning.
+
+=== Network Setup
+
+For most users, it will suffice to use automatic subnet provisioning with the following command:
+
+[source,console]
+----
+gcloud compute networks create my-network
+----
+
+For the purposes of this document we will manually configure our subnets so we are able to add in the necessary firewall rules to allow xref:xdcr.adoc[XDCR] between Couchbase clusters in different GKE clusters.
+We create two non-overlapping subnets in the 10.0.0.0/8 https://tools.ietf.org/html/rfc1918[RFC-1918^] private address space in different regions, then allow all ingress traffic from the 10.0.0.0/8 prefix via a firewall rule.
+By default network traffic is dropped between different GKE clusters.
+
+[source,console]
+----
+gcloud compute networks create my-network \
+  --subnet-mode custom
+----
+
+[source,console]
+----
+gcloud compute networks subnets create my-subnet-us-east1 \
+  --network my-network \
+  --region us-east1 \
+  --range 10.0.0.0/12
+----
+
+[source,console]
+----
+gcloud compute networks subnets create my-subnet-us-west1 \
+  --network my-network \
+  --region us-west1 \
+  --range 10.16.0.0/12
+----
+
+[source,console]
+----
+gcloud compute firewall-rules create my-network-allow-all-private \
+  --network my-network \
+  --direction INGRESS \
+  --source-ranges 10.0.0.0/8 \
+  --allow all
+----
+
+=== Kubernetes Cluster Setup
+
+The next step is to create our Kubernetes clusters in each region:
+
+[source,console]
+----
+gcloud container clusters create my-cluster-us-east1 \
+  --cluster-version 1.11.5-gke.5 \
+  --region us-east1 \
+  --network my-network \
+  --subnetwork my-subnet-us-east1
+----
+
+[source,console]
+----
+gcloud container clusters create my-cluster-us-west1 \
+  --cluster-version 1.11.5-gke.5 \
+  --region us-west1 \
+  --network my-network \
+  --subnetwork my-subnet-us-west1
+----
+
+When the clusters are running (the `gcloud` command will block and complete when the clusters are healthy) you can install credentials into your Kubernetes configuration with the following:
+
+[source,console]
+----
+gcloud container clusters get-credentials my-cluster-us-east1 \
+  --region us-east1 \
+  --project my-project
+----
+
+[source,console]
+----
+gcloud container clusters get-credentials my-cluster-us-west1 \
+  --region us-west1 \
+  --project my-project
+----
+
+You can select which cluster context to use by default with the following Kubernetes command:
+
+[source,console]
+----
+kubectl config use-context my-cluster-us-east1
+----
+
+=== Kubernetes Environment Setup
+
+By default users on a new GKE cluster have limited privileges and cannot perform necessary operation to deploy the Couchbase Operator.
+To enable these privileges run the following command on each cluster:
+
+[source,console]
+----
+kubectl create clusterrolebinding john-doe-admin-binding \
+  --clusterrole cluster-admin \
+  --user john.doe@acme.com
+----
+
+== Next Steps
+
+* xref:install-admission-controller.adoc[Install the Couchbase Autonomous Operator admission controller]
+* xref:install-kubernetes.adoc[Install the Couchbase Autonomous Operator]
+* xref:deploying-couchbase.adoc[Deploy a Couchbase cluster]
+* xref:xdcr.adoc[Set up XDCR between clusters]
