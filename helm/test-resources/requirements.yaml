@@ -1,0 +1,4 @@
+dependencies:
+  - name: couchbase-operator
+    version: 0.1.2
+    repository: "file://../couchbase-operator"

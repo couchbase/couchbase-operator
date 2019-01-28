@@ -1,0 +1,16 @@
+## Override RBAC with ClusterRole and ClusterBinding
+---
+rbac:
+  create: true
+  serviceAccountName: test-resource-sa
+couchbase-operator:
+  rbac:
+    create: false
+  couchbaseOperator:
+    serviceAccountName: test-resource-sa
+    image:
+      tag: 1.2.0-877
+  admissionController:
+    serviceAccountName: test-resource-sa
+    image:
+      tag: 1.2.0-877
