@@ -20,6 +20,8 @@ Options:
   --resource-group=STRING       Azure resource group to use
   --nodes-per-cluster=INT       Number of nodes to spin up per cluster
   --location=STRING             Azure location to use: westus, eastus, etc.
+  --service-principal-id=STRING Azure service principal account id
+  --service-principal-secret=STRING Azure service principal account secret
 " >&2
 }
 
@@ -66,7 +68,9 @@ function createCluster(){
                   --node-vm-size ${10} \
                   --service-cidr $8 \
                   --vnet-subnet-id /subscriptions/$4/resourceGroups/$1/providers/Microsoft.Network/virtualNetworks/$5/subnets/$6 \
-                  --subscription $4
+                  --subscription $4 \
+                  --service-principal $12 \
+                  --client-secret $13
     exitOnError $? "Fail: error creating aks cluster: cluster-1"
 }
 
@@ -163,6 +167,12 @@ case $i in
     --type=*)
     TYPE="${i#*=}"
     ;;
+    --service-principal-id=*)
+    SERVICEPRINCIPALID="${i#*=}"
+    ;;
+    --service-principal-secret=*)
+    SERVICEPRINCIPALSECRET="${i#*=}"
+    ;;
     --resource-group=*)
     RESOURCEGROUP="${i#*=}"
     ;;
@@ -207,6 +217,16 @@ if [ -z "$ACTION" ]
     echo "No action given"
     exit 1
 fi
+if [ -z "$SERVICEPRINCIPALID" ]
+  then
+    echo "No service principal app id given"
+    exit 1
+fi
+if [ -z "$SERVICEPRINCIPALSECRET" ]
+  then
+    echo "No service principal app secret given"
+    exit 1
+fi
 
 case "$ACTION" in
     "create")
@@ -242,7 +262,7 @@ case "$ACTION" in
 
                 # create cluster 1
                 echo "creating aks cluster: $CLUSTERNAME1"
-                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION1
+                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION1 $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRET
                 echo "Success: created aks cluster: $CLUSTERNAME1"
 
                 # open inbound traffic to cluster 1
@@ -289,13 +309,13 @@ case "$ACTION" in
 
                 # create cluster 1
                 echo "creating aks cluster: $CLUSTERNAME1"
-                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION1
+                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION1 $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRE
                 exitOnError $? "Fail: error creating aks cluster: $CLUSTERNAME1"
                 echo "Success: created aks cluster: $CLUSTERNAME1"
 
                 # create cluster 2
                 echo "creating aks cluster: $CLUSTERNAME2"
-                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME2 $VNETSUBNETNAME2 $DNSSERVICEIP2 $ADDRESSCIDR2 $CLUSTERNAME2 $VMSIZE2 $K8VERSION2
+                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME2 $VNETSUBNETNAME2 $DNSSERVICEIP2 $ADDRESSCIDR2 $CLUSTERNAME2 $VMSIZE2 $K8VERSION2 $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRE
                 echo "Success: created aks cluster: $CLUSTERNAME2"
 
                 # peer vnet 1 to vnet 2
