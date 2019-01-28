@@ -776,7 +776,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
-// cbopctl apply tests
+// CRD apply tests
 func TestValidationApply(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
@@ -1130,7 +1130,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
-//cbopctl delete tests
+// CRD delete tests
 func TestValidationDelete(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()

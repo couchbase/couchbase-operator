@@ -57,17 +57,6 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
-  digest = "1:b01f8aa184549e7fb432768eb7486edd5b51ff7b8b2866241fcf8ab962e1c3ee"
-  name = "github.com/couchbase/cbflag"
-  packages = [
-    ".",
-    "man",
-    "pwd",
-  ]
-  pruneopts = "UT"
-  revision = "dbeda68bf448ce8e85e52a3216f3b031ef18a4b7"
-
-[[projects]]
   digest = "1:0e9cf78ed723682ba2115aba41978075b222c24e9721aba15e5233c6ceea29d3"
   name = "github.com/couchbase/gocbmgr"
   packages = [
@@ -857,7 +846,6 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/couchbase/cbflag",
     "github.com/couchbase/gocbmgr",
     "github.com/ghodss/yaml",
     "github.com/go-openapi/errors",
@@ -907,7 +895,6 @@
     "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
-    "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/client-go/tools/leaderelection",
     "k8s.io/client-go/tools/leaderelection/resourcelock",
     "k8s.io/client-go/tools/portforward",

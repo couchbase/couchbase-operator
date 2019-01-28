@@ -9,9 +9,7 @@ This tutorial walks you through the steps to deploy a three-node cluster with pr
 * You have xref:install-kubernetes.adoc[deployed the Operator] and it is up and running
 * You have reviewed the xref:prerequisite-and-setup.adoc[prerequisites] and prepared your Kubernetes or OpenShift cluster to run Couchbase pods
 * You have administrative privileges for the Kubernetes or OpenShift cluster
-* You have downloaded the Operator https://www.couchbase.com/downloads[package] and installed xref:cbopctl.adoc[cbopctl]
-+
-`cbopctl` is a command line tool similar to `kubectl` or `oc`, except that it performs an extra check on the CouchbaseCluster configuration being sent to Kubernetes to ensure that it is valid.
+* You have downloaded the Operator https://www.couchbase.com/downloads[package]
 +
 The Operator package also contains YAML configuration files that you will use in this guide.
 +
@@ -39,7 +37,7 @@ Kubernetes::
 --
 [source,console]
 ----
-cbopctl apply -f  couchbase-cluster.yaml
+kubectl apply -f  couchbase-cluster.yaml
 ----
 --
 
@@ -48,7 +46,7 @@ OpenShift::
 --
 [source,console]
 ----
-cbopctl apply -f  couchbase-cluster.yaml
+oc apply -f  couchbase-cluster.yaml
 ----
 --
 ====

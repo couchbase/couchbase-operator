@@ -34,10 +34,6 @@ required = [
 ]
 
 [[constraint]]
-  name = "github.com/couchbase/cbflag"
-  revision = "dbeda68bf448ce8e85e52a3216f3b031ef18a4b7"
-
-[[constraint]]
   name = "github.com/couchbase/gocbmgr"
   revision = "01c0ef5789d830c91ba4390896daaa6929e238ed"
 

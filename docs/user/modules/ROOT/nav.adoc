@@ -38,7 +38,6 @@
 * Troubleshooting
  ** xref:logs-troubleshooting.adoc[Viewing and Retrieving Logs]
 * Tools
- ** xref:cbopctl.adoc[cbopctl]
  ** xref:cbopinfo.adoc[cbopinfo]
  * xref:demo.adoc[Couchbase Deployment Tutorial]
  * xref:release-notes.adoc[Release Notes]

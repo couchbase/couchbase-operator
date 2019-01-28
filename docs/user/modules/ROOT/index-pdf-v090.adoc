@@ -64,8 +64,6 @@ include::{includedir}/persisted-volumes-zoning-guide.adoc[]
 
 include::{includedir}/deploying-couchbase.adoc[]
 
-include::{includedir}/cbopctl.adoc[]
-
 include::{includedir}/cluster-status-guide.adoc[]
 
 include::{includedir}/list-and-describe.adoc[]

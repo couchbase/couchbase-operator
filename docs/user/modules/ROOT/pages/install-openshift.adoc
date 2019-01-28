@@ -220,7 +220,7 @@ time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controlle
 
 == Next Steps
 
-Install the xref:cbopctl.adoc[cbopctl] command line tool and use it to xref:deploying-couchbase.adoc[deploy a Couchbase Server cluster].
+xref:deploying-couchbase.adoc[Deploy a Couchbase Server cluster].
 
 == Quick Start Script
 
