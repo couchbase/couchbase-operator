@@ -63,7 +63,7 @@ func (r *podUpgradableResource) lenItems() int {
 
 func (r *podUpgradableResource) itemVersion(item int) string {
 	version := "0.0.0"
-	if v, ok := r.pods.Items[item].Annotations[resourceVersionAnnotation]; ok {
+	if v, ok := r.pods.Items[item].Annotations[constants.ResourceVersionAnnotation]; ok {
 		version = v
 	}
 	return version
@@ -98,7 +98,7 @@ func (r *podUpgradableResource) commit(item int) error {
 // * The "couchbase.version" annotation was changed to "server.couchbase.com/version".
 func upgradePod_000000_010200(cluster *Cluster, pod *corev1.Pod) error {
 	// Update the version annotation
-	pod.Annotations[resourceVersionAnnotation] = "1.2.0"
+	pod.Annotations[constants.ResourceVersionAnnotation] = "1.2.0"
 
 	// Add the server version annotation from the cluster's current version.
 	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = cluster.cluster.Status.CurrentVersion

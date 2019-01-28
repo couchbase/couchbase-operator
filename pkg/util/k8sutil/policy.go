@@ -30,6 +30,7 @@ func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev1.CouchbaseClu
 			},
 		},
 	}
+	applyBaseAnnotations(required.GetObjectMeta())
 	addOwnerRefToObject(required.GetObjectMeta(), cluster.AsOwner())
 
 	// Get any existing budgets, creating one if it doesn't exist.

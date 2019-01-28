@@ -287,6 +287,8 @@ func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v
 		},
 	}
 
+	applyBaseAnnotations(svc.GetObjectMeta())
+
 	return svc
 }
 

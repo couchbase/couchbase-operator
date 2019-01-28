@@ -64,7 +64,7 @@ func (r *pvcUpgradableResource) lenItems() int {
 
 func (r *pvcUpgradableResource) itemVersion(item int) string {
 	version := "0.0.0"
-	if v, ok := r.pvcs.Items[item].Annotations[resourceVersionAnnotation]; ok {
+	if v, ok := r.pvcs.Items[item].Annotations[constants.ResourceVersionAnnotation]; ok {
 		version = v
 	}
 	return version
@@ -100,7 +100,7 @@ func (r *pvcUpgradableResource) commit(item int) error {
 // * The "failure-domain.beta.kubernetes.io/zone" annotation was added.
 func upgradePVC_000000_010200(cluster *Cluster, pvc *corev1.PersistentVolumeClaim) error {
 	// Update the version annotation
-	pvc.Annotations[resourceVersionAnnotation] = "1.2.0"
+	pvc.Annotations[constants.ResourceVersionAnnotation] = "1.2.0"
 
 	// Add the server version annotation from the cluster's current version.
 	pvc.Annotations[constants.CouchbaseVersionAnnotationKey] = cluster.cluster.Status.CurrentVersion

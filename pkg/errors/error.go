@@ -90,6 +90,12 @@ type ErrVolumeMissingGroup struct {
 	VolumeName string
 }
 
+func NewErrVolumeMissingGroup(name string) error {
+	return &ErrVolumeMissingGroup{
+		VolumeName: name,
+	}
+}
+
 func (e ErrVolumeMissingGroup) Error() string {
 	return fmt.Sprintf("volume `%s` is not labeled with a server group", e.VolumeName)
 }

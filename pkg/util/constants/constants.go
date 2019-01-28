@@ -50,6 +50,7 @@ var (
 
 	PodIndexAnnotation            = "pod.couchbase.com/index"
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
+	ResourceVersionAnnotation     = "operator.couchbase.com/version"
 )
 
 // Label types added to pods

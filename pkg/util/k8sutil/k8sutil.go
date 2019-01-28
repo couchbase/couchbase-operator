@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
+	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/ghodss/yaml"
 
@@ -29,11 +30,18 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const (
-	couchbaseVersionAnnotationKey = "couchbase.version"
-)
-
+// TODO: This is deprecated in 1.11+, remove me next release and use PublishNotReadyAddresses
 const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
+
+// applyBaseAnnotations adds common annotations to resources.
+// All resources created should have this set of annotations for upgrade reasons.
+func applyBaseAnnotations(object metav1.Object) {
+	annotations := map[string]string{
+		constants.ResourceVersionAnnotation: version.Version,
+	}
+	mergeLabels(annotations, object.GetAnnotations())
+	object.SetAnnotations(annotations)
+}
 
 func SetCouchbaseVersion(pod *v1.Pod, version string) {
 	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = version
@@ -458,7 +466,7 @@ func GetPersistentVolumeGroup(kubeCli kubernetes.Interface, name string) (string
 	}
 	group, ok := volume.Labels[constants.ServerGroupLabel]
 	if !ok {
-		return "", cberrors.ErrVolumeMissingGroup{VolumeName: name}
+		return "", cberrors.NewErrVolumeMissingGroup(name)
 	}
 	return group, nil
 }

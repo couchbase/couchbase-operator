@@ -111,6 +111,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					constants.AnnotationVolumeNodeConf:      config.Name,
 					constants.CouchbaseVersionAnnotationKey: version,
 				})
+				applyBaseAnnotations(claim.GetObjectMeta())
 				if gid := cs.GetFSGroup(); gid != nil {
 					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
 				}
@@ -369,9 +370,8 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        m.Name,
-			Labels:      labels,
-			Annotations: map[string]string{},
+			Name:   m.Name,
+			Labels: labels,
 		},
 		Spec: v1.PodSpec{
 			Containers:      []v1.Container{container},
@@ -383,6 +383,8 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 			SecurityContext: cs.SecurityContext,
 		},
 	}
+	applyBaseAnnotations(pod.GetObjectMeta())
+
 	if cs.AntiAffinity {
 		pod = PodWithAntiAffinity(pod, clusterName)
 	}

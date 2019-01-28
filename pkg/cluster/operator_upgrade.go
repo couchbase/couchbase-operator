@@ -8,10 +8,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
-const (
-	resourceVersionAnnotation = "operator.couchbase.com/version"
-)
-
 // upgradeRange specifies the range of versions to apply an upgrade action to.
 type upgradeRange struct {
 	// From allows an upgrade action to occur if a reosurce is greater than or equal to this version.
