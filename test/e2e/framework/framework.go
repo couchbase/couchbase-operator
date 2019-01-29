@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -38,6 +39,29 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+// Init performs one time only initialization of the framework.  Dynamic calls to these
+// functions will result in race conditions and spurious failures.
+func Init() {
+	// Register CouchbaseCluster and CustomResourceDefinition types with the main library.
+	if err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := api.AddToScheme(scheme.Scheme); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := apiextensionsv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Start the timeout timer.
+	startTimeoutTimer()
+}
 
 func ReadYamlData() (err error) {
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
@@ -84,8 +108,8 @@ func GetDuration(timeoutStr string) time.Duration {
 	return durationToReturn
 }
 
-// Starts timeout trigger based on given value in suiteData.Timeout
-func StartTimeoutTimer() {
+// startTimeoutTimer starts timeout trigger based on given value in suiteData.Timeout
+func startTimeoutTimer() {
 	go func() {
 		// In case of SystemTests, timeout will be set as part of test case
 		if suiteData.SuiteName == "TestSystem" {
@@ -100,18 +124,6 @@ func StartTimeoutTimer() {
 }
 
 func CreateDeploymentObject(operatorImageName string, restPort int32) (deployment *v1beta1.Deployment, err error) {
-	if err = v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		return
-	}
-
-	if err = api.AddToScheme(scheme.Scheme); err != nil {
-		return
-	}
-
-	if err = apiextensionsv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		return
-	}
-
 	deploymentSpecContent, err := ioutil.ReadFile(runtimeParams.DeploymentSpec)
 	if err != nil {
 		return

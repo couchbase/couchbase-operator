@@ -20,8 +20,8 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-	// Call to start timer for test timeout
-	framework.StartTimeoutTimer()
+	// Perform any static initialization
+	framework.Init()
 
 	// Run Test module
 	code := m.Run()
