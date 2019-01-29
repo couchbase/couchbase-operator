@@ -207,7 +207,7 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 // NewSupportableClusterSpec returns a basic supportable cluster spec with a stateful and stateless
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
 func NewSupportableClusterSpec(size int) api.ClusterSpec {
-	return api.ClusterSpec{
+	spec := api.ClusterSpec{
 		BaseImage:       e2e_constants.CbServerBaseImage,
 		Version:         e2e_constants.CbServerVersion,
 		AuthSecret:      e2e_constants.KubeTestSecretName,
@@ -258,6 +258,13 @@ func NewSupportableClusterSpec(size int) api.ClusterSpec {
 			},
 		},
 	}
+
+	// The defaults are too agressive.  When killing a pod during a rebalance the operator
+	// may hang for ~30 seconds due to network retries. During this period we may or may not
+	// observe a failover leading to non-determinism.
+	spec.ClusterSettings.AutoFailoverTimeout = 120
+
+	return spec
 }
 
 // NewSupportableCluster returns a basic supportable cluster with a stateful and stateless
