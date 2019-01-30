@@ -12,33 +12,34 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Create couchbase cluster over TLS certificates
 // Check TLS handshake is successful with all nodes
 func TestTlsCreateCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the cluster.
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
+	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
-	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden, ctx)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
+	// When the cluster is healthy, check the TLS is correctly configured.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Tests scenario where a third node is being added to a cluster, and a separate
@@ -46,47 +47,47 @@ func TestTlsCreateCluster(t *testing.T) {
 // Expects: autofailover of down node occurs and a replacement node is added
 // Check TLS handshake is successful with all nodes
 func TestTlsKillClusterNode(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := constants.Size1
+	scaledClusterSize := constants.Size3
+	victimIndex := 1
+
+	// Create the cluster.
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
+	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, ctx)
 
-	podToKillMemberId := 1
+	// Runtime configuration.
+	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
 
-	// create 1 node cluster
-	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminHidden, ctx)
+	// When the cluster is healthy, remove the TLS certificate, expect the operator to
+	// raise an event to the effect that the TLS is invalid then restore the secret.
+	// Scale the cluster to ensure the TLS is still working.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, scaledClusterSize-1), 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
-	// async scale up to 3 node cluster
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube, testCouchbase)
-
-	// wait for add member event
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 5*time.Minute)
-
-	for nodeIndex := 1; nodeIndex < constants.Size3; nodeIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: scaledClusterSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	// kill pod 1
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podToKillMemberId, true)
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
-	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	// cluster should also be balanced
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create Couchbase cluster using certificates
@@ -139,69 +140,44 @@ func TestTlsResizeCluster(t *testing.T) {
 // raise an invalid TLS event.
 // Add the operator certificate back and check new node addition is successful
 func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := constants.Size3
+	victimIndex := 1
+
+	// Create the cluster.
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
+	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, ctx)
 
-	podToKillMemberId := 1
-
-	// create 3 node cluster
-	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden, ctx)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
-	// Get current secret to re-create later
-	operatorSecret, err := e2eutil.GetSecret(targetKube.KubeClient, f.Namespace, ctx.OperatorSecretName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("Couchbase operator certificate deleted")
-
-	// kill pod 1
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podToKillMemberId, true)
-
+	// When the cluster is healthy, remove the TLS certificate, expect the operator to
+	// raise an event to the effect that the TLS is invalid then restore the secret.
+	// Scale the cluster to ensure the TLS is still working.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
+	secret := e2eutil.MustGetSecret(t, targetKube, f.Namespace, ctx.OperatorSecretName)
+	e2eutil.MustDeleteSecret(t, targetKube, f.Namespace, ctx.OperatorSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
-	expectedEvents.AddTLSInvalidEvent(testCouchbase)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
+	e2eutil.MustRecreateSecret(t, targetKube, f.Namespace, secret)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	// Recreating the operator certificate with old data
-	operatorSecretData := e2eutil.CreateOperatorSecretData(f.Namespace, ctx.OperatorSecretName, operatorSecret.Data["ca.crt"], operatorSecret.Data["couchbase-operator.crt"], operatorSecret.Data["couchbase-operator.key"])
-	_, err = e2eutil.CreateSecret(targetKube.KubeClient, f.Namespace, operatorSecretData)
-	if err != nil {
-		t.Fatal(err)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Invalid TLS event
+	// * Cluster scaled up
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podToKillMemberId), 30*time.Second)
-	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podToKillMemberId), 40*time.Second)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 2*time.Minute)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // TestTlsRemoveOperatorCertificateAndResizeCluster removes the CA certificate
@@ -244,106 +220,92 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-
 }
 
 // Deploy cluster using valid TLS certificates
 // Remove the cluster certificate from the cluster and kill one of the cluster pod
 // The cluster should raise a TLS invalid event, then reconcile once the valid cluster certificate is available
 func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := constants.Size3
+	victimIndex := 1
+
+	// Create the cluster.
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
+	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, ctx)
 
-	podToKillMemberId := 1
-
-	// create 3 node cluster
-	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden, ctx)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
-	clusterSecret, err := e2eutil.GetSecret(targetKube.KubeClient, f.Namespace, ctx.ClusterSecretName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("Couchbase Cluster certificate deleted")
-
-	// kill pod 1
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podToKillMemberId, true)
-
+	// When the cluster is healthy, remove the TLS certificate, expect the operator to
+	// raise an event to the effect that the TLS is invalid then restore the secret.
+	// Scale the cluster to ensure the TLS is still working.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
+	secret := e2eutil.MustGetSecret(t, targetKube, f.Namespace, ctx.ClusterSecretName)
+	e2eutil.MustDeleteSecret(t, targetKube, f.Namespace, ctx.ClusterSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
-	expectedEvents.AddTLSInvalidEvent(testCouchbase)
-
-	// Recreate the cluster certificate with old data
-	clusterSecretData := e2eutil.CreateClusterSecretData(f.Namespace, ctx.ClusterSecretName, clusterSecret.Data["chain.pem"], clusterSecret.Data["pkey.key"])
-	_, err = e2eutil.CreateSecret(targetKube.KubeClient, f.Namespace, clusterSecretData)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 6*time.Minute)
-
-	expectedEvents.AddMemberDownEvent(testCouchbase, podToKillMemberId)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podToKillMemberId)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
+	e2eutil.MustRecreateSecret(t, targetKube, f.Namespace, secret)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Invalid TLS event
+	// * Cluster scaled up
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		e2eutil.PodDownFailoverRecoverySequence(),
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates
 // Remove the cluster certificate from the cluster and scale up the cluster
 func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := constants.Size3
+	scaledClusterSize := constants.Size5
+
+	// Create the cluster.
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, &e2eutil.TlsOpts{})
 	defer teardown()
+	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, ctx)
 
-	// create 3 node cluster
-	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden, ctx)
+	// When the cluster is healthy, remove the TLS certificate, expect the operator to
+	// raise an event to the effect that the TLS is invalid then restore the secret.
+	// Scale the cluster to ensure the TLS is still working.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
+	secret := e2eutil.MustGetSecret(t, targetKube, f.Namespace, ctx.ClusterSecretName)
+	e2eutil.MustDeleteSecret(t, targetKube, f.Namespace, ctx.ClusterSecretName)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), time.Minute)
+	e2eutil.MustRecreateSecret(t, targetKube, f.Namespace, secret)
+	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
-	if err := e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{}); err != nil {
-		t.Fatal(err)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Invalid TLS event
+	// * Cluster scaled up
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		e2eutil.ClusterScaleUpSequence(scaledClusterSize - clusterSize),
 	}
-	t.Log("Couchbase Cluster certificate deleted")
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
-	expectedEvents.AddTLSInvalidEvent(testCouchbase)
-
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Deploy cluster using invalid DNS name value in the certificate

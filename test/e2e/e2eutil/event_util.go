@@ -351,6 +351,10 @@ func (eventsequence *EventValidator) AddMemberVolumeUnhealthyEvent(cbCluster *ap
 
 // ClusterCreateSequence is a common function for generating cluster creation events.
 func ClusterCreateSequence(size int) eventschema.Validatable {
+	if size == 1 {
+		return eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}
+	}
+
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Repeat{
@@ -372,6 +376,20 @@ func ClusterScaleUpSequence(size int) eventschema.Validatable {
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
+
+// PodDownFailoverRecoverySequence is a common function for generating down/failover/recovery events.
+func PodDownFailoverRecoverySequence() eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
 	}
