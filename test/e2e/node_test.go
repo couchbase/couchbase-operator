@@ -921,9 +921,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberToKill)
 
 	if f.KubeType == "kubernetes" {
-		if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "mv /etc/service/couchbase-server /tmp/")
 	} else {
 		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
 			t.Fatal(err)
@@ -994,7 +992,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT; iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT; iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
 
 	autofailoverTimeout, err := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
 	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
@@ -1080,37 +1078,18 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	//block all incoming and outgoing traffic expect ssh on port 22
-	if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT"); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT"); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT")
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
 
 	// wait half of autofailover timeout
 	time.Sleep(time.Duration(int64(autofailoverTimeout/2)) * time.Second)
 
 	//revert iptable changes, allow all incoming and outgoing traffic
-	if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -F"); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -X"); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -P INPUT DROP"); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -P OUTPUT DROP"); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "iptables -P FORWARD DROP"); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -F")
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -X")
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P INPUT DROP")
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P OUTPUT DROP")
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P FORWARD DROP")
 
 	t.Logf("waiting for pods to die...")
 	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, constants.Retries10, testCouchbase); err != nil {

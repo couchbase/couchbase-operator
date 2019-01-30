@@ -28,7 +28,6 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -576,10 +575,6 @@ func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace s
 		}
 	}
 	return nil
-}
-
-func (f *Framework) PodClient(kubeName string) typedv1.PodInterface {
-	return f.ClusterSpec[kubeName].KubeClient.CoreV1().Pods(f.Namespace)
 }
 
 func (f *Framework) GetCluster(index int) *types.Cluster {

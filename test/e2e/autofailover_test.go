@@ -12,8 +12,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Create 3 server groups and 9 node homogeneous cb cluster
@@ -340,60 +338,38 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 
 	// Get pod object for reading container name
 	podName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	pod, err := f.PodClient(f.TestClusters[0]).Get(podName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get pod data: %v", err)
-	}
 
-	cbWorkLoadGoRoutine := func() {
-		podCmdStr := []string{"/opt/couchbase/bin/cbworkloadgen", "-n", "127.0.0.1:8091", "-u", "Administrator", "-p", "password", "-b", bucketName, "-j", "-s", "100000", "-i", "10000"}
-		podCmdOptions := framework.ExecOptions{
-			Command:            podCmdStr,
-			Namespace:          f.Namespace,
-			PodName:            podName,
-			ContainerName:      pod.Spec.Containers[0].Name,
-			Stdin:              nil,
-			CaptureStdout:      true,
-			CaptureStderr:      true,
-			PreserveWhitespace: true,
+	// Asynchronously insert data into the cluster so that Couchbase server
+	// notices it cannot read/write to the bucket directory.
+	go func() {
+		cmd := []string{
+			"/opt/couchbase/bin/cbworkloadgen",
+			"-n", "127.0.0.1:8091",
+			"-u", "Administrator",
+			"-p", "password",
+			"-b", bucketName,
+			"-j",
+			"-s", "100000",
+			"-i", "10000",
 		}
-
-		// start loading data
-		stdOut, _, err := f.ExecWithOptions(f.TestClusters[0], podCmdOptions)
+		// Note: we expect an error here as the directory gets deleted later.
+		stdout, stderr, err := e2eutil.ExecCommandInPod(targetKube, f.Namespace, podName, cmd...)
 		if err != nil {
-			t.Logf("Stdout: %v", stdOut)
-			t.Logf("Execution failed: %v", err)
+			t.Logf("Error: %v", err)
+			t.Logf("Command: %s", cmd)
+			t.Logf("stdout: %s", stdout)
+			t.Logf("stderr: %s", stderr)
 		}
-	}
+	}()
 
-	deleteBucketDirErrChan := make(chan error)
-
-	// this function doesnt work
-	deleteBucketDirGoRoutine := func() {
-		podCmdStr := "rm -vf /opt/couchbase/var/lib/couchbase/data/" + bucketName + "/*"
-
-		t.Log("Entering sleep to load data")
-		time.Sleep(time.Second * 20)
-
-		stdOut, err := f.ExecShellInPod(f.TestClusters[0], podName, podCmdStr)
-		if err != nil {
-			t.Logf("Stdout: %v", stdOut)
-		}
-		deleteBucketDirErrChan <- err
-	}
-
-	go cbWorkLoadGoRoutine()
-	go deleteBucketDirGoRoutine()
-
-	if err := <-deleteBucketDirErrChan; err != nil {
-		t.Fatalf("Failed to delete bucket dir: %v", err)
-	}
-
+	t.Log("Entering sleep to load data")
+	time.Sleep(time.Second * 20)
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podName, "rm -vf /opt/couchbase/var/lib/couchbase/data/"+bucketName+"/*")
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
 	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
 }

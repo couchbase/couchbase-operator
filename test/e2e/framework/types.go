@@ -1,7 +1,6 @@
 package framework
 
 import (
-	"io"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -98,21 +97,6 @@ type TestRunParam struct {
 	// DockerPassword is the docker registry password to use, required when
 	// DockerServer is specified.
 	DockerPassword string `yaml:"docker-password"`
-}
-
-// ExecOptions passed to ExecWithOptions
-type ExecOptions struct {
-	Command []string
-
-	Namespace     string
-	PodName       string
-	ContainerName string
-
-	Stdin         io.Reader
-	CaptureStdout bool
-	CaptureStderr bool
-	// If false, whitespace in std{err,out} will be removed.
-	PreserveWhitespace bool
 }
 
 /************************************************

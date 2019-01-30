@@ -168,9 +168,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		// Kill couchbase server process in target pods
 		for _, podMemberId := range podMembersToKill {
 			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-			if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "pkill beam.smp"); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "pkill beam.smp")
 			eventsExpected = append(eventsExpected, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
 		}
 		if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 100); err != nil {
@@ -613,9 +611,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		// Kill couchbase server process in target pods
 		for _, podMemberId := range podMembersToKill {
 			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-			if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "pkill beam.smp"); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "pkill beam.smp")
 		}
 
 		time.Sleep(timeToSleep)

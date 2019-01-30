@@ -415,9 +415,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	if f.KubeType == "kubernetes" {
-		if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "mv /etc/service/couchbase-server /tmp/")
 	} else {
 		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
 			t.Fatal(err)
@@ -480,9 +478,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	if f.KubeType == "kubernetes" {
-		if _, err := f.ExecShellInPod(f.TestClusters[0], memberName, "mv /etc/service/couchbase-server /tmp/"); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "mv /etc/service/couchbase-server /tmp/")
 	} else {
 		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
 			t.Fatal(err)

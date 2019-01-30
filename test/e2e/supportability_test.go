@@ -1539,9 +1539,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 				t.Fatal(err)
 			}
 		case "killServerProcess":
-			if _, err := f.ExecShellInPod(f.TestClusters[0], podNameToKill, "pkill beam.smp"); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podNameToKill, "pkill beam.smp")
 		}
 
 		// If operator was killed, will waits for operator recovery to happen
@@ -2132,9 +2130,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 				t.Fatal(err)
 			}
 		case "killServerProcess":
-			if _, err := f.ExecShellInPod(f.TestClusters[0], podNameToKill, "pkill beam.smp"); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podNameToKill, "pkill beam.smp")
 		}
 	}
 
