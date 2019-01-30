@@ -135,7 +135,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 				if err != nil {
 					// only address errors from cli here, if the volume is not
 					// labeled then allow scheduler to apply it instead
-					if _, ok := err.(cberrors.ErrVolumeMissingGroup); !ok {
+					if !cberrors.IsErrVolumeMissingGroup(err) {
 						return nil, err
 					}
 				} else {
