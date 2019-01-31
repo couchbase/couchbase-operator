@@ -28,7 +28,7 @@ func TestCreateCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Tests creation of a 3 node cluster with 1 bucket
@@ -51,5 +51,5 @@ func TestCreateBucketCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

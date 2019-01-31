@@ -246,7 +246,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(scaledClusterSize - clusterSize),
 	}
 
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 
 }
 
@@ -524,7 +524,7 @@ func TestTLSRotate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRotateChain tests a certificate can be reissued by a CA with a new sub-CA.
@@ -556,7 +556,7 @@ func TestTLSRotateChain(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRotateCA tests a certificate and CA can be reissued.
@@ -588,7 +588,7 @@ func TestTLSRotateCA(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRotateCAAndScale tests the operator can talk to a cluster after
@@ -625,7 +625,7 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(clusterScaleUpSize),
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRotateCAAndKillOperator tests a certificate and CA can be reissued while
@@ -659,7 +659,7 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRotateCAKillPodAndKillOperator tests a certificate and CA can be reissued while
@@ -709,7 +709,7 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRotateInvalid tests the operator raises a TLSInvalid event when a certificate
@@ -741,5 +741,5 @@ func TestTLSRotateInvalid(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

@@ -108,7 +108,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create eventing enabled couchbase cluster with eventing buckets
@@ -259,7 +259,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create couchbase cluster with eventing service and required buckets
@@ -371,5 +371,5 @@ func TestEventingKillEventingPods(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

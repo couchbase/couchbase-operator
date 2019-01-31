@@ -185,7 +185,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5)
 	// K8S-537 - Will fail due to Pod recovery event not generated
-	//ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	//ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Generic function to kill pods with operator
@@ -294,7 +294,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300*platformTimingMultiplier)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Generic proc to create cluster given by server configs passed
@@ -432,7 +432,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberIdToKill)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 	e2eutil.DeleteCbCluster(t, targetKube.KubeClient, targetKube.CRClient, f.Namespace, testCouchbase)
 }
 
@@ -459,7 +459,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 
 	// Check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
@@ -624,7 +624,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create cb cluster with PVC enabled

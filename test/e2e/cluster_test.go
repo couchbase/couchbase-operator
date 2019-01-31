@@ -3,19 +3,19 @@ package e2e
 import (
 	"os"
 	"strconv"
-	"strings"
 	"testing"
+	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/gocbmgr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test scaling a cluster with no buckets up and down
@@ -180,13 +180,8 @@ func TestEditClusterSettings(t *testing.T) {
 
 }
 
-// Tests if specs with invalid base image will create a cluster (they should not)
-// 1. Attempt to create a cluster with invalid base image
-// 2. Wait until cluster creation fails
+// TestInvalidBaseImage tests cluster with invalid image repos fail
 func TestInvalidBaseImage(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -204,57 +199,25 @@ func TestInvalidBaseImage(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	retries := &e2eutil.ClusterReadyRetries{
-		Size:    constants.Retries5,
-		Bucket:  constants.Retries1,
-		Service: constants.Retries1,
-	}
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, targetKube, f.Namespace, configMap, constants.AdminHidden, retries)
-	if err == nil {
-		t.Fatalf("failed to reject cluster creation: %v", err)
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
+
+	// When a pod has been created check it's event stream has an image pull error.  Also expect the
+	// cluster to enter the failed state.
+	e2eutil.MustWaitForFirstPodContainerWaiting(t, targetKube, testCouchbase, constants.Retries10, "ErrImagePull", "ImagePullBackOff")
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, constants.Retries120)
+
+	// Check the events match what we expect:
+	// * First member creation failed
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	if len(pods.Items) != 1 {
-		t.Fatalf("more than one pod: %v", pods.Items)
-	}
-
-	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
-	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image "+couchbaseBaseImage+":"+couchbaseVerString+" not found") {
-		t.Fatalf("container status error: %s", reason)
-	}
-
-	acceptableMessages := []string{
-		"Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\"",
-		"rpc error: code = 2 desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
-		"rpc error: code = Unknown desc = repository docker.io/" + couchbaseBaseImage + " not found: does not exist or no pull access",
-		// For openshift v3.9.33, kubernetes v1.9.1+a0ce1bc657
-		"rpc error: code = Unknown desc = Error: image " + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
-		"rpc error: code = Unknown desc = Error response from daemon: repository " + couchbaseBaseImage + " not found: does not exist or no pull access",
-	}
-
-	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	correctMsg := false
-	for _, acceptableMsg := range acceptableMessages {
-		if containerMsg == acceptableMsg {
-			correctMsg = true
-			break
-		}
-	}
-
-	if !correctMsg {
-		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
-	}
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Tests if specs with invalid version will create a cluster (they should not)
-// 1. Attempt to create a cluster with invalid version
-// 2. Wait until cluster creation fails
+// TestInvalidBaseImage tests cluster with invalid version repos fail
 func TestInvalidVersion(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -272,119 +235,75 @@ func TestInvalidVersion(t *testing.T) {
 		"other1":   otherConfig1,
 	}
 
-	retries := &e2eutil.ClusterReadyRetries{
-		Size:    constants.Retries5,
-		Bucket:  constants.Retries1,
-		Service: constants.Retries1,
-	}
-	testCouchbase, err := e2eutil.NewClusterMultiQuick(t, targetKube, f.Namespace, configMap, constants.AdminHidden, retries)
-	if err == nil {
-		t.Fatalf("failed to reject cluster creation: %v", err)
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
+
+	// When a pod has been created check it's event stream has an image pull error.  Also expect the
+	// cluster to enter the failed state.
+	e2eutil.MustWaitForFirstPodContainerWaiting(t, targetKube, testCouchbase, constants.Retries10, "ErrImagePull", "ImagePullBackOff")
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, constants.Retries60)
+
+	// Check the events match what we expect:
+	// * First member creation failed
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	if len(pods.Items) != 1 {
-		t.Fatalf("more than one pod: %v", pods.Items)
-	}
-
-	reason := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Reason
-	if reason != "ErrImagePull" && reason != "ImagePullBackOff" && !strings.Contains(reason, "image "+couchbaseBaseImage+":"+couchbaseVerString+" not found") {
-		t.Fatalf("container status error: %s", reason)
-	}
-
-	acceptableMessages := []string{
-		"Back-off pulling image \"" + couchbaseBaseImage + ":" + couchbaseVerString + "\"",
-		"rpc error: code = 2 desc = Tag " + couchbaseVerString + " not found in repository docker.io/",
-		"rpc error: code = Unknown desc = manifest for docker.io/" + couchbaseBaseImage + ":" + couchbaseVerString + " not found",
-		// For openshift v3.9.33, kubernetes v1.9.1+a0ce1bc657
-		"rpc error: code = Unknown desc = Tag " + couchbaseVerString + " not found in repository docker.io/" + couchbaseBaseImage,
-	}
-
-	containerMsg := pods.Items[0].Status.ContainerStatuses[0].State.Waiting.Message
-	correctMsg := false
-	for _, acceptableMsg := range acceptableMessages {
-		if containerMsg == acceptableMsg {
-			correctMsg = true
-			break
-		}
-	}
-
-	if !correctMsg {
-		t.Fatalf("incorrect msg, container status error: %+v", containerMsg)
-	}
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, e2eutil.EventList{})
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// 1. create 1 node cluster
-// 2. get max allocatable memory of a k8s node
-// 3. update resource limits to 70% allocatable memory
-// 4. attempt to scale up as 3 node cluster
-// 5. wait for unbalanced condition
-// 6. remove resource limits
-// 7. expect scale up to complete
+// TestNodeUnschedulable tests running out of allocatable memory and then updates
+// to the pod memory requests are reflected in new pods.
+//
+// NOTE: The memory policy applies to the operator template only, and pods
+// created from it.  Changes will not and cannot be reflected on the running
+// pod.
 func TestNodeUnschedulable(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	clusterSize := constants.Size1
 
-	// create 1 node cluster
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	// Static configuration.
+	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
+	allocatableMemory := e2eutil.MustGetMinNodeMem(t, targetKube)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
-	// Get max from k8s cluster allocatable memory
-	allocatableMemory, err := e2eutil.GetK8SMaxAllocatableMemory(targetKube.KubeClient)
-	if err != nil {
-		t.Fatal(err)
+	// Create the cluster.
+	clusterConfig := e2eutil.BasicClusterConfig
+	serviceConfig1 := map[string]string{
+		"size":               "1",
+		"name":               "test_config_1",
+		"services":           "data",
+		"resourceMemRequest": strconv.Itoa(int(allocatableMemory * 0.7)),
 	}
-
-	t.Logf("Allocatable Memory: %d", allocatableMemory)
-	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, func(cl *api.CouchbaseCluster) {
-		cl.Spec.ServerSettings[0].Pod = e2espec.CreateMemoryPodPolicy(allocatableMemory*7/10, allocatableMemory)
-	})
-	nodeList, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
+	configMap := map[string]map[string]string{
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
 	}
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
-	//first node wont change request and last node should be unschedulable and minus out the master node
-	clusterSize = len(nodeList.Items) + 1
-	serviceId := 0
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceId, clusterSize, targetKube, testCouchbase)
-
-	// Wait for each member add event
-	for memberId := 1; memberId < clusterSize-1; memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
-	}
-
-	// expect unbalanced condition
-	if err := e2eutil.WaitForClusterUnBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
-		t.Fatal(err)
-	}
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, clusterSize-1)
-
-	// drop limits so that pod can be scheduled
-	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, func(cl *api.CouchbaseCluster) {
-		cl.Spec.ServerSettings[0].Pod = nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1), 180)
-	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
-
-	// Wait for cluster balanced condition
+	// Scal up the cluster enhauting memory, We expect the last node to not schedule. When the
+	// policy is removed the last node will be created successfully and the cluster rebalanced
+	// into a healthy state.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 300)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/ServerSettings/0/Pod"), constants.Retries5)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
+
+	// Check the events match what we expect:
+	// * All but one new nodes are created
+	// * The last one fails creation
+	// * A new node is created, after the memory constaints are removed
+	// * Cluster rebalances
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Repeat{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Cluster recovers after node service goes down
@@ -438,68 +357,49 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
-// Node service goes down while scaling down cluster
-//
-// 1. Create 5 node cluster
-// 2. Scale down to 4 nodes
-// 3. When rebalance starts, stop couchbase on node-0000
-// 4. Expect down node-0000 to be removed
-// 5. Cluster should eventually reconcile as 4 nodes:
-//      a. either by not continuing to scale down since down node was removed
-//      b. continuing to scale down and replacing down node
+// TestNodeServiceDownDuringRebalance tests killing a node during a scale down.
 func TestNodeServiceDownDuringRebalance(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	// create 5 node cluster
+	// Static configuration.
 	clusterSize := constants.Size5
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
+	victimIndex := 0
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+
+	// Runtime configuration.
+	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+
+	// When healthy scale down the cluster and terminate the victim during the rebalance,
+	// we expect the cluster to end up healthy.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 30)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize-1, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 30)
+	e2eutil.MustWaitForRebalanceProgress(t, targetKube, testCouchbase, 25.0, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 300)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Scale down starts
+	// * Rebalance incomplete
+	// * Rebalance retried, down node removed.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	clusterSize--
-	// scale down to a node in cluster
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
-
-	// when cluster starts scaling kill couchbase service on pod 0
-	if err := e2eutil.WaitForClusterScalingCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
-		t.Fatal(err)
-	}
-
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	if f.KubeType == "kubernetes" {
-		e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "mv /etc/service/couchbase-server /tmp/")
-	} else {
-		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
-			t.Fatal(err)
-		}
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceIncomplete")
-	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", 0)
-	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", 0)
-
-	// Add possible outcomes for this scenario into new event list
-	multipleOutcomeEvents := e2eutil.EventValidator{}
-	multipleOutcomeEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", 0)
-	multipleOutcomeEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", clusterSize)
-
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddAnyOfEvents(multipleOutcomeEvents)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 50)
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Test that a node is added back when operator is resumed

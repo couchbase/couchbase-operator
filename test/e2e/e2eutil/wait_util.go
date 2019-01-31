@@ -189,6 +189,12 @@ func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *api.
 	return err
 }
 
+func MustWaitClusterPhaseFailed(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, retries int) {
+	if err := WaitClusterPhaseFailed(t, k8s.CRClient, cluster, retries); err != nil {
+		Die(t, err)
+	}
+}
+
 func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, cluster *api.CouchbaseCluster, retries int) error {
 	expectedNodes := 0
 	for _, class := range cluster.Spec.ServerSettings {
@@ -872,6 +878,49 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.C
 
 func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, threshold float64, timeout time.Duration) {
 	if err := WaitForRebalanceProgress(t, k8s, couchbase, threshold, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitForFirstPodContainerWaiting waits for the first pods's container to enter a waiting state
+// with optional reasons to validate.
+func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *api.CouchbaseCluster, retries int, reasons ...string) error {
+	return retryutil.Retry(Context, retryInterval, retries, func() (bool, error) {
+		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+		if err != nil {
+			return false, err
+		}
+
+		if len(pods.Items) == 0 {
+			return false, nil
+		}
+
+		pod := pods.Items[0]
+		if len(pod.Status.ContainerStatuses) == 0 {
+			return false, retryutil.RetryOkError(fmt.Errorf("pod has no container status"))
+		}
+
+		if pod.Status.ContainerStatuses[0].State.Waiting == nil {
+			return false, retryutil.RetryOkError(fmt.Errorf("pod is not waiting"))
+		}
+
+		if len(reasons) == 0 {
+			return true, nil
+		}
+
+		waitReason := pod.Status.ContainerStatuses[0].State.Waiting.Reason
+		for _, reason := range reasons {
+			if waitReason == reason {
+				return true, nil
+			}
+		}
+
+		return false, retryutil.RetryOkError(fmt.Errorf("pod waiting reason is %s", waitReason))
+	})
+}
+
+func MustWaitForFirstPodContainerWaiting(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, retries int, reasons ...string) {
+	if err := WaitForFirstPodContainerWaiting(k8s, couchbase, retries, reasons...); err != nil {
 		Die(t, err)
 	}
 }

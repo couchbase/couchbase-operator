@@ -201,8 +201,8 @@ func XdcrClusterRemoveNode(t *testing.T, cluster1, cluster2 *types.Cluster, targ
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries60); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, xdcr1Kube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcr2Kube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, xdcr1Kube, xdcrCluster1, expectedCluster1Events)
+	ValidateEvents(t, xdcr2Kube, xdcrCluster2, expectedCluster2Events)
 }
 
 // Generic test case for creating Xdcr clusters
@@ -266,8 +266,8 @@ func CreateXdcrCluster(t *testing.T, cluster1, cluster2 *types.Cluster) {
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 10, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, xdcr1Kube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcr2Kube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, xdcr1Kube, xdcrCluster1, expectedCluster1Events)
+	ValidateEvents(t, xdcr2Kube, xdcrCluster2, expectedCluster2Events)
 }
 
 // Generic testcase to run NodeDown test cases on kubeNames given by kubeNameList
@@ -383,8 +383,8 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, cluster1, clust
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, xdcrCluster1, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, xdcrCluster2, expectedCluster2Events)
 }
 
 // Generic testcase to run AddNode test cases on kubeNames given by kubeNameList
@@ -487,8 +487,8 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, cluster1, cluste
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries30); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, xdcrCluster1, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, xdcrCluster2, expectedCluster2Events)
 }
 
 // Generic testcase to kill the XDCR exposed service test cases on kubeNames given by kubeNameList
@@ -582,8 +582,8 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, cluster1, cl
 	if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 20, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, xdcrCluster1, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, xdcrCluster2, expectedCluster2Events)
 }
 
 // Create XDCR cluster within same k8s cluster
@@ -686,8 +686,8 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 			}
 		}
 	}
-	ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
-	ValidateEvents(t, xdcrKube, f.Namespace, xdcrCluster2.Name, expectedCluster2Events)
+	ValidateEvents(t, defKube, xdcrCluster1, expectedCluster1Events)
+	ValidateEvents(t, xdcrKube, xdcrCluster2, expectedCluster2Events)
 }
 
 // Create two clusters one on k8s using operator
@@ -790,7 +790,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 			if err := e2eutil.VerifyDocCountInBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 200, constants.Retries10); err != nil {
 				t.Fatal(err)
 			}
-		ValidateEvents(t, defKube, f.Namespace, xdcrCluster1.Name, expectedCluster1Events)
+		ValidateEvents(t, defKube, xdcrCluster1, expectedCluster1Events)
 	*/
 }
 

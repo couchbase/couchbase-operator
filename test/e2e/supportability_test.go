@@ -1580,7 +1580,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 
 	// Verifying the persistence of log PVs are preserved by operator
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
-	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
 }
 
 // Generic function to kill Cb server pod and update the server class in parallel
@@ -1685,7 +1685,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 
 	// Verifying the persistence of log PVs are preserved by operator
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
-	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
 }
 
 // Define log mount for ephemeral pods and validate the logs are preserved
@@ -1853,7 +1853,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Verifying the persistence of log PVs are preserved by operator
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
-	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
 }
 
 // Kill Cb server pod and update the server class in parallel
@@ -1956,7 +1956,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 
 	// Verifying the persistence of log PVs are preserved by operator
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
-	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
 }
 
 // Collect logs from ephemeral log PVs
@@ -2075,7 +2075,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 	// Verifying the persistence of log PVs are preserved by operator
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
-	ValidateEvents(t, targetKube, f.Namespace, cbCluster.Name, expectedEvents)
+	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
 }
 
 /**************************************

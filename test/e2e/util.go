@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -228,8 +229,8 @@ var (
 	}
 )
 
-func ValidateEvents(t *testing.T, k8s *types.Cluster, namespace, cbClusterName string, events e2eutil.EventValidator) {
-	clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, cbClusterName, namespace)
+func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, events e2eutil.EventValidator) {
+	clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, couchbase.Name, couchbase.Namespace)
 	if err != nil {
 		t.Error(err)
 		return

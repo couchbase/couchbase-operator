@@ -514,6 +514,14 @@ func NewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, c
 	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
+func MustNewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) *api.CouchbaseCluster {
+	cluster, err := NewClusterMultiNoWait(t, k8s, namespace, config)
+	if err != nil {
+		Die(t, err)
+	}
+	return cluster
+}
+
 // convert interfaced value to int, note this can downcast i64
 func ConvertToInt(value interface{}) int {
 	switch value.(type) {

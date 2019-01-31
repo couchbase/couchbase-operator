@@ -161,7 +161,7 @@ func TestUpgrade(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestUpgradeRollback begins an upgrade then rolls it back to the previous version.
@@ -204,7 +204,7 @@ func TestUpgradeRollback(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRollbackFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestUpgradeKillPodOnCreate begins an upgrade then kills a pod to be added to the
@@ -252,7 +252,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestUpgradeInvalidUpgrade ensures an upgrade cannot happen across major versions.
@@ -355,7 +355,7 @@ func TestUpgradeSupportable(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatefulPodOnCreate tests that upgrades work for a supportable cluster
@@ -405,7 +405,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatefulPodOnRebalance tests that upgrades work for a supportable cluster
@@ -457,7 +457,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatelessPodOnCreate tests that upgrades work for a supportable cluster
@@ -507,7 +507,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestUpgradeSupportableKillStatelessPodOnRebalance tests that upgrades work for a supportable cluster
@@ -559,5 +559,5 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

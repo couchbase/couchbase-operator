@@ -83,7 +83,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, constants.Retries10); err != nil {
 		t.Fatal(err)
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create analytics enabled couchbase cluster
@@ -250,7 +250,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Deploy analyitcs enabled couchbase cluster and populate data
@@ -431,7 +431,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Deploy analyitcs enabled couchbase cluster over PVC and populate data
@@ -563,5 +563,5 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

@@ -9,6 +9,7 @@ import (
 	"k8s.io/api/core/v1"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -218,88 +219,66 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
-// Tests node recovery after killing during rebalance and then killing the newly added node
-// 1. Create 1 node cluster
-// 2. Scale cluster to 3 members
-// 3. When rebalance starts kill 3rd member
-// 4. Wait for autofailover to add a 4th member
-// 5. Kill 4th member when added to cluster
-// 6. Wait for resize to reach 3 nodes
-// 7. Make sure cluster is healthy
-//
-// NOTE:
-// There are potential race conditions here i.e. not our fault
-// 1. When killing the first node, instead of failedAdd the node can be flagged as down
-//    but NS server will prevent a failover as it thinks two nodes are down.  See comments
-//    for K8S-497.
-// 2. A rebalance can complete, but NS server reports that it needs a rebalance, this
-//    will be cleared by the time we complete the next reconcile.
+// TestKillNodesAfterRebalanceAndFailover tests repeated pod termination at
+// different points in a scale up operation.
 func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	// Static configuration.
 	clusterSize := constants.Size1
+	scaledClusterSize := constants.Size3
+	victim1Index := scaledClusterSize - 1
+	victim2Index := scaledClusterSize
 
-	// create 1 node cluster
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	// Runtime configuration.
+	victim1Name := couchbaseutil.CreateMemberName(testCouchbase.Name, victim1Index)
+	victim2Name := couchbaseutil.CreateMemberName(testCouchbase.Name, victim2Index)
 
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	// resize to 3 member cluster
-	clusterSize = constants.Size3
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
-
-	// detect 3rd member add event
-	newPodMemberId := clusterSize - 1
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), 300)
-
-	for nodeIndex := 1; nodeIndex < clusterSize; nodeIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
-	}
-
-	// wait rebalance event
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 60)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-
-	// kill 3rd member being rebalanced in
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, newPodMemberId, true)
-	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
-	expectedEvents.AddFailedAddNodeEvent(testCouchbase, newPodMemberId)
-
-	// waiting for 3rd member to be killed
-	newPodMemberId = clusterSize
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), 180)
-	expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
-
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, newPodMemberId, true)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
-	expectedEvents.AddFailedAddNodeEvent(testCouchbase, newPodMemberId)
-
-	// 1/3 times we'll probably hit the dead node before the service is revoked so retry
-	err := retryutil.RetryOnErr(e2eutil.Context, time.Second, 5, "reset failover", testCouchbase.Name, func() error {
-		return client.ResetFailoverCounter()
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize+1), 120)
-	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize+1)
-
+	// When the cluster is healthy, resize to the target size.  When the first victim starts balancing in
+	// kill it.  When the second victim is created to replace the dead node, kill it too.  Cluster should
+	// end up healthy.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForRebalanceProgress(t, targetKube, testCouchbase, 25.0, 2*time.Minute)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim1Index, true)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, victim2Index), 300)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim2Index, true)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
 
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	// Check the events match what we expect:
+	// * Cluster is created
+	// * Scale up begins
+	// * Rebalance fails
+	// * First victim node goes down and fails over
+	// * New node is created to replace the first victim
+	// * Rebalance fails
+	// * Second victim fails to add
+	// * Another new node is created and balanced in and the first victim is removed.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: scaledClusterSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victim1Name},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victim1Name},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victim2Name},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victim2Name},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victim1Name},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Test that a foreign node is removed from cluster
@@ -891,7 +870,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddParallelEvents(memRemovedEventValidator)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {

@@ -28,51 +28,6 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (E
 	return events, nil
 }
 
-// returns quota for any node unless name is specified
-// quota value is in MB
-func GetK8SAllocatableMemory(kubeCli kubernetes.Interface, namespace string, name *string) (int, error) {
-	// list or get node
-	var node *v1.Node
-	if name == nil {
-		nodeList, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil {
-			return -1, err
-		}
-		nodeItems := nodeList.Items
-		if len(nodeItems) == 0 {
-			return -1, NewErrEmptyNodeList()
-		}
-		node = &nodeItems[0]
-	} else {
-		var err error
-		node, err = kubeCli.CoreV1().Nodes().Get(*name, metav1.GetOptions{})
-		if err != nil {
-			return -1, err
-		}
-	}
-
-	// get allocatable memory
-	memQuantity := node.Status.Allocatable[v1.ResourceMemory]
-	memQuantityMB := int(memQuantity.Value() >> 20)
-	return memQuantityMB, nil
-}
-
-// Returns max allocatable memory within all K8S nodes
-func GetK8SMaxAllocatableMemory(kubeClient kubernetes.Interface) (memQuantityMb int, err error) {
-	nodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return
-	}
-	for _, node := range nodeList.Items {
-		nodeAllocatableMem := node.Status.Allocatable[v1.ResourceMemory]
-		nodeAllocatableMemMb := int(nodeAllocatableMem.Value() >> 20)
-		if memQuantityMb < nodeAllocatableMemMb {
-			memQuantityMb = nodeAllocatableMemMb
-		}
-	}
-	return
-}
-
 // Updates K8S nodes with given Unschedulable and Taint values
 func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnschedulable bool, podTaintList []v1.Taint, nodeIndex int) (err error) {
 	for retryCount := 0; retryCount < 3; retryCount++ {

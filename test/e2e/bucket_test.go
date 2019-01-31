@@ -337,7 +337,7 @@ func TestEditBucket(t *testing.T) {
 		eventschema.Repeat{Times: 9, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
 	}
 
-	ValidateEvents(t, kubernetes, f.Namespace, cluster.Name, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // attempt to change bucket type to ephemeral

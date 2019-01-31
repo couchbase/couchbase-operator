@@ -129,5 +129,5 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 	}
 
-	ValidateEvents(t, targetKube, f.Namespace, testCouchbase.Name, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
