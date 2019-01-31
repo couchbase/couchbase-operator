@@ -91,3 +91,19 @@ func GetTLSState(hostport string, cacert []byte) ([]*x509.Certificate, error) {
 	state := conn.ConnectionState()
 	return state.VerifiedChains[0], nil
 }
+
+// GetFreePort probes the kernel for a randomly allocated port to use for port forwarding.
+func GetFreePort() (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	defer listener.Close()
+
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		return "", err
+	}
+
+	return port, nil
+}

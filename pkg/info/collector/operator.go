@@ -2,6 +2,7 @@ package collector
 
 import (
 	"fmt"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"io/ioutil"
 	"net/http"
 
@@ -54,13 +55,18 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 		return nil
 	}
 
+	port, err := netutil.GetFreePort()
+	if err != nil {
+		return fmt.Errorf("unable to allocate port %v", err)
+	}
+
 	// Open a channel to the operator http endpoint
 	pf := portforward.PortForwarder{
 		Config:    r.context.KubeConfig,
 		Client:    r.context.KubeClient,
 		Namespace: r.context.Config.Namespace,
 		Pod:       pod.Name,
-		Port:      r.context.Config.OperatorRestPort,
+		Port:      port + ":" + r.context.Config.OperatorRestPort,
 	}
 	if err := pf.ForwardPorts(); err != nil {
 		return fmt.Errorf("unable to forward port %s for pod %s", r.context.Config.OperatorRestPort, pod.Name)
@@ -84,7 +90,7 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 
 	for name, path := range paths {
 		// Get the debug info, we need debug=1 here or it spits out binary
-		uri := fmt.Sprintf("http://localhost:%s%s", r.context.Config.OperatorRestPort, path)
+		uri := fmt.Sprintf("http://localhost:%s%s", port, path)
 		resp, err := http.Get(uri)
 		if err != nil {
 			fmt.Printf("unable to collect %s for pod %s\n", uri, pod.Name)
