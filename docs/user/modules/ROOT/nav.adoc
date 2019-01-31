@@ -41,3 +41,5 @@
  ** xref:cbopinfo.adoc[cbopinfo]
  * xref:demo.adoc[Couchbase Deployment Tutorial]
  * xref:release-notes.adoc[Release Notes]
+.Other Resources
+* xref:sync-gateway::kubernetes/deploy-cluster.adoc[Sync Gateway on Kubernetes]
