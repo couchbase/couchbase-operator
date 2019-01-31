@@ -39,6 +39,9 @@ NAME = 'cao-test'
 # Default version of Kubernetes.
 VERSION = '1.11.5-gke.5'
 
+# Default machine type.
+MACHINE = 'n1-highcpu-4'
+
 # Static RFC1918 prefix used to simplify firewall deployment.
 PREFIX = '10.0.0.0/8'
 
@@ -102,6 +105,7 @@ def start(args):
         gcloud('container', 'clusters', 'create', args.name,
                '--cluster-version', args.cluster_version,
                '--region', region,
+               '--machine-type', args.machine,
                '--network', args.name,
                '--subnetwork', args.name,
                '--no-enable-ip-alias',
@@ -145,6 +149,7 @@ def main():
     parser.add_argument('command')
     parser.add_argument('-n', '--name', default=NAME)
     parser.add_argument('-c', '--cluster-version', default=VERSION)
+    parser.add_argument('-m', '--machine', default=MACHINE)
     args = parser.parse_args()
 
     # Parse gcloud configuration.
