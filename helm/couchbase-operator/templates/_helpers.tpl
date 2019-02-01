@@ -36,6 +36,18 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
+Create service account for couchbase-operator when enabled and there
+aren't any overrides from the operator.ServiceAccount
+*/}}
+{{- define "couchbase-operator.createServiceAccount" -}}
+{{- if .Values.deployments.couchbaseOperator -}}
+{{ not (empty .Values.couchbaseOperator.serviceAccountName) | ternary false .Values.serviceAccount.couchbaseOperator.create  }}
+{{- else -}}
+{{ false }}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create the name of the couchbase-operator service account to use
 */}}
 {{- define "couchbase-operator.serviceAccountName" -}}
@@ -47,6 +59,7 @@ Create the name of the couchbase-operator service account to use
 {{- end -}}
 {{- end -}}
 
+
 {{/*
 Get kind of rbac role to use based on requested level of access
 */}}
@@ -55,6 +68,18 @@ Get kind of rbac role to use based on requested level of access
 {{- printf "ClusterRole" }}
 {{- else -}}
 {{- printf "Role" }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create service account for admission-controller when enabled and there
+aren't any overrides from the controller.ServiceAccount
+*/}}
+{{- define "admission-controller.createServiceAccount" -}}
+{{- if .Values.deployments.admissionController -}}
+{{ not (empty .Values.admissionController.serviceAccountName) | ternary false .Values.serviceAccount.admissionController.create  }}
+{{- else -}}
+{{ false }}
 {{- end -}}
 {{- end -}}
 
