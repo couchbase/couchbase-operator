@@ -3,6 +3,7 @@ package e2e
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -56,7 +57,7 @@ func TestPauseOperator(t *testing.T) {
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToKill)
 
 	event := e2eutil.NewMemberAddEvent(testCouchbase, 3)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 2*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToKill)
@@ -116,7 +117,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
 	e2eutil.MustPatchBucketInfo(t, client, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", &flush), constants.Retries1)
 	e2eutil.MustPatchBucketInfo(t, client, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", &flush), constants.Retries1)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 180)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 3*time.Minute)
 
 	// Check the events match what we expect:
 	// * Admin console service created

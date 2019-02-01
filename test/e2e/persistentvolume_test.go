@@ -149,7 +149,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	// For validation purpose only
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600); err != nil {
+	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
 
@@ -171,14 +171,14 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "pkill beam.smp")
 			eventsExpected = append(eventsExpected, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
 		}
-		if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 100); err != nil {
+		if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 2*time.Minute); err != nil {
 			t.Fatal(err)
 		}
 
 		expectedEvents.AddParallelEvents(memberDownEvents)
 		expectedEvents.AddParallelEvents(memberRecoveredEvents)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 600)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
@@ -289,9 +289,9 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), totalTimeToRecover+(60*platformTimingMultiplier))
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Duration(totalTimeToRecover+(60*platformTimingMultiplier))*time.Second)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300*platformTimingMultiplier)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), time.Duration(5*platformTimingMultiplier)*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -385,7 +385,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberIdToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill), autofailoverTimeout+(90*platformTimingMultiplier))
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill), time.Duration(autofailoverTimeout+(90*platformTimingMultiplier))*time.Second)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberIdToKill)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5*platformTimingMultiplier)
@@ -422,12 +422,12 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberIdToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 180)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 3*time.Minute)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberIdToKill), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberIdToKill), 5*time.Minute)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 400)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberIdToKill)
@@ -585,7 +585,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 
 	time.Sleep(timeToSleep)
 
-	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 300*platformTimingMultiplier); err != nil {
+	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, time.Duration(5*platformTimingMultiplier)*time.Minute); err != nil {
 		t.Error(err)
 	}
 
@@ -700,7 +700,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	expectedEvents.AddMemberDownEvent(testCouchbase, podMemberToKill)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
@@ -711,8 +711,8 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 	expectedEvents.AddFailedAddNodeEvent(testCouchbase, clusterSize)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 90)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberToKill)
@@ -828,7 +828,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		podNameToKill := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
 		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
 		go func(event corev1.Event) {
-			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 300)
+			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 5*time.Minute)
 			eventChan <- event
 			errChan <- err
 		}(*event)
@@ -853,7 +853,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	}
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600*platformTimingMultiplier)
+	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, time.Duration(10*platformTimingMultiplier)*time.Minute)
 
 	for _, recEvent := range receivedEvents {
 		expectedEvents = append(expectedEvents, recEvent)
@@ -949,7 +949,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		podNameToKill := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
 		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
 		go func(event corev1.Event) {
-			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 300)
+			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 5*time.Minute)
 			eventChan <- event
 			errChan <- err
 		}(*event)
@@ -974,7 +974,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	}
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 600*platformTimingMultiplier)
+	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, time.Duration(10*platformTimingMultiplier)*time.Minute)
 
 	for _, recEvent := range receivedEvents {
 		expectedEvents = append(expectedEvents, recEvent)

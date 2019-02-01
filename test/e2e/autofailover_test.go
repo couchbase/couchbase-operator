@@ -89,11 +89,11 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		memRemovedParallelEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberToKill)
 	}
 
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30); err != nil {
+	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60); err != nil {
+	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, time.Minute); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,14 +102,14 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	// Event check for new member add
 	for memberIndex := clusterSize; memberIndex < clusterSize+3; memberIndex++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberIndex), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberIndex), 2*time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
 
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddParallelEvents(memRemovedParallelEvents)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
@@ -229,7 +229,7 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 	}
 	expectedEvents.AddParallelEvents(memDownParallelEvents)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMembersToKill[0]), 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMembersToKill[0]), 2*time.Minute)
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -288,7 +288,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	}
 
 	for memberId := clusterSize; memberId < clusterSize+podMembersToKillLen; memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 3*time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
 	}
 
@@ -365,8 +365,8 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	t.Log("Entering sleep to load data")
 	time.Sleep(time.Second * 20)
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podName, "rm -vf /opt/couchbase/var/lib/couchbase/data/"+bucketName+"/*")
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 

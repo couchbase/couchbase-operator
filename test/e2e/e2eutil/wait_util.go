@@ -437,7 +437,7 @@ func CreateAndWaitPod(kubecli kubernetes.Interface, ns string, pod *v1.Pod, time
 }
 
 // waits until the provided condition type occurs with associated status
-func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, seconds int) error {
+func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, timeout time.Duration) error {
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: api.CRDResourceKind},
 	}
@@ -450,8 +450,7 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	now := metav1.Now()
 
 	resultChan := watch.ResultChan()
-	duration := time.Duration(seconds) * time.Second
-	timeoutChan := time.After(duration)
+	timeoutChan := time.After(timeout)
 	for {
 		select {
 		case <-timeoutChan:
@@ -472,20 +471,20 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
-func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, event *v1.Event, seconds int) {
-	if err := WaitForClusterEvent(k8s.KubeClient, cl, event, seconds); err != nil {
+func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
+	if err := WaitForClusterEvent(k8s.KubeClient, cl, event, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func WaitForClusterEventsInParallel(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, expectedEvents EventList, seconds int) (EventList, error) {
+func WaitForClusterEventsInParallel(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, expectedEvents EventList, timeout time.Duration) (EventList, error) {
 	receivedEvents := EventList{}
 	eventChan := make(chan v1.Event)
 	errChan := make(chan error)
 	for _, event := range expectedEvents {
 		// Creates go routines for each event
 		go func(event v1.Event) {
-			err := WaitForClusterEvent(kubeClient, cl, &event, seconds)
+			err := WaitForClusterEvent(kubeClient, cl, &event, timeout)
 			eventChan <- event
 			errChan <- err
 		}(event)
@@ -502,7 +501,7 @@ func WaitForClusterEventsInParallel(kubeClient kubernetes.Interface, cl *api.Cou
 }
 
 // waits until the provided condition type occurs with associated status
-func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, eventList EventList, maxExpectedEvents, seconds int) (EventList, error) {
+func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, eventList EventList, maxExpectedEvents int, timeout time.Duration) (EventList, error) {
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: api.CRDResourceKind},
 	}
@@ -516,8 +515,7 @@ func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.Couchba
 	now := metav1.Now()
 
 	resultChan := watch.ResultChan()
-	duration := time.Duration(seconds) * time.Second
-	timeoutChan := time.After(duration)
+	timeoutChan := time.After(timeout)
 	for {
 		select {
 		case <-timeoutChan:

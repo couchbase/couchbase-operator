@@ -519,7 +519,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// verify that the operator has reverted the change
 	// and re-enabled bucket flush
 	event := k8sutil.BucketEditEvent("default", testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30*time.Second)
 	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to enable bucket flush %v", err)
 	}
@@ -562,7 +562,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		return false
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30*time.Second)
 	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to revert bucket replicas to 1 %v", err)
 	}
@@ -605,7 +605,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		return false
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30*time.Second)
 	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
 		t.Fatalf("failed to revert bucket io prioritys to high %v", err)
 	}

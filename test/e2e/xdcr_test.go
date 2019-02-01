@@ -37,9 +37,9 @@ func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, cluste
 		}
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIndex)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 120)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceStartedEvent(cbCluster), 60)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 2*time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceStartedEvent(cbCluster), time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
 
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", nextNodeToBeAdded)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
@@ -64,9 +64,9 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 		}
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberIndex)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIndex), 90)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 180)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIndex), 2*time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, nextNodeToBeAdded), 3*time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
 
 		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIndex)
 		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", nextNodeToBeAdded)
@@ -330,14 +330,14 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, cluster1, clust
 		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "MemberDown", nodeIndex)
 
 		event := e2eutil.NewMemberFailedOverEvent(xdcrCluster1, nodeIndex)
-		if err := e2eutil.WaitForClusterEvent(defKube.KubeClient, xdcrCluster1, event, 90); err != nil {
+		if err := e2eutil.WaitForClusterEvent(defKube.KubeClient, xdcrCluster1, event, 2*time.Minute); err != nil {
 			errChan <- err
 			return
 		}
 		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "FailedOver", nodeIndex)
 
 		event = e2eutil.NewMemberAddEvent(xdcrCluster1, 5)
-		if err := e2eutil.WaitForClusterEvent(defKube.KubeClient, xdcrCluster1, event, 120); err != nil {
+		if err := e2eutil.WaitForClusterEvent(defKube.KubeClient, xdcrCluster1, event, 2*time.Minute); err != nil {
 			errChan <- err
 			return
 		}

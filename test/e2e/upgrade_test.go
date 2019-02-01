@@ -232,7 +232,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 120)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 2*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries120)
 
@@ -384,7 +384,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
 
@@ -434,8 +434,8 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 30*time.Second)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
@@ -486,7 +486,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)
 
@@ -536,8 +536,8 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), constants.Retries10)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 600)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 30)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 30*time.Second)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries240)

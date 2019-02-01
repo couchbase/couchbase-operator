@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -132,7 +133,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleNum+1, targetKube, testCouchbase)
 
 	// Wait for the creation failure event to be raised
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, scaleNum), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, scaleNum), time.Minute)
 
 	// Check the event stream is as expected
 	expectedEvents := e2eutil.EventList{}
@@ -251,11 +252,11 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 
 	var memberId int
 	for memberId = 0; memberId < numNodes; memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 180)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 3*time.Minute)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, memberId), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, memberId), 5*time.Minute)
 
 	t.Logf("Failed to add extra cluster node: %v", err)
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, memberId)
@@ -301,7 +302,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	t.Logf("Attempting to add a node")
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, numNodes+1, targetKube, testCouchbase)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes), 5*time.Minute)
 	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, numNodes)
 	t.Logf("Node not added")
 

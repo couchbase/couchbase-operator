@@ -286,7 +286,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	// into a healthy state.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 5*time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/ServerSettings/0/Pod"), constants.Retries5)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
 
@@ -345,7 +345,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 
 	// expect down node to be removed from cluster
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, removePodMemberId), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, removePodMemberId), 5*time.Minute)
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -377,7 +377,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	// we expect the cluster to end up healthy.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 30)
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize-1, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 30*time.Second)
 	e2eutil.MustWaitForRebalanceProgress(t, targetKube, testCouchbase, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 300)
@@ -455,7 +455,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	}
 
 	// expect an add member event to occur
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), time.Minute)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
 	expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
 
@@ -790,7 +790,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 
 	for memeberId := 3; memeberId <= 4; memeberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memeberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memeberId), 2*time.Minute)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memeberId)
 	}
 
@@ -894,7 +894,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, 6)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 6), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 6), 5*time.Minute)
 
 	serviceMap = map[string]int{
 		"Data":  2,

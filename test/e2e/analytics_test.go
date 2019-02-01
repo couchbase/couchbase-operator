@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -394,23 +395,23 @@ func TestAnalyticsKillPods(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
 
 		if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, constants.Size1); err != nil {
 			t.Fatalf("Mismatch in unhealthy nodes count: %v", err)
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberId), 40)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberId), time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberId)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberIdToBeAdded), 90)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberIdToBeAdded), 2*time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", newMemberIdToBeAdded)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberId)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
@@ -534,7 +535,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		if podMemberId == 0 {
 			continue
 		}
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), 2*time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
 	}
 
@@ -543,14 +544,14 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		if podMemberId == 0 {
 			continue
 		}
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId), time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
 	}
 
 	// Event checks for rebalance to start and complete successfully
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 

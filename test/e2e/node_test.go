@@ -53,7 +53,7 @@ func TestEditServiceConfig(t *testing.T) {
 	t.Log("Changing cluster size")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Size", newSize), constants.Retries10)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 1), 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 1), 2*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -107,7 +107,7 @@ func TestNodeManualFailover(t *testing.T) {
 	}
 
 	// expect rebalance event to start
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.RebalanceStartedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
@@ -146,7 +146,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 
 	for memberId := 1; memberId < clusterSize; memberId++ {
 		// wait for add member event
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 2*time.Minute)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 
 		if memberId == clusterSize-2 {
@@ -155,15 +155,15 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 		}
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceIncompleteEvent(testCouchbase), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceIncompleteEvent(testCouchbase), time.Minute)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.FailedAddNodeEvent(testCouchbase, podToKillMemberId), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.FailedAddNodeEvent(testCouchbase, podToKillMemberId), time.Minute)
 	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
 
 	// wait for add member event
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 150)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 3*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 
 	// cluster should also be balanced
@@ -199,7 +199,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, constants.Size3, targetKube, testCouchbase)
 
 	// wait for add member event
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 2), 5*time.Minute)
 
 	for nodeIndex := 1; nodeIndex < constants.Size3; nodeIndex++ {
 		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
@@ -244,10 +244,10 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	// end up healthy.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, targetKube, testCouchbase, 25.0, 2*time.Minute)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim1Index, true)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, victim2Index), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, victim2Index), 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim2Index, true)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
 
@@ -431,11 +431,11 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 
 	// Wait for the nodes to be reported as down before failing over, so we deterministically
 	// see the down events
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 0), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 0), 5*time.Minute)
 	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 5), 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 5), 2*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -489,7 +489,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	for _, memberId := range memberIdsToKill {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, memberId, true)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), time.Minute)
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
 	}
 
@@ -504,7 +504,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	}
 
 	for memberId := clusterSize; memberId < clusterSize+len(memberIdsToKill); memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 2*time.Minute)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
@@ -568,7 +568,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 
 	// Wait for the nodes to be reported as down before failing over, so we deterministically
 	// see the down events
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberIdToKill), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberIdToKill), time.Minute)
 
 	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToKill)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToKill)
@@ -649,7 +649,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	for _, memberId := range memberIdsToKill {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, memberId, true)
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 60)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), time.Minute)
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
 	}
 
@@ -677,7 +677,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	for memberId := clusterSize; memberId < clusterSize+memberIdsToKillLen; memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 2*time.Minute)
 		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
 	}
 
@@ -737,19 +737,19 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 
 	// Wait for the nodes to be reported as down before failing over, so we deterministically
 	// see the down events
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberIdToKill), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberIdToKill), time.Minute)
 	expectedEvents.AddMemberDownEvent(testCouchbase, podMemberIdToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberIdToKill), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberIdToKill), time.Minute)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberIdToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 180)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 3*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberIdToKill)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
@@ -838,7 +838,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 		t.Fatalf("failed to kill pods: %v", err)
 	}
 
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30); err != nil {
+	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -849,7 +849,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	// Manually failover nodes
 	e2eutil.FailoverNodes(t, client, clusterSize, podMembersToKill)
 
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, 60); err != nil {
+	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, time.Minute); err != nil {
 		t.Fatal(err)
 	}
 
@@ -858,7 +858,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	// event capture for new pod creation
 	for memberId := clusterSize; memberId < clusterSize+len(podMembersToKill); memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 120)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 2*time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
 	}
 
@@ -912,19 +912,19 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberToKill), 30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberToKill), 30*time.Second)
 	expectedEvents.AddMemberDownEvent(testCouchbase, memberToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, memberToKill), autofailoverTimeout+30)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, memberToKill), time.Duration(autofailoverTimeout+30)*time.Second)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 120)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 2*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 60)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberToKill)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
@@ -1167,10 +1167,10 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 5*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown), 300)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown), 5*time.Minute)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
