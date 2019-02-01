@@ -7,6 +7,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"testing"
+	"time"
 )
 
 // Tests creation of a 3 node cluster with persistence
@@ -40,7 +41,7 @@ func TestCreateStatefulCluster(t *testing.T) {
 		}
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }

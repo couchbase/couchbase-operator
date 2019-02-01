@@ -112,7 +112,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -262,7 +262,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	memDownParallelEvents := e2eutil.EventValidator{}
 	memFailoverParallelEvents := e2eutil.EventValidator{}
@@ -296,7 +296,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	expectedEvents.AddParallelEvents(memRemoveParallelEvents)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries60)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -334,7 +334,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Get pod object for reading container name
 	podName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -370,6 +370,6 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

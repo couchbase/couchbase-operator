@@ -2,6 +2,7 @@ package e2eutil
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -136,8 +137,11 @@ func GetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.Couch
 }
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
-func PatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, retries int) error {
-	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+func PatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
 		before, err := GetBucket(t, client, bucketName)
 		if err != nil {
 			return false, err
@@ -160,8 +164,8 @@ func PatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, p
 	})
 }
 
-func MustPatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, retries int) {
-	if err := PatchBucketInfo(t, client, bucketName, patches, retries); err != nil {
+func MustPatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchBucketInfo(t, client, bucketName, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -388,8 +392,11 @@ func FailoverNodes(t *testing.T, client *cbmgr.Couchbase, cbClusterSize int, mem
 	}
 }
 
-func VerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, tries int) error {
-	err := retryutil.RetryOnErr(Context, 5*time.Second, tries, "failover nodes", "test-cluster",
+func VerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	err := retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "failover nodes", "test-cluster",
 		func() error {
 			clusterInfo, err := client.ClusterInfo()
 			if err != nil {
@@ -412,6 +419,12 @@ func VerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, trie
 		return err
 	}
 	return nil
+}
+
+func MustVerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, timeout time.Duration) {
+	if err := VerifyClusterBalancedAndHealthy(t, client, timeout); err != nil {
+		Die(t, err)
+	}
 }
 
 func WaitForUnhealthyNodes(t *testing.T, client *cbmgr.Couchbase, tries int, numUnhealthy int) error {
@@ -440,8 +453,11 @@ func WaitForUnhealthyNodes(t *testing.T, client *cbmgr.Couchbase, tries int, num
 }
 
 // PatchCouchbaseInfo tries patching the cluster information returned directly from Couchbase server.
-func PatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) error {
-	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+func PatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
 		info, err := client.ClusterInfo()
 		if err != nil {
 			return false, err
@@ -453,8 +469,8 @@ func PatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch
 	})
 }
 
-func MustPatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) {
-	if err := PatchCouchbaseInfo(t, client, patches, retries); err != nil {
+func MustPatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchCouchbaseInfo(t, client, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -545,8 +561,11 @@ func BucketInfoVerifier(t *testing.T, bucket *cbmgr.Bucket, bucketKey string, bu
 	return verified
 }
 
-func PatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) error {
-	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+func PatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
 		info, err := client.GetAutoFailoverSettings()
 		if err != nil {
 			return false, err
@@ -558,14 +577,17 @@ func PatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpa
 	})
 }
 
-func MustPatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) {
-	if err := PatchAutoFailoverInfo(t, client, patches, retries); err != nil {
+func MustPatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchAutoFailoverInfo(t, client, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func PatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) error {
-	return retryutil.Retry(Context, 5*time.Second, retries, func() (done bool, err error) {
+func PatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
 		info, err := client.GetIndexSettings()
 		if err != nil {
 			return false, err
@@ -577,8 +599,8 @@ func PatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpa
 	})
 }
 
-func MustPatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, retries int) {
-	if err := PatchIndexSettingInfo(t, client, patches, retries); err != nil {
+func MustPatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchIndexSettingInfo(t, client, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }

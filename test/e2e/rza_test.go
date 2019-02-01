@@ -233,7 +233,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	serviceIndex := 0
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube, testCouchbase)
@@ -256,7 +256,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -343,7 +343,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 		}
 		// Updating CRD to add new server-group in CRD
 		newAvailableServerGroupList = append(availableServerGroupList, "NewRzaGroup-1")
-		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), constants.Retries5)
+		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), time.Minute)
 	}
 
 	if err := <-nodeUpdateErrChan; err != nil {
@@ -357,7 +357,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	for memberId := prevClusterSize; memberId < clusterSize; memberId++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
@@ -592,7 +592,7 @@ func TestRzaResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		// Update deployed server-groups based on new cluster size
 		deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -676,7 +676,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	}
 
 	availableServerGroupList = []string{availableServerGroupList[0], availableServerGroupList[2]}
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", availableServerGroupList), constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", availableServerGroupList), time.Minute)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 1), 5*time.Minute)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", 1)
@@ -684,7 +684,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 5*time.Minute)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -740,7 +740,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", serverGroupsUsed), constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", serverGroupsUsed), time.Minute)
 
 	clusterSize = clusterSize + 1
 	service := 0
@@ -755,7 +755,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap = GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -815,7 +815,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 
 	newAvailableServerGroupList := append(availableServerGroupList, "InvalidGroup-1")
 
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), time.Minute)
 
 	service := 0
 	clusterSize++
@@ -826,7 +826,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize-1)
 
 	// Revert server group addition
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), constants.Retries5)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", newAvailableServerGroupList), time.Minute)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-1), 2*time.Minute)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize-1)
@@ -955,7 +955,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberIdToGoDown)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")

@@ -1499,7 +1499,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1621,7 +1621,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	// Create Cb cluster
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
 
 	// Add expected kube events for verification
 	expectedEvents := e2eutil.EventValidator{}
@@ -1776,7 +1776,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1904,7 +1904,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -2000,7 +2000,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -2112,7 +2112,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	createPodSecurityContext(1000, &clusterSpec)
 
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 
 	// Kills operator pod in async way
 	if isOperatorKilledWithServerPod {
@@ -2286,7 +2286,7 @@ func TestLogRedactionVerify(t *testing.T) {
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 
 	// Collect logs
 	args := argumentList{}
@@ -2364,7 +2364,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 
 	// Collect logs
 	args := argumentList{}
@@ -2427,15 +2427,15 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 	cluster2 := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
 
 	// Ensure cluster 1 is healthy and update the retention period to be 1m.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, constants.Retries10)
-	cluster1 = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, 2*time.Minute)
+	cluster1 = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), time.Minute)
 
 	// Ensure cluster2 is healthy then kill the first stateless pod in cluster 2.  Wait for the recovery to
 	// start and complete.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster2, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster2, 2*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster2, mdsGroupSize, false)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster2, e2eutil.RebalanceStartedEvent(cluster2), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster2, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster2, 2*time.Minute)
 
 	// We expect that after 3 minutes (1m to flag as orphaned and 1m retention period) the
 	// persistent log volume should still be present.
@@ -2465,7 +2465,7 @@ func TestLogCollectListJson(t *testing.T) {
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 
 	// Collect logs
 	args := argumentList{}

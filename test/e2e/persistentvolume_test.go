@@ -183,7 +183,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	// K8S-537 - Will fail due to Pod recovery event not generated
 	//ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -388,7 +388,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill), time.Duration(autofailoverTimeout+(90*platformTimingMultiplier))*time.Second)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberIdToKill)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5*platformTimingMultiplier)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(platformTimingMultiplier)*time.Minute)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
@@ -451,7 +451,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
@@ -580,7 +580,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	clusterBalancedErr := make(chan error)
 	go func() {
 		// Wait for cluster balanced condition after recovering the cluster pods
-		clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300*platformTimingMultiplier)
+		clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
 	}()
 
 	time.Sleep(timeToSleep)
@@ -617,7 +617,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		time.Sleep(timeToSleep)
 
 		// Wait for cluster balanced condition after recovering the cluster pods
-		if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300*platformTimingMultiplier); err != nil {
+		if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute); err != nil {
 			t.Fatal(err)
 		}
 
@@ -859,7 +859,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30*platformTimingMultiplier)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
 
 	// Cross check rza deployment matches the expected values
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -980,7 +980,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		expectedEvents = append(expectedEvents, recEvent)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30*platformTimingMultiplier)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
 
 	// Cross check rza deployment matches the expected values
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -1180,7 +1180,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		switch clusterSize {
 		case 2:
@@ -1223,6 +1223,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }

@@ -363,8 +363,8 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")
-	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), constants.Retries5)
-	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), constants.Retries5)
+	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
+	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 
 	// make sure cluster is healthy before proceeding
 	err = e2eutil.WaitForClusterStatus(t, targetKube.CRClient, "ControlPaused", "true", testCouchbase1, 300)
@@ -520,14 +520,8 @@ outerLoop:
 			}
 		}
 		// make sure cluster is healthy before running next cycle
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase1, constants.Retries10)
-		if err != nil {
-			t.Fatalf("failed to wait for cluster to be healthy %v", err)
-		}
-		err = e2eutil.WaitClusterStatusHealthy(t, targetKube.CRClient, testCouchbase2, constants.Retries10)
-		if err != nil {
-			t.Fatalf("failed to wait for cluster to be healthy %v", err)
-		}
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase1, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase2, 2*time.Minute)
 
 		cycles = cycles + 1
 		time.Sleep(1 * time.Second)

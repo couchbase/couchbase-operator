@@ -228,7 +228,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		}
 		t.Logf("Resize Success: %v...\n", names)
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -248,7 +248,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Stop the insertion and wait for it to exit, checking for any errors encountered
 	stopDataInsertion <- true

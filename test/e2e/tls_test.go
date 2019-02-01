@@ -36,7 +36,7 @@ func TestTlsCreateCluster(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
@@ -85,7 +85,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// cluster should also be balanced
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -116,7 +116,7 @@ func TestTlsResizeCluster(t *testing.T) {
 		service := 0
 		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -132,7 +132,7 @@ func TestTlsResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -197,7 +197,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 2*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
@@ -226,14 +226,14 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, targetKube, f.Namespace, ctx)
 	secret := e2eutil.MustGetSecret(t, targetKube, f.Namespace, ctx.OperatorSecretName)
 	e2eutil.MustDeleteSecret(t, targetKube, f.Namespace, ctx.OperatorSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
 	e2eutil.MustRecreateSecret(t, targetKube, f.Namespace, secret)
 	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, targetKube, testCouchbase, 300)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -310,7 +310,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	expectedEvents.AddMemberRemoveEvent(testCouchbase, podToKillMemberId)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries30)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
@@ -511,7 +511,7 @@ func TestTLSRotate(t *testing.T) {
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the old certificate for a new one and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificate(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
@@ -543,7 +543,7 @@ func TestTLSRotateChain(t *testing.T) {
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the old certificate for a new chain and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificateChain(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
@@ -575,7 +575,7 @@ func TestTLSRotateCA(t *testing.T) {
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, swap out the all certificates for new ones and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
@@ -609,7 +609,7 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 
 	// When the cluster is ready, swap out the all certificates for a new ones and verify,
 	// then make sure the operator can scale the cluster (e.g. talk to it with the new CA)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
@@ -645,7 +645,7 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden, ctx)
 
 	// When the cluster is ready, restart the operator and swap out the all certificates for new ones and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes, cluster.Namespace)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
@@ -683,13 +683,13 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is ready, kill a stateful pod,  restart the operator and swap out the all certificates for new ones and verify
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes, cluster.Namespace)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries20)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
 	// Check the events match what we expect:
@@ -729,7 +729,7 @@ func TestTLSRotateInvalid(t *testing.T) {
 
 	// When the cluster is ready, swap out the server certificate for a new one from a new CA.
 	// Expect the operator to raise an event to alert that TLS has been misconfigured.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificateWrongCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSInvalidEvent(cluster), 5*time.Minute)
 

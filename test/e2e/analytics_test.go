@@ -219,7 +219,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries10)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -235,7 +235,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries120)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 	// To stop background data insertion and wait for function to complete
 	stopDataInsertionChan <- true
@@ -555,7 +555,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, constants.Retries5)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, 0, 0}

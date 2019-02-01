@@ -45,7 +45,7 @@ func rebalanceOutXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, cluste
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries5)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 		nextNodeToBeAdded++
 	}
 	return nil
@@ -74,7 +74,7 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIndex)
 		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries5)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 		nextNodeToBeAdded++
 	}
 	return nil
@@ -85,7 +85,7 @@ func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSiz
 	service := 0
 	targetKube := k8s
 	cbCluster = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, cbCluster, constants.Retries30)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, constants.Retries10)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 	return cbCluster
 }
 
@@ -426,7 +426,7 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, cluster1, cluste
 			return
 		}
 
-		if err := e2eutil.WaitClusterStatusHealthy(t, defKube.CRClient, xdcrCluster1, constants.Retries10); err != nil {
+		if err := e2eutil.WaitClusterStatusHealthy(t, defKube.CRClient, xdcrCluster1, 2*time.Minute); err != nil {
 			errChan <- err
 			return
 		}
