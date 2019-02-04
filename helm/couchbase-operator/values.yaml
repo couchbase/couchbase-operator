@@ -100,9 +100,12 @@ admissionTLS:
   create: true
   # Expiry time of CA in days for generated certs
   expiration: 365
-  # PEM format ca certificate for use by validation webhook (auto-generated)
-  # override via --set-file
-  webhookCa: ""
+  # CA certificate used to generate client key and cert (auto-generated)
+  webhookCa:
+    # A base64 encoded PEM format certificate
+    cert:
+    # A base64 encoded PEM format private key
+    key:
   # secret is a kubrnetes Secret with certs mounted within the admission controller.
   secret:
     # name of the secret (auto-generated)

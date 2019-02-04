@@ -122,14 +122,26 @@ Create secret for admission operator.
 Generate certificates for admission-controller webhooks
 */}}
 {{- define "admission-controller.gen-certs" -}}
-{{- $altNames := list ( include "admission-controller.service.fullname" . ) -}}
 {{- $expiration := (.Values.admissionTLS.expiration | int) -}}
-{{- $ca := genCA "admission-controller-ca" $expiration -}}
-{{- $caCert := default $ca.Cert .Values.admissionTLS.webhookCa | b64enc -}}
-{{- $cert := genSignedCert ( include "admission-controller.fullname" . ) nil $altNames $expiration $ca -}}
-{{- $clientCert := default $cert.Cert .Values.admissionTLS.secret.tlsCert | b64enc -}}
-{{- $clientKey := default $cert.Key .Values.admissionTLS.secret.tlsKey | b64enc -}}
-caCert: {{ $caCert }}
+{{- if (or (empty .Values.admissionTLS.webhookCa.cert) (empty .Values.admissionTLS.webhookCa.key)) -}}
+{{- $ca :=  genCA "admission-controller-ca" $expiration -}}
+{{- template "admission-controller.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
+{{- else -}}
+{{- $ca :=  buildCustomCert (.Values.admissionTLS.webhookCa.cert | b64enc) (.Values.admissionTLS.webhookCa.key | b64enc) -}}
+{{- template "admission-controller.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Generate client key and cert from CA
+*/}}
+{{- define "admission-controller.gen-client-tls" -}}
+{{- $altNames := list ( include "admission-controller.service.fullname" .RootScope) -}}
+{{- $expiration := (.RootScope.Values.admissionTLS.expiration | int) -}}
+{{- $cert := genSignedCert ( include "admission-controller.fullname" .RootScope) nil $altNames $expiration .CA -}}
+{{- $clientCert := default $cert.Cert .RootScope.Values.admissionTLS.secret.tlsCert | b64enc -}}
+{{- $clientKey := default $cert.Key .RootScope.Values.admissionTLS.secret.tlsKey | b64enc -}}
+caCert: {{ .CA.Cert | b64enc }}
 clientCert: {{ $clientCert }}
 clientKey: {{ $clientKey }}
 {{- end -}}
