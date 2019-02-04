@@ -12,6 +12,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -21,6 +22,8 @@ import (
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -833,9 +836,19 @@ func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, 
 
 // WaitForPVCDeletion is used as synchronization between runs, especially in the cloud
 // as PVC reclaim is not instant.
-func WaitForPVCDeletion(k8s *types.Cluster, namespace string, retries int) error {
-	return retryutil.Retry(Context, 10*time.Second, retries, func() (bool, error) {
-		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{})
+func WaitForPVCDeletion(k8s *types.Cluster, namespace string, ctx context.Context) error {
+	requirements := []labels.Requirement{}
+	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
+	if err != nil {
+		return err
+	}
+	requirements = append(requirements, *req)
+
+	selector := labels.NewSelector()
+	selector = selector.Add(requirements...)
+
+	return retryutil.Retry(ctx, 10*time.Second, IntMax, func() (bool, error) {
+		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -846,10 +859,58 @@ func WaitForPVCDeletion(k8s *types.Cluster, namespace string, retries int) error
 	})
 }
 
-func MustWaitForPVCDeletion(t *testing.T, k8s *types.Cluster, namespace string, retries int) {
-	if err := WaitForPVCDeletion(k8s, namespace, retries); err != nil {
-		Die(t, err)
+// DeleteAndWaitForPVCDeletion deletes all PVCs in the cluster and waits for them
+// to be deleted.  If this operation fails we retry again and again until it does
+// work or the context timeout triggers.
+func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Select all Couchbase PVCs in the namespace.
+	requirements := []labels.Requirement{}
+	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
+	if err != nil {
+		return err
 	}
+	requirements = append(requirements, *req)
+
+	selector := labels.NewSelector()
+	selector = selector.Add(requirements...)
+
+	// Retry deletion until success or the timeout context fires.
+	return retryutil.Retry(ctx, time.Second, IntMax, func() (bool, error) {
+		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		// Nothing to do, move along
+		if len(pvcs.Items) == 0 {
+			return true, nil
+		}
+
+		// Temporarily report that stuff needs to be deleted synchronously
+		pvcNames := []string{}
+		for _, pvc := range pvcs.Items {
+			pvcNames = append(pvcNames, pvc.Name)
+		}
+		fmt.Println("Waiting for deletion of:", strings.Join(pvcNames, ", "))
+
+		for _, pvc := range pvcs.Items {
+			if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, nil); err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+		}
+
+		// Wait for upto a minute for the PVCs to be deleted before we retry the deletion.
+		waitContext, waitCancel := context.WithTimeout(ctx, time.Minute)
+		defer waitCancel()
+
+		if err := WaitForPVCDeletion(k8s, namespace, waitContext); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
 }
 
 // WaitForRebalanceProgress waits until a rebalance is running and the progress is greater

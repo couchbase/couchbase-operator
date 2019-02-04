@@ -79,10 +79,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 	}
 
 	// Expect the cluster to enter a failed state
-	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster, 10); err != nil {
-		t.Fatalf("cluster failed to enter failed state")
-	}
-	t.Logf("Pod not placed")
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, cluster, 10*time.Minute)
 }
 
 func TestPodResourcesHigh(t *testing.T) {
@@ -178,10 +175,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	}
 
 	// Expect the cluster to enter a failed state
-	if err := e2eutil.WaitClusterPhaseFailed(t, targetKube.CRClient, cluster, 10); err != nil {
-		t.Fatalf("cluster failed to enter failed state")
-	}
-	t.Logf("Cluster failed, pod not scheduled")
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, cluster, 10*time.Minute)
 }
 
 func TestAntiAffinityOn(t *testing.T) {

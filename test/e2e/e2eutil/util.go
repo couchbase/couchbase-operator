@@ -719,24 +719,11 @@ func CleanK8Cluster(t *testing.T, k8s *types.Cluster, namespace string) {
 	}
 	WaitUntilPodDeleted(t, k8s.KubeClient, namespace)
 
-	// Remove all PVC for the CB clusters
-	for _, cluster := range clusters.Items {
-		pvcSelectorLabel := constants.CouchbaseServerClusterKey + "=" + cluster.Name
-		pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: pvcSelectorLabel})
-		if err != nil {
-			t.Logf("Failed to list pvcs for %s: %v", err, cluster.Name)
-		} else {
-			for _, pvc := range pvcList.Items {
-				k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
-			}
-		}
-	}
-
 	// Ensure all existing PVCs are deleted before continuing.  In the cloud these may take a
 	// while to fully disappear, and may bleed through into other tests, especially ones that
 	// cover supportability.
-	if err := WaitForPVCDeletion(k8s, namespace, constants.Retries120); err != nil {
-		t.Logf("Warning - PVC deletion not complete")
+	if err := DeleteAndWaitForPVCDeletion(k8s, namespace, 5*time.Minute); err != nil {
+		fmt.Println("Warning: Unable to delete PVCs:", err)
 	}
 }
 
