@@ -213,13 +213,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	prevClusterSize := clusterSize
 	for _, clusterSize = range clusterSizes {
 		service := 0
-		var err error
-		testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries120)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 20*time.Minute)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:

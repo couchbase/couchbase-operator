@@ -33,8 +33,6 @@ var (
 		"TestRecoveryAfterOnePodFailureNoBucket":              TestRecoveryAfterOnePodFailureNoBucket,
 		"TestAntiAffinityOn":                                  TestAntiAffinityOn,
 		"TestPodResourcesBasic":                               TestPodResourcesBasic,
-		"TestNegBucketAdd":                                    TestNegBucketAdd,
-		"TestNegBucketEdit":                                   TestNegBucketEdit,
 		"TestResizeClusterWithBucket":                         TestResizeClusterWithBucket,
 		"TestEditServiceConfig":                               TestEditServiceConfig,
 		"TestRecoveryAfterTwoPodFailureNoBucket":              TestRecoveryAfterTwoPodFailureNoBucket,

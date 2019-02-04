@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -220,15 +219,7 @@ func TestEventingResizeCluster(t *testing.T) {
 
 		// Resize cluster and wait for healthy cluster
 		service := 1
-		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, eventingNodes, targetKube, testCouchbase)
-		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("Resize Success: %v...\n", names)
-
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, eventingNodes, targetKube, testCouchbase, 20*time.Minute)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -247,8 +238,6 @@ func TestEventingResizeCluster(t *testing.T) {
 		}
 		prevClusterSize = clusterSize
 	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Stop the insertion and wait for it to exit, checking for any errors encountered
 	stopDataInsertion <- true

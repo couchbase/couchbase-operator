@@ -163,9 +163,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
 
 	// cluster should also be balanced
-	if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, 300); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -365,14 +363,8 @@ func TestRemoveForeignNode(t *testing.T) {
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 
 	// resize to 2 member cluster
-	testCouchbase, err = e2eutil.ResizeCluster(t, 0, constants.Size2, targetKube, testCouchbase, constants.Retries30)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase = e2eutil.MustResizeCluster(t, 0, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-
-	// check that actual cluster size is only 2 nodes
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddEvent(*k8sutil.MemberRemoveEvent(foreignNodeName, testCouchbase))

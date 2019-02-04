@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -301,13 +300,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	t.Logf("Node not added")
 
 	t.Logf("Reverting add")
-	var err error
-	testCouchbase, err = e2eutil.ResizeCluster(t, 0, numNodes, targetKube, testCouchbase, constants.Retries30)
-	if err != nil {
-		t.Fatalf("cluster failed to revert, fail: %v", err)
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, 0, numNodes, targetKube, testCouchbase, 5*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -346,17 +339,12 @@ func TestAntiAffinityOff(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	t.Logf("Attempting to add a node")
-	var err error
-	testCouchbase, err = e2eutil.ResizeCluster(t, 0, scaleToNum+1, targetKube, testCouchbase, constants.Retries30)
-	if err != nil {
-		t.Fatalf("cluster failed to scale to 5 nodes: %v", err)
-	}
+	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaleToNum+1, targetKube, testCouchbase, 5*time.Minute)
 	t.Logf("Node added")
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, scaleToNum)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }

@@ -99,13 +99,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 
 		// add bucket
 		t.Logf("Desired Bucket Properties: %v\n", bucketSetting)
-		t.Logf("Spec Buckets: %v\n", bucketConfigs)
-		updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = bucketConfigs }
-		t.Logf("Adding Bucket To Cluster \n")
-		testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries10, updateFunc)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings", bucketConfigs), time.Minute)
 
 		buckets = append(buckets, bucketSetting.BucketName)
 
@@ -126,12 +120,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		}
 	}
 	// delete all buckets
-	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = []api.BucketConfig{} }
-	t.Logf("Removing Bucket From Cluster \n")
-	testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries10, updateFunc)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
 	err = e2eutil.WaitUntilBucketsNotExists(t, targetKube.CRClient, []string{"default1", "default2", "default3", "default4"}, constants.Retries10, testCouchbase)
 	if err != nil {
 		t.Fatalf("failed to delete bucket %v", err)
@@ -187,12 +176,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 		// add bucket
 		t.Logf("Desired Bucket Properties: %v\n", newConfig)
-		updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = newConfig }
-		t.Logf("Adding Bucket To Cluster \n")
-		testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries10, updateFunc)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings", newConfig), time.Minute)
 
 		t.Logf("Waiting For Bucket To Be Created \n")
 		err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{bucketSetting.BucketName}, constants.Retries10, testCouchbase)
@@ -216,14 +200,8 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		}
 
 		// delete bucket
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = []api.BucketConfig{} }
-		t.Logf("Removing Bucket From Cluster \n")
-		testCouchbase, err = e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries10, updateFunc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = e2eutil.WaitUntilBucketsNotExists(t, targetKube.CRClient, []string{bucketSetting.BucketName}, constants.Retries10, testCouchbase)
-		if err != nil {
+		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
+		if err := e2eutil.WaitUntilBucketsNotExists(t, targetKube.CRClient, []string{bucketSetting.BucketName}, constants.Retries10, testCouchbase); err != nil {
 			t.Fatalf("failed to delete bucket %v", err)
 		}
 
@@ -237,47 +215,6 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		}
 	}
 
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
-}
-
-// Creates a cluster and adds a bucket with an invalid configuration
-// 1. Create a single node cluster with no buckets
-// 2. Creates an ephemeral bucket with replicaIndexes enabled (replicaIndexes
-//    are not supported on ephemeral buckets so creation should fail)
-// 3. Wait for 90 seconds to ensure that the bucket is not created
-// 4. (TODO) Check to make sure that an error is reported in the conditions section
-func TestNegBucketAdd(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
-
-	bucketSettings := api.BucketConfig{
-		BucketName:         "default",
-		BucketType:         pkg_constants.BucketTypeEphemeral,
-		BucketMemoryQuota:  constants.Mem256Mb,
-		BucketReplicas:     pkg_constants.BucketReplicasOne,
-		IoPriority:         pkg_constants.BucketIoPriorityHigh,
-		EvictionPolicy:     pkg_constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
-		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: constants.IndexReplicaDisabled,
-	}
-	bucketConfig := []api.BucketConfig{bucketSettings}
-
-	// add bucket
-	t.Logf("Desired Bucket Properties: %v\n", bucketConfig)
-	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings = bucketConfig }
-	t.Logf("Adding Bucket To Cluster \n")
-	testCouchbase, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc)
-	if err == nil {
-		t.Fatal("successful update to bucket with invalid eviction settings")
-	}
-
-	expectedEvents := e2eutil.EventList{}
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -338,52 +275,6 @@ func TestEditBucket(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
-}
-
-// attempt to change bucket type to ephemeral
-func TestNegBucketEdit(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	// edit bucket type
-	updateFunc := func(cl *api.CouchbaseCluster) {
-		cl.Spec.BucketSettings[0].BucketType = "ephemeral"
-	}
-
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err == nil {
-		t.Fatal("successful update to bucket type")
-	}
-
-	// edit memory quota
-	updateFunc = func(cl *api.CouchbaseCluster) {
-		cl.Spec.BucketSettings[0].BucketMemoryQuota = 9999
-	}
-
-	if _, err := e2eutil.UpdateCluster(targetKube.CRClient, testCouchbase, constants.Retries5, updateFunc); err == nil {
-		t.Fatal("successful update to bucket memory quota")
-	}
-
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
 func TestRevertExternalBucketAdd(t *testing.T) {

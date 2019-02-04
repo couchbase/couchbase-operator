@@ -84,9 +84,7 @@ func killXdcrNodes(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize in
 func resizeXdcrCluster(t *testing.T, cbCluster *api.CouchbaseCluster, clusterSize int, k8s *types.Cluster) *api.CouchbaseCluster {
 	service := 0
 	targetKube := k8s
-	cbCluster = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, cbCluster, constants.Retries30)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
-	return cbCluster
+	return e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, cbCluster, 5*time.Minute)
 }
 
 // Generic function to run all pod removal/resize tests
@@ -420,13 +418,8 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, cluster1, cluste
 		service := 0
 		clusterSize := constants.Size3
 		var err error
-		xdcrCluster1, err = e2eutil.ResizeCluster(t, service, clusterSize, defKube, xdcrCluster1, constants.Retries30)
+		xdcrCluster1, err = e2eutil.ResizeCluster(t, service, clusterSize, defKube, xdcrCluster1, 5*time.Minute)
 		if err != nil {
-			errChan <- err
-			return
-		}
-
-		if err := e2eutil.WaitClusterStatusHealthy(t, defKube.CRClient, xdcrCluster1, 2*time.Minute); err != nil {
 			errChan <- err
 			return
 		}

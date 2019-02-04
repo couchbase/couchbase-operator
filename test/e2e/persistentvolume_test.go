@@ -577,12 +577,6 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Error(err)
 	}
 
-	clusterBalancedErr := make(chan error)
-	go func() {
-		// Wait for cluster balanced condition after recovering the cluster pods
-		clusterBalancedErr <- e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
-	}()
-
 	time.Sleep(timeToSleep)
 
 	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, time.Duration(5*platformTimingMultiplier)*time.Minute); err != nil {
@@ -598,9 +592,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		expectedEvents.AddAnyOfEvents(memRecoveredEventsValidator)
 	}
 
-	if err := <-clusterBalancedErr; err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
 
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -617,9 +609,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		time.Sleep(timeToSleep)
 
 		// Wait for cluster balanced condition after recovering the cluster pods
-		if err := e2eutil.WaitForClusterBalancedCondition(t, targetKube.CRClient, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
 
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -1172,15 +1162,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
 
-		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube, testCouchbase)
-		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, 60*platformTimingMultiplier, testCouchbase)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("Resize Success: %v...\n", names)
-
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, time.Duration(platformTimingMultiplier)*time.Minute)
 
 		switch clusterSize {
 		case 2:

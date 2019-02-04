@@ -196,24 +196,7 @@ func newClusterFromSpecQuick(t *testing.T, k8s *types.Cluster, namespace string,
 		return nil, err
 	}
 
-	errChan := make(chan error)
-	go func() {
-		// Expect the cluster to enter a failed state
-		if err := WaitClusterPhaseFailed(t, k8s.CRClient, cluster, constants.Retries20); err == nil {
-			errChan <- errors.New("Cluster entered failed state")
-		}
-	}()
-
-	go func() {
-		// Wait for the cluster to reach the correct size
-		_, err := WaitUntilSizeReached(t, k8s.CRClient, cluster.Spec.TotalSize(), retries.Size, cluster)
-		errChan <- err
-	}()
-
-	if err := <-errChan; err != nil {
-		t.Logf("failed to wait until size reached")
-		return cluster, err
-	}
+	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
 
 	// If any buckets are specified wait for these to become active
 	buckets := cluster.Spec.BucketNames()
@@ -522,35 +505,38 @@ func MustNewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace strin
 	return cluster
 }
 
-// convert interfaced value to int, note this can downcast i64
-func ConvertToInt(value interface{}) int {
-	switch value.(type) {
-	case int, int64:
-		return value.(int)
-	case string:
-		strInt, _ := strconv.Atoi(value.(string))
-		return strInt
+func AddServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, newService api.ServerConfig, timeout time.Duration) (*api.CouchbaseCluster, error) {
+	settings := append(cl.Spec.ServerSettings, newService)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", settings), timeout)
+}
+
+func MustAddServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, newService api.ServerConfig, timeout time.Duration) *api.CouchbaseCluster {
+	couchbase, err := AddServices(t, k8s, cl, newService, timeout)
+	if err != nil {
+		Die(t, err)
 	}
-	return 0
+	return couchbase
 }
 
-func AddServices(crClient versioned.Interface, cl *api.CouchbaseCluster, newService api.ServerConfig, maxRetries int) (*api.CouchbaseCluster, error) {
-	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = append(cl.Spec.ServerSettings, newService) }
-	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
-}
-
-func RemoveServices(crClient versioned.Interface, cl *api.CouchbaseCluster, removeServiceName string, maxRetries int) (*api.CouchbaseCluster, error) {
+func RemoveServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, removeServiceName string, timeout time.Duration) (*api.CouchbaseCluster, error) {
 	newServiceConfig := []api.ServerConfig{}
 	for _, service := range cl.Spec.ServerSettings {
 		if service.Name != removeServiceName {
 			newServiceConfig = append(newServiceConfig, service)
 		}
 	}
-	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = newServiceConfig }
-	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", newServiceConfig), timeout)
 }
 
-func ScaleServices(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int, servicesMap map[string]int) (*api.CouchbaseCluster, error) {
+func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, removeServiceName string, timeout time.Duration) *api.CouchbaseCluster {
+	couchbase, err := RemoveServices(t, k8s, cl, removeServiceName, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return couchbase
+}
+
+func ScaleServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) (*api.CouchbaseCluster, error) {
 	newServiceConfig := []api.ServerConfig{}
 	for _, service := range cl.Spec.ServerSettings {
 		for serviceName, size := range servicesMap {
@@ -560,18 +546,25 @@ func ScaleServices(crClient versioned.Interface, cl *api.CouchbaseCluster, maxRe
 		}
 		newServiceConfig = append(newServiceConfig, service)
 	}
-	updateFunc := func(cl *api.CouchbaseCluster) { cl.Spec.ServerSettings = newServiceConfig }
-	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", newServiceConfig), timeout)
+}
+
+func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) *api.CouchbaseCluster {
+	couchbase, err := ScaleServices(t, k8s, cl, servicesMap, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return couchbase
 }
 
 // PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster
-func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*api.CouchbaseCluster, error) {
+func PatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*api.CouchbaseCluster, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	return cluster, retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
 		// Get the current cluster resource
-		before, err := client.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		before, err := k8s.CRClient.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -588,7 +581,7 @@ func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.Couchba
 		}
 
 		// Attempt to post the update, updating the cluster
-		updated, err := client.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Update(after)
+		updated, err := k8s.CRClient.CouchbaseV1().CouchbaseClusters(cluster.Namespace).Update(after)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -601,7 +594,7 @@ func PatchCluster(t *testing.T, client versioned.Interface, cluster *api.Couchba
 
 // MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error
 func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) *api.CouchbaseCluster {
-	cluster, err := PatchCluster(t, k8s.CRClient, cluster, patches, timeout)
+	cluster, err := PatchCluster(t, k8s, cluster, patches, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -610,52 +603,9 @@ func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCl
 
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
 func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet) {
-	if _, err := PatchCluster(t, k8s.CRClient, cluster, patches, 1); err == nil {
+	if _, err := PatchCluster(t, k8s, cluster, patches, 1); err == nil {
 		Die(t, fmt.Errorf("cluster patch applied unexpectedly"))
 	}
-}
-
-func UpdateBucketSpec(bucketName string, field string, value string, crClient versioned.Interface, cl *api.CouchbaseCluster, maxRetries int) (*api.CouchbaseCluster, error) {
-	bucketIndex := 0
-	for i, bucket := range cl.Spec.BucketSettings {
-		if bucketName == bucket.BucketName {
-			bucketIndex = i
-			break
-		}
-	}
-	updateFunc := func(cl *api.CouchbaseCluster) {}
-	switch {
-	case field == "BucketName":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].BucketName = value }
-	case field == "BucketType":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].BucketType = value }
-	case field == "BucketMemoryQuota":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			cl.Spec.BucketSettings[bucketIndex].BucketMemoryQuota, _ = strconv.Atoi(value)
-		}
-	case field == "BucketReplicas":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			replicas, _ := strconv.Atoi(value)
-			cl.Spec.BucketSettings[bucketIndex].BucketReplicas = replicas
-		}
-	case field == "IoPriority":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].IoPriority = value }
-	case field == "EvictionPolicy":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].EvictionPolicy = value }
-	case field == "ConflictResolution":
-		updateFunc = func(cl *api.CouchbaseCluster) { cl.Spec.BucketSettings[bucketIndex].ConflictResolution = value }
-	case field == "EnableFlush":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			flush, _ := strconv.ParseBool(value)
-			cl.Spec.BucketSettings[bucketIndex].EnableFlush = flush
-		}
-	case field == "EnableIndexReplica":
-		updateFunc = func(cl *api.CouchbaseCluster) {
-			enableReplicas, _ := strconv.ParseBool(value)
-			cl.Spec.BucketSettings[bucketIndex].EnableIndexReplica = enableReplicas
-		}
-	}
-	return UpdateCluster(crClient, cl, maxRetries, updateFunc)
 }
 
 func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster) {
@@ -798,18 +748,9 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 	}
 }
 
-func isMasterNode(nodeMap map[string]string) bool {
-	_, isK8SMaster := nodeMap["node-role.kubernetes.io/master"]
-	_, isOpenshiftMaster := nodeMap["openshift-infra"]
-	if isK8SMaster || isOpenshiftMaster {
-		return true
-	}
-	return false
-}
-
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	return PatchCluster(t, k8s.CRClient, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/ServerSettings/%d/Size", service), clusterSize), constants.Retries1)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/ServerSettings/%d/Size", service), clusterSize), constants.Retries1)
 }
 
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
@@ -820,22 +761,21 @@ func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *ty
 	return cluster
 }
 
-func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, retries int) (*api.CouchbaseCluster, error) {
+// ResizeCluster resizes the MDS service to the desired size and waits until the cluster is
+// healthy.
+func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, timeout time.Duration) (*api.CouchbaseCluster, error) {
 	cluster, err := ResizeClusterNoWait(t, service, clusterSize, k8s, cl)
 	if err != nil {
 		return cl, err
 	}
-	t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-	names, err := WaitUntilSizeReached(t, k8s.CRClient, clusterSize, retries, cl)
-	if err != nil {
+	if err := WaitClusterStatusHealthy(t, k8s, cluster, timeout); err != nil {
 		return cluster, err
 	}
-	t.Logf("Resize Success: %v...\n", names)
 	return cluster, nil
 }
 
-func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, retries int) *api.CouchbaseCluster {
-	cluster, err := ResizeCluster(t, service, clusterSize, k8s, cl, retries)
+func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, timeout time.Duration) *api.CouchbaseCluster {
+	cluster, err := ResizeCluster(t, service, clusterSize, k8s, cl, timeout)
 	if err != nil {
 		Die(t, err)
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -96,37 +95,6 @@ func WaitUntilPodSizeReachedEtcd(t *testing.T, kubeClient kubernetes.Interface, 
 	return names, nil
 }
 
-func WaitUntilSizeReached(t *testing.T, crClient versioned.Interface, size, retries int, cl *api.CouchbaseCluster) ([]string, error) {
-	return waitSizeReachedWithAccept(t, crClient, size, retries, cl)
-}
-
-func waitSizeReachedWithAccept(t *testing.T, crClient versioned.Interface, size, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) ([]string, error) {
-	var names []string
-	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		for _, accept := range accepts {
-			if !accept(currCluster) {
-				return false, nil
-			}
-		}
-
-		names = currCluster.Status.Members.Ready.Names()
-		LogfWithTimestamp(t, "waiting size (%d), healthy couchbase members: names (%v)", size, names)
-		if len(names) != size {
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return names, nil
-}
-
 func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
 	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
 		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
@@ -206,22 +174,19 @@ func MustWaitClusterPhaseFailed(t *testing.T, k8s *types.Cluster, cluster *api.C
 	}
 }
 
-func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, cluster *api.CouchbaseCluster, timeout time.Duration) error {
-	expectedNodes := 0
-	for _, class := range cluster.Spec.ServerSettings {
-		expectedNodes += class.Size
-	}
+func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	defer cancel()
 	err := retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
-		cl, err := GetCouchbaseCluster(crClient, cluster.Name, cluster.Namespace)
+		cl, err := GetCouchbaseCluster(k8s.CRClient, cluster.Name, cluster.Namespace)
 		if err != nil {
 			LogfWithTimestamp(t, "could not get cluster: (%v)", err)
 			return false, err
 		}
 
-		if cl.Status.Size != expectedNodes {
-			LogfWithTimestamp(t, "Cluster nodes (%d) does not match expected nodes (%d) \n", cl.Status.Size, expectedNodes)
+		if cl.Status.Size != cluster.Spec.TotalSize() {
+			LogfWithTimestamp(t, "Cluster nodes (%d) does not match expected nodes (%d) \n", cl.Status.Size, cluster.Spec.TotalSize())
 			return false, nil
 		}
 
@@ -271,7 +236,7 @@ func WaitClusterStatusHealthy(t *testing.T, crClient versioned.Interface, cluste
 }
 
 func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, timeout time.Duration) {
-	if err := WaitClusterStatusHealthy(t, k8s.CRClient, cluster, timeout); err != nil {
+	if err := WaitClusterStatusHealthy(t, k8s, cluster, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -553,25 +518,6 @@ func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.Couchba
 	return occuredEvents, nil
 }
 
-func WaitForManagedConfigCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, status v1.ConditionStatus, timeout time.Duration) error {
-	return WaitForClusterCondition(t, crClient, api.ClusterConditionBalanced, status, cl, timeout)
-}
-
-// waits until the cluter's scaling condition
-func WaitForClusterScalingCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, timeout time.Duration) error {
-	return WaitForClusterCondition(t, crClient, api.ClusterConditionScaling, v1.ConditionTrue, cl, timeout)
-}
-
-// waits until the cluter's balanced condition is set
-func WaitForClusterBalancedCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, timeout time.Duration) error {
-	return WaitForClusterCondition(t, crClient, api.ClusterConditionBalanced, v1.ConditionTrue, cl, timeout)
-}
-
-// waits until the cluter's balanced condition is false
-func WaitForClusterUnBalancedCondition(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, timeout time.Duration) error {
-	return WaitForClusterCondition(t, crClient, api.ClusterConditionBalanced, v1.ConditionFalse, cl, timeout)
-}
-
 // waits until the provided condition type with associated status after specified timestamp
 func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, timeout time.Duration) error {
 	after := time.Now()
@@ -610,105 +556,6 @@ func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType
 	if err := WaitForClusterCondition(t, k8s.CRClient, conditionType, status, cl, timeout); err != nil {
 		Die(t, err)
 	}
-}
-
-func WaitForClusterStatus(t *testing.T, crClient versioned.Interface, statusType string, statusValue string, cl *api.CouchbaseCluster, wait int) error {
-	cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
-	if err != nil {
-		return err
-	}
-
-	timeOutChan := time.NewTimer(time.Duration(wait) * time.Second).C
-	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
-	for {
-		select {
-		case <-timeOutChan:
-			return fmt.Errorf("timed out waiting for status %s with status: %s", statusType, statusValue)
-
-		case <-tickChan:
-			// compare cluster conditions to desired condition
-			if statusType == "ControlPaused" {
-				t.Logf("cluster paused: %t", cluster.Status.ControlPaused)
-				desiredStatusBool, _ := strconv.ParseBool(statusValue)
-				if desiredStatusBool == cluster.Status.ControlPaused {
-					return nil
-				}
-			}
-			// update cluster
-			cluster, err = GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
-			if err != nil {
-				return err
-			}
-		}
-	}
-}
-
-func MustWaitForClusterStatus(t *testing.T, k8s *types.Cluster, statusType string, statusValue string, cl *api.CouchbaseCluster, wait int) {
-	if err := WaitForClusterStatus(t, k8s.CRClient, statusType, statusValue, cl, wait); err != nil {
-		Die(t, err)
-	}
-}
-
-func WaitUntilAccepts(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
-	interval := 5 * time.Second
-	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, accept := range accepts {
-			if !accept(currCluster) {
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func WaitUntilEventsCompare(t *testing.T, kubecli kubernetes.Interface, retries int, cl *api.CouchbaseCluster, compareEvents EventList, namespace string) error {
-	interval := 5 * time.Second
-	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {
-		events, err := GetCouchbaseEvents(kubecli, cl.Name, namespace)
-		if err != nil {
-			return false, fmt.Errorf("failed to get coucbase cluster events: %v", err)
-		}
-		if !compareEvents.Compare(events) {
-			return false, errors.New(EventListCompareFailedString(compareEvents, events))
-		}
-		return true, nil
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func WaitForConditionMessage(t *testing.T, crClient versioned.Interface, retries int, cl *api.CouchbaseCluster, conditionType api.ClusterConditionType, message string) error {
-	interval := 5 * time.Second
-	err := retryutil.Retry(Context, interval, retries, func() (done bool, err error) {
-		cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
-		if err != nil {
-			return false, err
-		}
-		for kind, condition := range cluster.Status.Conditions {
-			if kind == conditionType && strings.Contains(condition.Message, message) {
-				return true, nil
-			}
-			t.Logf("condition: %v, message: %v", conditionType, condition.Message)
-		}
-		t.Logf("conditions: %v", cluster.Status.Conditions)
-		return false, nil
-
-	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func nodeReady(node v1.Node) bool {

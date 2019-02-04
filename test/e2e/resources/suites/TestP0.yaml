@@ -19,8 +19,6 @@ tcGroups:
     testcases:
       - name: TestBucketAddRemoveBasic
       - name: TestEditBucket
-      - name: TestNegBucketAdd
-      - name: TestNegBucketEdit
 
   - name: ServiceTests
     clusters:

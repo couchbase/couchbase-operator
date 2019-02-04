@@ -367,14 +367,8 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 
 	// make sure cluster is healthy before proceeding
-	err = e2eutil.WaitForClusterStatus(t, targetKube.CRClient, "ControlPaused", "true", testCouchbase1, 300)
-	if err != nil {
-		t.Fatalf("failed to pause control: %v", err)
-	}
-	err = e2eutil.WaitForClusterStatus(t, targetKube.CRClient, "ControlPaused", "true", testCouchbase2, 300)
-	if err != nil {
-		t.Fatalf("failed to pause control: %v", err)
-	}
+	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
+	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
 
 	// get info from cluster to add to the scope
 	t.Logf("grabbing cluster info")

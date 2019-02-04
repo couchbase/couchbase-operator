@@ -367,11 +367,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	service := 0
 	prevClusterSize := clusterSize
 	clusterSize += 1
-	testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
-	if err != nil {
-		t.Fatal(err)
-	}
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
 
 	for memberId := prevClusterSize; memberId < clusterSize; memberId++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
@@ -612,13 +608,7 @@ func TestRzaResizeCluster(t *testing.T) {
 		// Resize cluster and wait for healthy cluster
 		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube, testCouchbase)
 		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
-		names, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, clusterSize, constants.Retries120, testCouchbase)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("Resize Success: %v...\n", names)
-
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 		// Update deployed server-groups based on new cluster size
 		deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -780,16 +770,11 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	service := 0
 
 	// Resize cluster and wait for healthy cluster
-	testCouchbase, err = e2eutil.ResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
 
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize-1)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap = GetExpectedRzaResultMap(clusterSize, availableServerGroupList)

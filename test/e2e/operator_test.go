@@ -32,13 +32,11 @@ func TestPauseOperator(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	if _, err := e2eutil.WaitUntilSizeReached(t, targetKube.CRClient, constants.Size3, constants.Retries10, testCouchbase); err != nil {
-		t.Fatalf("failed to create 3 members couchbase cluster: %v", err)
-	}
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	t.Logf("Pausing operator...")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
-	e2eutil.MustWaitForClusterStatus(t, targetKube, "ControlPaused", "true", testCouchbase, 300)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
 
 	t.Logf("Killing pod...")
 	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 1)
@@ -52,7 +50,7 @@ func TestPauseOperator(t *testing.T) {
 
 	t.Logf("Resuming operator...")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
-	e2eutil.MustWaitForClusterStatus(t, targetKube, "ControlPaused", "false", testCouchbase, 300)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Spec/Paused", false), time.Minute)
 
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToKill)
 

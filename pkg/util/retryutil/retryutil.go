@@ -60,7 +60,7 @@ func Retry(ctx context.Context, interval time.Duration, maxRetries int, f RetryF
 		select {
 		case <-tick.C:
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("%v: %v", ctx.Err(), err)
 		}
 	}
 	return &RetryError{n: maxRetries, e: err}

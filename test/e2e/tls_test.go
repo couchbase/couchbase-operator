@@ -114,9 +114,7 @@ func TestTlsResizeCluster(t *testing.T) {
 
 	for _, clusterSize := range clusterSizes {
 		service := 0
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, constants.Retries30)
-
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
 
 		switch {
 		case clusterSize-prevClusterSize > 0:
@@ -232,8 +230,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	e2eutil.MustDeleteSecret(t, targetKube, f.Namespace, ctx.OperatorSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
 	e2eutil.MustRecreateSecret(t, targetKube, f.Namespace, secret)
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, targetKube, testCouchbase, 300)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -613,7 +610,7 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
-	e2eutil.MustResizeCluster(t, 0, clusterSize+clusterScaleUpSize, kubernetes, cluster, constants.Retries30)
+	e2eutil.MustResizeCluster(t, 0, clusterSize+clusterScaleUpSize, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
