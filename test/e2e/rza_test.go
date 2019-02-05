@@ -23,6 +23,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// supportsAvailabilityZones returns true if these tests can be run.  In general for
+// the moment we mandate the use of 3 until the tests can be made more flexible,
+func supportsAvailabilityZones(t *testing.T, kubernetes *types.Cluster) bool {
+	return len(GetAvailabilityZones(t, kubernetes)) == 3
+}
+
 // Labels k8s nodes based on the values provided from the ClusterInfo struct
 func K8SNodesAddLabel(nodeLabelName string, kubeClient kubernetes.Interface, k8sNodesData framework.ClusterInfo) error {
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -166,6 +172,10 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
+
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 
@@ -279,6 +289,10 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
+
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
@@ -389,6 +403,10 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
+
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
@@ -439,6 +457,10 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 7
@@ -518,6 +540,10 @@ func TestRzaResizeCluster(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -635,6 +661,10 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
+
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
@@ -697,6 +727,10 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -783,6 +817,10 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
+
 	// Create cluster spec for RZA feature
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	clusterSize := len(availableServerGroupList)
@@ -860,6 +898,10 @@ func TestRzaServerGroupDown(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsAvailabilityZones(t, targetKube) {
+		t.Skip("unsupported platform")
+	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
