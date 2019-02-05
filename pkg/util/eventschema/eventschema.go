@@ -203,9 +203,21 @@ func (e AnyOf) Validate(c *Validator) error {
 	return newAnyOfError()
 }
 
-func CreateEventFrom(v1_event corev1.Event) Event {
-	return Event{
-		Reason:  v1_event.Reason,
-		Message: v1_event.Message,
+// Optional represents a validator that may happen.  This is useful for situations
+// where behaviour could be observed, or it happens too quickly to be observed.
+type Optional struct {
+	Validator Validatable
+}
+
+// Validate checks that the given validator validates.  If it does then the pointer
+// is moved forward.  If it is not it is left where it is and the next validator is
+// processed.
+func (e Optional) Validate(c *Validator) error {
+	index := c.index
+	if err := e.Validator.Validate(c); err == nil {
+		return nil
 	}
+	// Roll back the index
+	c.index = index
+	return nil
 }

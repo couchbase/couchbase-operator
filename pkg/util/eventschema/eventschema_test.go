@@ -205,3 +205,23 @@ func TestAnyOfMismatch(t *testing.T) {
 	}
 	mustNotValidate(t, events, schema, &AnyOfError{})
 }
+
+// TestOptionalMatch tests that events validate with an optional validator on match
+func TestOptionalMatch(t *testing.T) {
+	events := []corev1.Event{
+		{Reason: "mickey"},
+	}
+	schema := Optional{
+		Validator: Event{Reason: "mickey"},
+	}
+	mustValidate(t, events, schema)
+}
+
+// TestOptionalMismatch tests that events validate with an optional validator on mismatch
+func TestOptionalMismatch(t *testing.T) {
+	events := []corev1.Event{}
+	schema := Optional{
+		Validator: Event{Reason: "mickey"},
+	}
+	mustValidate(t, events, schema)
+}

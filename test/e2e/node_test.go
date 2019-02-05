@@ -116,57 +116,50 @@ func TestNodeManualFailover(t *testing.T) {
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
-// Tests scenario where a third node is being added to a cluster, and a separate
-// node goes down immediately after the add & before the rebalance.
-//
-// Expects: autofailover of down node occurs and a replacement node is added
-// in order to reach desired cluster size
+// TestNodeRecoveryAfterMemberAdd tests killing a node during a scale up.
 func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	clusterSize := constants.Size1
-	podToKillMemberId := 1
 
-	// create 1 node cluster
+	// Static configuration.
+	clusterSize := constants.Size1
+	scaleSize := constants.Size5
+	triggerIndex := 3
+	victimIndex := 1
+
+	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	// Runtime configuration.
+	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
 
-	clusterSize = constants.Size5
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
+	// When the cluster is ready begin scaling up.  When the third new member is added
+	// kill the victim node.  Expect the cluster to become healthy again.
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleSize, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, triggerIndex), 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	for memberId := 1; memberId < clusterSize; memberId++ {
-		// wait for add member event
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 2*time.Minute)
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
-
-		if memberId == clusterSize-2 {
-			// kill pod 1
-			e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podToKillMemberId, true)
-		}
+	// Check the events match what we expect:
+	// * Cluster created
+	// * New nodes added
+	// * Rebalance starts and fails
+	// * Victim failed add
+	// * New node added and rebalanced in
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: scaleSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceIncompleteEvent(testCouchbase), time.Minute)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.FailedAddNodeEvent(testCouchbase, podToKillMemberId), time.Minute)
-	expectedEvents.AddFailedAddNodeEvent(testCouchbase, podToKillMemberId)
-
-	// wait for add member event
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 3*time.Minute)
-	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
-
-	// cluster should also be balanced
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Tests scenario where the node being added to is killed before it can be

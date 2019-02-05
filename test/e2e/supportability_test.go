@@ -579,6 +579,11 @@ func (a argumentList) add(k, v string) {
 	a[k] = v
 }
 
+// remove removes a kay from the argument list.
+func (a argumentList) remove(k string) {
+	delete(a, k)
+}
+
 // addClusterDefaults adds in configuration specific default arguments that must
 // be used for a successful run.
 func (a argumentList) addClusterDefaults(k8s *types.Cluster) {
@@ -1072,60 +1077,82 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 // Create Rbac user with reduced k8s cluster access
 // Verify collected log file list with reduced cluster access
 func TestLogCollectRbacPermission(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	svcAccName := "rbac-test"
 
-	kubeConfPath := targetKube.KubeConfPath
+	// Create the cluster.
+	cluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 
-	cluster1 := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
+	// Dynamic configuration.
+	kubeConfig := "/tmp/" + cluster.Name
 
-	// Code to backup current config and replace after test execution
-	configData, err := ioutil.ReadFile(kubeConfPath)
+	// Create the service account, role and bindings, installing into a temporary kubernetes
+	// configuration file.
+	if err := createClusterRoles(targetKube.KubeClient, cluster.Name); err != nil {
+		e2eutil.Die(t, err)
+	}
+	defer framework.RemoveClusterRole(targetKube.KubeClient, cluster.Name)
+
+	if err := framework.RecreateServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name); err != nil {
+		e2eutil.Die(t, err)
+	}
+	defer framework.RemoveServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name)
+
+	if err := framework.RecreateClusterRoleBindings(targetKube.KubeClient, f.Namespace, cluster.Name); err != nil {
+		e2eutil.Die(t, err)
+	}
+	defer framework.RemoveClusterRoleBinding(targetKube.KubeClient, f.Namespace, cluster.Name)
+
+	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(f.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
-		t.Fatal(err)
+		e2eutil.Die(t, err)
 	}
-	if err := ioutil.WriteFile(kubeConfPath+"_bk", configData, 0644); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Rename(kubeConfPath+"_bk", kubeConfPath)
 
-	// Code to create ClusterRole, ServiceAccount, ClusterRoleBinding for reduced RBAC permissions
-	if err := createClusterRoles(targetKube.KubeClient, svcAccName); err != nil {
-		t.Fatal(err)
-	}
-	defer framework.RemoveClusterRole(targetKube.KubeClient, svcAccName)
-
-	if err := framework.RecreateServiceAccount(targetKube.KubeClient, f.Namespace, svcAccName); err != nil {
-		t.Fatal(err)
-	}
-	defer framework.RemoveServiceAccount(targetKube.KubeClient, f.Namespace, svcAccName)
-
-	if err := framework.RecreateClusterRoleBindings(targetKube.KubeClient, f.Namespace, svcAccName); err != nil {
-		t.Fatal(err)
-	}
-	defer framework.RemoveClusterRoleBinding(targetKube.KubeClient, f.Namespace, svcAccName+"-"+f.Namespace)
-
-	// Update current config with updated rbac user permission context
-	cmdName := "resources/createKubeContextFromServiceAcc.sh"
-	cmdArgs := []string{f.Namespace, svcAccName, kubeConfPath}
-	execOut, err := exec.Command(cmdName, cmdArgs...).CombinedOutput()
+	secret, err := targetKube.KubeClient.CoreV1().Secrets(f.Namespace).Get(sa.Secrets[0].Name, metav1.GetOptions{})
 	if err != nil {
-		t.Fatal(err)
+		e2eutil.Die(t, err)
 	}
-	t.Log(string(execOut))
+
+	caFile, err := ioutil.TempFile("/tmp", "*")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	defer caFile.Close()
+
+	if _, err := caFile.Write(secret.Data["ca.crt"]); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if err := caFile.Sync(); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if out, err := exec.Command("kubectl", "config", "set-cluster", cluster.Name, "--kubeconfig="+kubeConfig, "--embed-certs=true", "--server="+targetKube.Config.Host, "--certificate-authority="+caFile.Name()).CombinedOutput(); err != nil {
+		t.Log(string(out))
+		e2eutil.Die(t, err)
+	}
+
+	if out, err := exec.Command("kubectl", "config", "set-credentials", cluster.Name, "--kubeconfig="+kubeConfig, "--token="+string(secret.Data["token"])).CombinedOutput(); err != nil {
+		t.Log(string(out))
+		e2eutil.Die(t, err)
+	}
+
+	if out, err := exec.Command("kubectl", "config", "set-context", cluster.Name, "--kubeconfig="+kubeConfig, "--cluster="+cluster.Name, "--user="+cluster.Name, "--namespace="+f.Namespace).CombinedOutput(); err != nil {
+		t.Log(string(out))
+		e2eutil.Die(t, err)
+	}
 
 	// Collect logs
 	args := argumentList{}
 	args.addClusterDefaults(targetKube)
 	args.addEnvironmentDefaults()
-	execOut, err = runCbopinfoCmd(args.slice())
+	args.add("--kubeconfig", kubeConfig)
+	args.add("--context", cluster.Name)
+	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Log(execOutStr)
-	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":rbac-test\" cannot list couchbaseclusters.couchbase.com in the namespace \"" + f.Namespace + "\""
+	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":" + cluster.Name + "\" cannot list couchbaseclusters.couchbase.com in the namespace \"" + f.Namespace + "\""
 	if err == nil {
 		logFileName := getLogFileNameFromExecOutput(execOutStr)
 		defer os.Remove(logFileName)
@@ -1142,7 +1169,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
-		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
+		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster.Name, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 		checkLogDirContents(reqFileList, logFileDir, &errMsgList)
@@ -1467,7 +1494,6 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	podMembersToKill := []int{2, 3, 4}
 	bucketName := "PVBucket"
 	pvcName := "couchbase-log-pv"
-	operatorKilledErrChan := make(chan error)
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverOnDiskIssues"] = "true"
 	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
@@ -1523,58 +1549,42 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 
 	// Kill PV log enabled pods and verify the logs are persisted after pod deletion
 	for _, memberToKill := range podMembersToKill {
-		podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, memberToKill)
-
 		// Kills operator pod in async way
 		if isOperatorKilledWithServerPod {
-			go func() {
-				operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace)
-			}()
+			e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
 		}
-
-		// Bring down couchbase server pod
-		switch podDownMethod {
-		case "deletePod":
-			if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, metav1.NewDeleteOptions(0)); err != nil {
-				t.Fatal(err)
-			}
-		case "killServerProcess":
-			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podNameToKill, "pkill beam.smp")
-		}
-
-		// If operator was killed, will waits for operator recovery to happen
-		if isOperatorKilledWithServerPod {
-			if err := <-operatorKilledErrChan; err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberToKill)
 
 		switch podDownMethod {
 		case "deletePod":
 			// Only in DeletePod, FailOver and NewMemberAdd is triggered
+			e2eutil.MustKillPodForMember(t, targetKube, cbCluster, memberToKill, false)
 			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberToKill), time.Minute)
-			expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberToKill)
-
 			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newMemberIndex), 3*time.Minute)
-			expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newMemberIndex)
-			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
+			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill), 5*time.Minute)
+			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
 
 			// To validate the new PVC created for new pod
 			newMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, newMemberIndex)
 			expectedPvcMap[newMemberName] = 1
 
-			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberRemoveEvent(cbCluster, memberToKill), 5*time.Minute)
+			expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberToKill)
+			expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberToKill)
+			expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newMemberIndex)
+			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 			expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberToKill)
+			expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 
 		case "killServerProcess":
 			// In KillServerProcess, cluster rebalance is triggered after cb service is restarted by operator
+			podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, memberToKill)
+			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podNameToKill, "pkill beam.smp")
+			e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
+
+			expectedEvents.AddOptionalClusterPodEvent(cbCluster, "MemberDown", memberToKill)
 			expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
+			expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
-		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
 		newMemberIndex++
 	}
 

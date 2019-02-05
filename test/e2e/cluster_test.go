@@ -438,9 +438,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	defer cleanup()
 
 	// remove node
-	if err := e2eutil.RebalanceOutMember(t, client, testCouchbase.Name, testCouchbase.Namespace, removePodMemberId, true); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustRebalanceOutMember(t, client, testCouchbase.Name, testCouchbase.Namespace, removePodMemberId, true)
 
 	// resume operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)

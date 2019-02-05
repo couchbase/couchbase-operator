@@ -95,9 +95,11 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -146,7 +148,7 @@ func TestUpgrade(t *testing.T) {
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	// Check the events match what we expect:
@@ -184,7 +186,7 @@ func TestUpgradeRollback(t *testing.T) {
 	// healthy after rollback has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerVersion), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
@@ -232,7 +234,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
@@ -339,7 +341,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Version", f.CouchbaseServerUpgradeVersion), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev1.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
 
 	// Check the events match what we expect:
@@ -555,7 +557,6 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		upgradeDownUnrecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 

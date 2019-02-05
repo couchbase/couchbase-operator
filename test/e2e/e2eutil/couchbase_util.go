@@ -294,6 +294,12 @@ func RebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, name
 		})
 }
 
+func MustRebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, namespace string, memberIndex int, wait bool) {
+	if err := RebalanceOutMember(t, client, clusterName, namespace, memberIndex, wait); err != nil {
+		Die(t, err)
+	}
+}
+
 func MemberFromSpecProps(name, namespace, serverConfig string, memberIndex int) *couchbaseutil.Member {
 	return &couchbaseutil.Member{
 		Name:         couchbaseutil.CreateMemberName(name, memberIndex),

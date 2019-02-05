@@ -101,7 +101,6 @@ tcGroups:
       - name: TestRzaAntiAffinityOn
       - name: TestRzaAntiAffinityOff
       - name: TestRzaUpdateK8SNodeLabelAndCrd
-      - name: TestRzaNegCreateCluster
 
   - name: PersistentVolumeTests
     clusters:

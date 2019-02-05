@@ -219,6 +219,13 @@ func TLSUpdateFailedEvent(cl *api.CouchbaseCluster) *v1.Event {
 // New Event schema code
 type EventValidator []eventschema.Validatable
 
+func createEventFrom(event v1.Event) eventschema.Event {
+	return eventschema.Event{
+		Reason:  event.Reason,
+		Message: event.Message,
+	}
+}
+
 func (eventsequence *EventValidator) AddClusterEvent(cbCluster *api.CouchbaseCluster, eventType string) {
 	var eventToAppend v1.Event
 	switch eventType {
@@ -231,7 +238,7 @@ func (eventsequence *EventValidator) AddClusterEvent(cbCluster *api.CouchbaseClu
 	case "RebalanceIncomplete":
 		eventToAppend = *k8sutil.RebalanceIncompleteEvent(cbCluster)
 	}
-	*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
+	*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 }
 
 func (eventsequence *EventValidator) AddClusterNodeServiceEvent(cbCluster *api.CouchbaseCluster, eventType string, serviceList ...api.Service) {
@@ -239,7 +246,7 @@ func (eventsequence *EventValidator) AddClusterNodeServiceEvent(cbCluster *api.C
 	case "Create":
 		for _, service := range serviceList {
 			eventToAppend := *k8sutil.NodeServiceCreateEvent(service, cbCluster)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 		}
 	}
 }
@@ -249,38 +256,46 @@ func (eventsequence *EventValidator) AddClusterPodEvent(cbCluster *api.Couchbase
 	case "AddNewMember":
 		for _, cbMemberId := range cbMemberIdList {
 			eventToAppend := NewMemberAddEvent(cbCluster, cbMemberId)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(*eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(*eventToAppend))
 		}
 	case "MemberDown":
 		for _, cbMemberId := range cbMemberIdList {
 			eventToAppend := NewMemberDownEvent(cbCluster, cbMemberId)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(*eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(*eventToAppend))
 		}
 	case "MemberRemoved":
 		for _, cbMemberId := range cbMemberIdList {
 			eventToAppend := NewMemberRemoveEvent(cbCluster, cbMemberId)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(*eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(*eventToAppend))
 		}
 	case "MemberRecovered":
 		for _, cbMemberId := range cbMemberIdList {
 			eventToAppend := MemberRecoveredEvent(cbCluster, cbMemberId)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(*eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(*eventToAppend))
 		}
 	case "CreationFailed":
 		for _, cbMemberId := range cbMemberIdList {
 			eventToAppend := NewMemberCreationFailedEvent(cbCluster, cbMemberId)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(*eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(*eventToAppend))
 		}
 	case "FailedOver":
 		for _, cbMemberId := range cbMemberIdList {
 			eventToAppend := NewMemberFailedOverEvent(cbCluster, cbMemberId)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(*eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(*eventToAppend))
 		}
 	case "FailedAddNode":
 		for _, cbMemberId := range cbMemberIdList {
 			eventToAppend := FailedAddNodeEvent(cbCluster, cbMemberId)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(*eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(*eventToAppend))
 		}
+	}
+}
+
+func (eventsequence *EventValidator) AddOptionalClusterPodEvent(cbCluster *api.CouchbaseCluster, eventType string, cbMemberId int) {
+	switch eventType {
+	case "MemberDown":
+		eventToAppend := NewMemberDownEvent(cbCluster, cbMemberId)
+		*eventsequence = append(*eventsequence, &eventschema.Optional{Validator: createEventFrom(*eventToAppend)})
 	}
 }
 
@@ -289,17 +304,17 @@ func (eventsequence *EventValidator) AddClusterBucketEvent(cbCluster *api.Couchb
 	case "Create":
 		for _, bucketName := range bucketNameList {
 			eventToAppend := *k8sutil.BucketCreateEvent(bucketName, cbCluster)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 		}
 	case "Delete":
 		for _, bucketName := range bucketNameList {
 			eventToAppend := *k8sutil.BucketDeleteEvent(bucketName, cbCluster)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 		}
 	case "Edit":
 		for _, bucketName := range bucketNameList {
 			eventToAppend := *k8sutil.BucketEditEvent(bucketName, cbCluster)
-			*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
+			*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 		}
 	}
 }
@@ -325,13 +340,13 @@ func (eventsequence *EventValidator) AddAnyOfEvents(eventList EventValidator) {
 
 func (eventsequence *EventValidator) AddClusterSettingsEditedEvent(cbCluster *api.CouchbaseCluster, settingName string) {
 	eventToAppend := *k8sutil.ClusterSettingsEditedEvent(settingName, cbCluster)
-	*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
+	*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 }
 
 func (eventsequence *EventValidator) AddMemberVolumeUnhealthyEvent(cbCluster *api.CouchbaseCluster, memberId int, reason string) {
 	cbMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberId)
 	eventToAppend := *k8sutil.MemberVolumeUnhealthyEvent(cbMemberName, reason, cbCluster)
-	*eventsequence = append(*eventsequence, eventschema.CreateEventFrom(eventToAppend))
+	*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 }
 
 // ClusterCreateSequence is a common function for generating cluster creation events.

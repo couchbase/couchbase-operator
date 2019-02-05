@@ -988,6 +988,13 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 // Such that one group without PVC, 2nd using PVC spec1, 3rd with PVC spec2
 // Kill single service node and test the behaviour
 func TestPersistentVolumeWithSingleNodeService(t *testing.T) {
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
 	availableServices := []string{"data", "query", "index", "analytics", "eventing"}
 	volServiceMap := map[string]string{
 		"data":      "dataVolMnt",
