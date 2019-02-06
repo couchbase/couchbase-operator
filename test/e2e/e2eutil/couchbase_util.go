@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"reflect"
@@ -24,6 +26,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	"github.com/couchbase/gocbmgr"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -110,29 +113,36 @@ func CreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *api.Cou
 	return client, cleanup
 }
 
-// GetAdminConsoleHostURL returns a URL for interacting with the admin service of a cluster.
-// Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
-// If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
-// the cleanup callback must be invoked first.
-func GetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func()) {
+// GetPod selects a random pod in the cluster.
+func GetPod(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) *corev1.Pod {
 	// Grab the Couchbase service and use it to select the set of pods to connect to.
 	svc, err := k8s.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
-		t.Fatal(err)
+		Die(t, err)
 	}
 
 	selector := labels.SelectorFromSet(svc.Spec.Selector).String()
 	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
+		Die(t, err)
 		t.Fatal(err)
 	}
 
 	if len(pods.Items) == 0 {
-		t.Fatal("no pods selected for connection to port 8091")
+		Die(t, fmt.Errorf("no pods found"))
 	}
 
-	// Forward port to the first pod to the local host.
-	port, cleanup := forwardPort(t, k8s, cluster.Namespace, pods.Items[0].Name, "8091")
+	return &pods.Items[rand.Int()%len(pods.Items)]
+}
+
+// GetAdminConsoleHostURL returns a URL for interacting with the admin service of a cluster.
+// Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
+// If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
+// the cleanup callback must be invoked first.
+func GetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func()) {
+	// Forward port to a pod to the local host.  Pick a random pod this will prevent hangs
+	// if the pod we are always selecting isn't the one we need.
+	port, cleanup := forwardPort(t, k8s, cluster.Namespace, GetPod(t, k8s, cluster).Name, "8091")
 	return "127.0.0.1:" + port, cleanup
 }
 
@@ -296,6 +306,42 @@ func RebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, name
 
 func MustRebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, namespace string, memberIndex int, wait bool) {
 	if err := RebalanceOutMember(t, client, clusterName, namespace, memberIndex, wait); err != nil {
+		Die(t, err)
+	}
+}
+
+// EjectMember removes the given member index from the cluster,
+func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, index int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client, cleanup := CreateAdminConsoleClient(t, k8s, couchbase)
+	defer cleanup()
+
+	member := MemberFromSpecProps(couchbase.Name, couchbase.Namespace, "", index)
+	err := client.Rebalance([]string{member.HostURL()})
+	if err != nil {
+		return err
+	}
+
+	// Given we could be balancing out the member we are talking to using a progress channel
+	// is not the best option here as it may error as the operator does things in the background
+	// affecting this.  The best option is to just check for the rebalance status to complete.
+	return retryutil.Retry(ctx, time.Second, IntMax, func() (bool, error) {
+		client, cleanup := CreateAdminConsoleClient(t, k8s, couchbase)
+		defer cleanup()
+
+		info, err := client.ClusterInfo()
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		return info.RebalanceStatus == "none", nil
+	})
+}
+
+func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, index int, timeout time.Duration) {
+	if err := EjectMember(t, k8s, couchbase, index, timeout); err != nil {
 		Die(t, err)
 	}
 }

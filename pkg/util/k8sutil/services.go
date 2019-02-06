@@ -787,7 +787,7 @@ func updateExposedService(service, requested *v1.Service) bool {
 // updateExposedServices examines existing external services.  It first filters the allowable ports on
 // a per-member basis so as not to expose services not enabled or allowable by the specification.  It then
 // returns an services which require an update or deletion.
-func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev1.CouchbaseCluster, ports []v1.ServicePort) (updates []*v1.Service, deletions []*v1.Service, err error) {
+func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev1.CouchbaseCluster, ports []v1.ServicePort) (updates, deletions, untouched []*v1.Service, err error) {
 	for _, service := range services {
 		// Extract metadata from the service
 		memberName, ok := service.Labels[constants.LabelNode]
@@ -824,6 +824,8 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 		// Update if necessary.
 		if updateExposedService(service, requested) {
 			updates = append(updates, service)
+		} else {
+			untouched = append(untouched, service)
 		}
 	}
 
@@ -862,13 +864,20 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 
 	// Calculate the services that need updating or deleting based on the member status
 	// and cluster specification.
-	updates, deletions, err := updateExposedServices(services, members, cluster, ports)
+	updates, deletions, untouched, err := updateExposedServices(services, members, cluster, ports)
 	if err != nil {
 		return nil, err
 	}
 
 	// Buffer the port status as we go through
 	portStatus := map[string]*couchbasev1.PortStatus{}
+
+	// Untouched nodes need to add their ports to the status.
+	for _, service := range untouched {
+		if err := updateExposedPorts(portStatus, service.Labels[constants.LabelNode], service); err != nil {
+			return nil, err
+		}
+	}
 
 	// Create any required services, buffering exposed ports if we aren't using public
 	// DNS based addressing.
@@ -957,7 +966,7 @@ func WouldUpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseu
 
 	// Calculate the services that need updating or deleting based on the member status
 	// and cluster specification.
-	updates, deletions, err := updateExposedServices(services, members, cluster, ports)
+	updates, deletions, _, err := updateExposedServices(services, members, cluster, ports)
 	if err != nil {
 		return false, err
 	}

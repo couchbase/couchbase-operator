@@ -8,7 +8,6 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -102,12 +101,8 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, targetKube, testCouchbase)
-	defer cleanup()
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
 
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -169,11 +164,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, targetKube, testCouchbase)
-	defer cleanup()
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
 
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan bool)
@@ -246,9 +237,8 @@ func TestEventingResizeCluster(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -309,11 +299,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, targetKube, testCouchbase)
-	defer cleanup()
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
 
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan bool)
@@ -358,8 +344,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	}
 
 	// Cross check number of docs inserted reflected in eventing
-	if err := e2eutil.VerifyDocCountInBucket(hostUrl, eventingDstBucketName, string(e2espec.BasicSecretData["username"]), string(e2espec.BasicSecretData["password"]), numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

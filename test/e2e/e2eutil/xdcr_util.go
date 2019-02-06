@@ -1,8 +1,10 @@
 package e2eutil
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -11,7 +13,10 @@ import (
 	"testing"
 	"time"
 
+	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
@@ -21,19 +26,6 @@ import (
 
 type cbClusterInfo struct {
 	Uuid string `json:"uuid"`
-}
-
-type cbBucketInfo struct {
-	BucketType string `json:"bucketType"`
-	BasicStats struct {
-		DataUsed         int     `json:"dataUsed"`
-		DiskFetches      int     `json:"diskFetches"`
-		DiskUsed         int     `json:"diskUsed"`
-		ItemCount        int     `json:"itemCount"`
-		MemUsed          int     `json:"memUsed"`
-		OpsPerSec        float32 `json:"opsPerSec"`
-		QuotaPercentUsed float32 `json:"quotaPercentUsed"`
-	} `json:"basicStats"`
 }
 
 type xdcrRemoteClusterReference struct {
@@ -72,63 +64,73 @@ func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string
 	return responseData, nil
 }
 
-func GetBucketInfo(hostUrl, bucketName, hostUsername, hostPassword string) (cbBucketInfo, error) {
-	//curl -u [admin]:[password] http://[localhost]:8091/pools/default/buckets/[bucket-name]
-	var bucketInfo cbBucketInfo
-	hostUrl = "http://" + hostUrl + "/pools/default/buckets/" + bucketName
-	responseData, err := GenerateHttpRequest("GET", hostUrl, hostUsername, hostPassword, nil)
-	if err != nil {
-		return bucketInfo, err
-	}
-	err = json.Unmarshal(responseData, &bucketInfo)
-	return bucketInfo, err
-}
-
 func FlushBucket(hostUrl, bucketName, hostUsername, hostPassword string) ([]byte, error) {
 	//curl -X POST -u [admin]:[password] [localhost]:8091/pools/default/buckets/[bucket-name]/controller/doFlush
 	hostUrl = "http://" + hostUrl + "/pools/default/buckets/" + bucketName + "/controller/doFlush"
 	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
 }
 
-func PopulateBucket(hostUrl, bucketName, hostUsername, hostPassword string, numOfItems, docStartIndex int) (responseBody []byte, err error) {
-	//curl 'http://172.23.121.211:8091/pools/default/buckets/sample/docs/1' --data 'flags=24&value={"city":"chennai"}'  -u Administrator:password
-	hostUrl = "http://" + hostUrl + "/pools/default/buckets/" + bucketName + "/docs/"
-	numOfItems += docStartIndex - 1
-	for docIndex := docStartIndex; docIndex <= numOfItems; docIndex++ {
-		currReqUrl := hostUrl + strconv.Itoa(docIndex)
-		flagStr := "flags=24"
-		docData := "value={\"docIndex\":\"TestData-" + strconv.Itoa(docIndex) + "\"}"
-		reqParamList := []string{flagStr, docData}
-		reqParams := strings.NewReader(strings.Join(reqParamList, "&"))
+// PopulateBucket selects a random pod from the cluster and then uses cbworkloadgen
+// to create a defined number of documents.  The prefix is randomized so subsequent
+// runs do not collide.
+func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket string, items int) error {
+	pod := GetPod(t, k8s, cluster)
 
-		for retryCount := 0; retryCount < 3; retryCount++ {
-			if responseBody, err = GenerateHttpRequest("POST", currReqUrl, hostUsername, hostPassword, reqParams); err == nil {
-				break
-			}
-		}
+	cmd := []string{
+		"/opt/couchbase/bin/cbworkloadgen",
+		"-n", "127.0.0.1:8091",
+		"-u", constants.CbClusterUsername,
+		"-p", constants.CbClusterPassword,
+		"-b", bucket,
+		"-j",
+		"-i", strconv.Itoa(items),
+		"--prefix", RandomSuffix(),
 	}
-	return
+	stdout, stderr, err := ExecCommandInPod(k8s, cluster.Namespace, pod.Name, cmd...)
+	if err != nil {
+		t.Logf("Error: %v", err)
+		t.Logf("Command: %s", cmd)
+		t.Logf("stdout: %s", stdout)
+		t.Logf("stderr: %s", stderr)
+		return err
+	}
+
+	return nil
 }
 
-func VerifyDocCountInBucket(url, bucketName, userName, password string, reqNumOfDocs, maxRetries int) error {
-	docMatched := false
-	currDocCount := 0
-	for retryCount := 0; retryCount < maxRetries; retryCount++ {
-		bucketStat, err := GetBucketInfo(url, bucketName, userName, password)
+func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, bucket string, items int) {
+	if err := PopulateBucket(t, k8s, couchbase, bucket, items); err != nil {
+		Die(t, err)
+	}
+}
+
+// VerifyDocCountInBucket polls the Couchbase API for the named bucket and checks whther the
+// document count matches the expected number of items.
+func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 10*time.Second, IntMax, func() (bool, error) {
+		client, cleanup := CreateAdminConsoleClient(t, k8s, cluster)
+		defer cleanup()
+
+		info, err := client.GetBucketStatus(bucket)
 		if err != nil {
-			return errors.New("Failed to get bucket info: " + err.Error())
+			return false, retryutil.RetryOkError(err)
 		}
-		currDocCount = bucketStat.BasicStats.ItemCount
-		if currDocCount == reqNumOfDocs {
-			docMatched = true
-			break
+
+		if info.BasicStats.ItemCount != items {
+			return false, retryutil.RetryOkError(fmt.Errorf("document count %d, expected %d", info.BasicStats.ItemCount, items))
 		}
-		time.Sleep(time.Second * 10)
+
+		return true, nil
+	})
+}
+
+func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket string, items int, timeout time.Duration) {
+	if err := VerifyDocCountInBucket(t, k8s, cluster, bucket, items, timeout); err != nil {
+		Die(t, err)
 	}
-	if !docMatched {
-		return errors.New("Replication count did not match. Item count is " + strconv.Itoa(currDocCount) + " expecting " + strconv.Itoa(reqNumOfDocs))
-	}
-	return nil
 }
 
 func GetRemoteUuid(hostUrl, cbUsername, cbPassword string) (uuid string, err error) {
