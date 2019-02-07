@@ -19,13 +19,11 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 If release name contains chart name it will be used as a full name.
 */}}
 {{- define "couchbase-operator.fullname" -}}
-{{- $name := default .Values.couchbaseOperator.name .Values.nameOverride -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-%s" .Release.Name .Values.couchbaseOperator.name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{- define "admission-controller.fullname" -}}
-{{- $name := default .Values.admissionController.name  .Values.nameOverride -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-%s" .Release.Name .Values.admissionController.name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
@@ -36,26 +34,13 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
-Create service account for couchbase-operator when enabled and there
-aren't any overrides from the operator.ServiceAccount
-*/}}
-{{- define "couchbase-operator.createServiceAccount" -}}
-{{- if .Values.deployments.couchbaseOperator -}}
-{{ not (empty .Values.couchbaseOperator.serviceAccountName) | ternary false .Values.serviceAccount.couchbaseOperator.create  }}
-{{- else -}}
-{{ false }}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Create the name of the couchbase-operator service account to use
 */}}
 {{- define "couchbase-operator.serviceAccountName" -}}
-{{- if .Values.serviceAccount.couchbaseOperator.create -}}
-    {{- $defaultSA := default (include "couchbase-operator.fullname" .) .Values.serviceAccount.couchbaseOperator.name -}}
-    {{ default $defaultSA .Values.couchbaseOperator.serviceAccountName }}
+{{- if .Values.rbac.create -}}
+    {{ default (include "couchbase-operator.fullname" .) .Values.rbac.couchbaseServiceAccountName }}
 {{- else -}}
-    {{ default "default" .Values.couchbaseOperator.serviceAccountName }}
+    {{- default "default" .Values.rbac.couchbaseServiceAccountName -}}
 {{- end -}}
 {{- end -}}
 
@@ -72,27 +57,14 @@ Get kind of rbac role to use based on requested level of access
 {{- end -}}
 
 {{/*
-Create service account for admission-controller when enabled and there
-aren't any overrides from the controller.ServiceAccount
-*/}}
-{{- define "admission-controller.createServiceAccount" -}}
-{{- if .Values.deployments.admissionController -}}
-{{ not (empty .Values.admissionController.serviceAccountName) | ternary false .Values.serviceAccount.admissionController.create  }}
-{{- else -}}
-{{ false }}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Create the name of the admission-controller service account to use.
 This value may be overriden by the serviceAccountName in the controller
 */}}
 {{- define "admission-controller.serviceAccountName" -}}
-{{- if .Values.serviceAccount.admissionController.create -}}
-    {{- $defaultSA := default (include "admission-controller.fullname" .) .Values.serviceAccount.admissionController.name -}}
-    {{ default $defaultSA .Values.admissionController.serviceAccountName }}
+{{- if .Values.rbac.create -}}
+    {{- default (include "admission-controller.fullname" .) .Values.rbac.admissionServiceAccountName -}}
 {{- else -}}
-    {{ default "default" .Values.admissionController.serviceAccountName }}
+    {{- default "default" .Values.rbac.admissionServiceAccountName -}}
 {{- end -}}
 {{- end -}}
 
@@ -100,7 +72,11 @@ This value may be overriden by the serviceAccountName in the controller
 Create service name for admission service from chart name or apply override.
 */}}
 {{- define "admission-controller.service.name" -}}
+{{- if .Values.admissionService.create -}}
 {{- default (include "admission-controller.fullname" .) .Values.admissionService.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- default "default" .Values.admissionService.name -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
@@ -115,19 +91,23 @@ Create service fullname for admission service with namespace as domain.
 Create secret for admission operator.
 */}}
 {{- define "admission-controller.secret.name" -}}
-{{- default (include "admission-controller.fullname" .) .Values.admissionTLS.secret.name | trunc 63 | trimSuffix "-" -}}
+{{- if .Values.admissionSecret.create -}}
+  {{- default (include "admission-controller.fullname" .) .Values.admissionSecret.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+  {{- default "default" .Values.admissionSecret.name -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
 Generate certificates for admission-controller webhooks
 */}}
 {{- define "admission-controller.gen-certs" -}}
-{{- $expiration := (.Values.admissionTLS.expiration | int) -}}
-{{- if (or (empty .Values.admissionTLS.webhookCa.cert) (empty .Values.admissionTLS.webhookCa.key)) -}}
+{{- $expiration := (.Values.admissionCA.expiration | int) -}}
+{{- if (or (empty .Values.admissionCA.cert) (empty .Values.admissionCA.key)) -}}
 {{- $ca :=  genCA "admission-controller-ca" $expiration -}}
 {{- template "admission-controller.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
 {{- else -}}
-{{- $ca :=  buildCustomCert (.Values.admissionTLS.webhookCa.cert | b64enc) (.Values.admissionTLS.webhookCa.key | b64enc) -}}
+{{- $ca :=  buildCustomCert (.Values.admissionCA.cert | b64enc) (.Values.admissionCA.key | b64enc) -}}
 {{- template "admission-controller.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
 {{- end -}}
 {{- end -}}
@@ -137,10 +117,10 @@ Generate client key and cert from CA
 */}}
 {{- define "admission-controller.gen-client-tls" -}}
 {{- $altNames := list ( include "admission-controller.service.fullname" .RootScope) -}}
-{{- $expiration := (.RootScope.Values.admissionTLS.expiration | int) -}}
+{{- $expiration := (.RootScope.Values.admissionCA.expiration | int) -}}
 {{- $cert := genSignedCert ( include "admission-controller.fullname" .RootScope) nil $altNames $expiration .CA -}}
-{{- $clientCert := default $cert.Cert .RootScope.Values.admissionTLS.secret.tlsCert | b64enc -}}
-{{- $clientKey := default $cert.Key .RootScope.Values.admissionTLS.secret.tlsKey | b64enc -}}
+{{- $clientCert := default $cert.Cert .RootScope.Values.admissionSecret.cert | b64enc -}}
+{{- $clientKey := default $cert.Key .RootScope.Values.admissionSecret.key | b64enc -}}
 caCert: {{ .CA.Cert | b64enc }}
 clientCert: {{ $clientCert }}
 clientKey: {{ $clientKey }}

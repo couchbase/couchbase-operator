@@ -2,15 +2,17 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-# Override default naming of chart resources
-nameOverride: ""
-
 # Install Default RBAC roles and bindings
 rbac:
   create: true
   apiVersion: v1beta1
-  # clusterRoleAccess determines if roles are created with cluster-wide access
+  # grant cluster-wide access to service accounts
   clusterRoleAccess: true
+  # name of couchbase service account
+  couchbaseServiceAccountName:
+  # name of admission service account
+  admissionServiceAccountName:
+
 
 # Select what to deploy
 deployments:
@@ -18,15 +20,6 @@ deployments:
   couchbaseOperator: true
   # admissionController enforces validation
   admissionController: true
-
-# Service account names and whether to create them
-serviceAccount:
-  couchbaseOperator:
-    create: true
-    name:
-  admissionController:
-    create: true
-    name:
 
 # couchbaseOperator is the controller for couchbase cluster
 couchbaseOperator:
@@ -39,9 +32,6 @@ couchbaseOperator:
   imagePullPolicy: IfNotPresent
   # imagePullSecrets is an optional list of references to secrets  to use for pulling images
   imagePullSecrets: []
-  # name of the serviceAccount to use when running operator
-  # defaults to serviceAccount.couchbaseOperator.name
-  serviceAccountName:
   # additional command arguments will be translated to `--key=value`
   commandArgs:
     # Set to false if you are installing the CRD manually
@@ -78,9 +68,6 @@ admissionController:
   # imagePullSecrets is an optional list of references to secrets  to use for pulling images
   imagePullSecrets: []
   verboseLogging: true
-  # name of the serviceAccount to use when running admission controller
-  # defaults to serviceAccount.admissionController.name
-  serviceAccountName:
 
 # admissionService exposes validation to cluster. This service
 # is over https and certs are auto-generated based on serviceName.
@@ -89,30 +76,31 @@ admissionService:
   # create determines if service is created
   create: true
   # name of the service (auto-generated)
-  name: ""
+  name:
   # port service exposes
   port: 443
 
-# admissionTLS can be used to override the Certs that will be used
+# admissionCA can be used to override the Certs that will be used
 # to sign the keys used by the admsission operator.
-admissionTLS:
-  # disable if manually creating certs, but be sure to specify name of secret.
+admissionCA:
+  # disable if manually creating certs
+  # provide cert and key via --set-file
   create: true
+  # A base64 encoded PEM format certificate
+  cert:
+  # A base64 encoded PEM format private key
+  key:
   # Expiry time of CA in days for generated certs
   expiration: 365
-  # CA certificate used to generate client key and cert (auto-generated)
-  webhookCa:
-    # A base64 encoded PEM format certificate
-    cert:
-    # A base64 encoded PEM format private key
-    key:
-  # secret is a kubrnetes Secret with certs mounted within the admission controller.
-  secret:
-    # name of the secret (auto-generated)
-    name: ""
-    # PEM format certificate (auto-generated)
-    # override via --set-file
-    tlsCert: ""
-    # PEM format certificate (auto-generated)
-    # override via --set-file
-    tlsKey: ""
+
+# secret with client certs mounted within the admission controller.
+admissionSecret:
+  create: true
+  # name of the secret (auto-generated)
+  name:
+  # PEM format certificate (auto-generated)
+  # override via --set-file
+  cert:
+  # PEM format certificate (auto-generated)
+  # override via --set-file
+  key:
