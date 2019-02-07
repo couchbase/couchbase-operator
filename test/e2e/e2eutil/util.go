@@ -888,6 +888,14 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 	return operatorPods[0], nil
 }
 
+func MustGetOperatorName(t *testing.T, k8s *types.Cluster, namespace string) string {
+	name, err := GetOperatorName(k8s.KubeClient, namespace)
+	if err != nil {
+		Die(t, err)
+	}
+	return name
+}
+
 func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error) {
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("name", "couchbase-operator")))
 	pods, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})

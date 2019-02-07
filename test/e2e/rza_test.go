@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -288,6 +289,8 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	t.Skip("server groups are immutable")
 
 	if !supportsAvailabilityZones(t, targetKube) {
 		t.Skip("unsupported platform")
@@ -651,6 +654,8 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	t.Skip("server groups are immutable")
+
 	if !supportsAvailabilityZones(t, targetKube) {
 		t.Skip("unsupported platform")
 	}
@@ -717,6 +722,8 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	t.Skip("server groups are immutable")
 
 	if !supportsAvailabilityZones(t, targetKube) {
 		t.Skip("unsupported platform")
@@ -802,6 +809,8 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	t.Skip("server groups are immutable")
+
 	if !supportsAvailabilityZones(t, targetKube) {
 		t.Skip("unsupported platform")
 	}
@@ -878,19 +887,18 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 // Server-group is brought down so the communication with K8S node is down
 // Expects recration of new pods should fail due to the server group down
 func TestRzaServerGroupDown(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	t.Skip("requires persistent volumes")
 
 	if !supportsAvailabilityZones(t, targetKube) {
 		t.Skip("unsupported platform")
 	}
 
 	// Create cluster spec for RZA feature
-	clusterSize := 3
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
+	clusterSize := len(availableServerGroupList)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -909,15 +917,6 @@ func TestRzaServerGroupDown(t *testing.T) {
 	// Deploy couchbase cluster
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
 	if err != nil {
@@ -929,63 +928,33 @@ func TestRzaServerGroupDown(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	// Set taint to
-	nodeTaint := v1.Taint{
-		Key:    "noExecKey",
-		Value:  "noExecVal",
-		Effect: "NoExecute",
-	}
-	nodeTaintList := []v1.Taint{nodeTaint}
-
-	operatorPodName, err := e2eutil.GetOperatorName(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatal(err)
-	}
-	operatorNodeIndex, err := e2eutil.GetTargetNodeIndexForPod(targetKube.KubeClient, f.Namespace, operatorPodName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var nodeIndex int
-	memberIdToGoDown := 1
-	for ; memberIdToGoDown < clusterSize; memberIdToGoDown++ {
-		memberNameToGoDown := couchbaseutil.CreateMemberName(testCouchbase.Name, memberIdToGoDown)
-		nodeIndex, err = e2eutil.GetTargetNodeIndexForPod(targetKube.KubeClient, f.Namespace, memberNameToGoDown)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if nodeIndex != operatorNodeIndex {
-			break
-		}
-	}
-
-	t.Logf("Selected member id %d running on node %d\n", memberIdToGoDown, nodeIndex)
-	if err = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, nodeTaintList, nodeIndex); err != nil {
-		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
-	}
-	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
-
-	// Wait till pod creation fail due to the Server Group unavailable to schedule a new pod
+	// When ready, evacuate the entire availability zone the operator is running on.
+	// Eventually a pod will be affected, the operator will try replace it but the
+	// AZ is tained.  Remove the taint and it should recover.
+	operatorPodName := e2eutil.MustGetOperatorName(t, targetKube, f.Namespace)
+	zone := e2eutil.MustGetAvailabiltyZoneForPod(t, targetKube, f.Namespace, operatorPodName)
+	untaint := e2eutil.MustEvacuateAvailabilityZone(t, targetKube, zone)
+	defer untaint()
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 3*time.Minute)
-	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", memberIdToGoDown)
-	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", memberIdToGoDown)
-	expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
+	untaint()
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	// Remove the taint from the node to allow pod schedulling
-	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
-		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Member in affected AZ goes down
+	// * Cannot replace as the AZ is unschedulable
+	// * Removing the taint allows the cluster to recover
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	// Wait for pod member to add back to the cluster
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 5*time.Minute)
-	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberIdToGoDown)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
