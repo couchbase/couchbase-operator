@@ -24,12 +24,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// supportsAvailabilityZones returns true if these tests can be run.  In general for
-// the moment we mandate the use of 3 until the tests can be made more flexible,
-func supportsAvailabilityZones(t *testing.T, kubernetes *types.Cluster) bool {
-	return len(GetAvailabilityZones(t, kubernetes)) == 3
-}
-
 // Labels k8s nodes based on the values provided from the ClusterInfo struct
 func K8SNodesAddLabel(nodeLabelName string, kubeClient kubernetes.Interface, k8sNodesData framework.ClusterInfo) error {
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -173,10 +167,6 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
-
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 
@@ -292,10 +282,6 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 
 	t.Skip("server groups are immutable")
 
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
-
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
@@ -402,10 +388,6 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
-
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
@@ -448,6 +430,41 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+// chooseServerGroups deterministically chooses a set of server groups to use based
+// on a seed, and a requested number of server groups.
+func chooseServerGroups(groups []string, seed string, max int) []string {
+	// Cap the maximum requested groups to the set actually provided by the
+	// underlying platform.
+	if max > len(groups) {
+		max = len(groups)
+	}
+
+	// Convert the seed into an integer index into our groups, this pseudo-
+	// randomizes so we don't start at zero all the time.
+	index := 0
+	for i := 0; i < len(seed); i++ {
+		index += int(seed[i])
+	}
+
+	// Return a contiguous (with wrap) set of server groups from the pseudo-
+	// random index.
+	output := []string{}
+	for i := 0; i < max; i++ {
+		output = append(output, groups[(i+index)%len(groups)])
+	}
+
+	return output
+}
+
+// accumulateExpectedPods populates a map of server group to pod count based on
+// the number of servers in a class and the allowed server groups.
+func accumulateExpectedPods(expected map[string]int, count int, serverGroups []string) {
+	sort.Strings(serverGroups)
+	for i := 0; i < count; i++ {
+		expected[serverGroups[i%len(serverGroups)]]++
+	}
+}
+
 // Define Class based ServersGroups config in the CRD
 // Deploy the cb cluster and verify the server groups are balanced as specified in the CRD
 func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
@@ -457,56 +474,39 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
+	serverGroups := GetAvailabilityZones(t, targetKube)
+
+	class1Size := 3
+	class2Size := 1
+	class3Size := 3
+
+	class1ServerGroups := chooseServerGroups(serverGroups, "class1", 2)
+	class2ServerGroups := chooseServerGroups(serverGroups, "class2", 1)
+	class3ServerGroups := chooseServerGroups(serverGroups, "class3", 2)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 7
-	availableServerGroupList := GetAvailabilityZones(t, targetKube)
-	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetClassSpecificServiceConfigMap(3, "test_config_1", []string{"data", "index"}, []string{availableServerGroupList[0], availableServerGroupList[2]})
-	serviceConfig2 := e2eutil.GetClassSpecificServiceConfigMap(1, "test_config_2", []string{"query"}, []string{availableServerGroupList[1]})
-	serviceConfig3 := e2eutil.GetClassSpecificServiceConfigMap(3, "test_config_3", []string{"search"}, []string{availableServerGroupList[0], availableServerGroupList[2]})
+	serviceConfig1 := e2eutil.GetClassSpecificServiceConfigMap(class1Size, "class1", []string{"data", "index"}, class1ServerGroups)
+	serviceConfig2 := e2eutil.GetClassSpecificServiceConfigMap(class2Size, "class2", []string{"query"}, class2ServerGroups)
+	serviceConfig3 := e2eutil.GetClassSpecificServiceConfigMap(class3Size, "class3", []string{"search"}, class3ServerGroups)
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
-	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
-		"cluster":      clusterConfig,
-		"service1":     serviceConfig1,
-		"service2":     serviceConfig2,
-		"service3":     serviceConfig3,
-		"bucket1":      bucketConfig1,
-		"serverGroups": serverGroups,
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"service2": serviceConfig2,
+		"service3": serviceConfig3,
+		"bucket1":  bucketConfig1,
 	}
 
 	// Deploy couchbase cluster
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// Creating expected RZA server groups pod maps
-	expectedRzaResultMap := map[string]int{
-		availableServerGroupList[0]: 4,
-		availableServerGroupList[1]: 1,
-		availableServerGroupList[2]: 2,
-	}
-
-	expectedRzaPodNodeSelectorMap := map[string]string{
-		testCouchbase.Name + "-0000": availableServerGroupList[0],
-		testCouchbase.Name + "-0001": availableServerGroupList[2],
-		testCouchbase.Name + "-0002": availableServerGroupList[0],
-		testCouchbase.Name + "-0003": availableServerGroupList[1],
-		testCouchbase.Name + "-0004": availableServerGroupList[0],
-		testCouchbase.Name + "-0005": availableServerGroupList[2],
-		testCouchbase.Name + "-0006": availableServerGroupList[0],
-	}
-
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
+	expectedRzaResultMap := map[string]int{}
+	accumulateExpectedPods(expectedRzaResultMap, class1Size, class1ServerGroups)
+	accumulateExpectedPods(expectedRzaResultMap, class2Size, class2ServerGroups)
+	accumulateExpectedPods(expectedRzaResultMap, class3Size, class3ServerGroups)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -519,15 +519,13 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 		t.Errorf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	deployedRzaPodMap, err := GetDeployedRzaPodMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	// Cross check it matches the expected values
-	if reflect.DeepEqual(expectedRzaPodNodeSelectorMap, deployedRzaPodMap) == false {
-		t.Errorf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaPodNodeSelectorMap, deployedRzaPodMap)
-	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -539,10 +537,6 @@ func TestRzaResizeCluster(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -656,10 +650,6 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 
 	t.Skip("server groups are immutable")
 
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
-
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
@@ -724,10 +714,6 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	t.Skip("server groups are immutable")
-
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -811,10 +797,6 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 
 	t.Skip("server groups are immutable")
 
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
-
 	// Create cluster spec for RZA feature
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	clusterSize := len(availableServerGroupList)
@@ -891,10 +873,6 @@ func TestRzaServerGroupDown(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	t.Skip("requires persistent volumes")
-
-	if !supportsAvailabilityZones(t, targetKube) {
-		t.Skip("unsupported platform")
-	}
 
 	// Create cluster spec for RZA feature
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)

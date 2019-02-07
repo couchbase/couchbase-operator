@@ -196,7 +196,7 @@ func newClusterFromSpecQuick(t *testing.T, k8s *types.Cluster, namespace string,
 		return nil, err
 	}
 
-	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
+	MustWaitClusterStatusHealthy(t, k8s, cluster, 15*time.Minute)
 
 	// If any buckets are specified wait for these to become active
 	buckets := cluster.Spec.BucketNames()
@@ -603,7 +603,7 @@ func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCl
 
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
 func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet) {
-	if _, err := PatchCluster(t, k8s, cluster, patches, 1); err == nil {
+	if _, err := PatchCluster(t, k8s, cluster, patches, 30*time.Second); err == nil {
 		Die(t, fmt.Errorf("cluster patch applied unexpectedly"))
 	}
 }
@@ -750,7 +750,7 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/ServerSettings/%d/Size", service), clusterSize), constants.Retries1)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/ServerSettings/%d/Size", service), clusterSize), 30*time.Second)
 }
 
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
