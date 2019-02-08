@@ -744,7 +744,7 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 		fmt.Println("Waiting for deletion of:", strings.Join(pvcNames, ", "))
 
 		for _, pvc := range pvcs.Items {
-			if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, nil); err != nil {
+			if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0)); err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
 		}

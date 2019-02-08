@@ -253,7 +253,8 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		eventschema.Repeat{Times: scaledClusterSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victim1Name},
+		// The operator may miss seeing this due to network timouts
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victim1Name}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victim1Name},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victim2Name},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
