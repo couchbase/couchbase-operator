@@ -34,10 +34,7 @@ import (
 
 type bucketModifier func(b *api.BucketConfig)
 type bucketVerifier func(t *testing.T, b *cbmgr.Bucket) bool
-type clusterVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value string) bool
 type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]int) bool
-type autoFailoverVerifier func(t *testing.T, ci *cbmgr.AutoFailoverSettings, value string) bool
-type indexSettingVerifier func(t *testing.T, ci *cbmgr.IndexSettings, value string) bool
 type bucketInfoVerifier func(t *testing.T, bs *cbmgr.Bucket, bucketKey string, bucketValue string) bool
 
 // newClient returns a new Couchbase management client (internal not go SDK)
@@ -268,46 +265,6 @@ func AddNode(t *testing.T, client *cbmgr.Couchbase, services api.ServiceList, us
 		func() error {
 			return client.AddNode(hostname, username, password, svcs)
 		})
-}
-
-// Rebalance out creates memberset with member at specified index and performs rebalance
-func RebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, namespace string, memberIndex int, wait bool) error {
-	outMember := MemberFromSpecProps(clusterName, namespace, "", memberIndex)
-	nodesToRemove := []string{outMember.HostURL()}
-	t.Logf("rebalance out: %s", outMember.Name)
-
-	return retryutil.RetryOnErr(Context, 5*time.Second, 36, "rebalance", clusterName,
-		func() error {
-			err := client.Rebalance(nodesToRemove)
-			if err != nil {
-				return err
-			}
-
-			if wait {
-				progress := client.NewRebalanceProgress()
-
-			RebalanceWaitLoop:
-				for {
-					select {
-					case _, ok := <-progress.Status():
-						// Channel closed, rebalance complete.
-						if !ok {
-							break RebalanceWaitLoop
-						}
-					case err := <-progress.Error():
-						return err
-					}
-				}
-			}
-
-			return nil
-		})
-}
-
-func MustRebalanceOutMember(t *testing.T, client *cbmgr.Couchbase, clusterName, namespace string, memberIndex int, wait bool) {
-	if err := RebalanceOutMember(t, client, clusterName, namespace, memberIndex, wait); err != nil {
-		Die(t, err)
-	}
 }
 
 // EjectMember removes the given member index from the cluster,

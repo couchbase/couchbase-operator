@@ -768,7 +768,7 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.C
 	defer cleanup()
 
 	progress := client.NewRebalanceProgress()
-	defer progress.Close()
+	defer progress.Cancel()
 
 	timeoutChan := time.After(timeout)
 	for {
@@ -777,7 +777,7 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.C
 			return fmt.Errorf("timeout")
 		case status, ok := <-progress.Status():
 			if !ok {
-				return fmt.Errorf("rebalance terminated")
+				return fmt.Errorf("rebalance status terminated: %v", progress.Error())
 			}
 			switch status.Status {
 			case cbmgr.RebalanceStatusUnknown:
@@ -787,8 +787,6 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.C
 					return nil
 				}
 			}
-		case err := <-progress.Error():
-			return err
 		}
 	}
 }

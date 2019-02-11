@@ -433,12 +433,8 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	// pause operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 
-	// create node port service for node 0
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
 	// remove node
-	e2eutil.MustRebalanceOutMember(t, client, testCouchbase.Name, testCouchbase.Namespace, removePodMemberId, true)
+	e2eutil.MustEjectMember(t, targetKube, testCouchbase, removePodMemberId, 5*time.Minute)
 
 	// resume operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
@@ -454,6 +450,8 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// check that actual cluster size is only 2 nodes
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	defer cleanup()
 	info, err := client.ClusterInfo()
 	if err != nil {
 		e2eutil.Die(t, err)

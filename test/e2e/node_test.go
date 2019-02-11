@@ -326,32 +326,23 @@ func TestRemoveForeignNode(t *testing.T) {
 
 	// Balanced cluster with foreign node
 	ctx := e2eutil.Context
-	err = retryutil.RetryOnErr(ctx, 5*time.Second, constants.Retries30, "rebalance", testCouchbase.GetName(),
-		func() error {
-			err := client.Rebalance([]string{""})
-			if err != nil {
-				e2eutil.Die(t, err)
-			}
-			progress := client.NewRebalanceProgress()
+	retryutil.RetryOnErr(ctx, 5*time.Second, constants.Retries30, "rebalance", testCouchbase.GetName(), func() error {
+		err := client.Rebalance([]string{""})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
 
-		RebalanceWaitLoop:
-			for {
-				select {
-				case _, ok := <-progress.Status():
-					// Channel closed, rebalance complete.
-					if !ok {
-						break RebalanceWaitLoop
-					}
-				case err := <-progress.Error():
-					return err
+		progress := client.NewRebalanceProgress()
+		for {
+			if _, ok := <-progress.Status(); !ok {
+				if err := progress.Error(); err != nil {
+					e2eutil.Die(t, err)
 				}
+				break
 			}
-
-			return nil
-		})
-	if err != nil {
-		t.Fatal("Rebalance failed")
-	}
+		}
+		return nil
+	})
 
 	// Resuming operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
