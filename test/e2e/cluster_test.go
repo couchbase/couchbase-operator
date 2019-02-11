@@ -1011,9 +1011,8 @@ func TestManageMultipleClusters(t *testing.T) {
 		// Verify the bucket also appears in the Couchbase API.
 		client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
 		defer cleanup()
-		if err := e2eutil.VerifyBucketInfo(t, client, constants.Retries5, bucketName, "BucketMemoryQuota", strconv.Itoa(constants.Mem256Mb), e2eutil.BucketInfoVerifier); err != nil {
-			e2eutil.Die(t, err)
-		}
+
+		e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", constants.Mem256Mb), time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		// Check the events match what we expect:

@@ -32,10 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type bucketModifier func(b *api.BucketConfig)
-type bucketVerifier func(t *testing.T, b *cbmgr.Bucket) bool
 type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]int) bool
-type bucketInfoVerifier func(t *testing.T, bs *cbmgr.Bucket, bucketKey string, bucketValue string) bool
 
 // newClient returns a new Couchbase management client (internal not go SDK)
 func newClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
@@ -149,7 +146,7 @@ func PatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, p
 	defer cancel()
 
 	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
-		before, err := GetBucket(t, client, bucketName)
+		before, err := getBucket(t, client, bucketName)
 		if err != nil {
 			return false, err
 		}
@@ -177,37 +174,8 @@ func MustPatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName strin
 	}
 }
 
-func EditBucket(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket) error {
-	t.Logf("editing bucket: %s", bucket.BucketName)
-	return client.EditBucket(bucket)
-}
-
-// Edit bucket to make sure change occurred via list of verification methods.
-// This is done within a retry loop in case the operator reconciles bucket
-// changes before verifiers run
-func EditBucketAndVerify(t *testing.T, client *cbmgr.Couchbase, bucket *cbmgr.Bucket, tries int, verifiers ...bucketVerifier) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "verify edit bucket", "test-cluster",
-		func() error {
-
-			err := EditBucket(t, client, bucket)
-			if err != nil {
-				return err
-			}
-			newBucket, err := GetBucket(t, client, bucket.BucketName)
-			if err != nil {
-				return err
-			}
-			for _, verify := range verifiers {
-				if verify(t, newBucket) == false {
-					return NewErrVerifyEditBucket(bucket.BucketName)
-				}
-			}
-			return nil
-		})
-}
-
 // Get Bucket from couchbase cluster
-func GetBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error) {
+func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error) {
 	t.Logf("get bucket: %s", bucketName)
 	buckets, err := client.GetBuckets()
 	if err == nil {
@@ -310,22 +278,6 @@ func MemberFromSpecProps(name, namespace, serverConfig string, memberIndex int) 
 		ServerConfig: serverConfig,
 		SecureClient: false,
 	}
-}
-
-// Converts cluster spec bucket to cbmgr api type with
-// the option of modifying the spec prior to translation
-func SpecToApiBucket(bucketName string, cl *api.CouchbaseCluster, modifiers ...bucketModifier) (*cbmgr.Bucket, error) {
-	var bucket api.BucketConfig
-	if b := cl.Spec.GetBucketByName(bucketName); b != nil {
-		bucket = *b
-	} else {
-		return nil, NewErrGetBucketSpec(bucketName)
-	}
-	for _, f := range modifiers {
-		f(&bucket)
-	}
-	apiBucket := couchbaseutil.ApiBucketToCbmgr(&bucket)
-	return apiBucket, nil
 }
 
 func GetClusterInfo(t *testing.T, client *cbmgr.Couchbase, tries int) (*cbmgr.ClusterInfo, error) {
@@ -503,73 +455,6 @@ func VerifyBucketDeleted(t *testing.T, client *cbmgr.Couchbase, tries int, bucke
 		})
 }
 
-func VerifyBucketInfo(t *testing.T, client *cbmgr.Couchbase, tries int, bucketName string, bucketKey string, bucketValue string, verifiers ...bucketInfoVerifier) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "verify cluster info", "test-cluster",
-		func() error {
-
-			info, err := client.GetBuckets()
-			if err != nil {
-				return err
-			}
-			bucketExists := false
-			for _, bucket := range info {
-				if bucket.BucketName == bucketName {
-					bucketExists = true
-					for _, verify := range verifiers {
-						if verify(t, bucket, bucketKey, bucketValue) == false {
-							return NewErrVerifyClusterInfo()
-						}
-					}
-					break
-				}
-			}
-			if !bucketExists {
-				return NewErrVerifyClusterInfo()
-			}
-
-			return nil
-		})
-}
-
-func BucketInfoVerifier(t *testing.T, bucket *cbmgr.Bucket, bucketKey string, bucketValue string) bool {
-	verified := false
-	switch {
-	case bucketKey == "BucketType":
-		bt := bucketValue
-		t.Logf("Want BucketType: %v \n Have BucketType: %v", bt, bucket.BucketType)
-		verified = bucket.BucketType == bt
-	case bucketKey == "ConflictResolution":
-		cr := bucketValue
-		t.Logf("Want ConflictResolution: %v \n Have ConflictResolution: %v", cr, bucket.ConflictResolution)
-		verified = *bucket.ConflictResolution == cr
-	case bucketKey == "BucketMemoryQuota":
-		bmq, _ := strconv.Atoi(bucketValue)
-		t.Logf("Want BucketMemoryQuota: %v \n Have BucketMemoryQuota: %v", bmq, bucket.BucketMemoryQuota)
-		verified = bucket.BucketMemoryQuota == bmq
-	case bucketKey == "BucketReplicas":
-		br, _ := strconv.Atoi(bucketValue)
-		t.Logf("Want BucketReplicas: %v \n Have BukcetReplicas: %v", br, bucket.BucketReplicas)
-		verified = bucket.BucketReplicas == br
-	case bucketKey == "EnableFlush":
-		ef, _ := strconv.ParseBool(bucketValue)
-		t.Logf("EnableFlush: %v", bucket.EnableFlush)
-		if ef == false {
-			if bucket.EnableFlush == nil {
-				verified = true
-			}
-			if bucket.EnableFlush != nil {
-				verified = *bucket.EnableFlush == ef
-			}
-		}
-		if ef == true {
-			if bucket.EnableFlush != nil {
-				verified = *bucket.EnableFlush == ef
-			}
-		}
-	}
-	return verified
-}
-
 func PatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -629,26 +514,6 @@ func VerifyServices(t *testing.T, client *cbmgr.Couchbase, tries int, value map[
 			}
 			return nil
 		})
-}
-
-// Verifies flush is disabled for an api bucket
-func FlushDisabledVerifier(t *testing.T, b *cbmgr.Bucket) bool {
-	// flush can be 'nil' as rest api doesn't specify flush info when disabled
-	flushDisabled := b.EnableFlush == nil || *b.EnableFlush == false
-	t.Logf("disabled bucket flush: %v", flushDisabled)
-	return flushDisabled
-}
-
-func ThreeReplicaVerifier(t *testing.T, b *cbmgr.Bucket) bool {
-	threeReplicas := b.BucketReplicas == 3
-	t.Logf("bucket replicas: %v", b.BucketReplicas)
-	return threeReplicas
-}
-
-func DefaultIoPriorityVerifier(t *testing.T, b *cbmgr.Bucket) bool {
-	defaultIoPriority := b.IoPriority == "low"
-	t.Logf("io priority: %v", b.IoPriority)
-	return defaultIoPriority
 }
 
 func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[string]int) bool {

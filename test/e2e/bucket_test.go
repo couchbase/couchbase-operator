@@ -2,12 +2,10 @@ package e2e
 
 import (
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -193,11 +191,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 			t.Fatalf("failed to see all buckets from client")
 		}
 
-		ramQuota := strconv.Itoa(bucketSetting.BucketMemoryQuota)
-		err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, bucketSetting.BucketName, "BucketMemoryQuota", ramQuota, e2eutil.BucketInfoVerifier)
-		if err != nil {
-			t.Fatalf("failed to verify default bucket ram quota: %v", err)
-		}
+		e2eutil.MustPatchBucketInfo(t, client, "default", jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", bucketSetting.BucketMemoryQuota), time.Minute)
 
 		// delete bucket
 		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
@@ -277,64 +271,6 @@ func TestEditBucket(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestRevertExternalBucketAdd(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	fullEvictionPolicy := "fullEviction"
-	timestampConflictResolution := "lww"
-	indexReplicaOff := false
-	disableFlush := false
-	newBucket := cbmgr.Bucket{
-		BucketName:         "default",
-		BucketType:         "couchbase",
-		BucketMemoryQuota:  101,
-		BucketReplicas:     0,
-		EvictionPolicy:     &fullEvictionPolicy,
-		ConflictResolution: &timestampConflictResolution,
-		EnableFlush:        &disableFlush,
-		EnableIndexReplica: &indexReplicaOff,
-	}
-
-	err = client.CreateBucket(&newBucket)
-	if err != nil {
-		t.Fatalf("failed to create bucket externally: %v", err)
-	}
-	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "BucketMemoryQuota", "101", e2eutil.BucketInfoVerifier)
-	if err != nil {
-		t.Fatalf("failed to verify create default bucket: %v", err)
-	}
-	err = e2eutil.VerifyBucketDeleted(t, client, constants.Retries10, "default")
-	if err != nil {
-		t.Fatalf("failed to delete bucket %v", err)
-	}
-
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
-}
-
 // Tests that the operator reverts bucket edits not made by the operator
 // 1. Create a one node cluster with one bucket
 // 2. Create a node port service so we can access the cluster externally
@@ -346,165 +282,47 @@ func TestRevertExternalBucketAdd(t *testing.T) {
 // 8. Verify that the operator reverts the change
 // 9. Check the events to make sure the operator took the correct actions
 func TestRevertExternalBucketUpdates(t *testing.T) {
-
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	// Static configuration.
+	bucketName := "default"
+	enabled := true
+	disabled := false
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 
 	// create connection to couchbase nodes
 	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	// bucket should exist with flush enabled
-	acceptsBucketFunc := func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			t.Logf("enabled bucket flush: %t", bucket.EnableFlush)
-			return bucket.EnableFlush == constants.BucketFlushEnabled
-		}
-		return false
-	}
-
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to create default bucket with flush enabled %v", err)
-	}
-
-	err = e2eutil.VerifyBucketInfo(t, client, constants.Retries5, "default", "EnableFlush", "true", e2eutil.BucketInfoVerifier)
-	if err != nil {
-		t.Fatalf("failed to verify create default bucket with flush enabled: %v", err)
-	}
-
-	// make a bucket spec with flush disabled
-	t.Logf("externally changing bucket flush to: false")
-	bucket, err := e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.EnableFlush = false
-	})
-	if err != nil {
-		t.Fatalf("error occurred converting bucket spec %v", err)
-	}
-
-	// edit bucket and verify change is reflected in cluster.
-	err = e2eutil.EditBucketAndVerify(t, client, bucket, constants.Retries5, e2eutil.FlushDisabledVerifier)
-	if err != nil {
-		t.Fatalf("error occurred editing cluster bucket %v", err)
-	}
-
-	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
-		t.Fatalf("failed to prevent changing bucket type: %v", err)
-	}
-
-	// verify that the operator has reverted the change
-	// and re-enabled bucket flush
-	event := k8sutil.BucketEditEvent("default", testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30*time.Second)
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to enable bucket flush %v", err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	// Bucket edits can be consumed by a prior reconcile interestingly due to
-	// a race somewhere in Couchbase server, so ensure we wait for things to
-	// settle
-	time.Sleep(5 * time.Second)
-
-	// make a bucket spec with bucket replicas = 3
-	t.Logf("externally changing bucket replicas to: 3")
-	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.BucketReplicas = pkg_constants.BucketReplicasThree
-	})
-	if err != nil {
-		t.Fatalf("error occurred converting bucket spec %v", err)
-	}
-
-	// edit bucket and verify change is reflected in cluster.
-	err = e2eutil.EditBucketAndVerify(t, client, bucket, constants.Retries5, e2eutil.ThreeReplicaVerifier)
-	if err != nil {
-		t.Fatalf("error occurred editing cluster bucket %v", err)
-	}
-
-	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
-		t.Fatalf("failed to prevent changing bucket type: %v", err)
-	}
-
-	// verify that the operator has reverted the change
-	// and reverted bucket replicas to 1
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			t.Logf("bucket replicas: %v", bucket.BucketReplicas)
-			if bucket.BucketReplicas == 1 {
-				return true
-			}
-		}
-		return false
-	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30*time.Second)
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to revert bucket replicas to 1 %v", err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
-	// Bucket edits can be consumed by a prior reconcile interestingly due to
-	// a race somewhere in Couchbase server, so ensure we wait for things to
-	// settle
-	time.Sleep(5 * time.Second)
-
-	// make a bucket spec with io priority = "low"
-	t.Logf("externally changing bucket io priority to: low")
-	bucket, err = e2eutil.SpecToApiBucket("default", testCouchbase, func(b *api.BucketConfig) {
-		b.IoPriority = pkg_constants.BucketIoPriorityLow
-	})
-	if err != nil {
-		t.Fatalf("error occurred converting bucket spec %v", err)
-	}
-
-	// edit bucket and verify change is reflected in cluster.
-	err = e2eutil.EditBucketAndVerify(t, client, bucket, constants.Retries5, e2eutil.DefaultIoPriorityVerifier)
-	if err != nil {
-		t.Fatalf("error occurred editing cluster bucket %v", err)
-	}
-
-	if _, allowed := err.(cberrors.ErrInvalidBucketParamChange); allowed {
-		t.Fatalf("failed to prevent changing bucket type: %v", err)
-	}
-
-	// verify that the operator has reverted the change
-	// and reverted io priority to "high"
-	acceptsBucketFunc = func(c *api.CouchbaseCluster) bool {
-		if bucket, ok := c.Status.Buckets["default"]; ok {
-			t.Logf("io priority: %v", bucket.IoPriority)
-			if bucket.IoPriority == "high" {
-				return true
-			}
-		}
-		return false
-	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, 30*time.Second)
-	if err := e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{"default"}, constants.Retries5, testCouchbase, acceptsBucketFunc); err != nil {
-		t.Fatalf("failed to revert bucket io prioritys to high %v", err)
-	}
-
-	expectedEvents.AddBucketEditEvent(testCouchbase, "default")
-
+	// Once ready, alter a few parameters and ensure they are reverted by the operator.
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Replace("/EnableFlush", &disabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &disabled), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 30*time.Second)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &enabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Replace("/BucketReplicas", 3), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 3), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 30*time.Second)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Replace("/IoPriority", cbmgr.IoPriorityTypeLow), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/IoPriority", cbmgr.IoPriorityTypeLow), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 30*time.Second)
+	e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/IoPriority", cbmgr.IoPriorityTypeHigh), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	// Event checking
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	// Check the events match what we expect:
+	// * Admin console service created
+	// * Cluster created
+	// * Bucket edited N times
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
