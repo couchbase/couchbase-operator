@@ -141,7 +141,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -178,9 +178,8 @@ func TestEventingResizeCluster(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				numOfDocs++
-				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err != nil {
-					break OuterLoop
+				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+					numOfDocs++
 				}
 			}
 		}
@@ -277,7 +276,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -312,9 +311,8 @@ func TestEventingKillEventingPods(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				numOfDocs++
-				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err != nil {
-					break OuterLoop
+				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+					numOfDocs++
 				}
 			}
 		}

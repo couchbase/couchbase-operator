@@ -127,7 +127,7 @@ func XdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, targetCluste
 	}
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 10*time.Minute)
 
 	switch operationType {
 	case "rebalanceOutNodes":
@@ -225,7 +225,7 @@ func CreateXdcrCluster(t *testing.T, k8s1, k8s2 *types.Cluster) {
 	}
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 10*time.Minute)
 
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedCluster1Events)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedCluster2Events)
@@ -312,7 +312,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *typ
 		t.Fatal(err)
 	}
 
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 10*time.Minute)
 
 	if triggerDuring == "afterXdcrSetup" {
 		go nodeDownFunc(nodeToKill)
@@ -398,7 +398,7 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *type
 	}
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 10*time.Minute)
 
 	if triggerDuring == "afterXdcrSetup" {
 		go resizeFunction()
@@ -479,7 +479,7 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, k8s1, k8s2 *
 	}
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 10*time.Minute)
 
 	if triggerDuring == "afterXdcrSetup" {
 		go serviceKillFunc()
@@ -490,7 +490,7 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, k8s1, k8s2 *
 	}
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 20, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 20, 10*time.Minute)
 
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedCluster1Events)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedCluster2Events)

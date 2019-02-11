@@ -125,7 +125,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -160,13 +160,13 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	stopDataInsertionChan := make(chan bool)
 	numOfType1Docs := 0
 	numOfType2Docs := 0
-	docInsertFunc := func() {
-		// Get bucket Obj
-		bucketObj, err := client.GetBucket(bucketName)
-		if err != nil {
-			t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
-		}
+	// Get bucket Obj
+	bucketObj, err := client.GetBucket(bucketName)
+	if err != nil {
+		t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
+	}
 
+	docInsertFunc := func() {
 		var docInsertErr error
 	OuterLoop:
 		for {
@@ -174,7 +174,6 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 			case <-stopDataInsertionChan:
 				break OuterLoop
 			default:
-				numOfDocs++
 				docKey := "doc" + strconv.Itoa(numOfDocs)
 				docMap := map[string]string{}
 				docMap["name"] = "docName " + strconv.Itoa(numOfDocs)
@@ -191,15 +190,16 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 				docData, err := json.Marshal(docMap)
 				if err != nil {
 					docInsertErr = err
-					break OuterLoop
+					break
 				}
 				docData = append([]byte("value="), docData...)
 
 				// Inserts document using client
 				if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
 					docInsertErr = err
-					break OuterLoop
+					break
 				}
+				numOfDocs++
 			}
 		}
 		dataInsertionErrChan <- docInsertErr
@@ -294,7 +294,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	defer cleanup()
 
 	// Load default data set into couchbase bucket
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -333,13 +333,13 @@ func TestAnalyticsKillPods(t *testing.T) {
 	stopDataInsertionChan := make(chan bool)
 	numOfType1Docs := 0
 	numOfType2Docs := 0
-	docInsertFunc := func() {
-		// Get bucket Obj
-		bucketObj, err := client.GetBucket(bucketName)
-		if err != nil {
-			t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
-		}
+	// Get bucket Obj
+	bucketObj, err := client.GetBucket(bucketName)
+	if err != nil {
+		t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
+	}
 
+	docInsertFunc := func() {
 		var docInsertErr error
 	OuterLoop:
 		for {
@@ -347,7 +347,6 @@ func TestAnalyticsKillPods(t *testing.T) {
 			case <-stopDataInsertionChan:
 				break OuterLoop
 			default:
-				numOfDocs++
 				docKey := "doc" + strconv.Itoa(numOfDocs)
 				docMap := map[string]string{}
 				docMap["name"] = "docName " + strconv.Itoa(numOfDocs)
@@ -364,15 +363,16 @@ func TestAnalyticsKillPods(t *testing.T) {
 				docData, err := json.Marshal(docMap)
 				if err != nil {
 					docInsertErr = err
-					break OuterLoop
+					break
 				}
 				docData = append([]byte("value="), docData...)
 
 				// Inserts document using client
 				if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
 					docInsertErr = err
-					break OuterLoop
+					break
 				}
+				numOfDocs++
 			}
 		}
 		dataInsertionErrChan <- docInsertErr
