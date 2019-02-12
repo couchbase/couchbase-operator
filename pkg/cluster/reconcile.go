@@ -46,11 +46,13 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		}
 	}
 
+	// Update the status and ready list before doing anything.
 	status, err := c.client.GetClusterStatus(c.members)
 	if err != nil {
-		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %s", err.Error())
-		return nil
+		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %v", err)
+		return err
 	}
+	c.updateMemberStatusWithClusterInfo(status)
 
 	state := &ReconcileMachine{
 		runningPods:   podsToMemberSet(pods, c.isSecureClient()),
@@ -69,6 +71,13 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	if err := c.reconcileMembers(state); err != nil {
 		return err
 	}
+
+	// Update the status and ready list to reflect any new members added.
+	if status, err = c.client.GetClusterStatus(c.members); err != nil {
+		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %v", err)
+		return err
+	}
+	c.updateMemberStatusWithClusterInfo(status)
 
 	if err := c.reconcileBuckets(); err != nil {
 		return err

@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,11 +54,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -85,6 +82,39 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func insertAnalyticsDocument(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket, docID, docType string) error {
+	// Establishing a client connection is essentially random so if we tried
+	// to reuse this one there is a high probability that the target pod will
+	// be killed and this will constantly error.
+	client, cleanup := e2eutil.CreateAdminConsoleClient(t, k8s, cluster)
+	defer cleanup()
+
+	b, err := client.GetBucket(bucket)
+	if err != nil {
+		return err
+	}
+
+	docKey := "doc" + docID
+	docMap := map[string]string{
+		"name":      "docName " + docID,
+		"value":     "dummy Value " + docID,
+		"valueType": docType,
+	}
+
+	// Convert map data to byte array
+	docData, err := json.Marshal(docMap)
+	if err != nil {
+		return err
+	}
+	docData = append([]byte("value="), docData...)
+
+	// Inserts document using client
+	if err := client.InsertDoc(b, docKey, docData); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Create analytics enabled couchbase cluster
@@ -121,11 +151,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 0, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -157,56 +183,48 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 
 	// Function to insert data with two types of valueType varaibles
 	dataInsertionErrChan := make(chan error)
-	stopDataInsertionChan := make(chan bool)
+	stopDataInsertionChan := make(chan interface{})
 	numOfType1Docs := 0
 	numOfType2Docs := 0
-	// Get bucket Obj
-	bucketObj, err := client.GetBucket(bucketName)
-	if err != nil {
-		t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
-	}
 
 	docInsertFunc := func() {
-		var docInsertErr error
+		var err error
 	OuterLoop:
 		for {
 			select {
 			case <-stopDataInsertionChan:
 				break OuterLoop
 			default:
-				docKey := "doc" + strconv.Itoa(numOfDocs)
-				docMap := map[string]string{}
-				docMap["name"] = "docName " + strconv.Itoa(numOfDocs)
-				docMap["value"] = "dummy Value " + strconv.Itoa(numOfDocs)
+				docID := strconv.Itoa(numOfDocs)
+				docType := "type1"
+				if numOfDocs%2 != 0 {
+					docType = "type2"
+				}
+				if err = insertAnalyticsDocument(t, targetKube, testCouchbase, bucketName, docID, docType); err != nil {
+					break
+				}
 				if numOfDocs%2 == 0 {
-					docMap["valueType"] = "type1"
 					numOfType1Docs++
 				} else {
-					docMap["valueType"] = "type2"
 					numOfType2Docs++
-				}
-
-				// Convert map data to byte array
-				docData, err := json.Marshal(docMap)
-				if err != nil {
-					docInsertErr = err
-					break
-				}
-				docData = append([]byte("value="), docData...)
-
-				// Inserts document using client
-				if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
-					docInsertErr = err
-					break
 				}
 				numOfDocs++
 			}
 		}
-		dataInsertionErrChan <- docInsertErr
+		dataInsertionErrChan <- err
 	}
 
 	//Run doc populator in backgroud while cluster resize is happening
 	go docInsertFunc()
+
+	// Ensure the routine is shut down properly in the event of a fatality.
+	stopped := false
+	defer func() {
+		if !stopped {
+			close(stopDataInsertionChan)
+			<-dataInsertionErrChan
+		}
+	}()
 
 	// Resize cluster
 	clusterSizes := []int{2, 3, 2, 1}
@@ -232,7 +250,8 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 	// To stop background data insertion and wait for function to complete
-	stopDataInsertionChan <- true
+	close(stopDataInsertionChan)
+	stopped = true
 	if err := <-dataInsertionErrChan; err != nil {
 		t.Fatal(err)
 	}
@@ -251,11 +270,10 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 // Deploy analyitcs enabled couchbase cluster and populate data
 // Kill analytics enabled node and check the cluster status
 func TestAnalyticsKillPods(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	t.Skip("cbas broken in 5.5.x, syntax broken in 6.0.x")
 
 	clusterSizeWoAnalytics := 3
 	clusterSizeOfAnalytics := 3
@@ -294,7 +312,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	defer cleanup()
 
 	// Load default data set into couchbase bucket
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 0, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -330,56 +348,48 @@ func TestAnalyticsKillPods(t *testing.T) {
 
 	// Function to insert data with two types of valueType varaibles
 	dataInsertionErrChan := make(chan error)
-	stopDataInsertionChan := make(chan bool)
+	stopDataInsertionChan := make(chan interface{})
 	numOfType1Docs := 0
 	numOfType2Docs := 0
-	// Get bucket Obj
-	bucketObj, err := client.GetBucket(bucketName)
-	if err != nil {
-		t.Fatalf("Failed to retrieve couchbase bucket %s: %v ", bucketName, err)
-	}
 
 	docInsertFunc := func() {
-		var docInsertErr error
+		var err error
 	OuterLoop:
 		for {
 			select {
 			case <-stopDataInsertionChan:
 				break OuterLoop
 			default:
-				docKey := "doc" + strconv.Itoa(numOfDocs)
-				docMap := map[string]string{}
-				docMap["name"] = "docName " + strconv.Itoa(numOfDocs)
-				docMap["value"] = "dummy Value " + strconv.Itoa(numOfDocs)
+				docID := strconv.Itoa(numOfDocs)
+				docType := "type1"
+				if numOfDocs%2 != 0 {
+					docType = "type2"
+				}
+				if err = insertAnalyticsDocument(t, targetKube, testCouchbase, bucketName, docID, docType); err != nil {
+					break
+				}
 				if numOfDocs%2 == 0 {
-					docMap["valueType"] = "type1"
 					numOfType1Docs++
 				} else {
-					docMap["valueType"] = "type2"
 					numOfType2Docs++
-				}
-
-				// Convert map data to byte array
-				docData, err := json.Marshal(docMap)
-				if err != nil {
-					docInsertErr = err
-					break
-				}
-				docData = append([]byte("value="), docData...)
-
-				// Inserts document using client
-				if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
-					docInsertErr = err
-					break
 				}
 				numOfDocs++
 			}
 		}
-		dataInsertionErrChan <- docInsertErr
+		dataInsertionErrChan <- err
 	}
 
-	//Run doc populator in backgroud while cluster resize is happening
+	// Run doc populator in backgroud while cluster resize is happening
 	go docInsertFunc()
+
+	// Ensure the routine is shut down properly in the event of a fatality.
+	stopped := false
+	defer func() {
+		if !stopped {
+			close(stopDataInsertionChan)
+			<-dataInsertionErrChan
+		}
+	}()
 
 	podMemberIdsToKill := []int{4, 5, 6}
 	newMemberIdToBeAdded := clusterSize
@@ -413,7 +423,8 @@ func TestAnalyticsKillPods(t *testing.T) {
 	}
 
 	// To stop background data insertion and wait for function to complete
-	stopDataInsertionChan <- true
+	close(stopDataInsertionChan)
+	stopped = true
 	if err := <-dataInsertionErrChan; err != nil {
 		t.Fatal(err)
 	}
@@ -476,11 +487,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, bucketName, 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 

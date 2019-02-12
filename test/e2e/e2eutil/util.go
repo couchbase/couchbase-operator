@@ -1162,3 +1162,16 @@ func Die(t *testing.T, err error) {
 	t.Log(string(debug.Stack()))
 	t.FailNow()
 }
+
+// MustKillCouchbaseService kills the couchbase service depending on the platform type
+// TODO: Find a generic way of doing this on OpenShift
+func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, member, platformType string) {
+	if platformType == "kubernetes" {
+		MustExecShellInPod(t, k8s, namespace, member, "mv /etc/service/couchbase-server /tmp/")
+		return
+	}
+
+	if err := DeletePod(t, k8s.KubeClient, member, namespace); err != nil {
+		Die(t, err)
+	}
+}

@@ -311,49 +311,42 @@ func TestNodeUnschedulable(t *testing.T) {
 // 3. Expect down node-0000 to be removed
 // 4. Cluster should eventually reconcile as 3 nodes:
 func TestNodeServiceDownRecovery(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
-	removePodMemberId := 0
 	targetKube := f.GetCluster(0)
 
-	// create 3 node cluster
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden)
+	// Static configuration.
+	clusterSize := constants.Size3
+	victimIndex := 0
 
-	expectedEvents := e2eutil.EventList{}
-	for nodeIndex := 0; nodeIndex < constants.Size3; nodeIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	// Create the cluster
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
 
-	// kill couchbase service on pod 0
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	// Runtime configuration
+	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
 
-	if f.KubeType == "kubernetes" {
-		e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "mv /etc/service/couchbase-server /tmp/")
-	} else {
-		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	expectedEvents.AddMemberDownEvent(testCouchbase, 0)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, 0)
-
-	// expect down node to be removed from cluster
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, removePodMemberId), 5*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	// healthy 3 node cluster
+	// When ready kill the Couchbase Server process and await recovery
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	e2eutil.MustKillCouchbaseService(t, targetKube, f.Namespace, victimName, f.KubeType)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Member goes down and fails over
+	// * New member balanced in to replace the failed one
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // TestNodeServiceDownDuringRebalance tests killing a node during a scale down.
@@ -391,7 +384,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},

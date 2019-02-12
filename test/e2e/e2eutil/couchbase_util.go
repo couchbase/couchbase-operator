@@ -189,7 +189,10 @@ func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 }
 
 // Inserts Json docs into couchbase bucket
-func InsertJsonDocsIntoBucket(client *cbmgr.Couchbase, bucketName string, docStartIndex, numOfDocs int) error {
+func InsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
+	client, cleanup := CreateAdminConsoleClient(t, k8s, cluster)
+	defer cleanup()
+
 	numOfDocs += docStartIndex
 	for docIndex := docStartIndex; docIndex < numOfDocs; docIndex++ {
 		docKey := "doc" + strconv.Itoa(docIndex)

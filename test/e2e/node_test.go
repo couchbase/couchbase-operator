@@ -835,68 +835,47 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Plaform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
 	clusterSize := constants.Size5
+	victimIndex := 0
+
+	// Create the cluster.
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{"cluster": clusterConfig, "service1": serviceConfig1, "bucket1": bucketConfig1}
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for nodeIndex := 0; nodeIndex < clusterSize; nodeIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
+	// Runtime configuration
+	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+
+	// When ready kill the Couchbase Server process and await recovery
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillCouchbaseService(t, targetKube, f.Namespace, victimName, f.KubeType)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Member goes down and fails over
+	// * New member balanced in to replace the failed one
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	memberToKill := 0
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberToKill)
-
-	if f.KubeType == "kubernetes" {
-		e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "mv /etc/service/couchbase-server /tmp/")
-	} else {
-		if err := e2eutil.DeletePod(t, targetKube.KubeClient, memberName, f.Namespace); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	autofailoverTimeout, err := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberToKill), 30*time.Second)
-	expectedEvents.AddMemberDownEvent(testCouchbase, memberToKill)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, memberToKill), time.Duration(autofailoverTimeout+30)*time.Second)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberToKill)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 2*time.Minute)
-	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberToKill)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	e2eutil.MustVerifyClusterBalancedAndHealthy(t, client, time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {

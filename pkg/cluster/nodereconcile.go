@@ -134,9 +134,6 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 		needsReconcile = true
 	}
 
-	// Update ready and unready members at end of reconciliation
-	defer c.updateMemberStatusWithClusterInfo(r.couchbase)
-
 	// If we have any server specs that are not properly sized then we need to
 	// reconcile the nodes.
 	serverSpecs := c.cluster.Spec.ServerSettings

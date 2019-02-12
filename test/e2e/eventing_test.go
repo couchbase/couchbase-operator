@@ -76,11 +76,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket2["bucketName"])
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket3["bucketName"])
 
-	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,11 +133,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket2"]["bucketName"])
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
-	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -167,7 +159,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
 
 	// Code to insert data in parallel with cluster resize
-	stopDataInsertion := make(chan bool)
+	stopDataInsertion := make(chan interface{})
 	dataInsertionError := make(chan error)
 	dataInsertionFunc := func(t *testing.T) {
 		// Return an error here, don't call Fatal() as this will trigger a race condition
@@ -178,7 +170,7 @@ func TestEventingResizeCluster(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
@@ -186,6 +178,15 @@ func TestEventingResizeCluster(t *testing.T) {
 		dataInsertionError <- err
 	}
 	go dataInsertionFunc(t)
+
+	// Ensure the routine is shut down properly in the event of a fatality.
+	stopped := false
+	defer func() {
+		if !stopped {
+			close(stopDataInsertion)
+			<-dataInsertionError
+		}
+	}()
 
 	// Don't scale this too high or it will pwn your laptop and the cluster will go unresponsive
 	eventingClusterSizes := []int{2, 4, 3}
@@ -230,7 +231,8 @@ func TestEventingResizeCluster(t *testing.T) {
 	}
 
 	// Stop the insertion and wait for it to exit, checking for any errors encountered
-	stopDataInsertion <- true
+	close(stopDataInsertion)
+	stopped = true
 	if err := <-dataInsertionError; err != nil {
 		t.Fatal(err)
 	}
@@ -272,11 +274,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket2"]["bucketName"])
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
-	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -301,7 +299,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
 
 	// Code to insert data in parallel with cluster resize
-	stopDataInsertion := make(chan bool)
+	stopDataInsertion := make(chan interface{})
 	dataInsertionErr := make(chan error)
 	dataInsertionFunc := func(t *testing.T) {
 		var err error
@@ -311,7 +309,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(client, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
@@ -319,6 +317,15 @@ func TestEventingKillEventingPods(t *testing.T) {
 		dataInsertionErr <- err
 	}
 	go dataInsertionFunc(t)
+
+	// Ensure the routine is shut down properly in the event of a fatality.
+	stopped := false
+	defer func() {
+		if !stopped {
+			close(stopDataInsertion)
+			<-dataInsertionErr
+		}
+	}()
 
 	newMemberToBeAdded := clusterSize
 	for _, memberId := range []int{2, 3, 4} {
@@ -336,7 +343,9 @@ func TestEventingKillEventingPods(t *testing.T) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 		newMemberToBeAdded++
 	}
-	stopDataInsertion <- true
+
+	close(stopDataInsertion)
+	stopped = true
 	if err := <-dataInsertionErr; err != nil {
 		t.Fatal(err)
 	}
