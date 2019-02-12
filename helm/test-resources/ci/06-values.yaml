@@ -1,0 +1,14 @@
+# Apply auto generated TLS to cluster cluster  
+---
+rbac:
+  create: false
+couchbase-operator:
+  couchbaseOperator:
+    image:
+      tag: 1.2.0-877
+  admissionController:
+    image:
+      tag: 1.2.0-877
+couchbase-cluster:
+  couchbaseTLS:
+    create: true 

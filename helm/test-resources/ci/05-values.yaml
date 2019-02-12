@@ -1,5 +1,5 @@
 # Creates operator chart with custom CA and secret
-# * Requires namespace named ci-namespace
+# * Requires namespace named ci-testnamespace
 # * Verifies DNS uses service named ci-testcluster
 ---
 rbac:

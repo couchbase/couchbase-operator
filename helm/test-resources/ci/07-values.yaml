@@ -1,0 +1,34 @@
+ # Cluster with persistent volumes  
+---
+rbac:
+  create: false
+couchbase-operator:
+  couchbaseOperator:
+    image:
+      tag: 1.2.0-877
+  admissionController:
+    image:
+      tag: 1.2.0-877
+couchbase-cluster:
+  couchbaseCluster:
+    servers:
+      all_services:
+        size: 4
+        services:
+          - data
+        pod:
+          volumeMounts:
+            default: couchbase
+            data:  couchbase
+    securityContext:
+      fsGroup: 1000
+    volumeClaimTemplates:
+      - metadata:
+          name: couchbase
+        spec:
+          storageClassName: "default"
+          resources:
+            requests:
+              storage: 1Gi
+    couchbaseTLS:
+      create: true 

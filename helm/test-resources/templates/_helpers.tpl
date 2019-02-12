@@ -55,3 +55,12 @@ Name of the tls secret.
 {{- define "test-resources.secretname" -}}
 {{- default (include "test-resources.fullname" .) .Values.tls.secretName | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+
+{{/*
+Name of the cluster 
+*/}}
+{{- define "test-resources.adminconsole" -}}
+{{- $clustername := default .Chart.Name ((index .Values "couchbase-cluster") | .couchbaseCluster.name) -}}
+{{- ( printf "%s.%s.svc" $clustername .Release.Namespace ) -}}
+{{- end -}}

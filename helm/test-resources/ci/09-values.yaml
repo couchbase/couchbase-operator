@@ -1,0 +1,207 @@
+# Override Cluster CA and Keys 
+# * Requires namespace named ci-namespace
+# * Verifies DNS uses service named ci-testcluster
+---
+# cannot do service test with fake dns
+enableServiceTest: false
+rbac:
+  create: false
+couchbase-operator:
+  couchbaseOperator:
+    image:
+      tag: 1.2.0-877
+  admissionController:
+    image:
+      tag: 1.2.0-877
+couchbase-cluster:
+  couchbaseCluster:
+    name: ci-testcluster
+    servers:
+      all_services:
+        size: 4
+        services:
+          - data
+        pod:
+          volumeMounts:
+            default: couchbase
+            data:  couchbase
+    securityContext:
+      fsGroup: 1000
+    volumeClaimTemplates:
+      - metadata:
+          name: couchbase
+        spec:
+          storageClassName: "default"
+          resources:
+            requests:
+              storage: 1Gi
+  couchbaseTLS:
+    create: true
+    key: |-
+          -----BEGIN RSA PRIVATE KEY-----
+          MIIEpAIBAAKCAQEAuZo/q8+zMZEIWV/4rfbFpKtPM+4r+/EmE7STfBKNkQhxWuch
+          2EVgy6yEFyL342EJHe+oVZKy3/NwVPmBKtDSsncp/pDQOgrtgjddddPGH+rxGNo7
+          S3N7r9H7eLbufWsa+0wOAxBSd/LiCpkaM2e4QRxlNdb6UXMA7m773vjDDgys6k+3
+          ZU5rzV2PUEhg0IwA0ZYRR7MVUZ7Qmau0mMpgu/vWN5IODAzgaCDHHdX85A187RI1
+          X36N5Drbw6J7aBKgy8P3cEqvf0Q3UNyFOxTEk43VqvdZXKQcIWH5mUri1vF1nkaC
+          3g+np7T83Ftoxbx5DKOfiyGKo+K+2IwQ8mz2hQIDAQABAoIBAQCj4juObduATNve
+          bwuaMGfcOxe4dvmHgStqAuynhYpTIe1VovkTik8qCK6p70qLD8eJE3DD/sDLVp09
+          qwIO2EzzIJ2IFj6GwdduP4za2Z/71uwEUc5BlTsFyJgPwxdazxQICOPmeKcZGvHV
+          AdNMyKy9cWE85RIqkS2lW4IzI9y3raBRf2xkHcwycn+o5A9MSowBgD9NwXzrbMLL
+          JLmzXV7jdxy1e1LDRoyHlwlFA3po9Su7OZEAQ/aaRNxW6eQXPXo1J8qC7V4qVJFD
+          uGZpgAHUDLelWwORv7/rW3Q6f67u+9s7+SkHZFvSf65z1Wft9tA/YbsceBQYjr0u
+          UCkkuUeBAoGBAOLLzhdrNwnFQCUSP4EK36DmQMjR+SoBpzqOIJC8RBsNYeIvA0lY
+          qphGYFcM7dYqm5DtngcaqmghGMSB/BV9vg2Qc3Z/yvOi+gKCqPLhQ6nU3fCgCnOO
+          1RinU01nfBnzJ7L5r8tBo8chZwGr00DCj3K/fzqSZySGLrpgOZWv44v5AoGBANGA
+          hcZlUOjRGwRNM25KKy3OORc0X5uFArl0P+Uzko+A9Lro74+1hO4ooxzTkjUAsFAd
+          7/WZlerqPhLQ3fdZZdJgBg921+NAfLFzbySPVbeUUBxQZ1QPleuytAVM2Ma8oipx
+          9dfwKvS4XgJSr0gvfacpMaesdt7d7xhIxMLVhantAoGBAMTYQ65L3l9alswWRIwK
+          FgMfFge3R13QRYcrKNS2sx4PxW99goq8rISyQJgNnriODqwBsXFVEaaDY23brCIz
+          GyvGvpCRZmOEhx56rYzxO7tCCMf7AFdAF3DoegLq2OnlBAXxdUUjWbVSJodqzVae
+          B8d+sjzyKReoZxJYxmJHYWZxAoGAPtwhR3X+4NxdDt1bISx/6C6IUr4UMcWnG54V
+          zd+7ifNXev2JY8VDLXJj/rI8nEqonGFfLoH2yZWfKmYhM6ZPNuA48UrnW/htcZEB
+          OCcJwRtvLg+x8Tb79MyZ1z1HjdnrjnDDIxecy/DFxEyq6y3UteNWUskcoaJVqyOq
+          ZgtLH8ECgYAsadMRiT8eX+g6aejk4ldGaEgFxS1HajdzBWrTLAJaiUVBYBJZeZn5
+          SI7v6ji+AENRyclVrVd45d6fsQqVUeoodPB8PdUz533gSJdYrwJF5AK+WL2QkYDM
+          VcuOhJ2WpkDRu447QkmebEtcVIlT8V+2MrkB3b7POYyIUe1N4B/CHA==
+          -----END RSA PRIVATE KEY-----
+
+    cert: |-
+            -----BEGIN CERTIFICATE-----
+            MIIDNTCCAh2gAwIBAgIJAKM9qfQsYQ01MA0GCSqGSIb3DQEBCwUAMBYxFDASBgNV
+            BAMTC0Vhc3ktUlNBIENBMB4XDTE5MDIxMTIyMDU1MloXDTI5MDIwODIyMDU1Mlow
+            FjEUMBIGA1UEAxMLRWFzeS1SU0EgQ0EwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+            ggEKAoIBAQC5mj+rz7MxkQhZX/it9sWkq08z7iv78SYTtJN8Eo2RCHFa5yHYRWDL
+            rIQXIvfjYQkd76hVkrLf83BU+YEq0NKydyn+kNA6Cu2CN11108Yf6vEY2jtLc3uv
+            0ft4tu59axr7TA4DEFJ38uIKmRozZ7hBHGU11vpRcwDubvve+MMODKzqT7dlTmvN
+            XY9QSGDQjADRlhFHsxVRntCZq7SYymC7+9Y3kg4MDOBoIMcd1fzkDXztEjVffo3k
+            OtvDontoEqDLw/dwSq9/RDdQ3IU7FMSTjdWq91lcpBwhYfmZSuLW8XWeRoLeD6en
+            tPzcW2jFvHkMo5+LIYqj4r7YjBDybPaFAgMBAAGjgYUwgYIwHQYDVR0OBBYEFDM9
+            toMOdaAXMGEt+jGzc5MKBxcjMEYGA1UdIwQ/MD2AFDM9toMOdaAXMGEt+jGzc5MK
+            BxcjoRqkGDAWMRQwEgYDVQQDEwtFYXN5LVJTQSBDQYIJAKM9qfQsYQ01MAwGA1Ud
+            EwQFMAMBAf8wCwYDVR0PBAQDAgEGMA0GCSqGSIb3DQEBCwUAA4IBAQCNMHiR34c6
+            DBsouPxytqH2yJTx8BERHysPXvqV9w2IFSkV0ELYun45CMRC5rN0DGQamussBQJB
+            Y8sLYq17katuY0ZYBiqyWS4A4pVcEGSTWsUL0ONrgnSJGJKG4bh/zf97u6kAFekT
+            dxh9uVfn/4aFUa1++GDEUqEC1PpGXVBcGlfmuHdsLVhFNHw4lDO67NUkrK4DDQTA
+            Oyk+wOheiSTEaKesIQ0ewlgCU+XKxgXP6b4TFuzK1OnoblcryDbHJtHzm61YbVDl
+            V2dxKtyGOlhQPxAb2UxcllnF7CqdEoZAp3XY3N17Edt667urWbs02xt6dCmviGWU
+            NnDiG0X8Dxse
+            -----END CERTIFICATE-----
+    operatorSecret:
+      cert: |-
+              Certificate:
+                  Data:
+                      Version: 3 (0x2)
+                      Serial Number:
+                          14:69:b2:f4:54:5e:65:94:c1:f9:34:5e:2e:46:f1:02
+                  Signature Algorithm: sha256WithRSAEncryption
+                      Issuer: CN=Easy-RSA CA
+                      Validity
+                          Not Before: Feb 11 22:57:34 2019 GMT
+                          Not After : Jan 26 22:57:34 2022 GMT
+                      Subject: CN=citestclusterb
+                      Subject Public Key Info:
+                          Public Key Algorithm: rsaEncryption
+                              Public-Key: (2048 bit)
+                              Modulus:
+                                  00:a8:f1:fd:c7:99:0c:b3:42:44:62:86:d7:98:1b:
+                                  8a:a3:36:32:d2:6c:73:1e:a6:38:4b:2e:68:b2:1a:
+                                  ad:04:58:54:0a:2b:23:6d:86:52:73:b8:fd:8b:da:
+                                  a8:81:f4:4e:b9:c1:c8:fb:5e:88:62:cd:31:86:d1:
+                                  0a:05:c4:24:9b:a9:c9:fb:57:f8:68:f2:e0:e0:60:
+                                  c5:af:dc:72:70:1e:a5:63:37:fd:e9:22:4d:77:ca:
+                                  02:bd:3a:2e:93:3a:e9:1b:60:c8:46:6d:bc:38:da:
+                                  61:fd:84:e9:d9:f3:97:29:10:70:c1:ff:fd:ed:fb:
+                                  51:1a:0c:93:3c:53:53:ac:52:34:99:7d:16:af:2c:
+                                  55:b8:e6:6b:74:d0:22:8f:84:ad:db:40:7a:6b:1f:
+                                  e5:b3:23:56:fa:30:5f:c3:82:8f:4c:42:72:cd:7b:
+                                  9f:41:99:be:f9:e5:b3:83:71:95:3d:f5:9d:65:23:
+                                  3e:67:de:56:4b:87:ed:3d:90:81:da:26:5c:63:07:
+                                  59:85:1a:b7:e5:a1:f7:68:88:10:e0:89:57:b8:67:
+                                  78:f2:81:06:c0:c0:7d:76:df:50:b8:9f:ce:8f:ba:
+                                  3d:80:08:8c:1b:f4:49:5b:a9:2d:a2:9b:bd:87:f2:
+                                  3f:70:5f:61:fc:ce:f7:c0:98:69:a1:9e:61:55:2b:
+                                  2e:7f
+                              Exponent: 65537 (0x10001)
+                      X509v3 extensions:
+                          X509v3 Basic Constraints: 
+                              CA:FALSE
+                          X509v3 Subject Key Identifier: 
+                              E1:92:D8:DA:38:99:4C:51:99:7B:2F:62:60:8A:09:91:58:A0:9B:C0
+                          X509v3 Authority Key Identifier: 
+                              keyid:33:3D:B6:83:0E:75:A0:17:30:61:2D:FA:31:B3:73:93:0A:07:17:23
+                              DirName:/CN=Easy-RSA CA
+                              serial:A3:3D:A9:F4:2C:61:0D:35
+
+                          X509v3 Extended Key Usage: 
+                              TLS Web Server Authentication
+                          X509v3 Key Usage: 
+                              Digital Signature, Key Encipherment
+                          X509v3 Subject Alternative Name: 
+                              DNS:*.ci-testcluster.ci-testnamespace.svc, DNS:*.ci-testcluster
+                  Signature Algorithm: sha256WithRSAEncryption
+                       08:fa:94:6c:1f:8f:00:cb:37:d9:de:61:09:a1:26:f9:95:ba:
+                       2f:b7:8c:11:00:9d:13:10:d5:0f:b0:70:d3:7f:d7:09:da:b1:
+                       00:73:3e:5d:dd:02:36:6a:57:ee:8d:52:de:f3:64:84:40:5f:
+                       9b:8a:74:44:9e:4a:80:92:f7:93:9b:27:30:f0:7b:04:4e:7b:
+                       f3:3b:14:9f:bc:40:a5:9f:d5:03:69:9e:ae:84:1f:66:2a:90:
+                       f0:b9:a9:10:52:f8:6d:0c:d2:93:c1:70:06:a6:2e:ed:a9:e2:
+                       c3:29:43:3f:84:38:38:e8:7d:53:f6:94:58:08:75:71:50:aa:
+                       99:b6:18:79:fb:41:e9:75:2b:6f:ee:d4:cb:be:75:44:a1:1c:
+                       5a:96:c9:9b:d8:6e:67:d9:a4:43:0b:85:82:ea:3c:bb:8f:36:
+                       f6:3a:f9:2e:80:2c:7f:14:0d:b5:c5:d5:93:4f:dc:a7:51:c0:
+                       ca:b4:32:de:3e:ae:37:1f:18:c3:09:43:63:2e:94:58:62:54:
+                       68:1e:68:25:1c:fe:f9:cb:f7:48:7b:f7:6b:ef:38:5e:14:7d:
+                       4f:f4:dd:1a:21:65:35:fd:df:0b:1c:c8:14:97:0f:bf:45:03:
+                       4f:22:be:3d:f8:e5:0c:a3:3b:bd:fe:62:b4:1d:91:a1:de:46:
+                       74:a6:0a:60
+              -----BEGIN CERTIFICATE-----
+              MIIDlTCCAn2gAwIBAgIQFGmy9FReZZTB+TReLkbxAjANBgkqhkiG9w0BAQsFADAW
+              MRQwEgYDVQQDEwtFYXN5LVJTQSBDQTAeFw0xOTAyMTEyMjU3MzRaFw0yMjAxMjYy
+              MjU3MzRaMBkxFzAVBgNVBAMTDmNpdGVzdGNsdXN0ZXJiMIIBIjANBgkqhkiG9w0B
+              AQEFAAOCAQ8AMIIBCgKCAQEAqPH9x5kMs0JEYobXmBuKozYy0mxzHqY4Sy5oshqt
+              BFhUCisjbYZSc7j9i9qogfROucHI+16IYs0xhtEKBcQkm6nJ+1f4aPLg4GDFr9xy
+              cB6lYzf96SJNd8oCvToukzrpG2DIRm28ONph/YTp2fOXKRBwwf/97ftRGgyTPFNT
+              rFI0mX0WryxVuOZrdNAij4St20B6ax/lsyNW+jBfw4KPTEJyzXufQZm++eWzg3GV
+              PfWdZSM+Z95WS4ftPZCB2iZcYwdZhRq35aH3aIgQ4IlXuGd48oEGwMB9dt9QuJ/O
+              j7o9gAiMG/RJW6ktopu9h/I/cF9h/M73wJhpoZ5hVSsufwIDAQABo4HbMIHYMAkG
+              A1UdEwQCMAAwHQYDVR0OBBYEFOGS2No4mUxRmXsvYmCKCZFYoJvAMEYGA1UdIwQ/
+              MD2AFDM9toMOdaAXMGEt+jGzc5MKBxcjoRqkGDAWMRQwEgYDVQQDEwtFYXN5LVJT
+              QSBDQYIJAKM9qfQsYQ01MBMGA1UdJQQMMAoGCCsGAQUFBwMBMAsGA1UdDwQEAwIF
+              oDBCBgNVHREEOzA5giUqLmNpLXRlc3RjbHVzdGVyLmNpLXRlc3RuYW1lc3BhY2Uu
+              c3ZjghAqLmNpLXRlc3RjbHVzdGVyMA0GCSqGSIb3DQEBCwUAA4IBAQAI+pRsH48A
+              yzfZ3mEJoSb5lbovt4wRAJ0TENUPsHDTf9cJ2rEAcz5d3QI2alfujVLe82SEQF+b
+              inREnkqAkveTmycw8HsETnvzOxSfvECln9UDaZ6uhB9mKpDwuakQUvhtDNKTwXAG
+              pi7tqeLDKUM/hDg46H1T9pRYCHVxUKqZthh5+0HpdStv7tTLvnVEoRxalsmb2G5n
+              2aRDC4WC6jy7jzb2OvkugCx/FA21xdWTT9ynUcDKtDLePq43HxjDCUNjLpRYYlRo
+              HmglHP75y/dIe/dr7zheFH1P9N0aIWU1/d8LHMgUlw+/RQNPIr49+OUMozu9/mK0
+              HZGh3kZ0pgpg
+              -----END CERTIFICATE-----
+      key: |-
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIEpAIBAAKCAQEAqPH9x5kMs0JEYobXmBuKozYy0mxzHqY4Sy5oshqtBFhUCisj
+            bYZSc7j9i9qogfROucHI+16IYs0xhtEKBcQkm6nJ+1f4aPLg4GDFr9xycB6lYzf9
+            6SJNd8oCvToukzrpG2DIRm28ONph/YTp2fOXKRBwwf/97ftRGgyTPFNTrFI0mX0W
+            ryxVuOZrdNAij4St20B6ax/lsyNW+jBfw4KPTEJyzXufQZm++eWzg3GVPfWdZSM+
+            Z95WS4ftPZCB2iZcYwdZhRq35aH3aIgQ4IlXuGd48oEGwMB9dt9QuJ/Oj7o9gAiM
+            G/RJW6ktopu9h/I/cF9h/M73wJhpoZ5hVSsufwIDAQABAoIBAGIJOujuSU5kb+Z0
+            tPrRUJvxQYCV6h+o+RW3co2XqTrSPsI/0ikmPwZkHM1hL1Np/50PdJ9Zde9PfyPq
+            fdRmw4+I8Wpm3AGanx/VSCIK3GVvgy2WOkNk4mtW0EwaTRimoMqAWPd1ijm7kA1b
+            aZBOKDNuFOCeui21HpTtIytody+Q+rf5p3QWMp/oBI4MZjJ6rh2j4r5B+inn/e2n
+            DT0yoSVMNlak5SchHmImngl4XgKRp6Rtezt+YDmmrnc6Vv/Rpj/4M0TUBkoCTwCk
+            hcGnyRbSG71LPGJcQHmEswTRSA89qDsmFLce0U/yk5AJQy3hpV86AejE8SDQxyr7
+            Y8KR4rECgYEA26SOr4FlxsopKKsURQvkmjx5I62UgPKm7VI6B9K9LFiIkIm8Kh7k
+            p+xgh6+RknN0VSIlAJGQQ5VLFhtTvqzBqmHh+u+rWGMMsW4V8yE2+iFDVQ/DPDmx
+            QH9fwT6PsOXZUrDpdJdVURDWV7p55QDmHLqcz/uJlanpkJtZLu7oTGMCgYEAxOkb
+            slTSIbun+QKRhbc1tulWSXcBt69jCTWL8GGJ2cAj1y3EkyvmnEZQaIFKOXVMsbQr
+            Yq3PjJe83Boq5TlsyUH7JBfiI1tf6ZaiRVdLuSl5/YUgTW58M9cjfxh0KtqW/sGC
+            GZ+obndAndsfEHIDNvBoxw7BWgafSNmp13hiijUCgYEAyTrjiwIHR/BxcxQCVxwF
+            ThW3equOUfF+ZBGgnwhBTv6x55J5NTHmlb6n1chRm5Zxb4n/0pyKSpDeIRvaRugp
+            6rsQ+gFYv3rH50sPixfUMagF80mkumm07n2EMhzqMszypaL10F7RyJqfdfKfuOJw
+            8MM75gTzUY5BMb5SIAC8DTcCgYEAgOe1qPXcJhcqLFphF69La7WvNiLBLhWT+Nhk
+            BvZjfvhIvjoJAOtxaYaiZveUtq6yiXbQHCZ6w6gmC9TZlfwU2l/mX8d+0/SiglGJ
+            Y2l1ef7MDIpVDjuw9WL2quJAUjmNNbNKTyn04nQRCgYDfQmWTyXtAbsIGr5REijk
+            BdmacK0CgYAk8+/A6APILmQ4XnEL4Zba1Faq6M3od8aWwwMdnwnIwo5Cv6QSq+zC
+            NmhNsPzE3hNxaF+Cn3QLythPcqTS2nwYFjnWQx/Xlz5SgpLuf41+pD8fWgTK7jo1
+            i9isA7nPgMzZisbxnbVVBsG37Rj2Z1wPN7FSjTgfh9zgZ316X2ltCQ==
+            -----END RSA PRIVATE KEY-----

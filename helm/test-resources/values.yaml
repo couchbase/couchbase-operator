@@ -4,6 +4,7 @@
 
 nameOverride: ""
 fullnameOverride: ""
+enableServiceTest: true
 
 # service account for rbac
 rbac:
@@ -28,3 +29,9 @@ couchbase-operator:
     image:
       repository: couchbase/couchbase-admission-internal
     imagePullPolicy: Always
+
+# place holder for overrides to cluster
+couchbase-cluster:
+  couchbaseCluster:
+    # setting name for the sake of dns testing and verifying services
+    name: ci-testcluster

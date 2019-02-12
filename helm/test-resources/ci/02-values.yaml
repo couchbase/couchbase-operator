@@ -2,17 +2,18 @@
 ---
 rbac:
   create: true
-  couchbaseServiceAccountName: test-resource-operator
-  admissionServiceAccountName: test-resource-admission
+  serviceAccountName: ci-service-account
   clusterRoleAccess: false
 couchbase-operator:
   rbac:
     create: false
+    couchbaseServiceAccountName: ci-service-account
+    admissionServiceAccountName: ci-service-account
   couchbaseOperator:
-    serviceAccountName: test-resource-operator
     image:
       tag: 1.2.0-877
+    commandArgs:
+      create-crd: false 
   admissionController:
-    serviceAccountName: test-resource-admission
     image:
       tag: 1.2.0-877

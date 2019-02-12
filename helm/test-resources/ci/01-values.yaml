@@ -6,11 +6,11 @@ rbac:
 couchbase-operator:
   rbac:
     create: false
+    couchbaseServiceAccountName: test-resource-sa 
+    admissionServiceAccountName: test-resource-sa 
   couchbaseOperator:
-    serviceAccountName: test-resource-sa
     image:
       tag: 1.2.0-877
   admissionController:
-    serviceAccountName: test-resource-sa
     image:
       tag: 1.2.0-877
