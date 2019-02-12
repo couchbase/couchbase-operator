@@ -160,7 +160,7 @@ This field specifies whether or not the Operator should be given access to resou
 
 Setting `clusterRoleAccess` to `false` is recommended for production.
 
-NOTE: When `clusterRoleAccess` is set to `false`, the Tiller service will not be able to create the CustomResourceDefinition (CRD).
+NOTE: When `clusterRoleAccess` is set to `false`, the operator will not be able to create the CustomResourceDefinition (CRD).
 This is because the CRD is a cluster-wide resource in Kubernetes.
 Make sure to xref:helm-setup-guide.adoc#deploy-production[manually install the CRD] if you set this field to `false`.
 
@@ -170,6 +170,7 @@ a| _Field Rules:_
 a| The `clusterRoleAccess` value defaults to `true` if not specified.
 When set to `true`, the service account of the Operator gets bound to a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings[cluster role].
 When set to `false`, the service account is bound to a standalone role.
+This field does not apply to the admission controller since it requires cluster wide access.
 |===
 
 [#rbac-couchbaseServiceAccountName]
