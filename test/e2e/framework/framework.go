@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"testing"
@@ -118,6 +119,15 @@ func startTimeoutTimer() {
 		logrus.Infof("Setting timeout of %v from %v", timeoutDuration, time.Now())
 		<-time.After(timeoutDuration)
 		logrus.Infof("Timeout happened at %v", time.Now())
+
+		// Dump out backtraces in case this is a deadlock situation.
+		profile := pprof.Lookup("goroutine")
+		if profile != nil {
+			buffer := &bytes.Buffer{}
+			profile.WriteTo(buffer, 2)
+			logrus.Info(string(buffer.Bytes()))
+		}
+
 		panic("Test timed out..")
 	}()
 }
