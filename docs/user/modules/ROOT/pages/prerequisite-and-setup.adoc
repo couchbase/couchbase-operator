@@ -21,7 +21,7 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| Certified 5.5, 5.5.x, 6.0
+| Certified 5.5, 5.5.x, 6.0, 6.0.x
 |===
 
 .Kubernetes Platform Compatibility List
@@ -62,25 +62,28 @@ Persistent volumes are mandatory for production deployments.
 Review the xref:best-practices.adoc#persistent-volumes-best-practices[Operator best practices] for more information about cluster supportability requirements.
 
 .Persistent Volume Compatibility List
-[#table-operator-compatibility-pv,cols="1,1,1,1,1,1",options="header"]
+[#table-operator-compatibility-pv,cols="1,1",options="header"]
 |===
+| Volume | Support Level
 
-^| https://kubernetes.io/docs/concepts/storage/storage-classes/#aws[AWS^]
-^| https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Azure Disk^]
-^| https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD^]
-^| https://kubernetes.io/docs/concepts/storage/storage-classes/#gce[GCE^]
-^| https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[Glusterfs^]
-^| https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx^]
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#aws[AWS^]
+| Certified
 
-^| Certified
-^| Certified
-^| Certified
-^| Certified
-^| Certified
-^| Certified
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Azure Disk^]
+| Certified
+
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD^]
+| Certified
+
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#gce[GCE^]
+| Certified
+
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[Glusterfs^]
+| Certified
+
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx^]
+| Certified
 |===
-
-NOTE: Only dynamic volume provisioning using storage classes is currently supported.
 
 == RBAC and Networking Requirements
 
@@ -94,7 +97,8 @@ Before moving forward, review the following documentation:
 
 As you're setting up your Kubernetes environment, make sure that you're following the recommended xref:best-practices.adoc[best practices].
 
-Once your Kubernetes environment is set up, you can move on to installing the Operator.
+Once your Kubernetes environment is set up, you can move on to installing the admission controller and the Operator.
 
-* xref:install-kubernetes.adoc[Installing on Open Source Kubernetes]
-* xref:install-openshift.adoc[Installing on OpenShift]
+* xref:install-admission-controller.adoc[Installing and Using the Admission Controller]
+* xref:install-kubernetes.adoc[Installing the Operator on Open Source Kubernetes]
+* xref:install-openshift.adoc[Installing the Operator on OpenShift]
