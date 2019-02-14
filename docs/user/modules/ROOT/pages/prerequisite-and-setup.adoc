@@ -21,7 +21,7 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| Certified 5.5, 5.5.x
+| Certified 5.5, 5.5.x, 6.0
 |===
 
 .Kubernetes Platform Compatibility List
@@ -30,24 +30,29 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Platform | Version
 
 | Open Source Kubernetes
-| Certified 1.9, 1.10
+| Certified 1.11, 1.12
 
-Supported 1.11+
+Supported 1.13+
 
 | Red Hat OpenShift
-| Certified 3.9, 3.10
+| Certified 3.11, 3.12
 
-Supported 3.11+
+Supported 3.13+
 |===
 
 .Public Kubernetes Service Compatibility List
-[#table-operator-compatibility-public,cols="1,1,1",options="header"]
+[#table-operator-compatibility-public,cols="1,1",options="header"]
 |===
-| Amazon EKS | Google GKE | Microsoft AKS
+| Service | Support Level
 
-| Developer Preview
-| Developer Preview
-| Developer Preview
+| Amazon EKS
+| Certified
+
+| Google GKE
+| Certified
+
+| Microsoft AKS
+| Certified
 |===
 
 [#compatibility-pv]

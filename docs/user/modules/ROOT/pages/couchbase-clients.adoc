@@ -25,6 +25,7 @@ c = Cluster('couchbase://{}-srv.default.svc.cluster.local'.format(cluster_name))
 Where the domain is composed of `my-cluster`, which is the name of the `CouchbaseCluster` resource, the namespace, and the domain of the cluster.
 Note that we use a separate service record to only advertise nodes with the Data Service enabled. This provides optimal bootstrapping of Couchbase clients.
 
+[#connect-external]
 == From Outside of the Kubernetes Cluster
 
 Couchbase SDKs are clients in exactly the same way as XDCR.

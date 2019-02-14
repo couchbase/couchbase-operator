@@ -16,10 +16,11 @@ IMPORTANT: This guide makes certain assumptions about the role-based access cont
 
 == Prerequisites
 
-Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `oc`.
-
+* Make sure you have installed the xref:install-admission-controller.adoc[admission controller] and that it is running.
+* Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `oc`.
++
 The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
-
++
 IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-openshift.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
 == Create an OpenShift Project

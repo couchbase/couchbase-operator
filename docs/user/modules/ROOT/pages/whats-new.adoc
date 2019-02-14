@@ -14,7 +14,7 @@ See xref:upgrading-couchbase.adoc[Upgrading a Couchbase Cluster]
 
 == Integrated CouchbaseCluster Resource Validation
 
-The Operator now requires resource validation via an https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/[admission controller].
+The Operator now requires resource validation via an https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/[admission controller^].
 
 In previous releases of the Operator, a command-line tool called `cbopctl` was required whenever you submitted a new CouchbaseCluster configuration to the Operator.
 This tool would perform client-side validation of Couchbase cluster configuration changes before the Operator would act on them, thus protecting your Couchbase deployment (and the Operator) from any accidental damage that might arise from an invalid configuration.
@@ -61,3 +61,12 @@ See xref:tls.adoc[Configuring TLS]
 Several enhancements have been made to `cbopinfo`, including a unified log collection experience for stateful and stateless deployments.
 
 See xref:cbopinfo.adoc[cbopinfo]
+
+== External Client Connectivity (Experimental)
+
+The only supported method for Couchbase clients to connect to a Couchbase Server deployment running in Kubernetes is to run the client from a pod within the same Kubernetes cluster.
+
+This release includes some experimental features for connecting to Couchbase clients that are located outside of the Kubernetes cluster.
+Note that this is unsupported functionality — use at your own risk!
+
+See xref:couchbase-clients.adoc#connect-external[Connecting Couchbase Clients]
