@@ -14,11 +14,9 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: registry.connect.redhat.com/couchbase/operator:1.1.0-1
+        image: registry.connect.redhat.com/couchbase/operator:1.2.0-DP-2
         command:
         - couchbase-operator
-        args:
-        - -enable-upgrades=false # Disable experimental upgrade feature
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:

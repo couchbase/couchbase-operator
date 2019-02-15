@@ -14,6 +14,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -226,7 +227,7 @@ func createAdmissionController(client kubernetes.Interface) error {
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "https",
-									ContainerPort: 443,
+									ContainerPort: 8443,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -272,8 +273,9 @@ func createAdmissionController(client kubernetes.Interface) error {
 			},
 			Ports: []corev1.ServicePort{
 				{
-					Protocol: corev1.ProtocolTCP,
-					Port:     443,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       443,
+					TargetPort: intstr.FromInt(8443),
 				},
 			},
 		},

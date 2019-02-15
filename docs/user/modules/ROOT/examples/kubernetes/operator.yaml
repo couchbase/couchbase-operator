@@ -14,12 +14,11 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: couchbase/operator:1.1.0
+        image: couchbase/operator:1.2.0-DP
         command:
         - couchbase-operator
         args:
         - -create-crd
-        - -enable-upgrades=false # Disable experimental upgrade feature
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:

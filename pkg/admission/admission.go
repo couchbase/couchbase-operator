@@ -304,7 +304,7 @@ func Serve(config *Config) {
 	http.HandleFunc("/couchbaseclusters/mutate", serveCouchbaseClustersMutate)
 
 	server := &http.Server{
-		Addr:      ":443",
+		Addr:      ":8443",
 		TLSConfig: configTLS(config),
 	}
 	server.ListenAndServeTLS("", "")

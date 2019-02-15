@@ -49,7 +49,7 @@ For instructions on how to install the chart, including how to customize the cha
     # image config
     image:
       repository: couchbase/operator
-      tag: 1.1.0
+      tag: 1.2.0
     imagePullPolicy: IfNotPresent
     # imagePullSecrets is an optional list of references to secrets  to use for pulling images
     imagePullSecrets: []
@@ -299,7 +299,7 @@ couchbaseOperator:
   serviceAccountName: ""
   image:
     repository: couchbase/operator
-    tag: 1.1.0
+    tag: 1.2.0
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   commandArgs:
@@ -342,7 +342,7 @@ The repository and tag to use for pulling the operater image.
 ----
   image:
     repository: couchbase/operator
-    tag: 1.1.0
+    tag: 1.2.0
 ----
 
 _Value rules:_ The `couchbaseOperator.image` values can refer to any repository and tag of a released version of the couchbase operator.
