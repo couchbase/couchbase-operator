@@ -6,6 +6,8 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"io"
 	"io/ioutil"
 	"os"
@@ -20,7 +22,6 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -107,19 +108,26 @@ func archiveName(namespace, name, timestamp string, redacted bool) string {
 
 // checkCollectInfoLogs checks all expected Couchbase server logs are present.
 func checkCollectInfoLogs(kubeClient kubernetes.Interface, namespace, cbClusterName, cbopinfoLogDir string, redacted bool, errMsgList *failureList) error {
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
-	if err != nil {
-		return fmt.Errorf("Failed to list pods: %v", err)
-	}
-
 	fileInfos, err := ioutil.ReadDir(".")
 	if err != nil {
-		return fmt.Errorf("Failed to read directory: %v", err)
+		errMsgList.AppendFailure("For directory "+" . ", fmt.Errorf("Failed to read directory: %v", err))
 	}
 
 	timestamp, err := extractTimestamp(cbopinfoLogDir)
 	if err != nil {
-		return fmt.Errorf("Failed to extract timestamp: %v", err)
+		errMsgList.AppendFailure("For log directory "+cbopinfoLogDir, fmt.Errorf("Failed to extract timestamp: %v", err))
+	}
+
+	var pods *corev1.PodList
+	err = retryutil.Retry(e2eutil.Context, 5*time.Second, 5, func() (bool, error) {
+		pods, err = kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
 	}
 
 PodForLoop:
@@ -137,12 +145,19 @@ PodForLoop:
 
 // verifyLogRedaction verifies logs collected for pods are redacted.
 func verifyLogRedaction(kubeClient kubernetes.Interface, namespace, cbClusterName, cbopinfoLogDir string, errMsgList *failureList) error {
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+	timestamp, err := extractTimestamp(cbopinfoLogDir)
 	if err != nil {
-		return errors.New("Failed to list pods: " + err.Error())
+		fmt.Printf("Failed to extract timestamp: %v", err)
 	}
 
-	timestamp, err := extractTimestamp(cbopinfoLogDir)
+	var pods *corev1.PodList
+	err = retryutil.Retry(e2eutil.Context, 5*time.Second, 5, func() (bool, error) {
+		pods, err = kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
 	if err != nil {
 		return err
 	}

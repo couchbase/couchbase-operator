@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"context"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"os"
 	"testing"
 	"time"
@@ -79,11 +81,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
-
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-
-	eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
-	defer cleanup()
 
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
@@ -91,7 +89,19 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	eventingDstBucketName := "eventingDst"
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
-	responseData, err := e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	var responseData []byte
+	err := retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
+		eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
+		defer cleanup()
+		var err error
+		if responseData, err = e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc); err != nil {
+			t.Log(err)
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
 	if err != nil {
 		t.Log(string(responseData))
 		t.Fatal(err)

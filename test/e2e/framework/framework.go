@@ -2,6 +2,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -541,16 +542,26 @@ func (f *Framework) SetupCouchbaseOperator(targetKube *types.Cluster) error {
 	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, constants.CouchbaseOperatorLabel)
 }
 
-func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, namespace string) int32 {
+func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, namespace string) (int32, error) {
 	operatorPodName, err := e2eutil.GetOperatorName(kubeClient, namespace)
 	if err != nil {
-		return -1
+		return 0, err
 	}
-	operatorPod, err := kubeClient.CoreV1().Pods(namespace).Get(operatorPodName, metav1.GetOptions{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var operatorPod *v1.Pod
+	err = retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
+		operatorPod, err = kubeClient.CoreV1().Pods(namespace).Get(operatorPodName, metav1.GetOptions{})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
 	if err != nil {
-		return -1
+		return 0, err
 	}
-	return operatorPod.Status.ContainerStatuses[0].RestartCount
+	return operatorPod.Status.ContainerStatuses[0].RestartCount, nil
 }
 
 func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, namespace string) error {

@@ -59,7 +59,7 @@ func runSuite(t *testing.T) {
 	ymlFilePath := "./resources/ansible"
 
 	// Over riding pullImage to true since if new cluster is created, images should be pulled
-	var operatorRestartCount int32 = 0
+	operatorRestartCount := map[string]int32{}
 	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
 
 	for _, testGroup := range f.SuiteYmlData.TestCaseGroup {
@@ -195,11 +195,15 @@ func runSuite(t *testing.T) {
 				fmt.Printf("  TestPassed: %v\n", testPassed)
 
 				// Detect couchbase-operator crash / restart event
-				for _, targetKube := range f.ClusterSpec {
-					if currRestartCount := f.GetOperatorRestartCount(targetKube.KubeClient, f.Namespace); currRestartCount != operatorRestartCount {
+				for _, cluster := range f.TestClusters {
+					currRestartCount, err := f.GetOperatorRestartCount(f.ClusterSpec[cluster].KubeClient, f.Namespace)
+					if err != nil {
+						t.Log(err)
+					}
+					if currRestartCount != operatorRestartCount[cluster] {
 						testPassed = false
-						operatorRestartCount = currRestartCount
-						t.Logf("Operator pod restart count is %d", operatorRestartCount)
+						t.Logf("Cluster %v restart count was %d and now is %d", cluster, operatorRestartCount[cluster], currRestartCount)
+						operatorRestartCount[cluster] = currRestartCount
 					}
 				}
 

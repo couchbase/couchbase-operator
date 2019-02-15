@@ -9,14 +9,12 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Create cluster with Analytics service enabled
@@ -38,7 +36,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 		"cluster":         clusterConfig,
 		"service1":        serviceConfig1,
 		"bucket1":         bucketConfig1,
-		"exposedFeatures": map[string]string{"featureNames": "client"},
+		"exposedFeatures": {"featureNames": "client"},
 	}
 
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
@@ -50,11 +48,12 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
+	// Can get stuck on rebalancing.
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 1, numOfDocs); err != nil {
+	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs); err != nil {
 		t.Fatal(err)
 	}
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -526,7 +525,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	for podMemberId := 0; podMemberId < clusterSize; podMemberId++ {
 		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
 		// Deletes only the pod leaving the pvc active
-		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberName, &metav1.DeleteOptions{}); err != nil {
+		if err := e2eutil.DeletePod(t, targetKube.KubeClient, podMemberName, f.Namespace); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -399,7 +399,12 @@ func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace stri
 // performing garbage collection
 func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	if err != nil {
+		Die(t, err)
+	}
+	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
+	return cluster, err
 }
 
 func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
@@ -873,14 +878,29 @@ func KillOperatorAndWaitForRecovery(t *testing.T, kubeClient kubernetes.Interfac
 }
 
 func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var pods *v1.PodList
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("app", "couchbase-operator")))
-	pods, err := kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return "couchbase-operator", err
+	outerErr := retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+		var err error
+		pods, err = kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+	if outerErr != nil {
+		return "couchbase-operator", outerErr
 	}
+
 	operatorPods := []string{}
-	for i := 0; i < len(pods.Items); i++ {
-		operatorPods = append(operatorPods, pods.Items[i].Name)
+	for _, pod := range pods.Items {
+		operatorPods = append(operatorPods, pod.Name)
+	}
+	if len(operatorPods) == 0 {
+		return "", errors.New("no pods available")
 	}
 	if len(operatorPods) > 1 {
 		return "couchbase-operator", errors.New("too many couchbase operators")
@@ -1089,10 +1109,15 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, n
 
 func DeletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace string) error {
 	t.Logf("deleting pod: %v", podName)
-	if err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
-		return err
-	}
-	return nil
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err := retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+		if err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+	return err
 }
 
 func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {

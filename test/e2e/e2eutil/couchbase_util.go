@@ -79,8 +79,17 @@ func forwardPort(t *testing.T, k8s *types.Cluster, namespace, pod, port string) 
 		Pod:       pod,
 		Port:      sport + ":" + port,
 	}
-	if err := pf.ForwardPorts(); err != nil {
-		t.Fatal(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	err = retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+		if err := pf.ForwardPorts(); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+	if err != nil {
+		Die(t, err)
 	}
 
 	// Analytics and eventing don't support persistent connections so we get a
@@ -573,7 +582,8 @@ func DeployEventingFunction(hostUrl, eventingPort, eventingFuncName, srcBucketNa
 	request.SetBasicAuth(hostUsername, hostPassword)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	response, err := http.DefaultClient.Do(request)
+	client := http.Client{Timeout: time.Minute}
+	response, err := client.Do(request)
 	if err != nil {
 		return responseData, errors.New("Failed to " + err.Error())
 	}
@@ -601,7 +611,8 @@ func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string) (responseData []by
 	request.SetBasicAuth(username, password)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	response, err := http.DefaultClient.Do(request)
+	client := http.Client{Timeout: time.Minute}
+	response, err := client.Do(request)
 	if err != nil {
 		err = errors.New("Http POST failed: " + err.Error())
 		return
