@@ -25,6 +25,7 @@ rules:
   - ""
   resources:
   - pods
+  - pods/exec
   - services
   - endpoints
   - persistentvolumeclaims
@@ -45,3 +46,9 @@ rules:
   - deployments
   verbs:
   - "*"
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - '*'
