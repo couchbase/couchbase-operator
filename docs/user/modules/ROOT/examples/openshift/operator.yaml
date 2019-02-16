@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: registry.connect.redhat.com/couchbase/operator:1.2.0-DP-2
+        image: registry.connect.redhat.com/couchbase/operator:1.2.0-DP
         command:
         - couchbase-operator
         env:
