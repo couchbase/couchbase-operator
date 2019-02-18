@@ -3,6 +3,8 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: couchbase-operator-admission
+imagePullSecrets:
+  - name: REDHAT_CONTAINER_REGISTRY_PULL_SECRET
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -66,7 +68,7 @@ spec:
     spec:
       containers:
       - name: couchbase-operator-admission
-        image: registry.connect.redhat.com/couchbase/admission-controller:1.2.0-DP-2
+        image: registry.connect.redhat.com/couchbase/admission-controller:1.2.0-DP-3
         command:
         - couchbase-operator-admission
         args:

@@ -161,7 +161,7 @@ You can use the following command to check on the status of the deployment:
 
 [source,console]
 ----
-oc get deployments -l app=couchbase-operator
+oc get deployments
 ----
 
 If you run the previous command immediately after the Operator is deployed, the output will look something like the following:

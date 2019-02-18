@@ -91,6 +91,15 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/
 ----
 kubectl create -f admission.yaml
 ----
+
+. Confirm the admission controller has deployed successfully:
++
+[source,console]
+----
+kubectl get deployments
+NAME                           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+couchbase-operator-admission   1         1         1            1           1m
+----
 --
 
 OpenShift::
@@ -103,11 +112,27 @@ OpenShift::
 cd couchbase-autonomous-operator-openshift_x.x.x-linux_x86_64/
 ----
 
+. Log in to the `system:admin` account and switch to the `default` project.
+
+. The `admission.yaml` file in the Operator package contains an field that will need to manually updated before proceeding.
+You must define a secret in the project that grants OpenShift permission to access the RedHat container registry.
+You can either do this manually with the `oc create secret docker-registry` command or configure a service account and download the secret YAML definition directly from the RedHat container registry website.
+Find the `REDHAT_CONTAINER_REGISTRY_PULL_SECRET` token an replace it with the name of the secret you have just created.
+
 . Run the following command to create the admission controller:
 +
 [source,console]
 ----
 oc create -f admission.yaml
+----
+
+. Confirm the admission controller has deployed successfully:
++
+[source,console]
+----
+oc get deployments
+NAME                           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+couchbase-operator-admission   1         1         1            1           1m
 ----
 --
 ====
@@ -120,6 +145,72 @@ The DNS alternate name must be in the form `${service-name}.${namespace}.svc`.
 The admission controller certificate and key pair are defined in the admission controller secret.
 The admission controller certificate issuer's CA certificate is defined in each of the webhooks.
 All certificates and keys are base64 encoded in the YAML definitions.
+====
+
+=== Testing the Admission Controller
+
+It is important that the dynamic admission controller is working.
+In order to verify functionality edit the `couchbase-cluster.yaml` file distributed with the Operator package.
+Change the bucket type in the example from `couchbase` to `memcached`.
+
+First ensure that the CouchbaseCluster custom resource definition is installed:
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+kubectl create -f crd.yaml
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+oc create -f crd.yaml
+----
+--
+====
+
+Create the `CouchbaseCluster` resource.
+If the admission controller is not correctly installed this operation will succeed.
+If correctly installed you will see something similar to the following:
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+kubectl create -f couchbase-cluster.yaml
+Error from server: error when creating "couchbase-cluster.yaml": admission webhook "couchbase-operator-admission.default.svc" denied the request: validation failure list:
+secret cb-example-auth must exist
+replicas in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+conflictResolution in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+evictionPolicy in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+ioPriority in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+oc create -f couchbase-cluster.yaml
+Error from server: error when creating "couchbase-cluster.yaml": admission webhook "couchbase-operator-admission.default.svc" denied the request: validation failure list:
+secret cb-example-auth must exist
+replicas in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+conflictResolution in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+evictionPolicy in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+ioPriority in spec.buckets[0] must be of type nil: "Bucket type is memcached"
+----
+--
 ====
 
 [#rbac-considerations]
