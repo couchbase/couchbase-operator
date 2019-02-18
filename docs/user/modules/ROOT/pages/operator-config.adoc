@@ -66,3 +66,55 @@ It is recommended that you use a service account named `couchbase-operator`, but
 == Changing the Replica Count
 
 Normally deployments are used to create multiple instances of a pod in order to provide redundancy. However, when deploying the Operator, you should always set replicas to `1`. This is because the Operator pod uses leader election to ensure that only one Operator is running in a specific namespace. If you start more than one Operator pod in the same namespace, only the first one will start successfully. The Operator uses deployments so that if the Operator dies, a new Operator pod gets created and picks up from where the old one left off.
+
+== Command-Line Arguments
+
+You can specify a list of command-line flags to pass on to the Operator to modify its behavior.
+
+[source,yaml]
+----
+    spec:
+      containers:
+      ...
+        args:
+        - -create-crd
+        - -log-level
+        - -pod-create-timeout
+----
+
+--create-crd <bool>::
+When given sufficient privileges, the Operator can automatically install the CRD(s).
++
+This flag is a boolean value that defaults to `true` on Kubernetes, and `false` on OpenShift.
++
+.Example:
+[source,yaml]
+----
+- "-create-crd=false"
+----
+
+--log-level <string>::
+The Operator allows control of the logging verbosity.
++
+Valid values are `panic`, `fatal`, `error`, `warn`, `info` and `debug`.
+The Operator will only log messages of the specified level and higher, i.e. when set to `fatal`, only messages marked `fatal` and `panic` will be logged.
+This flag defaults to `info`.
++
+.Example:
+[source,yaml]
+----
+- "-log-level=fatal"
+----
+
+--pod-create-timeout <string>::
+The Operator allows the timeout of pod creation to be manually configured.
+It is primarily intended for use on cloud platforms where the deployment of multiple volumes and pulling of a Couchbase Server container image may take a longer time than the default timeout period.
++
+Valid values are any string that can be parsed with the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration^] function.
+This flag defaults to `5m`.
++
+.Example:
+[source,yaml]
+----
+- "-pod-create-timeout=10m"
+----

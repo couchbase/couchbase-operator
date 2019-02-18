@@ -1,9 +1,10 @@
 = Upgrading the Autonomous Operator
+:tabs:
 
 Upgrading the Couchbase Autonomous Operator is a three-step process:
 
 . <<download-operator, Download and unpack the Operator package>>
-. <<update-crd, Update the CRD>>
+. <<update-crd, Update the CRD and roles>>
 . <<update-operator-version, Change the version in the Operator Deployment>>
 
 [#download-operator]
@@ -16,7 +17,7 @@ The Operator package contains the YAML configuration files and command-line tool
 IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
 [#update-crd]
-== Update the CRD
+== Update the CRD and Roles
 
 In the Operator package, you'll find the updated version of the CRD: `crd.yaml`. For minor releases of the Operator, the CRD (which defines acceptable CouchbaseCluster configurations) may undergo small changes that don't affect backward compatibility, but may add new fields or make changes to the validation code that ensures valid CouchbaseCluster configurations.
 
@@ -39,6 +40,31 @@ OpenShift::
 [source,console]
 ----
 oc apply -f crd.yaml
+----
+--
+====
+
+The permissions required by the Operator may also change between minor versions, so it's good practice to replace existing roles with up-to-date versions.
+Updates may be specific to the RBAC setup in your Kubernetes environment.
+The following commands will update the default roles supplied in the Operator distribution:
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+kubectl apply -f cluster-role.yaml
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+oc apply -f cluster-role-sa.yaml
 ----
 --
 ====
@@ -106,3 +132,10 @@ OpenShift::
 ====
 
 Once you save and close the text editor, the changes are sent to Kubernetes and the upgrade process begins.
+
+[NOTE]
+====
+Be aware that command line parameters to the Operator may change between releases.
+Please review the defaults supplied in the provided YAML manifest.
+Additionally, consult the xref:operator-config.adoc[Operator configuration] guide for command line flags.
+====
