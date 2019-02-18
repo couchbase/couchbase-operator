@@ -28,7 +28,7 @@ func rebalanceOutXdcrNodes(t *testing.T, k8s *types.Cluster, couchbase *api.Couc
 		expectedEvents.AddClusterPodEvent(couchbase, "MemberRemoved", memberIndex)
 
 		e2eutil.MustWaitForClusterEvent(t, k8s, couchbase, e2eutil.NewMemberAddEvent(couchbase, nextNodeToBeAdded), 2*time.Minute)
-		e2eutil.MustWaitForClusterEvent(t, k8s, couchbase, e2eutil.RebalanceStartedEvent(couchbase), time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, k8s, couchbase, e2eutil.RebalanceStartedEvent(couchbase), 5*time.Minute)
 		e2eutil.MustWaitForClusterEvent(t, k8s, couchbase, e2eutil.RebalanceCompletedEvent(couchbase), 5*time.Minute)
 
 		expectedEvents.AddClusterPodEvent(couchbase, "AddNewMember", nextNodeToBeAdded)
