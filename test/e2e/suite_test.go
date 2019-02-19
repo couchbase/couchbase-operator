@@ -2,13 +2,16 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -53,6 +56,27 @@ func collectClusterLogs(t *testing.T, testName, logDir string) {
 			t.Logf("cbopinfo returned: %s", execOutStr)
 			t.Errorf("cbopinfo command failed: %v", err)
 		}
+	}
+}
+
+// goroutineLeakCheck compares the number of goroutines with what we started a test
+// with.  If they don't match then raise a warning and print all routines so we can
+// ensure they are correctly killed off.  If this triggers, your test is broken, fix
+// it!
+func goroutineLeakCheck(expected int) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	callback := func() (bool, error) {
+		return runtime.NumGoroutine() == expected, nil
+	}
+
+	if err := retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, callback); err != nil {
+		fmt.Println("WARN: goroutine leak detected:", expected, "vs", runtime.NumGoroutine())
+		trace := &bytes.Buffer{}
+		profile := pprof.Lookup("goroutine")
+		profile.WriteTo(trace, 2)
+		fmt.Println(string(trace.Bytes()))
 	}
 }
 
@@ -196,7 +220,6 @@ func runSuite(t *testing.T) {
 			if testFunc != nil {
 				preGoroutines := runtime.NumGoroutine()
 				testPassed := t.Run(testName, testFunc)
-				postGoroutines := runtime.NumGoroutine()
 
 				// Detect couchbase-operator crash / restart event
 				for _, cluster := range f.TestClusters {
@@ -218,14 +241,7 @@ func runSuite(t *testing.T) {
 					fmt.Println("FAIL")
 				}
 
-				// If this triggers, your test is broken, fix it
-				if preGoroutines != postGoroutines {
-					fmt.Println("WARN: goroutine leak detected:", preGoroutines, "vs", postGoroutines)
-					trace := &bytes.Buffer{}
-					profile := pprof.Lookup("goroutine")
-					profile.WriteTo(trace, 2)
-					fmt.Println(string(trace.Bytes()))
-				}
+				goroutineLeakCheck(preGoroutines)
 
 				// Collect logs if test fails
 				if !testPassed && f.CollectLogs {
