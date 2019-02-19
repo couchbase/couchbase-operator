@@ -1,11 +1,19 @@
-= Upgrading A Couchbase Cluster
+= Upgrading a Couchbase Cluster
 
-The Couchbase operator provides support to automatically upgrade a running cluster.  It performs a rolling upgrade one node at a time.  First a new node is created with the same pod configuration as the chosen node to upgrade, thus maintaining the same services e.g. data, index etc.  Data is rebalanced across the cluster so that the old node is evacuated and ejected from the cluster and the new node takes the load as data is transferred.  By manintaining N+1 nodes during the process we are able to handle all queries seemlessly without any performance degrdation.  Finally the selected upgrade node is deleted.
+[abstract]
+The Couchbase Autonomous Operator provides support for automatically upgrading a running Couchbase cluster.
+
+The Operator performs a rolling upgrade of a Couchbase cluster one node at a time.
+A new node is created with the same pod configuration as the chosen node to upgrade, thus maintaining the same Couchbase services, e.g. Data, Index, etc.
+
+Data is rebalanced across the cluster so that the old node is evacuated and ejected from the cluster, and the new node takes the load as data is transferred.
+By maintaining N+1 nodes during the upgrade process, we are able to handle all queries seamlessly without any performance degradation.
 
 == Initiating an Upgrade
 
-Simply edit the cluster specification and change the version string to a valid container.  Instructions for updating your specification can be found xref:updating-couchbase.adoc[here]
+To upgrade a Couchbase cluster, simply edit the CouchbaseCluster specification and change the version string to a valid container.
+Instructions for updating your specification can be found xref:updating-couchbase.adoc[here]
 
-NOTE: Upgrades are limited to only next next major version.
-
-NOTE: If for some reason the upgrade process fails you are able to roll back to the previous version.  Couchbase Server does not support downgrading once the entire cluster has upgraded.
+* Upgrades are limited to only the next next major version.
+* If for some reason the upgrade process fails you, are able to roll back to the previous version.
+Couchbase Server does not support downgrading once the entire cluster has upgraded.
