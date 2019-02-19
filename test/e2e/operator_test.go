@@ -106,7 +106,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 
 	// Ccreate a direct connection to a couchbase node.
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	// When the cluster is ready, kill the operator, manually update the bucket.  Verify the

@@ -44,14 +44,36 @@ func GetServices(kubeClient kubernetes.Interface, namespace string) ([]v1.Servic
 	return serviceList.Items, nil
 }
 
-func GetEventingIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
-	port, cleanup := forwardPort(t, k8s, namespace, pod, "8096")
+func GetEventingIpAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
+	port, cleanup, err := forwardPort(k8s, namespace, pod, "8096")
+	if err != nil {
+		return "", "", nil, err
+	}
 	// TODO: return a host string e.g. "127.0.0.1:8096"
-	return "127.0.0.1", port, cleanup
+	return "127.0.0.1", port, cleanup, nil
 }
 
-func GetAnalyticsIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
-	port, cleanup := forwardPort(t, k8s, namespace, pod, "8095")
+func MustGetEventingIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
+	host, port, cleanup, err := GetEventingIpAndPort(k8s, namespace, pod)
+	if err != nil {
+		Die(t, err)
+	}
+	return host, port, cleanup
+}
+
+func GetAnalyticsIpAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
+	port, cleanup, err := forwardPort(k8s, namespace, pod, "8095")
+	if err != nil {
+		return "", "", nil, err
+	}
 	// TODO: return a host string e.g. "127.0.0.1:8095"
-	return "127.0.0.1", port, cleanup
+	return "127.0.0.1", port, cleanup, nil
+}
+
+func MustGetAnalyticsIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
+	host, port, cleanup, err := GetAnalyticsIpAndPort(k8s, namespace, pod)
+	if err != nil {
+		Die(t, err)
+	}
+	return host, port, cleanup
 }

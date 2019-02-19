@@ -53,12 +53,10 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"
@@ -83,11 +81,14 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func insertAnalyticsDocument(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket, docID, docType string) error {
+func insertAnalyticsDocument(k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket, docID, docType string) error {
 	// Establishing a client connection is essentially random so if we tried
 	// to reuse this one there is a high probability that the target pod will
 	// be killed and this will constantly error.
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, k8s, cluster)
+	client, cleanup, err := e2eutil.CreateAdminConsoleClient(k8s, cluster)
+	if err != nil {
+		return err
+	}
 	defer cleanup()
 
 	b, err := client.GetBucket(bucket)
@@ -150,13 +151,11 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"
@@ -186,7 +185,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	numOfType1Docs := 0
 	numOfType2Docs := 0
 
-	docInsertFunc := func() {
+	go func() {
 		var err error
 	OuterLoop:
 		for {
@@ -199,7 +198,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 				if numOfDocs%2 != 0 {
 					docType = "type2"
 				}
-				if err = insertAnalyticsDocument(t, targetKube, testCouchbase, bucketName, docID, docType); err != nil {
+				if err = insertAnalyticsDocument(targetKube, testCouchbase, bucketName, docID, docType); err != nil {
 					break
 				}
 				if numOfDocs%2 == 0 {
@@ -211,10 +210,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 			}
 		}
 		dataInsertionErrChan <- err
-	}
-
-	//Run doc populator in backgroud while cluster resize is happening
-	go docInsertFunc()
+	}()
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false
@@ -307,17 +303,15 @@ func TestAnalyticsKillPods(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	// Load default data set into couchbase bucket
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"
@@ -351,7 +345,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	numOfType1Docs := 0
 	numOfType2Docs := 0
 
-	docInsertFunc := func() {
+	go func() {
 		var err error
 	OuterLoop:
 		for {
@@ -364,7 +358,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 				if numOfDocs%2 != 0 {
 					docType = "type2"
 				}
-				if err = insertAnalyticsDocument(t, targetKube, testCouchbase, bucketName, docID, docType); err != nil {
+				if err = insertAnalyticsDocument(targetKube, testCouchbase, bucketName, docID, docType); err != nil {
 					break
 				}
 				if numOfDocs%2 == 0 {
@@ -376,10 +370,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 			}
 		}
 		dataInsertionErrChan <- err
-	}
-
-	// Run doc populator in backgroud while cluster resize is happening
-	go docInsertFunc()
+	}()
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false
@@ -486,13 +477,11 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 1, numOfDocs); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 1, numOfDocs)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.GetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
 	analyticsBucketName := "testAnalyticsBucket"

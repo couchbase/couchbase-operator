@@ -122,7 +122,7 @@ func XdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, targetCluste
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
+	hostUrl, cleanup := e2eutil.MustGetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
 	defer cleanup()
 
 	srcBucketName := "default"
@@ -220,7 +220,7 @@ func CreateXdcrCluster(t *testing.T, k8s1, k8s2 *types.Cluster) {
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
+	hostUrl, cleanup := e2eutil.MustGetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
 	defer cleanup()
 
 	srcBucketName := "default"
@@ -276,7 +276,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *typ
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
+	hostUrl, cleanup := e2eutil.MustGetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
 	defer cleanup()
 
 	srcBucketName := "default"
@@ -367,7 +367,7 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *type
 		go resizeFunction()
 	}
 
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
+	hostUrl, cleanup := e2eutil.MustGetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
 	defer cleanup()
 
 	srcBucketName := "default"
@@ -448,7 +448,7 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, k8s1, k8s2 *
 		go serviceKillFunc()
 	}
 
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
+	hostUrl, cleanup := e2eutil.MustGetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
 	defer cleanup()
 
 	srcBucketName := "default"
@@ -541,7 +541,7 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", api.AdminService, api.DataService, api.IndexService)
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	hostUrl, cleanup := e2eutil.GetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
+	hostUrl, cleanup := e2eutil.MustGetAdminConsoleHostURL(t, k8s1, xdcrCluster1)
 	defer cleanup()
 
 	srcBucketName := "default"

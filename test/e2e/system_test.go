@@ -356,9 +356,9 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
-	client1, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase1)
+	client1, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase1)
 	defer cleanup()
-	client2, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase2)
+	client2, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase2)
 	defer cleanup()
 
 	// pause the operator for the test duration

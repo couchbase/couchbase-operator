@@ -80,7 +80,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -158,7 +158,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -227,7 +227,7 @@ func TestEditBucket(t *testing.T) {
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 
 	// Create a direct connection to a couchbase node.
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, kubernetes, cluster)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, kubernetes, cluster)
 	defer cleanup()
 
 	// When healthy change the memory quota, replicas, whether flushes are allowed and the compression mode.
@@ -295,7 +295,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.

@@ -340,7 +340,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	// To cross check number of persistent vol claims matches the defined spec

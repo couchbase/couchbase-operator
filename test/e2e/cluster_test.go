@@ -129,7 +129,7 @@ func TestEditClusterSettings(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -443,7 +443,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// check that actual cluster size is only 2 nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 	info, err := client.ClusterInfo()
 	if err != nil {
@@ -483,7 +483,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -660,7 +660,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -886,7 +886,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -934,7 +934,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -1002,7 +1002,7 @@ func TestManageMultipleClusters(t *testing.T) {
 		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test(fmt.Sprintf("/Status/Buckets/%s/BucketName", bucketName), bucketName), time.Minute)
 
 		// Verify the bucket also appears in the Couchbase API.
-		client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+		client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 		defer cleanup()
 
 		e2eutil.MustPatchBucketInfo(t, client, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", constants.Mem256Mb), time.Minute)

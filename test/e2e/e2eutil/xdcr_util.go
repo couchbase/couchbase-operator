@@ -74,7 +74,10 @@ func FlushBucket(hostUrl, bucketName, hostUsername, hostPassword string) ([]byte
 // to create a defined number of documents.  The prefix is randomized so subsequent
 // runs do not collide.
 func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket string, items int) error {
-	pod := GetPod(t, k8s, cluster)
+	pod, err := GetPod(k8s, cluster)
+	if err != nil {
+		return err
+	}
 
 	cmd := []string{
 		"/opt/couchbase/bin/cbworkloadgen",
@@ -111,7 +114,7 @@ func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *api.Couch
 	defer cancel()
 
 	return retryutil.Retry(ctx, 10*time.Second, IntMax, func() (bool, error) {
-		client, cleanup := CreateAdminConsoleClient(t, k8s, cluster)
+		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
 		defer cleanup()
 
 		info, err := client.GetBucketStatus(bucket)

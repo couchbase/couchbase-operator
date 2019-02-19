@@ -78,9 +78,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket2["bucketName"])
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket3["bucketName"])
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 1, numOfDocs); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 1, numOfDocs)
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	eventingFuncName := "eventingFunc"
@@ -93,7 +91,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	defer cancel()
 	var responseData []byte
 	err := retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
-		eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
+		eventingHostUrl, eventingPortStr, cleanup := e2eutil.MustGetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
 		defer cleanup()
 		var err error
 		if responseData, err = e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc); err != nil {
@@ -143,14 +141,12 @@ func TestEventingResizeCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket2"]["bucketName"])
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs)
 
 	// Provide the pod index for the eventing node
 	// Here nonEventingNodes will be equal to eventing pod's index
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
-	eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
+	eventingHostUrl, eventingPortStr, cleanup := e2eutil.MustGetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
 	defer cleanup()
 
 	eventingFuncName := "eventingFunc"
@@ -171,7 +167,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan interface{})
 	dataInsertionError := make(chan error)
-	dataInsertionFunc := func(t *testing.T) {
+	go func() {
 		// Return an error here, don't call Fatal() as this will trigger a race condition
 		var err error
 	OuterLoop:
@@ -180,14 +176,13 @@ func TestEventingResizeCluster(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
 		}
 		dataInsertionError <- err
-	}
-	go dataInsertionFunc(t)
+	}()
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false
@@ -284,14 +279,12 @@ func TestEventingKillEventingPods(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket2"]["bucketName"])
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
 
-	if err := e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs)
 
 	// Provide the pod index for the eventing node
 	// Here nonEventingNodes will be equal to eventing pod's index
 	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
-	eventingHostUrl, eventingPortStr, cleanup := e2eutil.GetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
+	eventingHostUrl, eventingPortStr, cleanup := e2eutil.MustGetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
 	defer cleanup()
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
@@ -311,7 +304,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan interface{})
 	dataInsertionErr := make(chan error)
-	dataInsertionFunc := func(t *testing.T) {
+	go func() {
 		var err error
 	OuterLoop:
 		for {
@@ -319,14 +312,13 @@ func TestEventingKillEventingPods(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
 		}
 		dataInsertionErr <- err
-	}
-	go dataInsertionFunc(t)
+	}()
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false

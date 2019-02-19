@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -35,8 +34,8 @@ import (
 type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]int) bool
 
 // newClient returns a new Couchbase management client (internal not go SDK)
-func newClient(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
-	err, username, password := GetClusterAuth(t, kubeClient, cl.Namespace, cl.Spec.AuthSecret)
+func newClient(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
+	err, username, password := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.AuthSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +64,11 @@ func getFreePort() (string, error) {
 // forwardPort creates a local listener that forwards connections on to the specified
 // pod.  It returns a network adddress/port and a clean up function.  The port is random
 // so that multiple forwards can be active for the target port.
-func forwardPort(t *testing.T, k8s *types.Cluster, namespace, pod, port string) (string, func()) {
+func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(), error) {
 	// Allocate a free port to use
 	sport, err := getFreePort()
 	if err != nil {
-		t.Fatal(err)
+		return "", nil, err
 	}
 
 	pf := &portforward.PortForwarder{
@@ -89,64 +88,89 @@ func forwardPort(t *testing.T, k8s *types.Cluster, namespace, pod, port string) 
 		return true, nil
 	})
 	if err != nil {
-		Die(t, err)
+		return "", nil, err
 	}
 
 	// Analytics and eventing don't support persistent connections so we get a
 	// lot of "connection reset by peer" spam on the console.
 	portforward.Silent()
 
-	return sport, func() { pf.Close() }
+	return sport, func() { pf.Close() }, nil
 }
 
 // CreateAdminConsoleClient returns a client for interacting with the admin service of a cluster.
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func CreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (*cbmgr.Couchbase, func()) {
+func CreateAdminConsoleClient(k8s *types.Cluster, cluster *api.CouchbaseCluster) (*cbmgr.Couchbase, func(), error) {
 	// Create a port forward and get a host connection string
-	host, cleanup := GetAdminConsoleHostURL(t, k8s, cluster)
-
-	// Return a client proxying through the port forwarder.
-	client, err := newClient(t, k8s.KubeClient, cluster, []string{"http://" + host})
+	host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
 
+	// Return a client proxying through the port forwarder.
+	client, err := newClient(k8s.KubeClient, cluster, []string{"http://" + host})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return client, cleanup, nil
+}
+
+func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (*cbmgr.Couchbase, func()) {
+	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+	if err != nil {
+		Die(t, err)
+	}
 	return client, cleanup
 }
 
 // GetPod selects a random pod in the cluster.
-func GetPod(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) *corev1.Pod {
+func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster) (*corev1.Pod, error) {
 	// Grab the Couchbase service and use it to select the set of pods to connect to.
 	svc, err := k8s.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
-		Die(t, err)
+		return nil, err
 	}
 
 	selector := labels.SelectorFromSet(svc.Spec.Selector).String()
 	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
-		Die(t, err)
-		t.Fatal(err)
+		return nil, err
 	}
 
 	if len(pods.Items) == 0 {
-		Die(t, fmt.Errorf("no pods found"))
+		return nil, err
 	}
 
-	return &pods.Items[rand.Int()%len(pods.Items)]
+	return &pods.Items[rand.Int()%len(pods.Items)], nil
 }
 
 // GetAdminConsoleHostURL returns a URL for interacting with the admin service of a cluster.
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func GetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func()) {
+func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func(), error) {
 	// Forward port to a pod to the local host.  Pick a random pod this will prevent hangs
 	// if the pod we are always selecting isn't the one we need.
-	port, cleanup := forwardPort(t, k8s, cluster.Namespace, GetPod(t, k8s, cluster).Name, "8091")
-	return "127.0.0.1:" + port, cleanup
+	pod, err := GetPod(k8s, cluster)
+	if err != nil {
+		return "", nil, err
+	}
+	port, cleanup, err := forwardPort(k8s, cluster.Namespace, pod.Name, "8091")
+	if err != nil {
+		return "", nil, err
+	}
+	return "127.0.0.1:" + port, cleanup, nil
+}
+
+func MustGetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func()) {
+	url, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+	return url, cleanup
 }
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
@@ -198,8 +222,11 @@ func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 }
 
 // Inserts Json docs into couchbase bucket
-func InsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
-	client, cleanup := CreateAdminConsoleClient(t, k8s, cluster)
+func InsertJsonDocsIntoBucket(k8s *types.Cluster, cluster *api.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
+	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+	if err != nil {
+		return err
+	}
 	defer cleanup()
 
 	numOfDocs += docStartIndex
@@ -232,6 +259,12 @@ func InsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *api.Cou
 	return nil
 }
 
+func MustInsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) {
+	if err := InsertJsonDocsIntoBucket(k8s, cluster, bucketName, docStartIndex, numOfDocs); err != nil {
+		Die(t, err)
+	}
+}
+
 // Add a node to the cluster
 func AddNode(t *testing.T, client *cbmgr.Couchbase, services api.ServiceList, username, password, hostname string) error {
 	t.Logf("adding node: %s", hostname)
@@ -252,7 +285,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseClust
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	client, cleanup := CreateAdminConsoleClient(t, k8s, couchbase)
+	client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
 	defer cleanup()
 
 	member := MemberFromSpecProps(couchbase.Name, couchbase.Namespace, "", index)
@@ -265,7 +298,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseClust
 	// is not the best option here as it may error as the operator does things in the background
 	// affecting this.  The best option is to just check for the rebalance status to complete.
 	return retryutil.Retry(ctx, time.Second, IntMax, func() (bool, error) {
-		client, cleanup := CreateAdminConsoleClient(t, k8s, couchbase)
+		client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
 		defer cleanup()
 
 		info, err := client.ClusterInfo()

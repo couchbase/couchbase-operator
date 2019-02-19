@@ -61,7 +61,7 @@ func UpdateSecret(kubeClient kubernetes.Interface, namespace string, secret *v1.
 }
 
 // Use username and password from secret store
-func GetClusterAuth(t *testing.T, kubeClient kubernetes.Interface, namespace string, secretName string) (error, string, string) {
+func GetClusterAuth(kubeClient kubernetes.Interface, namespace string, secretName string) (error, string, string) {
 
 	var username string
 	var password string

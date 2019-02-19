@@ -768,7 +768,7 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.C
 
 RetryLabel:
 	for {
-		client, cleanup := CreateAdminConsoleClient(t, k8s, couchbase)
+		client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
 		defer cleanup()
 
 		progress := client.NewRebalanceProgress()

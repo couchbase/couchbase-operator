@@ -39,7 +39,7 @@ func TestEditServiceConfig(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
@@ -89,7 +89,7 @@ func TestNodeManualFailover(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create a client to admin console
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	// failover member
@@ -294,10 +294,10 @@ func TestRemoveForeignNode(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// create a client to admin console
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	err, username, password := e2eutil.GetClusterAuth(t, targetKube.KubeClient, f.Namespace, targetKube.DefaultSecret.Name)
+	err, username, password := e2eutil.GetClusterAuth(targetKube.KubeClient, f.Namespace, targetKube.DefaultSecret.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	e2eutil.MustVerifyClusterBalancedAndHealthy(t, client, time.Minute)
@@ -465,7 +465,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	}
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	// Manually failover nodes
@@ -549,7 +549,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	e2eutil.MustVerifyClusterBalancedAndHealthy(t, client, time.Minute)
@@ -621,7 +621,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	}
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, memberIdsToKillLen); err != nil {
@@ -721,7 +721,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	e2eutil.MustVerifyClusterBalancedAndHealthy(t, client, time.Minute)
@@ -806,7 +806,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	}
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	// Manually failover nodes
@@ -921,7 +921,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
@@ -1012,7 +1012,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	t.Logf("waiting for unhealthy nodes from cluster...")
@@ -1090,7 +1090,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)
 
-	client, cleanup := e2eutil.CreateAdminConsoleClient(t, targetKube, testCouchbase)
+	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
 	if err := e2eutil.WaitForUnhealthyNodes(t, client, 5, 1); err != nil {
