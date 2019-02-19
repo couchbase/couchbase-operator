@@ -286,37 +286,11 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *typ
 	cbPassword := "password"
 
 	e2eutil.CreateDestClusterReference(t, hostUrl, k8s2, xdcrCluster2, cbUsername, cbPassword)
-
-	errChan := make(chan error)
-	nodeDownFunc := func(nodeIndex int) {
-		// Kill first Pod of cluster-1
-		if err := e2eutil.KillPodForMember(k8s1.KubeClient, xdcrCluster1, nodeIndex); err != nil {
-			errChan <- err
-			return
-		}
-		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "MemberDown", nodeIndex)
-
-		event := e2eutil.NewMemberFailedOverEvent(xdcrCluster1, nodeIndex)
-		if err := e2eutil.WaitForClusterEvent(k8s1.KubeClient, xdcrCluster1, event, 2*time.Minute); err != nil {
-			errChan <- err
-			return
-		}
-		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "FailedOver", nodeIndex)
-
-		event = e2eutil.NewMemberAddEvent(xdcrCluster1, 5)
-		if err := e2eutil.WaitForClusterEvent(k8s1.KubeClient, xdcrCluster1, event, 2*time.Minute); err != nil {
-			errChan <- err
-			return
-		}
-		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", 5)
-		errChan <- nil
-	}
-
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
 
 	nodeToKill := 1
 	if triggerDuring == "duringXdcrSetup" {
-		go nodeDownFunc(nodeToKill)
+		e2eutil.MustKillPodForMember(t, k8s1, xdcrCluster1, nodeToKill, true)
 	}
 
 	if _, err := e2eutil.CreateXdcrBucketReplication(hostUrl, cbUsername, cbPassword, xdcrCluster2.Name, srcBucketName, destBucketName, versionType); err != nil {
@@ -326,16 +300,16 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *typ
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 10*time.Minute)
 
 	if triggerDuring == "afterXdcrSetup" {
-		go nodeDownFunc(nodeToKill)
-	}
-
-	if err := <-errChan; err != nil {
-		t.Fatal(err)
+		e2eutil.MustKillPodForMember(t, k8s1, xdcrCluster1, nodeToKill, true)
 	}
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
+	e2eutil.MustWaitClusterStatusHealthy(t, k8s1, xdcrCluster1, 5*time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 20, 10*time.Minute)
 
+	expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "MemberDown", nodeToKill)
+	expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "FailedOver", nodeToKill)
+	expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", 5)
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceStarted")
 	expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "MemberRemoved", nodeToKill)
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
