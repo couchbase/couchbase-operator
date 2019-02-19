@@ -25,7 +25,6 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestEditServiceConfig
-      - name: TestCreateClusterWithoutDataService
       - name: TestCreateClusterDataServiceNotFirst
       - name: TestRemoveLastDataService
       - name: TestSwapNodesBetweenServices

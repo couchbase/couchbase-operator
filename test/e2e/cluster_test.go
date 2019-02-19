@@ -25,40 +25,36 @@ import (
 // 3. After each resize make sure the cluster is balanced and available
 // 4. Check the events to make sure the operator took the correct actions
 func TestResizeCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	t.Logf("Creating New Couchbase Cluster...\n")
+	// Static configuration.
+	clusterSize := constants.Size1
+	serviceID := 0
+
+	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	// When the cluster is ready scale up to 3 nodes then down to 1 again.
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, targetKube, testCouchbase, 5*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	clusterSizes := []int{2, 3, 2, 1}
-	prevClusterSize := constants.Size1
-	for _, clusterSize := range clusterSizes {
-		service := 0
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
-
-		switch {
-		case clusterSize-prevClusterSize > 0:
-			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-		case clusterSize-prevClusterSize < 0:
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
-			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-		}
-		prevClusterSize = clusterSize
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Cluster scales up and down
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleDownSequence(1),
+		e2eutil.ClusterScaleDownSequence(1),
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Test scaling a cluster with no buckets up and down
@@ -67,40 +63,37 @@ func TestResizeCluster(t *testing.T) {
 // 3. After each resize make sure the cluster is balanced and available
 // 4. Check the events to make sure the operator took the correct actions
 func TestResizeClusterWithBucket(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	t.Logf("Creating New Couchbase Cluster...\n")
+	// Static configuration.
+	clusterSize := constants.Size1
+	serviceID := 0
+
+	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminHidden)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	// When the cluster is ready scale up to 3 nodes then down to 1 again.
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, targetKube, testCouchbase, 5*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
+	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	clusterSizes := []int{2, 3, 2, 1}
-	prevClusterSize := constants.Size1
-	for _, clusterSize := range clusterSizes {
-		service := 0
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
-
-		switch {
-		case clusterSize-prevClusterSize > 0:
-			expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize-1)
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-		case clusterSize-prevClusterSize < 0:
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddMemberRemoveEvent(testCouchbase, clusterSize)
-			expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-		}
-		prevClusterSize = clusterSize
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Cluster scales up and down
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleDownSequence(1),
+		e2eutil.ClusterScaleDownSequence(1),
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Tests editing of cluster settings
@@ -110,72 +103,55 @@ func TestResizeClusterWithBucket(t *testing.T) {
 // 4. Change search service memory quota from 256 to 257 ( verify via rest call to cluster)
 // 5. Change autofailover timeout from 30 to 31 ( verify via rest call to cluster)
 func TestEditClusterSettings(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := constants.Size1
+	newDataServiceMemQuota := uint64(257)
+	newIndexServiceMemQuota := uint64(257)
+	newSearchServiceMemQuota := uint64(257)
+	newAutoFailoverTimeout := uint64(31)
+	newIndexStorageSetting := "plasma"
+
+	// Create the cluster.
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
-		"service1": serviceConfig1}
+		"service1": serviceConfig1,
+	}
 
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	// create connection to couchbase nodes
+	// Runtime configuration
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	// edit cluster dataServiceMemQuota
-	newDataServiceMemQuota := uint64(257)
-	t.Log("Changing cluster data service mem quota")
+	// When ready change various cluster settings and ensure the changes are reflected
+	// in the Couchbase API.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/DataServiceMemQuota", newDataServiceMemQuota), time.Minute)
 	e2eutil.MustPatchCouchbaseInfo(t, client, jsonpatch.NewPatchSet().Test("/DataMemoryQuotaMB", newDataServiceMemQuota), time.Minute)
-	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
-
-	// edit cluster indexServiceMemQuota
-	newIndexServiceMemQuota := uint64(257)
-	t.Log("Changing cluster index service mem quota")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", newIndexServiceMemQuota), time.Minute)
 	e2eutil.MustPatchCouchbaseInfo(t, client, jsonpatch.NewPatchSet().Test("/IndexMemoryQuotaMB", newIndexServiceMemQuota), time.Minute)
-	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
-
-	// edit cluster searchServiceMemQuota
-	newSearchServiceMemQuota := uint64(257)
-	t.Log("Changing cluster search service mem quota")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/SearchServiceMemQuota", newSearchServiceMemQuota), time.Minute)
 	e2eutil.MustPatchCouchbaseInfo(t, client, jsonpatch.NewPatchSet().Test("/SearchMemoryQuotaMB", newSearchServiceMemQuota), time.Minute)
-	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "memory quota")
-
-	// edit cluster autoFailoverTimeout
-	newAutoFailoverTimeout := uint64(31)
-	t.Log("Changing cluster autofailover timeout")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoFailoverTimeout", newAutoFailoverTimeout), time.Minute)
 	e2eutil.MustPatchAutoFailoverInfo(t, client, jsonpatch.NewPatchSet().Test("/Timeout", newAutoFailoverTimeout), time.Minute)
-	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "autofailover")
-
-	// edit cluster indexStorageSetting
-	// TODO: Need to make the API version typed on the underlying library
-	newIndexStorageSetting := "plasma"
-	t.Log("Changing cluster index storage setting")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexStorageSetting", newIndexStorageSetting), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, client, jsonpatch.NewPatchSet().Test("/StorageMode", cbmgr.IndexStoragePlasma), time.Minute)
-	expectedEvents.AddClusterSettingsEditedEvent(testCouchbase, "index service")
-
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * All cluster edits are reported
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 5, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 
 }
 
@@ -830,32 +806,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
-}
-
-// Tests creating a cluster without data service
-// 1. Attempt to create cluster without data service
-// 2. Verify that the cluster could not be created
-func TestCreateClusterWithoutDataService(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"query", "index", "search"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1}
-
-	retries := &e2eutil.ClusterReadyRetries{
-		Size:    constants.Retries5,
-		Bucket:  constants.Retries1,
-		Service: constants.Retries1,
-	}
-	if _, err := e2eutil.NewClusterMultiQuick(t, targetKube, f.Namespace, configMap, constants.AdminHidden, retries); err == nil {
-		t.Fatalf("failed to reject cluster creation: %v", err)
-	}
 }
 
 // Tests creating a cluster where the data service is the second service listed in the spec

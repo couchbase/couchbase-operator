@@ -1,92 +1,82 @@
 package e2e
 
 import (
-	"os"
 	"strconv"
 	"testing"
 	"time"
 
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestPodResourcesBasic(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := 1
 	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
-	memReq := strconv.Itoa(int(0.7 * maxMem))
-	t.Logf("Mem Request: %s MB", memReq)
-	memLimit := strconv.Itoa(int(0.8 * maxMem))
-	t.Logf("Mem Limit: %s MB", memLimit)
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":               "1",
-		"name":               "test_config_1",
-		"services":           "data",
-		"resourceMemRequest": memReq,
-		"resourceMemLimit":   memLimit,
+	memReq := strconv.Itoa(int(0.7*maxMem)) + "Mi"
+	memLimit := strconv.Itoa(int(0.8*maxMem)) + "Mi"
+
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev1.PodPolicy{
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse(memReq),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse(memLimit),
+			},
+		},
 	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	t.Logf("Pod Policy Resource Memory Request=%sMB... \n Pod Policy Resource Memory Limit=%sMB... \n attempting to create 1 node cluster", memReq, memLimit)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestNegPodResourcesBasic(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := 1
 	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
-	memReq := strconv.Itoa(int(0.8 * maxMem))
-	t.Logf("Mem Request: %s MB", memReq)
-	memLimit := strconv.Itoa(int(0.7 * maxMem))
-	t.Logf("Mem Limit: %s MB", memLimit)
+	memReq := strconv.Itoa(int(0.8*maxMem)) + "Mi"
+	memLimit := strconv.Itoa(int(0.7*maxMem)) + "Mi"
 
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":               "1",
-		"name":               "test_config_1",
-		"services":           "data",
-		"resourceMemRequest": memReq,
-		"resourceMemLimit":   memLimit,
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev1.PodPolicy{
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse(memReq),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse(memLimit),
+			},
+		},
 	}
-
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-	}
-	t.Logf("Pod Policy Resource Memory Request=%sMB... \n Pod Policy Resource Memory Limit=%sMB... \n attempting to create 1 node cluster", memReq, memLimit)
-	cluster, err := e2eutil.NewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
-	if err != nil {
-		t.Fatalf("failed to create cluster")
-	}
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, cluster, 10*time.Minute)
-}
-
-func TestPodResourcesHigh(t *testing.T) {
-	t.Skip("test not fully implemented...")
-}
-
-func TestPodResourcesLow(t *testing.T) {
-	t.Skip("test not fully implemented...")
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 10*time.Minute)
 }
 
 // TestPodResourcesCannotBePlaced tests for additional pods failing creation due to
@@ -97,254 +87,155 @@ func TestPodResourcesLow(t *testing.T) {
 // 4. Try scaling up by one pod
 // 5. Expect to see an event indicating that pod creation failed
 func TestPodResourcesCannotBePlaced(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
 	minMem := e2eutil.MustGetMinNodeMem(t, targetKube)
-	reqMem := minMem * 0.9
-	scaleNum := e2eutil.MustGetMaxScale(t, targetKube, reqMem)
+	memoryRequest := 0.9 * minMem
+	memReq := strconv.Itoa(int(memoryRequest)) + "Mi"
+	clusterSize := e2eutil.MustGetMaxScale(t, targetKube, memoryRequest)
 
-	memReq := strconv.Itoa(int(reqMem))
-	t.Logf("Mem Request: %s MB", memReq)
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":               strconv.Itoa(scaleNum),
-		"name":               "test_config_1",
-		"services":           "data",
-		"resourceMemRequest": memReq,
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev1.PodPolicy{
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse(memReq),
+			},
+		},
 	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// When the cluster is ready, scale up, the node shouldn't be scheduled.
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), time.Minute)
+
+	// Check the events match what we expect:
+	// * N-1 members added
+	// * Final member fails to be created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
-
-	// Scale the cluster up to just below the memory threshold
-	t.Logf("Pod Policy Resource Memory Request=%s MB...\n Cluster Capacity=%d  \n scaling until pods cannot be placed", memReq, scaleNum)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-
-	// Add in a new node which should cause a memory allocation error
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleNum+1, targetKube, testCouchbase)
-
-	// Wait for the creation failure event to be raised
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, scaleNum), time.Minute)
-
-	// Check the event stream is as expected
-	expectedEvents := e2eutil.EventList{}
-	for i := 0; i < scaleNum; i++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, i)
-	}
-	if scaleNum > 1 {
-		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	}
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, scaleNum)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := 1
 	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
-	memReq := strconv.Itoa(2 * int(maxMem))
-	t.Logf("Mem Request: %s MB", memReq)
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":               "1",
-		"name":               "test_config_1",
-		"services":           "data",
-		"resourceMemRequest": memReq,
-	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-	}
-	t.Logf("Pod Policy Resource Memory Request=%sMB... \n attempting to create 1 pod cluster with max allocatable memory of %dMB", memReq, int(maxMem))
+	memReq := strconv.Itoa(int(2*maxMem)) + "Mi"
 
-	// Asynchronously create the cluster
-	cluster, err := e2eutil.NewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
-	if err != nil {
-		t.Fatalf("failed to create cluster")
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev1.PodPolicy{
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse(memReq),
+			},
+		},
 	}
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, cluster, 10*time.Minute)
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 10*time.Minute)
 }
 
 func TestAntiAffinityOn(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes := e2eutil.MustNumNodes(t, targetKube)
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":     strconv.Itoa(numNodes),
-		"name":     "test_config_1",
-		"services": "data"}
-	otherConfig1 := map[string]string{
-		"antiAffinity": "on",
-	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"other1":   otherConfig1,
-	}
-	t.Logf("AntiAffinity=on... \n attempting to create %d pod cluster with %d nodes", numNodes, numNodes)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
+	// Static configuration.
+	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 
-	expectedEvents := e2eutil.EventList{}
-	for i := 0; i < numNodes; i++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, i)
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.AntiAffinity = true
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	t.Logf("cluster created")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes := e2eutil.MustNumNodes(t, targetKube)
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":     strconv.Itoa(numNodes + 1),
-		"name":     "test_config_1",
-		"services": "data"}
-	otherConfig1 := map[string]string{
-		"antiAffinity": "on",
-	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"other1":   otherConfig1,
-	}
-	t.Logf("AntiAffinity=on... \n attempting to create %d pod cluster with %d nodes", numNodes+1, numNodes)
-	testCouchbase, err := e2eutil.NewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
-	if err != nil {
-		t.Fatalf("Failed to create cluster: %v", err)
-	}
+	// Static configuration.
+	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
 
-	expectedEvents := e2eutil.EventList{}
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.AntiAffinity = true
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
-	var memberId int
-	for memberId = 0; memberId < numNodes; memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 3*time.Minute)
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
+	// Wait for a healthy status.
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 10*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Repeat{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, memberId), 5*time.Minute)
-
-	t.Logf("Failed to add extra cluster node: %v", err)
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, memberId)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes := e2eutil.MustNumNodes(t, targetKube)
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":     strconv.Itoa(numNodes),
-		"name":     "test_config_1",
-		"services": "data"}
-	otherConfig1 := map[string]string{
-		"antiAffinity": "on",
+	// Static configuration.
+	clusterSize := e2eutil.MustNumNodes(t, targetKube)
+
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.AntiAffinity = true
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// When ready scale beyond the limits and wait for a failed creation.
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"other1":   otherConfig1,
-	}
-	t.Logf("AntiAffinity=on... \n attempting to create %d pod cluster with %d nodes", numNodes, numNodes)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	t.Logf("Cluster created")
-
-	expectedEvents := e2eutil.EventList{}
-	for i := 0; i < numNodes; i++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, i)
-	}
-
-	// For single node cluster
-	if numNodes > 1 {
-		expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	}
-
-	t.Logf("Attempting to add a node")
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, numNodes+1, targetKube, testCouchbase)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, numNodes), 5*time.Minute)
-	expectedEvents.AddMemberCreationFailedEvent(testCouchbase, numNodes)
-	t.Logf("Node not added")
-
-	t.Logf("Reverting add")
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, numNodes, targetKube, testCouchbase, 5*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestAntiAffinityOff(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	numNodes := e2eutil.MustNumNodes(t, targetKube)
-	scaleToNum := numNodes + 1
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":     strconv.Itoa(scaleToNum),
-		"name":     "test_config_1",
-		"services": "data"}
-	otherConfig1 := map[string]string{
-		"antiAffinity": "off",
+	// Static configuration.
+	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
+
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+
+	// Wait for a healthy status.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"other1":   otherConfig1,
-	}
-
-	t.Logf("AntiAffinity=off... \n attempting to create %d pod cluster with %d nodes", scaleToNum, numNodes)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
-	t.Logf("cluster created")
-
-	expectedEvents := e2eutil.EventList{}
-	for i := 0; i < scaleToNum; i++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, i)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	t.Logf("Attempting to add a node")
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaleToNum+1, targetKube, testCouchbase, 5*time.Minute)
-	t.Logf("Node added")
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, scaleToNum)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

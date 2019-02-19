@@ -204,6 +204,40 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 	return crd
 }
 
+func NewBasicClusterSpec(size int, bucket, console bool) *api.CouchbaseCluster {
+	bucketConfig := []api.BucketConfig{}
+	if bucket {
+		bucketSettings := api.BucketConfig(DefaultBucketSettings)
+		bucketSettings.BucketName = "default"
+		bucketConfig = []api.BucketConfig{bucketSettings}
+	}
+	spec := api.ClusterSpec{
+		BaseImage:       e2e_constants.CbServerBaseImage,
+		Version:         e2e_constants.CbServerVersion,
+		AuthSecret:      e2e_constants.KubeTestSecretName,
+		ClusterSettings: defaultClusterSettings,
+		BucketSettings:  bucketConfig,
+		ServerSettings: []api.ServerConfig{api.ServerConfig{
+			Size: size,
+			Name: "test_config_1",
+			Services: api.ServiceList{
+				api.DataService,
+				api.QueryService,
+				api.IndexService,
+			},
+		}},
+		ExposedFeatures: []string{},
+	}
+	crd := NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
+	if console {
+		crd.Spec.ExposeAdminConsole = true
+		crd.Spec.AdminConsoleServices = api.ServiceList{
+			api.DataService,
+		}
+	}
+	return crd
+}
+
 // NewSupportableClusterSpec returns a basic supportable cluster spec with a stateful and stateless
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
 func NewSupportableClusterSpec(size int) api.ClusterSpec {

@@ -186,13 +186,12 @@ func GetBucketConfigMap(bucketName, bucketType, ioPriority string, memQuotaInMB,
 	}
 }
 
-// newClusterFromSpecQuick creates a cluster and waits for various ready conditions.
-// Returns the cluster object regardless so we can test for error conditions
-func newClusterFromSpecQuick(t *testing.T, k8s *types.Cluster, namespace string, cluster *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
+// newClusterFromSpec creates a cluster and waits for various ready conditions.
+// Performs retries and garbage collection in the event of transient failure
+func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
 	// Create the cluster
-	var err error
-	if cluster, err = CreateCluster(t, k8s.CRClient, namespace, cluster); err != nil {
-		t.Logf("failed to create cluster")
+	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	if err != nil {
 		return nil, err
 	}
 
@@ -203,41 +202,40 @@ func newClusterFromSpecQuick(t *testing.T, k8s *types.Cluster, namespace string,
 	if len(buckets) > 0 {
 		err := WaitUntilBucketsExists(t, k8s.CRClient, buckets, retries.Bucket, cluster)
 		if err != nil {
-			t.Logf("failed to wait for bucket to exist")
 			return cluster, err
 		}
 	}
 	// Update the cluster status
 	updatedCluster, err := getClusterCRD(k8s.CRClient, cluster)
 	if err != nil {
-		t.Logf("failed to get updated cluster spec")
 		return cluster, err
 	}
 	return updatedCluster, nil
 }
 
-// newClusterFromSpec creates a cluster and waits for various ready conditions.
-// Performs retries and garbage collection in the event of transient failure
-func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
-	var err error
-	for i := 0; i < 1; i++ {
-		time.Sleep(10 * time.Second)
-
-		// Ensure we set the err variable in the main scope
-		var cluster *api.CouchbaseCluster
-		cluster, err = newClusterFromSpecQuick(t, k8s, namespace, clusterSpec, retries)
-		if err != nil {
-			t.Logf("failed to create cluster from spec")
-			if cluster != nil {
-				t.Logf("deleting failed cluster")
-				DeleteCluster(t, k8s.CRClient, k8s.KubeClient, cluster, 5)
-			}
-			continue
-		}
-
-		return cluster, nil
+func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) *api.CouchbaseCluster {
+	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	if err != nil {
+		Die(t, err)
 	}
-	return nil, err
+	return cluster
+}
+
+func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+	// Create the cluster
+	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	if err != nil {
+		return nil, err
+	}
+	return cluster, nil
+}
+
+func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) *api.CouchbaseCluster {
+	cluster, err := NewClusterFromSpecAsync(t, k8s, namespace, clusterSpec)
+	if err != nil {
+		Die(t, err)
+	}
+	return cluster
 }
 
 // Creates Cluster Spec object and returns it
@@ -296,20 +294,6 @@ func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace
 func CreateClusterFromSpecNoWait(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	return CreateCluster(t, k8s.CRClient, namespace, crd)
-}
-
-// NewClusterBasicQuick attempts to create a basic cluster only once.  The returned
-// cluster object may still be valid upon error
-func NewClusterBasicQuick(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster("test-couchbase-", k8s.DefaultSecret.Name, size, withBucket, exposed)
-	return newClusterFromSpecQuick(t, k8s, namespace, clusterSpec, retries)
-}
-
-// NewClusterMultiQuick attempts to create a multi cluster only once.  The returned
-// cluster object may still be valid upon error
-func NewClusterMultiQuick(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, exposed)
-	return newClusterFromSpecQuick(t, k8s, namespace, clusterSpec, retries)
 }
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and

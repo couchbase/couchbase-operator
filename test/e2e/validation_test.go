@@ -414,6 +414,12 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers.size in body should be greater than or equal to 1"},
 		},
+		{
+			name:           "TestNoDataService",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", []api.ServerConfig{{Name: "test", Size: 1, Services: api.ServiceList{api.IndexService}}}),
+			shouldFail:     true,
+			expectedErrors: []string{`at least one "data" service in spec.servers[*].services is required`},
+		},
 
 		// ServerGroups list validation
 		{

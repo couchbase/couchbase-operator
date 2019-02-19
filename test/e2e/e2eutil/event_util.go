@@ -381,6 +381,20 @@ func ClusterScaleUpSequence(size int) eventschema.Validatable {
 	}
 }
 
+// ClusterScaleDownSequence is a common function for generating cluster scaling down events.
+func ClusterScaleDownSequence(size int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Repeat{
+				Times:     size,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
+
 // PodDownFailoverRecoverySequence is a common function for generating down/failover/recovery events.
 func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
