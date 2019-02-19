@@ -1,8 +1,11 @@
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"testing"
 
@@ -191,8 +194,9 @@ func runSuite(t *testing.T) {
 			testFunc = DecoratorFuncMap["recoverDecorator"](testFunc, decoratorArgs)
 
 			if testFunc != nil {
+				preGoroutines := runtime.NumGoroutine()
 				testPassed := t.Run(testName, testFunc)
-				fmt.Printf("  TestPassed: %v\n", testPassed)
+				postGoroutines := runtime.NumGoroutine()
 
 				// Detect couchbase-operator crash / restart event
 				for _, cluster := range f.TestClusters {
@@ -205,6 +209,22 @@ func runSuite(t *testing.T) {
 						t.Logf("Cluster %v restart count was %d and now is %d", cluster, operatorRestartCount[cluster], currRestartCount)
 						operatorRestartCount[cluster] = currRestartCount
 					}
+				}
+
+				// Give real time feedback ...
+				if testPassed {
+					fmt.Println("PASS")
+				} else {
+					fmt.Println("FAIL")
+				}
+
+				// If this triggers, your test is broken, fix it
+				if preGoroutines != postGoroutines {
+					fmt.Println("WARN: goroutine leak detected:", preGoroutines, "vs", postGoroutines)
+					trace := &bytes.Buffer{}
+					profile := pprof.Lookup("goroutine")
+					profile.WriteTo(trace, 2)
+					fmt.Println(string(trace.Bytes()))
 				}
 
 				// Collect logs if test fails
