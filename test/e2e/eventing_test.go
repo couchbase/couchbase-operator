@@ -167,8 +167,10 @@ func TestEventingResizeCluster(t *testing.T) {
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan interface{})
 	dataInsertionError := make(chan error)
-	go func() {
-		// Return an error here, don't call Fatal() as this will trigger a race condition
+
+	// Clone the cluster here to avoid read/write races
+	// Don't not use any Must* calls as it will cause a hang
+	go func(cluster *api.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -176,13 +178,13 @@ func TestEventingResizeCluster(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
 		}
 		dataInsertionError <- err
-	}()
+	}(testCouchbase.DeepCopy())
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false
@@ -235,7 +237,10 @@ func TestEventingResizeCluster(t *testing.T) {
 		prevClusterSize = clusterSize
 	}
 
-	// Stop the insertion and wait for it to exit, checking for any errors encountered
+	// To stop background data insertion and wait for function to complete.
+	// Wait for a short while so that the load generator has a chance to successfully
+	// commit documents to only pods that exist now.
+	time.Sleep(10 * time.Second)
 	close(stopDataInsertion)
 	stopped = true
 	if err := <-dataInsertionError; err != nil {
@@ -304,7 +309,10 @@ func TestEventingKillEventingPods(t *testing.T) {
 	// Code to insert data in parallel with cluster resize
 	stopDataInsertion := make(chan interface{})
 	dataInsertionErr := make(chan error)
-	go func() {
+
+	// Clone the cluster here to avoid read/write races
+	// Don't not use any Must* calls as it will cause a hang
+	go func(cluster *api.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -312,13 +320,13 @@ func TestEventingKillEventingPods(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, testCouchbase, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
 		}
 		dataInsertionErr <- err
-	}()
+	}(testCouchbase.DeepCopy())
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false
@@ -346,6 +354,10 @@ func TestEventingKillEventingPods(t *testing.T) {
 		newMemberToBeAdded++
 	}
 
+	// To stop background data insertion and wait for function to complete.
+	// Wait for a short while so that the load generator has a chance to successfully
+	// commit documents to only pods that exist now.
+	time.Sleep(10 * time.Second)
 	close(stopDataInsertion)
 	stopped = true
 	if err := <-dataInsertionErr; err != nil {

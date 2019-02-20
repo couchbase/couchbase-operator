@@ -185,7 +185,9 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	numOfType1Docs := 0
 	numOfType2Docs := 0
 
-	go func() {
+	// Clone the cluster here to avoid read/write races
+	// Don't not use any Must* calls as it will cause a hang
+	go func(cluster *api.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -198,7 +200,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 				if numOfDocs%2 != 0 {
 					docType = "type2"
 				}
-				if err = insertAnalyticsDocument(targetKube, testCouchbase, bucketName, docID, docType); err != nil {
+				if err = insertAnalyticsDocument(targetKube, cluster, bucketName, docID, docType); err != nil {
 					break
 				}
 				if numOfDocs%2 == 0 {
@@ -210,7 +212,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 			}
 		}
 		dataInsertionErrChan <- err
-	}()
+	}(testCouchbase.DeepCopy())
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false
@@ -244,11 +246,14 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
-	// To stop background data insertion and wait for function to complete
+	// To stop background data insertion and wait for function to complete.
+	// Wait for a short while so that the load generator has a chance to successfully
+	// commit documents to only pods that exist now.
+	time.Sleep(10 * time.Second)
 	close(stopDataInsertionChan)
 	stopped = true
 	if err := <-dataInsertionErrChan; err != nil {
-		t.Fatal(err)
+		e2eutil.Die(t, err)
 	}
 
 	// Verify total docs in data sets
@@ -256,7 +261,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	dataSetDocCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
 	for index, datasetName := range datasetNames {
 		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, datasetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], constants.Retries10); err != nil {
-			t.Fatal(err)
+			e2eutil.Die(t, err)
 		}
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -345,7 +350,9 @@ func TestAnalyticsKillPods(t *testing.T) {
 	numOfType1Docs := 0
 	numOfType2Docs := 0
 
-	go func() {
+	// Clone the cluster here to avoid read/write races
+	// Don't not use any Must* calls as it will cause a hang
+	go func(cluster *api.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -358,7 +365,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 				if numOfDocs%2 != 0 {
 					docType = "type2"
 				}
-				if err = insertAnalyticsDocument(targetKube, testCouchbase, bucketName, docID, docType); err != nil {
+				if err = insertAnalyticsDocument(targetKube, cluster, bucketName, docID, docType); err != nil {
 					break
 				}
 				if numOfDocs%2 == 0 {
@@ -370,7 +377,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 			}
 		}
 		dataInsertionErrChan <- err
-	}()
+	}(testCouchbase.DeepCopy())
 
 	// Ensure the routine is shut down properly in the event of a fatality.
 	stopped := false
@@ -412,11 +419,14 @@ func TestAnalyticsKillPods(t *testing.T) {
 		newMemberIdToBeAdded++
 	}
 
-	// To stop background data insertion and wait for function to complete
+	// To stop background data insertion and wait for function to complete.
+	// Wait for a short while so that the load generator has a chance to successfully
+	// commit documents to only pods that exist now.
+	time.Sleep(10 * time.Second)
 	close(stopDataInsertionChan)
 	stopped = true
 	if err := <-dataInsertionErrChan; err != nil {
-		t.Fatal(err)
+		e2eutil.Die(t, err)
 	}
 
 	// Verify document counts for each dataset in analytics bucket

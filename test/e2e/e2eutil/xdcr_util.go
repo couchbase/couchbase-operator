@@ -16,7 +16,6 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
@@ -70,32 +69,40 @@ func FlushBucket(hostUrl, bucketName, hostUsername, hostPassword string) ([]byte
 	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
 }
 
-// PopulateBucket selects a random pod from the cluster and then uses cbworkloadgen
+// PopulateBucket selects a random pod from the cluster and then uses the API
 // to create a defined number of documents.  The prefix is randomized so subsequent
-// runs do not collide.
+// runs do not collide.  Documents are inserted one at a time, so we can keep a count
+// of exactly how many were successfully committed.
 func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket string, items int) error {
-	pod, err := GetPod(k8s, cluster)
-	if err != nil {
-		return err
-	}
+	document := RandomSuffix()
+	for i := 0; i < items; i++ {
+		callback := func() (bool, error) {
+			host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
+			if err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+			defer cleanup()
 
-	cmd := []string{
-		"/opt/couchbase/bin/cbworkloadgen",
-		"-n", "127.0.0.1:8091",
-		"-u", constants.CbClusterUsername,
-		"-p", constants.CbClusterPassword,
-		"-b", bucket,
-		"-j",
-		"-i", strconv.Itoa(items),
-		"--prefix", RandomSuffix(),
-	}
-	stdout, stderr, err := ExecCommandInPod(k8s, cluster.Namespace, pod.Name, cmd...)
-	if err != nil {
-		t.Logf("Error: %v", err)
-		t.Logf("Command: %s", cmd)
-		t.Logf("stdout: %s", stdout)
-		t.Logf("stderr: %s", stderr)
-		return err
+			// Note: I tried using cbworkloadgen, however it does die half way through, so say you
+			// want to add 10 docs, and it does 7, if you retry you end up with 17, which is not
+			// what we want from a test stability perspective!
+			uri := "http://" + host + "/pools/default/buckets/" + bucket + "/docs/" + document + strconv.Itoa(i)
+			values := url.Values{}
+			values.Add(`flags`, `24`)
+			values.Add(`value`, `{"key":"value"}`)
+
+			if _, err := GenerateHttpRequest("POST", uri, "Administrator", "password", strings.NewReader(values.Encode())); err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+			return true, nil
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+
+		if err := retryutil.Retry(ctx, 5*time.Second, IntMax, callback); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -153,28 +160,48 @@ func GetRemoteUuid(hostUrl, cbUsername, cbPassword string) (uuid string, err err
 
 // CreateDestClusterReference polls the destination cluster to discover the node port of a pod and uses that to
 // initialize connection on the source cluster.
-func CreateDestClusterReference(t *testing.T, host string, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, username, password string) {
-	// List the pods on the remote cluster and pick one
-	selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster.Name)).String()
-	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(pods.Items) == 0 {
-		t.Fatal("no pods listed")
-	}
-	pod := pods.Items[0]
+func CreateDestClusterReference(k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev1.CouchbaseCluster, username, password string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
 
-	// Make the request
-	values := url.Values{}
-	values.Add("uuid", cluster.Status.ClusterID)
-	values.Add("name", cluster.Name)
-	values.Add("hostname", pod.Status.HostIP+":"+strconv.Itoa(int(cluster.Status.ExposedPorts[pod.Name].AdminServicePort)))
-	values.Add("username", username)
-	values.Add("password", password)
+	callback := func() (bool, error) {
+		// List the pods on the remote cluster and pick one
+		selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(dst.Name)).String()
+		pods, err := k8sDst.KubeClient.CoreV1().Pods(dst.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		if len(pods.Items) == 0 {
+			return false, retryutil.RetryOkError(fmt.Errorf("no pods listed"))
+		}
+		pod := pods.Items[0]
 
-	if _, err := GenerateHttpRequest("POST", "http://"+host+"/pools/default/remoteClusters", username, password, strings.NewReader(values.Encode())); err != nil {
-		t.Fatal(err)
+		host, cleanup, err := GetAdminConsoleHostURL(k8sSrc, src)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		// Make the request
+		values := url.Values{}
+		values.Add("uuid", dst.Status.ClusterID)
+		values.Add("name", dst.Name)
+		values.Add("hostname", pod.Status.HostIP+":"+strconv.Itoa(int(dst.Status.ExposedPorts[pod.Name].AdminServicePort)))
+		values.Add("username", username)
+		values.Add("password", password)
+
+		if _, err := GenerateHttpRequest("POST", "http://"+host+"/pools/default/remoteClusters", username, password, strings.NewReader(values.Encode())); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	}
+
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, callback)
+}
+
+func MustCreateDestClusterReference(t *testing.T, k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev1.CouchbaseCluster, username, password string) {
+	if err := CreateDestClusterReference(k8sSrc, k8sDst, src, dst, username, password); err != nil {
+		Die(t, err)
 	}
 }
 
@@ -200,18 +227,35 @@ func DeleteXdcrClusterReferences(hostUrl, hostUsername, hostPassword string, xdc
 	return err
 }
 
-func CreateXdcrBucketReplication(hostUrl, hostUsername, hostPassword, remoteClusterName, fromBucketName, destBucketName, versionType string) ([]byte, error) {
-	// curl -v -X POST -u Administrator:password http://192.168.99.100:32589/controller/createReplication -d fromBucket=default
-	//  -d toCluster=test-couchbase-zcrxp -d toBucket=default  -d replicationType=continuous
-	fromBucketName = "fromBucket=" + fromBucketName
-	remoteClusterName = "toCluster=" + remoteClusterName
-	destBucketName = "toBucket=" + destBucketName
-	replicationType := "replicationType=continuous"
-	versionType = "type=" + versionType
+func CreateXdcrBucketReplication(k8s *types.Cluster, src, dst *api.CouchbaseCluster, username, password, srcbucket, dstBucket string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
 
-	hostUrl = "http://" + hostUrl + "/controller/createReplication"
-	reqParamList := []string{fromBucketName, remoteClusterName, destBucketName, replicationType, versionType}
-	reqParams := strings.NewReader(strings.Join(reqParamList, "&"))
+	values := url.Values{}
+	values.Add("fromBucket", srcbucket)
+	values.Add("toCluster", dst.Name)
+	values.Add("toBucket", dstBucket)
+	values.Add("versionType", "xmem")
+	values.Add("replicationType", "continuous")
 
-	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, reqParams)
+	callback := func() (bool, error) {
+		host, cleanup, err := GetAdminConsoleHostURL(k8s, src)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		if _, err := GenerateHttpRequest("POST", "http://"+host+"/controller/createReplication", username, password, strings.NewReader(values.Encode())); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	}
+
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, callback)
+}
+
+func MustCreateXdcrBucketReplication(t *testing.T, k8s *types.Cluster, src, dst *api.CouchbaseCluster, username, password, srcbucket, dstBucket string) {
+	if err := CreateXdcrBucketReplication(k8s, src, dst, username, password, srcbucket, dstBucket); err != nil {
+		Die(t, err)
+	}
 }
