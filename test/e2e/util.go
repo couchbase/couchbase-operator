@@ -83,6 +83,7 @@ var (
 		"TestValidationDelete":                                TestValidationDelete,
 		"TestNegValidationDelete":                             TestNegValidationDelete,
 		"TestTaintK8SNodeAndRemoveTaint":                      TestTaintK8SNodeAndRemoveTaint,
+		"TestDenyCommunityEdition":                            TestDenyCommunityEdition,
 
 		// System testing cases
 		"TestFeaturesAll": TestFeaturesAll,
@@ -312,4 +313,12 @@ func RemoveServerGroupLabelFromNodes(t *testing.T, clusterInfoList []framework.C
 		}
 	}
 	return err
+}
+
+// skipEnterpriseOnlyPlatform skips the test if it's Enterprise Edition only e.g.
+// RedHat Openshift, as it doesn't have community edition binaries.
+func skipEnterpriseOnlyPlatform(t *testing.T) {
+	if framework.Global.PlatformType == "openshift" {
+		t.Skip("unsupported on platform")
+	}
 }

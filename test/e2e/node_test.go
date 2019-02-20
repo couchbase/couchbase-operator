@@ -19,6 +19,28 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
+// TestDenyCommunityEdition tries installing with a CE version of Couchbase server
+// and expects it not to work.
+func TestDenyCommunityEdition(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Don't run this on Openshift etc. as there is no community edition.
+	skipEnterpriseOnlyPlatform(t)
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.Version = constants.CommunityEditionVersion
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
+
+	// Expect the cluster to enter a failed state
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 5*time.Minute)
+}
+
 // Tests editing service spec
 // 1. Create 1 node cluster with single service spec
 // 2. Update service spec size from 1 to 2 (verify via rest call to cluster)

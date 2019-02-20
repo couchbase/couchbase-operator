@@ -511,6 +511,21 @@ func (c *CouchbaseClient) ClusterUUID(m *Member) (string, error) {
 	return uuid, err
 }
 
+// IsEnterprise returns whether the member is Couchbase Enterprise Edition or not.
+func (c *CouchbaseClient) IsEnterprise(m *Member) (bool, error) {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+
+	var err error
+	var isEnterprise bool
+	err = retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "is enterprise", c.clusterName, func() error {
+		isEnterprise, err = c.client.IsEnterprise()
+		return err
+	})
+
+	return isEnterprise, err
+}
+
 func (c *CouchbaseClient) GetClusterStatus(ms MemberSet) (*ClusterStatus, error) {
 	status := &ClusterStatus{}
 	if err := c.UpdateClusterStatus(ms, status); err != nil {

@@ -12,6 +12,7 @@ tcGroups:
       - name: TestResizeClusterWithBucket
       - name: TestEditClusterSettings
       - name: TestBasicMDSScaling
+      - name: TestDenyCommunityEdition
 
   - name: BucketTests
     clusters:

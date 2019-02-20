@@ -5,6 +5,13 @@ import (
 	util_const "github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
+const (
+	// CommunityEditionVersion is a version of CE that exists.  Sadly we have to
+	// hard code this (not do a regex replace) as this only gets major releases,
+	// mo minors or patches.
+	CommunityEditionVersion = "community-6.0.0"
+)
+
 // These values can be updated from e2espec/crd.go
 var (
 	CbServerBaseImage = "couchbase/server"

@@ -177,6 +177,16 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 	c.client.SetUUID("")
 	defer c.client.SetUUID(c.status.ClusterID)
 
+	// Check the pod is EE
+	isEnterprise, err := c.client.IsEnterprise(newMember)
+	if err != nil {
+		return nil, err
+	}
+	if !isEnterprise {
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
+		return nil, fmt.Errorf("couchbase server reports community edition")
+	}
+
 	// Enable TLS if requested
 	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
