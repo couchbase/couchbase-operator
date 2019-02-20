@@ -136,6 +136,14 @@ func (c *Cluster) logFailedMember(name string) {
 
 // Create a new Couchbase cluster member
 func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Member, err error) {
+	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
+	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("PodCreateTimeout improperly formatted: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
+	defer cancel()
+
 	// Allocate an index to be used in the name.  Get the current index then increment
 	// and commit back to etcd.  That way we are guaranteed to never have conflicting
 	// names
@@ -156,12 +164,12 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 		}
 	}()
 
-	if err := c.createPod(newMember, serverSpec); err != nil {
+	if err := c.createPod(ctx, newMember, serverSpec); err != nil {
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
 
 	// Synchronize on pod creation and service availability
-	if err := c.waitForCreatePod(newMember); err != nil {
+	if err := c.waitForCreatePod(ctx, newMember); err != nil {
 		// We will delete the pod on error, so collect any ephemeral debug we can before
 		// discarding it forever.  This will capture errors such as users specifying the
 		// wrong image name (pull error), PVCs taking an age to become bound etc.
@@ -188,7 +196,7 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 	}
 
 	// Enable TLS if requested
-	if err := c.initMemberTLS(newMember, c.cluster.Spec); err != nil {
+	if err := c.initMemberTLS(ctx, newMember, c.cluster.Spec); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		return nil, err
 	}
@@ -508,7 +516,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 }
 
 // Initialize a member with TLS certificates
-func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) error {
+func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs api.ClusterSpec) error {
 	if cs.TLS != nil {
 		// Static configuration:
 		// * Upload the cluster CA certifcate
@@ -556,8 +564,6 @@ func (c *Cluster) initMemberTLS(m *couchbaseutil.Member, cs api.ClusterSpec) err
 			//}
 
 			// Wait for the port to come backup with the correct certificate chain
-			ctx, cancel := context.WithTimeout(c.ctx, 60*time.Second)
-			defer cancel()
 			if err := netutil.WaitForHostPortTLS(ctx, m.HostURL(), ca); err != nil {
 				return err
 			}

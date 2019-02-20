@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
@@ -39,7 +38,6 @@ const (
 var (
 	defaultSecurityContextUid          int64 = 1000
 	defaultSecurityContextRunAsNonRoot bool  = true
-	defaultVolumeCreateTimeout         int64 = 120
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -269,8 +267,6 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 	}
 
 	// wait for claim to be created before allowing it to be mounted by pod
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(defaultVolumeCreateTimeout)*time.Second)
-	defer cancel()
 	err = WaitForPersistentVolumeClaim(ctx, kubeCli, namespace, pvc.Name)
 	if err != nil {
 		return nil, err

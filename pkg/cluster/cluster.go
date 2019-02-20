@@ -479,10 +479,10 @@ func (c *Cluster) isSecureClient() bool {
 	return c.cluster.Spec.TLS.IsSecureClient()
 }
 
-func (c *Cluster) createPod(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
+func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 	version := c.cluster.Spec.Version
 	c.logger.Infof("Creating a pod (%s) running Couchbase %s", m.Name, version)
-	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, c.ctx)
+	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, ctx)
 	return err
 }
 
@@ -517,21 +517,24 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 	if err != nil {
 		return err
 	}
-	err = c.createPod(m, *config)
-	if err != nil {
-		return err
-	}
-	return c.waitForCreatePod(m)
-}
 
-// wait with context
-func (c *Cluster) waitForCreatePod(member *couchbaseutil.Member) error {
+	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
 		return fmt.Errorf("PodCreateTimeout improperly formatted: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
 	defer cancel()
+
+	err = c.createPod(ctx, m, *config)
+	if err != nil {
+		return err
+	}
+	return c.waitForCreatePod(ctx, m)
+}
+
+// wait with context
+func (c *Cluster) waitForCreatePod(ctx context.Context, member *couchbaseutil.Member) error {
 	if err := k8sutil.WaitForPod(ctx, c.config.KubeCli, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
 		return err
 	}
