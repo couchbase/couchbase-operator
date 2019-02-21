@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +18,7 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -27,6 +27,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -133,53 +134,16 @@ func startTimeoutTimer() {
 	}()
 }
 
-func CreateDeploymentObject(operatorImageName string, restPort int32) (deployment *v1beta1.Deployment, err error) {
-	deploymentSpecContent, err := ioutil.ReadFile(runtimeParams.DeploymentSpec)
-	if err != nil {
-		return
-	}
+func CreateDeploymentObject(operatorImageName string, restPort int32) (deployment *appsv1.Deployment, err error) {
+	deployment = config.GetOperatorDeployment(operatorImageName, dockerPullSecretName)
 
-	deserializer := scheme.Codecs.UniversalDeserializer()
-	obj, _, err := deserializer.Decode([]byte(deploymentSpecContent), nil, nil)
-	if err != nil {
-		return
-	}
+	// Enable CRD auto-creation.
+	deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--create-crd")
 
-	deployment, ok := obj.(*v1beta1.Deployment)
-	if !ok {
-		errMsg := "File " + runtimeParams.DeploymentSpec + " does not define a deployment"
-		err = errors.New(errMsg)
-		return
-	}
-
-	// set operator image from env var
-	if operatorImageName != "" {
-		deployment.Spec.Template.Spec.Containers[0].Image = operatorImageName
-	}
-
-	// set ServiceAccountName if default is not being used for testing
-	if runtimeParams.ServiceAccountName != "" {
-		deployment.Spec.Template.Spec.ServiceAccountName = runtimeParams.ServiceAccountName
-	}
-
-	// If using private repos add in the pull secret
-	if runtimeParams.DockerServer != "" {
-		deployment.Spec.Template.Spec.ImagePullSecrets = []v1.LocalObjectReference{
-			{Name: dockerPullSecretName},
-		}
-	}
-
-	// set given rest port as the readiness-port in deployment spec
-	for index, containers := range deployment.Spec.Template.Spec.Containers {
-		if containers.Image == operatorImageName {
-			deployment.Spec.Template.Spec.Containers[index].ReadinessProbe.HTTPGet.Port = intstr.FromInt(int(restPort))
-			// if given rest port is not a default one, include '-listen-addr' as operator's arg list
-			if restPort != constants.OperatorRestPort {
-				listerAddrArg := "-listen-addr=0.0.0.0:" + strconv.Itoa(int(restPort))
-				deployment.Spec.Template.Spec.Containers[index].Args = append(deployment.Spec.Template.Spec.Containers[index].Args, listerAddrArg)
-			}
-		}
-	}
+	// Manually set the HTTP port.
+	listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(int(restPort))
+	deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
+	deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(int(restPort))
 	return
 }
 
@@ -536,7 +500,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 }
 
 func (f *Framework) SetupCouchbaseOperator(targetKube *types.Cluster) error {
-	if _, err := targetKube.KubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(f.Deployment); err != nil {
+	if _, err := targetKube.KubeClient.AppsV1().Deployments(f.Namespace).Create(f.Deployment); err != nil {
 		return err
 	}
 	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, constants.CouchbaseOperatorLabel)
@@ -571,7 +535,7 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
 	err := retryutil.Retry(e2eutil.Context, 5*time.Second, 24, func() (bool, error) {
-		_, err := kubeClient.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+		_, err := kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return false, err
 		}
@@ -590,7 +554,7 @@ func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace s
 	deletePropagation := metav1.DeletePropagationForeground
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
-	if err := kubeClient.ExtensionsV1beta1().Deployments(namespace).Delete(deploymentName, deleteOpts); err != nil {
+	if err := kubeClient.AppsV1().Deployments(namespace).Delete(deploymentName, deleteOpts); err != nil {
 		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}

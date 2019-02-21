@@ -1,0 +1,130 @@
+= About cbopcfg
+:tabs:
+
+`cbopcfg` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package].
+It is used to generate resource configuration to quickly configure and run the Operator.
+
+The `cbopcfg` is not intended to allow configuration of every aspect of the Operator.
+We provide xref:helm-setup-guide.adoc[Helm] charts to allow more complex deployment scenarios.
+
+== Installation
+
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package] and unpacked it.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
+
+[{tabs}]
+====
+macOS::
++
+--
+. Open a Terminal window and go to the directory where the `cbopcfg` binary is located:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
+----
+
+. Make the `cbopcfg` binary executable:
++
+[source,console]
+----
+chmod +x ./cbopcfg
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+sudo mv ./cbopcfg /usr/local/bin/cbopcfg
+----
+--
+
+Linux::
++
+--
+. Open a command prompt and go to the directory where the `cbopcfg` binary is located:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
+----
+
+. Make the `cbopcfg` binary executable:
++
+[source,console]
+----
+chmod +x ./cbopcfg
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+sudo mv ./cbopcfg /usr/local/bin/cbopcfg
+----
+--
+
+Windows::
++
+--
+. Open a command prompt and go to the directory where the `cbopcfg` binary is located:
++
+[source,console]
+----
+cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
+----
+
+. Add the `cbopcfg` binary into your PATH.
+--
+====
+
+=== Options
+
+--namespace <string>::
+If specified this will override the default namespace `default`.
+
+--operator-image <string>::
+If specified this will override the default operator image `couchbase/operator:${version}`.
+
+--dynamic-admission-controller-image <string>::
+If specified this will override the default admission controller image `couchbase/admission-controller:${version}`.
+
+--image-pull-secret <string>::
+If specified this will add the image pull secret name to all deployments.
+This is required when pulling images from private container repositories such as the RedHat container registry.
+
+--no-operator::
+If specified the command will not emit operator configuration.
+
+--no-admission::
+If specified the command will not emit admission controller configuration.
+
+--file::
+If specified individual YAML files are created rather than all output going to the console.
+
+== Examples
+
+To create configuration to run the operator in the `default` namespace.
+
+[source,console]
+----
+cbopcfg | kubectl create -f -
+----
+
+To create a configuration file:
+
+[source,console]
+----
+cbopcfg > operator.yaml
+----
+
+To create configuration to run on RedHat Openshift:
+
+[source,console]
+----
+cbopcfg --namespace myproject \
+  --operator-image registry.connect.redhat.com/couchbase/operator:1.2.0-1 \
+  --dynamic-admission-controller-image registry.connect.redhat.com/couchbase/admission-controller:1.2.0-1 \
+  --image-pull-secret my-redhat-docker-credentials > operator.yaml
+----

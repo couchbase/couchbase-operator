@@ -13,9 +13,6 @@ admission-controller-image: couchbase/couchbase-operator-admission:v1
 # Cluster namespace to run the tests
 namespace: default
 
-# Deployment yaml file path
-deployment-spec: ../../example/deployment.yaml
-
 # cluster config file path
 cluster-config: resources/cluster_conf.yaml
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // Main framework structure
@@ -13,7 +13,7 @@ type Framework struct {
 	// CbopinfoPath is the absolute path to the cbopinfo binary
 	CbopinfoPath    string
 	OpImage         string
-	Deployment      *v1beta1.Deployment
+	Deployment      *appsv1.Deployment
 	Namespace       string
 	KubeType        string
 	KubeVersion     string
@@ -74,7 +74,6 @@ type TestRunParam struct {
 	CbServerImgVer           string `yaml:"cbServerImageVersion"`
 	CbServerImgVerUpgrade    string `yaml:"cbServerImageVersionUpgrade"`
 	SuiteToRun               string `yaml:"suite"`
-	DeploymentSpec           string `yaml:"deployment-spec"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`

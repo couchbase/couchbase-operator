@@ -13,13 +13,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,13 +167,13 @@ func CreateK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) e
 }
 
 func RemoveClusterRole(kubeClient kubernetes.Interface, roleName string) error {
-	clusterRoleList, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
+	clusterRoleList, err := kubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for _, clusterRole := range clusterRoleList.Items {
 		if clusterRole.GetName() == roleName {
-			kubeClient.RbacV1beta1().ClusterRoles().Delete(roleName, &metav1.DeleteOptions{})
+			kubeClient.RbacV1().ClusterRoles().Delete(roleName, &metav1.DeleteOptions{})
 			err = WaitForClusterRoleDeleted(kubeClient, roleName, 30)
 			if err != nil {
 				return err
@@ -202,13 +203,13 @@ func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAcc
 }
 
 func RemoveClusterRoleBinding(kubeClient kubernetes.Interface, namespace, clusterRoleBindingName string) error {
-	clusterRoleBindingList, err := kubeClient.RbacV1beta1().ClusterRoleBindings().List(metav1.ListOptions{})
+	clusterRoleBindingList, err := kubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for _, clusterRoleBinding := range clusterRoleBindingList.Items {
 		if clusterRoleBinding.GetName() == clusterRoleBindingName {
-			kubeClient.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, &metav1.DeleteOptions{})
+			kubeClient.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, &metav1.DeleteOptions{})
 			err = WaitForClusterRoleBindingDeleted(kubeClient, clusterRoleBindingName, 30)
 			if err != nil {
 				return err
@@ -268,48 +269,9 @@ func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) erro
 		return nil
 	}
 
-	policyRule1 := rbacv1.PolicyRule{
-		APIGroups: []string{"couchbase.com"},
-		Resources: []string{"couchbaseclusters"},
-		Verbs:     []string{"*"},
-	}
-
-	policyRule2 := rbacv1.PolicyRule{
-		APIGroups: []string{"storage.k8s.io"},
-		Resources: []string{"storageclasses"},
-		Verbs:     []string{"get"},
-	}
-
-	policyRule3 := rbacv1.PolicyRule{
-		APIGroups: []string{"apiextensions.k8s.io"},
-		Resources: []string{"customresourcedefinitions"},
-		Verbs:     []string{"*"},
-	}
-
-	policyRule4 := rbacv1.PolicyRule{
-		APIGroups: []string{""},
-		Resources: []string{"pods", "pods/exec", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes", "events", "secrets"},
-		Verbs:     []string{"*"},
-	}
-
-	policyRule5 := rbacv1.PolicyRule{
-		APIGroups: []string{"apps"},
-		Resources: []string{"deployments"},
-		Verbs:     []string{"*"},
-	}
-
-	policyRule6 := rbacv1.PolicyRule{
-		APIGroups: []string{"policy"},
-		Resources: []string{"poddisruptionbudgets"},
-		Verbs:     []string{"*"},
-	}
-
-	clusterRoleSpec := &rbacv1.ClusterRole{
-		TypeMeta:   metav1.TypeMeta{Kind: "ClusterRole", APIVersion: "rbac.authorization.k8s.io/v1beta1"},
-		ObjectMeta: metav1.ObjectMeta{Name: roleName},
-		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3, policyRule4, policyRule5, policyRule6},
-	}
-	_, err := kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
+	clusterRoleSpec := config.GetOperatorClusterRole()
+	clusterRoleSpec.Name = roleName
+	_, err := kubeClient.RbacV1().ClusterRoles().Create(clusterRoleSpec)
 	return err
 }
 
@@ -321,33 +283,20 @@ func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceA
 		return nil
 	}
 	// Create service account given by the name
-	serviceAccountSpec := &v1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{Name: serviceAccountName, Namespace: namespace},
-	}
+	serviceAccountSpec := config.GetOperatorServiceAccount()
+	serviceAccountSpec.Name = serviceAccountName
 	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccountSpec)
 	return err
 }
 
 func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
-	clusterRoleBindingName := clusterRoleName + "-" + namespace
-	if err := RemoveClusterRoleBinding(kubeClient, namespace, clusterRoleBindingName); err != nil {
+	if err := RemoveClusterRoleBinding(kubeClient, namespace, clusterRoleName); err != nil {
 		return err
 	}
 
-	clusterRoleBindingSubjects := []rbacv1.Subject{
-		rbacv1.Subject{
-			Kind:      "ServiceAccount",
-			Name:      clusterRoleName,
-			Namespace: namespace,
-		},
-	}
-
-	clusterRoleBindingSpec := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleBindingName},
-		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: clusterRoleName},
-		Subjects:   clusterRoleBindingSubjects,
-	}
-	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	clusterRoleBindingSpec := config.GetOperatorClusterRoleBinding(Global.Namespace)
+	clusterRoleBindingSpec.Name = clusterRoleName
+	_, err := kubeClient.RbacV1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
 	return err
 }
 
@@ -477,7 +426,7 @@ func WaitForClusterRoleDeleted(kubeClient kubernetes.Interface, roleName string,
 			return errors.New("Timed out waiting for role to be delete: " + roleName)
 
 		case <-tickChan:
-			clusterRoleList, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
+			clusterRoleList, err := kubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -528,7 +477,7 @@ func WaitForClusterRoleBindingDeleted(kubeClient kubernetes.Interface, clusterRo
 			return errors.New("Timed out waiting for cluster role binding to be delete: " + clusterRoleBindingName)
 
 		case <-tickChan:
-			clusterRoleBindingList, err := kubeClient.RbacV1beta1().ClusterRoleBindings().List(metav1.ListOptions{})
+			clusterRoleBindingList, err := kubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -597,7 +546,7 @@ func RecreateClusterRolesEtcd(kubeClient kubernetes.Interface) error {
 		ObjectMeta: metav1.ObjectMeta{Name: "etcd-operator"},
 		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3, policyRule4, policyRule5},
 	}
-	_, err := kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
+	_, err := kubeClient.RbacV1().ClusterRoles().Create(clusterRoleSpec)
 	return err
 }
 
@@ -624,7 +573,7 @@ func RecreateClusterRoleBindingsEtcd(kubeClient kubernetes.Interface, namespace 
 			Name:     clusterRoleName},
 		Subjects: clusterRoleBindingSubjects,
 	}
-	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	_, err := kubeClient.RbacV1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
 	return err
 }
 
@@ -656,7 +605,7 @@ func RecreateClusterRolesPortworx(kubeClient kubernetes.Interface) error {
 		ObjectMeta: metav1.ObjectMeta{Name: "node-get-put-list-role"},
 		Rules:      []rbacv1.PolicyRule{policyRule1, policyRule2, policyRule3},
 	}
-	_, err := kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
+	_, err := kubeClient.RbacV1().ClusterRoles().Create(clusterRoleSpec)
 	return err
 }
 
@@ -683,7 +632,7 @@ func RecreateClusterRoleBindingsPortworx(kubeClient kubernetes.Interface) error 
 			Name:     clusterRoleName},
 		Subjects: clusterRoleBindingSubjects,
 	}
-	_, err := kubeClient.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	_, err := kubeClient.RbacV1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
 	return err
 }
 

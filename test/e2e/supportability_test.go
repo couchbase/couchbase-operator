@@ -29,8 +29,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -214,11 +214,11 @@ func verifyLogCollectListJson(kubeClient kubernetes.Interface, namespace, cbClus
 // Function to populate deployment file list
 func getDeployementFileList(kubeClient kubernetes.Interface, namespace, deploymentDir string, fileList *[]string, allFlag bool) error {
 	var err error
-	var deployments *v1beta1.DeploymentList
+	var deployments *appsv1.DeploymentList
 	if allFlag {
-		deployments, err = kubeClient.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
+		deployments, err = kubeClient.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
 	} else {
-		deployments, err = kubeClient.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+		deployments, err = kubeClient.AppsV1().Deployments(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	}
 	if err != nil {
 		return errors.New("Failed to list deployments: " + err.Error())
@@ -1152,7 +1152,7 @@ func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName s
 	}
 
 	t.Logf("Deploying operator using image '%s' and port %d", imageName, port)
-	if _, err := kubeClient.ExtensionsV1beta1().Deployments(f.Namespace).Create(deployment); err != nil {
+	if _, err := kubeClient.AppsV1().Deployments(f.Namespace).Create(deployment); err != nil {
 		return err
 	}
 	if err := e2eutil.WaitUntilOperatorReady(kubeClient, f.Namespace, constants.CouchbaseOperatorLabel); err != nil {

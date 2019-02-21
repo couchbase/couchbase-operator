@@ -32,7 +32,7 @@ To create the cluster role for the Operator, run the following command:
 
 [source,console]
 ----
-kubectl create -f cluster-role.yaml
+kubectl create -f operator-cluster-role.yaml
 ----
 
 NOTE: This cluster role only needs to be created once.
@@ -55,7 +55,7 @@ To assign the cluster role to the service account:
 kubectl create clusterrolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount default:couchbase-operator
 ----
 
-NOTE: If you would prefer to use a _role binding_ instead of a cluster role binding, then the CRD needs to be installed separately from the Operator. This can be accomplished by removing the `-create-crd` argument from the `operator.yaml` file and uploading the CRD separately.
+NOTE: If you would prefer to use a _role binding_ instead of a cluster role binding, then the CRD needs to be installed separately from the Operator. This can be accomplished by removing the `-create-crd` argument from the `operator-deployment.yaml` file and uploading the CRD separately.
 
 == Create the Operator
 
@@ -63,10 +63,10 @@ Now that the service account is set up with the appropriate permissions, you can
 
 [source,console]
 ----
-kubectl create -f operator.yaml
+kubectl create -f operator-deployment.yaml
 ----
 
-Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
+Running this command downloads the Operator Docker image (specified in the `operator-deployment.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
 
 After you run the `kubectl create` command, it generally takes less than a minute for Kubernetes to deploy the Operator and for the Operator to be ready to run.
 
@@ -76,7 +76,7 @@ You can use the following command to check on the status of the deployment:
 
 [source,console]
 ----
-kubectl get deployments -l app=couchbase-operator
+kubectl get deployments
 ----
 
 If you run the this command immediately after the Operator is deployed, the output will look something like the following:

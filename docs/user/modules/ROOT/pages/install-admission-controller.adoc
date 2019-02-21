@@ -72,6 +72,12 @@ The admission controller is supported on Kubernetes 1.11.0+ and OpenShift 3.11.0
 Before you can deploy the admission controller, you must download and unpack the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package] on the same computer where you normally run `kubectl` or `oc`.
 Contained in this package are a set of YAML files that define the admission controller.
 
+[NOTE]
+====
+The admission controller is only deployed once for the whole Kubernetes cluster.
+If the following installation steps fail, you can verify the admission controller is already installed and working by <<test-controller,testing it>>.
+====
+
 Use the following steps to deploy the the admission controller:
 
 [{tabs}]

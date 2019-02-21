@@ -80,7 +80,7 @@ To create the cluster role for the Operator, run the following command as the `s
 
 [source,console]
 ----
-oc create -f cluster-role-sa.yaml
+oc create -f operator-cluster-role.yaml
 ----
 
 NOTE: You only need to create the cluster role once.
@@ -148,10 +148,10 @@ At this point you can now use the `developer` user to create the Operator in the
 ----
 oc logout
 oc login -u developer
-oc create -f operator.yaml -n operator-example-namespace
+oc create -f operator-deployment.yaml -n operator-example-namespace
 ----
 
-Running this command downloads the Operator Docker image (specified in the `operator.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
+Running this command downloads the Operator Docker image (specified in the `operator-deployment.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
 
 After you run the `oc create` command, it generally takes less than a minute for OpenShift to deploy the Operator and for the Operator to be ready to run.
 
@@ -283,7 +283,7 @@ oc logout
 # them to the service and user accounts
 oc login -u ${ADMIN_ACCOUNT}
 oc create -f crd.yaml
-oc create -f cluster-role-sa.yaml
+oc create -f operator-cluster-role.yaml
 oc create -f cluster-role-user.yaml
 oc create clusterrolebinding ${OPERATOR_CLUSTER_ROLE_BINDING} --clusterrole ${OPERATOR_CLUSTER_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT}
 oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
@@ -300,7 +300,7 @@ oc secrets add serviceaccount/default secrets/rh-catalog --for=pull
 
 # Deploy the Operator as an unprivileged user
 oc login -u ${USER_ACCOUNT}
-oc create -f operator.yaml -n ${NAMESPACE}
+oc create -f operator-deployment.yaml -n ${NAMESPACE}
 oc logout
 ----
 
