@@ -69,9 +69,10 @@ The admission controller is supported on Kubernetes 1.11.0+ and OpenShift 3.11.0
 
 == Deploying the Admission Controller
 
-Before you can deploy the admission controller, you must download and unpack the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package] on the same computer where you normally run `kubectl` or `oc`. Contained in this package are a set of YAML files that define the admission controller.
+Before you can deploy the admission controller, you must download and unpack the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package] on the same computer where you normally run `kubectl` or `oc`.
+Contained in this package are a set of YAML files that define the admission controller.
 
-To begin using the admission controller there are YAML files defined in the Operator https://www.couchbase.com/downloads[package].
+Use the following steps to deploy the the admission controller:
 
 [{tabs}]
 ====
@@ -97,9 +98,15 @@ kubectl create -f admission.yaml
 [source,console]
 ----
 kubectl get deployments
+----
++
+[source,console]
+----
 NAME                           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator-admission   1         1         1            1           1m
 ----
+
+. <<test-controller,Test the admission controller>> to see if it successfully rejects invalid CouchbaseCluster resources.
 --
 
 OpenShift::
@@ -131,9 +138,56 @@ oc create -f admission.yaml
 [source,console]
 ----
 oc get deployments
+----
++
+[source,console]
+----
 NAME                           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 couchbase-operator-admission   1         1         1            1           1m
 ----
+
+.Enable webhook plug-ins
+Before the admission controller can start intercepting requests made to the master API, you need to enable the mutating webhook and validating webhook https://docs.openshift.com/container-platform/latest/architecture/additional_concepts/admission_controllers.html[plug-ins] in the master configuration file of your OpenShift cluster.
+
+. Open the master configuration file for your OpenShift cluster: `/etc/origin/master/master-config.yaml`.
++
+(It's recommended that you make a backup of this file before making edits.)
+
+. Locate (or create) the the top-level `admissionConfig.pluginConfig` element and add the `MutatingAdmissionWebhook` and `ValidatingAdmissionWebhook` stanzas as follows:
++
+[source,yaml]
+----
+admissionConfig:
+  pluginConfig:
+   MutatingAdmissionWebhook:
+     configuration:
+       apiVersion: v1
+       disable: false
+       kind: DefaultAdmissionConfig
+   ValidatingAdmissionWebhook:
+     configuration:
+       apiVersion: v1
+       disable: false
+       kind: DefaultAdmissionConfig
+----
+
+. Save your changes and close the file.
+
+. Restart the master for the changes to take effect:
++
+[source,console]
+----
+master-restart api
+----
++
+For rpm-based installs, use the Ansible playbook to restart the api server:
++
+[source,console]
+----
+ansible-playbook  playbooks/openshift-master/restart.yml
+----
+
+. <<test-controller,Test the admission controller>> to see if it successfully rejects invalid CouchbaseCluster resources.
 --
 ====
 
@@ -147,13 +201,13 @@ The admission controller certificate issuer's CA certificate is defined in each 
 All certificates and keys are base64 encoded in the YAML definitions.
 ====
 
+[#test-controller]
 === Testing the Admission Controller
 
-It is important that the dynamic admission controller is working.
-In order to verify functionality edit the `couchbase-cluster.yaml` file distributed with the Operator package.
-Change the bucket type in the example from `couchbase` to `memcached`.
+It's important to check that the dynamic admission controller is working.
+A good way to verify functionality is to submit an invalid CouchbaseCluser configuration and see if the admission controller intercepts and rejects it.
 
-First ensure that the CouchbaseCluster custom resource definition is installed:
+First ensure that the CouchbaseCluster custom resource definition (CRD) is installed:
 
 [{tabs}]
 ====
@@ -176,9 +230,8 @@ oc create -f crd.yaml
 --
 ====
 
-Create the `CouchbaseCluster` resource.
-If the admission controller is not correctly installed this operation will succeed.
-If correctly installed you will see something similar to the following:
+Next, open the `couchbase-cluster.yaml` file that's provided with the Operator package and change the bucket type in the example from `couchbase` to `memcached`.
+Use the edited file to create the `CouchbaseCluster` resource:
 
 [{tabs}]
 ====
@@ -188,12 +241,6 @@ Kubernetes::
 [source,console]
 ----
 kubectl create -f couchbase-cluster.yaml
-Error from server: error when creating "couchbase-cluster.yaml": admission webhook "couchbase-operator-admission.default.svc" denied the request: validation failure list:
-secret cb-example-auth must exist
-replicas in spec.buckets[0] must be of type nil: "Bucket type is memcached"
-conflictResolution in spec.buckets[0] must be of type nil: "Bucket type is memcached"
-evictionPolicy in spec.buckets[0] must be of type nil: "Bucket type is memcached"
-ioPriority in spec.buckets[0] must be of type nil: "Bucket type is memcached"
 ----
 --
 
@@ -203,6 +250,15 @@ OpenShift::
 [source,console]
 ----
 oc create -f couchbase-cluster.yaml
+----
+--
+====
+
+If the admission controller isn't correctly installed, this operation will _succeed_.
+If correctly installed, you will see something similar to the following:
+
+[source,console]
+----
 Error from server: error when creating "couchbase-cluster.yaml": admission webhook "couchbase-operator-admission.default.svc" denied the request: validation failure list:
 secret cb-example-auth must exist
 replicas in spec.buckets[0] must be of type nil: "Bucket type is memcached"
@@ -210,8 +266,6 @@ conflictResolution in spec.buckets[0] must be of type nil: "Bucket type is memca
 evictionPolicy in spec.buckets[0] must be of type nil: "Bucket type is memcached"
 ioPriority in spec.buckets[0] must be of type nil: "Bucket type is memcached"
 ----
---
-====
 
 [#rbac-considerations]
 == RBAC Considerations
