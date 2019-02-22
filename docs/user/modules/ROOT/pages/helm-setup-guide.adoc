@@ -53,7 +53,12 @@ For development environments, the Couchbase Cluster Chart is available to help y
 === Deploying for Development (Quick Start)
 
 To quickly deploy the admission controller and Operator, as well as a Couchbase Server cluster for development purposes:
-
++
+[{tabs}]
+====
+Kubernetes::
++
+--
 . Add the chart repository to `helm`:
 +
 [source,console]
@@ -74,6 +79,65 @@ helm install couchbase/couchbase-operator
 ----
 helm install couchbase/couchbase-cluster
 ----
+--
+
+OpenShift::
++
+--
+. Add the chart repository to `helm`:
++
+[source,console]
+----
+helm repo add couchbase https://couchbase-partners.github.io/helm-charts/
+----
+
+. Create an imagePullSecret for retrieving images from openshift registry:
++
+[source,console]
+----
+oc create secret docker-registry rh-catalog \
+  --docker-server=registry.connect.redhat.com \
+  --docker-username=<rhel-username> \
+  --docker-password=<rhel-password> \
+  --docker-email=<docker-email>
+----
+
+. Create a file named `openshift_values.yaml` with the following values to customize the Oprator Chart:
++
+[source,yaml]
+----
+couchbaseOperator:
+  image:
+    repository: registry.connect.redhat.com/couchbase/operator
+    tag: 1.2.0-DP-3
+  imagePullSecrets:
+  - rh-catalog
+admissionController:
+  image:
+    repository: registry.connect.redhat.com/couchbase/admission-controller
+    tag: 1.2.0-DP-3
+  imagePullSecrets:
+  - rh-catalog
+----
+
+. Install the Operator Chart using override values from previous step:
++
+[source,console]
+----
+helm install -f openshift_values.yaml couchbase/couchbase-operator
+----
+
+. Install the Couchbase Cluster Chart with images from redhat registry:
++
+[source,console]
+----
+helm install \
+  --set couchbaseCluster.baseImage=registry.connect.redhat.com/couchbase/server \
+  --set  couchbaseCluster.version=5.5.3-3 \
+  couchbase/couchbase-cluster
+----
+====
+
 
 [#deploy-production]
 === Deploying for Production
