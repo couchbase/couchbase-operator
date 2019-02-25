@@ -17,38 +17,72 @@ The key distinction is that cluster-scoped roles can be specified once and used 
 The Couchbase Autonomous Operator is currently scoped to a namespace and needs access to various resources within that namespace in order to function correctly. The resources required by the Operator are:
 
 customresourcedefinitions::
-The Operator has the ability to automatically install the custom resource definition (CRD) (defining the `CouchbaseCluster` resource type).  This is a cluster-level operation. For more information, refer to the xref:operator-config.adoc[Operator configuration documentation].
+The Operator has the ability to automatically install the custom resource definition (CRD) (defining the `CouchbaseCluster` resource type).
+This is a cluster-level operation.
+For more information, refer to the xref:operator-config.adoc[Operator configuration documentation].
++
+_Required Permissions_: `get`, `create`
 
 couchbaseclusters::
-The Operator watches for changes to cluster resources and preforms the necessary steps to create a cluster according to the configuration that is defined in the cluster specification.
+The Operator lists available Couchbase clusters to manage, watches for changes to cluster resources and preforms the necessary steps to create a cluster according to the configuration that is defined in the cluster specification.
+The operator also updates the couchbase cluster status to reflect cluster state.
++
+_Required Permissions_: `get`, `list`, `watch`, `update`
 
 pods::
 The Operator needs to be able to create and delete pods to deploy and scale the Couchbase Server cluster, as well as perform auto-healing activities.
++
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
+
+pods/exec::
+The operator needs access to execute commands on Couchbase Server pods in order to flag that the pod is ready.
+This allows orchestration of xref:upgrading-kubernetes.adoc[automatic Kubernetes upgrades].
++
+_Required Permissions_: `create`
 
 services::
 The Operator needs to create services in order to generate DNS names that are used to address pods, as well as create SRV records for service discovery.
++
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 endpoints::
 The Operator creates an endpoint resource in order to ensure that no more than one instance is managing clusters at any one time.
++
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 events::
 The Operator will raise xref:conditions-and-events.adoc[events] that are associated with a `CouchbaseCluster` resource, which can be used to synchronize external operations or raise alerts.
++
+_Required Permissions_: `create`, `patch`
 
 secrets::
 The Operator consumes cluster passwords and private keys from secrets.  Secrets can be securely managed by a separate user from that which is controlling the cluster, giving isolation for security compliance purposes.
++
+_Required Permissions_: `get`
 
 persistentvolumeclaims::
 The Operator needs to be able to claim persistent volumes when server pods are using the persistent storage option.
++
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 persistentvolumes::
-The Operator needs to be able to monitor the status of a persistent volume claim.
+The Operator needs to be able to monitor the status of a persistent volume before monitoring the status of a persistent volume claim.  The persisten volume is required to derive the availability zone of a pod when using xref:server-groups.adoc[server groups].
++
+_Required Permissions_: `get`, `watch`
 
 storageclasses::
 The Operator needs to verify that the requested storage class exists before claiming a persistent volume.
++
+_Required Permissions_: `get`
+
+poddisruptionbudgets::
+The Operator need to be able to create and update pod disruption budgets to allow orchestration of xref:upgrading-kubernetes.adoc[automatic Kubernetes upgrades].
++
+_Required Permissions_: `get`, `create`, `delete`
 
 [source,yaml]
 ----
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: couchbase-operator
@@ -58,19 +92,23 @@ rules:
   resources:
   - couchbaseclusters
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - update
 - apiGroups:
   - storage.k8s.io
   resources:
   - storageclasses
   verbs:
-  - "get"
+  - get
 - apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
   verbs:
-  - "*"
+  - get
+  - create
 - apiGroups:
   - ""
   resources:
@@ -78,23 +116,47 @@ rules:
   - services
   - endpoints
   - persistentvolumeclaims
-  - events
-  - secrets
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
 - apiGroups:
   - ""
   resources:
   - persistentvolumes
   verbs:
-  - "get"
-  - "watch"
+  - get
+  - watch
 - apiGroups:
-  - apps
+  - ""
   resources:
-  - deployments
+  - events
   verbs:
-  - "*"
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - create
+  - delete
 ----
 
 TIP: You may improve security and resilience by running the Operator and the Couchbase Server clusters in an isolated namespace. This will restrict the resources that the Operator potentially has access to to only those that are defined in that namespace. The `NetworkPolicy` resource can also be used to restrict access to the clusters at the network level.

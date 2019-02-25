@@ -55,7 +55,10 @@ func GetOperatorClusterRole() *rbacv1.ClusterRole {
 					couchbasev1.CRDResourcePlural,
 				},
 				Verbs: []string{
-					"*",
+					"get",    // used by the operator to update status.
+					"list",   // used by the operator-sdk to discover couchbase clusters.
+					"watch",  // used by the operator-sdk to monitor changes.
+					"update", // used by the operator to update status.
 				},
 			},
 			{
@@ -66,7 +69,7 @@ func GetOperatorClusterRole() *rbacv1.ClusterRole {
 					"storageclasses",
 				},
 				Verbs: []string{
-					"get",
+					"get", // used by the operator to confirm existence and binding mode.
 				},
 			},
 			{
@@ -77,7 +80,8 @@ func GetOperatorClusterRole() *rbacv1.ClusterRole {
 					"customresourcedefinitions",
 				},
 				Verbs: []string{
-					"*",
+					"get",    // used by the operator to monitor for installation (optional).
+					"create", // used by the operator for auto installation (optional).
 				},
 			},
 			{
@@ -86,16 +90,28 @@ func GetOperatorClusterRole() *rbacv1.ClusterRole {
 				},
 				Resources: []string{
 					"pods",
-					"pods/exec",
 					"services",
 					"endpoints",
 					"persistentvolumeclaims",
-					"persistentvolumes",
-					"events",
-					"secrets",
 				},
 				Verbs: []string{
-					"*",
+					"get",    // used by the operator to get specific resources.
+					"list",   // used by the operator to list all resources.
+					"watch",  // used by the operator to monitor changes to resources (pods, pvcs only).
+					"create", // used by the operator to create resources.
+					"update", // used by the operator to modify resources.
+					"delete", // used by the operator to delete resources.
+				},
+			},
+			{
+				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"pods/exec",
+				},
+				Verbs: []string{
+					"create", // used by the operator to signify readiness.
 				},
 			},
 			{
@@ -106,28 +122,46 @@ func GetOperatorClusterRole() *rbacv1.ClusterRole {
 					"persistentvolumes",
 				},
 				Verbs: []string{
-					"get",
-					"watch",
+					"get",   // used by the operator to lookup availability zone.
+					"watch", // used by the operator to monitor changes.
 				},
 			},
 			{
 				APIGroups: []string{
-					"apps",
+					"",
 				},
 				Resources: []string{
-					"deployments",
+					"events",
 				},
 				Verbs: []string{
-					"*",
+					"create", // used by the operator to create events.
+					"patch",  // used by client-go to create and update events.
 				},
 			},
 			{
 				APIGroups: []string{
-					"policy"},
+					"",
+				},
 				Resources: []string{
-					"poddisruptionbudgets"},
+					"secrets",
+				},
 				Verbs: []string{
-					"*"},
+					"get", // used by the operator to get cluster and TLS secrets.
+				},
+			},
+			// Require read/write of pod disruption budgets.
+			{
+				APIGroups: []string{
+					"policy",
+				},
+				Resources: []string{
+					"poddisruptionbudgets",
+				},
+				Verbs: []string{
+					"get",    // used by the operator to get pod disruption budgets.
+					"create", // used by the operator to create pod disruption budgets.
+					"delete", // used by the operator to delete pod disruption budgets.
+				},
 			},
 		},
 	}
