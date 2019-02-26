@@ -14,6 +14,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -247,7 +248,8 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 
 	// storage class must exist
 	sc, err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName)
-	if err != nil {
+
+	if err != nil && !k8errors.IsForbidden(err) {
 		return nil, err
 	}
 
@@ -259,10 +261,12 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 		return nil, err
 	}
 
-	// return if volumes will be bound after Pod creation
-	if bindMode := sc.VolumeBindingMode; bindMode != nil {
-		if *bindMode == storage.VolumeBindingWaitForFirstConsumer {
-			return pvc, nil
+	// check storageclass to discover if volumes should be bound after Pod creation
+	if sc != nil {
+		if bindMode := sc.VolumeBindingMode; bindMode != nil {
+			if *bindMode == storage.VolumeBindingWaitForFirstConsumer {
+				return pvc, nil
+			}
 		}
 	}
 
