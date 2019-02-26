@@ -149,7 +149,7 @@ couchbaseCluster:
 Install the cluster chart using the custom value file:
 [source,console]
 ----
-helm install -f values-persistent.yaml helm/couchbase-operator
+helm install -f values-persistent.yaml couchbase/couchbase-cluster
 ----
 
 
@@ -254,5 +254,5 @@ couchbaseTLS:
 
 [source, console]
 ----
-helm install  -f values-tls.yaml helm/couchbase-operator
+helm install  -f values-tls.yaml couchbase/couchbase-cluster
 ----
