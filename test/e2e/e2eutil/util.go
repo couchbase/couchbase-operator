@@ -1184,3 +1184,20 @@ func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, membe
 		Die(t, err)
 	}
 }
+
+// MustDeletePodServices deletes all services in the cluster namespace that
+// belong to individual pods.
+func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster) {
+	selector := constants.CouchbaseServerPodLabelStr + couchbase.Name
+	services, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		Die(t, err)
+	}
+	for _, service := range services.Items {
+		if strings.HasSuffix(service.Name, "-exposed-ports") {
+			if err := DeleteService(k8s.KubeClient, service.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
+				Die(t, err)
+			}
+		}
+	}
+}

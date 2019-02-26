@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -393,26 +392,8 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, k8s1, k8s2 *
 	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", api.AdminService, api.DataService, api.IndexService)
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
-	errChan := make(chan error)
-	serviceKillFunc := func() {
-		services, err := k8s1.KubeClient.CoreV1().Services(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + xdcrCluster1.Name})
-		if err != nil {
-			errChan <- err
-			return
-		}
-		for _, service := range services.Items {
-			if strings.HasSuffix(service.Name, "-exposed-ports") {
-				if err := e2eutil.DeleteService(k8s1.KubeClient, f.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
-					errChan <- err
-					return
-				}
-			}
-		}
-		errChan <- nil
-	}
-
 	if triggerDuring == "duringXdcrSetup" {
-		go serviceKillFunc()
+		e2eutil.MustDeletePodServices(t, k8s1, xdcrCluster1)
 	}
 
 	e2eutil.MustCreateDestClusterReference(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, cbUsername, cbPassword)
@@ -421,11 +402,7 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, k8s1, k8s2 *
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, destBucketName, 10, 10*time.Minute)
 
 	if triggerDuring == "afterXdcrSetup" {
-		go serviceKillFunc()
-	}
-
-	if err := <-errChan; err != nil {
-		t.Fatalf("Failed to remove Xdcr services: %s", err.Error())
+		e2eutil.MustDeletePodServices(t, k8s1, xdcrCluster1)
 	}
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, srcBucketName, 10)
