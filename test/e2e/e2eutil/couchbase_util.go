@@ -298,7 +298,10 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseClust
 	// is not the best option here as it may error as the operator does things in the background
 	// affecting this.  The best option is to just check for the rebalance status to complete.
 	return retryutil.Retry(ctx, time.Second, IntMax, func() (bool, error) {
-		client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
 		defer cleanup()
 
 		info, err := client.ClusterInfo()
