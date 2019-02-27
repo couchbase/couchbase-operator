@@ -74,6 +74,11 @@ tcGroups:
       - name: TestTlsGenerateWrongCACertType
       - name: TestTLSRotateCAAndScale
       - name: TestTLSRotateCAAndKillOperator
+
+  - name: SupportableTlsTests
+    clusters:
+      - NewCluster1
+    testcases:
       - name: TestTLSRotateCAKillPodAndKillOperator
 
   - name: XdcrCases
