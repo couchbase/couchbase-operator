@@ -27,7 +27,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create cluster spec for RZA feature
-	clusterSize := 9
+	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 	bucketName := "testBucket"
 	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
@@ -72,7 +72,13 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	podMembersToKill := []int{2, 5, 8}
+	victimGroup := 0
+	victims := []int{}
+	for i := 0; i < clusterSize; i++ {
+		if i%len(availableServerGroupList) == victimGroup {
+			victims = append(victims, i)
+		}
+	}
 	memberDownEvents := e2eutil.EventList{}
 	memberFailedOverEvents := e2eutil.EventList{}
 
@@ -81,7 +87,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	memRemovedParallelEvents := e2eutil.EventValidator{}
 
 	// Loop to kill the nodes
-	for _, podMemberToKill := range podMembersToKill {
+	for _, podMemberToKill := range victims {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
 		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
