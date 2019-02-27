@@ -764,10 +764,10 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 // than or eual to the defined threshold.  This allows us to kill pods during a rebalance
 // with greater confidence that some vbuckets have migrated to the new master.
 func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, threshold float64, timeout time.Duration) error {
-	timeoutChan := time.After(timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-RetryLabel:
-	for {
+	return retryutil.Retry(ctx, 1*time.Second, IntMax, func() (bool, error) {
 		client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
 		defer cleanup()
 
@@ -776,28 +776,23 @@ RetryLabel:
 
 		for {
 			select {
-			case <-timeoutChan:
-				return fmt.Errorf("timeout")
+			case <-ctx.Done():
+				return false, ctx.Err()
 			case status, ok := <-progress.Status():
 				if !ok {
-					return fmt.Errorf("rebalance status terminated: %v", progress.Error())
+					return false, fmt.Errorf("rebalance status terminated: %v", progress.Error())
 				}
 				switch status.Status {
 				case cbmgr.RebalanceStatusUnknown:
-					// Don't fail on unknown, just free up resources and try again with
-					// another random pod until we get something that definitively succeeeds
-					// or fails.
-					cleanup()
-					progress.Cancel()
-					continue RetryLabel
+					return false, retryutil.RetryOkError(fmt.Errorf("rebalance status unknown"))
 				case cbmgr.RebalanceStatusRunning:
 					if status.Progress >= threshold {
-						return nil
+						return true, nil
 					}
 				}
 			}
 		}
-	}
+	})
 }
 
 func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, threshold float64, timeout time.Duration) {
