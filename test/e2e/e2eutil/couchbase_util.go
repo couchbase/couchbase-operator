@@ -547,21 +547,34 @@ func MustPatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches js
 	}
 }
 
-func VerifyServices(t *testing.T, client *cbmgr.Couchbase, tries int, value map[string]int, verifiers ...serviceVerifier) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "verify service info", "test-cluster",
-		func() error {
+func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-			info, err := client.ClusterInfo()
-			if err != nil {
-				return err
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		info, err := client.ClusterInfo()
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		for _, verify := range verifiers {
+			if verify(t, info, value) == false {
+				return false, retryutil.RetryOkError(NewErrVerifyServices())
 			}
-			for _, verify := range verifiers {
-				if verify(t, info, value) == false {
-					return NewErrVerifyServices()
-				}
-			}
-			return nil
-		})
+		}
+		return true, nil
+	})
+}
+
+func MustVerifyServices(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) {
+	if err := VerifyServices(t, k8s, couchbase, timeout, value, verifiers...); err != nil {
+		Die(t, err)
+	}
 }
 
 func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[string]int) bool {

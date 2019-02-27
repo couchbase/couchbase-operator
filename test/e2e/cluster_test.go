@@ -458,16 +458,6 @@ func TestBasicMDSScaling(t *testing.T) {
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	// adding query service
 	t.Log("adding query service")
 	newService := api.ServerConfig{
@@ -488,9 +478,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries10, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to add query service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// adding index service
 	t.Log("adding index service")
@@ -512,9 +500,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to add index service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// adding search service
 	t.Log("adding search service")
@@ -536,17 +522,12 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to add search service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// removing search service
 	t.Log("removing search service")
 	removeServiceName := "test_config_4"
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
-	if err != nil {
-		t.Fatalf("remove service failed: %v", err)
-	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -559,9 +540,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to remove search service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// removing index service
 	t.Log("removing index service")
@@ -579,9 +558,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to remove index service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// removing query service
 	t.Log("removing query service")
@@ -599,9 +576,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to remove query service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -635,16 +610,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	// adding query service
 	t.Log("adding query service")
 	newService := api.ServerConfig{
@@ -665,10 +630,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, constants.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
-		t.Fatalf("failed to add query service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// adding index service
 	t.Log("adding index service")
@@ -690,10 +652,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	err = e2eutil.VerifyServices(t, client, constants.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
-		t.Fatalf("failed to add index service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// adding search services
 	t.Log("adding search service")
@@ -703,9 +662,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Services: api.ServiceList{api.SearchService},
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
-	if err != nil {
-		t.Fatalf("add service failed: %v", err)
-	}
 
 	for memeberId := 3; memeberId <= 4; memeberId++ {
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memeberId), 2*time.Minute)
@@ -723,10 +679,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   2,
 	}
-	err = e2eutil.VerifyServices(t, client, constants.Retries10, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
-		t.Fatalf("failed to add search service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// swapping nodes search - 1 and index + 1
 	t.Log("swaping nodes: test_config_4--, test_config_3++")
@@ -748,10 +701,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 2,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, constants.Retries20, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
-		t.Fatalf("failed to scale test_config_4--, test_config_3++: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// swapping nodes index - 1 and query + 1
 	t.Log("swaping nodes: test_config_3--, test_config_2++")
@@ -773,10 +723,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	err = e2eutil.VerifyServices(t, client, constants.Retries20, serviceMap, e2eutil.NodeServicesVerifier)
-	if err != nil {
-		t.Fatalf("failed to scale test_config_3--, test_config_2++: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// swapping nodes query - 1 and data + 1
 	t.Log("swaping nodes: test_config_2--, test_config_1++")
@@ -800,9 +747,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries10, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -835,25 +780,13 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	serviceMap := map[string]int{
 		"Data":  1,
 		"N1QL":  1,
 		"Index": 1,
 		"FTS":   1,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to scale test_config_2--, test_config_1++: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
@@ -884,16 +817,6 @@ func TestRemoveLastDataService(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
-	t.Log("removing last data service")
 	removeServiceName := "test_config_2"
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
 
@@ -909,9 +832,7 @@ func TestRemoveLastDataService(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	if err := e2eutil.VerifyServices(t, client, constants.Retries5, serviceMap, e2eutil.NodeServicesVerifier); err != nil {
-		t.Fatalf("failed to remove data service: %v", err)
-	}
+	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
