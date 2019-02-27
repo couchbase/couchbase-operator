@@ -239,8 +239,9 @@ func TestEventingResizeCluster(t *testing.T) {
 
 	// To stop background data insertion and wait for function to complete.
 	// Wait for a short while so that the load generator has a chance to successfully
-	// commit documents to only pods that exist now.
-	time.Sleep(10 * time.Second)
+	// commit documents to only pods that exist now.  Note that the port forward has
+	// a timeout of 1 minute, so wait for two to be certain.
+	time.Sleep(2 * time.Minute)
 	close(stopDataInsertion)
 	stopped = true
 	if err := <-dataInsertionError; err != nil {
@@ -356,8 +357,9 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	// To stop background data insertion and wait for function to complete.
 	// Wait for a short while so that the load generator has a chance to successfully
-	// commit documents to only pods that exist now.
-	time.Sleep(10 * time.Second)
+	// commit documents to only pods that exist now.  Note that the port forward has
+	// a timeout of 1 minute, so wait for two to be certain.
+	time.Sleep(2 * time.Minute)
 	close(stopDataInsertion)
 	stopped = true
 	if err := <-dataInsertionErr; err != nil {
