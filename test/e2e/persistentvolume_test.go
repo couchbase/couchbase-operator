@@ -411,15 +411,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 
 	// Manual failover to recover the pod
-	member := &couchbaseutil.Member{
-		Name:         podMemberNameToKill,
-		Namespace:    f.Namespace,
-		ServerConfig: testCouchbase.Spec.ServerSettings[2].Name,
-		SecureClient: false,
-	}
-	if err := e2eutil.FailoverNode(t, client, constants.Retries5, member.HostURL()); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, podMemberIdToKill)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberIdToKill)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 3*time.Minute)

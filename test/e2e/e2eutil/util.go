@@ -807,26 +807,26 @@ func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseClu
 	}
 }
 
-func CreateMemberPod(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cl *api.CouchbaseCluster, clusterName, namespace string) (*v1.Pod, error) {
+func CreateMemberPod(k8s *types.Cluster, cl *api.CouchbaseCluster, m *couchbaseutil.Member) (*v1.Pod, error) {
 	podGetter := scheduler.NewNullPodGetter()
 	scheduler, _ := scheduler.NewNullScheduler(podGetter, cl)
 
 	for _, config := range cl.Spec.ServerSettings {
 		if config.Name == m.ServerConfig {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(60)*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
-			pod, err := k8sutil.CreateCouchbasePod(kubeCli, scheduler, cl, m, cl.Status.CurrentVersion, config, ctx)
+			pod, err := k8sutil.CreateCouchbasePod(k8s.KubeClient, scheduler, cl, m, cl.Status.CurrentVersion, config, ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			ctx, cancel = context.WithTimeout(context.Background(), time.Duration(60)*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
-			err = k8sutil.WaitForPod(ctx, kubeCli, namespace, pod.Name, "")
+			err = k8sutil.WaitForPod(ctx, k8s.KubeClient, cl.Namespace, pod.Name, "")
 			if err != nil {
 				return nil, err
 			}
-			return kubeCli.Core().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+			return k8s.KubeClient.Core().Pods(cl.Namespace).Get(pod.Name, metav1.GetOptions{})
 		}
 	}
 

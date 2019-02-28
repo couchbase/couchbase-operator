@@ -266,18 +266,74 @@ func MustInsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *api
 }
 
 // Add a node to the cluster
-func AddNode(t *testing.T, client *cbmgr.Couchbase, services api.ServiceList, username, password, hostname string) error {
-	t.Logf("adding node: %s", hostname)
+func AddNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, services api.ServiceList, username, password string, member *couchbaseutil.Member) error {
+	if _, err := CreateMemberPod(k8s, couchbase, member); err != nil {
+		return err
+	}
 
 	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
 	}
-	err = client.AddNode(hostname, username, password, svcs)
-	return retryutil.RetryOnErr(Context, 5*time.Second, 36, "add node", hostname,
-		func() error {
-			return client.AddNode(hostname, username, password, svcs)
-		})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	callback := func() (bool, error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		if err := client.AddNode(member.ClientURLPlaintext(), username, password, svcs); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		return true, nil
+	}
+	if err := retryutil.Retry(ctx, 5*time.Second, IntMax, callback); err != nil {
+		return err
+	}
+
+	callback = func() (bool, error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		if err := client.Rebalance([]string{}); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		return true, nil
+	}
+	if err := retryutil.Retry(ctx, 5*time.Second, IntMax, callback); err != nil {
+		return err
+	}
+
+	callback = func() (bool, error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		info, err := client.ClusterInfo()
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		return info.RebalanceStatus == "none", nil
+	}
+	return retryutil.Retry(ctx, time.Second, IntMax, callback)
+}
+
+func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, services api.ServiceList, username, password string, member *couchbaseutil.Member) {
+	if err := AddNode(k8s, couchbase, services, username, password, member); err != nil {
+		Die(t, err)
+	}
 }
 
 // EjectMember removes the given member index from the cluster,
@@ -357,81 +413,71 @@ func GetNodesFromCluster(t *testing.T, client *cbmgr.Couchbase, tries int) ([]cb
 	return info.Nodes, nil
 }
 
-func FailoverNode(t *testing.T, client *cbmgr.Couchbase, tries int, nodeName string) error {
-	err := retryutil.RetryOnErr(Context, 5*time.Second, tries, "failover nodes", "test-cluster",
-		func() error {
-			err := client.Failover(nodeName)
-			if err != nil {
-				t.Logf("Failover error: %v", err)
-				return err
-			}
-			return nil
-		})
-	if err != nil {
-		return err
-	}
-	t.Logf("failover success: %v", nodeName)
-	return nil
+func FailoverNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, tries, index int) error {
+	return retryutil.Retry(Context, 5*time.Second, tries, func() (bool, error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		member := couchbaseutil.Member{
+			Name:      couchbaseutil.CreateMemberName(couchbase.Name, index),
+			Namespace: couchbase.Namespace,
+		}
+
+		if err := client.Failover(member.HostURLPlaintext()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		return true, nil
+	})
 }
 
-// FailoverNodes manually fails over nodes, raises an error if the cluster is the wrong size
+func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, index int) {
+	if err := FailoverNode(k8s, couchbase, constants.Retries5, index); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustFailoverNodes manually fails over nodes, raises an error if the cluster is the wrong size
 // or the number of down nodes is wrong
-func FailoverNodes(t *testing.T, client *cbmgr.Couchbase, cbClusterSize int, memberIdsToFailover []int) {
-	clusterNodes, err := GetNodesFromCluster(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("Failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != cbClusterSize {
-		t.Fatalf("Expected %d nodes, got %d nodes", cbClusterSize, len(clusterNodes))
-	}
-
-	nodesToFailover := []string{}
-	for _, node := range clusterNodes {
-		t.Logf("Node %s: %v", node.HostName, node.Status)
-		if node.Status == "unhealthy" {
-			nodesToFailover = append(nodesToFailover, node.HostName)
-		}
-	}
-
-	t.Logf("Failing over nodes: %v", nodesToFailover)
-	for _, nodeName := range nodesToFailover {
-		if err := FailoverNode(t, client, constants.Retries5, nodeName); err != nil {
-			t.Fatalf("Failed to failover node '%s': %v", nodeName, err)
-		}
+func MustFailoverNodes(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, memberIdsToFailover []int) {
+	for _, index := range memberIdsToFailover {
+		MustFailoverNode(t, k8s, couchbase, index)
 	}
 }
 
-func VerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, timeout time.Duration) error {
+func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *api.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	err := retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "failover nodes", "test-cluster",
-		func() error {
-			clusterInfo, err := client.ClusterInfo()
-			if err != nil {
-				return err
-			}
+	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "failover nodes", "test-cluster", func() error {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
 
-			if clusterInfo.Balanced != true {
-				t.Logf("cluster balanced: %v", clusterInfo.Balanced)
+		clusterInfo, err := client.ClusterInfo()
+		if err != nil {
+			return err
+		}
+
+		if clusterInfo.Balanced != true {
+			return NewErrVerifyClusterInfo()
+		}
+		for _, node := range clusterInfo.Nodes {
+			if node.Status != "healthy" {
 				return NewErrVerifyClusterInfo()
 			}
-			for _, node := range clusterInfo.Nodes {
-				if node.Status != "healthy" {
-					t.Logf("node status: %v", node.Status)
-					return NewErrVerifyClusterInfo()
-				}
-			}
-			return nil
-		})
-	if err != nil {
-		return err
-	}
-	return nil
+		}
+		return nil
+	})
 }
 
-func MustVerifyClusterBalancedAndHealthy(t *testing.T, client *cbmgr.Couchbase, timeout time.Duration) {
-	if err := VerifyClusterBalancedAndHealthy(t, client, timeout); err != nil {
+func MustVerifyClusterBalancedAndHealthy(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, timeout time.Duration) {
+	if err := VerifyClusterBalancedAndHealthy(k8s, couchbase, timeout); err != nil {
 		Die(t, err)
 	}
 }
