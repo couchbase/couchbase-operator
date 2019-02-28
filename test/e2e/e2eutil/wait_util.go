@@ -768,7 +768,10 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.C
 	defer cancel()
 
 	return retryutil.Retry(ctx, 1*time.Second, IntMax, func() (bool, error) {
-		client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
 		defer cleanup()
 
 		progress := client.NewRebalanceProgress()

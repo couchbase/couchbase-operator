@@ -105,16 +105,12 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
 
-	// Ccreate a direct connection to a couchbase node.
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
 	// When the cluster is ready, kill the operator, manually update the bucket.  Verify the
 	// bucket was updated and wait for it to revert as the operator regains mastership.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
-	e2eutil.MustPatchBucketInfo(t, client, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", &flush), constants.Retries1)
-	e2eutil.MustPatchBucketInfo(t, client, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", &flush), constants.Retries1)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", &flush), constants.Retries1)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", &flush), constants.Retries1)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 3*time.Minute)
 
 	// Check the events match what we expect:

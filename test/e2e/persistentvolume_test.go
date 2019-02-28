@@ -340,9 +340,6 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
 	// To cross check number of persistent vol claims matches the defined spec
 	var expectedPvcMap map[string]int
 	switch serviceConfig3["services"] {
@@ -406,9 +403,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	// Sleep for autofailover to occur
 	time.Sleep(time.Second*time.Duration(autofailoverTimeout) + 120)
 
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, constants.Size1); err != nil {
-		t.Fatalf("Mismatch in unhealthy nodes count: %v", err)
-	}
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, constants.Size1)
 
 	// Manual failover to recover the pod
 	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, podMemberIdToKill)

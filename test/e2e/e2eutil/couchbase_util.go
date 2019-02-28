@@ -174,11 +174,17 @@ func MustGetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.C
 }
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
-func PatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
 		before, err := getBucket(t, client, bucketName)
 		if err != nil {
 			return false, err
@@ -201,8 +207,8 @@ func PatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, p
 	})
 }
 
-func MustPatchBucketInfo(t *testing.T, client *cbmgr.Couchbase, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) {
-	if err := PatchBucketInfo(t, client, bucketName, patches, timeout); err != nil {
+func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchBucketInfo(t, k8s, couchbase, bucketName, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -482,37 +488,48 @@ func MustVerifyClusterBalancedAndHealthy(t *testing.T, k8s *types.Cluster, couch
 	}
 }
 
-func WaitForUnhealthyNodes(t *testing.T, client *cbmgr.Couchbase, tries int, numUnhealthy int) error {
-	err := retryutil.RetryOnErr(Context, 5*time.Second, tries, "wait for unhealthy nodes", "test-cluster",
-		func() error {
-			unhealthy := []string{}
-			clusterInfo, err := client.ClusterInfo()
-			if err != nil {
-				return err
+func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *api.CouchbaseCluster, tries int, numUnhealthy int) error {
+	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "wait for unhealthy nodes", "test-cluster", func() error {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+
+		unhealthy := []string{}
+		clusterInfo, err := client.ClusterInfo()
+		if err != nil {
+			return err
+		}
+		for _, node := range clusterInfo.Nodes {
+			if node.Status == "unhealthy" {
+				unhealthy = append(unhealthy, node.HostName)
 			}
-			for _, node := range clusterInfo.Nodes {
-				if node.Status == "unhealthy" {
-					unhealthy = append(unhealthy, node.HostName)
-				}
-			}
-			if len(unhealthy) != numUnhealthy {
-				t.Logf("unhealthy nodes: %v", unhealthy)
-				return NewErrVerifyClusterInfo()
-			}
-			return nil
-		})
-	if err != nil {
-		return err
+		}
+		if len(unhealthy) != numUnhealthy {
+			return NewErrVerifyClusterInfo()
+		}
+		return nil
+	})
+}
+
+func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, tries int, numUnhealthy int) {
+	if err := WaitForUnhealthyNodes(k8s, couchbase, tries, numUnhealthy); err != nil {
+		Die(t, err)
 	}
-	return nil
 }
 
 // PatchCouchbaseInfo tries patching the cluster information returned directly from Couchbase server.
-func PatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
 		info, err := client.ClusterInfo()
 		if err != nil {
 			return false, err
@@ -524,8 +541,8 @@ func PatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch
 	})
 }
 
-func MustPatchCouchbaseInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) {
-	if err := PatchCouchbaseInfo(t, client, patches, timeout); err != nil {
+func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchCouchbaseInfo(t, k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -549,11 +566,16 @@ func VerifyBucketDeleted(t *testing.T, client *cbmgr.Couchbase, tries int, bucke
 		})
 }
 
-func PatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
 		info, err := client.GetAutoFailoverSettings()
 		if err != nil {
 			return false, err
@@ -565,17 +587,22 @@ func PatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpa
 	})
 }
 
-func MustPatchAutoFailoverInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) {
-	if err := PatchAutoFailoverInfo(t, client, patches, timeout); err != nil {
+func MustPatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchAutoFailoverInfo(t, k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func PatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
 		info, err := client.GetIndexSettings()
 		if err != nil {
 			return false, err
@@ -587,8 +614,8 @@ func PatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpa
 	})
 }
 
-func MustPatchIndexSettingInfo(t *testing.T, client *cbmgr.Couchbase, patches jsonpatch.PatchSet, timeout time.Duration) {
-	if err := PatchIndexSettingInfo(t, client, patches, timeout); err != nil {
+func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchIndexSettingInfo(t, k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }

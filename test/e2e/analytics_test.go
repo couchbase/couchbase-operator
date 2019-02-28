@@ -308,10 +308,6 @@ func TestAnalyticsKillPods(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	// Creates the client with exposed admin port
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
 	// Load default data set into couchbase bucket
 	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
 
@@ -392,17 +388,12 @@ func TestAnalyticsKillPods(t *testing.T) {
 	podMemberIdsToKill := []int{4, 5, 6}
 	newMemberIdToBeAdded := clusterSize
 	for _, podMemberId := range podMemberIdsToKill {
-		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		if err := e2eutil.KillMember(targetKube.KubeClient, f.Namespace, testCouchbase.Name, podMemberName, true); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberId, true)
 
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
 
-		if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, constants.Size1); err != nil {
-			t.Fatalf("Mismatch in unhealthy nodes count: %v", err)
-		}
+		e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, constants.Size1)
 
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberId), time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberId)

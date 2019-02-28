@@ -598,9 +598,8 @@ func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.Couchbas
 }
 
 func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster) {
-	err1 := DeleteCluster(t, crClient, kubeClient, cluster, 10)
-	if err1 != nil {
-		t.Fatal(err1)
+	if err := DeleteCluster(t, crClient, kubeClient, cluster, 10); err != nil {
+		Die(t, err)
 	}
 }
 
@@ -774,12 +773,12 @@ func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cl
 func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
 	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 	if err != nil {
-		t.Fatalf("Error getting pods in cluster: %v", err)
+		Die(t, err)
 	}
 
 	items := len(pods.Items)
 	if numToKill > items {
-		t.Fatalf("Trying to kill %d pods, but only %d exist", numToKill, items)
+		Die(t, fmt.Errorf("Trying to kill %d pods, but only %d exist", numToKill, items))
 	}
 
 	killPods := []string{}

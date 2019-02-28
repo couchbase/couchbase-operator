@@ -291,10 +291,6 @@ func TestRemoveForeignNode(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	// create a client to admin console
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
 	err, username, password := e2eutil.GetClusterAuth(targetKube.KubeClient, f.Namespace, targetKube.DefaultSecret.Name)
 	if err != nil {
 		t.Fatal(err)
@@ -323,17 +319,6 @@ func TestRemoveForeignNode(t *testing.T) {
 	expectedEvents.AddEvent(*k8sutil.MemberRemoveEvent(foreignNodeName, testCouchbase))
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
-	// None of the nodes should be the foreign member and
-	// all should be healthy
-	info, err := client.ClusterInfo()
-	if err != nil {
-		t.Fatalf("unable to poll cluster info")
-	}
-	for _, node := range info.Nodes {
-		if node.Status != "healthy" {
-			t.Fatalf("node %s is not healthy, status: %s", node.HostName, node.Status)
-		}
-	}
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -576,26 +561,11 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
 	}
 
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, memberIdsToKillLen); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, memberIdsToKillLen)
 
 	// Manually failover nodes
 	for _, memberId := range memberIdsToKill {
-		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
-		m := &couchbaseutil.Member{
-			Name:         memberName,
-			Namespace:    f.Namespace,
-			ServerConfig: testCouchbase.Spec.ServerSettings[0].Name,
-			SecureClient: false,
-		}
-		if err := client.Failover(m.HostURL()); err != nil {
-			t.Fatalf("failed to failover host %s: %v", m.HostURL(), err)
-		}
+		e2eutil.MustFailoverNode(t, targetKube, testCouchbase, memberId)
 		expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberId)
 	}
 
@@ -859,32 +829,13 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT; iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
 
-	autofailoverTimeout, err := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
+	autofailoverTimeout, _ := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
 	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
 
 	t.Logf("waiting for pods to die...")
 	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, constants.Retries30, testCouchbase); err != nil {
 		t.Logf("status: %v+", testCouchbase)
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
-	}
-
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	t.Logf("waiting for unhealthy nodes from cluster...")
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, 1); err != nil {
-		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
-	}
-
-	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != 5 {
-		t.Logf("clusterNodes: %v", clusterNodes)
-		t.Fatal("failed to see 5 nodes in the cluster")
 	}
 
 	t.Logf("waiting for cluster size to be 5")
@@ -959,25 +910,6 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		t.Fatalf("failed to reach cluster size of 4: %v", err)
 	}
 
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	t.Logf("waiting for unhealthy nodes from cluster...")
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, constants.Retries5, 1); err != nil {
-		t.Fatalf("failed to wait for 1 unhealthy node: %v", err)
-	}
-
-	t.Logf("getting cluster nodes...")
-	clusterNodes, err := e2eutil.GetNodesFromCluster(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get nodes from cluster: %v", err)
-	}
-	if len(clusterNodes) != 5 {
-		t.Logf("clusterNodes: %v", clusterNodes)
-		t.Fatal("failed to see 5 nodes in the cluster")
-	}
-
 	t.Logf("waiting for cluster size to be 5")
 	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 5, constants.Retries10, testCouchbase); err != nil {
 		t.Fatalf("failed to reach cluster size of 5: %v", err)
@@ -1038,12 +970,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)
 
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	if err := e2eutil.WaitForUnhealthyNodes(t, client, 5, 1); err != nil {
-		t.Fatalf("No unhealthy nodes in cluster: %v", err)
-	}
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 5, 1)
 
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
 		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)
