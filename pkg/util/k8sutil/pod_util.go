@@ -14,7 +14,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -50,15 +49,15 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 		return nil, err
 	}
 
+	if err := scheduler.Create(pod); err != nil {
+		return nil, err
+	}
+
 	if config.GetVolumeMounts() != nil {
 		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, version, cluster.AsOwner(), ctx)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if err := scheduler.Create(pod); err != nil {
-		return nil, err
 	}
 
 	return CreatePod(kubeCli, cluster.Namespace, pod)
@@ -105,17 +104,19 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					constants.LabelCluster:    clusterName,
 					constants.LabelVolumeName: claimName,
 				}
+				volumeBindingMode := getVolumeBindingMode(kubeCli, claim)
 				claim.SetAnnotations(map[string]string{
 					constants.AnnotationVolumeMountPath:     mountPath,
 					constants.AnnotationVolumeNodeConf:      config.Name,
 					constants.CouchbaseVersionAnnotationKey: version,
+					constants.ServerGroupLabel:              pod.Spec.NodeSelector[constants.ServerGroupLabel],
 				})
 				applyBaseAnnotations(claim.GetObjectMeta())
 				if gid := cs.GetFSGroup(); gid != nil {
 					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
 				}
 				claim.Name = NameForPersistentVolumeClaim(pod.Name, claimUsageCnt[claimName], mountName)
-				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner, ctx)
+				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, volumeBindingMode, owner, ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -129,15 +130,10 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 				}
 			} else {
 				// Get availability zone of the Volumes and apply to Pod
-				// so that it is honored by the scheduler
-				group, err := GetPersistentVolumeGroup(kubeCli, pvc.Spec.VolumeName)
-				if err != nil {
-					// only address errors from cli here, if the volume is not
-					// labeled then allow scheduler to apply it instead
-					if !cberrors.IsErrVolumeMissingGroup(err) {
-						return nil, err
-					}
-				} else {
+				// so that it is honored by the scheduler.
+				// When group is an empty string then scheduler will decide best
+				// group to use.
+				if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
 					pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
 				}
 			}
@@ -243,15 +239,31 @@ func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 	return path
 }
 
-// Creates custom PVC from the generic spec
-func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference, ctx context.Context) (*v1.PersistentVolumeClaim, error) {
+// Get volume binding mode from annotation of the volume claim
+// claim template. If key is not set in the storage class then
+// attempt to get volume binding mode from storage class
+// provisoning the volume.
+func getVolumeBindingMode(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim) string {
 
-	// storage class must exist
-	sc, err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName)
-
-	if err != nil && !k8errors.IsForbidden(err) {
-		return nil, err
+	// check claim template
+	if mode, ok := claim.Annotations[constants.AnnotationVolumeBindingMode]; ok {
+		return mode
 	}
+
+	// attempt to get binding mode from storage class
+	sc, err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName)
+	if err == nil {
+		if sc.VolumeBindingMode != nil {
+			return string(*sc.VolumeBindingMode)
+		}
+	}
+
+	// default mode is Immediate
+	return string(storage.VolumeBindingImmediate)
+}
+
+// Creates custom PVC from the generic spec
+func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, volumeBindingMode string, owner metav1.OwnerReference, ctx context.Context) (*v1.PersistentVolumeClaim, error) {
 
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim.GetObjectMeta(), owner)
@@ -261,13 +273,9 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 		return nil, err
 	}
 
-	// check storageclass to discover if volumes should be bound after Pod creation
-	if sc != nil {
-		if bindMode := sc.VolumeBindingMode; bindMode != nil {
-			if *bindMode == storage.VolumeBindingWaitForFirstConsumer {
-				return pvc, nil
-			}
-		}
+	// skip wait if volumes should be bound after Pod creation
+	if strings.Compare(volumeBindingMode, string(storage.VolumeBindingWaitForFirstConsumer)) == 0 {
+		return pvc, nil
 	}
 
 	// wait for claim to be created before allowing it to be mounted by pod
@@ -889,18 +897,9 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 		}
 		for mountName, _ := range mountPaths {
 			mountPath := pathForVolumeMountName(mountName)
-			pvc, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
+			_, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
 			if err != nil {
 				return err
-			}
-			// Volume belonging to the claim must also be healthy
-			volume, err := GetPersistentVolume(kubeCli, pvc.Spec.VolumeName)
-			if err != nil {
-				return err
-			}
-			volumePhase := volume.Status.Phase
-			if volumePhase != v1.VolumeBound {
-				return cberrors.ErrVolumeUnexpectedPhase{Path: mountPath, Phase: volumePhase}
 			}
 		}
 	}

@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -105,17 +104,8 @@ func upgradePVC_000000_010200(cluster *Cluster, pvc *corev1.PersistentVolumeClai
 	// Add the server version annotation from the cluster's current version.
 	pvc.Annotations[constants.CouchbaseVersionAnnotationKey] = cluster.cluster.Status.CurrentVersion
 
-	// Add in the PVC zone from the associated PV.  While we could derive this from the
-	// pod, it may not be alive by the time we run the upgrade actions, using the PV
-	// seems less fraught with errors.
-	group, err := k8sutil.GetPersistentVolumeGroup(cluster.config.KubeCli, pvc.Spec.VolumeName)
-	if err != nil {
-		if !errors.IsErrVolumeMissingGroup(err) {
-			return err
-		}
-	} else {
-		pvc.Annotations[constants.ServerGroupLabel] = group
-	}
+	// Attempt to add in the PVC zone from the associated Pod.
+	// TODO: Pod may not be alive by the time we run the upgrade actions
 
 	return nil
 }

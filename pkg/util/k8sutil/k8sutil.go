@@ -388,8 +388,8 @@ func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interf
 				case v1.ClaimPending:
 					continue
 				case v1.ClaimBound:
-					// Claim object is ready, ensure volume created
-					return WaitForPersistentVolume(ctx, kubeCli, obj.Spec.VolumeName)
+					// Claim object is ready
+					return nil
 				case v1.ClaimLost:
 					return cberrors.ErrCreatingPersistentVolumeClaim{Reason: reason}
 				}
@@ -398,77 +398,6 @@ func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interf
 	}
 
 	return nil
-}
-
-// Wait for volume which is bound by claim.  In general when the claim status is 'ClaimBound' then it may
-// be assumed that it's volume is ready, but we should check actual volume for the sake of completeness.
-func WaitForPersistentVolume(ctx context.Context, kubeCli kubernetes.Interface, volumeName string) error {
-
-	opts := metav1.ListOptions{
-		FieldSelector: "metadata.name=" + volumeName,
-	}
-
-	watcher, err := kubeCli.CoreV1().PersistentVolumes().Watch(opts)
-	if err != nil {
-		return err
-	}
-	events := watcher.ResultChan()
-
-	// Loop until success
-	done := false
-	for !done {
-		select {
-		// Handle timeout and cancellation events
-		case <-ctx.Done():
-			return cberrors.ErrCreatingPersistentVolume{Reason: fmt.Sprintf("%v for %v", ctx.Err().Error(), volumeName)}
-
-		// Process K8S events of creation cycle
-		case ev := <-events:
-			if ev.Object == nil {
-				continue
-			}
-			obj := ev.Object.(*v1.PersistentVolume)
-			status := obj.Status
-
-			switch ev.Type {
-			// check if any error occurred while creating
-			case watch.Error:
-				return cberrors.ErrCreatingPersistentVolume{Reason: status.Reason}
-			case watch.Deleted:
-				return cberrors.ErrCreatingPersistentVolume{Reason: status.Reason}
-			case watch.Added, watch.Modified:
-				// make sure volume status is bound
-				switch status.Phase {
-				case v1.VolumePending, v1.VolumeAvailable:
-					continue
-				case v1.VolumeBound:
-					done = true
-				default:
-					return cberrors.ErrCreatingPersistentVolume{Reason: status.Reason}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func GetPersistentVolume(kubeCli kubernetes.Interface, name string) (*v1.PersistentVolume, error) {
-	return kubeCli.CoreV1().PersistentVolumes().Get(name, metav1.GetOptions{})
-}
-
-// Get the server group associated with a Persistent volume
-// according to the standard zone labels
-func GetPersistentVolumeGroup(kubeCli kubernetes.Interface, name string) (string, error) {
-	volume, err := GetPersistentVolume(kubeCli, name)
-	if err != nil {
-		return "", err
-	}
-	group, ok := volume.Labels[constants.ServerGroupLabel]
-	if !ok {
-		return "", cberrors.NewErrVolumeMissingGroup(name)
-	}
-	return group, nil
 }
 
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {

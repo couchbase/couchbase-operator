@@ -92,6 +92,8 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: couchbase
+        annotations:
+          storageclass.couchbase.com/binding-mode: Immediate
       spec:
         storageClassName: "standard"
         resources:
