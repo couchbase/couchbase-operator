@@ -787,17 +787,17 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 // alternate address to the DDNS name.  For private addresses these will be an IP based on the
 // node address and node ports in the 30000 range.
 func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
-	if c.cluster.Spec.IsExposedFeatureServiceTypePublic() {
-		addresses := &cbmgr.AlternateAddressesExternal{
-			Hostname: k8sutil.GetDNSName(c.cluster, member.Name),
+	var hostname string
+	if c.cluster.Spec.DNS != nil {
+		// Use the user provided DNS name.
+		hostname = k8sutil.GetDNSName(c.cluster, member.Name)
+	} else {
+		// Lookup the node IP the pod is running on.
+		var err error
+		hostname, err = k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
+		if err != nil {
+			return nil, err
 		}
-		return addresses, nil
-	}
-
-	// Lookup the node IP the pod is running on.
-	hostname, err := k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
-	if err != nil {
-		return nil, err
 	}
 
 	addresses := &cbmgr.AlternateAddressesExternal{

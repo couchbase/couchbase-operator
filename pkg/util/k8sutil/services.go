@@ -362,10 +362,12 @@ func generateConsoleService(cluster *couchbasev1.CouchbaseCluster) *v1.Service {
 	// Create the basic service.
 	service := createServiceManifest(ConsoleServiceName(cluster.Name), cluster.Spec.AdminConsoleServiceType, ports, labels, selectors)
 
-	if cluster.Spec.IsAdminConsoleServiceTypePublic() {
-		// If we are exposing publicly add a DNS name for use with TLS.
+	// If a DNS domain is specified add a DNS name for use with TLS.
+	if cluster.Spec.DNS != nil {
 		service.Annotations[ddnsAnnotation] = dnsAdminConsoleName(cluster)
+	}
 
+	if cluster.Spec.IsAdminConsoleServiceTypePublic() {
 		// Also set the external trafic policy to Local which means the load balancer is
 		// responsible for routing trafic to the destination and not Kubernetes.  For
 		// ELB at least this appears to keep sessions open to the same console instance.
@@ -718,9 +720,8 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	selectors := getNodeServiceSelectors(cluster, name)
 	service := createServiceManifest(exposedServiceName, cluster.Spec.ExposedFeatureServiceType, allowedPorts, labels, selectors)
 
-	// Update external service definitions.
-	if cluster.Spec.IsExposedFeatureServiceTypePublic() {
-		// Annotate the service with DNS.
+	// If a DNS domain is specified annotate with the pod DNS name.
+	if cluster.Spec.DNS != nil {
 		service.Annotations[ddnsAnnotation] = GetDNSName(cluster, name)
 		// TODO: data nodes only please
 		// TODO: await input from external-dns

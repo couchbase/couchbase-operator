@@ -386,6 +386,11 @@ Given the example domain `couchbase-0.us-east-1.example.com` it will annotate th
 
 The user is required to use these annotations to actually create the DNS entries as the services are created, updated and modified.  The recommended solution is the https://github.com/kubernetes-incubator/external-dns[Kubernetes External DNS] integration.  As such services will be annotated with `external-dns.alpha.kubernetes.io/hostname`.
 
+The DNS configuration can also be used with the _NodePort_ external feature type.
+This allows the cluster to be addressed with DNS over private networks e.g. through a VPN.
+In this mode of operation the Operator does not enforce the use of TLS.
+To create A records for your individual Couchbase server nodes, map the service DNS name annotation to the associated pod's node IP address.
+
 IMPORTANT: The individual DNS per-pod exposed service A records should be dynamically collated into an SRV record.  This provides a stable name for the cluster as nodes are added and removed during the cluster lifecycle, and service discovery.  The resource name for the given examples should be `_couchbases._tcp.couchbase-0.us-east-1.example.com`, with equal priority and weight and a port value of `11207`.
 
 IMPORTANT: When creating your cluster TLS certificates you will need to add a wildcard entry in the subject alternate names list for your specified domain.  For the given examples this would be `DNS:*.couchbase-0.us-east-1.example.com`.
