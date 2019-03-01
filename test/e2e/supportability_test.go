@@ -31,12 +31,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	rbacv1 "k8s.io/api/rbac/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
+
+	"github.com/ghodss/yaml"
 )
 
 // lazyBoundStorageClass examines the requested storage class and returns true if
@@ -527,50 +529,6 @@ type cbopinfoArg struct {
 	ArgValue    string
 	WillFail    bool
 	ExpectedErr string
-}
-
-func createClusterRoles(kubeClient kubernetes.Interface, roleName string) error {
-	clusterRoleList, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, clusterRole := range clusterRoleList.Items {
-		if clusterRole.GetName() == roleName {
-			kubeClient.RbacV1beta1().ClusterRoles().Delete(roleName, &metav1.DeleteOptions{})
-			err = framework.WaitForClusterRoleDeleted(kubeClient, roleName, 30)
-			if err != nil {
-				return err
-			}
-			break
-		}
-	}
-
-	policyRule2 := rbacv1.PolicyRule{
-		APIGroups: []string{"storage.k8s.io"},
-		Resources: []string{"storageclasses"},
-		Verbs:     []string{"get"},
-	}
-
-	policyRule3 := rbacv1.PolicyRule{
-		APIGroups: []string{"apiextensions.k8s.io"},
-		Resources: []string{"customresourcedefinitions"},
-		Verbs:     []string{"*"},
-	}
-
-	policyRule4 := rbacv1.PolicyRule{
-		APIGroups: []string{""},
-		//Resources: []string{"pods", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes", "events", "secrets"},
-		Resources: []string{"services", "endpoints", "persistentvolumeclaims", "persistentvolumes"},
-		Verbs:     []string{"*"},
-	}
-
-	clusterRoleSpec := &rbacv1.ClusterRole{
-		TypeMeta:   metav1.TypeMeta{Kind: "ClusterRole", APIVersion: "rbac.authorization.k8s.io/v1beta1"},
-		ObjectMeta: metav1.ObjectMeta{Name: roleName},
-		Rules:      []rbacv1.PolicyRule{policyRule2, policyRule3, policyRule4},
-	}
-	_, err = kubeClient.RbacV1beta1().ClusterRoles().Create(clusterRoleSpec)
-	return err
 }
 
 // argumentList represents parameters to cbopinfo.  They are modelled as a
@@ -1100,26 +1058,13 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	// Create the cluster.
 	cluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
 
-	// Dynamic configuration.
-	kubeConfig := "/tmp/" + cluster.Name
-
-	// Create the service account, role and bindings, installing into a temporary kubernetes
-	// configuration file.
-	if err := createClusterRoles(targetKube.KubeClient, cluster.Name); err != nil {
-		e2eutil.Die(t, err)
-	}
-	defer framework.RemoveClusterRole(targetKube.KubeClient, cluster.Name)
-
+	// Create a service account with no permissions.
 	if err := framework.RecreateServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name); err != nil {
 		e2eutil.Die(t, err)
 	}
 	defer framework.RemoveServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name)
 
-	if err := framework.RecreateClusterRoleBindings(targetKube.KubeClient, f.Namespace, cluster.Name); err != nil {
-		e2eutil.Die(t, err)
-	}
-	defer framework.RemoveClusterRoleBinding(targetKube.KubeClient, f.Namespace, cluster.Name)
-
+	// Create a kubernetes configuration file.
 	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(f.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -1130,71 +1075,65 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	caFile, err := ioutil.TempFile("/tmp", "*")
+	config := &clientcmdapiv1.Config{
+		Clusters: []clientcmdapiv1.NamedCluster{
+			{
+				Name: "default",
+				Cluster: clientcmdapiv1.Cluster{
+					Server:                   targetKube.Config.Host,
+					CertificateAuthorityData: secret.Data["ca.crt"],
+				},
+			},
+		},
+		AuthInfos: []clientcmdapiv1.NamedAuthInfo{
+			{
+				Name: "default",
+				AuthInfo: clientcmdapiv1.AuthInfo{
+					Token: string(secret.Data["token"]),
+				},
+			},
+		},
+		Contexts: []clientcmdapiv1.NamedContext{
+			{
+				Name: "default",
+				Context: clientcmdapiv1.Context{
+					Cluster:   "default",
+					AuthInfo:  "default",
+					Namespace: f.Namespace,
+				},
+			},
+		},
+		CurrentContext: "default",
+	}
+
+	data, err := yaml.Marshal(config)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
-	defer caFile.Close()
-
-	if _, err := caFile.Write(secret.Data["ca.crt"]); err != nil {
+	kubeconfig, err := ioutil.TempFile("/tmp", "*")
+	if err != nil {
 		e2eutil.Die(t, err)
 	}
-
-	if err := caFile.Sync(); err != nil {
+	defer kubeconfig.Close()
+	if _, err := kubeconfig.Write(data); err != nil {
 		e2eutil.Die(t, err)
 	}
-
-	if out, err := exec.Command("kubectl", "config", "set-cluster", cluster.Name, "--kubeconfig="+kubeConfig, "--embed-certs=true", "--server="+targetKube.Config.Host, "--certificate-authority="+caFile.Name()).CombinedOutput(); err != nil {
-		t.Log(string(out))
-		e2eutil.Die(t, err)
-	}
-
-	if out, err := exec.Command("kubectl", "config", "set-credentials", cluster.Name, "--kubeconfig="+kubeConfig, "--token="+string(secret.Data["token"])).CombinedOutput(); err != nil {
-		t.Log(string(out))
-		e2eutil.Die(t, err)
-	}
-
-	if out, err := exec.Command("kubectl", "config", "set-context", cluster.Name, "--kubeconfig="+kubeConfig, "--cluster="+cluster.Name, "--user="+cluster.Name, "--namespace="+f.Namespace).CombinedOutput(); err != nil {
-		t.Log(string(out))
+	if err := kubeconfig.Sync(); err != nil {
 		e2eutil.Die(t, err)
 	}
 
 	// Collect logs
 	args := argumentList{}
-	args.addClusterDefaults(targetKube)
-	args.addEnvironmentDefaults()
-	args.add("--kubeconfig", kubeConfig)
-	args.add("--context", cluster.Name)
+	args.add("--kubeconfig", kubeconfig.Name())
 	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Log(execOutStr)
 	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":" + cluster.Name + "\" cannot list couchbaseclusters.couchbase.com in the namespace \"" + f.Namespace + "\""
 	if err == nil {
-		logFileName := getLogFileNameFromExecOutput(execOutStr)
-		defer os.Remove(logFileName)
-
-		logFileDir := strings.Split(logFileName, ".")[0]
-		defer os.RemoveAll(logFileDir)
-		if err := untarGzFile(logFileName); err != nil {
-			t.Fatal(err)
-		}
-
-		// Verify file list
-		errMsgList := failureList{}
-		reqFileList := []string{}
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster.Name, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-		checkLogDirContents(reqFileList, logFileDir, &errMsgList)
-		errMsgList.PrintFailures(t)
-
-		t.Fatal("Able to read resource without valid rbac permissions")
+		e2eutil.Die(t, fmt.Errorf("Able to read resource without valid rbac permissions"))
 	}
 	if execOutStr != expectedErrMsg {
-		t.Fatal("Invalid error message")
+		e2eutil.Die(t, fmt.Errorf("Invalid error message"))
 	}
 }
 
