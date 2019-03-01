@@ -166,6 +166,13 @@ func CreateK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) e
 	return err
 }
 
+func RemoveRole(kubeClient kubernetes.Interface, roleName string) error {
+	if err := kubeClient.RbacV1().Roles(Global.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 func RemoveClusterRole(kubeClient kubernetes.Interface, roleName string) error {
 	clusterRoleList, err := kubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
 	if err != nil {
@@ -264,14 +271,14 @@ func RecreateDockerAuthSecret(client kubernetes.Interface) error {
 	return nil
 }
 
-func RecreateClusterRoles(kubeClient kubernetes.Interface, roleName string) error {
-	if err := RemoveClusterRole(kubeClient, roleName); err != nil {
+func RecreateRoles(kubeClient kubernetes.Interface, roleName string) error {
+	if err := RemoveRole(kubeClient, config.OperatorResourceName); err != nil {
 		return nil
 	}
 
-	clusterRoleSpec := config.GetOperatorClusterRole()
-	clusterRoleSpec.Name = roleName
-	_, err := kubeClient.RbacV1().ClusterRoles().Create(clusterRoleSpec)
+	roleSpec := config.GetOperatorRole()
+	roleSpec.Name = roleName
+	_, err := kubeClient.RbacV1().Roles(Global.Namespace).Create(roleSpec)
 	return err
 }
 
@@ -283,21 +290,27 @@ func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceA
 		return nil
 	}
 	// Create service account given by the name
-	serviceAccountSpec := config.GetOperatorServiceAccount()
-	serviceAccountSpec.Name = serviceAccountName
-	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccountSpec)
+	serviceAccount := config.GetOperatorServiceAccount()
+	serviceAccount.Name = serviceAccountName
+	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccount)
 	return err
 }
 
-func RecreateClusterRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
-	if err := RemoveClusterRoleBinding(kubeClient, namespace, clusterRoleName); err != nil {
+func RecreateRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
+	if err := RemoveRoleBinding(kubeClient, namespace, config.OperatorResourceName); err != nil {
 		return err
 	}
 
-	clusterRoleBindingSpec := config.GetOperatorClusterRoleBinding(Global.Namespace)
-	clusterRoleBindingSpec.Name = clusterRoleName
-	_, err := kubeClient.RbacV1().ClusterRoleBindings().Create(clusterRoleBindingSpec)
+	clusterRoleBindingSpec := config.GetOperatorRoleBinding(Global.Namespace)
+	_, err := kubeClient.RbacV1().RoleBindings(Global.Namespace).Create(clusterRoleBindingSpec)
 	return err
+}
+
+func RemoveRoleBinding(kubeClient kubernetes.Interface, namespace, roleBindingName string) error {
+	if err := kubeClient.RbacV1().RoleBindings(namespace).Delete(roleBindingName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 // Create ansibleHost file for the list of host provided

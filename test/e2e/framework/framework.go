@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -136,9 +135,6 @@ func startTimeoutTimer() {
 
 func CreateDeploymentObject(operatorImageName string, restPort int32) (deployment *appsv1.Deployment, err error) {
 	deployment = config.GetOperatorDeployment(operatorImageName, dockerPullSecretName)
-
-	// Enable CRD auto-creation.
-	deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--create-crd")
 
 	// Manually set the HTTP port.
 	listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(int(restPort))
@@ -370,14 +366,16 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 	return err
 }
 
-func (f *Framework) DeleteCRDs(config *rest.Config) error {
-	logrus.Info("Removing CRDs")
-	clientSet, err := clientset.NewForConfig(config)
+func RecreateCRDs(k8s *types.Cluster) error {
+	clientSet, err := clientset.NewForConfig(k8s.Config)
 	if err != nil {
 		return errors.New("Failed to create clientset object: " + err.Error())
 	}
 	if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
 		return errors.New("Failed to delete CRDs: " + err.Error())
+	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(k8sutil.GetCRD()); err != nil {
+		return err
 	}
 	return nil
 }
@@ -460,7 +458,8 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("Secret deleted: %v", "basic-test-secret")
 	}
 
-	if err := f.DeleteCRDs(targetKube.Config); err != nil {
+	logrus.Info("Recreating CRD")
+	if err := RecreateCRDs(targetKube); err != nil {
 		return err
 	}
 
@@ -469,16 +468,16 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	logrus.Info("Recreating cluster role")
-	if err := RecreateClusterRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	logrus.Info("Recreating role")
+	if err := RecreateRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
 	logrus.Info("Recreating service account")
 	if err := RecreateServiceAccount(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
-	logrus.Info("Recreating cluster role binding")
-	if err := RecreateClusterRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	logrus.Info("Recreating role binding")
+	if err := RecreateRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
 	logrus.Info("Creating secret")

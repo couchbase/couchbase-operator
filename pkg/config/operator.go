@@ -24,10 +24,10 @@ func DumpOperatorYAML(conf *Config) error {
 	if err := DumpYAML(conf, "operator-service-account", GetOperatorServiceAccount()); err != nil {
 		return err
 	}
-	if err := DumpYAML(conf, "operator-cluster-role", GetOperatorClusterRole()); err != nil {
+	if err := DumpYAML(conf, "operator-role", GetOperatorRole()); err != nil {
 		return err
 	}
-	if err := DumpYAML(conf, "operator-cluster-role-binding", GetOperatorClusterRoleBinding(conf.Namespace)); err != nil {
+	if err := DumpYAML(conf, "operator-role-binding", GetOperatorRoleBinding(conf.Namespace)); err != nil {
 		return err
 	}
 	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.OperatorImage, conf.ImagePullSecret)); err != nil {
@@ -36,12 +36,12 @@ func DumpOperatorYAML(conf *Config) error {
 	return nil
 }
 
-// GetOperatorClusterRole generates the cluster role to run with.
-func GetOperatorClusterRole() *rbacv1.ClusterRole {
-	return &rbacv1.ClusterRole{
+// GetOperatorRole generates the cluster role to run with.
+func GetOperatorRole() *rbacv1.Role {
+	return &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "ClusterRole",
+			Kind:       "Role",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: OperatorResourceName,
@@ -59,29 +59,6 @@ func GetOperatorClusterRole() *rbacv1.ClusterRole {
 					"list",   // used by the operator-sdk to discover couchbase clusters.
 					"watch",  // used by the operator-sdk to monitor changes.
 					"update", // used by the operator to update status.
-				},
-			},
-			{
-				APIGroups: []string{
-					"storage.k8s.io",
-				},
-				Resources: []string{
-					"storageclasses",
-				},
-				Verbs: []string{
-					"get", // used by the operator to confirm existence and binding mode.
-				},
-			},
-			{
-				APIGroups: []string{
-					"apiextensions.k8s.io",
-				},
-				Resources: []string{
-					"customresourcedefinitions",
-				},
-				Verbs: []string{
-					"get",    // used by the operator to monitor for installation (optional).
-					"create", // used by the operator for auto installation (optional).
 				},
 			},
 			{
@@ -112,18 +89,6 @@ func GetOperatorClusterRole() *rbacv1.ClusterRole {
 				},
 				Verbs: []string{
 					"create", // used by the operator to signify readiness.
-				},
-			},
-			{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
-					"persistentvolumes",
-				},
-				Verbs: []string{
-					"get",   // used by the operator to lookup availability zone.
-					"watch", // used by the operator to monitor changes.
 				},
 			},
 			{
@@ -180,12 +145,12 @@ func GetOperatorServiceAccount() *corev1.ServiceAccount {
 	}
 }
 
-// GetOperatorClusterRoleBinding generates the cluster role binding linking the role to the service account.
-func GetOperatorClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding {
-	return &rbacv1.ClusterRoleBinding{
+// GetOperatorRoleBinding generates the cluster role binding linking the role to the service account.
+func GetOperatorRoleBinding(namespace string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "ClusterRoleBinding",
+			Kind:       "RoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: OperatorResourceName,
@@ -199,7 +164,7 @@ func GetOperatorClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding 
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
+			Kind:     "Role",
 			Name:     OperatorResourceName,
 		},
 	}
@@ -240,6 +205,7 @@ func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deploym
 							},
 							Args: []string{
 								"--pod-create-timeout=10m",
+								"--create-crd=false",
 							},
 							Env: []corev1.EnvVar{
 								{
