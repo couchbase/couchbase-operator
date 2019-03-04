@@ -356,10 +356,16 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseClust
 		return err
 	}
 
+	// Ensure the operator doesn't start replacing the ejected node until we've registered it as having
+	// been fully ejected, the two rebalance events may merge in to one otherwise.
+	if _, err := PatchCluster(t, k8s, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute); err != nil {
+		return err
+	}
+
 	// Given we could be balancing out the member we are talking to using a progress channel
 	// is not the best option here as it may error as the operator does things in the background
 	// affecting this.  The best option is to just check for the rebalance status to complete.
-	return retryutil.Retry(ctx, time.Second, IntMax, func() (bool, error) {
+	callback := func() (bool, error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -372,7 +378,17 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseClust
 		}
 
 		return info.RebalanceStatus == "none", nil
-	})
+	}
+	if err := retryutil.Retry(ctx, time.Second, IntMax, callback); err != nil {
+		return err
+	}
+
+	// Restore the operator back to the previous condition.
+	if _, err := PatchCluster(t, k8s, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, index int, timeout time.Duration) {
