@@ -1,18 +1,29 @@
 = Overview
 
-The Couchbase Autonomous Operator provides a native integration of Couchbase Server with open source Kubernetes and Red Hat OpenShift. It enables you to automate the management of common Couchbase tasks such as the configuration, creation, scaling, and recovery of Couchbase clusters. By reducing the complexity of running a Couchbase cluster, it lets you focus on the desired configuration and not worry about the details of manual deployment and lifecycle management.
+The Couchbase Autonomous Operator provides a native integration of Couchbase Server with open source Kubernetes and Red Hat OpenShift.
+It enables you to automate the management of common Couchbase tasks such as the configuration, creation, scaling, and recovery of Couchbase clusters.
+By reducing the complexity of running a Couchbase cluster, it lets you focus on the desired configuration and not worry about the details of manual deployment and lifecycle management.
 
 NOTE: The Couchbase Autonomous Operator is only supported with Couchbase Server Enterprise Edition.
 
 == How It Works
 
-The Operator extends the Kubernetes API by creating a Custom Resource Definition (CRD) and registering a custom Couchbase controller (the Operator) to manage Couchbase clusters. The CRD allows you to define a configuration describing what a Couchbase cluster should look like. For example, a configuration might define a cluster with three nodes, one bucket, and 8 GB of memory for the data service. Once the CouchbaseCluster custom resource is loaded into Kubernetes, the configuration is passed to the Operator which takes actions to ensure a Couchbase cluster with the specified configuration is provisioned. The controller can also detect updates to the configuration and reacts to changes that occur in the cluster itself. Like all Kubernetes standard built-in resources, the Operator doesn't just manage a single Couchbase cluster, it can manage multiple Couchbase clusters across an entire Kubernetes deployment.
+The Operator extends the Kubernetes API by creating a Custom Resource Definition (CRD) and registering a custom Couchbase controller (the Operator) to manage Couchbase clusters.
+The CRD allows you to define a configuration describing what a Couchbase cluster should look like.
+For example, a configuration might define a cluster with three nodes, one bucket, and 8 GB of memory for the data service.
+Once the CouchbaseCluster custom resource is loaded into Kubernetes, the configuration is passed to the Operator which takes actions to ensure a Couchbase cluster with the specified configuration is provisioned.
+The controller can also detect updates to the configuration and reacts to changes that occur in the cluster itself.
+Like all Kubernetes standard built-in resources, the Operator doesn't just manage a single Couchbase cluster, it can manage multiple Couchbase clusters within a Kubernetes namespace.
 
 === Advantages Over StatefulSets
 
-StatefulSets are great for certain use-cases, but they don't work that well for running complex software like databases. That is because StatefulSets focus on creating and managing pods, not on managing the software running on them. For example, if you wanted a four-node cluster and deployed Couchbase using StatefulSets, you would get four uninitialized Couchbase pods that don't know about each other. It would then be up to you to join the nodes together into a cluster, and that means extra operational tasks.
+StatefulSets are great for certain use-cases, but they don't work that well for running complex software like databases.
+That is because StatefulSets focus on creating and managing pods, not on managing the software running on them.
+For example, if you wanted a four-node cluster and deployed Couchbase using StatefulSets, you would get four uninitialized Couchbase pods that don't know about each other.
+It would then be up to you to join the nodes together into a cluster, and that means extra operational tasks.
 
-By deploying a unique custom Couchbase controller, Kubernetes gets Couchbase-specific knowledge so that as each Couchbase pod is deployed, it can properly configure it and join it with the other Couchbase pods in the cluster. It's also important to keep in mind that provisioning a cluster is just one place where having a custom controller helps to automate tasks — node failure, ad-hoc scaling, and many other management tasks also require Couchbase-specific knowledge within Kubernetes in order to be properly automated.
+By deploying a unique custom Couchbase controller, Kubernetes gets Couchbase-specific knowledge so that as each Couchbase pod is deployed, it can properly configure it and join it with the other Couchbase pods in the cluster.
+It's also important to keep in mind that provisioning a cluster is just one place where having a custom controller helps to automate tasks — node failure, ad-hoc scaling, and many other management tasks also require Couchbase-specific knowledge within Kubernetes in order to be properly automated.
 
 == What It Supports
 
@@ -22,12 +33,15 @@ The goal of the Operator is to fully manage one or more Couchbase deployments so
 * Cluster provisioning
 * Ad-hoc scalability
 * Auto recovery
-* Configuration Validation
-* Persistent Volume Support
-* XDCR
-* Server Groups
-* TLS
-* Certified for OpenShift and Kubernetes
+* Automated Couchbase server upgrade
+* Rolling Kubernetes upgrade
+* Configuration validation
+* Persistent volume support
+* Cross data center replication (XDCR)
+* Server groups
+* Server side TLS and certificate rotation
+* Public and private cluster addressability
+* Certified for OpenShift, Kubernetes, AKS, EKS & GKE
 
 == Get Started
 
