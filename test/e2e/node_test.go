@@ -251,7 +251,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		eventschema.Repeat{Times: scaledClusterSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		// The operator may miss seeing this due to network timouts
+		// The operator may miss seeing this due to network timeouts
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victim1Name}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victim1Name},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victim2Name},
@@ -537,16 +537,6 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	service, err := e2eutil.CreateService(targetKube.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := e2eutil.DeleteService(targetKube.KubeClient, f.Namespace, service.Name, nil); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
@@ -675,85 +665,43 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	service, err := e2eutil.CreateService(targetKube.KubeClient, f.Namespace, e2espec.NewNodePortService(f.Namespace))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := e2eutil.DeleteService(targetKube.KubeClient, f.Namespace, service.Name, nil); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
 	// NewClusterMulti only waits for cluster size to be accurate (e.g. a node could still be pending-add),
 	// wait for the cluster to be fully balanced and healthy before killing things
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	// For WaitForClusterEventsInParallel API
-	memberDownEvents := e2eutil.EventList{}
-	memberFailedOverEvents := e2eutil.EventList{}
-	memberRemovedEvents := e2eutil.EventList{}
-
-	// For validation purpose
-	memDownEventValidator := e2eutil.EventValidator{}
-	memFailoverEventValidator := e2eutil.EventValidator{}
-	memRemovedEventValidator := e2eutil.EventValidator{}
-
 	for _, podMemberToKill := range podMembersToKill {
-		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
-		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
-		memberRemovedEvents = append(memberRemovedEvents, *e2eutil.NewMemberRemoveEvent(testCouchbase, podMemberToKill))
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 	}
-	memDownEventValidator.AddClusterPodEvent(testCouchbase, "MemberDown", podMembersToKill...)
-	memFailoverEventValidator.AddClusterPodEvent(testCouchbase, "FailedOver", podMembersToKill...)
-	memRemovedEventValidator.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMembersToKill...)
-
-	t.Logf("killing 2 pods...")
-	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 2)
-	if err != nil {
-		t.Fatalf("failed to kill pods: %v", err)
-	}
-
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30*time.Second); err != nil {
-		t.Fatal(err)
-	}
-
-	// Manually failover nodes
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, len(podMembersToKill))
 	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, podMembersToKill)
-
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, time.Minute); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddParallelEvents(memDownEventValidator)
-	expectedEvents.AddParallelEvents(memFailoverEventValidator)
-
-	// event capture for new pod creation
-	for memberId := clusterSize; memberId < clusterSize+len(podMembersToKill); memberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberId), 2*time.Minute)
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
-	}
-
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
-
 	e2eutil.MustVerifyClusterBalancedAndHealthy(t, targetKube, testCouchbase, time.Minute)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddParallelEvents(memRemovedEventValidator)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+
+	// Events:
+	// Create 5 node cluster
+	// Kill 2 nodes
+	// Manually failover the 2 nodes
+	// Wait for rebalance.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
-	// Plaform configuration.
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 

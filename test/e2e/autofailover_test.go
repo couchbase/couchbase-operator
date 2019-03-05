@@ -16,7 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
 
-// Create 3 server groups and 9 node homogeneous cb cluster
+// Create 3 server groups
 // Failover all pods in selected server group
 // This should trigger server group failover in the cluster
 func TestServerGroupAutoFailover(t *testing.T) {
@@ -53,14 +53,6 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	// Deploy couchbase cluster
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
-
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
 	if err != nil {
@@ -79,48 +71,14 @@ func TestServerGroupAutoFailover(t *testing.T) {
 			victims = append(victims, i)
 		}
 	}
-	memberDownEvents := e2eutil.EventList{}
-	memberFailedOverEvents := e2eutil.EventList{}
-
-	memDownParallelEvents := e2eutil.EventValidator{}
-	memFailoverParallelEvents := e2eutil.EventValidator{}
-	memRemovedParallelEvents := e2eutil.EventValidator{}
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range victims {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
-		memberDownEvents = append(memberDownEvents, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberToKill))
-		memberFailedOverEvents = append(memberFailedOverEvents, *e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberToKill))
-
-		memDownParallelEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberToKill)
-		memFailoverParallelEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberToKill)
-		memRemovedParallelEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", podMemberToKill)
 	}
 
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberDownEvents, 30*time.Second); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, memberFailedOverEvents, time.Minute); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedEvents.AddParallelEvents(memDownParallelEvents)
-	expectedEvents.AddParallelEvents(memFailoverParallelEvents)
-
-	// Event check for new member add
-	for memberIndex := clusterSize; memberIndex < clusterSize+3; memberIndex++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberIndex), 2*time.Minute)
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddParallelEvents(memRemovedParallelEvents)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -132,6 +90,18 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 

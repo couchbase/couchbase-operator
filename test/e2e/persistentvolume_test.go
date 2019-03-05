@@ -149,9 +149,9 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	// For validation purpose only
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
 	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 10*time.Minute); err != nil {
-		t.Fatal(err)
-	}
+
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 
 	// For event schema validation
 	expectedEvents.AddParallelEvents(memberDownEvents)
@@ -171,13 +171,10 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "pkill beam.smp")
 			eventsExpected = append(eventsExpected, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
 		}
-		if _, err := e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, 2*time.Minute); err != nil {
-			t.Fatal(err)
-		}
-
 		expectedEvents.AddParallelEvents(memberDownEvents)
 		expectedEvents.AddParallelEvents(memberRecoveredEvents)
 
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -200,8 +197,6 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
 	}
-
-	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	autofailoverTimeout := 30
 	totalTimeToRecover := 0
@@ -289,9 +284,9 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Duration(totalTimeToRecover+(60*platformTimingMultiplier))*time.Second)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Duration(totalTimeToRecover+60)*time.Second)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), time.Duration(5*platformTimingMultiplier)*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -305,7 +300,6 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
 
 	clusterSizeWithOutPvc, _ := strconv.Atoi(serviceConfig1["size"])
 	clusterSizeWithPvc1, _ := strconv.Atoi(serviceConfig2["size"])
@@ -382,10 +376,10 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberIdToKill)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill), time.Duration(autofailoverTimeout+(90*platformTimingMultiplier))*time.Second)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, podMemberIdToKill), 5*time.Minute)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberIdToKill)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(platformTimingMultiplier)*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
@@ -496,8 +490,6 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
-	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
-
 	clusterSize := 4
 	podMembersToKill := []int{0, 1, 2, 3}
 	autofailoverTimeout := 30
@@ -566,7 +558,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 
 	time.Sleep(timeToSleep)
 
-	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, time.Duration(5*platformTimingMultiplier)*time.Minute); err != nil {
+	if _, err := e2eutil.WaitForListOfClusterEvents(targetKube.KubeClient, testCouchbase, allMemberRecoveredEvents, clusterSize-1, 5*time.Minute); err != nil {
 		t.Error(err)
 	}
 
@@ -579,7 +571,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		expectedEvents.AddAnyOfEvents(memRecoveredEventsValidator)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -596,7 +588,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		time.Sleep(timeToSleep)
 
 		// Wait for cluster balanced condition after recovering the cluster pods
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -732,7 +724,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 }
 
 // Create couchbase cluster with Persistent volumes and server groups
-// Kill one couchbase server pods from each server groups
+// Kill one couchbase server pod from each server group
 // Operator should replace killed pods with new one with same name and reuse PVC
 func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
@@ -745,9 +737,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
-	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
-
-	clusterSize := 9
+	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 	pvcName := "couchbase"
 
 	// Create cluster spec for RZA feature
@@ -775,15 +765,6 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
 	// Create a expected RZA results map for verification
 	sort.Strings(availableServerGroupList)
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -797,46 +778,19 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	memberIdsToKill := []int{1, 3, 8}
-	receivedEvents := e2eutil.EventList{}
-	eventChan := make(chan corev1.Event)
-	errChan := make(chan error)
-	for _, memberId := range memberIdsToKill {
-		podNameToKill := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
-		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
-		go func(event corev1.Event) {
-			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 5*time.Minute)
-			eventChan <- event
-			errChan <- err
-		}(*event)
-		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, &metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("Failed to kill pod %s: %v", podNameToKill, err)
-		}
-	}
-	for _, _ = range memberIdsToKill {
-		receivedEvents = append(receivedEvents, <-eventChan)
-		if err = <-errChan; err != nil {
-			t.Fatalf("failed to wait for event %v", err)
-		}
+	// kill the first N pods where N is the no of server groups
+	victims := []int{}
+	for i := 0; i < len(availableServerGroupList); i++ {
+		victims = append(victims, i)
 	}
 
-	for _, recEvent := range receivedEvents {
-		expectedEvents = append(expectedEvents, recEvent)
+	// Loop to kill the nodes
+	for _, podMemberToKill := range victims {
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 	}
 
-	eventsExpected := e2eutil.EventList{}
-	for _, podMemberId := range memberIdsToKill {
-		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
-	}
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, time.Duration(10*platformTimingMultiplier)*time.Minute)
-
-	for _, recEvent := range receivedEvents {
-		expectedEvents = append(expectedEvents, recEvent)
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -847,11 +801,23 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create couchbase cluster with Persistent volumes and server groups
-// Kill couchbase server pods on particular server groups
+// Kill couchbase server pods on a particular server group
 // Operator should replace killed pods with new one with same name and reuse PVC
 func TestPersistentVolumeRzaFailover(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
@@ -864,9 +830,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
-	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
-
-	clusterSize := 9
+	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 	pvcName := "couchbase"
 
 	// Create cluster spec for RZA feature
@@ -894,15 +858,6 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
 	// Create a expected RZA results map for verification
 	sort.Strings(availableServerGroupList)
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
@@ -917,47 +872,22 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
 
-	// Kill nodes in 3rd server groups
-	memberIdsToKill := []int{2, 5, 8}
-	receivedEvents := e2eutil.EventList{}
-	eventChan := make(chan corev1.Event)
-	errChan := make(chan error)
-	for _, memberId := range memberIdsToKill {
-		podNameToKill := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
-		event := e2eutil.NewMemberDownEvent(testCouchbase, memberId)
-		go func(event corev1.Event) {
-			err := e2eutil.WaitForClusterEvent(targetKube.KubeClient, testCouchbase, &event, 5*time.Minute)
-			eventChan <- event
-			errChan <- err
-		}(*event)
-		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, &metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("Failed to kill pod %s: %v", podNameToKill, err)
-		}
-	}
-	for _, _ = range memberIdsToKill {
-		receivedEvents = append(receivedEvents, <-eventChan)
-		if err = <-errChan; err != nil {
-			t.Fatalf("failed to wait for event %v", err)
+	// Kill nodes in 1st server group
+	victimGroup := 0
+	victims := []int{}
+	for i := 0; i < clusterSize; i++ {
+		if i%len(availableServerGroupList) == victimGroup {
+			victims = append(victims, i)
 		}
 	}
 
-	for _, recEvent := range receivedEvents {
-		expectedEvents = append(expectedEvents, recEvent)
+	// Loop to kill the nodes
+	for _, podMemberToKill := range victims {
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 	}
 
-	eventsExpected := e2eutil.EventList{}
-	for _, podMemberId := range memberIdsToKill {
-		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
-	}
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
-	receivedEvents, err = e2eutil.WaitForClusterEventsInParallel(targetKube.KubeClient, testCouchbase, eventsExpected, time.Duration(10*platformTimingMultiplier)*time.Minute)
-
-	for _, recEvent := range receivedEvents {
-		expectedEvents = append(expectedEvents, recEvent)
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Duration(5*platformTimingMultiplier)*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
 	deployedRzaGroupsMap, err = GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)
@@ -967,7 +897,20 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
 		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
 	}
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create multiple Persistent volume claim definitions in spec
@@ -1118,8 +1061,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
-	platformTimingMultiplier := e2eutil.GetPlatformTimingMultiplier(f.PlatformType)
-
 	clusterSize := 3
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
@@ -1156,7 +1097,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
 
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, time.Duration(platformTimingMultiplier)*time.Minute)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
 
 		switch clusterSize {
 		case 2:

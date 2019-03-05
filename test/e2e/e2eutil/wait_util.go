@@ -451,29 +451,6 @@ func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *api.Couchbase
 	}
 }
 
-func WaitForClusterEventsInParallel(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, expectedEvents EventList, timeout time.Duration) (EventList, error) {
-	receivedEvents := EventList{}
-	eventChan := make(chan v1.Event)
-	errChan := make(chan error)
-	for _, event := range expectedEvents {
-		// Creates go routines for each event
-		go func(event v1.Event) {
-			err := WaitForClusterEvent(kubeClient, cl, &event, timeout)
-			eventChan <- event
-			errChan <- err
-		}(event)
-	}
-
-	var err error
-	for _, _ = range expectedEvents {
-		receivedEvents = append(receivedEvents, <-eventChan)
-		if err = <-errChan; err != nil {
-			break
-		}
-	}
-	return receivedEvents, err
-}
-
 // waits until the provided condition type occurs with associated status
 func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, eventList EventList, maxExpectedEvents int, timeout time.Duration) (EventList, error) {
 	opts := metav1.ListOptions{

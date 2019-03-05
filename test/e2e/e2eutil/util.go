@@ -218,14 +218,6 @@ func CreateClusterSpec(secretName string, config map[string]map[string]string) a
 	return e2espec.CreateClusterSpec(constants.ClusterNamePrefix, secretName, config)
 }
 
-func GetPlatformTimingMultiplier(platformType string) int {
-	if platformType == "azure" {
-		return 5
-	} else {
-		return 1
-	}
-}
-
 // Creates Couchbase cluster object and returns it
 func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
@@ -754,10 +746,14 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 	}
 	t.Logf("Killing pods: %v", killPods)
 
-	KillMembers(kubeCli, cl.Namespace, cl.Name, killPods...)
+	if err := KillMembers(kubeCli, cl.Namespace, cl.Name, killPods...); err != nil {
+		Die(t, err)
+	}
 
 	for _, pod := range killPods {
-		WaitPodDeleted(t, kubeCli, pod, cl)
+		if err := WaitPodDeleted(t, kubeCli, pod, cl); err != nil {
+			Die(t, err)
+		}
 	}
 }
 
