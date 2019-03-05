@@ -38,7 +38,7 @@ types:
           - ip: 172.23.96.172
           - ip: 172.23.104.129
 
-  - type: openshift_aws
+  - type: openshift
     clusters:
       - name: BasicCluster
         master:

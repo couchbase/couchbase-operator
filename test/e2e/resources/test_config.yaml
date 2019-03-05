@@ -29,9 +29,6 @@ kube-config:
 # Collect cluster logs when test case fails using cbopinfo tool
 collectLogsOnFailure: false
 
-# If true, operator and server images will be pulled to all k8s nodes
-pullDockerImages: false
-
 # Leaves the operator running after tests
 skip-tear-down: true
 
@@ -47,7 +44,7 @@ cbServerImageVersion: enterprise-5.5.0
 # Couchbase server version to upgrade to
 cbServerImageVersionUpgrade: enterprise-6.0.0
 
-# Cluster type kubernetes | aws-openshift
+# Cluster type kubernetes | openshift
 kube-type: kubernetes
 
 # KUBE version to install

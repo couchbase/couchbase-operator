@@ -51,7 +51,7 @@ The following are descriptions of the field in `test_config.yaml`:
 
 `suite`: the test suite descriptor file to run. The default test suite descriptor can be modified for custom testing, like running/debugging single tests.
 
-`kube-type`: the kubernetes cluster type (opensource kubernetes or openshift) to provision if no kubeconfig is provided to the framework.
+`kube-type`: the kubernetes cluster type (kubernetes or openshift) to provision if no kubeconfig is provided to the framework.
 
 `kube-version`: the version to install of the select `kube-type` if no kubeconfig is provided.
 
