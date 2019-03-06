@@ -109,8 +109,10 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					constants.AnnotationVolumeMountPath:     mountPath,
 					constants.AnnotationVolumeNodeConf:      config.Name,
 					constants.CouchbaseVersionAnnotationKey: version,
-					constants.ServerGroupLabel:              pod.Spec.NodeSelector[constants.ServerGroupLabel],
 				})
+				if serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+					claim.Annotations[constants.ServerGroupLabel] = serverGroup
+				}
 				applyBaseAnnotations(claim.GetObjectMeta())
 				if gid := cs.GetFSGroup(); gid != nil {
 					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
