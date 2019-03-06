@@ -18,28 +18,43 @@ IMPORTANT: This guide makes certain assumptions about the role-based access cont
 == Prerequisites
 
 * Make sure you have installed the xref:install-admission-controller.adoc[admission controller] and that it is running.
-* Download the Operator https://www.couchbase.com/downloads[package] and unpack it on the same computer where you normally run `kubectl`.
+* Download the Operator https://www.couchbase.com/downloads[package^] and unpack it on the same computer where you normally run `kubectl`.
 +
 The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
 +
 IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
 
-== Create a Cluster Role
+== Install the CRD
 
-The first step to installing the Operator is to create a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[cluster role] that allows the Operator to access the resources that it needs to run. Since the Operator might run in many different https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespaces], it is best to create a cluster role because you can assign that role to a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#service-account-permissions[service account] in any namespace.
-
-To create the cluster role for the Operator, run the following command:
+The first step in installing the Operator is to install the custom resource definition (CRD) that describes the `CouchbaseCluster` resource type.
+This can be achieved with the following command:
 
 [source,console]
 ----
-kubectl create -f operator-cluster-role.yaml
+kubectl create -f crd.yaml
 ----
 
-NOTE: This cluster role only needs to be created once.
+== Create a Role
+
+The next step to installing the Operator is to create a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[role^] that allows the Operator to access the resources that it needs to run.
+
+[TIP]
+====
+If you plan to run the Operator in more than one https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace^], it may be preferable to create a cluster role because you can assign that role to a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#service-account-permissions[service account^] in any namespace.
+Note that if you chose to to use a cluster role, making modifications to it will affect all instances of the Operator that use it.
+This has the potential to cause adverse affects in production environments, such as removing required premissions used by older instances of the Operator.
+====
+
+To create the role for the Operator, run the following command:
+
+[source,console]
+----
+kubectl create -f operator-role.yaml
+----
 
 == Create a Service Account
 
-After the cluster role is created, you need to create a service account in the namespace where you are installing the Operator, and then assign the cluster role to that service account using a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[cluster role binding]. (In this example, the service account is created in the namespace called `default`.)
+After the cluster role is created, you need to create a service account in the namespace where you are installing the Operator, and then assign the cluster role to that service account using a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[cluster role binding^]. (In this example, the service account is created in the namespace called `default`.)
 
 To create the service account:
 
@@ -48,14 +63,12 @@ To create the service account:
 kubectl create serviceaccount couchbase-operator --namespace default
 ----
 
-To assign the cluster role to the service account:
+To assign the role to the service account:
 
 [source,console]
 ----
-kubectl create clusterrolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount default:couchbase-operator
+kubectl create rolebinding couchbase-operator --role couchbase-operator --serviceaccount default:couchbase-operator
 ----
-
-NOTE: If you would prefer to use a _role binding_ instead of a cluster role binding, then the CRD needs to be installed separately from the Operator. This can be accomplished by removing the `-create-crd` argument from the `operator-deployment.yaml` file and uploading the CRD separately.
 
 == Create the Operator
 
@@ -66,7 +79,7 @@ Now that the service account is set up with the appropriate permissions, you can
 kubectl create -f operator-deployment.yaml
 ----
 
-Running this command downloads the Operator Docker image (specified in the `operator-deployment.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
+Running this command downloads the Operator Docker image (specified in the `operator-deployment.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment^], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
 
 After you run the `kubectl create` command, it generally takes less than a minute for Kubernetes to deploy the Operator and for the Operator to be ready to run.
 
