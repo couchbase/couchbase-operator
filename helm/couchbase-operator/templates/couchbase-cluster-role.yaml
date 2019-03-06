@@ -15,48 +15,49 @@ rules:
   resources:
   - couchbaseclusters
   verbs:
-  - "*"
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - storageclasses
-  verbs:
-  - "get"
-- apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - update
 - apiGroups:
   - ""
   resources:
   - pods
-  - pods/exec
   - services
   - endpoints
   - persistentvolumeclaims
-  - events
-  - secrets
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
 - apiGroups:
   - ""
   resources:
-  - persistentvolumes
+  - pods/exec
   verbs:
-  - "get"
-  - "watch"
+  - create
 - apiGroups:
-  - apps
+  - ""
   resources:
-  - deployments
+  - events
   verbs:
-  - "*"
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
 - apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
   verbs:
-  - '*'
+  - get
+  - create
+  - delete
 {{- end }}
