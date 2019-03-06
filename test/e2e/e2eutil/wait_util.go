@@ -732,6 +732,17 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 			return true, nil
 		}
 
+		// If there are any finalizers make sure they aren't there, this causes most hangs
+		for _, pvc := range pvcs.Items {
+			if len(pvc.Finalizers) == 0 {
+				continue
+			}
+			pvc.Finalizers = []string{}
+			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(&pvc); err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+		}
+
 		// Temporarily report that stuff needs to be deleted synchronously
 		pvcNames := []string{}
 		for _, pvc := range pvcs.Items {
