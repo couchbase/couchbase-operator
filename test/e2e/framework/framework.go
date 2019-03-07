@@ -133,13 +133,15 @@ func startTimeoutTimer() {
 	}()
 }
 
-func CreateDeploymentObject(operatorImageName string, restPort int32) (deployment *appsv1.Deployment, err error) {
-	deployment = config.GetOperatorDeployment(operatorImageName, dockerPullSecretName)
+func CreateDeploymentObject(operatorImage string, operatorPort int) (deployment *appsv1.Deployment, err error) {
+	deployment = config.GetOperatorDeployment(operatorImage, dockerPullSecretName)
 
 	// Manually set the HTTP port.
-	listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(int(restPort))
-	deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
-	deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(int(restPort))
+	if operatorPort != 0 {
+		listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(operatorPort)
+		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
+		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(operatorPort)
+	}
 	return
 }
 
@@ -163,7 +165,7 @@ func Setup(t *testing.T) (err error) {
 		StorageClassName:              runtimeParams.StorageClassName,
 	}
 
-	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, constants.OperatorRestPort)
+	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0)
 	if err != nil {
 		return err
 	}

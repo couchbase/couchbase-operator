@@ -20,7 +20,6 @@ The test configuration is defined in `./resources/test_config.yaml`. The default
 ```
 operator-image: couchbase/couchbase-operator:v1
 namespace: default
-deployment-spec: ../../example/deployment.yaml
 cluster-config: resources/cluster_conf.yaml
 kube-config:
   - name: BasicCluster
@@ -38,8 +37,6 @@ The following are descriptions of the field in `test_config.yaml`:
 `operator-image`: the name of the autonomous operator docker image to test. If you built the image locally and are using Minikube or Minishift, you do not need to modify this field.
 
 `namespace`: the namespace in the kubernetes cluster in which the test will be run. The testing framework will set up all required permissions (clusterrole, clusterrolebinding, and serviceaccount) in this namespace 
-
-`deployment-spec`: the deployment spec that will be used for the Autonomous Operator deployment. The `operator-image` field will be automatically injected into the deployment spec.
 
 `cluster-config`: this file defines different clusters used for regression and system testing. If the user is running test on Minikube or Minishift, this field can be ignored.
 

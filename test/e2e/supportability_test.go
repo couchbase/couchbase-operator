@@ -583,7 +583,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	context := targetKube.Context
 	t.Logf("KubeConfPath: %+v", kubeConfPath)
 	t.Logf("Context: %v", context)
-	operatorRestPort := strconv.Itoa(int(constants.OperatorRestPort))
+	operatorRestPort := strconv.Itoa(constants.OperatorRestPort)
 
 	// Validate args which won't produce output file
 	for _, arg := range []string{"-help", "-version"} {
@@ -1137,7 +1137,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	}
 }
 
-func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName string, port int32) error {
+func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName string, port int) error {
 	f := framework.Global
 
 	// Delete existing Deployment
@@ -1167,13 +1167,13 @@ func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName s
 
 // Generic function to re-deploy the operator with given image name and rest-port
 // Collect logs with appropiate cbopinfo arguments and verify the collected info
-func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, opImageName string, testPort, defPort int32, cmdArgs []string) {
+func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorImage string, operatorPort int, cmdArgs []string) {
 	f := framework.Global
 	targetKube := k8s
 	clusterSize := 3
 
-	defer ReDeployOperator(t, targetKube.KubeClient, f.OpImage, defPort)
-	if err := ReDeployOperator(t, targetKube.KubeClient, opImageName, testPort); err != nil {
+	defer ReDeployOperator(t, targetKube.KubeClient, f.OpImage, 0)
+	if err := ReDeployOperator(t, targetKube.KubeClient, operatorImage, operatorPort); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1233,14 +1233,13 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, opImageNam
 func TestExtendedDebugWithDefaultValues(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	defPort := constants.OperatorRestPort
 	args := argumentList{}
 	args.addClusterDefaults(targetKube)
 	args.addEnvironmentDefaults()
 	args.add("--collectinfo", "")
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
-	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, defPort, defPort, args.slice())
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, constants.OperatorRestPort, args.slice())
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
@@ -1248,23 +1247,15 @@ func TestExtendedDebugWithDefaultValues(t *testing.T) {
 func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	var defPort int32
-	var testPort int32
-	testPort = 32123
-	containerPorts := f.Deployment.Spec.Template.Spec.Containers[0].Ports
-	for _, temPort := range containerPorts {
-		if temPort.Name == "readiness-port" {
-			defPort = temPort.ContainerPort
-		}
-	}
+	testPort := 32123
 	args := argumentList{}
 	args.addClusterDefaults(targetKube)
 	args.addEnvironmentDefaults()
-	args.add("--operator-rest-port", strconv.Itoa(int(testPort)))
+	args.add("--operator-rest-port", strconv.Itoa(testPort))
 	args.add("--collectinfo", "")
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
-	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, defPort, args.slice())
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, args.slice())
 }
 
 // Collect cbopinfo with '--operator-image' & '-operator-rest-port'
@@ -1285,7 +1276,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	args := argumentList{}
 	args.addClusterDefaults(targetKube)
 	args.add("--operator-image", invalidImgName)
-	args.add("--operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)))
+	args.add("--operator-rest-port", strconv.Itoa(constants.OperatorRestPort))
 
 	execOut, err := runCbopinfoCmd(append(args.slice(), cbCluster.Name))
 	execOutStr := strings.TrimSpace(string(execOut))
@@ -1375,7 +1366,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	args := argumentList{}
 	args.addClusterDefaults(targetKube)
 	args.addEnvironmentDefaults()
-	args.add("--operator-rest-port", strconv.Itoa(int(constants.OperatorRestPort)))
+	args.add("--operator-rest-port", strconv.Itoa(constants.OperatorRestPort))
 	args.add("--collectinfo", "")
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")

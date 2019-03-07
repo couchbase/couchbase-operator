@@ -71,7 +71,7 @@ var (
 
 const (
 	// Operator constants
-	OperatorRestPort int32 = 8080
+	OperatorRestPort = 8080
 
 	// Couchbase cluster constants
 	CbClusterRestPort int32 = 8091
