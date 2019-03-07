@@ -160,18 +160,10 @@ func runSuite(t *testing.T) {
 			}
 
 			// Add required K8S node labels
-			for retryCount := 0; retryCount < constants.Retries5; retryCount++ {
-				t.Logf("Retry node label update: %d", retryCount)
-				// Label K8S nodes based on the labels present in the cluster conf yaml file
-				if err := K8SNodesAddLabel(constants.FailureDomainZoneLabel, clusterSpec.KubeClient, kubeCluster); err == nil {
-					break
-				} else if retryCount == 2 {
-					skipCurrTestGroup = true
-					t.Errorf("Failed to label the nodes: %v", err)
-					// Remove the map entry and break the loop
-					delete(f.ClusterSpec, kubeName)
-					break
-				}
+			if err := K8SNodesAddLabel(clusterSpec, kubeCluster, constants.FailureDomainZoneLabel, time.Minute); err != nil {
+				t.Errorf("Failed to label the nodes: %v", err)
+				skipCurrTestGroup = true
+				delete(f.ClusterSpec, kubeName)
 			}
 
 			if skipCurrTestGroup {
@@ -182,16 +174,6 @@ func runSuite(t *testing.T) {
 		// Avoid executing particular test group in case of setup failure
 		if skipCurrTestGroup {
 			continue
-		}
-
-		// Do setup procedure for this group
-		for _, setupFunc := range testGroup.GroupSetup {
-			if _, ok := TestGroupSetupFuncMap[setupFunc]; !ok {
-				logrus.Errorf("Function %s not found", setupFunc)
-				continue
-			}
-			logrus.Infof("Running setup %s for %s", setupFunc, testGroup.GroupName)
-			//TestGroupSetupFuncMap[setupFunc](t, kubeClustersToSetup)
 		}
 
 		for _, currTestCase := range testGroup.TestCase {
@@ -257,16 +239,6 @@ func runSuite(t *testing.T) {
 				}
 				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testPassed})
 			}
-		}
-
-		// Do clean procedure for this group
-		for _, teardownFunc := range testGroup.GroupTeardown {
-			if _, ok := TestGroupSetupFuncMap[teardownFunc]; !ok {
-				logrus.Errorf("Function %s not found", teardownFunc)
-				continue
-			}
-			logrus.Infof("Running teardown %s for %s", teardownFunc, testGroup.GroupName)
-			//TestGroupSetupFuncMap[teardownFunc](t, kubeClustersToSetup)
 		}
 	}
 }

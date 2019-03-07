@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"errors"
 	"os"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -25,43 +27,48 @@ import (
 )
 
 // Labels k8s nodes based on the values provided from the ClusterInfo struct
-func K8SNodesAddLabel(nodeLabelName string, kubeClient kubernetes.Interface, k8sNodesData framework.ClusterInfo) error {
-	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to get k8s nodes " + err.Error())
-	}
-	for _, k8sNode := range k8sNodeList.Items {
-		labelChanged := false
-		nodeLabels := k8sNode.GetLabels()
-		nodeIpAddress := k8sNode.Status.Addresses[0].Address
-		for _, node := range k8sNodesData.MasterNodeList {
-			if node.Ip == nodeIpAddress {
-				nodeLabels[nodeLabelName] = node.NodeLabel
-				labelChanged = true
-				break
+func K8SNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabelName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
+		k8sNodeList, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil {
+			return errors.New("Failed to get k8s nodes " + err.Error())
+		}
+		for _, k8sNode := range k8sNodeList.Items {
+			labelChanged := false
+			nodeLabels := k8sNode.GetLabels()
+			nodeIpAddress := k8sNode.Status.Addresses[0].Address
+			for _, node := range nodes.MasterNodeList {
+				if node.Ip == nodeIpAddress {
+					nodeLabels[nodeLabelName] = node.NodeLabel
+					labelChanged = true
+					break
+				}
+			}
+			for _, node := range nodes.WorkerNodeList {
+				if node.Ip == nodeIpAddress {
+					nodeLabels[nodeLabelName] = node.NodeLabel
+					labelChanged = true
+					break
+				}
+			}
+			if !labelChanged {
+				return errors.New("Unable to find node " + nodeIpAddress)
+			}
+			k8sNode.SetLabels(nodeLabels)
+
+			// Reset Taints and set schedulable property for nodes
+			k8sNode.Spec.Unschedulable = false
+			k8sNode.Spec.Taints = []v1.Taint{}
+
+			if _, err := k8s.KubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
+				return errors.New("Failed to update label for node " + nodeIpAddress + ": " + err.Error())
 			}
 		}
-		for _, node := range k8sNodesData.WorkerNodeList {
-			if node.Ip == nodeIpAddress {
-				nodeLabels[nodeLabelName] = node.NodeLabel
-				labelChanged = true
-				break
-			}
-		}
-		if !labelChanged {
-			return errors.New("Unable to find node " + nodeIpAddress)
-		}
-		k8sNode.SetLabels(nodeLabels)
-
-		// Reset Taints and set schedulable property for nodes
-		k8sNode.Spec.Unschedulable = false
-		k8sNode.Spec.Taints = []v1.Taint{}
-
-		if _, err := kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-			return errors.New("Failed to update label for node " + nodeIpAddress + ": " + err.Error())
-		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // Updates ServerGroup labels for the nodes with matches the oldLabelVal

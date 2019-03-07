@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -120,8 +121,11 @@ func checkCollectInfoLogs(kubeClient kubernetes.Interface, namespace, cbClusterN
 		errMsgList.AppendFailure("For log directory "+cbopinfoLogDir, fmt.Errorf("Failed to extract timestamp: %v", err))
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
 	var pods *corev1.PodList
-	err = retryutil.Retry(e2eutil.Context, 5*time.Second, 5, func() (bool, error) {
+	err = retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
 		pods, err = kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -152,8 +156,11 @@ func verifyLogRedaction(kubeClient kubernetes.Interface, namespace, cbClusterNam
 		fmt.Printf("Failed to extract timestamp: %v", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
 	var pods *corev1.PodList
-	err = retryutil.Retry(e2eutil.Context, 5*time.Second, 5, func() (bool, error) {
+	err = retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
 		pods, err = kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)

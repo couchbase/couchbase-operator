@@ -75,9 +75,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 
 	// Verify data set doc count
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, 5*time.Minute)
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -261,9 +259,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	datasetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
 	for index, datasetName := range datasetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, datasetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], constants.Retries10); err != nil {
-			e2eutil.Die(t, err)
-		}
+		e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, datasetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], 5*time.Minute)
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -337,9 +333,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	}
 
 	// Wait until analytics service is fully functional
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, 5*time.Minute)
 
 	// Function to insert data with two types of valueType varaibles
 	dataInsertionErrChan := make(chan error)
@@ -393,7 +387,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, podMemberId), time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
 
-		e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, constants.Size1)
+		e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Size1, time.Minute)
 
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberFailedOverEvent(testCouchbase, podMemberId), time.Minute)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberId)
@@ -426,9 +420,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
 	for index, dataSetName := range dataSetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetCount[index], constants.Retries5); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, dataSetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetCount[index], 5*time.Minute)
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -442,6 +434,10 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
 
 	numOfDocs := 100
 	clusterSize := 3
@@ -509,9 +505,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	}
 
 	// Wait till anlytics service become functional
-	if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, constants.Retries10); err != nil {
-		t.Fatal(err)
-	}
+	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, 5*time.Minute)
 
 	// Loop to kill the pod containers
 	for podMemberId := 0; podMemberId < clusterSize; podMemberId++ {
@@ -552,9 +546,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	dataSetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
 	dataSetDocCount := []int{numOfDocs, 0, 0}
 	for index, dataSetName := range dataSetNames {
-		if err := e2eutil.VerifyDocCountInAnalyticsDataset(analyticsHostUrl, analyticsNodePortStr, dataSetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], constants.Retries5); err != nil {
-			t.Fatal(err)
-		}
+		e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, dataSetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], 5*time.Minute)
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

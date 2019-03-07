@@ -100,7 +100,7 @@ func TestNodeManualFailover(t *testing.T) {
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
 	// failover member
-	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, []int{0})
+	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, 0, time.Minute)
 
 	// expect rebalance event to start
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
@@ -414,8 +414,8 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	}
 
 	// Manually failover nodes
-	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, memberIdsToKill)
 	for _, memberId := range memberIdsToKill {
+		e2eutil.MustFailoverNode(t, targetKube, testCouchbase, memberId, time.Minute)
 		expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberId)
 	}
 
@@ -551,11 +551,11 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		expectedEvents.AddMemberDownEvent(testCouchbase, memberId)
 	}
 
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, memberIdsToKillLen)
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, memberIdsToKillLen, time.Minute)
 
 	// Manually failover nodes
 	for _, memberId := range memberIdsToKill {
-		e2eutil.MustFailoverNode(t, targetKube, testCouchbase, memberId)
+		e2eutil.MustFailoverNode(t, targetKube, testCouchbase, memberId, time.Minute)
 		expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberId)
 	}
 
@@ -672,8 +672,10 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	for _, podMemberToKill := range podMembersToKill {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 	}
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, len(podMembersToKill))
-	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, podMembersToKill)
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, len(podMembersToKill), time.Minute)
+	for _, podMemberToKill := range podMembersToKill {
+		e2eutil.MustFailoverNode(t, targetKube, testCouchbase, podMemberToKill, time.Minute)
+	}
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 	e2eutil.MustVerifyClusterBalancedAndHealthy(t, targetKube, testCouchbase, time.Minute)
@@ -780,16 +782,8 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	autofailoverTimeout, _ := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
 	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
 
-	t.Logf("waiting for pods to die...")
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, constants.Retries30, testCouchbase); err != nil {
-		t.Logf("status: %v+", testCouchbase)
-		t.Fatalf("failed to reach cluster size of 4: %v", err)
-	}
-
-	t.Logf("waiting for cluster size to be 5")
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 5, constants.Retries10, testCouchbase); err != nil {
-		t.Fatalf("failed to reach cluster size of 5: %v", err)
-	}
+	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 4, 5*time.Minute)
+	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 5, 5*time.Minute)
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -853,15 +847,8 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P OUTPUT DROP")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P FORWARD DROP")
 
-	t.Logf("waiting for pods to die...")
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 4, constants.Retries10, testCouchbase); err != nil {
-		t.Fatalf("failed to reach cluster size of 4: %v", err)
-	}
-
-	t.Logf("waiting for cluster size to be 5")
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, 5, constants.Retries10, testCouchbase); err != nil {
-		t.Fatalf("failed to reach cluster size of 5: %v", err)
-	}
+	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 4, 5*time.Minute)
+	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 5, 5*time.Minute)
 
 	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
 	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
@@ -918,7 +905,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)
 
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 5, 1)
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 1, time.Minute)
 
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
 		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)

@@ -557,7 +557,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 100, constants.Retries10); err != nil {
+		if err := e2eutil.VerifyDocCountInBucket(destUrl, destBucketName, cbUsername, cbPassword, 100, 10*time.Minute); err != nil {
 			t.Fatal(err)
 		}
 
@@ -590,7 +590,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := e2eutil.VerifyDocCountInBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 200, constants.Retries10); err != nil {
+			if err := e2eutil.VerifyDocCountInBucket(hostUrl, srcBucketName, cbUsername, cbPassword, 200, 10*time.Minute); err != nil {
 				t.Fatal(err)
 			}
 		ValidateEvents(t, k8s1, xdcrCluster1, expectedCluster1Events)

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"errors"
 	"os"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -64,18 +66,13 @@ func VerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string,
 		return nil
 	}
 
-	maxRetires := constants.Retries5
-	if platformType == "azure" {
-		maxRetires = constants.Retries30
-	}
-	for retryCount := 0; retryCount < maxRetires; retryCount++ {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
 		// Sleep before next poll
-		time.Sleep(time.Second * 5)
-		if errToReturn = pvcMappingVerify(); errToReturn == nil {
-			return
-		}
-	}
-	return
+		return pvcMappingVerify()
+	})
 }
 
 func MustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int, platformType string) {
@@ -397,10 +394,10 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	// Sleep for autofailover to occur
 	time.Sleep(time.Second*time.Duration(autofailoverTimeout) + 120)
 
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Retries5, constants.Size1)
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, constants.Size1, time.Minute)
 
 	// Manual failover to recover the pod
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, podMemberIdToKill)
+	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, podMemberIdToKill, time.Minute)
 	expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", podMemberIdToKill)
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), 3*time.Minute)

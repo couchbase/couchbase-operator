@@ -384,20 +384,23 @@ func RecreateCRDs(k8s *types.Cluster) error {
 
 func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	logrus.Info("Marking all nodes as schedulable")
-	nodeTaintList := []v1.Taint{}
-	for i := 0; i < constants.Retries5; i++ {
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
+		nodeTaintList := []v1.Taint{}
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil && i == 2 {
-			return errors.New("Failed to get node list: " + err.Error())
+		if err != nil {
+			return fmt.Errorf("Failed to get node list: %v", err)
 		}
 		for nodeIndex, _ := range k8sNodeList.Items {
-			err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex)
-			if err != nil && i == 2 {
-				return errors.New("Failed to update node taint: " + err.Error())
+			if err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex); err != nil {
+				return fmt.Errorf("Failed to update node taint: %v", err)
 			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (f *Framework) SetupFramework(kubeName string) error {
@@ -533,9 +536,13 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 	if err := deleteOperator(kubeClient, deploymentName, namespace); err != nil {
 		return err
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
-	err := retryutil.Retry(e2eutil.Context, 5*time.Second, 24, func() (bool, error) {
+	return retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
 		_, err := kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return false, err
@@ -545,10 +552,6 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 		}
 		return false, err
 	})
-	if err != nil {
-		return errors.New("fail to wait couchbase operator pod gone from API: " + err.Error())
-	}
-	return nil
 }
 
 func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace string) error {

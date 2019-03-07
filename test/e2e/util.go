@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -218,11 +216,6 @@ var (
 	DecoratorFuncMap = framework.DecoratorMap{
 		"recoverDecorator": framework.RecoverDecorator,
 	}
-
-	TestGroupSetupFuncMap = GroupSetupFunction{
-		"AddServerGroupLabelToNodes":      AddServerGroupLabelToNodes,
-		"RemoveServerGroupLabelFromNodes": RemoveServerGroupLabelFromNodes,
-	}
 )
 
 func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, events e2eutil.EventValidator) {
@@ -273,46 +266,6 @@ func K8SNodesRemoveLabel(nodeLabelName string, kubeClient kubernetes.Interface) 
 		}
 	}
 	return nil
-}
-
-// Function to Label the K8S nodes with server group
-func AddServerGroupLabelToNodes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
-	f := framework.Global
-
-	for _, clusterInfo := range clusterInfoList {
-		kubeName := clusterInfo.ClusterName
-		targetKube := f.ClusterSpec[kubeName]
-
-		k8sNodesData, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, []string{kubeName})
-		if err != nil {
-			return errors.New("Failed to read cluster yaml data: " + err.Error())
-		}
-
-		for retryCount := 0; retryCount < constants.Retries5; retryCount++ {
-			t.Logf("Update node label count: %d", retryCount)
-			// Label K8S nodes based on the labels present in the cluster conf yaml file
-			if err = K8SNodesAddLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient, k8sNodesData[0]); err == nil {
-				break
-			}
-		}
-	}
-	return err
-}
-
-// Function to remove the server group specific labels from K8S nodes
-func RemoveServerGroupLabelFromNodes(t *testing.T, clusterInfoList []framework.ClusterInfo) (err error) {
-	f := framework.Global
-	for _, clusterInfo := range clusterInfoList {
-		kubeName := clusterInfo.ClusterName
-		targetKube := f.ClusterSpec[kubeName]
-		for retryCount := 0; retryCount < constants.Retries5; retryCount++ {
-			t.Logf("Update node label count: %d", retryCount)
-			if err = K8SNodesRemoveLabel(pkg_constants.ServerGroupLabel, targetKube.KubeClient); err == nil {
-				break
-			}
-		}
-	}
-	return err
 }
 
 // skipEnterpriseOnlyPlatform skips the test if it's Enterprise Edition only e.g.

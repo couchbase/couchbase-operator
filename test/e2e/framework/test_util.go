@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
@@ -1043,33 +1045,30 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		}
 
 		logrus.Info("Creating etcd cluster")
-		maxRetries := constants.Retries5
-		for retryCount := 0; retryCount < maxRetries; retryCount++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		err := retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
 			if err := CreateEtcd(t, kubeClient, namespace, kubeConfigPath); err != nil {
 				logrus.Infof("Error creating etcd: %v", err)
 				DeleteEtcd(t, kubeClient, namespace, kubeConfigPath)
-				if retryCount == maxRetries-1 {
-					return err
-				}
-				time.Sleep(time.Second * 3)
-				continue
+				return err
 			}
-			break
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
 		logrus.Info("Creating Portworx cluster")
-		for retryCount := 0; retryCount < maxRetries; retryCount++ {
+		return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
 			if err := CreatePortworx(t, kubeClient, namespace, kubeConfigPath); err != nil {
 				logrus.Infof("Error creating portworx cluster: %v", err)
 				DeletePortworx(t, kubeClient, kubeConfigPath)
-				if retryCount == maxRetries-1 {
-					return err
-				}
-				time.Sleep(time.Second * 3)
-				continue
+				return err
 			}
-			break
-		}
+			return nil
+		})
 	default:
 		logrus.Infof("Storage type '%s' creation not supported", storageClassType)
 	}

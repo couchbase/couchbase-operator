@@ -28,7 +28,6 @@ import (
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -79,14 +78,7 @@ var (
 		"conflictResolution": "seqno",
 		"enableFlush":        "true",
 		"enableIndexReplica": "false"}
-
-	// Global dummy context used buy blocking calls
-	Context context.Context
 )
-
-func init() {
-	Context = context.WithValue(context.Background(), "logger", logrus.WithField("module", "e2eutil"))
-}
 
 // randomSuffix generates a 5 character random suffix to be appended to
 // k8s resources to avoid namespace collisions (especially events)
@@ -1046,7 +1038,7 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, n
 			return err
 		}
 	}
-	_, err = WaitPodsDeleted(kubeClient, namespace, constants.Retries30, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitPodsDeleted(kubeClient, namespace, 30, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
@@ -1078,7 +1070,7 @@ func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, la
 			return err
 		}
 	}
-	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, constants.Retries30, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, 30, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}

@@ -98,17 +98,6 @@ const (
 )
 
 const (
-	Retries1   = 1
-	Retries5   = 5
-	Retries10  = 10
-	Retries20  = 20
-	Retries30  = 30
-	Retries60  = 60
-	Retries120 = 120
-	Retries240 = 240
-)
-
-const (
 	Mem256Mb = 256
 	Mem512Mb = 512
 	Mem1Gb   = 1024

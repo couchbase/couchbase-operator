@@ -36,63 +36,31 @@ type acceptFunc func(*api.CouchbaseCluster) bool
 type filterFunc func(*v1.Pod) bool
 type filterFuncDaemonSet func(*v1beta1.DaemonSet) bool
 
-func WaitUntilPodSizeReached(t *testing.T, kubeClient kubernetes.Interface, size, retries int, cl *api.CouchbaseCluster) ([]string, error) {
-	var names []string
-	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		podList, err := kubeClient.Core().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
+func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *api.CouchbaseCluster, size int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
+		podList, err := k8s.KubeClient.Core().Pods(couchbase.Namespace).List(k8sutil.ClusterListOpt(couchbase.Name))
 		if err != nil {
 			return false, err
 		}
-		names = nil
-		var nodeNames []string
-		for i := range podList.Items {
-			pod := &podList.Items[i]
-
+		for _, pod := range podList.Items {
 			if pod.Status.Phase != v1.PodRunning {
-				continue
+				return false, nil
 			}
-			names = append(names, pod.Name)
-			nodeNames = append(nodeNames, pod.Spec.NodeName)
 		}
-		LogfWithTimestamp(t, "waiting size (%d), couchbase pods: names (%v), nodes (%v)", size, names, nodeNames)
-		if len(names) != size {
+		if len(podList.Items) != size {
 			return false, nil
 		}
 		return true, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return names, nil
 }
 
-func WaitUntilPodSizeReachedEtcd(t *testing.T, kubeClient kubernetes.Interface, size, retries int) ([]string, error) {
-	var names []string
-	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		podList, err := kubeClient.Core().Pods("default").List(metav1.ListOptions{LabelSelector: "app=etcd"})
-		if err != nil {
-			return false, err
-		}
-		names = nil
-		var nodeNames []string
-		for i := range podList.Items {
-			pod := &podList.Items[i]
-			if pod.Status.Phase != v1.PodRunning {
-				continue
-			}
-			names = append(names, pod.Name)
-			nodeNames = append(nodeNames, pod.Spec.NodeName)
-		}
-		LogfWithTimestamp(t, "waiting size (%d), etcd pods: names (%v), nodes (%v)", size, names, nodeNames)
-		if len(names) != size {
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
+func MustWaitUntilPodSizeReached(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, size int, timeout time.Duration) {
+	if err := WaitUntilPodSizeReached(k8s, couchbase, size, timeout); err != nil {
+		Die(t, err)
 	}
-	return names, nil
 }
 
 func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *api.CouchbaseCluster, buckets []string, timeout time.Duration) error {
@@ -120,32 +88,25 @@ func MustWaitUntilBucketsExists(t *testing.T, k8s *types.Cluster, couchbase *api
 	}
 }
 
-func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
-	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *api.CouchbaseCluster, bucket string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
+		currCluster, err := k8s.CRClient.CouchbaseV1().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		for _, accept := range accepts {
-			if accept(currCluster) {
-				return false, nil
-			}
-		}
-
-		LogfWithTimestamp(t, "waiting for buckets to be deleted (%v)", buckets)
-		for _, b := range buckets {
-			if _, ok := currCluster.Status.Buckets[b]; ok {
-				return false, nil
-			}
-		}
-		return true, nil
+		_, ok := currCluster.Status.Buckets[bucket]
+		return !ok, nil
 	})
+}
 
-	if err != nil {
-		return err
+func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, bucket string, timeout time.Duration) {
+	if err := WaitUntilBucketNotExists(k8s, couchbase, bucket, timeout); err != nil {
+		Die(t, err)
 	}
-	return nil
 }
 
 // WaitClusterPhaseFailed expects the cluster to enter a failed state, useful for passing
@@ -254,7 +215,7 @@ func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
 
-	err = retryutil.Retry(Context, retryInterval, 3, func() (done bool, err error) {
+	err = retryutil.Retry(context.Background(), retryInterval, 3, func() (done bool, err error) {
 		list, err := kubeClient.CoreV1().Services(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 		if err != nil {
 			return false, err
@@ -318,7 +279,7 @@ func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int
 
 func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions, filters ...filterFunc) ([]*v1.Pod, error) {
 	var pods []*v1.Pod
-	err := retryutil.Retry(Context, retryInterval, retries, func() (bool, error) {
+	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
@@ -343,7 +304,7 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int
 
 // WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
 func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label string) error {
-	err := retryutil.Retry(Context, time.Second, 180, func() (bool, error) {
+	err := retryutil.Retry(context.Background(), time.Second, 180, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 		if err != nil {
 			return false, err
@@ -361,55 +322,6 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label strin
 	return nil
 }
 
-func WaitUntilOperatorDeleted(kubecli kubernetes.Interface, namespace, label string) error {
-	err := retryutil.Retry(Context, 10*time.Second, 6, func() (bool, error) {
-		podList, err := kubecli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
-		if err != nil {
-			return false, err
-		}
-		if len(podList.Items) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to wait for pods with label=(%v) to be deleted: %v", label, err)
-	}
-	return nil
-}
-
-func CreateAndWaitPod(kubecli kubernetes.Interface, ns string, pod *v1.Pod, timeout time.Duration) (*v1.Pod, error) {
-	_, err := kubecli.CoreV1().Pods(ns).Create(pod)
-	if err != nil {
-		return nil, err
-	}
-
-	interval := 5 * time.Second
-	var retPod *v1.Pod
-	err = retryutil.Retry(Context, interval, int(timeout/(interval)), func() (bool, error) {
-		retPod, err = kubecli.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		switch retPod.Status.Phase {
-		case v1.PodRunning:
-			return true, nil
-		case v1.PodPending:
-			return false, nil
-		default:
-			return false, fmt.Errorf("unexpected pod status.phase: %v", retPod.Status.Phase)
-		}
-	})
-
-	if err != nil {
-		if retryutil.IsRetryFailure(err) {
-			return nil, fmt.Errorf("failed to wait pod running, it is still pending: %v", err)
-		}
-		return nil, fmt.Errorf("failed to wait pod running: %v", err)
-	}
-	return retPod, nil
-}
-
 // waits until the provided condition type occurs with associated status
 func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, timeout time.Duration) error {
 	opts := metav1.ListOptions{
@@ -419,7 +331,17 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	if err != nil {
 		return err
 	}
-	defer watch.Stop()
+	defer func() {
+		// There is a race when you call stop, but the watcher is tring to send
+		// on the result channel, so drain any events to cause the routine to exit
+		// cleanly.
+		watch.Stop()
+		for {
+			if _, ok := <-watch.ResultChan(); !ok {
+				break
+			}
+		}
+	}()
 
 	now := metav1.Now()
 
@@ -607,7 +529,7 @@ func WaitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, retri
 
 func waitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions, filters ...filterFuncDaemonSet) ([]*v1beta1.DaemonSet, error) {
 	var dss []*v1beta1.DaemonSet
-	err := retryutil.Retry(Context, retryInterval, retries, func() (bool, error) {
+	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (bool, error) {
 		dsList, err := kubecli.ExtensionsV1beta1().DaemonSets(namespace).List(lo)
 		if err != nil {
 			return false, err

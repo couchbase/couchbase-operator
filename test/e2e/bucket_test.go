@@ -83,12 +83,6 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	bucketConfigs := []api.BucketConfig{}
 	buckets := []string{}
 
@@ -113,15 +107,15 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	}
 	// delete all buckets
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
-	err = e2eutil.WaitUntilBucketsNotExists(t, targetKube.CRClient, []string{"default1", "default2", "default3", "default4"}, constants.Retries10, testCouchbase)
-	if err != nil {
-		t.Fatalf("failed to delete bucket %v", err)
-	}
+	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket1.BucketName, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket2.BucketName, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket3.BucketName, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket4.BucketName, 2*time.Minute)
 
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default1")
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default2")
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default3")
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, "default4")
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket1.BucketName)
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket2.BucketName)
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket3.BucketName)
+	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket4.BucketName)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
@@ -155,12 +149,6 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	clusterInfo, err := e2eutil.GetClusterInfo(t, client, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo)
-
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucketSetting := range bucketSettingsList {
@@ -184,9 +172,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 		// delete bucket
 		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
-		if err := e2eutil.WaitUntilBucketsNotExists(t, targetKube.CRClient, []string{bucketSetting.BucketName}, constants.Retries10, testCouchbase); err != nil {
-			t.Fatalf("failed to delete bucket %v", err)
-		}
+		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucketSetting.BucketName, 2*time.Minute)
 
 		expectedEvents.AddBucketDeleteEvent(testCouchbase, "default")
 

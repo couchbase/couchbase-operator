@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -229,6 +231,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
 	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
+	clusterSize := 4
 
 	// cluster configuration, 10 buckets, 4 nodes, all services
 	withPvc := true
@@ -244,7 +247,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 
 	serviceConfig1 := map[string]string{
-		"size":     "4",
+		"size":     strconv.Itoa(clusterSize),
 		"name":     "test_config_1",
 		"services": "data,query,index,search,eventing,analytics",
 	}
@@ -370,19 +373,6 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
 	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
 
-	// get info from cluster to add to the scope
-	t.Logf("grabbing cluster info")
-	clusterInfo1, err := e2eutil.GetClusterInfo(t, client1, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo1)
-	clusterInfo2, err := e2eutil.GetClusterInfo(t, client2, constants.Retries5)
-	if err != nil {
-		t.Fatalf("failed to get cluster info %v", err)
-	}
-	t.Logf("cluster info: %v", clusterInfo2)
-
 	t.Logf("grabbing bucket info")
 	bucketInfo1, err := client1.GetBuckets()
 	if err != nil {
@@ -402,11 +392,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		buckets: []string{},
 	}
 
-	for _, n := range clusterInfo1.Nodes {
-		testScope.nodes1 = append(testScope.nodes1, n.HostName)
-	}
-	for _, n := range clusterInfo2.Nodes {
-		testScope.nodes2 = append(testScope.nodes2, n.HostName)
+	suffix1 := "." + testCouchbase1.Name + "." + f.Namespace + ".svc"
+	suffix2 := "." + testCouchbase2.Name + "." + f.Namespace + ".svc"
+	for i := 0; i < clusterSize; i++ {
+		testScope.nodes1 = append(testScope.nodes1, couchbaseutil.CreateMemberName(testCouchbase1.Name, i)+suffix1)
+		testScope.nodes2 = append(testScope.nodes2, couchbaseutil.CreateMemberName(testCouchbase2.Name, i)+suffix2)
 	}
 	for _, b := range bucketInfo1 {
 		testScope.buckets = append(testScope.buckets, b.BucketName)

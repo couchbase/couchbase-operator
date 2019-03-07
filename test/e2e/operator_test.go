@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -40,12 +41,9 @@ func TestPauseOperator(t *testing.T) {
 
 	t.Logf("Killing pod...")
 	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 1)
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, constants.Size2, constants.Retries10, testCouchbase); err != nil {
-		t.Fatalf("failed to wait for killed member to die: %v", err)
-	}
-
-	if _, err := e2eutil.WaitUntilPodSizeReached(t, targetKube.KubeClient, constants.Size3, constants.Retries10, testCouchbase); err == nil {
-		t.Fatalf("cluster should not be recovered: control is paused")
+	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, constants.Size2, 2*time.Minute)
+	if err := e2eutil.WaitUntilPodSizeReached(targetKube, testCouchbase, constants.Size3, 2*time.Minute); err == nil {
+		e2eutil.Die(t, fmt.Errorf("cluster expectedly recovered"))
 	}
 
 	t.Logf("Resuming operator...")
@@ -109,8 +107,8 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	// bucket was updated and wait for it to revert as the operator regains mastership.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", &flush), constants.Retries1)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", &flush), constants.Retries1)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", &flush), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", &flush), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 3*time.Minute)
 
 	// Check the events match what we expect:

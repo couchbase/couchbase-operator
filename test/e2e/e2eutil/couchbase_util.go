@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -20,7 +21,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	"github.com/couchbase/gocbmgr"
@@ -406,37 +406,11 @@ func MemberFromSpecProps(name, namespace, serverConfig string, memberIndex int) 
 	}
 }
 
-func GetClusterInfo(t *testing.T, client *cbmgr.Couchbase, tries int) (*cbmgr.ClusterInfo, error) {
-	err := retryutil.RetryOnErr(Context, 5*time.Second, tries, "get cluster info", "test-cluster",
-		func() error {
-			_, err := client.ClusterInfo()
-			if err != nil {
-				t.Logf("error getting cluster info: %v", err)
-				return err
-			}
-			return nil
-		})
-	if err != nil {
-		return nil, err
-	}
-	t.Logf("getting cluster info")
-	info, err := client.ClusterInfo()
-	if err != nil {
-		return nil, err
-	}
-	return info, nil
-}
+func FailoverNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, index int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-func GetNodesFromCluster(t *testing.T, client *cbmgr.Couchbase, tries int) ([]cbmgr.NodeInfo, error) {
-	info, err := GetClusterInfo(t, client, tries)
-	if err != nil {
-		return nil, err
-	}
-	return info.Nodes, nil
-}
-
-func FailoverNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, tries, index int) error {
-	return retryutil.Retry(Context, 5*time.Second, tries, func() (bool, error) {
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -456,17 +430,9 @@ func FailoverNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, tries, in
 	})
 }
 
-func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, index int) {
-	if err := FailoverNode(k8s, couchbase, constants.Retries5, index); err != nil {
+func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, index int, timeout time.Duration) {
+	if err := FailoverNode(k8s, couchbase, index, timeout); err != nil {
 		Die(t, err)
-	}
-}
-
-// MustFailoverNodes manually fails over nodes, raises an error if the cluster is the wrong size
-// or the number of down nodes is wrong
-func MustFailoverNodes(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, memberIdsToFailover []int) {
-	for _, index := range memberIdsToFailover {
-		MustFailoverNode(t, k8s, couchbase, index)
 	}
 }
 
@@ -504,8 +470,11 @@ func MustVerifyClusterBalancedAndHealthy(t *testing.T, k8s *types.Cluster, couch
 	}
 }
 
-func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *api.CouchbaseCluster, tries int, numUnhealthy int) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "wait for unhealthy nodes", "test-cluster", func() error {
+func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *api.CouchbaseCluster, numUnhealthy int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "wait for unhealthy nodes", "test-cluster", func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -529,8 +498,8 @@ func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *api.CouchbaseCluster, 
 	})
 }
 
-func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, tries int, numUnhealthy int) {
-	if err := WaitForUnhealthyNodes(k8s, couchbase, tries, numUnhealthy); err != nil {
+func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, numUnhealthy int, timeout time.Duration) {
+	if err := WaitForUnhealthyNodes(k8s, couchbase, numUnhealthy, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -561,25 +530,6 @@ func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *api.Cou
 	if err := PatchCouchbaseInfo(t, k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
-}
-
-func VerifyBucketDeleted(t *testing.T, client *cbmgr.Couchbase, tries int, bucketName string) error {
-	return retryutil.RetryOnErr(Context, 5*time.Second, tries, "verify bucket deleted", "test-cluster",
-		func() error {
-
-			info, err := client.GetBuckets()
-			if err != nil {
-				return err
-			}
-
-			for _, bucket := range info {
-				if bucket.BucketName == bucketName {
-					return NewErrVerifyClusterInfo()
-				}
-			}
-
-			return nil
-		})
 }
 
 func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
@@ -766,7 +716,7 @@ func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string) (responseData []by
 	return
 }
 
-func VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName, password string, reqNumOfDocs, maxRetries int) error {
+func VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName, password string, reqNumOfDocs int, timeout time.Duration) error {
 	currDocCount := 0
 	query := "select count(*) as count from " + datasetName
 
@@ -774,19 +724,28 @@ func VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName,
 		Results []map[string]int
 	}
 
-	for retryCount := 0; retryCount < maxRetries; retryCount++ {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", func() error {
 		response, err := ExecuteAnalyticsQuery(hostName, hostPort, query)
 		if err != nil {
-			return errors.New(err.Error() + "-" + string(response))
+			return fmt.Errorf("%v: %v", err, string(response))
 		}
 		queryRes := queryResult{}
 		json.Unmarshal(response, &queryRes)
 		currDocCount = queryRes.Results[0]["count"]
 
-		if currDocCount == reqNumOfDocs {
-			return nil
+		if currDocCount != reqNumOfDocs {
+			return fmt.Errorf("expected %d, actual %d", reqNumOfDocs, currDocCount)
 		}
-		time.Sleep(time.Second * 10)
+
+		return nil
+	})
+}
+
+func MustVerifyDocCountInAnalyticsDataset(t *testing.T, hostName, hostPort, datasetName, userName, password string, reqNumOfDocs int, timeout time.Duration) {
+	if err := VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName, password, reqNumOfDocs, timeout); err != nil {
+		Die(t, err)
 	}
-	return errors.New("Mismatch in doc " + datasetName + " count. Current docs " + strconv.Itoa(currDocCount) + ", expecting " + strconv.Itoa(reqNumOfDocs))
 }
