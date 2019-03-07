@@ -88,33 +88,6 @@ func init() {
 	Context = context.WithValue(context.Background(), "logger", logrus.WithField("module", "e2eutil"))
 }
 
-// ClusterReadyRetries specifies how many times to retry various ready checks
-type ClusterReadyRetries struct {
-	Size    int
-	Bucket  int
-	Service int
-}
-
-var (
-	defaultRetries = &ClusterReadyRetries{
-		Size:    constants.Retries120,
-		Bucket:  constants.Retries60,
-		Service: constants.Retries20,
-	}
-
-	azureRetries = &ClusterReadyRetries{
-		Size:    constants.Retries120 * GetPlatformTimingMultiplier("azure"),
-		Bucket:  constants.Retries60 * GetPlatformTimingMultiplier("azure"),
-		Service: constants.Retries20 * GetPlatformTimingMultiplier("azure"),
-	}
-
-	systemTestRetries = &ClusterReadyRetries{
-		Size:    constants.Retries120,
-		Bucket:  constants.Retries120,
-		Service: constants.Retries120,
-	}
-)
-
 // randomSuffix generates a 5 character random suffix to be appended to
 // k8s resources to avoid namespace collisions (especially events)
 func RandomSuffix() string {
@@ -188,8 +161,8 @@ func GetBucketConfigMap(bucketName, bucketType, ioPriority string, memQuotaInMB,
 
 // newClusterFromSpec creates a cluster and waits for various ready conditions.
 // Performs retries and garbage collection in the event of transient failure
-func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster, retries *ClusterReadyRetries) (*api.CouchbaseCluster, error) {
-	// Create the cluster
+func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+	// Create the cluster.
 	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 	if err != nil {
 		return nil, err
@@ -197,15 +170,17 @@ func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clus
 
 	MustWaitClusterStatusHealthy(t, k8s, cluster, 15*time.Minute)
 
-	// If any buckets are specified wait for these to become active
+	// If any buckets are specified wait for these to become active.
 	buckets := cluster.Spec.BucketNames()
 	if len(buckets) > 0 {
-		err := WaitUntilBucketsExists(t, k8s.CRClient, buckets, retries.Bucket, cluster)
+		MustWaitUntilBucketsExists(t, k8s, cluster, buckets, 5*time.Minute)
 		if err != nil {
 			return cluster, err
 		}
 	}
-	// Update the cluster status
+
+	// Update the cluster status, this is important for the test, especially if the cluster
+	// name is auto-generated.
 	updatedCluster, err := getClusterCRD(k8s.CRClient, cluster)
 	if err != nil {
 		return cluster, err
@@ -214,7 +189,7 @@ func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clus
 }
 
 func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) *api.CouchbaseCluster {
-	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -243,14 +218,6 @@ func CreateClusterSpec(secretName string, config map[string]map[string]string) a
 	return e2espec.CreateClusterSpec(constants.ClusterNamePrefix, secretName, config)
 }
 
-func GetRetriesForPlatform(platformType string) *ClusterReadyRetries {
-	if platformType == "azure" {
-		return azureRetries
-	} else {
-		return defaultRetries
-	}
-}
-
 func GetPlatformTimingMultiplier(platformType string) int {
 	if platformType == "azure" {
 		return 5
@@ -262,7 +229,7 @@ func GetPlatformTimingMultiplier(platformType string) int {
 // Creates Couchbase cluster object and returns it
 func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
-	return newClusterFromSpec(t, k8s, namespace, crd, GetRetriesForPlatform(platformType))
+	return newClusterFromSpec(t, k8s, namespace, crd)
 }
 
 func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) *api.CouchbaseCluster {
@@ -287,7 +254,7 @@ func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace
 			},
 		}
 	}
-	return newClusterFromSpec(t, k8s, namespace, crd, systemTestRetries)
+	return newClusterFromSpec(t, k8s, namespace, crd)
 }
 
 // Creates Couchbase cluster object and returns it
@@ -300,7 +267,7 @@ func CreateClusterFromSpecNoWait(t *testing.T, k8s *types.Cluster, namespace str
 // performing garbage collection
 func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
 func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
@@ -323,7 +290,7 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
 func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
@@ -368,7 +335,7 @@ func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
 func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
@@ -383,7 +350,7 @@ func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace stri
 // performing garbage collection
 func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
-	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -408,7 +375,7 @@ func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, s
 // error is encountered and performing garbage collection
 func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewStatefulCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
 func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
@@ -424,7 +391,7 @@ func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, 
 // query enabled.
 func NewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*api.CouchbaseCluster, error) {
 	spec := e2espec.NewSupportableCluster(size)
-	return newClusterFromSpec(t, k8s, namespace, spec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, spec)
 }
 
 // MustNewSupportableCluster creates a supportable cluster as described by NewSupportableCluster
@@ -451,7 +418,7 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	return newClusterFromSpec(t, k8s, namespace, cluster, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, cluster)
 }
 
 // MustNewSupportableTLSCluster creates a supportable cluster as described by NewSupportableTLSCluster
@@ -468,7 +435,7 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace st
 // performing garbage collection
 func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, exposed)
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec, defaultRetries)
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
 func MustNewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) *api.CouchbaseCluster {

@@ -102,14 +102,8 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		buckets = append(buckets, bucketSetting.BucketName)
 
 		t.Logf("Waiting For Bucket To Be Created \n")
-		err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, buckets, constants.Retries20, testCouchbase)
-		if err != nil {
-			t.Logf("status: %v+", testCouchbase.Status)
-			t.Fatalf("failed to create bucket %v", err)
-		}
-
+		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, buckets, 2*time.Minute)
 		expectedEvents.AddBucketCreateEvent(testCouchbase, bucketSetting.BucketName)
-
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		currentBuckets, err := client.GetBuckets()
@@ -177,13 +171,8 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings", newConfig), time.Minute)
 
 		t.Logf("Waiting For Bucket To Be Created \n")
-		err = e2eutil.WaitUntilBucketsExists(t, targetKube.CRClient, []string{bucketSetting.BucketName}, constants.Retries10, testCouchbase)
-		if err != nil {
-			t.Fatalf("failed to create bucket %v", err)
-		}
-
+		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucketSetting.BucketName}, 2*time.Minute)
 		expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
-
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		currentBuckets, err := client.GetBuckets()

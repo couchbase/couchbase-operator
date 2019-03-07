@@ -95,33 +95,29 @@ func WaitUntilPodSizeReachedEtcd(t *testing.T, kubeClient kubernetes.Interface, 
 	return names, nil
 }
 
-func WaitUntilBucketsExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
-	err := retryutil.Retry(Context, retryInterval, retries, func() (done bool, err error) {
-		currCluster, err := crClient.CouchbaseV1().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *api.CouchbaseCluster, buckets []string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
+		currCluster, err := k8s.CRClient.CouchbaseV1().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		for _, accept := range accepts {
-			if !accept(currCluster) {
-				return false, nil
-			}
-		}
-
-		LogfWithTimestamp(t, "waiting for buckets to be ready (%v)", buckets)
 		for _, b := range buckets {
 			if _, ok := currCluster.Status.Buckets[b]; !ok {
-				LogfWithTimestamp(t, "bucket (%v), not ready: (%v)", b, currCluster.Status.Buckets[b])
 				return false, nil
 			}
 		}
 		return true, nil
 	})
+}
 
-	if err != nil {
-		return err
+func MustWaitUntilBucketsExists(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, buckets []string, timeout time.Duration) {
+	if err := WaitUntilBucketsExists(k8s, couchbase, buckets, timeout); err != nil {
+		Die(t, err)
 	}
-	return nil
 }
 
 func WaitUntilBucketsNotExists(t *testing.T, crClient versioned.Interface, buckets []string, retries int, cl *api.CouchbaseCluster, accepts ...acceptFunc) error {
