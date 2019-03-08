@@ -76,7 +76,7 @@ func (r *logCollector) Fetch(resource resource.ResourceReference) error {
 
 func (r *logCollector) Write(b backend.Backend) error {
 	for name, logs := range r.logs {
-		b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.resource.Kind(), r.resource.Name(), name+".log"), string(logs.Bytes()))
+		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.resource.Kind(), r.resource.Name(), name+".log"), logs.String())
 	}
 	return nil
 }

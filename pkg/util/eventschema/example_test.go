@@ -68,7 +68,7 @@ func ExampleValidator_Validate() {
 	}
 
 	v := &eventschema.Validator{Events: events, Schema: schema}
-	v.Validate(os.Stdout)
+	_ = v.Validate(os.Stdout)
 
 	// Output:
 }
@@ -205,7 +205,7 @@ func ExampleValidator_Validate_strict() {
 	}
 
 	v := &eventschema.Validator{Events: events, Schema: schema}
-	v.Validate(os.Stdout)
+	_ = v.Validate(os.Stdout)
 
 	// Output:
 }

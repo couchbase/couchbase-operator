@@ -40,14 +40,14 @@ func DecodeCouchbaseCluster(raw []byte) (*api.CouchbaseCluster, error) {
 	}
 
 	if kind.Kind != "CouchbaseCluster" {
-		return nil, fmt.Errorf("Spec is not a CouchbaseCluster")
+		return nil, fmt.Errorf("spec is not a CouchbaseCluster")
 	}
 
 	if rv, ok := obj.(*api.CouchbaseCluster); ok {
 		return rv, nil
 	}
 
-	return nil, fmt.Errorf("Could not convert object to CouchbaseCluster")
+	return nil, fmt.Errorf("could not convert object to CouchbaseCluster")
 }
 
 func EncodeCouchbaseCluster(resource *api.CouchbaseCluster) ([]byte, error) {

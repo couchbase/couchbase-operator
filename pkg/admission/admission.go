@@ -34,16 +34,16 @@ var (
 	codecs = serializer.NewCodecFactory(scheme)
 )
 
-// Global initialization routines
-func init() {
-	addToScheme(scheme)
-}
-
 // addToScheme registers types we need to be able to decode from the raw JSON
-func addToScheme(scheme *runtime.Scheme) {
+func addToScheme(scheme *runtime.Scheme) error {
 	// TODO: admissionv1beta1 surely?
-	admissionregistrationv1beta1.AddToScheme(scheme)
-	couchbaseclusterv1.AddToScheme(scheme)
+	if err := admissionregistrationv1beta1.AddToScheme(scheme); err != nil {
+		return err
+	}
+	if err := couchbaseclusterv1.AddToScheme(scheme); err != nil {
+		return err
+	}
+	return nil
 }
 
 // getClient returns a new Kubernetes client
@@ -112,7 +112,7 @@ func errorResponse(err error) *admissionv1beta1.AdmissionResponse {
 }
 
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the
-// operator.  This is for things which cannot be acheived with JSON schema v3 only.
+// operator.  This is for things which cannot be achieved with JSON schema v3 only.
 func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
 	if glog.V(1) {
 		glog.Info("validating couchbasecluster")
@@ -152,7 +152,7 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 			return errorResponse(err)
 		}
 		// Note: the we cannot raise warnings as the Result field is only consulted if Allowed is false
-		if err, _ := validator.CheckImmutableFields(existingCouchbaseCluser, &couchbaseCluster); err != nil {
+		if err := validator.CheckImmutableFields(existingCouchbaseCluser, &couchbaseCluster); err != nil {
 			glog.Error(err)
 			return errorResponse(err)
 		}
@@ -221,7 +221,7 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 			glog.Error(err)
 			return errorResponse(err)
 		}
-		reviewResponse.Patch = []byte(data)
+		reviewResponse.Patch = data
 	}
 
 	return &reviewResponse
@@ -299,6 +299,11 @@ func serveCouchbaseClustersMutate(w http.ResponseWriter, r *http.Request) {
 func Serve(config *Config) {
 	glog.Infof("couchbase-operator-admission %s (%s)", version.Version, revision.Revision())
 
+	if err := addToScheme(scheme); err != nil {
+		glog.Error(err)
+		return
+	}
+
 	http.HandleFunc("/", serveDefault)
 	http.HandleFunc("/couchbaseclusters/validate", serveCouchbaseClustersValidate)
 	http.HandleFunc("/couchbaseclusters/mutate", serveCouchbaseClustersMutate)
@@ -307,5 +312,7 @@ func Serve(config *Config) {
 		Addr:      ":8443",
 		TLSConfig: configTLS(config),
 	}
-	server.ListenAndServeTLS("", "")
+	if err := server.ListenAndServeTLS("", ""); err != nil {
+		glog.Error(err)
+	}
 }

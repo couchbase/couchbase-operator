@@ -264,7 +264,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	// Check the events match what we expect:
 	// * All but one new nodes are created
 	// * The last one fails creation
-	// * A new node is created, after the memory constaints are removed
+	// * A new node is created, after the memory constraints are removed
 	// * Cluster rebalances
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Repeat{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
@@ -834,7 +834,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
-// TestManageMultipleClusters tests that multiple clusters can be managed independantly
+// TestManageMultipleClusters tests that multiple clusters can be managed independently
 // within the same namespace.
 func TestManageMultipleClusters(t *testing.T) {
 	// Platform configuration.

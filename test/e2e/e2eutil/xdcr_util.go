@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -34,7 +35,7 @@ type xdcrRemoteClusterReference struct {
 	Username string `json:"username"`
 }
 
-func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string, reqParams *strings.Reader) ([]byte, error) {
+func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string, reqParams io.Reader) ([]byte, error) {
 	var request *http.Request
 	var err error
 
@@ -114,7 +115,7 @@ func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *api.Couchba
 	}
 }
 
-// VerifyDocCountInBucket polls the Couchbase API for the named bucket and checks whther the
+// VerifyDocCountInBucket polls the Couchbase API for the named bucket and checks whether the
 // document count matches the expected number of items.
 func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -208,18 +209,23 @@ func MustCreateDestClusterReference(t *testing.T, k8sSrc, k8sDst *types.Cluster,
 func GetXdcrClusterReferences(hostUrl, hostUsername, hostPassword string) (xdcrClusterRefList []xdcrRemoteClusterReference, err error) {
 	// Get all XDCR cluster reference
 	hostUrl = "http://" + hostUrl + "/pools/default/remoteClusters"
-	responseData, err := GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
+	var responseData []byte
+	responseData, err = GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
 	if err != nil {
-		return xdcrClusterRefList, err
+		return
 	}
-	json.Unmarshal(responseData, &xdcrClusterRefList)
-	return xdcrClusterRefList, err
+	if err = json.Unmarshal(responseData, &xdcrClusterRefList); err != nil {
+		return
+	}
+	return
 }
 
-func DeleteXdcrClusterReferences(hostUrl, hostUsername, hostPassword string, xdcrClusterRef xdcrRemoteClusterReference) error {
+func DeleteXdcrClusterReferences(hostUsername, hostPassword string, xdcrClusterRef xdcrRemoteClusterReference) error {
 	// Stop replication of default bucket
-	hostUrl = "http://" + xdcrClusterRef.Hostname + "/controller/cancelXDCR/" + xdcrClusterRef.Uri + "%2Fdeafult%2Fdefault"
-	GenerateHttpRequest("DELETE", hostUrl, hostUsername, hostPassword, nil)
+	hostUrl := "http://" + xdcrClusterRef.Hostname + "/controller/cancelXDCR/" + xdcrClusterRef.Uri + "%2Fdeafult%2Fdefault"
+	if _, err := GenerateHttpRequest("DELETE", hostUrl, hostUsername, hostPassword, nil); err != nil {
+		return err
+	}
 
 	// Delete XDCR reference
 	hostUrl = "http://" + xdcrClusterRef.Hostname + xdcrClusterRef.Uri

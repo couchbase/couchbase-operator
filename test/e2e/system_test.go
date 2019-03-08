@@ -118,7 +118,7 @@ func CreateJobSpec(op operation) *batchv1.Job {
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: &privilegedVal,
 							},
-							ImagePullPolicy: corev1.PullPolicy(corev1.PullIfNotPresent),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             []corev1.EnvVar{},
 							VolumeMounts:    []corev1.VolumeMount{},
 						},
@@ -197,7 +197,7 @@ func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName st
 		t.Fatalf("failed to list pods for cluster: " + err.Error())
 	}
 	for _, pod := range pods.Items {
-		targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		_ = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}
 }
 
@@ -497,7 +497,7 @@ outerLoop:
 						go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, op.duration, op.timeout, results)
 						jobList[job.Name] = job
 					}
-					i = i + 1
+					i++
 				}
 
 				time.Sleep(3 * time.Second)
@@ -507,7 +507,7 @@ outerLoop:
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase1, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase2, 2*time.Minute)
 
-		cycles = cycles + 1
+		cycles++
 		time.Sleep(1 * time.Second)
 
 	}

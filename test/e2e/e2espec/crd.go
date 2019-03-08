@@ -172,8 +172,8 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 // basic 3 node cluster
 func NewBasicCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 	bucketConfig := []api.BucketConfig{}
-	if withBucket == true {
-		bucketSettings := api.BucketConfig(DefaultBucketSettings)
+	if withBucket {
+		bucketSettings := DefaultBucketSettings
 		bucketSettings.BucketName = "default"
 		bucketConfig = []api.BucketConfig{bucketSettings}
 	}
@@ -207,7 +207,7 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 func NewBasicClusterSpec(size int, bucket, console bool) *api.CouchbaseCluster {
 	bucketConfig := []api.BucketConfig{}
 	if bucket {
-		bucketSettings := api.BucketConfig(DefaultBucketSettings)
+		bucketSettings := DefaultBucketSettings
 		bucketSettings.BucketName = "default"
 		bucketConfig = []api.BucketConfig{bucketSettings}
 	}
@@ -293,7 +293,7 @@ func NewSupportableClusterSpec(size int) api.ClusterSpec {
 		},
 	}
 
-	// The defaults are too agressive.  When killing a pod during a rebalance the operator
+	// The defaults are too aggressive.  When killing a pod during a rebalance the operator
 	// may hang for ~30 seconds due to network retries. During this period we may or may not
 	// observe a failover leading to non-determinism.
 	spec.ClusterSettings.AutoFailoverTimeout = 120
@@ -311,8 +311,8 @@ func NewSupportableCluster(size int) *api.CouchbaseCluster {
 // basic 3 node cluster with Xdcr cluster
 func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, exposed bool) *api.CouchbaseCluster {
 	bucketConfig := []api.BucketConfig{}
-	if withBucket == true {
-		bucketSettings := api.BucketConfig(DefaultBucketSettings)
+	if withBucket {
+		bucketSettings := DefaultBucketSettings
 		bucketSettings.BucketName = "default"
 		bucketConfig = []api.BucketConfig{bucketSettings}
 	}
@@ -358,7 +358,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 		BaseImage:            e2e_constants.CbServerBaseImage,
 		Version:              e2e_constants.CbServerVersion,
 		AuthSecret:           secretName,
-		ClusterSettings:      api.ClusterConfig(defaultClusterSettings),
+		ClusterSettings:      defaultClusterSettings,
 		BucketSettings:       []api.BucketConfig{},
 		ServerSettings:       []api.ServerConfig{},
 		AdminConsoleServices: api.ServiceList{},
@@ -409,7 +409,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 
 		// Update Buckets configs in ClusterSpec
 		case strings.Contains(key, "bucket"):
-			bucketSettings := api.BucketConfig(DefaultBucketSettings)
+			bucketSettings := DefaultBucketSettings
 			for setting := range config[key] {
 				switch setting {
 				case "bucketName":
@@ -443,7 +443,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 
 		// Modify Service in ClusterSpec
 		case strings.Contains(key, "service"):
-			serverSettings := api.ServerConfig(defaultServerSettings)
+			serverSettings := defaultServerSettings
 			volumeMnt := &api.VolumeMounts{}
 			podPolicy := &api.PodPolicy{VolumeMounts: nil}
 			podPolicy.Resources = v1.ResourceRequirements{
@@ -461,12 +461,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 				case "services":
 					serverSettings.Services = api.NewServiceList(strings.Split(config[key][setting], ","))
 				case "serverGroups":
-					serverGroups := []string{}
-					parsedGroups := strings.Split(config[key][setting], ",")
-					for _, group := range parsedGroups {
-						serverGroups = append(serverGroups, group)
-					}
-					serverSettings.ServerGroups = serverGroups
+					serverSettings.ServerGroups = strings.Split(config[key][setting], ",")
 				case "resourceMemLimit":
 					if _, err := strconv.Atoi(config[key][setting]); err == nil {
 						serverSettings.Pod.Resources.Limits[v1.ResourceMemory] = resource.MustParse(config[key][setting] + "Mi")

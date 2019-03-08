@@ -15,12 +15,12 @@ import (
 )
 
 func GetCouchbaseCluster(crClient versioned.Interface, name, namespace string) (*api.CouchbaseCluster, error) {
-	return crClient.Couchbase().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
+	return crClient.CouchbaseV1().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
 }
 
 // Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest)
 func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (EventList, error) {
-	list, err := kubeCli.Core().Events(namespace).List(metav1.ListOptions{FieldSelector: "involvedObject.name=" + name})
+	list, err := kubeCli.CoreV1().Events(namespace).List(metav1.ListOptions{FieldSelector: "involvedObject.name=" + name})
 	if err != nil {
 		return nil, err
 	}

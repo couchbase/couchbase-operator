@@ -50,7 +50,7 @@ type reconcileFuncMap map[ReconcileState]reconcileFunc
 func (r reconcileFuncMap) lookup(state ReconcileState) (reconcileFunc, error) {
 	f, ok := r[state]
 	if !ok {
-		return nil, fmt.Errorf("Invalid reconcile state")
+		return nil, fmt.Errorf("invalid reconcile state")
 	}
 	return f, nil
 }
@@ -256,7 +256,7 @@ func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 				return nil
 			}
 		}
-		return fmt.Errorf("Skipping reconcile loop because the cluster is currently rebalancing")
+		return fmt.Errorf("skipping reconcile loop because the cluster is currently rebalancing")
 	}
 	r.transitionState(ReconcileDownNodes)
 	return nil
@@ -267,7 +267,10 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.DownNodes.Size() > 0 {
 		// Ensure the cluster is visibly unhealthy before triggering any events
 		c.status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
-		c.updateCRStatus()
+
+		if err := c.updateCRStatus(); err != nil {
+			return err
+		}
 
 		// Get the duration that the node has been down from the status
 		// and check if it has persistent volumes to be recovered
@@ -308,7 +311,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			}
 		}
 
-		return fmt.Errorf("Unable to reconcile cluster because some nodes are down")
+		return fmt.Errorf("unable to reconcile cluster because some nodes are down")
 	}
 
 	c.status.SetReadyCondition()
@@ -317,10 +320,10 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 }
 
 func handleUnclusteredNodes(r *ReconcileMachine, c *Cluster) error {
-	for name, _ := range r.couchbase.UnclusteredNodes {
+	for name := range r.couchbase.UnclusteredNodes {
 		removeVolumes := shouldRemoveVolumes(r, c, name)
 		if err := c.destroyMember(name, removeVolumes); err != nil {
-			return fmt.Errorf("Unable to remove unclustered node: %s", err.Error())
+			return fmt.Errorf("unable to remove unclustered node: %s", err.Error())
 		}
 
 		c.logger.Infof("Removed unclustered node: %s", name)
@@ -352,14 +355,16 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 				return nil
 			} else {
 				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-				return fmt.Errorf("recovering pending  add node %s", m.ClientURL())
+				return fmt.Errorf("recovering pending add node %s", m.ClientURL())
 			}
 		}
 		err := c.cancelAddMember(r.knownNodes, m)
 		if err != nil {
-			return fmt.Errorf("Unable to removed a failed pending add node: %s", err.Error())
+			return fmt.Errorf("unable to remove a failed pending add node: %s", err.Error())
 		}
-		c.clusterRemoveMember(m.Name)
+		if err := c.clusterRemoveMember(m.Name); err != nil {
+			return err
+		}
 		r.runningPods.Remove(m.Name)
 	}
 
@@ -495,7 +500,7 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 		for i := 0; i < nodesToRemove; i++ {
 			server, err := c.scheduler.Delete(serverSpec.Name)
 			if err != nil {
-				return fmt.Errorf("Failed to schedule removal of member '%s': %v", serverSpec.Name, err)
+				return fmt.Errorf("failed to schedule removal of member '%s': %v", serverSpec.Name, err)
 			}
 			r.knownNodes.Remove(server)
 			r.ejectNodes.Add(c.members[server])
@@ -544,7 +549,7 @@ func handleAddNode(r *ReconcileMachine, c *Cluster) error {
 			r.couchbase.NeedsRebalance = true
 			m, err := c.addMember(serverSpec)
 			if err != nil {
-				return fmt.Errorf("Failed to add new node to cluster: %v", err)
+				return fmt.Errorf("failed to add new node to cluster: %v", err)
 			}
 			r.knownNodes.Add(m)
 			r.runningPods.Add(m)
@@ -580,10 +585,14 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 
 	// Flag that an upgrade is in action, validation will use this to control what
 	// resource modifications are allowed.
-	c.reportUpgrade(status)
+	if err := c.reportUpgrade(status); err != nil {
+		return err
+	}
 
 	// Remove the candidate from the scheduler.
-	c.scheduler.Upgrade(candidate.ServerConfig, candidate.Name)
+	if err := c.scheduler.Upgrade(candidate.ServerConfig, candidate.Name); err != nil {
+		return err
+	}
 
 	// Grab the server class.
 	class := c.cluster.Spec.GetServerConfigByName(candidate.ServerConfig)
@@ -642,14 +651,14 @@ func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
 func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.NeedsRebalance {
 		if err := c.rebalance(r.ejectNodes, r.couchbase.UnmanagedNodes); err != nil {
-			// If rebalance error occured due to a node that could not be delta
+			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be reconciled with FailedAddBack nodes
 			if c.didDeltaRecoveryFail(err) {
 				c.logger.Errorf("Could not Rebalance because requested delta recovery is not possible. You probably added more nodes to the cluster or changed server groups configuration: %v", err)
 				r.transitionState(ReconcileFailedAddBackNodes)
 				return nil
 			} else {
-				return fmt.Errorf("Failed to rebalance: %s", err.Error())
+				return fmt.Errorf("failed to rebalance: %s", err.Error())
 			}
 		}
 
@@ -698,17 +707,17 @@ func handleFailedAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 func handleDeadMembers(r *ReconcileMachine, c *Cluster) error {
 	dead := c.members.Diff(r.runningPods)
 
-	for name, _ := range dead {
+	for name := range dead {
 		removeVolumes := shouldRemoveVolumes(r, c, name)
 		if err := c.destroyMember(name, removeVolumes); err != nil {
-			return fmt.Errorf("Failed to remove dead members: %s", err.Error())
+			return fmt.Errorf("failed to remove dead members: %s", err.Error())
 		}
 	}
 
-	for name, _ := range r.unknownNodes {
+	for name := range r.unknownNodes {
 		removeVolumes := shouldRemoveVolumes(r, c, name)
 		if err := c.removePod(name, removeVolumes); err != nil {
-			return fmt.Errorf("Failed to remove unknown member: %s", err.Error())
+			return fmt.Errorf("failed to remove unknown member: %s", err.Error())
 		}
 	}
 
@@ -726,7 +735,7 @@ func handleNotifyFinished(r *ReconcileMachine, c *Cluster) error {
 func shouldRemoveVolumes(r *ReconcileMachine, c *Cluster, server string) bool {
 	removeVolumes, ok := r.removeVolumes[server]
 	if !ok {
-		// If descision to remove volume is unset then only
+		// If decision to remove volume is unset then only
 		// remove if it's not a log volume
 		return !c.memberHasLogVolumes(server)
 	}

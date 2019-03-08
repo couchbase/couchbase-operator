@@ -31,7 +31,7 @@ func (r *deploymentResource) Kind() string {
 
 // Fetch collects all deployments as defined by the configuration
 func (r *deploymentResource) Fetch() error {
-	deployments, err := r.context.KubeClient.Apps().Deployments(r.context.Config.Namespace).List(metav1.ListOptions{})
+	deployments, err := r.context.KubeClient.AppsV1().Deployments(r.context.Config.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func (r *deploymentResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), deployment.Name, deployment.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), deployment.Name, deployment.Name+".yaml"), string(data))
 	}
 	return nil
 }

@@ -27,12 +27,6 @@ const (
 	DefaultAnalyticsServiceMemQuota               = 1024
 )
 
-type Warning string
-
-func (w Warning) String() string {
-	return fmt.Sprintf("Warning: %s", string(w))
-}
-
 type EnumList []string
 
 func (e EnumList) Contains(s string) bool {
@@ -128,20 +122,20 @@ func (v *Validator) Create(resource *api.CouchbaseCluster) error {
 	return nil
 }
 
-func (v *Validator) Update(current, updated *api.CouchbaseCluster) (error, []Warning) {
+func (v *Validator) Update(current, updated *api.CouchbaseCluster) error {
 	ApplyDefaults(updated)
 
-	err, warn := CheckImmutableFields(current, updated)
+	err := CheckImmutableFields(current, updated)
 	if err != nil {
-		return err, warn
+		return err
 	}
 
 	if err := v.CheckConstraints(updated); err != nil {
-		return err, warn
+		return err
 	}
 
 	updated.ResourceVersion = current.ResourceVersion
-	return nil, warn
+	return nil
 }
 
 func ApplyDefaults(customResource *api.CouchbaseCluster) {
@@ -269,12 +263,12 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 	}
 
 	// Ensure unnecessary settings in memcached and ephemeral buckets are nil
-	for i, _ := range customResource.Spec.BucketSettings {
+	for i := range customResource.Spec.BucketSettings {
 		if customResource.Spec.BucketSettings[i].BucketType == constants.BucketTypeCouchbase {
 			continue
 		}
 
-		if customResource.Spec.BucketSettings[i].EnableIndexReplica == true {
+		if customResource.Spec.BucketSettings[i].EnableIndexReplica {
 			err := errors.InvalidType("enableReplicaIndex", fmt.Sprintf("spec.buckets[%d]", i),
 				"nil", fmt.Sprintf("Bucket type is %s", customResource.Spec.BucketSettings[i].BucketType))
 			errs = append(errs, err)
@@ -374,7 +368,7 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 	// 2. The data service is specified on at least one node
 	unique := make(map[string]bool)
 	hasDataService := false
-	for i, _ := range customResource.Spec.ServerSettings {
+	for i := range customResource.Spec.ServerSettings {
 		if _, ok := unique[customResource.Spec.ServerSettings[i].Name]; ok {
 			errs = append(errs, errors.DuplicateItems("spec.servers.name", "body"))
 		}
@@ -644,8 +638,7 @@ func (e *UpdateError) Error() string {
 	return fmt.Sprintf("%s in %s cannot be updated", e.field, e.in)
 }
 
-func CheckImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warning) {
-	warns := []Warning{}
+func CheckImmutableFields(current, updated *api.CouchbaseCluster) error {
 	errs := []error{}
 
 	if current.Spec.AntiAffinity != updated.Spec.AntiAffinity {
@@ -672,16 +665,6 @@ func CheckImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 				if cur.ConflictResolution != up.ConflictResolution {
 					err := &UpdateError{fmt.Sprintf("spec.buckets[%d].conflictResolution", i), "body"}
 					errs = append(errs, err)
-				}
-
-				if cur.IoPriority != up.IoPriority {
-					warn := Warning(fmt.Sprintf("Changing the IO Priority will cause the bucket %s to be temporarily unavailable", cur.BucketName))
-					warns = append(warns, warn)
-				}
-
-				if cur.EvictionPolicy != up.EvictionPolicy {
-					warn := Warning(fmt.Sprintf("Changing the Eviction Policy will cause the bucket %s to be temporarily unavailable", cur.BucketName))
-					warns = append(warns, warn)
 				}
 			}
 		}
@@ -828,15 +811,11 @@ func CheckImmutableFields(current, updated *api.CouchbaseCluster) (error, []Warn
 		}
 	}
 
-	if len(warns) == 0 {
-		warns = nil
-	}
-
 	if len(errs) > 0 {
-		return errors.CompositeValidationError(errs...), warns
+		return errors.CompositeValidationError(errs...)
 	}
 
-	return nil, warns
+	return nil
 }
 
 // stringArrayCompareOrdered compares two arrays and ensure the elements are the same
@@ -844,7 +823,7 @@ func stringArrayCompareOrdered(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for i, _ := range a {
+	for i := range a {
 		if a[i] != b[i] {
 			return false
 		}
@@ -877,10 +856,6 @@ func stringArrayCompare(a1, a2 []string) bool {
 	}
 
 	return true
-}
-
-func stringPtrArrayCompare(p1, p2 *[]string) bool {
-	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && stringArrayCompare(*p1, *p2))
 }
 
 func stringPtrEquals(p1, p2 *string) bool {

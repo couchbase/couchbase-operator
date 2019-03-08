@@ -28,7 +28,7 @@ type LogType string
 
 const (
 	LogTypePod                   LogType = "pod"
-	LogTypePersistentVolumeClaim         = "persistentVolumeClaim"
+	LogTypePersistentVolumeClaim LogType = "persistentVolumeClaim"
 )
 
 // LogEntry is a generic log which may either be a running pod or a log volume.
@@ -112,29 +112,29 @@ func parseRangeField(field string, max int, indices indexSet) error {
 	// Is it a range?
 	parts := strings.Split(field, "-")
 	if len(parts) != 2 {
-		return fmt.Errorf("Invalid field value %s", field)
+		return fmt.Errorf("invalid field value %s", field)
 	}
 
 	// Check the start and end are valid integers
 	start, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return fmt.Errorf("Invalid range start value %s", field)
+		return fmt.Errorf("invalid range start value %s", field)
 	}
 	end, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return fmt.Errorf("Invalid range end value %s", field)
+		return fmt.Errorf("invalid range end value %s", field)
 	}
 
 	// Check that the limits are valid for iteration
 	if start >= end {
-		return fmt.Errorf("Invalid range value %s", field)
+		return fmt.Errorf("invalid range value %s", field)
 	}
 
 	// Accumulate the range
 	for index := start; index < end+1; index++ {
 		// Check the index is in range
 		if index < 0 || index >= max {
-			return fmt.Errorf("Index %d out of range", index)
+			return fmt.Errorf("index %d out of range", index)
 		}
 
 		indices[index] = nil
@@ -155,7 +155,7 @@ func parseField(field string, max int, indices indexSet) error {
 
 	// Check the index is in range
 	if index < 0 || index >= max {
-		return fmt.Errorf("Index %d out of range", index)
+		return fmt.Errorf("index %d out of range", index)
 	}
 
 	indices[index] = nil
@@ -280,17 +280,17 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	}
 
 	// Wait for the pod to come alive, this should be ample time to pull down a docker image
-	// and start the containers.  It's also necessary so we don't block indefinitly and hang.
+	// and start the containers.  It's also necessary so we don't block indefinitely and hang.
 	c, cancel := ctx.WithTimeout(ctx.Background(), 5*time.Minute)
 	defer cancel()
 	if err := k8sutil.WaitForPod(c, context.KubeClient, pvc.Namespace, podName, ""); err != nil {
-		k8sutil.DeletePod(context.KubeClient, pvc.Namespace, podName, nil)
+		_ = k8sutil.DeletePod(context.KubeClient, pvc.Namespace, podName, nil)
 		return nil, nil, fmt.Errorf("ephemeral pod %s failed to come up for log collection", podName)
 	}
 
 	// Return a clean up closure which can be deferred by the caller.
 	cleanup := func() {
-		k8sutil.DeletePod(context.KubeClient, pvc.Namespace, podName, nil)
+		_ = k8sutil.DeletePod(context.KubeClient, pvc.Namespace, podName, nil)
 	}
 	return pod, cleanup, nil
 }
@@ -393,7 +393,7 @@ func render(logEntries LogEntryList) {
 		})
 	}
 
-	table.Write(os.Stdout)
+	_ = table.Write(os.Stdout)
 }
 
 // configureInteractive prompts the user for which logs to collect, then if not defined
@@ -481,7 +481,7 @@ func Collect(context *context.Context) error {
 
 	// Collect the logs in parallel.
 	resultChan := make(chan *util.CollectInfoResult)
-	for index, _ := range indices {
+	for index := range indices {
 		go func(entry LogEntry) {
 			// Always return a result.
 			result := &util.CollectInfoResult{

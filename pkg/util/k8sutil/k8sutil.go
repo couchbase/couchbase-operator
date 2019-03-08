@@ -128,7 +128,7 @@ func GetServerGroup(kubecli kubernetes.Interface, ns, name string) (string, erro
 	if pod.Spec.NodeSelector == nil {
 		return "", err
 	}
-	serverGroup, _ := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
 	return serverGroup, nil
 }
 
@@ -204,7 +204,7 @@ func mergeLabels(l1, l2 map[string]string) {
 }
 
 func DeletePod(kubeCli kubernetes.Interface, namespace, podName string, opts *metav1.DeleteOptions) error {
-	err := kubeCli.Core().Pods(namespace).Delete(podName, opts)
+	err := kubeCli.CoreV1().Pods(namespace).Delete(podName, opts)
 	if err != nil {
 		if !IsKubernetesResourceNotFoundError(err) {
 			return err
@@ -214,7 +214,7 @@ func DeletePod(kubeCli kubernetes.Interface, namespace, podName string, opts *me
 }
 
 func CreatePod(kubeCli kubernetes.Interface, namespace string, pod *v1.Pod) (*v1.Pod, error) {
-	return kubeCli.Core().Pods(namespace).Create(pod)
+	return kubeCli.CoreV1().Pods(namespace).Create(pod)
 }
 
 // Waits for a pod to be created and for it to respond to TCP connections on
@@ -291,8 +291,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 }
 
 func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespace, podName string) error {
-	_, err := kubeCli.Core().Pods(namespace).Get(podName, metav1.GetOptions{})
-	if err != nil {
+	if _, err := kubeCli.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{}); err != nil {
 		if IsKubernetesResourceNotFoundError(err) {
 			return nil
 		} else {
@@ -414,7 +413,7 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	if versionMajor == "" || versionMinor == "" {
 		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}")
 		if !rx.MatchString(gitVersion) {
-			err := fmt.Errorf("Unable to get version from Kubernetes API response")
+			err := fmt.Errorf("unable to get version from Kubernetes API response")
 			return constants.KubernetesVersionUnknown, err
 		}
 		gitVersion = rx.FindString(gitVersion)
@@ -426,17 +425,17 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	rx := regexp.MustCompile("^[0-9]{1,2}")
 	// simply require that version starts with a number to be valid
 	if !rx.MatchString(versionMajor) || !rx.MatchString(versionMinor) {
-		err := fmt.Errorf("Unable to get version from Kubernetes API response")
+		err := fmt.Errorf("unable to get version from Kubernetes API response")
 		return constants.KubernetesVersionUnknown, err
 	}
 	major, err := strconv.Atoi(rx.FindString(versionMajor))
 	if err != nil {
-		err := fmt.Errorf("Unable to get version from Kubernetes API response")
+		err := fmt.Errorf("unable to get version from Kubernetes API response")
 		return constants.KubernetesVersionUnknown, err
 	}
 	minor, err := strconv.Atoi(rx.FindString(versionMinor))
 	if err != nil {
-		err := fmt.Errorf("Unable to get version from Kubernetes API response")
+		err := fmt.Errorf("unable to get version from Kubernetes API response")
 		return constants.KubernetesVersionUnknown, err
 	}
 	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
@@ -451,7 +450,7 @@ func GetPodUptime(kubecli kubernetes.Interface, ns, name string) int {
 	if err != nil {
 		return 0
 	}
-	return int(time.Now().Sub(pod.CreationTimestamp.Time).Seconds())
+	return int(time.Since(pod.CreationTimestamp.Time).Seconds())
 }
 
 // LogPod returns ephemeral debug information about a failed pod, e.g. it's about to be
@@ -463,9 +462,7 @@ func LogPod(kubeCli kubernetes.Interface, namespace, name string) []string {
 	if err == nil {
 		if data, err := yaml.Marshal(pod); err == nil {
 			result = append(result, "resource:")
-			for _, line := range strings.Split(string(data), "\n") {
-				result = append(result, line)
-			}
+			result = append(result, strings.Split(string(data), "\n")...)
 		}
 	}
 
@@ -488,9 +485,7 @@ func LogPod(kubeCli kubernetes.Interface, namespace, name string) []string {
 		}
 		data := &bytes.Buffer{}
 		if err := table.Write(data); err == nil {
-			for _, line := range strings.Split(string(data.Bytes()), "\n") {
-				result = append(result, line)
-			}
+			result = append(result, strings.Split(data.String(), "\n")...)
 		}
 	}
 

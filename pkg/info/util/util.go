@@ -62,7 +62,7 @@ var (
 // Timestamp returns an ISO8601 formatted timestamp suitable for
 // use in generated file names.  These include the time zone for ease of
 // use by end users.  This is a 'singleton' style function whose subsequent
-// invokations return the same result
+// invocations return the same result
 func Timestamp() string {
 	if timestamp != "" {
 		return timestamp
@@ -74,7 +74,7 @@ func Timestamp() string {
 }
 
 // Salt returns a UUID used on a per-run basis for redacting server logs.
-// This is a 'singleton' style function whose subsequent invokations return
+// This is a 'singleton' style function whose subsequent invocations return
 // the same result.
 func Salt() string {
 	saltMutex.Lock()

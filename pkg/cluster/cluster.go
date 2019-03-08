@@ -3,7 +3,6 @@ package cluster
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -80,7 +79,6 @@ type Cluster struct {
 	eventCh    chan *clusterEvent
 	stopCh     chan struct{}
 	members    couchbaseutil.MemberSet
-	tlsConfig  *tls.Config
 	eventsCli  corev1.EventInterface
 	username   string
 	password   string
@@ -106,7 +104,7 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 		cluster:   cl,
 		eventCh:   make(chan *clusterEvent, 100),
 		stopCh:    make(chan struct{}),
-		eventsCli: config.KubeCli.Core().Events(cl.Namespace),
+		eventsCli: config.KubeCli.CoreV1().Events(cl.Namespace),
 	}
 
 	c.logger.Logger.SetLevel(c.config.LogLevel)
@@ -125,7 +123,7 @@ func New(config Config, cl *api.CouchbaseCluster) *Cluster {
 	}
 	broadcaster := record.NewBroadcaster()
 	c.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: os.Getenv(constants.EnvOperatorPodName)})
-	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: config.KubeCli.Core().Events(c.cluster.Namespace)})
+	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: config.KubeCli.CoreV1().Events(c.cluster.Namespace)})
 
 	c.logger.Info("Watching new cluster")
 
@@ -194,7 +192,7 @@ func (c *Cluster) setup() error {
 	case api.ClusterPhaseRunning:
 		shouldCreateCluster = false
 	default:
-		return fmt.Errorf("Unexpected cluster phase: %s", c.status.Phase)
+		return fmt.Errorf("unexpected cluster phase: %s", c.status.Phase)
 	}
 
 	if err := c.setupAuth(c.cluster.Spec.AuthSecret); err != nil {
@@ -248,23 +246,23 @@ func (c *Cluster) create() error {
 	c.status.SetVersion(c.cluster.Spec.Version)
 
 	if err := c.updateCRStatus(); err != nil {
-		return fmt.Errorf("Cluster create: failed to update cluster phase (%v): %v",
+		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
 			api.ClusterPhaseCreating, err)
 	}
 
 	if len(c.cluster.Spec.ServerSettings) == 0 {
-		return fmt.Errorf("Cluster create: no server specification defined")
+		return fmt.Errorf("cluster create: no server specification defined")
 	}
 
 	idx := c.indexOfServerConfigWithService(api.DataService)
 	if idx == -1 {
-		return fmt.Errorf("Cluster create: at least one server specification must contain the `data` service")
+		return fmt.Errorf("cluster create: at least one server specification must contain the `data` service")
 	}
 
 	// Set up services e.g. DNS records before calling WaitForPod which will poll
 	// for the admin port via a DNS lookup
 	if err := c.setupServices(); err != nil {
-		return fmt.Errorf("Cluster create: fail to create services: %v", err)
+		return fmt.Errorf("cluster create: fail to create services: %v", err)
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
@@ -347,7 +345,7 @@ func (c *Cluster) runReconcile(forceUpdate bool) bool {
 		return false
 	}
 
-	// When cluster is being restored or reconcile error has occured then
+	// When cluster is being restored or reconcile error has occurred then
 	// then the memberset can be updated from the status of running pods and
 	// persistent volumes.
 	if forceUpdate || c.members.Empty() {
@@ -568,7 +566,7 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 func (c *Cluster) elapsedRecoveryDuration(ts time.Time) (bool, time.Duration) {
 
 	// get duration since timestamp
-	elapsedDuration := time.Now().Sub(ts)
+	elapsedDuration := time.Since(ts)
 
 	// require a duration of 30s after autofailover timeout
 	requiredDuration := time.Duration(c.cluster.Spec.ClusterSettings.AutoFailoverTimeout+30) * time.Second
@@ -592,7 +590,7 @@ func (c *Cluster) recoverClusterDown() error {
 }
 
 func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
-	podList, err := c.config.KubeCli.Core().Pods(c.cluster.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Name))
+	podList, err := c.config.KubeCli.CoreV1().Pods(c.cluster.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Name))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list running pods: %v", err)
 	}
@@ -623,7 +621,7 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 	return running, pending, nil
 }
 
-func (c *Cluster) updateMemberStatus() {
+func (c *Cluster) updateMemberStatus() error {
 	// The first member will get here when the pod is brought up, however calls
 	// to get the cluster status will fail as it hasn't been initialized yet, so
 	// instead just return an empty status
@@ -633,19 +631,18 @@ func (c *Cluster) updateMemberStatus() {
 	} else {
 		var err error
 		if info, err = c.client.GetClusterStatus(c.members); err != nil {
-			c.logger.Warningf("update member status failed failed: %v", err)
-			return
+			return err
 		}
 	}
-	c.updateMemberStatusWithClusterInfo(info)
+	return c.updateMemberStatusWithClusterInfo(info)
 }
 
 // use cluster info to set ready members from active nodes
 // and all remaining nodes as unready
-func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) {
+func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) error {
 	c.status.Members.SetReady(cs.ActiveNodes.Names())
 	c.status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
-	c.updateCRStatus()
+	return c.updateCRStatus()
 }
 
 // Use username and password from secret store
@@ -658,12 +655,12 @@ func (c *Cluster) setupAuth(authSecret string) error {
 
 	data := secret.Data
 	if username, ok := data[constants.AuthSecretUsernameKey]; ok {
-		c.username = string(username[:])
+		c.username = string(username)
 	} else {
 		return cberrors.ErrSecretMissingUsername{Reason: authSecret}
 	}
 	if password, ok := data[constants.AuthSecretPasswordKey]; ok {
-		c.password = string(password[:])
+		c.password = string(password)
 	} else {
 		return cberrors.ErrSecretMissingPassword{Reason: authSecret}
 	}
@@ -729,17 +726,17 @@ func (c *Cluster) indexOfServerConfigWithService(svc api.Service) int {
 }
 
 // Adds a new member to our cluster object and updates the cluster status
-func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) {
+func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) error {
 	c.members.Add(member)
 	c.status.Size = c.members.Size()
-	c.updateMemberStatus()
+	return c.updateMemberStatus()
 }
 
 // Removes a member from our cluster object and updates the cluster status
-func (c *Cluster) clusterRemoveMember(name string) {
+func (c *Cluster) clusterRemoveMember(name string) error {
 	c.members.Remove(name)
 	c.status.Size = c.members.Size()
-	c.updateMemberStatus()
+	return c.updateMemberStatus()
 }
 
 // Raises an event.  Unfortunately the event stream only appears to have a

@@ -40,10 +40,10 @@ func (r *secretResource) Fetch() error {
 	// keys, but this is still too dangerous as we collect all secrets in a namespace
 	// which may or may not relate to a cluster.
 	for index, secret := range r.secrets.Items {
-		for key, _ := range secret.Data {
+		for key := range secret.Data {
 			r.secrets.Items[index].Data[key] = []byte{}
 		}
-		for key, _ := range secret.StringData {
+		for key := range secret.StringData {
 			r.secrets.Items[index].StringData[key] = ""
 		}
 		// Plug a gaping hole that 'kubectl apply' creates for us
@@ -59,7 +59,7 @@ func (r *secretResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), secret.Name, secret.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), secret.Name, secret.Name+".yaml"), string(data))
 	}
 	return nil
 }

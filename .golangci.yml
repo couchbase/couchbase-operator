@@ -1,0 +1,10 @@
+run:
+  # Assume the build boxes are going to be miniscule
+  deadline: 5m
+
+linters:
+  enable:
+    - stylecheck
+    - interfacer
+    - unconvert
+    - misspell

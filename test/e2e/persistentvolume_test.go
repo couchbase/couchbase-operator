@@ -124,9 +124,6 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
-	// For validation purpose only
-	eventsExpected := e2eutil.EventList{}
-
 	// For event validation scheme
 	memberDownEvents := e2eutil.EventValidator{}
 	memberRecoveredEvents := e2eutil.EventValidator{}
@@ -139,13 +136,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		}
 		memberDownEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
 		memberRecoveredEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
-
-		eventsExpected = append(eventsExpected, *e2eutil.MemberRecoveredEvent(testCouchbase, podMemberId))
 	}
-
-	// For validation purpose only
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceStartedEvent(testCouchbase))
-	eventsExpected = append(eventsExpected, *e2eutil.RebalanceCompletedEvent(testCouchbase))
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
@@ -159,14 +150,10 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	// Execute this test code only in case of kubernetes cluster,
 	// since openshift container does not have permissions to execute in privileged mode
 	if f.KubeType == "kubernetes" {
-		// For validation purpose only
-		eventsExpected = e2eutil.EventList{}
-
 		// Kill couchbase server process in target pods
 		for _, podMemberId := range podMembersToKill {
 			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
 			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "pkill beam.smp")
-			eventsExpected = append(eventsExpected, *e2eutil.NewMemberDownEvent(testCouchbase, podMemberId))
 		}
 		expectedEvents.AddParallelEvents(memberDownEvents)
 		expectedEvents.AddParallelEvents(memberRecoveredEvents)
@@ -267,7 +254,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	podMembersToKillLen := len(podMembersToKill)
 	if podMembersToKillLen == clusterSize {
 		// All cluster pods are killed, should get one less than all events since first pod
-		// event will not have the repective event, but recovered event will be registered
+		// event will not have the respective event, but recovered event will be registered
 		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
 		for index := 1; index < podMembersToKillLen; index++ {
 			expectedEvents.AddAnyOfEvents(memberDownEvents)
@@ -911,7 +898,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 }
 
 // Create multiple Persistent volume claim definitions in spec
-// Create couchbase cluster with one seperate service in isolated PVC
+// Create couchbase cluster with one separate service in isolated PVC
 // Such that one group without PVC, 2nd using PVC spec1, 3rd with PVC spec2
 // Kill single service node and test the behaviour
 func TestPersistentVolumeWithSingleNodeService(t *testing.T) {

@@ -15,7 +15,7 @@ func ExampleTable_Write() {
 		},
 	}
 
-	t.Write(os.Stdout)
+	_ = t.Write(os.Stdout)
 
 	// Output:
 	// ┌─────────────────┬───────┬────────────────┐

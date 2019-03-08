@@ -801,7 +801,7 @@ func TestValidation(t *testing.T) {
 			if !cont {
 				t.Fatal("unexpected load failure of existing resource")
 			}
-			err, _ = v.Update(previous, current)
+			err = v.Update(previous, current)
 			checkErrors(t, tc, err)
 		})
 	}

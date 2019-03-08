@@ -552,7 +552,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 	clusterReqKeyPair := CreateKeyPairReqData(keyType, clusterCertType, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
-		DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 		return
 	}
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
@@ -562,13 +562,13 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 	ctx.ClusterSecretName = "cluster-secret-tls-" + RandomSuffix()
 	clusterSecretData := CreateClusterSecretData(namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
 	if _, err = CreateSecret(client, namespace, clusterSecretData); err != nil {
-		DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 		return
 	}
 
 	teardown = func() {
-		DeleteSecret(client, namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{})
-		DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(client, namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 	}
 
 	return
@@ -670,7 +670,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
 		Die(t, err)
 	}
 
-	// Update the exising operator secret
+	// Update the existing operator secret
 	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
 	if err != nil {
 		Die(t, err)

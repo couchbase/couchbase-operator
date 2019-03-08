@@ -72,7 +72,7 @@ const (
 
 // Represents the Kubernetes version by its major and minor parts. The first
 // two digits represent the major version and the last two digits represent the
-// minor version. We do not track the maintainence version.
+// minor version. We do not track the maintenance version.
 type KubernetesVersion string
 
 const (
@@ -91,7 +91,7 @@ func (v KubernetesVersion) String() string {
 	}
 
 	vstr := string(v)
-	major := string(vstr[0:2])
+	major := vstr[0:2]
 	if v[0] == '0' {
 		major = string(vstr[1])
 	}

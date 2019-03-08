@@ -35,24 +35,21 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	// there's no way to determine if this node is managed by the operator.
 	for _, node := range status.KnownNodes() {
 		if !members.Contains(node) {
-			return fmt.Errorf("Cluster contains node `%s` which cannot be managed. Failover/Rebalance is recommended.", node)
+			return fmt.Errorf("cluster contains node `%s` which cannot be managed. Failover/Rebalance is recommended", node)
 		}
 	}
 
 	if members.Empty() {
-		return fmt.Errorf("Cluster does not have any Pods that are running or recoverable")
+		return fmt.Errorf("cluster does not have any Pods that are running or recoverable")
 	}
 
 	c.members = members
-	c.updateMemberStatusWithClusterInfo(status)
+
+	if err := c.updateMemberStatusWithClusterInfo(status); err != nil {
+		return err
+	}
 
 	return nil
-}
-
-// What would the next member name allocated by the cluster be?
-func (c *Cluster) nextMemberName() string {
-	index := c.getPodIndex()
-	return couchbaseutil.CreateMemberName(c.cluster.Name, index)
 }
 
 func (c *Cluster) newMember(id int, serverSpecName, version string) *couchbaseutil.Member {

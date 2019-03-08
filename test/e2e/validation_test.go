@@ -79,8 +79,8 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 	targetKube := f.ClusterSpec[kubeName]
 
 	// Stop the operator, we don't actually need it to validate the API and the tests will take forever.
-	framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, f.Namespace)
-	defer f.SetupCouchbaseOperator(targetKube)
+	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, f.Namespace)
+	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
 
 	for _, test := range testDefs {
 		// Run each test case defined as a separate test so we have a way
@@ -114,7 +114,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			testCouchbase.ObjectMeta.Name = ctx.ClusterName
 			testCouchbase.ObjectMeta.Namespace = f.Namespace
 
-			for i, _ := range testCouchbase.Spec.VolumeClaimTemplates {
+			for i := range testCouchbase.Spec.VolumeClaimTemplates {
 				testCouchbase.Spec.VolumeClaimTemplates[i].Spec.StorageClassName = &f.StorageClassName
 			}
 

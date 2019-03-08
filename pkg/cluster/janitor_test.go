@@ -41,7 +41,7 @@ var (
 // for unit tests. For each test it allows the pvcListing of a single invariant set
 // of PVCs, so it doesn't support tests which behave differently based on pvcUpdates
 // to the PVC pvcList.  It does however accept multiple pvcUpdates and pvcDeletions, each
-// of which is individually verified, bascially a mock which checks the parameters
+// of which is individually verified, basically a mock which checks the parameters
 // fo each call.
 type janitorAbstractionInterfaceTestImpl struct {
 	// t is the testing object.

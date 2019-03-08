@@ -94,12 +94,12 @@ func RandomSuffix() string {
 		// Less than 10 places it in the 0-9 range, otherwise in
 		// the a-z range
 		if ordinal < 10 {
-			ordinal = ordinal + int('0')
+			ordinal += int('0')
 		} else {
-			ordinal = ordinal - 10 + int('a')
+			ordinal += int('a') - 10
 		}
 		// Append to the name
-		suffix = suffix + string(rune(ordinal))
+		suffix += string(rune(ordinal))
 	}
 	return suffix
 }
@@ -586,27 +586,34 @@ func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 		killPods = append(killPods, pod.Name)
 	}
 	t.Logf("Killing pods: %v", killPods)
-	KillMembers(kubeClient, namespace, cbCluster.Name, killPods...)
+	if err := KillMembers(kubeClient, namespace, cbCluster.Name, killPods...); err != nil {
+		t.Logf("Failed to kill members: %v", err)
+	}
 }
 
 func CleanK8Cluster(t *testing.T, k8s *types.Cluster, namespace string) {
 	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	for _, service := range services.Items {
-		k8s.KubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+	if err == nil {
+		for _, service := range services.Items {
+			_ = k8s.KubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+		}
 	}
 
 	jobs, err := k8s.KubeClient.BatchV1().Jobs(namespace).List(metav1.ListOptions{})
-	for _, job := range jobs.Items {
-		k8s.KubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+	if err == nil {
+		for _, job := range jobs.Items {
+			_ = k8s.KubeClient.BatchV1().Jobs(namespace).Delete(job.Name, metav1.NewDeleteOptions(0))
+		}
 	}
 	clusters, err := k8s.CRClient.CouchbaseV1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		t.Logf("Error: %v", err)
+	if err == nil {
+		for _, cluster := range clusters.Items {
+			DeleteCbCluster(t, k8s.KubeClient, k8s.CRClient, namespace, &cluster)
+		}
 	}
-	for _, cluster := range clusters.Items {
-		DeleteCbCluster(t, k8s.KubeClient, k8s.CRClient, namespace, &cluster)
+	if err := WaitUntilPodDeleted(t, k8s.KubeClient, namespace); err != nil {
+		fmt.Println("Warning: Unable to delete pods:", err)
 	}
-	WaitUntilPodDeleted(t, k8s.KubeClient, namespace)
 
 	// Ensure all existing PVCs are deleted before continuing.  In the cloud these may take a
 	// while to fully disappear, and may bleed through into other tests, especially ones that
@@ -729,7 +736,7 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 
 	items := len(pods.Items)
 	if numToKill > items {
-		Die(t, fmt.Errorf("Trying to kill %d pods, but only %d exist", numToKill, items))
+		Die(t, fmt.Errorf("trying to kill %d pods, but only %d exist", numToKill, items))
 	}
 
 	killPods := []string{}
@@ -780,7 +787,7 @@ func CreateMemberPod(k8s *types.Cluster, cl *api.CouchbaseCluster, m *couchbaseu
 			if err != nil {
 				return nil, err
 			}
-			return k8s.KubeClient.Core().Pods(cl.Namespace).Get(pod.Name, metav1.GetOptions{})
+			return k8s.KubeClient.CoreV1().Pods(cl.Namespace).Get(pod.Name, metav1.GetOptions{})
 		}
 	}
 
@@ -878,7 +885,7 @@ func getSchedulableNodes(k8s *types.Cluster) ([]*v1.Node, error) {
 	}
 
 	result := []*v1.Node{}
-	for index, _ := range nodes.Items {
+	for index := range nodes.Items {
 		schedulable := true
 		for _, taint := range nodes.Items[index].Spec.Taints {
 			if taint.Effect == v1.TaintEffectNoSchedule {
@@ -1008,7 +1015,7 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace, memberName string, in
 func TlsCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx *TlsContext) error {
 	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
 	if err != nil {
-		return fmt.Errorf("Unable to get couchbase pods: %v", err)
+		return fmt.Errorf("unable to get couchbase pods: %v", err)
 	}
 
 	// TLS handshake with pods

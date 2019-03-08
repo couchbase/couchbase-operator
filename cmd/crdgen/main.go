@@ -14,12 +14,10 @@ import (
 
 var outfile string
 
-func init() {
+func main() {
 	flag.StringVar(&outfile, "outfile", "", "The file to write the crd to")
 	flag.Parse()
-}
 
-func main() {
 	if outfile == "" {
 		fmt.Println("The outfile parameter is required")
 		os.Exit(1)

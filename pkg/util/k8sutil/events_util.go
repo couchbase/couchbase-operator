@@ -324,7 +324,7 @@ func (s eventSorter) Swap(i, j int) {
 	s.events[i], s.events[j] = s.events[j], s.events[i]
 }
 
-// Less does a numeric comparission of event time stamps.
+// Less does numeric comparisons of event time stamps.
 func (s eventSorter) Less(i, j int) bool {
 	return s.events[i].LastTimestamp.String() < s.events[j].LastTimestamp.String()
 }

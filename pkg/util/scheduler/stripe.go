@@ -136,7 +136,7 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 
 // Upgrade removes a node from the scheduler as it's an upgrade target.
 func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
-	for serverGroup, _ := range sched.serverClasses[class] {
+	for serverGroup := range sched.serverClasses[class] {
 		if err := sched.serverClasses[class][serverGroup].del(name); err == nil {
 			return nil
 		}
@@ -156,18 +156,18 @@ func (sched *stripeSchedulerImpl) LogStatus(w io.Writer) error {
 
 	for class, groups := range sched.serverClasses {
 		mapClass[class] = nil
-		for group, _ := range groups {
+		for group := range groups {
 			mapGroup[group] = nil
 		}
 	}
 
 	// Make the output deterministic
 	listClass := []string{}
-	for class, _ := range mapClass {
+	for class := range mapClass {
 		listClass = append(listClass, class)
 	}
 	listGroup := []string{}
-	for group, _ := range mapGroup {
+	for group := range mapGroup {
 		listGroup = append(listGroup, group)
 	}
 	sort.Strings(listClass)

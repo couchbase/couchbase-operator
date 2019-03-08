@@ -35,7 +35,7 @@ type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]
 
 // newClient returns a new Couchbase management client (internal not go SDK)
 func newClient(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
-	err, username, password := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.AuthSecret)
+	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.AuthSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +452,7 @@ func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *api.Couchbas
 			return err
 		}
 
-		if clusterInfo.Balanced != true {
+		if !clusterInfo.Balanced {
 			return NewErrVerifyClusterInfo()
 		}
 		for _, node := range clusterInfo.Nodes {
@@ -602,7 +602,7 @@ func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCl
 			return false, retryutil.RetryOkError(err)
 		}
 		for _, verify := range verifiers {
-			if verify(t, info, value) == false {
+			if !verify(t, info, value) {
 				return false, retryutil.RetryOkError(NewErrVerifyServices())
 			}
 		}
@@ -627,13 +627,13 @@ func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[s
 		for _, service := range node.Services {
 			switch {
 			case service == "kv":
-				clusterServices["Data"] = clusterServices["Data"] + 1
+				clusterServices["Data"]++
 			case service == "n1ql":
-				clusterServices["N1QL"] = clusterServices["N1QL"] + 1
+				clusterServices["N1QL"]++
 			case service == "index":
-				clusterServices["Index"] = clusterServices["Index"] + 1
+				clusterServices["Index"]++
 			case service == "fts":
-				clusterServices["FTS"] = clusterServices["FTS"] + 1
+				clusterServices["FTS"]++
 			}
 		}
 	}
@@ -733,7 +733,9 @@ func VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName,
 			return fmt.Errorf("%v: %v", err, string(response))
 		}
 		queryRes := queryResult{}
-		json.Unmarshal(response, &queryRes)
+		if err := json.Unmarshal(response, &queryRes); err != nil {
+			return err
+		}
 		currDocCount = queryRes.Results[0]["count"]
 
 		if currDocCount != reqNumOfDocs {

@@ -73,7 +73,7 @@ func (t *Table) getStyle() *Style {
 }
 
 // updateMaxWidths takes a list of column widths and a row, updating if
-// the current element length is greater than the exising one.
+// the current element length is greater than the existing one.
 func (t *Table) updateMaxWidths(row Row) {
 	for index, elem := range row {
 		length := len(elem)
@@ -140,7 +140,7 @@ func (t *Table) Write(w io.Writer) error {
 		}
 	}
 
-	// Caclulate the character width of each column based on the largest string
+	// Calculate the character width of each column based on the largest string
 	// in each.
 	t.widths = make([]int, columns)
 	t.updateMaxWidths(t.Header)
@@ -150,7 +150,9 @@ func (t *Table) Write(w io.Writer) error {
 
 	// Write out the header
 	for _, line := range t.format() {
-		w.Write([]byte(line + "\n"))
+		if _, err := w.Write([]byte(line + "\n")); err != nil {
+			return err
+		}
 	}
 	return nil
 }

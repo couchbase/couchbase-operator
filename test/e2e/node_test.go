@@ -291,7 +291,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
 	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 
-	err, username, password := e2eutil.GetClusterAuth(targetKube.KubeClient, f.Namespace, targetKube.DefaultSecret.Name)
+	username, password, err := e2eutil.GetClusterAuth(targetKube.KubeClient, f.Namespace, targetKube.DefaultSecret.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -900,7 +900,9 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
 		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
 	}
-	defer e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
+	defer func() {
+		_ = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
+	}()
 
 	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
 	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)

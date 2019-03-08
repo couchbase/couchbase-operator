@@ -125,8 +125,8 @@ func startTimeoutTimer() {
 		profile := pprof.Lookup("goroutine")
 		if profile != nil {
 			buffer := &bytes.Buffer{}
-			profile.WriteTo(buffer, 2)
-			logrus.Info(string(buffer.Bytes()))
+			_ = profile.WriteTo(buffer, 2)
+			logrus.Info(buffer.String())
 		}
 
 		panic("Test timed out..")
@@ -208,7 +208,7 @@ func Setup(t *testing.T) (err error) {
 	}
 	Global.CbopinfoPath = wd + "/../../build/bin/cbopinfo"
 
-	for kubeName, _ := range Global.ClusterSpec {
+	for kubeName := range Global.ClusterSpec {
 		if err = Global.SetupFramework(kubeName); err != nil {
 			return err
 		}
@@ -265,7 +265,9 @@ func DeleteCouchbaseClusters(kubeClient kubernetes.Interface, crClient versioned
 		for _, pod := range pods.Items {
 			killPods = append(killPods, pod.Name)
 		}
-		e2eutil.KillMembers(kubeClient, Global.Namespace, cluster.Name, killPods...)
+		if err := e2eutil.KillMembers(kubeClient, Global.Namespace, cluster.Name, killPods...); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -302,7 +304,9 @@ func cleanUpNamespace() (err error) {
 				}
 			}
 		}
-		e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, "basic-test-secret", &metav1.DeleteOptions{})
+		if err := e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
 
 		// Clean-up Deployments and pods
 		if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, Global.Namespace); err != nil {
@@ -328,7 +332,7 @@ func cleanUpNamespace() (err error) {
 
 func Teardown() error {
 	if Global == nil {
-		return errors.New("Framework is uninitialized")
+		return errors.New("framework is uninitialized")
 	}
 
 	if Global.SkipTeardown {
@@ -361,7 +365,7 @@ func CreateKubeClusterObject(kubeConfPath, context string) (*types.Cluster, erro
 func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 	secret, err := e2eutil.CreateSecret(f.ClusterSpec[kubeName].KubeClient, f.Namespace, e2espec.NewDefaultSecret(f.Namespace))
 	if err != nil {
-		err = errors.New("Failed to create default couchbase secret: " + err.Error())
+		err = errors.New("failed to create default couchbase secret: " + err.Error())
 		return err
 	}
 	f.ClusterSpec[kubeName].DefaultSecret = secret
@@ -371,10 +375,10 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 func RecreateCRDs(k8s *types.Cluster) error {
 	clientSet, err := clientset.NewForConfig(k8s.Config)
 	if err != nil {
-		return errors.New("Failed to create clientset object: " + err.Error())
+		return errors.New("failed to create clientset object: " + err.Error())
 	}
 	if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
-		return errors.New("Failed to delete CRDs: " + err.Error())
+		return errors.New("failed to delete CRDs: " + err.Error())
 	}
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(k8sutil.GetCRD()); err != nil {
 		return err
@@ -392,11 +396,11 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 		nodeTaintList := []v1.Taint{}
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
-			return fmt.Errorf("Failed to get node list: %v", err)
+			return fmt.Errorf("failed to get node list: %v", err)
 		}
-		for nodeIndex, _ := range k8sNodeList.Items {
+		for nodeIndex := range k8sNodeList.Items {
 			if err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex); err != nil {
-				return fmt.Errorf("Failed to update node taint: %v", err)
+				return fmt.Errorf("failed to update node taint: %v", err)
 			}
 		}
 		return nil
@@ -439,6 +443,9 @@ func (f *Framework) SetupFramework(kubeName string) error {
 
 	logrus.Info("Deleting orphaned pods")
 	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	if err != nil {
+		return err
+	}
 	for _, pod := range pods.Items {
 		err = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 		if err != nil {
@@ -496,7 +503,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 
 	logrus.Info("Setting up operator")
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
-		return errors.New("Failed to setup couchbase operator: " + err.Error())
+		return errors.New("failed to setup couchbase operator: " + err.Error())
 	}
 	logrus.Info("Couchbase operator created successfully")
 	logrus.Info("E2E setup successfully")
@@ -589,24 +596,13 @@ func GenerateLogDir() (string, error) {
 }
 
 // Execute shell command and returns the stderr and stdout buffers
-func runExecCommand(t *testing.T, command *exec.Cmd) error {
+func runExecCommand(command *exec.Cmd) error {
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 
 	if err := command.Run(); err != nil {
-		return errors.New("Error during execution: " + err.Error() + "\n\n stdout: " + stdout.String() + "\n\n stderr: " + stderr.String())
-	}
-	return nil
-}
-
-func runExecCmd(command *exec.Cmd) error {
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-
-	if err := command.Run(); err != nil {
-		return errors.New("Error during execution: " + err.Error() + "\n\n stdout: " + stdout.String() + "\n\n stderr: " + stderr.String())
+		return errors.New("error during execution: " + err.Error() + "\n\n stdout: " + stdout.String() + "\n\n stderr: " + stderr.String())
 	}
 	return nil
 }

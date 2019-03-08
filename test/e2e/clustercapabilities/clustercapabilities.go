@@ -25,7 +25,7 @@ func (z zoneSet) add(zone string) {
 // toZoneList turns a set into a list.
 func (z zoneSet) toZoneList() ZoneList {
 	l := ZoneList{}
-	for zone, _ := range z {
+	for zone := range z {
 		l = append(l, zone)
 	}
 	return l

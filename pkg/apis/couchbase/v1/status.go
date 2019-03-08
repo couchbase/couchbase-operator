@@ -13,9 +13,9 @@ type ClusterPhase string
 
 const (
 	ClusterPhaseNone     ClusterPhase = ""
-	ClusterPhaseCreating              = "Creating"
-	ClusterPhaseRunning               = "Running"
-	ClusterPhaseFailed                = "Failed"
+	ClusterPhaseCreating ClusterPhase = "Creating"
+	ClusterPhaseRunning  ClusterPhase = "Running"
+	ClusterPhaseFailed   ClusterPhase = "Failed"
 )
 
 type ClusterCondition struct {
@@ -35,11 +35,11 @@ type ClusterConditionType string
 
 const (
 	ClusterConditionAvailable     ClusterConditionType = "Available"
-	ClusterConditionBalanced                           = "Balanced"
-	ClusterConditionManageBuckets                      = "ManageBuckets"
-	ClusterConditionManageConfig                       = "ManageConfig"
-	ClusterConditionScaling                            = "Scaling"
-	ClusterConditionUpgrading                          = "Upgrading"
+	ClusterConditionBalanced      ClusterConditionType = "Balanced"
+	ClusterConditionManageBuckets ClusterConditionType = "ManageBuckets"
+	ClusterConditionManageConfig  ClusterConditionType = "ManageConfig"
+	ClusterConditionScaling       ClusterConditionType = "Scaling"
+	ClusterConditionUpgrading     ClusterConditionType = "Upgrading"
 )
 
 type ClusterStatusMap map[ClusterConditionType]*ClusterCondition
@@ -332,8 +332,8 @@ type UpgradeStatus struct {
 const (
 	// UpgradingMessageFormat is the message format used when the cluster is upgrading.
 	// The first field is the state of the operation, the second and third fields are
-	// the source and target versions repsectively, the forth and fifth fields are the
-	// counts of members at the target version and total members repsectively.
+	// the source and target versions respectively, the forth and fifth fields are the
+	// counts of members at the target version and total members respectively.
 	UpgradingMessageFormat = "Cluster %s from %s to %s (progress %d/%d)"
 	// UpgradingMessageStateUpgrading is used in the UpgradingMessageFormat to indicate
 	// an upgrade in progress.

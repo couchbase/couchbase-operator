@@ -104,7 +104,7 @@ func (c *Cluster) operatorUpgrade() error {
 				upgraded[item] = nil
 			}
 		}
-		for item, _ := range upgraded {
+		for item := range upgraded {
 			if err := resource.commit(item); err != nil {
 				return err
 			}

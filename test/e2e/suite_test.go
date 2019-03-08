@@ -19,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func collectClusterLogs(t *testing.T, testName, logDir string) {
+func collectClusterLogs(t *testing.T, logDir string) {
 	f := framework.Global
 
 	// Create and move to the log directory.
@@ -37,10 +37,10 @@ func collectClusterLogs(t *testing.T, testName, logDir string) {
 	}
 
 	// Move back to where we were regardless of outcome.
-	defer os.Chdir(pwd)
+	defer func() { _ = os.Chdir(pwd) }()
 
 	// Collect logs from all clusters defined for this test.
-	for index, _ := range f.TestClusters {
+	for index := range f.TestClusters {
 		cluster := f.GetCluster(index)
 
 		args := argumentList{}
@@ -75,8 +75,8 @@ func goroutineLeakCheck(expected int) {
 		fmt.Println("WARN: goroutine leak detected:", expected, "vs", runtime.NumGoroutine())
 		trace := &bytes.Buffer{}
 		profile := pprof.Lookup("goroutine")
-		profile.WriteTo(trace, 2)
-		fmt.Println(string(trace.Bytes()))
+		_ = profile.WriteTo(trace, 2)
+		fmt.Println(trace.String())
 	}
 }
 
@@ -228,7 +228,7 @@ func runSuite(t *testing.T) {
 				// Collect logs if test fails
 				if !testPassed && f.CollectLogs {
 					logDir := f.LogDir + "/" + testName
-					collectClusterLogs(t, testName, logDir)
+					collectClusterLogs(t, logDir)
 				}
 
 				// Clean up all known clusters if SkipTeardown is disabled

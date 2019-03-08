@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -168,7 +167,7 @@ func (c *CouchbaseClient) GetTLS() *cbmgr.TLSAuth {
 	return c.client.GetTLS()
 }
 
-// SetUUID sets or updates the cluster UUID to be checked by new persistant
+// SetUUID sets or updates the cluster UUID to be checked by new persistent
 // connections being dialed
 func (c *CouchbaseClient) SetUUID(uuid string) {
 	c.client.SetUUID(uuid)
@@ -295,7 +294,7 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 
 	// Sort the names so it's easier to grok
 	names := []string{}
-	for name, _ := range cs.managedNodes {
+	for name := range cs.managedNodes {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -336,13 +335,9 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 	}
 
 	// Sort the names so it's easier to grok
-	names = []string{}
-	for _, name := range cs.UnmanagedNodes {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	sort.Strings(cs.UnmanagedNodes)
 
-	for _, name := range names {
+	for _, name := range cs.UnmanagedNodes {
 		states := []string{"unmanaged"}
 
 		// Ignore the error, if we've added the unmanaged node it has to exist in the node info.
@@ -577,7 +572,9 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 			status.NodeStateMap[member.Name] = state
 
 			// Add the member to the relevant state based set
-			status.addMemberToStateSet(state, member)
+			if err := status.addMemberToStateSet(state, member); err != nil {
+				return err
+			}
 		}
 
 		// Any managed nodes not known to the cluster are unclustered (have been ejected).
@@ -681,7 +678,7 @@ func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *cbapi.BucketConfig)
 		_, err := c.client.BucketReady(bucket.BucketName)
 		// Bucket doesn't exist, someone deleted it.
 		if cbmgr.IsServerError(err, 404) {
-			return false, fmt.Errorf("Bucket %s does not exist", bucket.BucketName)
+			return false, fmt.Errorf("bucket %s does not exist", bucket.BucketName)
 		}
 		return err == nil, nil
 	})
@@ -881,7 +878,7 @@ func (c *CouchbaseClient) GetRecoveryType(m *Member) (cbmgr.RecoveryType, error)
 		}
 	}
 
-	return cbmgr.RecoveryTypeFull, fmt.Errorf("No member exists for %s", m.Name)
+	return cbmgr.RecoveryTypeFull, fmt.Errorf("no member exists for %s", m.Name)
 }
 
 func (c *CouchbaseClient) IsRecoveryTypeDelta(m *Member) (bool, error) {
@@ -962,15 +959,4 @@ func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) *cbapi.BucketConfig {
 	}
 
 	return rv
-}
-
-// transforms bucket status into bucketConfig type and compares the two
-func bucketStatusEqualsConfig(statusConfig *cbmgr.Bucket, specConfig *cbmgr.Bucket) bool {
-
-	// consider type couchbase = membase
-	if specConfig.BucketType == constants.BucketTypeCouchbase && statusConfig.BucketType == constants.BucketTypeMembase {
-		statusConfig.BucketType = constants.BucketTypeCouchbase
-	}
-
-	return reflect.DeepEqual(statusConfig, specConfig)
 }

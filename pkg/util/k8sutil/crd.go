@@ -70,7 +70,7 @@ func WaitCRDReady(clientset apiextensionsclient.Interface) error {
 				}
 			case apiextensionsv1beta1.NamesAccepted:
 				if cond.Status == apiextensionsv1beta1.ConditionFalse {
-					return false, fmt.Errorf("Name conflict: %v", cond.Reason)
+					return false, fmt.Errorf("name conflict: %v", cond.Reason)
 				}
 			}
 		}
@@ -93,10 +93,13 @@ func MustNewKubeExtClient() apiextensionsclient.Interface {
 func ValidateCRD(customResource *unstructured.Unstructured) error {
 	validation := apiextensions.CustomResourceValidation{}
 	err := scheme.Scheme.Convert(getCustomResourceValidation(), &validation, nil)
+	if err != nil {
+		return err
+	}
 
 	validator, _, err := apiservervalidation.NewSchemaValidator(&validation)
 	if err != nil {
-		return fmt.Errorf("Error creating schema validator : %v", err)
+		return fmt.Errorf("error creating schema validator : %v", err)
 	}
 
 	result := validator.Validate(customResource)

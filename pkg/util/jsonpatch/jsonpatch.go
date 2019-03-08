@@ -247,7 +247,7 @@ type PatchSet interface {
 	// Remove removes a value from an object or removes from an array.  If the
 	// target is a struct field then it is set to the types zero value.
 	Remove(string) PatchSet
-	// Replace changes a pre-exising value in an object or array.
+	// Replace changes a pre-existing value in an object or array.
 	Replace(string, interface{}) PatchSet
 	// Test asserts that a value in an object or array matches what is expected.
 	Test(string, interface{}) PatchSet
@@ -280,7 +280,7 @@ func (p *patchSetImpl) Remove(path string) PatchSet {
 	return p
 }
 
-// Replace changes a pre-exising value in an object or array.
+// Replace changes a pre-existing value in an object or array.
 func (p *patchSetImpl) Replace(path string, value interface{}) PatchSet {
 	p.patches = append(p.patches, Patch{Op: Replace, Path: path, Value: value})
 	return p

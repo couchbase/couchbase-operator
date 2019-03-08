@@ -68,7 +68,7 @@ func (r *couchbaseClusterResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), couchbaseCluster.Name, couchbaseCluster.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), couchbaseCluster.Name, couchbaseCluster.Name+".yaml"), string(data))
 	}
 	return nil
 }

@@ -128,7 +128,10 @@ func Parse() Configuration {
 	flagSet.BoolVar(&c.CollectInfoList, collectInfoListFlag, lookupFlagFromEnvBool(collectInfoListFlag, false), "list all log sources in json and exit, requires the -"+collectInfoFlag+" flag to be set")
 	flagSet.BoolVar(&c.Help, "help", false, "print this message and exit")
 	flagSet.BoolVar(&c.Version, "version", false, "print the version string and exit")
-	flagSet.Parse(os.Args[1:])
+	if err := flagSet.Parse(os.Args[1:]); err != nil {
+		fmt.Println("failed to parse arguments:", err)
+		os.Exit(1)
+	}
 
 	// Echo out help if we need it
 	if c.Help {

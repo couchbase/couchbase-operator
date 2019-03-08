@@ -80,7 +80,7 @@ func (l ServiceList) Swap(a, b int) {
 	l[a], l[b] = l[b], l[a]
 }
 
-// Contains returns true if a sevice is part of a service list
+// Contains returns true if a service is part of a service list
 func (l ServiceList) Contains(service Service) bool {
 	for _, s := range l {
 		if s == service {
@@ -226,7 +226,7 @@ type ClusterSpec struct {
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
 	// ServerGroups define the set of availability zones we want to distribute
-	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
+	// pods over.  This allows the Kubernetes cluster administrator to label all
 	// nodes, but use a specific subset for a particular Couchbase cluster.
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
@@ -347,7 +347,7 @@ type ServerConfig struct {
 	Services ServiceList `json:"services"`
 
 	// ServerGroups define the set of availability zones we want to distribute
-	// pods over.  This allows the Kubernetes cluster adminsitrator to label all
+	// pods over.  This allows the Kubernetes cluster administrator to label all
 	// nodes, but use a specific subset for a particular Couchbase cluster.
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
@@ -408,10 +408,10 @@ type VolumeMountName string
 
 const (
 	DefaultVolumeMount   VolumeMountName = "default"
-	DataVolumeMount                      = "data"
-	IndexVolumeMount                     = "index"
-	AnalyticsVolumeMount                 = "analytics"
-	LogsVolumeMount                      = "logs"
+	DataVolumeMount      VolumeMountName = "data"
+	IndexVolumeMount     VolumeMountName = "index"
+	AnalyticsVolumeMount VolumeMountName = "analytics"
+	LogsVolumeMount      VolumeMountName = "logs"
 )
 
 type VolumeMounts struct {
@@ -444,7 +444,7 @@ func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 // for analytics service
 func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	paths := []string{}
-	for mount, _ := range v.GetAnalyticsMountClaims() {
+	for mount := range v.GetAnalyticsMountClaims() {
 		paths = append(paths, fmt.Sprintf("/mnt/%s", mount))
 	}
 	return paths
@@ -582,27 +582,12 @@ func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}
 	for _, a := range a1 {
 		// checking if item from a1 is missing from a2
-		if _, ok := HasItem(a, a2); ok == false {
+		if _, ok := HasItem(a, a2); !ok {
 			// add to missing
 			missingItems = append(missingItems, a)
 		}
 	}
 	return missingItems
-}
-
-// Returns true of the values of two pointers are equal
-func stringPtrEquals(p1, p2 *string) bool {
-	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
-}
-
-// Returns true of the values of two pointers are equal
-func intPtrEquals(p1, p2 *int) bool {
-	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
-}
-
-// Returns true of the values of two pointers are equal
-func boolPtrEquals(p1, p2 *bool) bool {
-	return (p1 == nil && p2 == nil) || (p1 != nil && p2 != nil && *p1 == *p2)
 }
 
 // HasExposedFeatures returns whether we need to expose ports and update the

@@ -73,7 +73,7 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []by
 	}
 
 	// Wait for the certificate data to be updated. NS server has a few quirks (as per usual... sigh).
-	// Reloading the chain will sometimes not work and need to be repeatedy prodded until it decides
+	// Reloading the chain will sometimes not work and need to be repeatedly prodded until it decides
 	// to obey our command.
 	return retryutil.Retry(c.ctx, 5*time.Second, couchbaseutil.ExtendedRetryCount, func() (bool, error) {
 		if tlsValid(member, cacert, cert) {
@@ -132,7 +132,7 @@ func (c *Cluster) reconcileTLS() error {
 		return err
 	}
 
-	// Work out what zones should be in the certificate for verfication purposes.
+	// Work out what zones should be in the certificate for verification purposes.
 	zones := []string{
 		c.cluster.Name + "." + c.cluster.Namespace + ".svc",
 	}

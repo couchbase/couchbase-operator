@@ -17,7 +17,6 @@ var (
 	minimumServicesLength              int64   = 1
 	minimumServersLength               int64   = 1
 	minimumStringLength                int64   = 1
-	maximumAdminConsoleServices        int64   = 6
 	minimumBucketReplicas              float64 = 0
 	maximumBucketReplicas              float64 = 3
 	minimumAutofailoverMaxCount        float64 = 1

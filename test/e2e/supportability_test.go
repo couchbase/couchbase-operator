@@ -65,15 +65,8 @@ func supportsMultipleVolumeClaims(t *testing.T, cluster *types.Cluster) bool {
 		lazyBoundStorageClass(t, cluster)
 }
 
-// Removes first dir name present in the file path
-func parentDirStrRemover(fileList []string) {
-	for index, fileName := range fileList {
-		fileList[index] = strings.Join(strings.Split(fileName, "/")[1:], "/")
-	}
-}
-
 // Function to cross check log dir contents against populated file list
-func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *failureList) {
+func checkLogDirContents(reqFileList []string, errMsgList *failureList) {
 	for _, fileName := range reqFileList {
 		if _, err := os.Stat(fileName); err != nil {
 			errMsgList.AppendFailure("File "+fileName, errors.New("File not found!"))
@@ -82,7 +75,7 @@ func checkLogDirContents(reqFileList []string, logDirName string, errMsgList *fa
 }
 
 // Function to cross check log dir contents are not present against the populated file list
-func checkLogDirContentsForExcludedFiles(excludedFileList []string, logFileDir string, errMsgList *failureList) {
+func checkLogDirContentsForExcludedFiles(excludedFileList []string, errMsgList *failureList) {
 	for _, fileName := range excludedFileList {
 		if _, err := os.Stat(fileName); err == nil {
 			errMsgList.AppendFailure("File "+fileName, errors.New("File Exists!"))
@@ -240,7 +233,7 @@ func getDeployementFileList(kubeClient kubernetes.Interface, namespace, deployme
 }
 
 // Function to get kube-system specific log file names
-func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, crClient versioned.Interface, config *rest.Config, namespace, cbopinfoLogDir string, allFlag bool, reqFileList *[]string) error {
+func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, config *rest.Config, namespace, cbopinfoLogDir string, allFlag bool, reqFileList *[]string) error {
 	namespaceDir := cbopinfoLogDir + "/" + namespace
 
 	clusterroleDir := namespaceDir + "/clusterrole"
@@ -433,7 +426,9 @@ func unzipFile(zipFileName string) error {
 	}
 	defer zipReader.Close()
 
-	os.MkdirAll(destFileName, 0777)
+	if err := os.MkdirAll(destFileName, 0777); err != nil {
+		return err
+	}
 
 	// Closure to address file descriptors issue with all the deferred .Close() methods
 	extractAndWriteFile := func(file *zip.File) error {
@@ -441,14 +436,18 @@ func unzipFile(zipFileName string) error {
 		if err != nil {
 			return err
 		}
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 
 		filePath := filepath.Join(destFileName, file.Name)
 
 		if file.FileInfo().IsDir() {
-			os.MkdirAll(filePath, 0777)
+			if err := os.MkdirAll(filePath, 0777); err != nil {
+				return err
+			}
 		} else {
-			os.MkdirAll(filepath.Dir(filePath), 0777)
+			if err := os.MkdirAll(filepath.Dir(filePath), 0777); err != nil {
+				return err
+			}
 			fPtr, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 			if err != nil {
 				return err
@@ -473,13 +472,13 @@ func unzipFile(zipFileName string) error {
 // Function to untar the log file
 func untarGzFile(tarGzFilePath string) error {
 	file, err := os.OpenFile(tarGzFilePath, os.O_RDONLY, 0444)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if err != nil {
 		return err
 	}
 
 	gr, err := gzip.NewReader(file)
-	defer gr.Close()
+	defer func() { _ = gr.Close() }()
 	if err != nil {
 		return err
 	}
@@ -497,7 +496,9 @@ func untarGzFile(tarGzFilePath string) error {
 			filePathAsList := strings.Split(filePath, "/")
 			filePathAsList = filePathAsList[0 : len(filePathAsList)-1]
 			filePathToCreate := strings.Join(filePathAsList, "/")
-			os.MkdirAll(filePathToCreate, 0766)
+			if err := os.MkdirAll(filePathToCreate, 0766); err != nil {
+				return err
+			}
 
 			filePtr, err := os.OpenFile(filePath, os.O_RDWR|os.O_TRUNC, 0777)
 			defer filePtr.Close()
@@ -558,11 +559,6 @@ func (a argumentList) slice() []string {
 // add adds a new key and value to the argument list.
 func (a argumentList) add(k, v string) {
 	a[k] = v
-}
-
-// remove removes a kay from the argument list.
-func (a argumentList) remove(k string) {
-	delete(a, k)
 }
 
 // addClusterDefaults adds in configuration specific default arguments that must
@@ -814,13 +810,13 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	// collect logs from multi clusters by specifying cluster names in command line
@@ -843,14 +839,14 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster3.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	// collect logs from all clusters in the given namespace
@@ -872,13 +868,13 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster2.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	///////////////////////////////////////////////
@@ -904,14 +900,14 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster2.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	// Verify kube-system logs with multiple couchbase cluster logs
@@ -935,7 +931,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -944,7 +940,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	// Verify kube-system logs with all other cb cluster logs
@@ -968,7 +964,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -977,7 +973,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	///////////////////////////////////////////////////
@@ -1002,13 +998,13 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	///////////////////////////////////////////////////
@@ -1034,7 +1030,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	}
 
 	isAllFlagSet = true
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	for _, clusterName := range []string{cluster1.Name, cluster2.Name, cluster3.Name} {
@@ -1042,7 +1038,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists = errMsgList.PrintFailures(t) || failureExists
 
 	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cluster1.Name, logFileDir, false, &errMsgList); err != nil {
@@ -1069,7 +1065,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	if err := framework.RecreateServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name); err != nil {
 		e2eutil.Die(t, err)
 	}
-	defer framework.RemoveServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name)
+	defer func() { _ = framework.RemoveServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name) }()
 
 	// Create a kubernetes configuration file.
 	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(f.Namespace).Get(cluster.Name, metav1.GetOptions{})
@@ -1173,13 +1169,13 @@ func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName s
 ***********************************/
 
 // Generic function to re-deploy the operator with given image name and rest-port
-// Collect logs with appropiate cbopinfo arguments and verify the collected info
+// Collect logs with appropriate cbopinfo arguments and verify the collected info
 func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorImage string, operatorPort int, cmdArgs []string) {
 	f := framework.Global
 	targetKube := k8s
 	clusterSize := 3
 
-	defer ReDeployOperator(t, targetKube.KubeClient, f.OpImage, 0)
+	defer func() { _ = ReDeployOperator(t, targetKube.KubeClient, f.OpImage, 0) }()
 	if err := ReDeployOperator(t, targetKube.KubeClient, operatorImage, operatorPort); err != nil {
 		t.Fatal(err)
 	}
@@ -1211,14 +1207,14 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &reqFileList)
 
 	isAllFlagSet := true
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists := errMsgList.PrintFailures(t)
 
 	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, false, &errMsgList); err != nil {
@@ -1310,7 +1306,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 		}
 		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
 
-		checkLogDirContentsForExcludedFiles(excludedFileList, logFileDir, &errMsgList)
+		checkLogDirContentsForExcludedFiles(excludedFileList, &errMsgList)
 		if failureExists := errMsgList.PrintFailures(t); failureExists {
 			t.Error("Log file verification failed")
 		}
@@ -1350,8 +1346,8 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 		}
 		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
 
-		checkLogDirContents(reqFileList, logFileDir, &errMsgList)
-		checkLogDirContentsForExcludedFiles(excludedFileList, logFileDir, &errMsgList)
+		checkLogDirContents(reqFileList, &errMsgList)
+		checkLogDirContentsForExcludedFiles(excludedFileList, &errMsgList)
 		if failureExists := errMsgList.PrintFailures(t); failureExists {
 			t.Error("Log file verification failed")
 		}
@@ -1364,7 +1360,6 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	clusterSize := constants.Size1
-	execOut := []byte{}
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
@@ -1378,26 +1373,23 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
 
-	logFileNameChan := make(chan string)
-	go func() {
-		// Collect logs when operator pod goes down in parallel
-		t.Log("Starting log collection")
-		var err error
-		execOut, err = runCbopinfoCmd(append(args.slice(), cbCluster.Name))
-		execOutStr := strings.TrimSpace(string(execOut))
-		t.Logf("Returned: %s\n", execOutStr)
-		// TODO: This is broken, you cannot call Fatal() in a go routine :/
-		if err != nil {
-			t.Fatal(err)
-		}
-		logFileNameChan <- getLogFileNameFromExecOutput(execOutStr)
-	}()
-
-	if err := e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace); err != nil {
-		t.Fatal(err)
+	if err := e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace); err != nil {
+		e2eutil.Die(t, err)
 	}
 
-	logFileName := <-logFileNameChan
+	// Collect logs when operator pod goes down in parallel
+	t.Log("Starting log collection")
+	var err error
+	execOut, err := runCbopinfoCmd(append(args.slice(), cbCluster.Name))
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	execOutStr := strings.TrimSpace(string(execOut))
+	t.Logf("Returned: %s\n", execOutStr)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	logFileName := getLogFileNameFromExecOutput(execOutStr)
 	defer os.Remove(logFileName)
 
 	logFileDir := strings.Split(logFileName, ".")[0]
@@ -1413,14 +1405,14 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &reqFileList)
 
 	isAllFlagSet := true
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	failureExists := errMsgList.PrintFailures(t)
 
 	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, false, &errMsgList); err != nil {
@@ -2087,13 +2079,13 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	// Verify file list
 	errMsgList := failureList{}
 	reqFileList := []string{}
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.CRClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
+	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
 	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
 		t.Fatal(err)
 	}
-	checkLogDirContents(reqFileList, logFileDir, &errMsgList)
+	checkLogDirContents(reqFileList, &errMsgList)
 	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, false, &errMsgList); err != nil {
 		t.Error(err)
 	}
@@ -2343,7 +2335,7 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 
 	// Ensure cluster 1 is healthy and update the retention period to be 1m.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, 2*time.Minute)
-	cluster1 = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), time.Minute)
+	_ = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), time.Minute)
 
 	// Ensure cluster2 is healthy then kill the first stateless pod in cluster 2.  Wait for the recovery to
 	// start and complete.

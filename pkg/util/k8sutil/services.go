@@ -23,7 +23,7 @@ const (
 	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
 	ddnsAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 	// Used to annotate services which belong to an SRV record.
-	srvAnnotaion = "external-dns.alpha.kubernetes.io/service"
+	//srvAnnotaion = "external-dns.alpha.kubernetes.io/service"
 
 	// Fixed port names (generate SRV records for the peer services)
 	couchbaseSRVName    = "couchbase"
@@ -264,10 +264,10 @@ type ReconcileStatus string
 
 const (
 	ReconcileStatusError     ReconcileStatus = "error"
-	ReconcileStatusCreated                   = "created"
-	ReconcileStatusDeleted                   = "deleted"
-	ReconcileStatusUpdated                   = "updated"
-	ReconcileStatusUnchanged                 = "unchanged"
+	ReconcileStatusCreated   ReconcileStatus = "created"
+	ReconcileStatusDeleted   ReconcileStatus = "deleted"
+	ReconcileStatusUpdated   ReconcileStatus = "updated"
+	ReconcileStatusUnchanged ReconcileStatus = "unchanged"
 )
 
 // createServiceManifest creates a basic service with a type, ports, labels and pod selectors.
@@ -311,7 +311,7 @@ func labelsForNodeService(clusterName, nodeName string) map[string]string {
 }
 
 // creates a service of Type ClusterIP which is only resolvable internally.
-// futhermore the ClusterIP is "None" allowing the service to run "headless"
+// furthermore the ClusterIP is "None" allowing the service to run "headless"
 // (sans load balancing middleware) which allows the operator to resolve
 // addresses of individual pods instead of a proxy
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
@@ -368,8 +368,8 @@ func generateConsoleService(cluster *couchbasev1.CouchbaseCluster) *v1.Service {
 	}
 
 	if cluster.Spec.IsAdminConsoleServiceTypePublic() {
-		// Also set the external trafic policy to Local which means the load balancer is
-		// responsible for routing trafic to the destination and not Kubernetes.  For
+		// Also set the external traffic policy to Local which means the load balancer is
+		// responsible for routing traffic to the destination and not Kubernetes.  For
 		// ELB at least this appears to keep sessions open to the same console instance.
 		service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 
@@ -380,7 +380,7 @@ func generateConsoleService(cluster *couchbasev1.CouchbaseCluster) *v1.Service {
 			service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		}
 	} else {
-		// Ensure client sessions are mantained by routing to the same backend node based
+		// Ensure client sessions are maintained by routing to the same backend node based
 		// on the client IP address.
 		service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	}
@@ -561,7 +561,7 @@ func exposedFeatureSetToServiceList(featureSet couchbasev1.ExposedFeatureList) (
 	}
 
 	// Map the set keys into a list
-	for service, _ := range serviceSet {
+	for service := range serviceSet {
 		serviceList = append(serviceList, service)
 	}
 	return serviceList, nil
@@ -794,6 +794,7 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 		memberName, ok := service.Labels[constants.LabelNode]
 		if !ok {
 			err = fmt.Errorf("exposed service %s missing node label", service.Name)
+			return
 		}
 
 		// Generate the requested resource
@@ -850,7 +851,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 	// Filter out any insecure ports if we need to
 	ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
 
-	// Get a list of pre-exising external services that belong to our members.
+	// Get a list of pre-existing external services that belong to our members.
 	services, err := listExposedServices(kubecli, cluster)
 	if err != nil {
 		return nil, err

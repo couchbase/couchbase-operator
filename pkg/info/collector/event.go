@@ -54,6 +54,6 @@ func (r *eventCollector) Write(b backend.Backend) error {
 		return err
 	}
 
-	b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.resource.Kind(), r.resource.Name(), "events.yaml"), string(data))
+	_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.resource.Kind(), r.resource.Name(), "events.yaml"), string(data))
 	return nil
 }

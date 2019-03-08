@@ -35,11 +35,6 @@ const (
 	readinessFile                   = "/tmp/ready"
 )
 
-var (
-	defaultSecurityContextUid          int64 = 1000
-	defaultSecurityContextRunAsNonRoot bool  = true
-)
-
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
 func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig, ctx context.Context) (*v1.Pod, error) {
@@ -141,7 +136,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 			}
 
 			// Volumes will be added to Pod spec
-			volume := podVolumeSpecForClaim(config.Name, pvc.Name)
+			volume := podVolumeSpecForClaim(pvc.Name)
 			volumes = append(volumes, volume)
 
 			// Mount point for Pod Container spec to reference volume by name.
@@ -296,7 +291,7 @@ func verifyStorageClass(kubeCli kubernetes.Interface, storageClassName *string) 
 	return sc, err
 }
 
-func podVolumeSpecForClaim(configName, claimName string) v1.Volume {
+func podVolumeSpecForClaim(claimName string) v1.Volume {
 	return v1.Volume{
 		Name: claimName,
 		VolumeSource: v1.VolumeSource{
@@ -337,8 +332,7 @@ func deletePodVolumes(kubeCli kubernetes.Interface, namespace, clusterName, memb
 	}
 	if len(pvcList.Items) > 0 {
 		for _, pvc := range pvcList.Items {
-			err := kubeCli.Core().PersistentVolumeClaims(namespace).Delete(pvc.Name, CascadeDeleteOptions(0))
-			if err != nil {
+			if err := kubeCli.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, CascadeDeleteOptions(0)); err != nil {
 				return err
 			}
 		}
@@ -371,7 +365,7 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 
 	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
-	container := containerWithReadinessProbe(couchbaseContainer("", cs.BaseImage, version),
+	container := containerWithReadinessProbe(couchbaseContainer(cs.BaseImage, version),
 		couchbaseReadinessProbe())
 
 	if ns.Pod != nil {
@@ -399,7 +393,7 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 		pod = PodWithAntiAffinity(pod, clusterName)
 	}
 
-	applyPodPolicy(clusterName, pod, ns.Pod)
+	applyPodPolicy(pod, ns.Pod)
 
 	if ns.GetDefaultVolumeClaim() == "" {
 		// supply emptydir as volume mount when
@@ -447,10 +441,10 @@ func couchbaseVolumeMounts() []v1.VolumeMount {
 }
 
 func CouchbaseContainer(baseImage, version string) v1.Container {
-	return couchbaseContainer("", baseImage, version)
+	return couchbaseContainer(baseImage, version)
 }
 
-func couchbaseContainer(commands, baseImage, version string) v1.Container {
+func couchbaseContainer(baseImage, version string) v1.Container {
 	c := v1.Container{
 		Name:  couchbaseContainerName,
 		Image: imageName(baseImage, version),
@@ -646,7 +640,7 @@ func couchbaseContainer(commands, baseImage, version string) v1.Container {
 // to copy the etc dir into a persisted volume which will be
 // shared with with the Pod's main container
 func couchbaseInitContainer(baseImage, version, claimName string) v1.Container {
-	initContainer := couchbaseContainer("", baseImage, version)
+	initContainer := couchbaseContainer(baseImage, version)
 	initContainer.Name = fmt.Sprintf("%s-init", couchbaseContainerName)
 	initContainer.Args = []string{"cp", "-a", "/opt/couchbase/etc", "/mnt/"}
 	initContainer.VolumeMounts = []v1.VolumeMount{
@@ -685,7 +679,7 @@ func PodWithNodeSelector(p *v1.Pod, ns map[string]string) *v1.Pod {
 	return p
 }
 
-func applyPodPolicy(clusterName string, pod *v1.Pod, policy *cbapi.PodPolicy) {
+func applyPodPolicy(pod *v1.Pod, policy *cbapi.PodPolicy) {
 	if policy == nil {
 		return
 	}
@@ -897,7 +891,7 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, p
 		if err != nil {
 			return err
 		}
-		for mountName, _ := range mountPaths {
+		for mountName := range mountPaths {
 			mountPath := pathForVolumeMountName(mountName)
 			_, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
 			if err != nil {

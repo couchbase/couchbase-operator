@@ -90,7 +90,7 @@ func GetPod(context *context.Context, resource resource.ResourceReference) (*cor
 
 		// Select just one instance
 		if len(pods.Items) == 0 {
-			return nil, fmt.Errorf("No pods delected for Deployment %s", resource.Name())
+			return nil, fmt.Errorf("no pods delected for Deployment %s", resource.Name())
 		}
 		return &pods.Items[0], nil
 	}

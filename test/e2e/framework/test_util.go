@@ -56,7 +56,7 @@ func AnalyzeResults(t *testing.T) {
 	pass := float64(len(Results) - len(failures))
 	fail := float64(len(failures))
 	total := float64(len(Results))
-	passRate := float64((pass / total) * 100.0)
+	passRate := (pass / total) * 100.0
 
 	if fail > 0 {
 		t.Logf("Failures: ")
@@ -84,12 +84,12 @@ func ElementExistsInArr(itemToSearch string, itemList []string) bool {
 func ReadRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err error) {
 	ymlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = fmt.Errorf("Unable to read cluster config file `%s`: %v", ymlFilePath, err)
+		err = fmt.Errorf("unable to read cluster config file `%s`: %v", ymlFilePath, err)
 		return
 	}
 
 	if err = yaml.Unmarshal(ymlFileContent, &runTimeConfig); err != nil {
-		err = fmt.Errorf("Unable to decode test config: %v", err)
+		err = fmt.Errorf("unable to decode test config: %v", err)
 		return
 	}
 	for i, kubeConf := range runTimeConfig.KubeConfig {
@@ -106,13 +106,13 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = fmt.Errorf("Unable to read cluster config file `%s`: %v", ymlFilePath, err)
+		err = fmt.Errorf("unable to read cluster config file `%s`: %v", ymlFilePath, err)
 		return
 	}
 
 	err = yaml.Unmarshal(yamlFileContent, &clusterConf)
 	if err != nil {
-		err = errors.New("Unable to decode cluster config: " + err.Error())
+		err = errors.New("unable to decode cluster config: " + err.Error())
 		return
 	}
 
@@ -126,7 +126,7 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 		}
 	}
 	if len(reqClusters) != len(clusters) {
-		err = errors.New("Unable to get cluster config for all required clusters")
+		err = errors.New("unable to get cluster config for all required clusters")
 	}
 	return
 }
@@ -135,13 +135,13 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 func GetSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = errors.New("Unable to read suite config file: " + err.Error())
+		err = errors.New("unable to read suite config file: " + err.Error())
 		return
 	}
 
 	err = yaml.Unmarshal(yamlFileContent, &suiteData)
 	if err != nil {
-		err = errors.New("Unable to decode suite config: " + err.Error())
+		err = errors.New("unable to decode suite config: " + err.Error())
 		return
 	}
 	return
@@ -182,9 +182,10 @@ func RemoveClusterRole(kubeClient kubernetes.Interface, roleName string) error {
 	}
 	for _, clusterRole := range clusterRoleList.Items {
 		if clusterRole.GetName() == roleName {
-			kubeClient.RbacV1().ClusterRoles().Delete(roleName, &metav1.DeleteOptions{})
-			err = WaitForClusterRoleDeleted(kubeClient, roleName, 30)
-			if err != nil {
+			if err := kubeClient.RbacV1().ClusterRoles().Delete(roleName, &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			if err := WaitForClusterRoleDeleted(kubeClient, roleName, 30); err != nil {
 				return err
 			}
 			break
@@ -200,9 +201,10 @@ func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAcc
 	}
 	for _, svcAcc := range svcAccList.Items {
 		if svcAcc.GetName() == serviceAccountName {
-			kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{})
-			err = WaitForServiceAccountDeleted(kubeClient, serviceAccountName, namespace, 30)
-			if err != nil {
+			if err := kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			if err := WaitForServiceAccountDeleted(kubeClient, serviceAccountName, namespace, 30); err != nil {
 				return err
 			}
 		}
@@ -218,9 +220,10 @@ func RemoveClusterRoleBinding(kubeClient kubernetes.Interface, namespace, cluste
 	}
 	for _, clusterRoleBinding := range clusterRoleBindingList.Items {
 		if clusterRoleBinding.GetName() == clusterRoleBindingName {
-			kubeClient.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, &metav1.DeleteOptions{})
-			err = WaitForClusterRoleBindingDeleted(kubeClient, clusterRoleBindingName, 30)
-			if err != nil {
+			if err := kubeClient.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			if err := WaitForClusterRoleBindingDeleted(kubeClient, clusterRoleBindingName, 30); err != nil {
 				return err
 			}
 			break
@@ -315,41 +318,6 @@ func RemoveRoleBinding(kubeClient kubernetes.Interface, namespace, roleBindingNa
 	return nil
 }
 
-// Create ansibleHost file for the list of host provided
-func createAnsibleHostFileFromHosts(filePathToSave string, hostList []string) error {
-	loadOptions := ini.LoadOptions{}
-	loadOptions.Loose = true
-
-	newClusterConfig, err := ini.LoadSources(loadOptions, "")
-	if err != nil {
-		return errors.New("Unable to initialize cluster file: " + err.Error())
-	}
-
-	loginSectionForCluster, err := newClusterConfig.NewSection("all:vars")
-	if err != nil {
-		return errors.New("Error while creating new section 'all'")
-	}
-
-	nodesSection, err := newClusterConfig.NewSection("nodes")
-	if err != nil {
-		return errors.New("Error while creating new section 'nodes'")
-	}
-
-	for key, value := range constants.AnsibleLoginSectionData {
-		loginSectionForCluster.NewKey(key, value)
-	}
-
-	for _, host := range hostList {
-		nodesSection.NewKey(host, "")
-	}
-
-	err = newClusterConfig.SaveTo(filePathToSave)
-	if err != nil {
-		return errors.New("Unable to save playbook file: " + err.Error())
-	}
-	return nil
-}
-
 // Create hosts file for each cluster to be used by Ansible script
 func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) error {
 	loadOptions := ini.LoadOptions{}
@@ -361,16 +329,18 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 
 	newClusterConfig, err := ini.LoadSources(loadOptions, "")
 	if err != nil {
-		return errors.New("Unable to initialize cluster file: " + err.Error())
+		return errors.New("unable to initialize cluster file: " + err.Error())
 	}
 
 	loginSectionForCluster, err := newClusterConfig.NewSection("all:vars")
 	if err != nil {
-		return errors.New("Error while creating new section 'all'")
+		return errors.New("error while creating new section 'all'")
 	}
 
 	for key, value := range constants.AnsibleLoginSectionData {
-		loginSectionForCluster.NewKey(key, value)
+		if _, err := loginSectionForCluster.NewKey(key, value); err != nil {
+			return err
+		}
 	}
 
 	for index, nodeData := range kubeClusterSpec.MasterNodeList {
@@ -384,16 +354,16 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 
 	_, err = newClusterConfig.NewRawSection("master_node", masterSectionData)
 	if err != nil {
-		return errors.New("Unable to create master_node section: " + err.Error())
+		return errors.New("unable to create master_node section: " + err.Error())
 	}
 	_, err = newClusterConfig.NewRawSection("worker_node", workerSectionData)
 	if err != nil {
-		return errors.New("Unable to create worker_node section: " + err.Error())
+		return errors.New("unable to create worker_node section: " + err.Error())
 	}
 
 	err = newClusterConfig.SaveTo(filePathToSave)
 	if err != nil {
-		return errors.New("Unable to save cluster file: " + err.Error())
+		return errors.New("unable to save cluster file: " + err.Error())
 	}
 	return nil
 }
@@ -414,20 +384,20 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 
 		ansibleExtraVarParam := "kubeVersion=" + kubeVersion
 		ansibleCmd := exec.Command("ansible-playbook", "-i", clusterHostFile, clusterInitFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
-		if err := runExecCommand(t, ansibleCmd); err != nil {
+		if err := runExecCommand(ansibleCmd); err != nil {
 			return err
 		}
 		kubeVersionParsed := strings.Split(kubeVersion, "-")
 		kubeVersion = kubeVersionParsed[0]
 		ansibleExtraVarParam = "kubeConfPathToSave=" + clusterConfFile + " kubeVersion=" + kubeVersion
 		ansibleCmd = exec.Command("ansible-playbook", "-i", clusterHostFile, clusterSetupFile, "-c", "paramiko", "--extra-vars", ansibleExtraVarParam)
-		if err := runExecCommand(t, ansibleCmd); err != nil {
+		if err := runExecCommand(ansibleCmd); err != nil {
 			return err
 		}
 
 		logrus.Infof("Cluster %s created successfully", kubeClusterSpec.ClusterName)
 	default:
-		return errors.New("Unsupported kube-type in test_config")
+		return errors.New("unsupported kube-type in test_config")
 	}
 	return nil
 }
@@ -438,7 +408,7 @@ func WaitForClusterRoleDeleted(kubeClient kubernetes.Interface, roleName string,
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out waiting for role to be delete: " + roleName)
+			return errors.New("timed out waiting for role to be delete: " + roleName)
 
 		case <-tickChan:
 			clusterRoleList, err := kubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
@@ -462,7 +432,7 @@ func WaitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccoun
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out waiting for service account to be delete: " + serviceAccountName)
+			return errors.New("timed out waiting for service account to be delete: " + serviceAccountName)
 
 		case <-tickChan:
 			svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
@@ -489,7 +459,7 @@ func WaitForClusterRoleBindingDeleted(kubeClient kubernetes.Interface, clusterRo
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out waiting for cluster role binding to be delete: " + clusterRoleBindingName)
+			return errors.New("timed out waiting for cluster role binding to be delete: " + clusterRoleBindingName)
 
 		case <-tickChan:
 			clusterRoleBindingList, err := kubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
@@ -673,7 +643,7 @@ func WaitForServiceDeleted(kubeClient kubernetes.Interface, serviceName string, 
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out waiting for service account to be delete: " + serviceName)
+			return errors.New("timed out waiting for service account to be delete: " + serviceName)
 
 		case <-tickChan:
 			svcList, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{})
@@ -701,9 +671,10 @@ func RemoveService(kubeClient kubernetes.Interface, namespace, serviceName strin
 	}
 	for _, svc := range svcList.Items {
 		if svc.GetName() == serviceName {
-			kubeClient.CoreV1().Services(namespace).Delete(svc.GetName(), &metav1.DeleteOptions{})
-			err = WaitForServiceDeleted(kubeClient, serviceName, namespace, 30)
-			if err != nil {
+			if err := kubeClient.CoreV1().Services(namespace).Delete(svc.GetName(), &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			if err := WaitForServiceDeleted(kubeClient, serviceName, namespace, 30); err != nil {
 				return err
 			}
 		}
@@ -762,7 +733,7 @@ func WaitForStorageClassDeleted(kubeClient kubernetes.Interface, storageClassNam
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out waiting for storage class to be delete: " + storageClassName)
+			return errors.New("timed out waiting for storage class to be delete: " + storageClassName)
 
 		case <-tickChan:
 			scList, err := kubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
@@ -786,9 +757,10 @@ func RemoveStorageClass(kubeClient kubernetes.Interface, storageClassName string
 	}
 	for _, sc := range scList.Items {
 		if sc.GetName() == storageClassName {
-			kubeClient.StorageV1().StorageClasses().Delete(sc.GetName(), &metav1.DeleteOptions{})
-			err = WaitForStorageClassDeleted(kubeClient, storageClassName, 30)
-			if err != nil {
+			if err := kubeClient.StorageV1().StorageClasses().Delete(sc.GetName(), &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			if err := WaitForStorageClassDeleted(kubeClient, storageClassName, 30); err != nil {
 				return err
 			}
 		}
@@ -820,7 +792,7 @@ func RecreateStorageClassPortworx(kubeClient kubernetes.Interface) error {
 func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeConfigPath string) error {
 	logrus.Info("Running delete-etcd-automation.sh")
 	wipePortworxCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", "--namespace", namespace, "--kubeConfig", kubeConfigPath)
-	if err := runExecCommand(t, wipePortworxCmd); err != nil {
+	if err := runExecCommand(wipePortworxCmd); err != nil {
 		logrus.Infof("Error deleteing etcd operator crd: %v", err)
 	}
 
@@ -865,14 +837,13 @@ func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeCo
 	}
 
 	logrus.Info("Deleting etcd deployment")
-	DeleteOperatorCompletely(kubeClient, "etcd-operator", namespace)
-	return nil
+	return DeleteOperatorCompletely(kubeClient, "etcd-operator", namespace)
 }
 
 func CreateEtcdCluster(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeConfigPath string) error {
 	logrus.Info("Deploying etcd")
 	createEtcCLusterdCmd := exec.Command("bash", "./resources/thirdparty/etcd/deploy-etcd-automation.sh", "--namespace", namespace, "--kubeConfig", kubeConfigPath)
-	if err := runExecCommand(t, createEtcCLusterdCmd); err != nil {
+	if err := runExecCommand(createEtcCLusterdCmd); err != nil {
 		return errors.New("error creating etcd cluster: " + err.Error())
 	}
 	if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 60, "app=etcd", namespace); err != nil {
@@ -951,12 +922,15 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, namespace, ku
 	logrus.Info("Deploying portworx service")
 	portworxClusterName := "test-portworx-" + e2eutil.RandomSuffix()
 	deployPortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/deploy-portworx-automation.sh", etcdEndpointIP, portworxClusterName, kubeConfigPath)
-	if err := runExecCommand(t, deployPortworxCmd); err != nil {
+	if err := runExecCommand(deployPortworxCmd); err != nil {
 		return errors.New("error running submit-portworx-automation.sh: " + err.Error())
 	}
 
 	logrus.Info("Scaling up portworx pods")
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
 	numNodes := len(k8sNodeList.Items)
 	for i := 0; i < numNodes; i++ {
 		//remove label from node i
@@ -980,7 +954,9 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, namespace, ku
 		}
 		time.Sleep(5 * time.Second)
 		if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 300, "name=portworx", "kube-system"); err != nil {
-			e2eutil.AddLabelToNodes(t, kubeClient, "px/enabled", "true")
+			if lerr := e2eutil.AddLabelToNodes(t, kubeClient, "px/enabled", "true"); lerr != nil {
+				return lerr
+			}
 			time.Sleep(120 * time.Second)
 			return err
 		}
@@ -997,7 +973,7 @@ func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeConfigPat
 
 	logrus.Info("Running delete-portworx-automation.sh")
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
-	if err := runExecCommand(t, deletePortworxCmd); err != nil {
+	if err := runExecCommand(deletePortworxCmd); err != nil {
 		return errors.New("error running delete-portworx-automation.sh: " + err.Error())
 	}
 
@@ -1022,7 +998,9 @@ func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeConfigPat
 		return err
 	}
 	for _, job := range jobs.Items {
-		kubeClient.BatchV1().Jobs("kube-system").Delete(job.Name, metav1.NewDeleteOptions(0))
+		if err := kubeClient.BatchV1().Jobs("kube-system").Delete(job.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
 	}
 
 	logrus.Info("Deleting talisman pods")
@@ -1051,7 +1029,7 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		err := retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
 			if err := CreateEtcd(t, kubeClient, namespace, kubeConfigPath); err != nil {
 				logrus.Infof("Error creating etcd: %v", err)
-				DeleteEtcd(t, kubeClient, namespace, kubeConfigPath)
+				_ = DeleteEtcd(t, kubeClient, namespace, kubeConfigPath)
 				return err
 			}
 			return nil
@@ -1064,7 +1042,7 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
 			if err := CreatePortworx(t, kubeClient, namespace, kubeConfigPath); err != nil {
 				logrus.Infof("Error creating portworx cluster: %v", err)
-				DeletePortworx(t, kubeClient, kubeConfigPath)
+				_ = DeletePortworx(t, kubeClient, kubeConfigPath)
 				return err
 			}
 			return nil

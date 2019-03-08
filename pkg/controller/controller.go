@@ -105,10 +105,8 @@ func (c *Controller) Handle(ctx context.Context, event sdk.Event) error {
 
 		if event.Deleted {
 			ev.Type = kwatch.Deleted
-		} else {
-			if _, ok := c.clusters.Load(ev.Object.Name); ok { // re-watch or restart could give ADD event
-				ev.Type = kwatch.Modified
-			}
+		} else if _, ok := c.clusters.Load(ev.Object.Name); ok { // re-watch or restart could give ADD event
+			ev.Type = kwatch.Modified
 		}
 
 		pt.start()
@@ -162,7 +160,7 @@ func (c *Controller) handleClusterEvent(event *Event) error {
 		if c.VerifyVersion {
 			err := couchbaseutil.VerifyVersion(clus.Spec.Version)
 			if err != nil {
-				return fmt.Errorf("Cluster create failed, Please delete its CR: %s, %v", clus.Name, err)
+				return fmt.Errorf("cluster create failed, Please delete its CR: %s, %v", clus.Name, err)
 			}
 		}
 
@@ -222,18 +220,18 @@ func (c *Controller) SettingsLoggingHandler(w http.ResponseWriter, r *http.Reque
 		}
 
 		w.Header().Add("Content-Type", "application/json")
-		w.Write(data)
+		_, _ = w.Write(data)
 	} else if r.Method == http.MethodPost {
 		if r.Header.Get("Content-Type") != "application/json" {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
-			w.Write([]byte("Content-Type must be application/json"))
+			_, _ = w.Write([]byte("Content-Type must be application/json"))
 			return
 		}
 
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			_, _ = w.Write([]byte(err.Error()))
 			return
 		}
 
@@ -241,14 +239,14 @@ func (c *Controller) SettingsLoggingHandler(w http.ResponseWriter, r *http.Reque
 		err = json.Unmarshal(body, &request)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			_, _ = w.Write([]byte(err.Error()))
 			return
 		}
 
 		level, err := logrus.ParseLevel(request.LogLevel)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			_, _ = w.Write([]byte(err.Error()))
 			return
 		}
 
@@ -283,12 +281,12 @@ func (c *Controller) StatsClusterHandler(w http.ResponseWriter, r *http.Request)
 		data, err := json.Marshal(response)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
+			_, _ = w.Write([]byte(err.Error()))
 			return
 		}
 
 		w.Header().Add("Content-Type", "application/json")
-		w.Write(data)
+		_, _ = w.Write(data)
 	} else {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

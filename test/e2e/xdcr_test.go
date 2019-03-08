@@ -18,7 +18,7 @@ import (
 
 // Generic function to run rebalance out test case
 // Rebalance out xdcrCluster nodes one by one for the provided clustersize
-func rebalanceOutXdcrNodes(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, clusterSize int, expectedEvents *e2eutil.EventValidator) error {
+func rebalanceOutXdcrNodes(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, clusterSize int, expectedEvents *e2eutil.EventValidator) {
 	nextNodeToBeAdded := clusterSize
 
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -47,7 +47,6 @@ func rebalanceOutXdcrNodes(t *testing.T, k8s *types.Cluster, couchbase *api.Couc
 		e2eutil.MustWaitClusterStatusHealthy(t, k8s, couchbase, 2*time.Minute)
 		nextNodeToBeAdded++
 	}
-	return nil
 }
 
 // Generic function to kill xdcrCluster nodes
@@ -133,13 +132,9 @@ func XdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, targetCluste
 	switch operationType {
 	case "rebalanceOutNodes":
 		if targetClusterNodes == "source" {
-			if err := rebalanceOutXdcrNodes(t, k8s1, xdcrCluster1, clusterSize, &expectedCluster1Events); err != nil {
-				t.Fatal(err)
-			}
+			rebalanceOutXdcrNodes(t, k8s1, xdcrCluster1, clusterSize, &expectedCluster1Events)
 		} else {
-			if err := rebalanceOutXdcrNodes(t, k8s2, xdcrCluster2, clusterSize, &expectedCluster2Events); err != nil {
-				t.Fatal(err)
-			}
+			rebalanceOutXdcrNodes(t, k8s2, xdcrCluster2, clusterSize, &expectedCluster2Events)
 		}
 	case "killNodes":
 		if targetClusterNodes == "source" {
@@ -568,7 +563,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 			}
 
 			for _, xdcrRef := range xdcrRefList {
-				if err := e2eutil.DeleteXdcrClusterReferences(destUrl, cbUsername, cbPassword, xdcrRef); err != nil {
+				if err := e2eutil.DeleteXdcrClusterReferences(cbUsername, cbPassword, xdcrRef); err != nil {
 					t.Fatal(err)
 				}
 			}

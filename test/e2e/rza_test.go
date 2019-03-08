@@ -91,16 +91,6 @@ func UpdateServerGroupLabel(nodeLabelName, oldLabelVal, newLabelVal string, kube
 	return nil
 }
 
-// Function to check an element exists in the array
-func checkElementExists(element string, elementList []string) bool {
-	for _, temElement := range elementList {
-		if temElement == element {
-			return true
-		}
-	}
-	return false
-}
-
 // Note: Should be used only when using static server-group configuration
 // Returns for map of expected ServerGroup names with the pod count in the group
 // assuming the CRD is having static server-group configuration in it
@@ -343,7 +333,9 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	} else {
 		k8sNodeLabelUpdateFunc()
 	}
-	defer UpdateServerGroupLabel(constants.FailureDomainZoneLabel, "NewRzaGroup-1", availableServerGroupList[0], targetKube.KubeClient)
+	defer func() {
+		_ = UpdateServerGroupLabel(constants.FailureDomainZoneLabel, "NewRzaGroup-1", availableServerGroupList[0], targetKube.KubeClient)
+	}()
 
 	newAvailableServerGroupList := []string{}
 	if strings.Contains(editType, "update") {
@@ -766,7 +758,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerGroups", serverGroupsUsed), time.Minute)
 
-	clusterSize = clusterSize + 1
+	clusterSize++
 	service := 0
 
 	// Resize cluster and wait for healthy cluster
@@ -819,9 +811,6 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 		"serverGroups": serverGroups,
 	}
 
-	// Create a expected RZA results map for verification
-	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
-
 	// Deploy couchbase cluster
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
@@ -857,7 +846,7 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
 	// Update expected RZA results map for verification
-	expectedRzaResultMap = GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
+	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	deployedRzaGroupsMap, err := GetDeployedRzaMap(targetKube.KubeClient, f.Namespace)

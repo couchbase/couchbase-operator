@@ -32,7 +32,6 @@ const (
 
 var retryInterval = 10 * time.Second
 
-type acceptFunc func(*api.CouchbaseCluster) bool
 type filterFunc func(*v1.Pod) bool
 type filterFuncDaemonSet func(*v1beta1.DaemonSet) bool
 
@@ -41,7 +40,7 @@ func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *api.CouchbaseCluster
 	defer cancel()
 
 	return retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
-		podList, err := k8s.KubeClient.Core().Pods(couchbase.Namespace).List(k8sutil.ClusterListOpt(couchbase.Name))
+		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(k8sutil.ClusterListOpt(couchbase.Name))
 		if err != nil {
 			return false, err
 		}
@@ -187,7 +186,7 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.Cou
 	})
 
 	if err != nil {
-		return fmt.Errorf("fail to wait for cluster status to be healthy: %v \n", err)
+		return fmt.Errorf("fail to wait for cluster status to be healthy: %v", err)
 	}
 	return nil
 }
@@ -350,7 +349,7 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	for {
 		select {
 		case <-timeoutChan:
-			return fmt.Errorf("Time out waiting for cluster event %s, %s:", event.Reason, event.Message)
+			return fmt.Errorf("time out waiting for cluster event %s, %s", event.Reason, event.Message)
 
 		case watchEvent := <-resultChan:
 			crdEvent := watchEvent.Object.(*v1.Event)
@@ -392,7 +391,7 @@ func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.Couchba
 	for {
 		select {
 		case <-timeoutChan:
-			return occuredEvents, fmt.Errorf("Time out waiting for %d cluster events from,\n%v \nEvents got:\n%v", maxExpectedEvents, eventList, occuredEvents)
+			return occuredEvents, fmt.Errorf("time out waiting for %d cluster events from,\n%v \nEvents got:\n%v", maxExpectedEvents, eventList, occuredEvents)
 
 		case watchEvent := <-resultChan:
 			crdEvent := watchEvent.Object.(*v1.Event)
@@ -477,7 +476,7 @@ func WaitForKubeNodesToBeReady(kubeClient kubernetes.Interface, requiredNodesInC
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out to get K8S node to ready state")
+			return errors.New("timed out to get K8S node to ready state")
 
 		case <-tickChan:
 			nodesList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -498,7 +497,7 @@ func WaitForPodsReadyWithLabel(t *testing.T, kubeClient kubernetes.Interface, wa
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out waiting for pods to enter ready state")
+			return errors.New("timed out waiting for pods to enter ready state")
 
 		case <-tickChan:
 			podReady := true
@@ -558,7 +557,7 @@ func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, 
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("Timed out to get K8S node to ready state")
+			return errors.New("timed out to get K8S node to ready state")
 
 		case <-tickChan:
 			service, err := GetService(kubeClient, namespace, loadBalancerServiceName)

@@ -52,7 +52,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %v", err)
 		return err
 	}
-	c.updateMemberStatusWithClusterInfo(status)
+
+	if err := c.updateMemberStatusWithClusterInfo(status); err != nil {
+		return err
+	}
 
 	state := &ReconcileMachine{
 		runningPods:   podsToMemberSet(pods, c.isSecureClient()),
@@ -77,7 +80,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %v", err)
 		return err
 	}
-	c.updateMemberStatusWithClusterInfo(status)
+
+	if err := c.updateMemberStatusWithClusterInfo(status); err != nil {
+		return err
+	}
 
 	if err := c.reconcileBuckets(); err != nil {
 		return err
@@ -93,7 +99,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	c.reconcileAdminService()
 
-	c.reportUpgradeComplete()
+	if err := c.reportUpgradeComplete(); err != nil {
+		return err
+	}
+
 	c.status.ClearCondition(api.ClusterConditionScaling)
 	c.status.SetReadyCondition()
 
@@ -119,7 +128,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 //    any issues with the current nodes in the cluster. We now need to either
 //    remove healthy nodes if we're scaling down, or add noew nodes if we need
 //    to scale up.
-// 6. Run a rebalance if neccessary.
+// 6. Run a rebalance if necessary.
 // 7. Remove any nodes from the cached member set that are not part actually
 //    part of the cluster.
 // Returns true if reconciliation completed properly
@@ -160,7 +169,7 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 			c.decPodIndex()
 			// Deleting volumes, even log volumes
 			// if node doesn't get to start
-			c.removePod(newMember.Name, true)
+			_ = c.removePod(newMember.Name, true)
 		}
 	}()
 
@@ -208,7 +217,10 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 	}
 
 	// Notify that we have created a new member
-	c.clusterAddMember(newMember)
+	if err := c.clusterAddMember(newMember); err != nil {
+		return nil, err
+	}
+
 	if err := c.updateCRStatus(); err != nil {
 		return nil, err
 	}
@@ -246,7 +258,10 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 	}
 
 	// Notify of deletion
-	c.clusterRemoveMember(name)
+	if err := c.clusterRemoveMember(name); err != nil {
+		return err
+	}
+
 	if err := c.updateCRStatus(); err != nil {
 		return err
 	}
@@ -332,7 +347,7 @@ func (c *Cluster) reconcileBuckets() error {
 
 	existingBuckets, err := c.client.GetBucketNames(c.readyMembers())
 	if err != nil {
-		return fmt.Errorf("Unable to get buckets from cluster: %v", err)
+		return fmt.Errorf("unable to get buckets from cluster: %v", err)
 	}
 
 	// when reconciling buckets, any buckets in cluster
@@ -343,7 +358,7 @@ func (c *Cluster) reconcileBuckets() error {
 	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
 	bucketsToEdit, err := c.client.GetBucketsToEdit(c.readyMembers(), &spec)
 	if err != nil {
-		return fmt.Errorf("Unable to get list of buckets to edit: %v", err)
+		return fmt.Errorf("unable to get list of buckets to edit: %v", err)
 	}
 
 	for _, bucketName := range bucketsToRemove {
@@ -351,7 +366,7 @@ func (c *Cluster) reconcileBuckets() error {
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket delete failed", msg)
-			return fmt.Errorf("Unable to delete bucketName named - %s: %v", bucketName, err)
+			return fmt.Errorf("unable to delete bucketName named - %s: %v", bucketName, err)
 		}
 		c.logger.Infof("Removed bucketName %s", bucketName)
 	}
@@ -361,7 +376,7 @@ func (c *Cluster) reconcileBuckets() error {
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket edit failed", msg)
-			return fmt.Errorf("Unable to edit bucketName named - %s: %v", bucketName, err)
+			return fmt.Errorf("unable to edit bucketName named - %s: %v", bucketName, err)
 		}
 		c.logger.Infof("Edited bucketName %s", bucketName)
 	}
@@ -371,7 +386,7 @@ func (c *Cluster) reconcileBuckets() error {
 		if err != nil {
 			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
 			c.status.SetBucketManagementFailedCondition("Bucket add failed", msg)
-			return fmt.Errorf("Unable to create bucketName named - %s: %v", bucketName, err)
+			return fmt.Errorf("unable to create bucketName named - %s: %v", bucketName, err)
 		}
 		c.logger.Infof("Created bucketName %s", bucketName)
 	}
@@ -588,7 +603,7 @@ func (c *Cluster) getServerGroups() []string {
 
 	// Map into a list
 	serverGroupList := []string{}
-	for serverGroup, _ := range serverGroups {
+	for serverGroup := range serverGroups {
 		serverGroupList = append(serverGroupList, serverGroup)
 	}
 
@@ -648,7 +663,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 		return false, nil
 	}
 
-	// Poll the server for exising information
+	// Poll the server for existing information
 	existingGroups, err := c.client.GetServerGroups(c.members)
 	if err != nil {
 		return false, err
@@ -735,7 +750,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 		return false, nil
 	}
 
-	// Poll the server for exising information
+	// Poll the server for existing information
 	existingGroups, err := c.client.GetServerGroups(c.members)
 	if err != nil {
 		return false, err
@@ -1119,7 +1134,7 @@ func getServiceDataPaths(mounts *api.VolumeMounts) (string, string, []string) {
 	dataPath := constants.DefaultDataPath
 	indexPath := constants.DefaultDataPath
 	analyticsPaths := []string{}
-	if mounts != nil && mounts.LogsOnly() == false {
+	if mounts != nil && !mounts.LogsOnly() {
 		if mounts.DataClaim != "" {
 			dataPath = k8sutil.CouchbaseVolumeMountDataDir
 		}
@@ -1153,7 +1168,7 @@ func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int) {
 
 // reportUpgrade looks at the current state and any existing upgrade status
 // condition, makes condition updates and raises events.
-func (c *Cluster) reportUpgrade(status *api.UpgradeStatus) {
+func (c *Cluster) reportUpgrade(status *api.UpgradeStatus) error {
 	// Look for an existing condition
 	condition := c.status.GetCondition(api.ClusterConditionUpgrading)
 
@@ -1184,22 +1199,27 @@ func (c *Cluster) reportUpgrade(status *api.UpgradeStatus) {
 	}
 
 	c.status.SetUpgradingCondition(status)
-	c.updateCRStatus()
+
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // reportUpgradeComplete is called unconditionally when the reconcile is complete.
 // If there was an unpgrade condition and the cluster no longer needs an upgrade clear
 // the condition and raise any necessary events.
-func (c *Cluster) reportUpgradeComplete() {
+func (c *Cluster) reportUpgradeComplete() error {
 	// Still upgrading do nothing
 	if candidate, _ := c.needsUpgrade(); candidate != nil {
-		return
+		return nil
 	}
 
 	// There is no condition, we weren't upgrading, do nothing
 	condition := c.status.GetCondition(api.ClusterConditionUpgrading)
 	if condition == nil {
-		return
+		return nil
 	}
 
 	status := api.NewUpgradeStatus(condition.Message)
@@ -1212,14 +1232,19 @@ func (c *Cluster) reportUpgradeComplete() {
 
 	c.status.ClearCondition(api.ClusterConditionUpgrading)
 	c.status.CurrentVersion = c.cluster.Spec.Version
-	c.updateCRStatus()
+
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // reconcileReadiness marks the pods as "ready" once everything is repaired, scaled and
 // balanced.  It also reconciles a pod disruption budget so we only tolerate a certain
 // number of evictions during a drain i.e. k8s upgrade.
 func (c *Cluster) reconcileReadiness() error {
-	for name, _ := range c.members {
+	for name := range c.members {
 		if err := k8sutil.FlagPodReady(c.config.KubeCli, c.cluster.Namespace, name); err != nil {
 			return err
 		}

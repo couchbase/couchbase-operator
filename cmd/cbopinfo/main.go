@@ -168,7 +168,7 @@ func main() {
 	// Collect logs first, this supports reporting which logs are available to be collected
 	// which can then be explicitly collected on the next run.
 	if err := logs.Collect(context); err != nil {
-		fmt.Println("log collection failed: %v", err)
+		fmt.Println("log collection failed:", err)
 	}
 
 	// Initialize the backend file writer, defer closing so it will flush any
@@ -182,7 +182,9 @@ func main() {
 	defer backend.Close()
 
 	// Store the arguments used to invoke the command
-	backend.WriteFile(util.ArchiveName()+"/cmdline", strings.Join(os.Args, " "))
+	if err := backend.WriteFile(util.ArchiveName()+"/cmdline", strings.Join(os.Args, " ")); err != nil {
+		fmt.Println("failed to archive:", err)
+	}
 
 	// Harvest the content defined by the user context
 	if err := harvest(context, backend, resourceInitializers); err != nil {

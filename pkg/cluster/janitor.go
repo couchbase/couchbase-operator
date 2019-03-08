@@ -253,8 +253,8 @@ func (j *janitor) deleteOverCapacityVolumes() error {
 
 	// Sort based on detached annotation, RFC3339 usefully is sortable as a string
 	sorter := func(i, j int) bool {
-		a, _ := pvcs[i].Annotations[constants.VolumeDetachedAnnotation]
-		b, _ := pvcs[j].Annotations[constants.VolumeDetachedAnnotation]
+		a := pvcs[i].Annotations[constants.VolumeDetachedAnnotation]
+		b := pvcs[j].Annotations[constants.VolumeDetachedAnnotation]
 		return a < b
 	}
 	sort.SliceStable(pvcs, sorter)

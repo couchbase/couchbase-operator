@@ -27,7 +27,7 @@ import (
 type Validator struct {
 	// Events is a list of Kubernetes events.
 	Events []corev1.Event
-	// Schema is a heirarchy of Event validators.
+	// Schema is a hierarchy of Event validators.
 	Schema Validatable
 	// index is an index into the events list.
 	index int
@@ -56,14 +56,18 @@ func (c *Validator) Validate(out io.Writer) error {
 		format := fmt.Sprintf("| %%-%ds | %%-%ds |", reasonWidth, messageWidth)
 
 		// Print out the event list with the error embedded in the correct place
-		out.Write([]byte("Event schema validation failed:\n"))
+		if _, err := out.Write([]byte("Event schema validation failed:\n")); err != nil {
+			return err
+		}
 		for index, event := range c.Events {
 			line := fmt.Sprintf(format, event.Reason, event.Message)
 			if index == c.index {
 				line += fmt.Sprintf(" <== %v", err)
 			}
 			line += "\n"
-			out.Write([]byte(line))
+			if _, err := out.Write([]byte(line)); err != nil {
+				return err
+			}
 		}
 	}
 	return err
@@ -109,7 +113,7 @@ func (e Event) Validate(c *Validator) error {
 	return nil
 }
 
-// Repeat represents an event validation which we expect to occur mulitple times.
+// Repeat represents an event validation which we expect to occur multiple times.
 type Repeat struct {
 	// Times tells us how many times we expect to match
 	Times int
@@ -168,7 +172,7 @@ func (e Set) Validate(c *Validator) error {
 			// If there is a match indicate so and remove the matching index
 			if err := e.Validators[index].Validate(c); err == nil {
 				matched = true
-				indices = append(indices[0:i], indices[i+1:len(indices)]...)
+				indices = append(indices[0:i], indices[i+1:]...)
 				break
 			}
 		}

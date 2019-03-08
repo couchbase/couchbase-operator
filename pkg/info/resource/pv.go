@@ -46,7 +46,7 @@ func (r *persistentVolumeResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		b.WriteFile(util.ArchivePathUnscoped(r.Kind(), persistentVolume.Name, persistentVolume.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), persistentVolume.Name, persistentVolume.Name+".yaml"), string(data))
 	}
 	return nil
 }

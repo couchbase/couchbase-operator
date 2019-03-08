@@ -21,10 +21,8 @@ func TestCouchbaseVersionEnterprise(t *testing.T) {
 	}
 	if len(version.semver) != 3 {
 		t.Errorf("incorrect version format: %v", version.semver)
-	} else {
-		if version.Major() != 5 || version.Minor() != 5 || version.Patch() != 0 {
-			t.Errorf("expected semver=%s, got=%s", "enterprise", version.prefix)
-		}
+	} else if version.Major() != 5 || version.Minor() != 5 || version.Patch() != 0 {
+		t.Errorf("expected semver=%s, got=%s", "enterprise", version.prefix)
 	}
 }
 
@@ -43,10 +41,8 @@ func TestCouchbaseVersionBeta(t *testing.T) {
 	}
 	if len(version.semver) != 3 {
 		t.Errorf("incorrect version format: %v", version.semver)
-	} else {
-		if version.Major() != 5 || version.Minor() != 5 || version.Patch() != 0 {
-			t.Errorf("expected semver=%s, got=%s", "enterprise", version.prefix)
-		}
+	} else if version.Major() != 5 || version.Minor() != 5 || version.Patch() != 0 {
+		t.Errorf("expected semver=%s, got=%s", "enterprise", version.prefix)
 	}
 }
 
@@ -65,10 +61,8 @@ func TestCouchbaseVersionOnly(t *testing.T) {
 	}
 	if len(version.semver) != 3 {
 		t.Errorf("incorrect version format: %v", version.semver)
-	} else {
-		if version.Major() != 5 || version.Minor() != 5 || version.Patch() != 0 {
-			t.Errorf("expected semver=%s, got=%s", "enterprise", version.prefix)
-		}
+	} else if version.Major() != 5 || version.Minor() != 5 || version.Patch() != 0 {
+		t.Errorf("expected semver=%s, got=%s", "enterprise", version.prefix)
 	}
 }
 

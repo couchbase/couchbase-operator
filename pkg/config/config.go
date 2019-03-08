@@ -9,7 +9,7 @@ import (
 
 // Config contains command line configuration
 type Config struct {
-	// Namespace is the namespace to target, relevent for services and TLS.
+	// Namespace is the namespace to target, relevant for services and TLS.
 	Namespace string
 	// OperatorImage is the operator image name to use in deployments.
 	OperatorImage string
@@ -35,6 +35,5 @@ func (c *Config) ParseArgs() error {
 	flagSet.BoolVar(&c.NoOperator, "no-operator", false, "Don't generate operator configuration")
 	flagSet.BoolVar(&c.NoAdmission, "no-admission", false, "Dont generate dynamic admission controller configuration")
 	flagSet.BoolVar(&c.File, "file", false, "Create separate files rather than echo to standard out")
-	flagSet.Parse(os.Args[1:])
-	return nil
+	return flagSet.Parse(os.Args[1:])
 }

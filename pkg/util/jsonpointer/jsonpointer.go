@@ -1,7 +1,7 @@
 // Package jsonpointer implements RFC6901: JavaScript Object Notation (JSON) Pointer.
 //
 // Rather than operate on JSON encoded strings this operates on native go data
-// structures allowing abritrary fields to be modified and tested in a generic
+// structures allowing arbitrary fields to be modified and tested in a generic
 // and programatic way.
 //
 // For more details please see the specification:
@@ -27,7 +27,7 @@ func LookupValue(v reflect.Value, k string) (value reflect.Value, err error) {
 	// Reflection will panic, so be sure to catch and return an error
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Invalid token %s: %v", k, r)
+			err = fmt.Errorf("invalid token %s: %v", k, r)
 		}
 	}()
 
@@ -75,14 +75,14 @@ func LookupPath(object interface{}, pointer string) (value reflect.Value, key st
 	// Reflection will panic, so be sure to catch and return an error
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Invalid pointer %s: %v", pointer, r)
+			err = fmt.Errorf("invalid pointer %s: %v", pointer, r)
 		}
 	}()
 
 	// Ensure the pointer is correctly specified
 	re := regexp.MustCompile(`^(/[\w\d~-]*)+$`)
 	if !re.MatchString(pointer) {
-		err = fmt.Errorf("Malformed pointer %s", pointer)
+		err = fmt.Errorf("malformed pointer %s", pointer)
 		return
 	}
 

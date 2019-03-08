@@ -46,8 +46,8 @@ var (
 	mainLogger *logrus.Entry
 )
 
-// parse command-line args and initialise config
-func init() {
+// create controller from initialised config
+func main() {
 	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
 	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
 	flag.BoolVar(&createCrd, "create-crd", false, "Create the crd if it does not exist")
@@ -58,10 +58,7 @@ func init() {
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
 	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
-}
 
-// create controller from initialised config
-func main() {
 	if level, err := logrus.ParseLevel(logLevel); err != nil {
 		mainLogger.Fatalf("Invalid log level: %s", logLevel)
 	} else {
@@ -96,7 +93,7 @@ func main() {
 	kubecli := k8sutil.MustNewKubeClient()
 
 	http.HandleFunc(probe.HTTPReadyzEndpoint, probe.ReadyzHandler)
-	go http.ListenAndServe(listenAddr, nil)
+	go func() { _ = http.ListenAndServe(listenAddr, nil) }()
 
 	mainLogger.Info("Obtaining resource lock")
 	rl, err := resourcelock.New(resourcelock.EndpointsResourceLock,
@@ -181,6 +178,6 @@ func createRecorder(kubecli kubernetes.Interface, name, namespace string) record
 	mainLogger.Info("Starting event recorder")
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(logrus.WithField("module", "event_recorder").Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubecli.Core().RESTClient()).Events(namespace)})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubecli.CoreV1().RESTClient()).Events(namespace)})
 	return eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: name})
 }

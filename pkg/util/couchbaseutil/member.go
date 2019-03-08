@@ -95,7 +95,7 @@ func (ms MemberSet) Diff(other MemberSet) MemberSet {
 }
 
 func (ms MemberSet) Equal(other MemberSet) bool {
-	for n, _ := range ms {
+	for n := range ms {
 		if _, ok := other[n]; !ok {
 			return false
 		}

@@ -49,7 +49,7 @@ func (r *serviceResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), service.Name, service.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), service.Name, service.Name+".yaml"), string(data))
 	}
 	return nil
 }

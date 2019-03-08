@@ -177,7 +177,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		}
 	}
 
-	// Function to insert data with two types of valueType varaibles
+	// Function to insert data with two types of valueType variables
 	dataInsertionErrChan := make(chan error)
 	stopDataInsertionChan := make(chan interface{})
 	numOfType1Docs := 0
@@ -264,7 +264,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy analyitcs enabled couchbase cluster and populate data
+// Deploy analytics enabled couchbase cluster and populate data
 // Kill analytics enabled node and check the cluster status
 func TestAnalyticsKillPods(t *testing.T) {
 	f := framework.Global
@@ -335,7 +335,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	// Wait until analytics service is fully functional
 	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, 5*time.Minute)
 
-	// Function to insert data with two types of valueType varaibles
+	// Function to insert data with two types of valueType variables
 	dataInsertionErrChan := make(chan error)
 	stopDataInsertionChan := make(chan interface{})
 	numOfType1Docs := 0
@@ -425,7 +425,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy analyitcs enabled couchbase cluster over PVC and populate data
+// Deploy analytics enabled couchbase cluster over PVC and populate data
 // Kill analytics enabled node and check the cluster and PVC status
 // Kill all analytics nodes at once and check for node recovery
 func TestAnalyticsKillPodsWithPVC(t *testing.T) {
