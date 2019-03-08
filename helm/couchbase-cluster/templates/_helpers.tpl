@@ -16,17 +16,6 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-%s" .Release.Name (include "couchbase-cluster.name" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{/*
-Cluster DNS name
-*/}}
-{{- define "couchbase-cluster.dns" -}}
-{{- if .Values.couchbaseCluster.dns.domain -}}
-  {{ printf "%s.%s" (include "couchbase-cluster.name" .) .Values.couchbaseCluster.dns.domain }}
-{{- else -}}
-  {{ printf "%s" (include "couchbase-cluster.name" .) }}
-{{- end -}}
-{{- end -}}
-
 
 {{/*
 Create chart name and version as used by the chart label.
@@ -102,13 +91,25 @@ Generate certificates for couchbase-cluster
 Generate client key and cert from CA
 */}}
 {{- define "couchbase-cluster.gen-client-tls" -}}
-{{- $clustername := (include "couchbase-cluster.clustername" .RootScope) -}}
-{{- $altNames := list ( printf "*.%s.%s.svc" $clustername .RootScope.Release.Namespace ) ( printf "*.%s" ( include "couchbase-cluster.dns" .RootScope) ) -}}
 {{- $expiration := (.RootScope.Values.couchbaseTLS.expiration | int) -}}
+{{- $altNames :=  list (include "couchbase-cluster.dns.altnames" .RootScope) -}}
 {{- $cert := genSignedCert ( include "couchbase-cluster.fullname" .RootScope) nil $altNames $expiration .CA -}}
 {{- $clientCert := default $cert.Cert .RootScope.Values.couchbaseTLS.operatorSecret.cert | b64enc -}}
 {{- $clientKey := default $cert.Key .RootScope.Values.couchbaseTLS.operatorSecret.key | b64enc -}}
 caCert: {{ .CA.Cert | b64enc }}
 clientCert: {{ $clientCert }}
 clientKey: {{ $clientKey }}
+{{- end -}}
+
+{{/*
+Generate valid alternate names for certificates
+*/}}
+{{- define "couchbase-cluster.dns.altnames" -}}
+{{- $clustername := (include "couchbase-cluster.clustername" .) -}}
+{{- $altNames :=  printf "%s *.%s.%s.svc" $clustername $clustername .Release.Namespace -}}
+{{- if .Values.couchbaseCluster.dns -}}
+{{- printf "%s *.%s.%s" $altNames $clustername .Values.couchbaseCluster.dns.domain -}}
+{{- else -}}
+{{- $altNames -}}
+{{- end -}}
 {{- end -}}
