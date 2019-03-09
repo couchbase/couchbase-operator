@@ -5,10 +5,10 @@ rbac:
 couchbase-operator:
   couchbaseOperator:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
   admissionController:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
 couchbase-cluster:
   couchbaseCluster:
     servers:
@@ -25,6 +25,8 @@ couchbase-cluster:
     volumeClaimTemplates:
       - metadata:
           name: couchbase
+          annotations:
+            storageclass.couchbase.com/binding-mode: WaitForFirstConsumer
         spec:
           storageClassName: "default"
           resources:

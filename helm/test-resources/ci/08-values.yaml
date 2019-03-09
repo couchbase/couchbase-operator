@@ -5,12 +5,14 @@ rbac:
 couchbase-operator:
   couchbaseOperator:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
   admissionController:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
 couchbase-cluster:
   couchbaseCluster:
+    # setting name for the sake of dns testing and verifying services
+    name: ci-testcluster
     servers:
       all_services:
         size: 4

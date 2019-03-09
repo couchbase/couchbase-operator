@@ -5,10 +5,10 @@ rbac:
 couchbase-operator:
   couchbaseOperator:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
   admissionController:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
   admissionCA:
       key: |-
               -----BEGIN RSA PRIVATE KEY-----

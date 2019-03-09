@@ -1,5 +1,5 @@
 # Creates operator chart with custom CA and client certs
-# * Requires namespace named ci-namespace
+# * Requires namespace named ci-testnamespace
 # * Verifies DNS uses service named ci-testcluster
 ---
 rbac:
@@ -7,10 +7,10 @@ rbac:
 couchbase-operator:
   couchbaseOperator:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
   admissionController:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
   admissionService:
     name: ci-testservice
   admissionSecret:

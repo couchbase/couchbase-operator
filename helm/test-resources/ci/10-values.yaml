@@ -2,17 +2,19 @@
 # * Requires namespace named ci-namespace
 # * Verifies DNS uses service named ci-testcluster
 ---
-# cannot do service test with fake dns
+# Cannot do service test with fake dns.
+# However, if there are any issues the admission
+# controller will fail cluster creation.
 enableServiceTest: false
 rbac:
   create: false
 couchbase-operator:
   couchbaseOperator:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
   admissionController:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
 couchbase-cluster:
   couchbaseCluster:
     name: ci-testcluster

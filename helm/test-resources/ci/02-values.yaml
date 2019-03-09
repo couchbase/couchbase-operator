@@ -11,9 +11,9 @@ couchbase-operator:
     admissionServiceAccountName: ci-service-account
   couchbaseOperator:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933
     commandArgs:
       create-crd: false 
   admissionController:
     image:
-      tag: 1.2.0-877
+      tag: 1.2.0-933

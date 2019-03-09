@@ -33,5 +33,3 @@ couchbase-operator:
 # place holder for overrides to cluster
 couchbase-cluster:
   couchbaseCluster:
-    # setting name for the sake of dns testing and verifying services
-    name: ci-testcluster
