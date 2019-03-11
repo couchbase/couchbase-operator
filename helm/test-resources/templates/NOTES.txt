@@ -1,1 +1,10 @@
+Test chart deployed
+1. Check the operator logs
+  kubectl logs -f deployment/{{ .Release.Name }}-couchbase-operator  --namespace {{ .Release.Namespace }}
+  kubectl logs -f deployment/{{ .Release.Name }}-couchbase-admission-controller --namespace {{ .Release.Namespace }}
 
+2. Test the deployment
+  helm test {{ .Release.Name }}
+
+3. Get test logs
+  kubectl logs -f --namespace {{ .Release.Namespace }} {{ template "test-resources.ci-fullname" . }}

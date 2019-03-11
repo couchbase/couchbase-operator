@@ -1,5 +1,6 @@
 # Creates operator chart with custom CA
 ---
+testID: "03"
 rbac:
   create: false
 couchbase-operator:

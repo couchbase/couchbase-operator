@@ -2,6 +2,7 @@
 # * Requires namespace named ci-namespace
 # * Verifies DNS uses service named ci-testcluster
 ---
+testID: "10"
 # Cannot do service test with fake dns.
 # However, if there are any issues the admission
 # controller will fail cluster creation.
@@ -36,6 +37,8 @@ couchbase-cluster:
     volumeClaimTemplates:
       - metadata:
           name: couchbase
+          annotations:
+            storageclass.couchbase.com/binding-mode: WaitForFirstConsumer
         spec:
           storageClassName: "default"
           resources:

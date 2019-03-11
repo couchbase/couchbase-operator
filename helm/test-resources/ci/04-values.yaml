@@ -2,6 +2,7 @@
 # * Requires namespace named ci-testnamespace
 # * Verifies DNS uses service named ci-testcluster
 ---
+testID: "04"
 rbac:
   create: false
 couchbase-operator:

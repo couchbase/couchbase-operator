@@ -1,5 +1,6 @@
-# Apply auto generated TLS to cluster cluster  
+# Apply auto generated TLS to cluster cluster
 ---
+testID: "06"
 rbac:
   create: false
 couchbase-operator:

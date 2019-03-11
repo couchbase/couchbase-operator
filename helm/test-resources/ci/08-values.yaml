@@ -1,5 +1,6 @@
- # Override Cluster TLS  
+ # Override Cluster TLS
 ---
+testID: "08"
 rbac:
   create: false
 couchbase-operator:
@@ -27,6 +28,8 @@ couchbase-cluster:
     volumeClaimTemplates:
       - metadata:
           name: couchbase
+          annotations:
+            storageclass.couchbase.com/binding-mode: WaitForFirstConsumer
         spec:
           storageClassName: "default"
           resources:

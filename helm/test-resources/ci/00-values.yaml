@@ -1,5 +1,6 @@
 # Creates operator chart without any custom resources
 ---
+testID: "00"
 rbac:
   create: false
 couchbase-operator:
