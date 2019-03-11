@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -48,7 +49,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	if err != nil {
 		return err
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport, Timeout: 10 * time.Second}, "POST", req.URL())
 
 	// Finally do the actual work
 	pf.stopChan = make(chan struct{})
