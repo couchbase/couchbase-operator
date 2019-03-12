@@ -111,7 +111,8 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-      - name: TestPersistentVolumeKillAllPods
+      - name: TestPersistentVolumeKillAllPodsDeletePod
+      - name: TestPersistentVolumeKillAllPodsKillService
       - name: TestPersistentVolumeKillPodAndOperator
       - name: TestPersistentVolumeKillAllPodsAndOperator
       - name: TestPersistentVolumeRzaNodesKilled

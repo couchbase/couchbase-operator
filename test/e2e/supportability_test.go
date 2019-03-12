@@ -2112,10 +2112,7 @@ func TestLogCollectClusterWithPVC(t *testing.T) {
 
 // Create couchbase cluster with persistent volume claim
 // Bring down a pod and collect log and check for persistent volume definition files
-func TestCollectLogFromPvPodRecovered(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+func TestCollectLogFromPvPodRecoveredDeletePod(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -2130,9 +2127,20 @@ func TestCollectLogFromPvPodRecovered(t *testing.T) {
 		1: "deletePod",
 	}
 	LogCollectionWithDefaultPvcMount(t, targetKube, serverPodsToKill, isOperatorKilledWithServerPod)
+}
+
+func TestCollectLogFromPvPodRecoveredKillService(t *testing.T) {
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
 
 	// Pods brought down by killing cb-server process
 	if f.KubeType == "kubernetes" {
+		isOperatorKilledWithServerPod := false
+
 		serverPodsToKill := map[int]string{
 			1: "killServerProcess",
 		}

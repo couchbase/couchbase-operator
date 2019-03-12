@@ -64,7 +64,8 @@ tcGroups:
       - name: TestLogCollectValidateArguments
       - name: TestExtendedDebugWithDefaultValues
       - name: TestCollectLogFromEphemeralPodsUsingLogPV
-      - name: TestCollectLogFromPvPodRecovered
+      - name: TestCollectLogFromPvPodRecoveredDeletePod
+      - name: TestCollectLogFromPvPodRecoveredKillService
       - name: TestLogCollectWithDefaultRetentionAndSize
       - name: TestLogRedactionVerify
 
