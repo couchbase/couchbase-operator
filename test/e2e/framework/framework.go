@@ -304,9 +304,6 @@ func cleanUpNamespace() (err error) {
 				}
 			}
 		}
-		if err := e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err != nil {
-			return err
-		}
 
 		// Clean-up Deployments and pods
 		if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, Global.Namespace); err != nil {
