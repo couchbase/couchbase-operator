@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -22,16 +23,31 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // This will create a Persistent volume claim data
 // for adding into the cluster CRD
-func createPersistentVolumeClaimSpec(storageClass, pvcName string, resourceQtyVal int64) corev1.PersistentVolumeClaim {
+func createPersistentVolumeClaimSpec(t *testing.T, k8s *types.Cluster, storageClass, pvcName string, resourceQtyVal int64) corev1.PersistentVolumeClaim {
+	sc, err := k8s.KubeClient.StorageV1().StorageClasses().Get(storageClass, metav1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	annotations := map[string]string{}
+
+	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+		annotations[operator_constants.AnnotationVolumeBindingMode] = string(storagev1.VolumeBindingWaitForFirstConsumer)
+	}
+
 	resourceQuantity := apiresource.NewQuantity(resourceQtyVal*1024*1024*1024, apiresource.BinarySI)
 	return corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: pvcName},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        pvcName,
+			Annotations: annotations,
+		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,
 			Resources: corev1.ResourceRequirements{
@@ -109,7 +125,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -201,7 +217,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -310,8 +326,8 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	podMemberIdToKill := clusterSize - 1
 
 	// Define multiple volume claim template spec
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvc1Name, 2)
-	pvcTemplate2 := createPersistentVolumeClaimSpec(f.StorageClassName, pvc2Name, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvc1Name, 2)
+	pvcTemplate2 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvc2Name, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1, pvcTemplate2}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -494,7 +510,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -618,7 +634,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -742,7 +758,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	}
 
 	// Deploy couchbase cluster with PVC
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -835,7 +851,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	}
 
 	// Deploy couchbase cluster with PVC
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -1002,7 +1018,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	}
 
 	// This will request storage claim of 2000Gi
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2000)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2000)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
@@ -1061,7 +1077,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)

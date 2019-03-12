@@ -32,12 +32,13 @@ Options:
 import argparse
 import subprocess
 import sys
+import tempfile
 
 # Default name for created resources.
 NAME = 'cao-test'
 
 # Default version of Kubernetes.
-VERSION = '1.11.5-gke.5'
+VERSION = '1.12.5-gke.10'
 
 # Default machine type.
 MACHINE = 'n1-highcpu-4'
@@ -55,6 +56,21 @@ REGIONS = {
         'prefix': '10.16.0.0/12',
     }
 }
+
+# Storage class that allows volumes to bound after the pod is scheduled.
+STORAGE_CLASS = """
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  labels:
+    kubernetes.io/cluster-service: "true"
+  name: dynamic-bound
+parameters:
+  type: pd-standard
+provisioner: kubernetes.io/gce-pd
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+"""
 
 def gcloud(*cmd):
     """Runs a gcloud command raising an exception on error"""
@@ -126,6 +142,14 @@ def start(args):
                 '--clusterrole', 'cluster-admin',
                 '--user', args.user,
                 '--context', context_name(args, region))
+
+        # Add in a useful storage class
+        with tempfile.NamedTemporaryFile() as manifest:
+            manifest.write(STORAGE_CLASS)
+            manifest.flush()
+
+            kubectl('create', '-f', manifest.name,
+                    '--context', context_name(args, region))
 
 
 def stop(args):
