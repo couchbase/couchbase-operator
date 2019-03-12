@@ -433,9 +433,6 @@ func (c *Cluster) logSpecUpdate(oldSpec, newSpec api.ClusterSpec) {
 }
 
 func (c *Cluster) updateCRStatus() error {
-	kind := c.cluster.Kind
-	apiVersion := c.cluster.APIVersion
-
 	// The cluster object can be updated asynchronously e.g. via a spec update,
 	// hence what's in etcd need not reflect what's locally cached and the k8s
 	// server will reject any updates that fail the CAS test.  We only pick up
@@ -444,10 +441,6 @@ func (c *Cluster) updateCRStatus() error {
 	if err != nil {
 		return err
 	}
-	if c.cluster.ResourceVersion != cluster.ResourceVersion {
-		c.logger.Infof("Resource version conflict, updating %s to %s", c.cluster.ResourceVersion, cluster.ResourceVersion)
-		c.cluster = cluster
-	}
 
 	// Ignore the case where nothing needs to be updated
 	if reflect.DeepEqual(c.cluster.Status, c.status) {
@@ -455,21 +448,11 @@ func (c *Cluster) updateCRStatus() error {
 	}
 
 	// Copy the updated status to our cluster object and try update it
-	c.cluster.Status = c.status
-	newCluster, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Update(c.cluster)
-	if err != nil {
+	cluster.Status = c.status
+	if _, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 		return err
 	}
 
-	// Cache the new cluster object (with its new revision ID)
-	//
-	// Note: TypeMeta isn't populated after the Update() so manually restore.
-	//       May be related to https://github.com/kubernetes/apiextensions-apiserver/issues/29 for tracking
-	//       This must be populated for cached events to work properly as there is a bug in the fallback
-	//       code which parses the object link to extract the same information.
-	c.cluster = newCluster
-	c.cluster.Kind = kind
-	c.cluster.APIVersion = apiVersion
 	return nil
 }
 
