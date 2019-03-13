@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -15,9 +14,6 @@ import (
 // 2. Check the events to make sure the operator took the correct actions
 // 3. Verifies that the cluster is balanced and all data is available
 func TestCreateCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -37,9 +33,6 @@ func TestCreateCluster(t *testing.T) {
 // 2. Check the events to make sure the operator took the correct actions
 // 3. Verifies that the cluster is balanced and all data is available
 func TestCreateBucketCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 

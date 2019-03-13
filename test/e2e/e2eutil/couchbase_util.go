@@ -310,7 +310,12 @@ func MustInsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *api
 }
 
 // Add a node to the cluster
-func AddNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, services api.ServiceList, username, password string, member *couchbaseutil.Member) error {
+func AddNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, services api.ServiceList, member *couchbaseutil.Member) error {
+	username, password, err := GetClusterAuth(k8s.KubeClient, couchbase.Namespace, k8s.DefaultSecret.Name)
+	if err != nil {
+		return err
+	}
+
 	if _, err := CreateMemberPod(k8s, couchbase, member); err != nil {
 		return err
 	}
@@ -374,8 +379,8 @@ func AddNode(k8s *types.Cluster, couchbase *api.CouchbaseCluster, services api.S
 	return retryutil.Retry(ctx, time.Second, IntMax, callback)
 }
 
-func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, services api.ServiceList, username, password string, member *couchbaseutil.Member) {
-	if err := AddNode(k8s, couchbase, services, username, password, member); err != nil {
+func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, services api.ServiceList, member *couchbaseutil.Member) {
+	if err := AddNode(k8s, couchbase, services, member); err != nil {
 		Die(t, err)
 	}
 }
