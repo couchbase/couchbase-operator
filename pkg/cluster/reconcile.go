@@ -174,6 +174,7 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 	}()
 
 	if err := c.createPod(ctx, newMember, serverSpec); err != nil {
+		c.logFailedMember(newMember.Name)
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
 
