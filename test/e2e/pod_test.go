@@ -76,7 +76,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 15*time.Minute)
 }
 
 // TestPodResourcesCannotBePlaced tests for additional pods failing creation due to
@@ -143,7 +143,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 15*time.Minute)
 }
 
 func TestAntiAffinityOn(t *testing.T) {
