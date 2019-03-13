@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"math/rand"
 	"net"
 	"net/http"
@@ -27,7 +30,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -95,7 +97,7 @@ func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(
 	// lot of "connection reset by peer" spam on the console.
 	portforward.Silent()
 
-	return sport, func() { pf.Close() }, nil
+	return sport, func() { _ = pf.Close() }, nil
 }
 
 // CreateAdminConsoleClient returns a client for interacting with the admin service of a cluster.
@@ -126,16 +128,30 @@ func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *api
 	return client, cleanup
 }
 
-// GetPod selects a random pod in the cluster.
-func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster) (*corev1.Pod, error) {
-	// Grab the Couchbase service and use it to select the set of pods to connect to.
-	svc, err := k8s.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+// GetPod selects a random pod that may be running a specified service or set of services from the cluster.
+func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster, services ...api.Service) (*corev1.Pod, error) {
+	appreq, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App})
 	if err != nil {
 		return nil, err
 	}
 
-	selector := labels.SelectorFromSet(svc.Spec.Selector).String()
-	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	clusterreq, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{cluster.Name})
+	if err != nil {
+		return nil, err
+	}
+
+	selector := labels.NewSelector()
+	selector = selector.Add(*appreq, *clusterreq)
+
+	for _, service := range services {
+		requirement, err := labels.NewRequirement(fmt.Sprintf("couchbase_service_%s", string(service)), selection.Equals, []string{"enabled"})
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*requirement)
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -147,30 +163,43 @@ func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster) (*corev1.Pod, err
 	return &pods.Items[rand.Int()%len(pods.Items)], nil
 }
 
-// GetAdminConsoleHostURL returns a URL for interacting with the admin service of a cluster.
+// GetHostURL returns a URL for interacting with a specified service of a cluster.
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func(), error) {
+func GetHostURL(k8s *types.Cluster, cluster *api.CouchbaseCluster, service api.Service) (string, func(), error) {
 	// Forward port to a pod to the local host.  Pick a random pod this will prevent hangs
 	// if the pod we are always selecting isn't the one we need.
-	pod, err := GetPod(k8s, cluster)
+	pod, err := GetPod(k8s, cluster, service)
 	if err != nil {
 		return "", nil, err
 	}
-	port, cleanup, err := forwardPort(k8s, cluster.Namespace, pod.Name, "8091")
+
+	var p string
+	switch service {
+	case api.AdminService:
+		p = "8091"
+	case api.AnalyticsService:
+		p = "8095"
+	case api.EventingService:
+		p = "8096"
+	default:
+		return "", nil, fmt.Errorf("unsupported service specified")
+	}
+
+	port, cleanup, err := forwardPort(k8s, cluster.Namespace, pod.Name, p)
 	if err != nil {
 		return "", nil, err
 	}
 	return "127.0.0.1:" + port, cleanup, nil
 }
 
-func MustGetAdminConsoleHostURL(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func()) {
-	url, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
-	if err != nil {
-		Die(t, err)
-	}
-	return url, cleanup
+// GetAdminConsoleHostURL returns a URL for interacting with the Admin service of a cluster.
+// Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
+// If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
+// the cleanup callback must be invoked first.
+func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *api.CouchbaseCluster) (string, func(), error) {
+	return GetHostURL(k8s, cluster, api.AdminService)
 }
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
@@ -645,8 +674,17 @@ func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[s
 	}
 }
 
-func DeployEventingFunction(hostUrl, eventingPort, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) ([]byte, error) {
-	hostUrl = "http://" + hostUrl + ":" + eventingPort + "/api/v1/functions?name=" + eventingFuncName
+func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *api.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) {
+	if responseData, err := DeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc); err != nil {
+		t.Log(string(responseData))
+		Die(t, err)
+	}
+}
+
+func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *api.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
 	requestType := "POST"
 	hostUsername := "Administrator"
 	hostPassword := "password"
@@ -662,25 +700,46 @@ func DeployEventingFunction(hostUrl, eventingPort, eventingFuncName, srcBucketNa
 		`"appcode": "` + jsFunc + `"` +
 		`}]`
 
-	request, err := http.NewRequest(requestType, hostUrl, strings.NewReader(eventingJsonFunc))
+	err := retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+		var eventingUrl string
+		var cleanup func()
+		var err error
+		if eventingUrl, cleanup, err = GetHostURL(targetKube, cluster, api.EventingService); err != nil {
+			t.Log(err)
+			return false, retryutil.RetryOkError(err)
+		}
+		if err == nil {
+			defer cleanup()
+		}
+
+		hostUrl := "http://" + eventingUrl + "/api/v1/functions?name=" + eventingFuncName
+
+		request, err := http.NewRequest(requestType, hostUrl, strings.NewReader(eventingJsonFunc))
+		if err != nil {
+			return false, retryutil.RetryOkError(errors.New("Http request failed: " + err.Error()))
+		}
+
+		request.SetBasicAuth(hostUsername, hostPassword)
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		client := http.Client{Timeout: 5 * time.Minute}
+		response, err := client.Do(request)
+		if err != nil {
+			return false, retryutil.RetryOkError(errors.New("Failed to " + err.Error()))
+		}
+		defer response.Body.Close()
+
+		responseData, _ = ioutil.ReadAll(response.Body)
+		if response.StatusCode != http.StatusOK {
+			return false, retryutil.RetryOkError(errors.New("Remote call failed with response: " + response.Status + ", " + string(responseData)))
+		}
+
+		return true, nil
+	})
 	if err != nil {
-		return responseData, errors.New("Http request failed: " + err.Error())
+		return nil, err
 	}
 
-	request.SetBasicAuth(hostUsername, hostPassword)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := http.Client{Timeout: time.Minute}
-	response, err := client.Do(request)
-	if err != nil {
-		return responseData, errors.New("Failed to " + err.Error())
-	}
-	defer response.Body.Close()
-
-	responseData, _ = ioutil.ReadAll(response.Body)
-	if response.StatusCode != http.StatusOK {
-		return responseData, errors.New("Remote call failed with response: " + response.Status + ", " + string(responseData))
-	}
 	return responseData, nil
 }
 

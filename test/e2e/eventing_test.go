@@ -1,14 +1,11 @@
 package e2e
 
 import (
-	"context"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"os"
 	"testing"
 	"time"
 
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -79,7 +76,6 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket3["bucketName"])
 
 	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 1, numOfDocs)
-	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
@@ -87,23 +83,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	eventingDstBucketName := "eventingDst"
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	var responseData []byte
-	err := retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
-		eventingHostUrl, eventingPortStr, cleanup := e2eutil.MustGetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
-		defer cleanup()
-		var err error
-		if responseData, err = e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc); err != nil {
-			t.Log(err)
-			return false, retryutil.RetryOkError(err)
-		}
-		return true, nil
-	})
-	if err != nil {
-		t.Log(string(responseData))
-		t.Fatal(err)
-	}
+	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
 
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
 
@@ -143,23 +123,13 @@ func TestEventingResizeCluster(t *testing.T) {
 
 	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs)
 
-	// Provide the pod index for the eventing node
-	// Here nonEventingNodes will be equal to eventing pod's index
-	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
-	eventingHostUrl, eventingPortStr, cleanup := e2eutil.MustGetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
-	defer cleanup()
-
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
 	eventingMetaBucketName := "eventingMetaBucket"
 	eventingDstBucketName := "eventingDst"
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
-	responseData, err := e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
-	if err != nil {
-		t.Log(string(responseData))
-		t.Fatal(err)
-	}
+	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
 
 	// Cross check number of docs inserted reflected in eventing
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
@@ -287,22 +257,13 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs)
 
-	// Provide the pod index for the eventing node
-	// Here nonEventingNodes will be equal to eventing pod's index
-	eventingNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, nonEventingNodes)
-	eventingHostUrl, eventingPortStr, cleanup := e2eutil.MustGetEventingIpAndPort(t, targetKube, f.Namespace, eventingNodeName)
-	defer cleanup()
 	eventingFuncName := "eventingFunc"
 	eventingSrcBucketName := "eventingSrc"
 	eventingMetaBucketName := "eventingMetaBucket"
 	eventingDstBucketName := "eventingDst"
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
-	responseData, err := e2eutil.DeployEventingFunction(eventingHostUrl, eventingPortStr, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
-	if err != nil {
-		t.Log(string(responseData))
-		t.Fatal(err)
-	}
+	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
 
 	// Cross check number of docs inserted reflected in eventing
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
