@@ -59,15 +59,28 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
-	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset := "testDataset1"
 
-	queryMap := []string{
-		`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
-		`create dataset ` + analyticsDataset + ` on ` + analyticsBucketName,
-		`connect bucket ` + analyticsBucketName,
+	queries := []string{
+		"CREATE DATASET " + analyticsDataset + " ON `" + bucketName + "`",
+		"CONNECT LINK Local",
 	}
-	for _, query := range queryMap {
+
+	// TODO: Kill me ASAP as it's DP code.
+	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	if version.Major() < 6 {
+		analyticsBucketName := "testAnalyticsBucket"
+		queries = []string{
+			`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
+			`create dataset ` + analyticsDataset + ` on ` + analyticsBucketName,
+			`connect bucket ` + analyticsBucketName,
+		}
+	}
+
+	for _, query := range queries {
 		t.Log(query)
 		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
@@ -156,21 +169,35 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
-	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset1 := "testDataset1"
 	analyticsDataset2 := "testDataset2"
 	analyticsDataset3 := "testDataset3"
 
-	queryMap := []string{
-		`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
-		`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
-		`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
-		`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,
-		`connect bucket ` + analyticsBucketName,
+	queries := []string{
+		"CREATE DATASET " + analyticsDataset1 + " ON `" + bucketName + "`",
+		"CREATE DATASET " + analyticsDataset2 + " ON `" + bucketName + "` WHERE `valueType` = \"type1\"",
+		"CREATE DATASET " + analyticsDataset3 + " ON `" + bucketName + "` WHERE `valueType` = \"type2\"",
+		"CONNECT LINK Local",
+	}
+
+	// TODO: Kill me ASAP as it's DP code.
+	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	if version.Major() < 6 {
+		analyticsBucketName := "testAnalyticsBucket"
+		queries = []string{
+			`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
+			`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
+			`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
+			`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,
+			`connect bucket ` + analyticsBucketName,
+		}
 	}
 
 	// Load default data set into couchbase bucket
-	for _, query := range queryMap {
+	for _, query := range queries {
 		t.Log(query)
 		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
@@ -270,7 +297,13 @@ func TestAnalyticsKillPods(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	t.Skip("cbas broken in 5.5.x, syntax broken in 6.0.x")
+	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	if version.Major() < 6 {
+		t.Skip("cbas broken in 5.5.x")
+	}
 
 	clusterSizeWoAnalytics := 3
 	clusterSizeOfAnalytics := 3
@@ -312,20 +345,19 @@ func TestAnalyticsKillPods(t *testing.T) {
 	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
-	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset1 := "testDataset1"
 	analyticsDataset2 := "testDataset2"
 	analyticsDataset3 := "testDataset3"
 
-	queryMap := []string{
-		`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
-		`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
-		`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
-		`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,
-		`connect bucket ` + analyticsBucketName,
+	queries := []string{
+		"CREATE DATASET " + analyticsDataset1 + " ON `" + bucketName + "`",
+		"CREATE DATASET " + analyticsDataset2 + " ON `" + bucketName + "` WHERE `valueType` = \"type1\"",
+		"CREATE DATASET " + analyticsDataset3 + " ON `" + bucketName + "` WHERE `valueType` = \"type2\"",
+		"CONNECT LINK Local",
 	}
 
-	for _, query := range queryMap {
+	// Load default data set into couchbase bucket
+	for _, query := range queries {
 		t.Log(query)
 		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
@@ -483,21 +515,35 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
 	defer cleanup()
 
-	analyticsBucketName := "testAnalyticsBucket"
 	analyticsDataset1 := "testDataset1"
 	analyticsDataset2 := "testDataset2"
 	analyticsDataset3 := "testDataset3"
 
-	queryMap := []string{
-		`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
-		`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
-		`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
-		`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,
-		`connect bucket ` + analyticsBucketName,
+	queries := []string{
+		"CREATE DATASET " + analyticsDataset1 + " ON `" + bucketName + "`",
+		"CREATE DATASET " + analyticsDataset2 + " ON `" + bucketName + "` WHERE `valueType` = \"type1\"",
+		"CREATE DATASET " + analyticsDataset3 + " ON `" + bucketName + "` WHERE `valueType` = \"type2\"",
+		"CONNECT LINK Local",
+	}
+
+	// TODO: Kill me ASAP as it's DP code.
+	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	if version.Major() < 6 {
+		analyticsBucketName := "testAnalyticsBucket"
+		queries = []string{
+			`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
+			`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
+			`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
+			`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,
+			`connect bucket ` + analyticsBucketName,
+		}
 	}
 
 	// Load default data set into couchbase bucket
-	for _, query := range queryMap {
+	for _, query := range queries {
 		t.Log(query)
 		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
