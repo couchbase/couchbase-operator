@@ -129,7 +129,7 @@ func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *api
 }
 
 // GetPod selects a random pod that may be running a specified service or set of services from the cluster.
-func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster, services ...api.Service) (*corev1.Pod, error) {
+func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster, services []api.Service) (*corev1.Pod, error) {
 	appreq, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App})
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster, services ...api.S
 	}
 
 	if len(pods.Items) == 0 {
-		return nil, err
+		return nil, fmt.Errorf("no pods selected")
 	}
 
 	return &pods.Items[rand.Int()%len(pods.Items)], nil
@@ -170,24 +170,33 @@ func GetPod(k8s *types.Cluster, cluster *api.CouchbaseCluster, services ...api.S
 func GetHostURL(k8s *types.Cluster, cluster *api.CouchbaseCluster, service api.Service) (string, func(), error) {
 	// Forward port to a pod to the local host.  Pick a random pod this will prevent hangs
 	// if the pod we are always selecting isn't the one we need.
-	pod, err := GetPod(k8s, cluster, service)
+
+	// Admin is special as it's enabled everyehere and doesn't have a label selector
+	services := []api.Service{}
+	if service != api.AdminService {
+		services = append(services, service)
+	}
+
+	pod, err := GetPod(k8s, cluster, services)
 	if err != nil {
 		return "", nil, err
 	}
 
-	var p string
-	switch service {
-	case api.AdminService:
-		p = "8091"
-	case api.AnalyticsService:
-		p = "8095"
-	case api.EventingService:
-		p = "8096"
-	default:
+	portMap := map[api.Service]string{
+		api.AdminService:     "8091",
+		api.IndexService:     "8092",
+		api.QueryService:     "8093",
+		api.SearchService:    "8094",
+		api.AnalyticsService: "8095",
+		api.EventingService:  "8096",
+		api.DataService:      "11210",
+	}
+	targetPort, ok := portMap[service]
+	if !ok {
 		return "", nil, fmt.Errorf("unsupported service specified")
 	}
 
-	port, cleanup, err := forwardPort(k8s, cluster.Namespace, pod.Name, p)
+	port, cleanup, err := forwardPort(k8s, cluster.Namespace, pod.Name, targetPort)
 	if err != nil {
 		return "", nil, err
 	}
