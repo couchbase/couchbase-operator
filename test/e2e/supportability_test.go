@@ -1131,11 +1131,10 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 	t.Log(execOutStr)
-	expectedErrMsg := "unable to poll CouchbaseCluster resources: couchbaseclusters.couchbase.com is forbidden: User \"system:serviceaccount:" + f.Namespace + ":" + cluster.Name + "\" cannot list couchbaseclusters.couchbase.com in the namespace \"" + f.Namespace + "\""
 	if err == nil {
 		e2eutil.Die(t, fmt.Errorf("Able to read resource without valid rbac permissions"))
 	}
-	if execOutStr != expectedErrMsg {
+	if !strings.Contains(execOutStr, "unable to poll CouchbaseCluster resources") {
 		e2eutil.Die(t, fmt.Errorf("Invalid error message"))
 	}
 }
