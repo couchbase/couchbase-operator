@@ -91,25 +91,25 @@ Generate certificates for couchbase-cluster
 Generate client key and cert from CA
 */}}
 {{- define "couchbase-cluster.gen-client-tls" -}}
+{{- $clustername := (include "couchbase-cluster.clustername" .RootScope) -}}
+{{- $altNames :=  list (printf "*.%s.%s.svc" $clustername .RootScope.Release.Namespace) -}}
+{{- if .RootScope.Values.couchbaseCluster.dns -}}
+{{- $extendedAltNames := append $altNames (printf "*.%s.%s" $clustername .RootScope.Values.couchbaseCluster.dns.domain) -}}
+{{- template "couchbase-cluster.internal.gen-client-tls" (dict "RootScope" .RootScope "CA" .CA "AltNames" $extendedAltNames) -}}
+{{- else -}}
+{{- template "couchbase-cluster.internal.gen-client-tls" (dict "RootScope" .RootScope "CA" .CA "AltNames" $altNames) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Generate client key and cert from CA and altNames
+*/}}
+{{- define "couchbase-cluster.internal.gen-client-tls" -}}
 {{- $expiration := (.RootScope.Values.couchbaseTLS.expiration | int) -}}
-{{- $altNames :=  list (include "couchbase-cluster.dns.altnames" .RootScope) -}}
-{{- $cert := genSignedCert ( include "couchbase-cluster.fullname" .RootScope) nil $altNames $expiration .CA -}}
+{{- $cert := genSignedCert ( include "couchbase-cluster.fullname" .RootScope) nil .AltNames $expiration .CA -}}
 {{- $clientCert := default $cert.Cert .RootScope.Values.couchbaseTLS.operatorSecret.cert | b64enc -}}
 {{- $clientKey := default $cert.Key .RootScope.Values.couchbaseTLS.operatorSecret.key | b64enc -}}
 caCert: {{ .CA.Cert | b64enc }}
 clientCert: {{ $clientCert }}
 clientKey: {{ $clientKey }}
-{{- end -}}
-
-{{/*
-Generate valid alternate names for certificates
-*/}}
-{{- define "couchbase-cluster.dns.altnames" -}}
-{{- $clustername := (include "couchbase-cluster.clustername" .) -}}
-{{- $altNames :=  printf "%s *.%s.%s.svc" $clustername $clustername .Release.Namespace -}}
-{{- if .Values.couchbaseCluster.dns -}}
-{{- printf "%s *.%s.%s" $altNames $clustername .Values.couchbaseCluster.dns.domain -}}
-{{- else -}}
-{{- $altNames -}}
-{{- end -}}
 {{- end -}}
