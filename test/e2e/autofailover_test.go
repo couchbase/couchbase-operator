@@ -26,10 +26,14 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	availableServerGroupList := GetAvailabilityZones(t, targetKube)
+	if len(availableServerGroupList) < 3 {
+		t.Skip("couchbase server requires 3 or more availability zones")
+	}
+
 	// Create cluster spec for RZA feature
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 	bucketName := "testBucket"
-	availableServerGroupList := GetAvailabilityZones(t, targetKube)
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 2, true)
 	clusterConfig["autoFailoverTimeout"] = "10"
