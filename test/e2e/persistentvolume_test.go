@@ -68,7 +68,7 @@ func createPodSecurityContext(fsGroup int, clusterSpec *v1.ClusterSpec) {
 }
 
 // Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user
-func VerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int, platformType string) (errToReturn error) {
+func VerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int) (errToReturn error) {
 	pvcMappingVerify := func() error {
 		for memberName, pvcCount := range expectedPvcMap {
 			pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
@@ -91,8 +91,8 @@ func VerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string,
 	})
 }
 
-func MustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int, platformType string) {
-	if err := VerifyPvcMappingForPods(t, k8s, namespace, expectedPvcMap, platformType); err != nil {
+func MustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int) {
+	if err := VerifyPvcMappingForPods(t, k8s, namespace, expectedPvcMap); err != nil {
 		e2eutil.Die(t, err)
 	}
 }
@@ -130,7 +130,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	expectedEvents := e2eutil.EventValidator{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -222,7 +222,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
@@ -332,7 +332,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1, pvcTemplate2}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	var expectedPvcMap map[string]int
@@ -382,7 +382,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// To cross check number of persistent vol claims matches the defined spec
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 
 	// Kill pod along with its PVC
 	if err := e2eutil.RemovePersistentVolumesOfPod(targetKube.KubeClient, f.Namespace, testCouchbase.Name, podMemberIdToKill); err != nil {
@@ -451,7 +451,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap, f.PlatformType)
+	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 }
 
 // Create PV enabled couchbase cluster
@@ -510,7 +510,7 @@ func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	for i := 0; i < clusterSize; i++ {
@@ -563,7 +563,7 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	for i := 0; i < clusterSize; i++ {
@@ -619,7 +619,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -679,7 +679,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -743,7 +743,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	// Create a expected RZA results map for verification
 	sort.Strings(availableServerGroupList)
@@ -834,7 +834,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	// Create a expected RZA results map for verification
 	sort.Strings(availableServerGroupList)
@@ -1003,7 +1003,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1023,7 +1023,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	}
 
 	// To cross check number of persistent vol claims matches the defined spec
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
+	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
 }
 
@@ -1062,7 +1062,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	expectedEvents := e2eutil.EventList{}
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -1117,7 +1117,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 
 		// To cross check number of persistent vol claims matches the defined spec
-		MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap, f.PlatformType)
+		MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)

@@ -211,13 +211,13 @@ func CreateClusterSpec(secretName string, config map[string]map[string]string) a
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	return newClusterFromSpec(t, k8s, namespace, crd)
 }
 
-func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, platformType string) *api.CouchbaseCluster {
-	cluster, err := CreateClusterFromSpec(t, k8s, namespace, adminConsoleExposed, spec, platformType)
+func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) *api.CouchbaseCluster {
+	cluster, err := CreateClusterFromSpec(t, k8s, namespace, adminConsoleExposed, spec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1135,8 +1135,8 @@ func Die(t *testing.T, err error) {
 
 // MustKillCouchbaseService kills the couchbase service depending on the platform type
 // TODO: Find a generic way of doing this on OpenShift
-func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, member, platformType string) {
-	if platformType == "kubernetes" {
+func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, member, kubernetesType string) {
+	if kubernetesType == "kubernetes" {
 		MustExecShellInPod(t, k8s, namespace, member, "mv /etc/service/couchbase-server /tmp/")
 		return
 	}

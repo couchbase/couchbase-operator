@@ -273,7 +273,7 @@ func K8SNodesRemoveLabel(nodeLabelName string, kubeClient kubernetes.Interface) 
 // skipEnterpriseOnlyPlatform skips the test if it's Enterprise Edition only e.g.
 // RedHat Openshift, as it doesn't have community edition binaries.
 func skipEnterpriseOnlyPlatform(t *testing.T) {
-	if framework.Global.PlatformType == "openshift" {
+	if framework.Global.KubeType == "openshift" {
 		t.Skip("unsupported on platform")
 	}
 }

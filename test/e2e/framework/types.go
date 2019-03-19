@@ -23,7 +23,6 @@ type Framework struct {
 	SuiteYmlData    SuiteData
 	ClusterConfFile string
 	CollectLogs     bool
-	PlatformType    string
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
@@ -78,7 +77,6 @@ type TestRunParam struct {
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`
 	ClusterConfFile    string `yaml:"cluster-config"`
-	PlatformType       string `yaml:"platformType"`
 
 	KubeVersion string         `yaml:"kube-version"`
 	KubeConfig  []KubeConfData `yaml:"kube-config"`

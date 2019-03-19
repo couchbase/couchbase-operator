@@ -495,7 +495,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 
-	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec, f.PlatformType)
+	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")

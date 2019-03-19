@@ -159,7 +159,6 @@ func Setup(t *testing.T) (err error) {
 		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
 		SuiteYmlData:                  suiteData,
 		ClusterConfFile:               runtimeParams.ClusterConfFile,
-		PlatformType:                  runtimeParams.PlatformType,
 		ClusterSpec:                   types.ClusterMap{},
 		CouchbaseServerVersion:        runtimeParams.CbServerImgVer,
 		CouchbaseServerUpgradeVersion: runtimeParams.CbServerImgVerUpgrade,

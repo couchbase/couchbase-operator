@@ -52,6 +52,3 @@ StorageClassName: standard
 
 # Service account to use while running Tests
 serviceAccountName: default
-
-# custom, azure
-platformType: custom
