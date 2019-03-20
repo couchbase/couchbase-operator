@@ -107,3 +107,6 @@ test-operator:
 
 test-unit:
 	go test -v ./pkg/...
+
+test-helm:
+	ct install --charts helm/test-resources/ --namespace ci-testnamespace
