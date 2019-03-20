@@ -20,8 +20,6 @@ import (
 )
 
 const (
-	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
-	ddnsAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 	// Used to annotate services which belong to an SRV record.
 	//srvAnnotaion = "external-dns.alpha.kubernetes.io/service"
 
@@ -364,7 +362,7 @@ func generateConsoleService(cluster *couchbasev1.CouchbaseCluster) *v1.Service {
 
 	// If a DNS domain is specified add a DNS name for use with TLS.
 	if cluster.Spec.DNS != nil {
-		service.Annotations[ddnsAnnotation] = dnsAdminConsoleName(cluster)
+		service.Annotations[constants.DNSAnnotation] = dnsAdminConsoleName(cluster)
 	}
 
 	if cluster.Spec.IsAdminConsoleServiceTypePublic() {
@@ -722,7 +720,7 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 
 	// If a DNS domain is specified annotate with the pod DNS name.
 	if cluster.Spec.DNS != nil {
-		service.Annotations[ddnsAnnotation] = GetDNSName(cluster, name)
+		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, name)
 		// TODO: data nodes only please
 		// TODO: await input from external-dns
 		//service.Annotations[srvAnnotaion] = GetSRVName(cluster)
@@ -771,6 +769,11 @@ func updateExposedService(service, requested *v1.Service) bool {
 	// This handles spec.ddns.domain updates.
 	if !reflect.DeepEqual(service.Annotations, requested.Annotations) {
 		service.Annotations = requested.Annotations
+		updated = true
+	}
+	// This handles updates to the service type
+	if service.Spec.Type != requested.Spec.Type {
+		service.Spec.Type = requested.Spec.Type
 		updated = true
 	}
 	// This handles updates to spec.exposedFeatures

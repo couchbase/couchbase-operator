@@ -461,7 +461,7 @@ func TestTLSRotate(t *testing.T) {
 
 	// When the cluster is ready, swap out the old certificate for a new one and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	e2eutil.MustRotateServerCertificate(t, ctx)
+	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 

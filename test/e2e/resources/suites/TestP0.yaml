@@ -162,3 +162,15 @@ tcGroups:
       - name: TestUpgrade
       - name: TestUpgradeSupportableKillStatefulPodOnCreate
       - name: TestUpgradeSupportableKillStatefulPodOnRebalance
+
+  - name: NetworkingTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestExposedFeatureIP
+      - name: TestExposedFeatureDNS
+      - name: TestExposedFeatureDNSModify
+      - name: TestExposedFeatureServiceTypeModify
+      - name: TestConsoleServiceDNS
+      - name: TestConsoleServiceDNSModify
+      - name: TestConsoleServiceTypeModify

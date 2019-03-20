@@ -584,12 +584,15 @@ func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, opts
 }
 
 // MustRotateServerCertificate generates a new server certificate and updates the existing secret.
-func MustRotateServerCertificate(t *testing.T, ctx *TlsContext) {
+func MustRotateServerCertificate(t *testing.T, ctx *TlsContext, subjectAltNames []string) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
 	// Generate a new server certificate
-	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	if len(subjectAltNames) == 0 {
+		subjectAltNames = ctx.clusterSANs()
+	}
+	clusterReq := CreateClusterCertReq(clusterCN, subjectAltNames)
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {

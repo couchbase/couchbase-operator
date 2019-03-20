@@ -68,6 +68,9 @@ const (
 	AnnotationVolumeBindingMode = "storageclass.couchbase.com/binding-mode"
 
 	ServerGroupLabel = "failure-domain.beta.kubernetes.io/zone"
+
+	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
+	DNSAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 )
 
 // Represents the Kubernetes version by its major and minor parts. The first
