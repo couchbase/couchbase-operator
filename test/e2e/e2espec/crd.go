@@ -10,7 +10,6 @@ import (
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
 
 	"k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -71,16 +70,11 @@ func SetCbImageVersion(cbImgVer string) {
 }
 
 var storageClassName string
-var isStorageClassLazyBound bool
 
 func SetStorageClassName(storageClassNameIn string) {
 	if storageClassNameIn = strings.TrimSpace(storageClassNameIn); storageClassNameIn != "" {
 		storageClassName = storageClassNameIn
 	}
-}
-
-func SetStorageClassLazy() {
-	isStorageClassLazyBound = true
 }
 
 func GetCouchbaseDockerImgName() string {
@@ -298,11 +292,6 @@ func NewSupportableClusterSpec(size int) api.ClusterSpec {
 				},
 			},
 		},
-	}
-
-	// HACK HACK HACK
-	if isStorageClassLazyBound {
-		spec.VolumeClaimTemplates[0].Annotations[constants.AnnotationVolumeBindingMode] = string(storagev1.VolumeBindingWaitForFirstConsumer)
 	}
 
 	// The defaults are too aggressive.  When killing a pod during a rebalance the operator

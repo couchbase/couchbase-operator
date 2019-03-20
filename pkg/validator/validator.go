@@ -520,20 +520,8 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 				errs = append(errs, err)
 			} else if storageClass == nil {
 				errs = append(errs, fmt.Errorf("storage class %s must exist", *pvc.Spec.StorageClassName))
-			} else {
-				// Binding mode from claim template must match binding mode of storage class
-				if volumeBindingMode, ok := pvc.Annotations[constants.AnnotationVolumeBindingMode]; ok {
-					scBindingMode := storagev1.VolumeBindingImmediate
-					if storageClass.VolumeBindingMode != nil {
-						scBindingMode = *storageClass.VolumeBindingMode
-					}
-					if volumeBindingMode != string(scBindingMode) {
-						errs = append(errs, fmt.Errorf("volumeBindindgMode of template `%s` must match binding mode of StorageClass `%s`", volumeBindingMode, scBindingMode))
-					}
-				}
 			}
 		}
-
 	}
 
 	// version check

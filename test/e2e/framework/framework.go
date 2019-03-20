@@ -29,7 +29,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -181,18 +180,6 @@ func Setup(t *testing.T) (err error) {
 			return cerr
 		}
 		Global.ClusterSpec[kubeConf.ClusterName] = clusterSpec
-	}
-
-	// HACK HACK HACK
-	for _, cluster := range Global.ClusterSpec {
-		sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(runtimeParams.StorageClassName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-			e2espec.SetStorageClassLazy()
-		}
-		break
 	}
 
 	// Setting required spec values from test_config yaml

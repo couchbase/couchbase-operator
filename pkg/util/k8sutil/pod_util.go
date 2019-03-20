@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -99,7 +98,6 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					constants.LabelCluster:    clusterName,
 					constants.LabelVolumeName: claimName,
 				}
-				volumeBindingMode := getVolumeBindingMode(kubeCli, claim)
 				claim.SetAnnotations(map[string]string{
 					constants.AnnotationVolumeMountPath:     mountPath,
 					constants.AnnotationVolumeNodeConf:      config.Name,
@@ -113,7 +111,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
 				}
 				claim.Name = NameForPersistentVolumeClaim(pod.Name, claimUsageCnt[claimName], mountName)
-				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, volumeBindingMode, owner, ctx)
+				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner, ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -236,31 +234,8 @@ func pathForVolumeMountName(id cbapi.VolumeMountName) string {
 	return path
 }
 
-// Get volume binding mode from annotation of the volume claim
-// claim template. If key is not set in the storage class then
-// attempt to get volume binding mode from storage class
-// provisoning the volume.
-func getVolumeBindingMode(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim) string {
-
-	// check claim template
-	if mode, ok := claim.Annotations[constants.AnnotationVolumeBindingMode]; ok {
-		return mode
-	}
-
-	// attempt to get binding mode from storage class
-	sc, err := verifyStorageClass(kubeCli, claim.Spec.StorageClassName)
-	if err == nil {
-		if sc.VolumeBindingMode != nil {
-			return string(*sc.VolumeBindingMode)
-		}
-	}
-
-	// default mode is Immediate
-	return string(storage.VolumeBindingImmediate)
-}
-
 // Creates custom PVC from the generic spec
-func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, volumeBindingMode string, owner metav1.OwnerReference, ctx context.Context) (*v1.PersistentVolumeClaim, error) {
+func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference, ctx context.Context) (*v1.PersistentVolumeClaim, error) {
 
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim.GetObjectMeta(), owner)
@@ -270,25 +245,12 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 		return nil, err
 	}
 
-	// skip wait if volumes should be bound after Pod creation
-	if strings.Compare(volumeBindingMode, string(storage.VolumeBindingWaitForFirstConsumer)) == 0 {
-		return pvc, nil
-	}
-
 	// wait for claim to be created before allowing it to be mounted by pod
 	err = WaitForPersistentVolumeClaim(ctx, kubeCli, namespace, pvc.Name)
 	if err != nil {
 		return nil, err
 	}
 	return pvc, nil
-}
-
-func verifyStorageClass(kubeCli kubernetes.Interface, storageClassName *string) (*storage.StorageClass, error) {
-	if storageClassName == nil {
-		return nil, fmt.Errorf("storage class required")
-	}
-	sc, err := GetStorageClass(kubeCli, *storageClassName)
-	return sc, err
 }
 
 func podVolumeSpecForClaim(claimName string) v1.Volume {

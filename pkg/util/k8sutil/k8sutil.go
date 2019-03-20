@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/ghodss/yaml"
@@ -340,63 +341,42 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 }
 
 // Waits for a persistent volume claim belonging to be created with bounded volumes
-func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interface, namespace, claimName string) error {
+func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interface, namespace, name string) error {
+	var phase v1.PersistentVolumeClaimPhase
 
-	opts := metav1.ListOptions{
-		FieldSelector: "metadata.name=" + claimName,
+	// Get PV, and retry unless bound
+	retryFunc := func() (bool, error) {
+		var err error
+		claim, err := GetPersistentVolumeClaim(kubeCli, namespace, name, nil)
+		if err != nil {
+			return false, err
+		}
+		phase = claim.Status.Phase
+		if phase == v1.ClaimBound {
+			return true, nil
+		}
+		return false, fmt.Errorf("claim is not bound to a persistent volume")
 	}
 
-	watcher, err := kubeCli.CoreV1().PersistentVolumeClaims(namespace).Watch(opts)
-	if err != nil {
+	if err := retryutil.Retry(ctx, time.Second, 10, retryFunc); err != nil {
+		if phase == v1.ClaimPending {
+			// claim is not yet bound to volume but there was no error when
+			// creating so allow any consumer of this claim to deal with
+			// further error handling as is the case for lazy binding.
+			return nil
+		}
 		return err
 	}
-	events := watcher.ResultChan()
 
-	// Loop until success
-	done := false
-	for !done {
-		select {
-		// Handle timeout and cancellation events
-		case <-ctx.Done():
-			return cberrors.ErrCreatingPersistentVolumeClaim{Reason: fmt.Sprintf("%v for %v", ctx.Err().Error(), claimName)}
-
-		// Process K8S events of creation cycle
-		case ev := <-events:
-			if ev.Object == nil {
-				continue
-			}
-			obj := ev.Object.(*v1.PersistentVolumeClaim)
-			status := obj.Status
-
-			conditions := []string{}
-			for _, c := range status.Conditions {
-				msg := fmt.Sprintf("%s: %s", c.Reason, c.Message)
-				conditions = append(conditions, msg)
-			}
-			reason := strings.Join(conditions, ",")
-
-			switch ev.Type {
-			// check if any error occurred while creating
-			case watch.Error:
-				return cberrors.ErrCreatingPersistentVolumeClaim{Reason: reason}
-			case watch.Deleted:
-				return cberrors.ErrCreatingPersistentVolumeClaim{Reason: reason}
-			case watch.Added, watch.Modified:
-				// make sure claim is bound to a volume
-				switch status.Phase {
-				case v1.ClaimPending:
-					continue
-				case v1.ClaimBound:
-					// Claim object is ready
-					return nil
-				case v1.ClaimLost:
-					return cberrors.ErrCreatingPersistentVolumeClaim{Reason: reason}
-				}
-			}
-		}
-	}
-
+	// claim created and phase is bound
 	return nil
+}
+
+func GetPersistentVolumeClaim(kubeCli kubernetes.Interface, ns, name string, opts *metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
+	if opts == nil {
+		opts = &metav1.GetOptions{}
+	}
+	return kubeCli.CoreV1().PersistentVolumeClaims(ns).Get(name, *opts)
 }
 
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
