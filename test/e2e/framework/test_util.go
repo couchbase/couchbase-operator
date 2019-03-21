@@ -44,12 +44,16 @@ func AnalyzeResults(t *testing.T) {
 	t.Logf("Suite Test Results: \n")
 
 	failures := []string{}
+	instabilities := []string{}
 	for i, result := range Results {
 		if result.Result {
 			t.Logf("%d: %s...PASS", i+1, result.Name)
 		} else {
 			t.Logf("%d: %s...FAIL", i+1, result.Name)
 			failures = append(failures, result.Name)
+		}
+		if result.Unstable {
+			instabilities = append(instabilities, result.Name)
 		}
 	}
 
@@ -61,6 +65,13 @@ func AnalyzeResults(t *testing.T) {
 	if fail > 0 {
 		t.Logf("Failures: ")
 		for i, test := range failures {
+			t.Logf("%d: %s", i+1, test)
+		}
+	}
+
+	if len(instabilities) > 0 {
+		t.Log("Unstable tests:")
+		for i, test := range instabilities {
 			t.Logf("%d: %s", i+1, test)
 		}
 	}

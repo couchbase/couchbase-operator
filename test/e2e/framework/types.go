@@ -123,8 +123,9 @@ type DecoratorMap map[string]TestDecorator
 
 // TestResult simply maps a test name to a pass/fail flag
 type TestResult struct {
-	Name   string
-	Result bool
+	Name     string
+	Result   bool
+	Unstable bool
 }
 
 // To decode test-suite yaml file

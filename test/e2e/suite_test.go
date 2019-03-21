@@ -86,7 +86,6 @@ func runSuite(t *testing.T) {
 	ymlFilePath := "./resources/ansible"
 
 	// Over riding pullImage to true since if new cluster is created, images should be pulled
-	operatorRestartCount := map[string]int32{}
 	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
 
 	for _, testGroup := range f.SuiteYmlData.TestCaseGroup {
@@ -199,48 +198,104 @@ func runSuite(t *testing.T) {
 
 			testFunc = DecoratorFuncMap["recoverDecorator"](testFunc, decoratorArgs)
 
-			if testFunc != nil {
-				preGoroutines := runtime.NumGoroutine()
-				testPassed := t.Run(testName, testFunc)
-
-				// Detect couchbase-operator crash / restart event
-				for _, cluster := range f.TestClusters {
-					currRestartCount, err := f.GetOperatorRestartCount(f.ClusterSpec[cluster].KubeClient, f.Namespace)
-					if err != nil {
-						t.Log(err)
-					}
-					if currRestartCount != operatorRestartCount[cluster] {
-						testPassed = false
-						t.Logf("Cluster %v restart count was %d and now is %d", cluster, operatorRestartCount[cluster], currRestartCount)
-						operatorRestartCount[cluster] = currRestartCount
-					}
-				}
-
-				// Give real time feedback ...
-				if testPassed {
-					fmt.Println("PASS")
-				} else {
-					fmt.Println("FAIL")
-				}
-
-				goroutineLeakCheck(preGoroutines)
-
-				// Collect logs if test fails
-				if !testPassed && f.CollectLogs {
-					logDir := f.LogDir + "/" + testName
-					collectClusterLogs(t, logDir)
-				}
-
-				// Clean up all known clusters if SkipTeardown is disabled
-				if !f.SkipTeardown {
-					for kubeName, targetKube := range f.ClusterSpec {
-						e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, kubeName, testName)
-					}
-				}
-				framework.Results = append(framework.Results, framework.TestResult{Name: testName, Result: testPassed})
+			if testFunc == nil {
+				continue
 			}
+
+			// Either the test or Couchbase Server may suffer from instability so
+			// we allow a retry.  This means that we get a better idea of overall
+			// pass rates without having to rerun the entire suite and collate the
+			// results.
+			//
+			// Unstable tests will be listed in the suite output so pay attention as
+			// these may be bugs that need to be raised or fixed. Secondly do not rely
+			// on retries as it makes the tests take longer and costs us more money!
+			unstable := false
+			pass := runTest(t, testName, testFunc)
+			if !pass {
+				pass = runTest(t, testName, testFunc)
+				if pass {
+					unstable = true
+				}
+			}
+
+			// Give real time feedback ...
+			if pass {
+				fmt.Println("PASS")
+			} else {
+				fmt.Println("FAIL")
+			}
+
+			result := framework.TestResult{
+				Name:     testName,
+				Result:   pass,
+				Unstable: unstable,
+			}
+			framework.Results = append(framework.Results, result)
 		}
 	}
+}
+
+// getOperatorRestartCounts returns the restart counts for the operator in each
+// cluster.
+func getOperatorRestartCounts() map[string]int {
+	f := framework.Global
+
+	result := map[string]int{}
+	for _, cluster := range f.TestClusters {
+		restarts, err := f.GetOperatorRestartCount(f.ClusterSpec[cluster].KubeClient, f.Namespace)
+		if err != nil {
+			fmt.Println("WARN: unable to get restart counts on cluster", cluster, ":", err)
+		}
+		result[cluster] = int(restarts)
+	}
+
+	return result
+}
+
+// operatorRestarted returns whether the operator restarted/crashed during this
+// test.
+func operatorRestarted(before map[string]int) bool {
+	after := getOperatorRestartCounts()
+
+	restarted := false
+	for cluster := range before {
+		if before[cluster] != after[cluster] {
+			fmt.Println("WARN: operator crash detected in cluster", cluster)
+			restarted = true
+		}
+	}
+
+	return restarted
+}
+
+// runTest runs a named test once, spotting bugs in the operator, the test itself and
+// performing cleanup and looging duties.
+func runTest(t *testing.T, name string, test func(*testing.T)) bool {
+	f := framework.Global
+
+	// Run the test, catch and report any goroutine leaks or operator crashes
+	restartCounts := getOperatorRestartCounts()
+	preGoroutines := runtime.NumGoroutine()
+	pass := t.Run(name, test)
+	goroutineLeakCheck(preGoroutines)
+	if operatorRestarted(restartCounts) {
+		pass = false
+	}
+
+	// Collect logs.
+	if f.CollectLogs && !pass {
+		collectClusterLogs(t, f.LogDir+"/"+name)
+	}
+
+	// Cleanup the namespace.
+	if !f.SkipTeardown {
+		for clusterName, cluster := range f.ClusterSpec {
+			e2eutil.CleanUpCluster(t, cluster, f.Namespace, f.LogDir, clusterName, name)
+		}
+	}
+
+	return pass
 }
 
 func TestOperator(t *testing.T) {
