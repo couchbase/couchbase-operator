@@ -242,26 +242,6 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.Cou
 	}
 }
 
-func ValidateClusterEvents(t *testing.T, k8s *types.Cluster, clusterName, namespace string, expectedEvents e2eutil.EventList) {
-	events, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, clusterName, namespace)
-	if err != nil {
-		t.Fatalf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Fatalf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
-}
-
-func ValidateClusterEventsWithoutError(t *testing.T, kubeClient kubernetes.Interface, clusterName, namespace string, expectedEvents e2eutil.EventList) {
-	events, err := e2eutil.GetCouchbaseEvents(kubeClient, clusterName, namespace)
-	if err != nil {
-		t.Logf("failed to get coucbase cluster events: %v", err)
-	}
-	if !expectedEvents.Compare(events) {
-		t.Logf(e2eutil.EventListCompareFailedString(expectedEvents, events))
-	}
-}
-
 // Remove specified label from all k8s nodes identified by kubeName
 func K8SNodesRemoveLabel(nodeLabelName string, kubeClient kubernetes.Interface) error {
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})

@@ -1605,7 +1605,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	// Kill operator if flag is enabled
 	if isOperatorKilledWithServerPod {
 		go func() {
-			operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace)
+			operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(targetKube, f.Namespace)
 		}()
 	}
 
@@ -2023,7 +2023,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	// Kills operator pod in async way
 	if isOperatorKilledWithServerPod {
 		go func() {
-			operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(t, targetKube.KubeClient, f.Namespace)
+			operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(targetKube, f.Namespace)
 		}()
 	}
 

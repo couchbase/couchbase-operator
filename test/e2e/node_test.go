@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -615,14 +614,16 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 
 func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 	t.Skip("test not fully implemented...")
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := 5
+
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -630,45 +631,38 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT; iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
 
 	autofailoverTimeout, _ := strconv.Atoi(e2eutil.BasicClusterConfig["autoFailoverTimeout"])
 	time.Sleep(time.Duration(autofailoverTimeout) * time.Second)
-
 	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 4, 5*time.Minute)
 	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 5, 5*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	e2eutil.MustVerifyClusterBalancedAndHealthy(t, targetKube, testCouchbase, time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Pod goes down
+	// * New member balanced in to replace it
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownFailoverRecoverySequence(),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	t.Skip("test not fully implemented...")
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 5
 	autofailoverTimeout := 30
 
 	clusterConfig := map[string]string{
@@ -677,7 +671,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		"searchServiceMemQuota": "256",
 		"indexStorageSetting":   "memory_optimized",
 		"autoFailoverTimeout":   strconv.Itoa(autofailoverTimeout)}
-	serviceConfig1 := e2eutil.GetServiceConfigMap(5, "test_config_1", []string{"data", "query", "index"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
@@ -685,54 +679,46 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		"bucket1":  bucketConfig1,
 	}
 
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	//block all incoming and outgoing traffic expect ssh on port 22
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
-
-	// wait half of autofailover timeout
 	time.Sleep(time.Duration(int64(autofailoverTimeout/2)) * time.Second)
-
-	//revert iptable changes, allow all incoming and outgoing traffic
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -F")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -X")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P INPUT DROP")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P OUTPUT DROP")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P FORWARD DROP")
-
 	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 4, 5*time.Minute)
 	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, 5, 5*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	e2eutil.MustVerifyClusterBalancedAndHealthy(t, targetKube, testCouchbase, time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Pod goes down
+	// * Pod recovers and the operator rebalances
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	// Create cluster spec for RZA feature
+	// Static configuration.
 	clusterSize := 3
+
+	// Create cluster spec for RZA feature
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
 	bucketConfig1 := e2eutil.BasicOneReplicaBucket
@@ -743,52 +729,39 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	}
 
 	// Deploy couchbase cluster
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// Set taint properties
-	podTaint := v1.Taint{
-		Key:    "noExecKey",
-		Value:  "noExecVal",
-		Effect: "NoExecute",
+	podTaint := []v1.Taint{
+		{
+			Key:    "noExecKey",
+			Value:  "noExecVal",
+			Effect: "NoExecute",
+		},
 	}
-	podTaintList := []v1.Taint{podTaint}
 
 	nodeIndex := 2
-	memberIdToGoDown := 1
-	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaintList, nodeIndex); err != nil {
+	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaint, nodeIndex); err != nil {
 		t.Fatalf("Failed to set node taint and schedulable property: %v", err)
 	}
 	defer func() {
 		_ = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
 	}()
-
-	expectedEvents.AddMemberDownEvent(testCouchbase, memberIdToGoDown)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, memberIdToGoDown)
-
 	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 1, time.Minute)
-
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
 		t.Fatalf("Failed to unset node taint and schedulable property: %v", err)
 	}
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, 3), 5*time.Minute)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, memberIdToGoDown), 5*time.Minute)
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, memberIdToGoDown)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Pod goes down
+	// * Pod ejected and the operator recovers
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownFailoverRecoverySequence(),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

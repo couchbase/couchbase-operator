@@ -808,18 +808,21 @@ func MustDeleteCouchbaseOperator(t *testing.T, k8s *types.Cluster, namespace str
 	}
 }
 
-func KillOperatorAndWaitForRecovery(t *testing.T, kubeClient kubernetes.Interface, namespace string) error {
-	t.Logf("Killing operator...")
-	if err := DeleteCouchbaseOperator(kubeClient, namespace); err != nil {
-		return errors.New("Failed to kill couchbase operator: " + err.Error())
+func KillOperatorAndWaitForRecovery(k8s *types.Cluster, namespace string) error {
+	if err := DeleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
+		return fmt.Errorf("failed to kill couchbase operator: %v", err)
 	}
 
-	t.Logf("Waiting for operator to recover...")
-	if err := WaitUntilOperatorReady(kubeClient, namespace, constants.CouchbaseOperatorLabel); err != nil {
-		return errors.New("Failed to recover couchbase operator: " + err.Error())
+	if err := WaitUntilOperatorReady(k8s.KubeClient, namespace, constants.CouchbaseOperatorLabel); err != nil {
+		return fmt.Errorf("failed to recover couchbase operator: %v", err)
 	}
-	t.Logf("Operator recovered...")
 	return nil
+}
+
+func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster, namespace string) {
+	if err := KillOperatorAndWaitForRecovery(k8s, namespace); err != nil {
+		Die(t, err)
+	}
 }
 
 func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, error) {

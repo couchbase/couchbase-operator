@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -18,11 +17,12 @@ import (
 )
 
 func TestBucketAddRemoveBasic(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	// Static configuration
+	clusterSize := 3
 
 	bucket1 := api.BucketConfig{
 		BucketName:         "default1",
@@ -64,20 +64,12 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	bucketSettingsList := []api.BucketConfig{bucket1, bucket2, bucket3, bucket4}
 
 	clusterConfig := e2eutil.BasicClusterConfig2
-	serviceConfig1 := e2eutil.GetServiceConfigMap(3, "test_config_1", []string{"data"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
 
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// create connection to couchbase nodes
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
@@ -97,7 +89,6 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 
 		t.Logf("Waiting For Bucket To Be Created \n")
 		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, buckets, 2*time.Minute)
-		expectedEvents.AddBucketCreateEvent(testCouchbase, bucketSetting.BucketName)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		currentBuckets, err := client.GetBuckets()
@@ -112,11 +103,6 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket3.BucketName, 2*time.Minute)
 	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket4.BucketName, 2*time.Minute)
 
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket1.BucketName)
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket2.BucketName)
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket3.BucketName)
-	expectedEvents.AddBucketDeleteEvent(testCouchbase, bucket4.BucketName)
-
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	currentBuckets, err := client.GetBuckets()
@@ -124,26 +110,27 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		t.Fatalf("failed to see no buckets from client")
 	}
 
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Buckets added seqentially
+	// * Buckets removed
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: len(bucketSettingsList), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Repeat{Times: len(bucketSettingsList), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted}},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestBucketAddRemoveExtended(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	t.Logf("Creating New Couchbase Cluster...\n")
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminExposed)
+	// Static configuration.
+	clusterSize := 3
 
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
 
 	// create connection to couchbase nodes
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
@@ -155,12 +142,8 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		newConfig := []api.BucketConfig{bucketSetting}
 
 		// add bucket
-		t.Logf("Desired Bucket Properties: %v\n", newConfig)
 		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings", newConfig), time.Minute)
-
-		t.Logf("Waiting For Bucket To Be Created \n")
 		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucketSetting.BucketName}, 2*time.Minute)
-		expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		currentBuckets, err := client.GetBuckets()
@@ -173,9 +156,6 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		// delete bucket
 		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
 		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucketSetting.BucketName, 2*time.Minute)
-
-		expectedEvents.AddBucketDeleteEvent(testCouchbase, "default")
-
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		currentBuckets, err = client.GetBuckets()
@@ -184,7 +164,22 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 		}
 	}
 
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Buckets added then removed
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{
+			Times: len(bucketSettingsList),
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+					eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+				},
+			},
+		},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // TestEditBucket tests modifying various bucket parameters and reverting them.

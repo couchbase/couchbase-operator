@@ -581,9 +581,7 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 // Then remove the respective node
 // New pod along with PVC will be created and rebalanced by the operator
 func TestPersistentVolumeRemoveVolume(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -591,8 +589,10 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
+	// Static configuration.
 	clusterSize := 5
 	podMemberToKill := 3
+
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -621,14 +621,6 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
-	expectedEvents := e2eutil.EventList{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
-
 	if err := e2eutil.RemovePersistentVolumesOfPod(targetKube.KubeClient, f.Namespace, testCouchbase.Name, podMemberToKill); err != nil {
 		t.Fatal(err)
 	}
@@ -646,26 +638,14 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberNameToKill, &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Unable to kill pod member %d: %v", podMemberToKill, err)
 	}
-	expectedEvents.AddMemberDownEvent(testCouchbase, podMemberToKill)
-	expectedEvents.AddMemberFailedOverEvent(testCouchbase, podMemberToKill)
-
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize), time.Minute)
-	expectedEvents.AddMemberAddEvent(testCouchbase, clusterSize)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
 
 	podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, clusterSize)
 	if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberName, &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to kill pod %s: %v", podMemberName, err)
 	}
-	expectedEvents.AddRebalanceIncompleteEvent(testCouchbase)
-	expectedEvents.AddFailedAddNodeEvent(testCouchbase, clusterSize)
-
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, podMemberToKill)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
@@ -680,7 +660,26 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 
 	// To cross check number of persistent vol claims matches the defined spec
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Pod killed
+	// * Replacement killed after addition
+	// * Operator recovers the cluster
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create PVC enabled couchbase cluster
@@ -965,9 +964,7 @@ func TestPersistentVolumeWithSingleNodeService(t *testing.T) {
 
 // Create couchbase with large pvc template storage value request
 func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -975,7 +972,9 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
+	// Static configuration.
 	clusterSize := 5
+
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -1005,14 +1004,6 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
-	expectedEvents := e2eutil.EventList{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
-
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
 		couchbaseutil.CreateMemberName(testCouchbase.Name, 0): 0,
@@ -1024,16 +1015,21 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 
 	// To cross check number of persistent vol claims matches the defined spec
 	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create 3 node couchbase cluster initially
 // Resize cluster to different size
 // Check for PVC status and cluster health condition
 func TestPersistentVolumeResizeCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -1041,7 +1037,9 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
+	// Static configuration.
 	clusterSize := 3
+
 	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -1064,44 +1062,12 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
-	expectedEvents := e2eutil.EventList{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, memberIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, bucketName)
-
 	expectedPvcMap := map[string]int{}
 	resizeClusterSizes := []int{2, 5, 1, 3}
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
 
 		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
-
-		switch clusterSize {
-		case 2:
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
-
-		case 5:
-			for memberId := 3; memberId <= clusterSize; memberId++ {
-				expectedEvents.AddMemberAddEvent(testCouchbase, memberId)
-			}
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-
-		case 1:
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-			for _, memberId := range []int{1, 3, 4, 5} {
-				expectedEvents.AddMemberRemoveEvent(testCouchbase, memberId)
-			}
-
-		case 3:
-			expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-			expectedEvents.AddMemberAddEvent(testCouchbase, 7)
-			expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-		}
-		expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 		// Populate the expectedPvcMap for maximum available nodes everytime
 		for memberId := 0; memberId < 9; memberId++ {
@@ -1121,5 +1087,16 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.ClusterScaleDownSequence(1),
+		e2eutil.ClusterScaleUpSequence(3),
+		e2eutil.ClusterScaleDownSequence(4),
+		e2eutil.ClusterScaleUpSequence(2),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

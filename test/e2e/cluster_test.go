@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -375,44 +374,23 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 // 5. Expect operator to add another node
 // 6. Verify cluster is balanced with 2 nodes
 func TestReplaceManuallyRemovedNode(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	// Static configuration.
 	removePodMemberId := 1
-	newPodMemberId := 2
+	clusterSize := 2
 
 	// create 2 node cluster with admin console
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size2, constants.WithBucket, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	for nodeIndex := 0; nodeIndex < constants.Size2; nodeIndex++ {
-		expectedEvents.AddMemberAddEvent(testCouchbase, nodeIndex)
-	}
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-	expectedEvents.AddBucketCreateEvent(testCouchbase, "default")
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
 
 	// pause operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
-
-	// remove node
 	e2eutil.MustEjectMember(t, targetKube, testCouchbase, removePodMemberId, 5*time.Minute)
-
-	// resume operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
-
-	// expect an add member event to occur
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newPodMemberId), time.Minute)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, removePodMemberId)
-	expectedEvents.AddMemberAddEvent(testCouchbase, newPodMemberId)
-
-	// cluster should also be balanced
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	// check that actual cluster size is only 2 nodes
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
@@ -425,7 +403,20 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	if numNodes != 2 {
 		t.Fatalf("expected 2 nodes, found: %d", numNodes)
 	}
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Member removed
+	// * Member replaced
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Tests basic MDS Scaling
@@ -437,22 +428,19 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 // 6. Remove index service from cluster (verify via rest call to cluster)
 // 7. Remove query service from cluster (verify via rest call to cluster)
 func TestBasicMDSScaling(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := 1
+
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1}
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// adding query service
 	t.Log("adding query service")
@@ -463,10 +451,6 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -485,10 +469,6 @@ func TestBasicMDSScaling(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -508,10 +488,6 @@ func TestBasicMDSScaling(t *testing.T) {
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	expectedEvents.AddMemberAddEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	serviceMap = map[string]int{
 		"Data":  1,
 		"N1QL":  1,
@@ -526,9 +502,6 @@ func TestBasicMDSScaling(t *testing.T) {
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 3)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -544,10 +517,6 @@ func TestBasicMDSScaling(t *testing.T) {
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	serviceMap = map[string]int{
 		"Data":  1,
 		"N1QL":  1,
@@ -562,10 +531,6 @@ func TestBasicMDSScaling(t *testing.T) {
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	serviceMap = map[string]int{
 		"Data":  1,
 		"N1QL":  0,
@@ -575,7 +540,17 @@ func TestBasicMDSScaling(t *testing.T) {
 	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * 3 members added
+	// * 3 members removec
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 3, Validator: e2eutil.ClusterScaleUpSequence(1)},
+		eventschema.Repeat{Times: 3, Validator: e2eutil.ClusterScaleDownSequence(1)},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Tests swapping nodes between services
@@ -587,24 +562,22 @@ func TestBasicMDSScaling(t *testing.T) {
 // 6. Swap node from index service to query service (verify via rest call to cluster)
 // 7. Swap node from query service to data service (verify via rest call to cluster)
 func TestSwapNodesBetweenServices(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 1
+
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
 
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 	}
 
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// adding query service
 	t.Log("adding query service")
@@ -615,10 +588,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -637,10 +606,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 2)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -661,13 +626,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 
 	for memeberId := 3; memeberId <= 4; memeberId++ {
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memeberId), 2*time.Minute)
-		expectedEvents.AddMemberAddEvent(testCouchbase, memeberId)
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -686,11 +647,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	testCouchbase = e2eutil.MustScaleServices(t, targetKube, testCouchbase, swapMap, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	expectedEvents.AddMemberAddEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 4)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	serviceMap = map[string]int{
 		"Data":  1,
 		"N1QL":  1,
@@ -707,11 +663,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustScaleServices(t, targetKube, testCouchbase, swapMap, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddMemberAddEvent(testCouchbase, 6)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 5)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -730,11 +681,6 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	testCouchbase = e2eutil.MustScaleServices(t, targetKube, testCouchbase, swapMap, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
-	expectedEvents.AddMemberAddEvent(testCouchbase, 7)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 6)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
-
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 6), 5*time.Minute)
 
 	serviceMap = map[string]int{
@@ -746,35 +692,52 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * 2 server classes added with one node, 1 server class with 2 nodes
+	// * Server class scaled up while another is scaled down 3 times
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 2, Validator: e2eutil.ClusterScaleUpSequence(1)},
+		e2eutil.ClusterScaleUpSequence(2),
+		eventschema.Repeat{
+			Times: 3,
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+				},
+			},
+		},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Tests creating a cluster where the data service is the second service listed in the spec
 // 1. Attempt to create a 2 node cluster with cluster spec order {[query,search,search], [data]}
 // 2. Verify cluster was created via rest call
 func TestCreateClusterDataServiceNotFirst(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	mdsGroup1Size := 1
+	mdsGroup2Size := 1
+	clusterSize := mdsGroup1Size + mdsGroup2Size
+
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"query", "index", "search"})
-	serviceConfig2 := e2eutil.GetServiceConfigMap(1, "test_config_2", []string{"data"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(mdsGroup1Size, "test_config_1", []string{"query", "index", "search"})
+	serviceConfig2 := e2eutil.GetServiceConfigMap(mdsGroup2Size, "test_config_2", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2}
 
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -783,44 +746,40 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 		"FTS":   1,
 	}
 	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
-
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestRemoveLastDataService(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	mdsGroup1Size := 1
+	mdsGroup2Size := 1
+	clusterSize := mdsGroup1Size + mdsGroup2Size
+
 	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
-	serviceConfig2 := e2eutil.GetServiceConfigMap(1, "test_config_2", []string{"data"})
+	serviceConfig1 := e2eutil.GetServiceConfigMap(mdsGroup1Size, "test_config_1", []string{"data", "query", "index"})
+	serviceConfig2 := e2eutil.GetServiceConfigMap(mdsGroup2Size, "test_config_2", []string{"data"})
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2}
 
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-
-	expectedEvents := e2eutil.EventList{}
-	expectedEvents.AddAdminConsoleSvcCreateEvent(testCouchbase)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 0)
-	expectedEvents.AddMemberAddEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// create connection to couchbase nodes
 	removeServiceName := "test_config_2"
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
-
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	expectedEvents.AddRebalanceStartedEvent(testCouchbase)
-	expectedEvents.AddMemberRemoveEvent(testCouchbase, 1)
-	expectedEvents.AddRebalanceCompletedEvent(testCouchbase)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -831,7 +790,15 @@ func TestRemoveLastDataService(t *testing.T) {
 	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	ValidateClusterEvents(t, targetKube, testCouchbase.Name, f.Namespace, expectedEvents)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Cluster scales down
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		e2eutil.ClusterScaleDownSequence(1),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // TestManageMultipleClusters tests that multiple clusters can be managed independently
