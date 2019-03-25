@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/gocbmgr"
@@ -797,6 +798,62 @@ func TestRemoveLastDataService(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		e2eutil.ClusterScaleDownSequence(1),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestRemoveServerClassWithNodeService tests removing a server class with external features
+// enabled.  Due to all the per-service filtering stuff that occurs we could get into trouble
+// when the server class disappears.
+func TestRemoveServerClassWithNodeService(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	mdsGroupSize1 := 1
+	mdsGroupSize2 := 1
+	clusterSize := mdsGroupSize1 + mdsGroupSize2
+
+	// Create the cluster with two server classes, and exposed features.
+	testCouchbase := e2espec.NewBasicClusterSpec(0, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.ServerSettings = []api.ServerConfig{
+		{
+			Name: "data",
+			Size: mdsGroupSize1,
+			Services: api.ServiceList{
+				api.DataService,
+				api.IndexService,
+			},
+		},
+		{
+			Name: "query",
+			Size: mdsGroupSize2,
+			Services: api.ServiceList{
+				api.QueryService,
+			},
+		},
+	}
+	testCouchbase.Spec.ExposedFeatures = api.ExposedFeatureList{
+		api.FeatureXDCR,
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// Remove a service and ensure things still work.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/ServerSettings/1"), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * XDCR service created (admin, data, index)
+	// * Server class successfully removed.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonNodeServiceCreated}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		e2eutil.ClusterScaleDownSequence(mdsGroupSize2),
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

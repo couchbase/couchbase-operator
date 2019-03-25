@@ -744,8 +744,16 @@ func createExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 		// Generate the requested resource
 		var service *v1.Service
 		service, err = generateExposedService(member.Name, members, cluster, ports)
+
+		// If the server class is missing then we allow for the node to balanced out.
 		if err != nil {
-			return
+			switch {
+			case cberrors.IsErrUnknownServerClass(err):
+				err = nil
+				continue
+			default:
+				return
+			}
 		}
 
 		// Ignore if the service already exists, this will get handled by the update code.

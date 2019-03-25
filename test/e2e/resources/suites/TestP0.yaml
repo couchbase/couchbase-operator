@@ -37,6 +37,7 @@ tcGroups:
       - name: TestPodResourcesBasic
       - name: TestPodResourcesCannotBePlaced
       - name: TestFirstNodePodResourcesCannotBePlaced
+      - name: TestRemoveServerClassWithNodeService
 
   - name: RecoveryTests
     clusters:

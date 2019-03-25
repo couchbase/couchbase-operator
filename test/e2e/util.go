@@ -82,6 +82,7 @@ var (
 		"TestNegValidationDelete":                             TestNegValidationDelete,
 		"TestTaintK8SNodeAndRemoveTaint":                      TestTaintK8SNodeAndRemoveTaint,
 		"TestDenyCommunityEdition":                            TestDenyCommunityEdition,
+		"TestRemoveServerClassWithNodeService":                TestRemoveServerClassWithNodeService,
 
 		// System testing cases
 		"TestFeaturesAll": TestFeaturesAll,
