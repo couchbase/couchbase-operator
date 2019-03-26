@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"io"
 	"io/ioutil"
@@ -26,6 +25,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -1827,90 +1827,51 @@ func TestLogCollectWithClusterResizeAndOperatorPodKilled(t *testing.T) {
 // Collect logs from ephemeral log PVs
 // using default log retention time and size values
 func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
+	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+	kubernetes := f.GetCluster(0)
 
-	clusterSize := 5
-	newPodMemberId := clusterSize
-	bucketName := "PVBucket"
-	pvcName := "couchbase-log-pv"
-	clusterConfig := e2eutil.BasicClusterConfig
-	clusterConfig["autoFailoverOnDiskIssues"] = "true"
-	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
-	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_1", []string{"data"})
-	serviceConfig1["defaultVolMnt"] = pvcName
+	// Static configuration.
+	mdsGroupSize := 2
+	clusterSize := mdsGroupSize * 2
+	victims := 6
 
-	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query", "eventing"})
-	serviceConfig2["logVolMnt"] = pvcName
+	// Create the cluster.
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
+	// Cross check number of persistent vol claims matches the defined spec.
+	expectedPvcMap := map[string]int{}
+	for i := 0; i < clusterSize; i++ {
+		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
+	}
+	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
+
+	// Kill stateless pods repeatedly waiting for recovery each time.
+	for victim := mdsGroupSize; victim < mdsGroupSize+victims; victim++ {
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
+		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
 	}
 
-	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-	createPodSecurityContext(1000, &clusterSpec)
-
-	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
-
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", memberIndex)
+	// Check that log volumes are persisted.
+	for i := clusterSize; i < clusterSize+victims; i++ {
+		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", bucketName)
+	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 
-	// To cross check number of persistent vol claims matches the defined spec
-	expectedPvcMap := map[string]int{
-		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 3): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 4): 1,
-	}
-
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-
-	for memberIdToKill := 2; memberIdToKill <= 7; memberIdToKill++ {
-		memberNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, memberIdToKill)
-		if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, memberNameToKill, metav1.NewDeleteOptions(0)); err != nil {
-			t.Fatal(err)
-		}
-		expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", memberIdToKill)
-
-		// Wait for failover event
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, memberIdToKill), time.Minute)
-		expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", memberIdToKill)
-
-		// Wait for new pod add event
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberAddEvent(cbCluster, newPodMemberId), 3*time.Minute)
-		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", newPodMemberId)
-
-		// Wait for rebalance complete event
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
-
-		// Add expected events for cluster for verification
-		expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIdToKill)
-		expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-
-		// Updating expectedPvcMap for new cluster pod
-		expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, newPodMemberId)] = 1
-		newPodMemberId++
-	}
-
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
+	// Do not check events here.  Down and failed over events are cached and aggregated by
+	// the client library.  This also features rate limiting, so any more than 25 events in
+	// a short period will result in subsequent events being dropped silently.
+	//
+	//   	// Check the events match what we expect:
+	//   	// * Cluster created
+	//   	// * Members go down and are failed over
+	//   	// * New members balanced in to replace the failed ones
+	//   	expectedEvents := []eventschema.Validatable{
+	//   		e2eutil.ClusterCreateSequence(clusterSize),
+	//   		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	//   		eventschema.Repeat{Times: victims, Validator: e2eutil.PodDownFailoverRecoverySequence()},
+	//   	}
+	//   	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Collect logs from ephemeral log PVs
@@ -1925,11 +1886,12 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 	victims := 6
 	maxLogCount := 2
-	maxLogRetention := "15m"
-	autoFailoverTimeout := uint64(30)
 
-	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
+	// Create the cluster
+	cluster := e2espec.NewSupportableCluster(mdsGroupSize)
+	cluster.Spec.LogRetentionTime = "15m"
+	cluster.Spec.LogRetentionCount = maxLogCount
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, f.Namespace, cluster)
 
 	// Track pods we create and their expected number of persistent volumes.
 	expectedPvcMap := map[string]int{}
@@ -1937,24 +1899,12 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
 
-	// When ready check that PVCs are correctly associated with the pod. Update the rentention settings.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
-	patches := jsonpatch.NewPatchSet()
-	patches.Replace("/Spec/ClusterSettings/AutoFailoverTimeout", autoFailoverTimeout)
-	patches.Replace("/Spec/LogRetentionTime", maxLogRetention)
-	patches.Replace("/Spec/LogRetentionCount", maxLogCount)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patches, time.Minute)
-
 	// For each victim, kill the pod in turn and wait for the janitor to catch up.
-	for victim := 0; victim < victims; victim++ {
-		// Start killing from the start of the stateless pods.
-		victimIndex := mdsGroupSize + victim
-
+	for victim := mdsGroupSize; victim < mdsGroupSize+victims; victim++ {
 		// Kill the member and wait for the rebalance to complete.  We *must* wait for at least a minute
 		// so the janitor marks PVCs detached in order.  If two PVCs are detached at the same time we
 		// make *NO* guarantees about which one to retain.
-		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
 		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
 		time.Sleep(time.Minute)
 
@@ -1963,25 +1913,25 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	}
 
 	// We only expect the last N stateless logs to be left behind.
-	for victim := 0; victim < victims-maxLogCount; victim++ {
-		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, mdsGroupSize+victim)] = 0
+	for victim := mdsGroupSize; victim < mdsGroupSize+victims-maxLogCount; victim++ {
+		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, victim)] = 0
 	}
-
-	// Verify the persistence of log PVCs that are preserved by operator.
 	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Members go down and are failed over
-	// * New members balanced in to replace the failed ones
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
-		eventschema.Repeat{Times: victims, Validator: e2eutil.PodDownFailoverRecoverySequence()},
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	// Do not check events here.  Down and failed over events are cached and aggregated by
+	// the client library.  This also features rate limiting, so any more than 25 events in
+	// a short period will result in subsequent events being dropped silently.
+	//
+	//	// Check the events match what we expect:
+	//	// * Cluster created
+	//	// * Members go down and are failed over
+	//	// * New members balanced in to replace the failed ones
+	//	expectedEvents := []eventschema.Validatable{
+	//		e2eutil.ClusterCreateSequence(clusterSize),
+	//		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	//		eventschema.Repeat{Times: victims, Validator: e2eutil.PodDownFailoverRecoverySequence()},
+	//	}
+	//	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 /**************************************
