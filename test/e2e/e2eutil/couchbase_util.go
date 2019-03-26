@@ -736,7 +736,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *ap
 		request.SetBasicAuth(hostUsername, hostPassword)
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		client := http.Client{Timeout: 5 * time.Minute}
+		client := http.Client{Timeout: time.Minute}
 		response, err := client.Do(request)
 		if err != nil {
 			return false, retryutil.RetryOkError(errors.New("Failed to " + err.Error()))
