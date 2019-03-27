@@ -32,6 +32,8 @@ type Framework struct {
 	// CouchbaseServerUpgradeVersion is the version of Couchbase server we are upgrading to
 	CouchbaseServerUpgradeVersion string
 	StorageClassName              string
+	// TestRetries allows you to retry a test N times before giving up.
+	TestRetries int `yaml:"testRetries"`
 }
 
 // To decode cluster yaml file
@@ -94,6 +96,9 @@ type TestRunParam struct {
 	// DockerPassword is the docker registry password to use, required when
 	// DockerServer is specified.
 	DockerPassword string `yaml:"docker-password"`
+
+	// TestRetries allows you to retry a test N times before giving up.
+	TestRetries *int `yaml:"testRetries"`
 }
 
 /************************************************

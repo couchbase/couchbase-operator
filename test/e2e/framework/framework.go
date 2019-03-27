@@ -148,6 +148,12 @@ func CreateDeploymentObject(operatorImage string, operatorPort int) (deployment 
 // Setup setups a test framework and points "Global" to it.
 func Setup(t *testing.T) (err error) {
 
+	// Always run the test at least once, unless overridden by the config.
+	testRetries := 1
+	if runtimeParams.TestRetries != nil {
+		testRetries = *runtimeParams.TestRetries
+	}
+
 	// Initialize Global from runtime info
 	Global = &Framework{
 		Namespace:                     runtimeParams.Namespace,
@@ -162,6 +168,7 @@ func Setup(t *testing.T) (err error) {
 		CouchbaseServerVersion:        runtimeParams.CbServerImgVer,
 		CouchbaseServerUpgradeVersion: runtimeParams.CbServerImgVerUpgrade,
 		StorageClassName:              runtimeParams.StorageClassName,
+		TestRetries:                   testRetries,
 	}
 
 	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0)

@@ -211,11 +211,13 @@ func runSuite(t *testing.T) {
 			// these may be bugs that need to be raised or fixed. Secondly do not rely
 			// on retries as it makes the tests take longer and costs us more money!
 			unstable := false
-			pass := runTest(t, testName, testFunc)
-			if !pass {
-				pass = runTest(t, testName, testFunc)
-				if pass {
-					unstable = true
+			pass := false
+			for attempt := 0; attempt < f.TestRetries; attempt++ {
+				if pass = runTest(t, testName, testFunc); pass {
+					if attempt != 0 {
+						unstable = true
+					}
+					break
 				}
 			}
 
