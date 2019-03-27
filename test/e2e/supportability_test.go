@@ -683,24 +683,63 @@ func TestLogCollectValidateArguments(t *testing.T) {
 }
 
 // Negative test scenarios with command argument
-// TODO: Development cannot run/fix this
 func TestNegLogCollectValidateArgs(t *testing.T) {
-	invalidKubeConfPath := e2eutil.GetKubeConfigToUse(framework.Global.KubeType, "k8s_reclustered")
-	unreachableKubeConfPath := e2eutil.GetKubeConfigToUse(framework.Global.KubeType, "k8s_unreachable")
+	// Invent a kubernetes configuration, using an address from TEST-NET-1 will
+	// ensure it's always going to be unreachable.
+	config := &clientcmdapiv1.Config{
+		Clusters: []clientcmdapiv1.NamedCluster{
+			{
+				Name: "default",
+				Cluster: clientcmdapiv1.Cluster{
+					Server: "http://192.0.2.1",
+				},
+			},
+		},
+		AuthInfos: []clientcmdapiv1.NamedAuthInfo{
+			{
+				Name: "default",
+				AuthInfo: clientcmdapiv1.AuthInfo{
+					Token: "mickey mouse",
+				},
+			},
+		},
+		Contexts: []clientcmdapiv1.NamedContext{
+			{
+				Name: "default",
+				Context: clientcmdapiv1.Context{
+					Cluster:   "default",
+					AuthInfo:  "default",
+					Namespace: "default",
+				},
+			},
+		},
+		CurrentContext: "default",
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	kubeconfig, err := ioutil.TempFile("/tmp", "*")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	defer kubeconfig.Close()
+	defer os.Remove(kubeconfig.Name())
+	if _, err := kubeconfig.Write(data); err != nil {
+		e2eutil.Die(t, err)
+	}
+	if err := kubeconfig.Sync(); err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	errMsgList := failureList{}
 
 	validArgumentList := []cbopinfoArg{
 		{
-			Name:        "Validating invalid '-kubeconfig' file",
-			Arg:         "-kubeconfig",
-			ArgValue:    invalidKubeConfPath,
-			WillFail:    true,
-			ExpectedErr: "unable to discover cluster resources",
-		},
-		{
 			Name:        "Unreachable '-kubeconfig' file",
 			Arg:         "-kubeconfig",
-			ArgValue:    unreachableKubeConfPath,
+			ArgValue:    kubeconfig.Name(),
 			WillFail:    true,
 			ExpectedErr: "unable to discover cluster resources",
 		},
@@ -1118,6 +1157,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 	defer kubeconfig.Close()
+	defer os.Remove(kubeconfig.Name())
 	if _, err := kubeconfig.Write(data); err != nil {
 		e2eutil.Die(t, err)
 	}
