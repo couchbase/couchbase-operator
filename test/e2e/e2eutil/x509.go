@@ -728,7 +728,9 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 	}
 }
 
-func TlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TlsContext) error {
+// tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
+// using TlsCheckForCluster which is safer.
+func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TlsContext) error {
 	// Start the port forwarder
 	pf := portforward.PortForwarder{
 		Config:    k8s.Config,

@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -419,12 +418,6 @@ func TestXdcrCreateCluster(t *testing.T) {
 	CreateXdcrCluster(t, k8s1, k8s2)
 }
 
-// TLSClusterMap maps the Kubernetes cluster to its TLS configuration.
-type TLSClusterMap struct {
-	cluster *types.Cluster
-	context *e2eutil.TlsContext
-}
-
 // Create cb clusters on top of TLS certificates
 func TestXdcrCreateTlsCluster(t *testing.T) {
 	// Platform configuration.
@@ -439,53 +432,28 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	cbUsername := "Administrator"
 	cbPassword := "password"
 
-	// Create secrets in all k8s clusters
-	tlsMap := []TLSClusterMap{}
-	for index := 0; index < 2; index++ {
-		cluster := f.GetCluster(index)
-		ctx, teardown, err := e2eutil.InitClusterTLS(cluster.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer teardown()
-		tlsMap = append(tlsMap, TLSClusterMap{cluster: cluster, context: ctx})
-	}
+	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TlsOpts{})
+	defer teardown1()
+	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TlsOpts{})
+	defer teardown2()
 
 	// Create the clusters.
-	xdcrCluster1 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed, tlsMap[0].context)
-	xdcrCluster2 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed, tlsMap[1].context)
+	xdcrCluster1 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, tls1)
+	xdcrCluster2 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, tls2)
 
-	expectedCluster1Events := e2eutil.EventValidator{}
-	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "AdminConsoleServiceCreate")
-	expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", 0)
-	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", api.AdminService, api.DataService, api.IndexService)
-	expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")
-
-	expectedCluster2Events := e2eutil.EventValidator{}
-	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "AdminConsoleServiceCreate")
-	expectedCluster2Events.AddClusterPodEvent(xdcrCluster2, "AddNewMember", 0)
-	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", api.AdminService, api.DataService, api.IndexService)
-	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
-
+	// Create the XDCR connection.  Ensure TLS is enabled.
 	e2eutil.MustCreateDestClusterReference(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, cbUsername, cbPassword)
 	e2eutil.MustCreateXdcrBucketReplication(t, k8s1, xdcrCluster1, xdcrCluster2, cbUsername, cbPassword, srcBucketName, destBucketName)
+	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls1)
+	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls2)
 
-	// TLS handshake with pods
-	for index, tlsMapping := range tlsMap {
-		t.Logf("Verifying TLS for cluster %d", index)
-		pods, err := tlsMapping.cluster.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-		if err != nil {
-			t.Fatal("Unable to get couchbase pods:", err)
-		}
-
-		for _, pod := range pods.Items {
-			if err := e2eutil.TlsCheckForPod(t, tlsMapping.cluster, f.Namespace, pod.GetName(), tlsMapping.context); err != nil {
-				t.Fatal("TLS verification failed:", err)
-			}
-		}
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonNodeServiceCreated}},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedCluster1Events)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedCluster2Events)
+	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents)
+	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents)
 }
 
 // Create two clusters one on k8s using operator

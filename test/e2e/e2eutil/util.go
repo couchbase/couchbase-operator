@@ -1023,7 +1023,7 @@ func TlsCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx 
 
 	// TLS handshake with pods
 	for _, pod := range pods.Items {
-		if err := TlsCheckForPod(t, k8s, namespace, pod.GetName(), ctx); err != nil {
+		if err := tlsCheckForPod(t, k8s, namespace, pod.GetName(), ctx); err != nil {
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}
 	}
