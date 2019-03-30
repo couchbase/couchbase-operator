@@ -1940,11 +1940,14 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	}
 
 	// For each victim, kill the pod in turn and wait for the janitor to catch up.
-	for victim := mdsGroupSize; victim < mdsGroupSize+victims; victim++ {
+	for victim := 0; victim < victims; victim++ {
+		// Start killing from the start of the stateless pods.
+		victimIndex := mdsGroupSize + victim
+
 		// Kill the member and wait for the rebalance to complete.  We *must* wait for at least a minute
 		// so the janitor marks PVCs detached in order.  If two PVCs are detached at the same time we
 		// make *NO* guarantees about which one to retain.
-		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
 		time.Sleep(time.Minute)
 
@@ -1953,8 +1956,8 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	}
 
 	// We only expect the last N stateless logs to be left behind.
-	for victim := mdsGroupSize; victim < mdsGroupSize+victims-maxLogCount; victim++ {
-		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, victim)] = 0
+	for victim := 0; victim < victims-maxLogCount; victim++ {
+		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, mdsGroupSize+victim)] = 0
 	}
 	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 
