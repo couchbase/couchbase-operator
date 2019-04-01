@@ -23,7 +23,6 @@ const (
 	couchbaseContainerName          = "couchbase-server"
 	couchbaseTlsVolumeName          = "couchbase-server-tls"
 	couchbaseTlsVolumeMountDir      = "/opt/couchbase/var/lib/couchbase/inbox"
-	couchbaseVolumeName             = "couchbase-data"
 	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
 	CouchbaseVolumeMountLogsDir     = "/opt/couchbase/var/lib/couchbase/logs"
 	couchbaseVolumeDefaultEtcDir    = "/opt/couchbase/etc"
@@ -357,16 +356,6 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 
 	applyPodPolicy(pod, ns.Pod)
 
-	if ns.GetDefaultVolumeClaim() == "" {
-		// supply emptydir as volume mount when
-		// persistent volumes aren't requsted
-		pod.Spec.Volumes = []v1.Volume{
-			{Name: couchbaseVolumeName,
-				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
-		}
-		container.VolumeMounts = couchbaseVolumeMounts()
-	}
-
 	if err := applyPodTlsConfiguration(cs, pod); err != nil {
 		return nil, err
 	}
@@ -394,12 +383,6 @@ func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerCon
 }
 func imageName(baseImage, version string) string {
 	return fmt.Sprintf("%s:%s", baseImage, version)
-}
-
-func couchbaseVolumeMounts() []v1.VolumeMount {
-	return []v1.VolumeMount{
-		{Name: couchbaseVolumeName, MountPath: couchbaseVolumeDefaultConfigDir},
-	}
 }
 
 func CouchbaseContainer(baseImage, version string) v1.Container {
