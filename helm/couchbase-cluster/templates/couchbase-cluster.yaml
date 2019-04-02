@@ -33,7 +33,7 @@ spec:
   - name: {{ $server }}
 {{ toYaml $config | indent 4 }}
   {{- end }}
-{{- if .Values.couchbaseTLS.create }}
+{{- if (or .Values.couchbaseTLS.create (and .Values.couchbaseTLS.clusterSecret.name .Values.couchbaseTLS.operatorSecret.name)) }}
   tls:
     static:
       member:

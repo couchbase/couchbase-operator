@@ -62,7 +62,7 @@ Name of tls operator secret
 */}}
 {{- define  "couchbase-cluster.secret.tls-operator" -}}
 {{- $fullname := printf "%s-operator-tls" (include "couchbase-cluster.fullname" .) -}}
-{{- default $fullname .Values.couchbaseTLS.ServerSecret | trunc 63 | trimSuffix "-" -}}
+{{- default $fullname .Values.couchbaseTLS.operatorSecret.name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
@@ -70,7 +70,7 @@ Name of tls server secret
 */}}
 {{- define  "couchbase-cluster.secret.tls-server" -}}
 {{- $fullname := printf "%s-server-tls" (include "couchbase-cluster.fullname" .) -}}
-{{- default $fullname .Values.couchbaseTLS.ServerSecret | trunc 63 | trimSuffix "-" -}}
+{{- default $fullname .Values.couchbaseTLS.clusterSecret.name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
@@ -78,11 +78,11 @@ Generate certificates for couchbase-cluster
 */}}
 {{- define "couchbase-cluster.gen-certs" -}}
 {{- $expiration := (.Values.couchbaseTLS.expiration | int) -}}
-{{- if (or (empty .Values.couchbaseTLS.cert) (empty .Values.couchbaseTLS.key)) -}}
+{{- if (or (empty .Values.couchbaseTLS.operatorSecret.cert) (empty .Values.couchbaseTLS.operatorSecret.key)) -}}
 {{- $ca :=  genCA "couchbase-cluster-ca" $expiration -}}
 {{- template "couchbase-cluster.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
 {{- else -}}
-{{- $ca :=  buildCustomCert (.Values.couchbaseTLS.cert | b64enc) (.Values.couchbaseTLS.key | b64enc) -}}
+{{- $ca :=  buildCustomCert (.Values.couchbaseTLS.operatorSecret.cert | b64enc) (.Values.couchbaseTLS.operatorSecret.key | b64enc) -}}
 {{- template "couchbase-cluster.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
 {{- end -}}
 {{- end -}}
@@ -107,8 +107,8 @@ Generate client key and cert from CA and altNames
 {{- define "couchbase-cluster.internal.gen-client-tls" -}}
 {{- $expiration := (.RootScope.Values.couchbaseTLS.expiration | int) -}}
 {{- $cert := genSignedCert ( include "couchbase-cluster.fullname" .RootScope) nil .AltNames $expiration .CA -}}
-{{- $clientCert := default $cert.Cert .RootScope.Values.couchbaseTLS.operatorSecret.cert | b64enc -}}
-{{- $clientKey := default $cert.Key .RootScope.Values.couchbaseTLS.operatorSecret.key | b64enc -}}
+{{- $clientCert := default $cert.Cert .RootScope.Values.couchbaseTLS.clusterSecret.cert | b64enc -}}
+{{- $clientKey := default $cert.Key .RootScope.Values.couchbaseTLS.clusterSecret.key | b64enc -}}
 caCert: {{ .CA.Cert | b64enc }}
 clientCert: {{ $clientCert }}
 clientKey: {{ $clientKey }}

@@ -118,24 +118,31 @@ couchbaseCluster:
   # that can be requested and claimed by a pod.
   volumeClaimTemplates: []
 
-# couchbaseTLS can be used to override the Certs that will be used
-# to sign the keys used by the nodes.
+# couchbaseTLS can be used to generate a Certificate Authority
+# along with cert and keys of cluster cluster nodes
 couchbaseTLS:
   # disable if manually creating certs
-  # provide cert and key via --set-file
+  # provide either name of secrets or
+  # certs and keys via --set-file
   create: false
-  # A base64 encoded PEM format certificate for the CA
-  cert:
-  # A base64 encoded PEM format private key for the CA
-  key:
   # Expiry time of CA in days for generated certs
   expiration: 365
-  # OperatorSecret is the secret containing TLS certs used by operator
+  # operatorSecret contains the top-level CA which is used
+  # to authenticate all TLS server certificate chains
   operatorSecret:
-    name: ""
-    # PEM format certificate for operator (auto-generated)
+    # name of the operator secret
+    name:
+    # A base64 encoded PEM format certificate for the CA
+    cert:
+    # A base64 encoded PEM format private key for the CA
+    key:
+  # clusterSecret contain cert and private keys used by each couchbase node
+  clusterSecret:
+    # name of the cluster secret
+    name:
+    # PEM format certificate for cluster node (auto-generated)
     # override via --set-file
     cert:
-    # PEM format private key for operator (auto-generated)
+    # PEM format private key for cluster node (auto-generated)
     # override via --set-file
     key:

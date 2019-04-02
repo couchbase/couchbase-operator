@@ -26,8 +26,6 @@ couchbase-cluster:
     volumeClaimTemplates:
       - metadata:
           name: couchbase
-          annotations:
-            storageclass.couchbase.com/binding-mode: WaitForFirstConsumer
         spec:
           storageClassName: "default"
           resources:
