@@ -8,6 +8,8 @@ spec:
   authSecret: cb-example-auth
   exposeAdminConsole: true
   paused: false
+  adminConsoleServices:
+    - data
   exposedFeatures:
     - xdcr
     - admin
