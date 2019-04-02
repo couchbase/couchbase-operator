@@ -191,8 +191,8 @@ echo "Deleting files '$cbServerTarFileName' & '$testrunnerTarFileName'"
 rm -f $cbServerTarFileName $testrunnerTarFileName
 
 # Set proper couchbase server image in cb cluster yaml
-serverVer=$(echo $cbServerDockerImageName | cut -d':' -f 2)
-sed -i "s/version:.*\$/version: $serverVer/g" $cbClusterFile
+#serverVer=$(echo $cbServerDockerImageName | cut -d':' -f 2)
+#sed -i "s/version:.*\$/version: $serverVer/g" $cbClusterFile
 
 echo "Setting cb cluster to pause=false"
 sed -i "s/paused: .*\$/paused: false/g" $cbClusterFile
