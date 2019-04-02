@@ -78,11 +78,11 @@ Generate certificates for couchbase-cluster
 */}}
 {{- define "couchbase-cluster.gen-certs" -}}
 {{- $expiration := (.Values.couchbaseTLS.expiration | int) -}}
-{{- if (or (empty .Values.couchbaseTLS.operatorSecret.cert) (empty .Values.couchbaseTLS.operatorSecret.key)) -}}
+{{- if (or (empty .Values.couchbaseTLS.operatorSecret.cacert) (empty .Values.couchbaseTLS.operatorSecret.cakey)) -}}
 {{- $ca :=  genCA "couchbase-cluster-ca" $expiration -}}
 {{- template "couchbase-cluster.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
 {{- else -}}
-{{- $ca :=  buildCustomCert (.Values.couchbaseTLS.operatorSecret.cert | b64enc) (.Values.couchbaseTLS.operatorSecret.key | b64enc) -}}
+{{- $ca :=  buildCustomCert (.Values.couchbaseTLS.operatorSecret.cacert | b64enc) (.Values.couchbaseTLS.operatorSecret.cakey | b64enc) -}}
 {{- template "couchbase-cluster.gen-client-tls" (dict "RootScope" . "CA" $ca) -}}
 {{- end -}}
 {{- end -}}

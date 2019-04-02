@@ -29,7 +29,36 @@ Follow Helm's https://docs.helm.sh/using_helm/#installing-tiller[official steps^
 For development use-cases, the Tiller service can be given access to deploy charts into any namespace of your Kubernetes cluster.
 This also means that resources created by the chart, such as the custom resource definition (CRD), are allowed when Tiller is given this level of privilege.
 
-To create RBAC rules for Tiller with cluster-wide access, refer to the Helm documentation about https://docs.helm.sh/using_helm/#example-service-account-with-cluster-admin-role[deploying Tiller with the cluster-admin role^].
+To create RBAC rules for Tiller with cluster-wide access create the following ServiceAccount and save to `rbac-tiller.yaml`
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tiller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tiller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: tiller
+    namespace: kube-system
+----
+
+Now install the ServiceAccount and initialize Helm
+[source,console]
+----
+kubectl create -f rbac-tiller.yaml
+helm init --service-account tiller
+----
 
 ==== Installing Tiller for Production
 
@@ -109,13 +138,13 @@ oc create secret docker-registry rh-catalog \
 couchbaseOperator:
   image:
     repository: registry.connect.redhat.com/couchbase/operator
-    tag: 1.2.0-DP-3
+    tag: 1.2.0
   imagePullSecrets:
   - rh-catalog
 admissionController:
   image:
     repository: registry.connect.redhat.com/couchbase/admission-controller
-    tag: 1.2.0-DP-3
+    tag: 1.2.0
   imagePullSecrets:
   - rh-catalog
 ----

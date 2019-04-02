@@ -56,6 +56,7 @@ couchbaseCluster:
     logRetentionCount: 20
   buckets:
     default:
+      name: default
       type: couchbase
       memoryQuota: 128
       replicas: 1
@@ -76,7 +77,6 @@ couchbaseCluster:
         - analytics
       serverGroups: []
       pod: {}
-  tls: {}
   securityContext: {}
   volumeClaimTemplates: []
 ----
@@ -163,13 +163,14 @@ Also since couchbase certs are represented as plain kubernetes secrets, the secr
 couchbaseTLS:
   create: false
   expiration: 365
-  clusterSecret:
-    name: ""
-    caCert: ""
   operatorSecret:
-    name: ""
-    tlsCert: ""
-    tlsKey: ""
+    name:
+    cacert:
+    cakey:
+  clusterSecret:
+    name:
+    cert:
+    key:
 ----
 
 === create
@@ -177,7 +178,8 @@ couchbaseTLS:
 This value determines whether the chart should create the cluster with TLS.
 
 _Value rules:_ The `couchbaseTLS.create` is a boolean which defaults to `false`.
-When set to `true` all of the certs and keys required for tls will be auto-generated.
+When set to `true` all of the certs and keys required for tls will be auto-generated unless manually specified.
+When value is `false` certs are not generated, but manual Secrets can be provided by overriding both `operatorSecret.name` and `clusterSecret.name`.
 
 === expiration
 
@@ -185,42 +187,50 @@ Expiration of CA in days
 
 _Value rules:_ The `couchbaseTLS.expiration` defaults to 365 days.
 
-=== clusterSecret.name
+=== operatorSecret.name
 
-Name of secret with certs for cluster nodes.
+Name of secret with top-level CA of cluster nodes.
 
-_Value rules:_ The `couchbaseTLS.clusterSecret.name` value is auto-generated along with its data when `couchbaseTLS.create` is `true`.
+_Value rules:_ The `couchbaseTLS.operatorSecret.name` value is auto-generated along with its data when `couchbaseTLS.create` is `true`.
 When overriding, this value must refer to a native kubernetes Secret which contains a Base64 encoded `caCert`.
 
 
-=== clusterSecret.caCert
+=== operatorSecret.cert
 
-PEM format certificate for couchbase member Pods
+PEM format CA certificate
 
-_Value rules:_ The `couchbaseTLS.clusterSecret.caCert` value defaults to an auto-generated CA cert used by the cluster nodes.
-When overriding, both `tlsCert` and `tlsKey` generated from this cert must also be provided.
+_Value rules:_ The `couchbaseTLS.operatorSecret.cert` value defaults to an auto-generated CA cert used as the top-level CA.
+When overriding, `couchbaseTLS.operatorSecret.key` must also be provided.
 
-=== operatorSecret.name
+=== operatorSecret.key
 
-Name of secret with certs and private key for operator to use when communicating with nodes.
+PEM format CA private key
+
+_Value rules:_ The `couchbaseTLS.operatorSecret.key` value defaults to an auto-generated CA private key of the CA.
+When overriding, `couchbaseTLS.operatorSecret.cert` must also be provided.
+
+
+=== clusterSecret.name
+
+Name of secret with certs and private key for use by couchbase members.
 
 _Value rules:_ The `couchbaseTLS.operatorSecret.name` value is auto-generated along with its data when `couchbaseTLS.create` is `true`.
-When overriding, this value must refer to a native kubernetes Secret which contains a Base64 encoded `tlsCert` and `tlsKey`.
+When overriding, this value must refer to a native kubernetes Secret which contains a Base64 encoded `cert` and `key`.
 
 
-=== operatorSecret.tlsCert
+=== clusterSecret.cert
 
-PEM format certificate for operator
+PEM format certificate for cluster nodes
 
-_Value rules:_ The `couchbaseTLS.operatorSecret.tlsCert` value defaults to an auto-generated client cert.
-When overriding, you must also provide the `couchbaseTLS.clusterSecret.tlsCert` that generates this client key.
+_Value rules:_ The `couchbaseTLS.clusterSecret.cert` value defaults to an auto-generated client cert.
+When overriding, you must also provide the `couchbaseTLS.operatorSecret.cert` and `couchbaseTLS.operatorSecret.key` used to generates this client cert.
 
-=== operatorSecret.tlsKey
+=== clusterSecret.key
 
 PEM format private key for operator
 
-_Value rules:_ The `couchbaseTLS.operatorSecret.tlsKey` value defaults to an auto-generated private key.
-When overriding, you must also provide the `couchbaseTLS.clusterSecret.caCert` that generates this private key.
+_Value rules:_ The `couchbaseTLS.clusterSecret.key` value defaults to an auto-generated private key.
+When overriding, you must also provide the `couchbaseTLS.operatorSecret.cert` and `couchbaseTLS.operatorSecret.key` used to generate this private key.
 
 
 === Custom TLS
@@ -246,7 +256,8 @@ Create a value file named `values-tls.yaml` referencing manually created certs:
 ----
 couchbaseTLS:
   clusterSecret:
-    caCert: /home/ubuntu/easy-rsa/easyrsa3/pki/ca.crt
+    cert: /home/ubuntu/easy-rsa/easyrsa3/pki/ca.crt
+    key: /home/ubuntu/easy-rsa/easyrsa3/pki/ca.key
   operatorSecret:
     tlsCert: /home/ubuntu/easy-rsa/easyrsa3/pki/issued/couchbase-operator.crt
     tlsKey: /home/ubuntu/easy-rsa/easyrsa3/pki/private/couchbase-operator.key

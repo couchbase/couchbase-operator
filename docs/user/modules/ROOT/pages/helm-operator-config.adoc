@@ -57,6 +57,7 @@ admissionService:
   create: true
   name:
   port: 443
+  targetPort: 8443
 
 admissionCA:
   create: true
@@ -444,6 +445,7 @@ admissionService:
   create: true
   name:
   port: 443
+  targetPort: 8443
 ----
 
 The admission service is used by the webhooks to access the admission operator.
@@ -465,6 +467,17 @@ When set to `false`, you must specify the name of a pre-existing service in `<<a
 === name
 
 Name of the admission service.
+
+[#admissionService-port]
+=== port
+
+Port exposed by the admission service to the validation webhooks.
+
+[#admissionService-targetPort]
+=== targetPort
+
+Port of the admission controller targeted by the admission Service.
+
 
 [cols="1",options="header"]
 |===
