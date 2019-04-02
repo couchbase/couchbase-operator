@@ -128,6 +128,9 @@ case "$runType" in
         exit 1
 esac
 
+admissionFile="./testrunner/admission.yaml"
+operatorFile="./testrunner/operator.yaml"
+clusterRoleFile="./testrunner/cluster-role.yaml"
 deploymentFile="../../../example/deployment.yaml"
 secretFile="../../../example/secret.yaml"
 roleBindingFile="./testrunner/default-cluster-role-binding.yaml"
@@ -195,17 +198,36 @@ echo "Setting cb cluster to pause=false"
 sed -i "s/paused: .*\$/paused: false/g" $cbClusterFile
 exitOnError $? "Unable to replace string in cbcluster yaml"
 
+echo "Deploying admission controller"
+kubectl --namespace=$namespace delete -f $admissionFile &>/dev/null
+kubectl --namespace=$namespace create -f $admissionFile
+exitOnError $? "Unable to deploy admission controller"
+
+echo "Creating required roles"
+kubectl --namespace=$namespace delete -f $clusterRoleFile &>/dev/null
+kubectl --namespace=$namespace create -f $clusterRoleFile
+kubectl --namespace=$namespace delete serviceaccount couchbase-operator
+kubectl --namespace=$namespace create serviceaccount couchbase-operator
+kubectl delete clusterrolebinding couchbase-operator
+kubectl create clusterrolebinding couchbase-operator --clusterrole couchbase-operator --serviceaccount default:couchbase-operator 
+exitOnError $? "Unable to create roles"
+
+echo "Deploying operator"
+kubectl --namespace=$namespace delete -f $operatorFile &>/dev/null
+kubectl --namespace=$namespace create -f $operatorFile
+exitOnError $? "Unable to deploy operator"
+
 echo "Creating secret"
 showFileContent $secretFile
 kubectl --namespace=$namespace delete -f $secretFile &>/dev/null
 kubectl --namespace=$namespace create -f $secretFile
 exitOnError $? "Unable to create secret"
 
-echo "Making default SA cluster admin"
-showFileContent $roleBindingFile
-kubectl --namespace=$namespace delete -f $roleBindingFile &>/dev/null
-kubectl --namespace=$namespace create -f $roleBindingFile
-exitOnError $? "Unable to create role binding"
+#echo "Making default SA cluster admin"
+#showFileContent $roleBindingFile
+#kubectl --namespace=$namespace delete -f $roleBindingFile &>/dev/null
+#kubectl --namespace=$namespace create -f $roleBindingFile
+#exitOnError $? "Unable to create role binding"
 
 echo "Creating Couchbase Cluster"
 showFileContent $cbClusterFile
