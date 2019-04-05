@@ -277,20 +277,20 @@
     - name: Installing kubelet package
       yum:
         state: present
-        name: kubelet-{{ kubeVersion }}.x86_64
+        name: kubelet-{{ kubeVersion }}
 
     - name: Installing required packages
       yum: state=present name={{ item }}
       with_items:
         - docker
-        - kubectl-{{ kubeVersion }}.x86_64
-        - kubeadm-{{ kubeVersion }}.x86_64
+        - kubectl-{{ kubeVersion }}
+        - kubeadm-{{ kubeVersion }}
 
     - name: Reloading systemctl deamon
       shell: systemctl daemon-reload
 
     - name: Enabling docker service
-      shell: systemctl enable docker 
+      shell: systemctl enable docker
 
     - name: Starting docker
       shell: systemctl restart docker
