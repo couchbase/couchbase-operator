@@ -5,7 +5,11 @@ This chart is especially helpful for rolling out development clusters and genera
 Howerver, configurations requiring server groups and persistent volumes are better expressed and managed directly using a cluster spec.
 Refer to the couchbase operator documentation regarding https://docs.couchbase.com/operator/1.1/deploying-couchbase.html[deploying couchbase] directly from kubectl.
 
-NOTE: The cluster chart requires the CustomResourceDefinition(CRD) to be installed so that kubernetes knows about our custom CouchbaseCluster type.  By default the operator will install the CRD for you, but if you’ve disabled this then refer the the user guide for https://docs.couchbase.com/operator/1.1/install-openshift.html#install-the-custom-resource-definition[Installing the Custom Resource].
+[NOTE]
+====
+The cluster chart requires the custom resource definition (CRD) to be installed so that Kubernetes knows about the CouchbaseCluster type.
+By default the Operator will install the CRD for you. But if you’ve disabled this function, then you'll either need to enable the `createCRD` flag in this chart, or xref:install-openshift.html#install-the-custom-resource-definition[install the CRD manually].
+====
 
 To install the cluster chart run the following commands:
 [source,console]
@@ -22,6 +26,7 @@ The helm chart supports creating and managing a single couchbase cluster by expo
 
 [source,yaml]
 ----
+createCRD: false
 couchbaseCluster:
   create: true
   name: ""
@@ -80,6 +85,14 @@ couchbaseCluster:
   securityContext: {}
   volumeClaimTemplates: []
 ----
+
+=== createCRD
+
+Option to create the CRD defining the CouchbaseCluster type.
+
+_Value rules:_ The `createCRD` value defaults to `false` which excludes installation of the CRD resource.
+Therefore, when `false`, the CRD should be installed using the Operator chart, or be installed manually.
+When set to `true` the resource is installed.
 
 === name
 

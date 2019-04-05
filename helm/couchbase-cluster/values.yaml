@@ -2,6 +2,9 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# create the CRD defining couchbasecluster type
+createCRD: false
+
 # couchbaseCluster config
 couchbaseCluster:
   # create flag to deploy couchbase cluster
