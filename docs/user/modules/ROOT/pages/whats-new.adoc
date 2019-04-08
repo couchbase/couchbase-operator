@@ -33,6 +33,12 @@ Whether you're new to Helm, or already have an existing Helm infrastructure, the
 
 See xref:helm-setup-guide.adoc[Helm Guide for the Couchbase Operator]
 
+== Public Connectivity for Couchbase Clients
+
+This release introduces support for connecting clients to the Couchbase cluster over the internet via public IP-based addressing and dynamic DNS.
+
+See xref:network-requirements.adoc#public-connectivity-ddns[Public Connectivity]
+
 == Support for Public Kubernetes Services
 
 The Operator now offers full production support on the following public Kubernetes services:
@@ -62,11 +68,3 @@ Several enhancements have been made to `cbopinfo`, including a unified log colle
 
 See xref:cbopinfo.adoc[cbopinfo]
 
-== External Client Connectivity (Experimental)
-
-The only supported method for Couchbase clients to connect to a Couchbase Server deployment running in Kubernetes is to run the client from a pod within the same Kubernetes cluster.
-
-This release includes some experimental features for connecting to Couchbase clients that are located outside of the Kubernetes cluster.
-Note that this is unsupported functionality — use at your own risk!
-
-See xref:couchbase-clients.adoc#connect-external[Connecting Couchbase Clients]

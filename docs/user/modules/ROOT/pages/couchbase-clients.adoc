@@ -29,4 +29,5 @@ Note that we use a separate service record to only advertise nodes with the Data
 == From Outside of the Kubernetes Cluster
 
 Couchbase SDKs are clients in exactly the same way as XDCR.
-Please refer to the xref:xdcr.adoc[XDCR documentation] for deployment scenarios and client configuration.
+
+Please refer to the xref:network-requirements.adoc[client network requirements] for a general overview of client connectivity, and the xref:xdcr.adoc[XDCR documentation] for more detailed deployment scenarios and client configurations.
