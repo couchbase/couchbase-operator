@@ -1,4 +1,4 @@
-= Helm Guide for the Couchbase Operator
+= Helm Setup Guide
 :tabs:
 
 [abstract]
@@ -342,41 +342,3 @@ helm install --version 0.1.2 couchbase/couchbase-operator
 ====
 If you're having trouble finding or installing a specific version of a chart, use the `helm repo update` command to ensure that you have the latest list of charts.
 ====
-
-=== Updating a Helm Chart After Installation
-
-When you install a Helm chart, Tiller (the Helm server) creates an instance of that chart in your Kubernetes cluster.
-This instance is called a _release_, and Tiller uses it to track all of the objects and resources that the chart creates.
-
-After installation, you may find yourself needing to make updates to the Operator configuration.
-Similar to installing the chart, customizations are made in the form of overrides via the <<customize-charts,--values or --set options>>.
-However, instead of `helm install`, you'll be using `helm upgrade`.
-Here's an example:
-
-[source,console]
-----
-helm upgrade --values myvalues.yaml <release-name> couchbase/couchbase-operator
-----
-
-It's important that you make your updates using the `helm upgrade` command, as opposed to using `kubectl` or simply editing chart resources.
-This is to ensure that all resources are updated appropriately.
-
-== Upgrading with Helm Charts
-
-Upgrading the Operator to a newer version requires that you upgrade the _release_ to a newer version of its _chart_.
-This is to ensure that any other dependencies related to the Operator upgrade are also updated appropriately.
-
-NOTE: For <<deploy-production,production deployments>> where you've manually installed the CRD, you'll need to xref:upgrading-the-operator.adoc#update-crd[manually update] the CRD before you upgrade the Operator via Helm.
-
-.To upgrade the Operator using Helm:
-[source,console]
-----
-helm upgrade --version <version> <release-name> couchbase/couchbase-operator
-----
-
-Here, `<version>` is the version of the chart that you want to upgrade to, and  `<release-name>` is the name of the release that is managing the instance of the Operator that you are trying to upgrade.
-
-Refer to the xref:upgrading-the-operator.ado[Operator upgrade documentation] for more information about the upgrade process.
-
-IMPORTANT: If you didn't originally install the Operator using Helm, then you cannot upgrade the Operator using Helm.
-At this time, Operator installations that weren't created with Helm cannot be ported over to using Helm.

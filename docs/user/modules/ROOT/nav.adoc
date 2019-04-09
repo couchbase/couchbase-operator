@@ -9,7 +9,8 @@
  ** xref:install-eks.adoc[Installing on EKS]
  ** xref:install-gke.adoc[Installing on GKE]
 * Helm
- ** xref:helm-setup-guide.adoc[Helm Guide]
+ ** xref:helm-setup-guide.adoc[Helm Setup]
+ ** xref:helm-managing-guide.adoc[Helm Management]
  ** xref:helm-operator-config.adoc[Operator Chart Spec]
  ** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
 * Deploying the Operator

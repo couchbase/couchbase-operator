@@ -1,0 +1,98 @@
+= Helm Management Guide
+:tabs:
+
+[abstract]
+When you install a Helm chart, Helm creates a release.
+You can manage the release by updating, upgrading, or uninstalling it.
+
+When you install a Helm chart, Tiller (the Helm server) creates an instance of that chart in your Kubernetes cluster.
+This instance is called a _release_, and Tiller uses it to track all of the objects and resources that the chart creates.
+So when you need to manage the Operator or Couchbase Server using Helm, you do so by making changes to the release.
+
+The rest of this page describes the best practices for managing Helm releases in your Kubernetes or OpenShift environment.
+
+[#update-release]
+== Updating a Release
+
+After installation, you may find yourself needing to make updates to the Operator or Couchbase configuration.
+Similar to installing the chart, customizations are made in the form of overrides via the xref:helm-setup-guide.adoc#customize-charts[--values or --set options].
+However, instead of `helm install`, you'll use `helm upgrade`.
+Here's an example:
+
+[source,console]
+----
+helm upgrade --values myvalues.yaml <release-name> couchbase/couchbase-operator
+----
+
+It's important that you make your updates using the `helm upgrade` command instead of using `kubectl` or manually editing chart resources.
+This is to ensure that all resources are updated appropriately.
+
+== Upgrading a Release
+
+=== Operator Upgrade
+
+Upgrading the Operator and admission controller to a newer version requires that you upgrade the Operator _release_ to a newer version of its _chart_.
+This is to ensure that any other dependencies related to the Operator upgrade are also updated appropriately.
+
+NOTE: For xref:helm-setup-guide.adoc#deploy-production[production deployments] where you've manually installed the CRD, you'll need to xref:upgrading-the-operator.adoc#update-crd[manually update] the CRD before you upgrade the Operator via Helm.
+
+.To upgrade the Operator using Helm:
+[source,console]
+----
+helm upgrade --version <version> <release-name> couchbase/couchbase-operator
+----
+
+...where `<version>` is the version of the chart that you want to upgrade to, and  `<release-name>` is the name of the release that is managing the instance of the Operator that you are trying to upgrade.
+
+Refer to the xref:upgrading-the-operator.adoc[Operator upgrade documentation] for more information about the upgrade process.
+
+IMPORTANT: If you didn't originally install the Operator using Helm, then you cannot upgrade the Operator using Helm.
+At this time, Operator installations that weren't created with Helm cannot be ported over to using Helm.
+
+=== Couchbase Cluster Upgrade
+
+There are two ways to upgrade the Couchbase Server cluster with Helm.
+The first way is to upgrade the entire cluster chart to a version that uses the desired Couchbase Server version as a default.
+The second way is to update the existing chart to use a newer Couchbase Server image.
+The preferred way is to upgrade the entire cluster chart, since this will ensure that any parameters required to configure the cluster are defined.
+
+IMPORTANT: When upgrading the Couchbase Server cluster, you should first upgrade the Operator to the latest compatible version so as to ensure that the cluster can be properly managed.
+
+.Upgrading the Couchbase Server cluster using a newer chart
+. Check the default Couchbase Server version of a chart to make sure it uses the version that you want to upgrade your cluster to.
++
+[source,console]
+----
+helm inspect  --version <version> values couchbase/couchbase-cluster | grep  "version:"
+----
++
+...where `<version>` is the version of the chart.
+
+. Upgrade the Couchbase Server cluster using the newer chart.
++
+[source,console]
+----
+helm upgrade --version <version> <release-name> couchbase/couchbase-cluster
+----
+
+.Upgrading the Couchbase Server cluster without upgrading the chart
+[source,console]
+----
+helm upgrade --set couchbaseCluster.version=<version> <release-name> couchbase/couchbase-cluster
+----
+
+...where `<version>` is the name of the container image.
+For example, to upgrade a cluster to Couchbase Server 6.0.1:
+
+----
+helm upgrade --set couchbaseCluster.version=enterprise-6.0.1 <release-name> couchbase/couchbase-cluster
+----
+
+== Deleting a Release
+
+Installed releases of a chart can be deleted using `helm delete`.
+
+[source,console]
+----
+helm delete <release-name>
+----
