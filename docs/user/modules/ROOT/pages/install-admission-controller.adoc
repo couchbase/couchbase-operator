@@ -69,7 +69,7 @@ The admission controller is supported on Kubernetes 1.11.0+ and OpenShift 3.11.0
 
 == Deploying the Admission Controller
 
-Before you can deploy the admission controller, you must download and unpack the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package] on the same computer where you normally run `kubectl` or `oc`.
+Before you can deploy the admission controller, you must download and unpack the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package^] on the same computer where you normally run `kubectl` or `oc`.
 Contained in this package are a set of YAML files that define the admission controller.
 
 [NOTE]
@@ -153,7 +153,7 @@ couchbase-operator-admission   1         1         1            1           1m
 ----
 
 .Enable webhook plug-ins
-Before the admission controller can start intercepting requests made to the master API, you need to enable the mutating webhook and validating webhook https://docs.openshift.com/container-platform/latest/architecture/additional_concepts/admission_controllers.html[plug-ins] in the master configuration file of your OpenShift cluster.
+Before the admission controller can start intercepting requests made to the master API, you need to enable the mutating webhook and validating webhook https://docs.openshift.com/container-platform/latest/architecture/additional_concepts/admission_controllers.html[plug-ins^] in the master configuration file of your OpenShift cluster.
 
 . Open the master configuration file for your OpenShift cluster: `/etc/origin/master/master-config.yaml`.
 +
@@ -195,6 +195,22 @@ ansible-playbook  playbooks/openshift-master/restart.yml
 
 . <<test-controller,Test the admission controller>> to see if it successfully rejects invalid CouchbaseCluster resources.
 --
+====
+
+[IMPORTANT]
+====
+If you encounter a `ErrImagePull` or `ImagePullBackOff` event associated with the admission controller pod, check that the container image URL in `admission.yaml` is reachable, and that the specified image is available.
+
+The images that are specified in the provided YAML files are hosted in common public container registries.
+Couchbase regularly publishes new container images that incorporate the latest security updates and patches.
+In rare cases, a registry's security policy may force the removal of older container images, causing the provided YAML definitions to become invalid.
+It's recommended that you check the registry for new and discontinued container images, and update your deployment accordingly.
+
+To use a newer container image, simply update the container image URL in `admission.yaml` with the new image name, and then push the definition to your Kubernetes environment.
+Container images are available in the following registries:
+
+* https://hub.docker.com/r/couchbase/admission-controller/tags[Docker Hub (use for open source Kubernetes)^]
+* https://access.redhat.com/containers/?tab=tags#/registry.connect.redhat.com/couchbase/admission-controller[Red Hat Container Catalog (use for OpenShift)^]
 ====
 
 [IMPORTANT]

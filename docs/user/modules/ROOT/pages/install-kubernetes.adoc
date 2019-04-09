@@ -83,6 +83,21 @@ Running this command downloads the Operator Docker image (specified in the `oper
 
 After you run the `kubectl create` command, it generally takes less than a minute for Kubernetes to deploy the Operator and for the Operator to be ready to run.
 
+[IMPORTANT]
+====
+If you encounter a `ErrImagePull` or `ImagePullBackOff` event associated with the Operator pod, check that the container image URL in `operator-deployment.yaml` is reachable, and that the specified image is available.
+
+The images that are specified in the provided YAML files are hosted in common public container registries.
+Couchbase regularly publishes new container images that incorporate the latest security updates and patches.
+In rare cases, a registry's security policy may force the removal of older container images, causing the provided YAML definitions to become invalid.
+It's recommended that you check the registry for new and discontinued container images, and update your deployment accordingly.
+
+To use a newer container image, simply update the container image URL in `operator-deployment.yaml` with the new image name, and then push the definition to your Kubernetes environment.
+Container images are available in the following repository:
+
+* https://hub.docker.com/r/couchbase/operator/tags[Docker Hub (use for open source Kubernetes)^]
+====
+
 === Check the Status of the Deployment
 
 You can use the following command to check on the status of the deployment:
