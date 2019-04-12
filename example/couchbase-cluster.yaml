@@ -11,6 +11,8 @@ spec:
     - data
   exposedFeatures:
     - xdcr
+  exposedFeatureServiceType: NodePort
+  adminConsoleServiceType: NodePort
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
@@ -26,6 +28,7 @@ spec:
   buckets:
     - name: default
       type: couchbase
+      compressionMode: passive
       memoryQuota: 128
       replicas: 1
       ioPriority: high
