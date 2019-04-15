@@ -415,6 +415,14 @@ func updateConsoleService(service, requested *v1.Service) bool {
 		service.Spec.Type = requested.Spec.Type
 		updated = true
 	}
+
+	// sync session affinity from generated service since this value
+	// may also change when Type  or Platform changes
+	if service.Spec.SessionAffinity != requested.Spec.SessionAffinity {
+		service.Spec.SessionAffinity = requested.Spec.SessionAffinity
+		updated = true
+	}
+
 	return updated
 }
 

@@ -305,3 +305,37 @@ func MustCheckForConsoleServiceType(t *testing.T, k8s *types.Cluster, couchbase 
 		Die(t, err)
 	}
 }
+
+// CheckConsoleServiceStatus checks that if Console service type is LoadBalancer then an ingress route is established
+func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			// IP is set for load-balancer ingress points that are IP based
+			// (typically GCE or OpenStack load-balancers)
+			// Hostname is set for load-balancer ingress points that are DNS based
+			// (typically AWS load-balancers)
+			for _, ingress := range service.Status.LoadBalancer.Ingress {
+				if ingress.IP != "" || ingress.Hostname != "" {
+					return nil
+				}
+			}
+			return fmt.Errorf("loadbalancer service %s failed to create an ingress route", service.Name)
+		}
+		return nil
+
+	})
+}
+
+func MustCheckConsoleServiceStatus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) {
+	if err := CheckConsoleServiceStatus(k8s, couchbase, timeout); err != nil {
+		Die(t, err)
+	}
+}

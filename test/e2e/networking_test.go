@@ -330,4 +330,5 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
+	e2eutil.MustCheckConsoleServiceStatus(t, targetKube, testCouchbase, time.Minute)
 }
