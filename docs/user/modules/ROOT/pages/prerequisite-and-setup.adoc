@@ -30,14 +30,12 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Platform | Version
 
 | Open Source Kubernetes
-| Certified 1.11, 1.12
-
-Supported 1.13+
+| Certified 1.11, 1.12, 1.13
 
 | Red Hat OpenShift
-| Certified 3.11, 3.12
+| Certified 3.11
 
-Supported 3.13+
+Supported 3.10
 |===
 
 .Public Kubernetes Service Compatibility List
@@ -66,7 +64,7 @@ Review the xref:best-practices.adoc#persistent-volumes-best-practices[Operator b
 |===
 | Volume | Support Level
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#aws[AWS^]
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs[AWS EBS^]
 | Certified
 
 | https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Azure Disk^]
@@ -75,13 +73,13 @@ Review the xref:best-practices.adoc#persistent-volumes-best-practices[Operator b
 | https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD^]
 | Certified
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#gce[GCE^]
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#gce-pd[GCE PD]
 | Certified
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[Glusterfs^]
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[GlusterFS^]
 | Certified
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx^]
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx Volume^]
 | Certified
 |===
 

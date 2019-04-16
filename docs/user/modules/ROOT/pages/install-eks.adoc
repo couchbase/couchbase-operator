@@ -204,6 +204,11 @@ The https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html[offi
 [#known-issues]
 == Known Issues
 
+//K8S-933
+.Couchbase Web Console cannot be exposed using a LoadBalancer service on AWS
+The Couchbase Server Web Console cannot be exposed using a `LoadBalancer` service on AWS because the services backed by Elastic Load Balancing don't perform session stickiness, and a server-side issue caused by https://issues.couchbase.com/browse/MB-31756[MB-31756] requires clients to remain connected to a specific node.
+Therefore, the Web Console should be exposed using a `NodePort` service or through an exposed `LoadBalancer` service of a specific pod.
+
 .Setup error due to absence of default subnets
 You may encounter subnet errors similar to the following when creating the CloudFormation Stack in the first step:
 
