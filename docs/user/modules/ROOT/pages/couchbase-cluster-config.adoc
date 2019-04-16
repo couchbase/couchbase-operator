@@ -370,6 +370,7 @@ ____
 _Field rules:_ The `logRetentionCount` field is optional and defaults to `0`.  The value must be any non-negative integer.
 ____
 
+[#spec-platform]
 === platform
 
 This field indicates which underlying cloud platform the Kubernetes cluster is running on and is used as a hint to correctly configure managed resources.
