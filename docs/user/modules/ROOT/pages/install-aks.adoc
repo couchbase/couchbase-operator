@@ -45,8 +45,18 @@ Create an AKS cluster within the allocated resource group on the subnet created 
 ----
 subnet_id=$(az network vnet show -g myResourceGroup -n myAKSVnet --query subnets[].id -o tsv)
 
-az aks create -g myResourceGroup -n myAKSCluster --node-count 3  --vnet-subnet-id $subnet_id --service-cidr 10.0.0.0/16 --dns-service-ip 10.0.0.10 --generate-ssh-keys   --location eastus  --network-plugin azure  --kubernetes-version 1.12.5
+az aks create -g myResourceGroup -n myAKSCluster --node-count 3  --vnet-subnet-id $subnet_id --service-cidr 10.0.0.0/16 --dns-service-ip 10.0.0.10 --generate-ssh-keys   --location eastus  --network-plugin azure  --kubernetes-version 1.12.7
 ----
+
+[NOTE]
+====
+To check that the `--kubernetes-version` exists within your AKS environment, run the following command:
+
+[source,console]
+----
+az aks get-versions --location eastus --query orchestrators[].orchestratorVersion -o tsv`
+----
+====
 
 == Deploying Couchbase Cluster
 
