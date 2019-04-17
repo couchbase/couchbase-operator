@@ -16,7 +16,7 @@ environment.
 
 See the documentation for installation instructions:
 
-https://developer.couchbase.com/documentation/server/current/operator/overview.html
+https://docs.couchbase.com/operator/current/overview.html
 
 
 ABOUT COUCHBASE SERVER
