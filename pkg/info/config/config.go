@@ -119,7 +119,7 @@ func Parse() Configuration {
 	flagSet.StringVar(&c.Context, contextFlag, lookupFlagFromEnvString(contextFlag, ""), "kubernetes cluster context")
 	flagSet.StringVar(&c.OperatorImage, operatorImageFlag, lookupFlagFromEnvString(operatorImageFlag, "couchbase/operator:"+version.Version), "operator image name")
 	flagSet.StringVar(&c.OperatorRestPort, operatorRestPortFlag, lookupFlagFromEnvString(operatorRestPortFlag, "8080"), "operator rest port")
-	flagSet.StringVar(&c.ServerImage, serverImageFlag, lookupFlagFromEnvString(serverImageFlag, "couchbase/server:enterprise-5.5.1"), "couchbase server image")
+	flagSet.StringVar(&c.ServerImage, serverImageFlag, lookupFlagFromEnvString(serverImageFlag, "couchbase/server:enterprise-6.0.1"), "couchbase server image")
 	flagSet.StringVar(&c.CollectInfoCollect, collectInfoCollectFlag, lookupFlagFromEnvString(collectInfoCollectFlag, ""), "collect couchbase server logs non-interactively, requires the -"+collectInfoFlag+" flag to be set")
 	flagSet.BoolVar(&c.All, allFlag, lookupFlagFromEnvBool(allFlag, false), "collect all resources from the namespace")
 	flagSet.BoolVar(&c.System, systemFlag, lookupFlagFromEnvBool(systemFlag, false), "collect kube-system resources and logs")

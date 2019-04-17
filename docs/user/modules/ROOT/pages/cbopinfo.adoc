@@ -186,7 +186,7 @@ If specified this sets the Operator image name.  It is used to match containers 
 If specified this sets the Operator REST API port.  It is used for collection of runtime information.  If not set it will default to _8080_.
 
 --server-image <image>::
-If specified this defines the Couchbase Server image to use when collecting logs from detached log volumes.  If not set, it will default to `couchbase/server:enterprise-5.5.2`
+If specified this defines the Couchbase Server image to use when collecting logs from detached log volumes.  If not set, it will default to `couchbase/server:enterprise-6.0.1`
 
 --system::
 If specified, this flag will additionally collect all resources from the `kube-system` namespace, which may be useful in diagnosing problems with cluster-level roles, custom resource definitions, or system services.
