@@ -177,6 +177,7 @@ spec:
     fsGroup: 1000
   servers:
     - size: 3
+      name: all_services
       services:
         - data
       pod:
