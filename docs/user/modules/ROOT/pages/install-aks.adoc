@@ -78,6 +78,8 @@ az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
 ==== Deploy cluster
 * Refer to guide for xref:deploying-couchbase.adoc[deploying couchbase]
 
+==== Connecting to the Couchbase Web Console
+* Refer to the guide for xref:accessing-couchbase.adoc[accessing Couchbase]
 
 == Upgrading AKS cluster
 An AKS cluster can be upgraded to a new version if applicable.
@@ -94,7 +96,7 @@ To proceed with an upgrade, simply run the `upgrade` command with the desirable 
 
 [source,console]
 ----
- az aks upgrade -g myResourceGroup -n myAKSCluster --kubernetes-version 1.11.5
+ az aks upgrade -g myResourceGroup -n myAKSCluster --kubernetes-version 1.13.5
 ----
 
 
