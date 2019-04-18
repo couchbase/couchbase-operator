@@ -221,6 +221,8 @@ The DNS alternate name must be in the form `${service-name}.${namespace}.svc`.
 The admission controller certificate and key pair are defined in the admission controller secret.
 The admission controller certificate issuer's CA certificate is defined in each of the webhooks.
 All certificates and keys are base64 encoded in the YAML definitions.
+
+You can also choose to use the xref:helm-operator-config.adoc[Operator Helm Chart] for generating TLS certificates and installing the admission controller into custom namespaces.
 ====
 
 [#test-controller]
