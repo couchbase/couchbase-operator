@@ -92,12 +92,13 @@ gcloud compute firewall-rules create my-network-allow-all-private \
 
 === Kubernetes Cluster Setup
 
-The next step is to create our Kubernetes clusters in each region:
+After checking with GKE for an updated Kubernetes cluster version, the next step is to create our Kubernetes clusters in each region.
+For example:
 
 [source,console]
 ----
 gcloud container clusters create my-cluster-us-east1 \
-  --cluster-version 1.11.5-gke.5 \
+  --cluster-version 1.11.8-gke.6 \
   --region us-east1 \
   --network my-network \
   --subnetwork my-subnet-us-east1
@@ -106,7 +107,7 @@ gcloud container clusters create my-cluster-us-east1 \
 [source,console]
 ----
 gcloud container clusters create my-cluster-us-west1 \
-  --cluster-version 1.11.5-gke.5 \
+  --cluster-version 1.11.8-gke.6 \
   --region us-west1 \
   --network my-network \
   --subnetwork my-subnet-us-west1
