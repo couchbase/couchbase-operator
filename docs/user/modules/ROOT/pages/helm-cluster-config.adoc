@@ -136,6 +136,8 @@ couchbaseCluster:
         volumeMounts:
           default: couchbase
           data:  couchbase
+  securityContext:
+      fsGroup: 1000
   volumeClaimTemplates:
     - metadata:
         name: couchbase
