@@ -10,7 +10,8 @@ operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-ope
 namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
 deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
 bldNum = $(if $(BLD_NUM),$(BLD_NUM),999)
-productVersion = $(if $(VERSION),$(VERSION)-$(bldNum),1.2.0-999)
+version = $(if $(VERSION),$(VERSION),1.2.0)
+productVersion = $(version)-$(bldNum)
 testname = $(E2E_TEST)
 
 .PHONY: all dep build container dist test test-indv
@@ -62,12 +63,12 @@ tools: build
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopcfg.exe ./cmd/cbopcfg/
 
 artifacts: tools
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(productVersion)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --version $(productVersion)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --version $(productVersion)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --version $(productVersion)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --version $(productVersion)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(productVersion)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(version) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --version $(version) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --version $(version) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --version $(version) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --version $(version) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(version) --bld_num $(bldNum)
 
 image-artifacts: build
 	# Create a subdirectory for the operator docker build
@@ -97,6 +98,7 @@ dist: artifacts image-artifacts
 	mkdir dist
 	cp build/couchbase-autonomous-operator-image_*.tgz dist
 	cp build/couchbase-autonomous-operator-*.tar.gz dist
+	cp build/couchbase-autonomous-operator-*.zip dist
 
 prod: container tools artifacts
 
