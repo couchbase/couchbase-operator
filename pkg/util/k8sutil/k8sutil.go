@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -44,8 +45,24 @@ func applyBaseAnnotations(object metav1.Object) {
 	object.SetAnnotations(annotations)
 }
 
-func SetCouchbaseVersion(pod *v1.Pod, version string) {
+func CouchbaseVersion(image string) (string, error) {
+	parts := strings.Split(image, ":")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid image string: %s", image)
+	}
+	if err := couchbaseutil.VerifyVersion(parts[1]); err != nil {
+		return "", err
+	}
+	return parts[1], nil
+}
+
+func SetCouchbaseVersion(pod *v1.Pod, image string) error {
+	version, err := CouchbaseVersion(image)
+	if err != nil {
+		return err
+	}
 	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = version
+	return nil
 }
 
 func InClusterConfig() (*rest.Config, error) {
@@ -152,7 +169,7 @@ func ClusterListOpt(clusterName string) metav1.ListOptions {
 // If it is the admin port however we may apply it to only nodes with the
 // specified list of services installed (thus limiting the kinds of operations
 // that can be performed via the UI).
-func getNodeServiceSelectors(cluster *couchbasev1.CouchbaseCluster, nodeName string) map[string]string {
+func getNodeServiceSelectors(cluster *couchbasev2.CouchbaseCluster, nodeName string) map[string]string {
 	// Apply to a specific couchbase pod within the named cluster
 	selectors := LabelsForCluster(cluster.Name)
 	selectors[constants.LabelNode] = nodeName

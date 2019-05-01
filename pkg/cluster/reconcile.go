@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -17,8 +17,10 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
@@ -101,7 +103,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	c.status.ClearCondition(couchbasev1.ClusterConditionScaling)
+	c.status.ClearCondition(couchbasev2.ClusterConditionScaling)
 	c.status.SetReadyCondition()
 
 	return nil
@@ -142,7 +144,7 @@ func (c *Cluster) logFailedMember(name string) {
 }
 
 // Create a new Couchbase cluster member
-func (c *Cluster) createMember(serverSpec couchbasev1.ServerConfig) (m *couchbaseutil.Member, err error) {
+func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbaseutil.Member, err error) {
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
@@ -158,7 +160,10 @@ func (c *Cluster) createMember(serverSpec couchbasev1.ServerConfig) (m *couchbas
 	c.incPodIndex()
 
 	// Create a new member
-	newMember := c.newMember(index, serverSpec.Name, c.cluster.Spec.Version)
+	newMember, err := c.newMember(index, serverSpec.Name, c.cluster.Spec.Image)
+	if err != nil {
+		return nil, err
+	}
 
 	// Prepare to delete member Pod if any errors
 	// occur during creation or configuration
@@ -228,7 +233,7 @@ func (c *Cluster) createMember(serverSpec couchbasev1.ServerConfig) (m *couchbas
 }
 
 // Creates and adds a new Couchbase cluster member
-func (c *Cluster) addMember(serverSpec couchbasev1.ServerConfig) (*couchbaseutil.Member, error) {
+func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil.Member, error) {
 	// Save the existing members now, these will be the set we use to add the new node via
 	ms := c.members.Copy()
 
@@ -336,62 +341,158 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 	return nil
 }
 
+// gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
+func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
+	// TODO: Shared informers/cache please
+	listOpts := metav1.ListOptions{}
+	if c.cluster.Spec.Buckets.Selector != nil {
+		listOpts.LabelSelector = metav1.FormatLabelSelector(c.cluster.Spec.Buckets.Selector)
+	}
+	couchbaseBuckets, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseBuckets(c.cluster.Namespace).List(listOpts)
+	if err != nil {
+		return nil, err
+	}
+	couchbaseEphemeralBuckets, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseEphemeralBuckets(c.cluster.Namespace).List(listOpts)
+	if err != nil {
+		return nil, err
+	}
+	couchbaseMemcachedBuckets, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseMemcachedBuckets(c.cluster.Namespace).List(listOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	buckets := []cbmgr.Bucket{}
+	for _, bucket := range couchbaseBuckets.Items {
+		buckets = append(buckets, cbmgr.Bucket{
+			BucketName:         bucket.Name,
+			BucketType:         constants.BucketTypeCouchbase,
+			BucketMemoryQuota:  bucket.Spec.MemoryQuota,
+			BucketReplicas:     bucket.Spec.Replicas,
+			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
+			EvictionPolicy:     bucket.Spec.EvictionPolicy,
+			ConflictResolution: bucket.Spec.ConflictResolution,
+			EnableFlush:        bucket.Spec.EnableFlush,
+			EnableIndexReplica: bucket.Spec.EnableIndexReplica,
+			CompressionMode:    bucket.Spec.CompressionMode,
+		})
+	}
+	for _, bucket := range couchbaseEphemeralBuckets.Items {
+		buckets = append(buckets, cbmgr.Bucket{
+			BucketName:         bucket.Name,
+			BucketType:         constants.BucketTypeEphemeral,
+			BucketMemoryQuota:  bucket.Spec.MemoryQuota,
+			BucketReplicas:     bucket.Spec.Replicas,
+			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
+			EvictionPolicy:     bucket.Spec.EvictionPolicy,
+			ConflictResolution: bucket.Spec.ConflictResolution,
+			EnableFlush:        bucket.Spec.EnableFlush,
+			CompressionMode:    bucket.Spec.CompressionMode,
+		})
+	}
+	for _, bucket := range couchbaseMemcachedBuckets.Items {
+		buckets = append(buckets, cbmgr.Bucket{
+			BucketName:        bucket.Name,
+			BucketType:        constants.BucketTypeMemcached,
+			BucketMemoryQuota: bucket.Spec.MemoryQuota,
+			EnableFlush:       bucket.Spec.EnableFlush,
+		})
+	}
+
+	return buckets, nil
+}
+
+// inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
+// of buckets to create, update or remove.
+func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Bucket, error) {
+	requested, err := c.gatherBuckets()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	actual, err := c.client.ListBuckets(c.readyMembers())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	create := []cbmgr.Bucket{}
+	update := []cbmgr.Bucket{}
+	remove := []cbmgr.Bucket{}
+
+	// Do an exhaustive search of requested buckets in the actual list, creating and
+	// updating as necessary.
+	for _, r := range requested {
+		found := false
+		for _, a := range actual {
+			if r.BucketName == a.BucketName {
+				if !reflect.DeepEqual(r, a) {
+					update = append(update, r)
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			create = append(create, r)
+		}
+	}
+
+	// Do an exhaustive search of actual buckets in the requested list, deleting
+	// as necessary.
+	for _, a := range actual {
+		found := false
+		for _, r := range requested {
+			if a.BucketName == r.BucketName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remove = append(remove, a)
+		}
+	}
+
+	return create, update, remove, nil
+}
+
 // reconcile buckets by adding or removing
 // buckets one at a time based on comparison
 // of existing buckets to cluster spec
 func (c *Cluster) reconcileBuckets() error {
-	if c.cluster.Spec.DisableBucketManagement {
+	if !c.cluster.Spec.Buckets.Managed {
 		return nil
 	}
 
-	existingBuckets, err := c.client.GetBucketNames(c.readyMembers())
+	create, update, remove, err := c.inspectBuckets()
 	if err != nil {
-		return fmt.Errorf("unable to get buckets from cluster: %v", err)
+		return err
 	}
 
-	// when reconciling buckets, any buckets in cluster
-	// created outside of operator are removed,
-	// and any buckets removed by user are recreated
-	// if still present in active spec
-	spec := c.cluster.Spec
-	bucketsToAdd, bucketsToRemove := spec.BucketDiff(existingBuckets)
-	bucketsToEdit, err := c.client.GetBucketsToEdit(c.readyMembers(), &spec)
-	if err != nil {
-		return fmt.Errorf("unable to get list of buckets to edit: %v", err)
-	}
-
-	for _, bucketName := range bucketsToRemove {
-		err := c.deleteClusterBucket(bucketName)
-		if err != nil {
-			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
-			c.status.SetBucketManagementFailedCondition("Bucket delete failed", msg)
-			return fmt.Errorf("unable to delete bucketName named - %s: %v", bucketName, err)
+	for _, bucket := range create {
+		if err := c.client.CreateBucket(c.readyMembers(), bucket); err != nil {
+			return err
 		}
-		log.Info("Bucket deleted", "cluster", c.cluster.Name, "name", bucketName)
+		log.Info("Bucket created", "cluster", c.cluster.Name, "name", bucket.BucketName)
+		c.raiseEvent(k8sutil.BucketCreateEvent(bucket.BucketName, c.cluster))
+		c.status.CreateBucket(bucket)
 	}
-
-	for _, bucketName := range bucketsToEdit {
-		err := c.editClusterBucket(bucketName)
-		if err != nil {
-			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
-			c.status.SetBucketManagementFailedCondition("Bucket edit failed", msg)
-			return fmt.Errorf("unable to edit bucketName named - %s: %v", bucketName, err)
+	for _, bucket := range update {
+		if err := c.client.UpdateBucket(c.readyMembers(), bucket); err != nil {
+			return err
 		}
-		log.Info("Bucket updated", "cluster", c.cluster.Name, "name", bucketName)
+		log.Info("Bucket updated", "cluster", c.cluster.Name, "name", bucket.BucketName)
+		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
+		c.status.UpdateBucket(bucket)
 	}
-
-	for _, bucketName := range bucketsToAdd {
-		err := c.createClusterBucket(bucketName)
-		if err != nil {
-			msg := fmt.Sprintf("Bucket: %s %s", bucketName, err.Error())
-			c.status.SetBucketManagementFailedCondition("Bucket add failed", msg)
-			return fmt.Errorf("unable to create bucketName named - %s: %v", bucketName, err)
+	for _, bucket := range remove {
+		if err := c.client.DeleteBucket(c.readyMembers(), bucket); err != nil {
+			return err
 		}
-		log.Info("Bucket created", "cluster", c.cluster.Name, "name", bucketName)
+		log.Info("Bucket deleted", "cluster", c.cluster.Name, "name", bucket.BucketName)
+		c.raiseEvent(k8sutil.BucketDeleteEvent(bucket.BucketName, c.cluster))
+		c.status.DeleteBucket(bucket)
 	}
 
-	c.status.ClearCondition(couchbasev1.ClusterConditionManageBuckets)
-
+	c.status.ClearCondition(couchbasev2.ClusterConditionManageBuckets)
 	return nil
 }
 
@@ -434,68 +535,8 @@ func (c *Cluster) reconcileExposedFeatures() error {
 	return nil
 }
 
-// create bucket on cluster
-func (c *Cluster) createClusterBucket(bucketName string) error {
-	config := c.cluster.Spec.GetBucketByName(bucketName)
-	err := c.client.CreateBucket(c.readyMembers(), config)
-	if err == nil {
-		c.status.UpdateBuckets(bucketName, config)
-		c.raiseEvent(k8sutil.BucketCreateEvent(bucketName, c.cluster))
-	}
-	return err
-}
-
-func (c *Cluster) deleteClusterBucket(bucketName string) error {
-	err := c.client.DeleteBucket(c.readyMembers(), bucketName)
-	if err == nil {
-		c.status.RemoveBucket(bucketName)
-		c.raiseEvent(k8sutil.BucketDeleteEvent(bucketName, c.cluster))
-	}
-	return err
-}
-
-// edit bucket on cluster
-func (c *Cluster) editClusterBucket(bucketName string) error {
-	config := c.cluster.Spec.GetBucketByName(bucketName)
-
-	if err := c.validateEditBucket(config); err != nil {
-		return err
-	}
-	err := c.client.EditBucket(c.readyMembers(), config)
-	if err == nil {
-		c.status.UpdateBuckets(bucketName, config)
-		c.raiseEvent(k8sutil.BucketEditEvent(bucketName, c.cluster))
-	}
-	return err
-}
-
-// Validate edit bucket returns error on attempts
-// to change immutable attributes
-func (c *Cluster) validateEditBucket(config *couchbasev1.BucketConfig) error {
-
-	bucketName := config.BucketName
-	if statusBucket, ok := c.status.Buckets[bucketName]; ok {
-		if !reflect.DeepEqual(config.ConflictResolution, statusBucket.ConflictResolution) {
-			return cberrors.ErrInvalidBucketParamChange{
-				Bucket: bucketName,
-				Param:  "conflictResolution",
-				From:   statusBucket.ConflictResolution,
-				To:     config.ConflictResolution}
-		}
-		if config.BucketType != statusBucket.BucketType {
-			return cberrors.ErrInvalidBucketParamChange{
-				Bucket: bucketName,
-				Param:  "type",
-				From:   statusBucket.BucketType,
-				To:     config.BucketType}
-		}
-	}
-
-	return nil
-}
-
 // initializes the first member in the cluster
-func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev1.ServerConfig) error {
+func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
 	log.Info("Initial pod creating", "cluster", c.cluster.Name)
 	settings := c.cluster.Spec.ClusterSettings
 
@@ -530,7 +571,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev1.Ser
 }
 
 // Initialize a member with TLS certificates
-func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs couchbasev1.ClusterSpec) error {
+func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs couchbasev2.ClusterSpec) error {
 	if cs.TLS != nil {
 		// Static configuration:
 		// * Upload the cluster CA certifcate
@@ -943,7 +984,7 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
-	c.status.ClearCondition(couchbasev1.ClusterConditionManageConfig)
+	c.status.ClearCondition(couchbasev2.ClusterConditionManageConfig)
 	return nil
 }
 
@@ -1010,9 +1051,14 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 
 	current := info.PoolsDefaults()
 
+	name := c.cluster.Name
+	if c.cluster.Spec.ClusterSettings.ClusterName != "" {
+		name = c.cluster.Spec.ClusterSettings.ClusterName
+	}
+
 	config := c.cluster.Spec.ClusterSettings
 	requested := &cbmgr.PoolsDefaults{
-		ClusterName:          c.cluster.Spec.ClusterSettings.ClusterName,
+		ClusterName:          name,
 		DataMemoryQuota:      config.DataServiceMemQuota,
 		IndexMemoryQuota:     config.IndexServiceMemQuota,
 		SearchMemoryQuota:    config.SearchServiceMemQuota,
@@ -1125,7 +1171,7 @@ func (c *Cluster) didDeltaRecoveryFail(err error) bool {
 // Gets paths to use when initializing data, index, and analytics service.
 // Default paths are used unless a claim is specified for the service in which
 // case a custom mount path is used
-func getServiceDataPaths(mounts *couchbasev1.VolumeMounts) (string, string, []string) {
+func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []string) {
 	dataPath := constants.DefaultDataPath
 	indexPath := constants.DefaultDataPath
 	analyticsPaths := []string{}
@@ -1146,8 +1192,12 @@ func getServiceDataPaths(mounts *couchbasev1.VolumeMounts) (string, string, []st
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
-func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int) {
-	version := c.cluster.Spec.Version
+func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int, err error) {
+	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return
+	}
+
 	// Names returns a sorted list for determinism.
 	for _, member := range c.members.Names() {
 		// Book keep the target version count for status reporting and
@@ -1163,29 +1213,29 @@ func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int) {
 
 // reportUpgrade looks at the current state and any existing upgrade status
 // condition, makes condition updates and raises events.
-func (c *Cluster) reportUpgrade(status *couchbasev1.UpgradeStatus) error {
+func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 	// Look for an existing condition
-	condition := c.status.GetCondition(couchbasev1.ClusterConditionUpgrading)
+	condition := c.status.GetCondition(couchbasev2.ClusterConditionUpgrading)
 
 	if condition == nil {
 		// No existing condition, we are guaranteed to be upgrading.
-		status.State = couchbasev1.UpgradingMessageStateUpgrading
+		status.State = couchbasev2.UpgradingMessageStateUpgrading
 		c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
 	} else {
 		// There is an existing condition, check to see which way we are going.
 		// If we have switched directions we will need a new event.
-		oldStatus := couchbasev1.NewUpgradeStatus(condition.Message)
+		oldStatus := couchbasev2.NewUpgradeStatus(condition.Message)
 		if status.Target != oldStatus.Target {
 			version, _ := couchbaseutil.NewVersion(status.Target)
 			oldVersion, _ := couchbaseutil.NewVersion(oldStatus.Target)
 			switch version.Compare(oldVersion) {
 			case 1:
 				// Upgrading
-				status.State = couchbasev1.UpgradingMessageStateUpgrading
+				status.State = couchbasev2.UpgradingMessageStateUpgrading
 				c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
 			case -1:
 				// Rolling back
-				status.State = couchbasev1.UpgradingMessageStateRollback
+				status.State = couchbasev2.UpgradingMessageStateRollback
 				c.raiseEvent(k8sutil.RollbackStartedEvent(status.Source, status.Target, c.cluster))
 			}
 		} else {
@@ -1207,26 +1257,33 @@ func (c *Cluster) reportUpgrade(status *couchbasev1.UpgradeStatus) error {
 // the condition and raise any necessary events.
 func (c *Cluster) reportUpgradeComplete() error {
 	// Still upgrading do nothing
-	if candidate, _ := c.needsUpgrade(); candidate != nil {
+	if candidate, _, err := c.needsUpgrade(); err != nil {
+		return err
+	} else if candidate != nil {
 		return nil
 	}
 
 	// There is no condition, we weren't upgrading, do nothing
-	condition := c.status.GetCondition(couchbasev1.ClusterConditionUpgrading)
+	condition := c.status.GetCondition(couchbasev2.ClusterConditionUpgrading)
 	if condition == nil {
 		return nil
 	}
 
-	status := couchbasev1.NewUpgradeStatus(condition.Message)
+	status := couchbasev2.NewUpgradeStatus(condition.Message)
 	switch status.State {
-	case couchbasev1.UpgradingMessageStateUpgrading:
+	case couchbasev2.UpgradingMessageStateUpgrading:
 		c.raiseEvent(k8sutil.UpgradeFinishedEvent(status.Source, status.Target, c.cluster))
-	case couchbasev1.UpgradingMessageStateRollback:
+	case couchbasev2.UpgradingMessageStateRollback:
 		c.raiseEvent(k8sutil.RollbackFinishedEvent(status.Source, status.Target, c.cluster))
 	}
 
-	c.status.ClearCondition(couchbasev1.ClusterConditionUpgrading)
-	c.status.CurrentVersion = c.cluster.Spec.Version
+	c.status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
+
+	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+	c.status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
 		return err

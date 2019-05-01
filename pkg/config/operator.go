@@ -1,7 +1,7 @@
 package config
 
 import (
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -52,16 +52,41 @@ func GetOperatorRole() *rbacv1.Role {
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{
-					couchbasev1.GroupName,
+					couchbasev2.GroupName,
 				},
 				Resources: []string{
-					couchbasev1.CRDResourcePlural,
+					couchbasev2.ClusterCRDResourcePlural,
 				},
 				Verbs: []string{
 					"get",    // used by the operator to update status.
 					"list",   // used by the operator-sdk to discover couchbase clusters.
 					"watch",  // used by the operator-sdk to monitor changes.
 					"update", // used by the operator to update status.
+				},
+			},
+			{
+				APIGroups: []string{
+					couchbasev2.GroupName,
+				},
+				Resources: []string{
+					couchbasev2.BucketCRDResourcePlural,
+					couchbasev2.EphemeralBucketCRDResourcePlural,
+					couchbasev2.MemcachedBucketCRDResourcePlural,
+				},
+				Verbs: []string{
+					"list", // used by the operator to configure buckets.
+				},
+			},
+			{
+				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"configmaps",
+				},
+				Verbs: []string{
+					"get",    // used by the controller-runtime for leadership.
+					"create", // used by the controller-runtime for leadership.
 				},
 			},
 			{

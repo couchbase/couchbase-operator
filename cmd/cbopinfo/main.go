@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/collector"
 	"github.com/couchbase/couchbase-operator/pkg/info/config"
@@ -95,7 +95,7 @@ func harvest(context *context.Context, backend backend.Backend, initializers []r
 }
 
 // clusterExists is a helper to see if a named cluster exists in the supplied list
-func clusterExists(clusters *v1.CouchbaseClusterList, name string) bool {
+func clusterExists(clusters *couchbasev2.CouchbaseClusterList, name string) bool {
 	for _, cluster := range clusters.Items {
 		if cluster.Name == name {
 			return true

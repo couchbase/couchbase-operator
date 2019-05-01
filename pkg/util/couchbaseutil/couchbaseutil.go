@@ -9,9 +9,8 @@ import (
 	"strings"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
@@ -465,7 +464,7 @@ func CheckHealth(url string, tc *tls.Config) (bool, error) {
 	return true, nil
 }
 
-func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchbasev1.ServiceList) error {
+func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchbasev2.ServiceList) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
@@ -605,7 +604,7 @@ func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath
 }
 
 func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
-	services couchbasev1.ServiceList, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
+	services couchbasev2.ServiceList, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
@@ -666,86 +665,34 @@ func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
 	return c.client.CompareRebalanceStatus(cbmgr.RebalanceStatusRunning)
 }
 
-func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *couchbasev1.BucketConfig) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	bucket := ApiBucketToCbmgr(config)
-	if err := c.client.CreateBucket(bucket); err != nil {
-		return err
-	}
-
-	// make sure bucket exists
-	return retryutil.Retry(c.ctx, 5*time.Second, ExtendedRetryCount, func() (bool, error) {
-		_, err := c.client.BucketReady(bucket.BucketName)
-		// Bucket doesn't exist, someone deleted it.
-		if cbmgr.IsServerError(err, 404) {
-			return false, fmt.Errorf("bucket %s does not exist", bucket.BucketName)
-		}
-		return err == nil, nil
-	})
-}
-
-func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucketName string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.DeleteBucket(bucketName)
-}
-
-func (c *CouchbaseClient) EditBucket(ms MemberSet, config *couchbasev1.BucketConfig) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	bucket := ApiBucketToCbmgr(config)
-
-	return c.client.EditBucket(bucket)
-}
-
-func (c *CouchbaseClient) GetBuckets(ms MemberSet) ([]*couchbasev1.BucketConfig, error) {
+func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]cbmgr.Bucket, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	buckets, err := c.client.GetBuckets()
 	if err != nil {
 		return nil, err
 	}
 
-	rv := make([]*couchbasev1.BucketConfig, len(buckets))
-	for i, bucket := range buckets {
-		rv[i] = CbmgrBucketToApiBucket(bucket)
+	// TODO: Standardize on value/pointer
+	res := []cbmgr.Bucket{}
+	for _, bucket := range buckets {
+		res = append(res, *bucket)
 	}
-
-	return rv, nil
+	return res, nil
 }
 
-func (c *CouchbaseClient) GetBucketNames(ms MemberSet) ([]string, error) {
-
-	bucketNames := []string{}
-
+func (c *CouchbaseClient) CreateBucket(ms MemberSet, bucket cbmgr.Bucket) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	buckets, err := c.client.GetBuckets()
-	if err == nil {
-		for _, b := range buckets {
-			bucketNames = append(bucketNames, b.BucketName)
-		}
-	}
-
-	return bucketNames, err
+	return c.client.CreateBucket(&bucket)
 }
 
-// compare spec buckets to couchbase buckets and add to list of buckets
-// that need editing
-func (c *CouchbaseClient) GetBucketsToEdit(ms MemberSet, spec *couchbasev1.ClusterSpec) ([]string, error) {
-	bucketNames := []string{}
-	clusterBuckets, err := c.GetBuckets(ms)
-	if err != nil {
-		return nil, err
-	}
+func (c *CouchbaseClient) UpdateBucket(ms MemberSet, bucket cbmgr.Bucket) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.EditBucket(&bucket)
+}
 
-	for _, clusterBucket := range clusterBuckets {
-		specBucket := spec.GetBucketByName(clusterBucket.BucketName)
-		if specBucket != nil {
-			if !specBucket.Equals(clusterBucket) {
-				bucketNames = append(bucketNames, specBucket.BucketName)
-			}
-		}
-	}
-
-	return bucketNames, nil
+func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket cbmgr.Bucket) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.DeleteBucket(bucket.BucketName)
 }
 
 func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.AutoFailoverSettings) error {
@@ -903,61 +850,4 @@ func (c *CouchbaseClient) CreateServerGroup(ms MemberSet, name string) error {
 func (c *CouchbaseClient) UpdateServerGroups(ms MemberSet, revision string, groups *cbmgr.ServerGroupsUpdate) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.UpdateServerGroups(revision, groups)
-}
-
-func ApiBucketToCbmgr(config *couchbasev1.BucketConfig) *cbmgr.Bucket {
-	rv := &cbmgr.Bucket{
-		BucketName:        config.BucketName,
-		BucketType:        config.BucketType,
-		BucketMemoryQuota: config.BucketMemoryQuota,
-		EnableFlush:       &config.EnableFlush,
-	}
-
-	if rv.BucketType == constants.BucketTypeMemcached {
-		return rv
-	}
-
-	// Required ephemeral/couchbase fields
-	rv.BucketReplicas = config.BucketReplicas
-	rv.IoPriority = cbmgr.IoPriorityType(config.IoPriority)
-	rv.EvictionPolicy = &config.EvictionPolicy
-	rv.ConflictResolution = &config.ConflictResolution
-	rv.CompressionMode = config.CompressionMode
-
-	// Required couchbase only fields
-	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {
-		rv.BucketType = constants.BucketTypeCouchbase
-		rv.EnableIndexReplica = &config.EnableIndexReplica
-	}
-
-	return rv
-}
-
-func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) *couchbasev1.BucketConfig {
-	rv := &couchbasev1.BucketConfig{
-		BucketName:        bucket.BucketName,
-		BucketType:        bucket.BucketType,
-		BucketMemoryQuota: bucket.BucketMemoryQuota,
-	}
-
-	rv.EnableFlush = bucket.EnableFlush != nil && *bucket.EnableFlush
-
-	if rv.BucketType == constants.BucketTypeMemcached {
-		return rv
-	}
-
-	// Required ephemeral/couchbase fields
-	rv.BucketReplicas = bucket.BucketReplicas
-	rv.IoPriority = string(bucket.IoPriority)
-	rv.EvictionPolicy = *bucket.EvictionPolicy
-	rv.ConflictResolution = *bucket.ConflictResolution
-	rv.CompressionMode = bucket.CompressionMode
-
-	// Required couchbase only fields
-	if rv.BucketType == constants.BucketTypeMembase || rv.BucketType == constants.BucketTypeCouchbase {
-		rv.BucketType = constants.BucketTypeCouchbase
-		rv.EnableIndexReplica = *bucket.EnableIndexReplica
-	}
-
-	return rv
 }

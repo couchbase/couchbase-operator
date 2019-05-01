@@ -3,7 +3,7 @@ package k8sutil
 import (
 	"reflect"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,7 +13,7 @@ import (
 )
 
 // ReconcilePDB takes a cluster and creates a PodDisruptionBudget based on cluster size.
-func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev1.CouchbaseCluster) error {
+func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster) error {
 	name := cluster.Name + "-pdb"
 
 	required := &policyv1beta1.PodDisruptionBudget{

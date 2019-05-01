@@ -5,7 +5,7 @@ import (
 	"crypto/x509/pkix"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -88,13 +88,16 @@ func GetAdmissionClusterRole() *rbacv1.ClusterRole {
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{
-					couchbasev1.GroupName,
+					couchbasev2.GroupName,
 				},
 				Resources: []string{
-					couchbasev1.CRDResourcePlural,
+					couchbasev2.ClusterCRDResourcePlural,
+					couchbasev2.BucketCRDResourcePlural,
+					couchbasev2.EphemeralBucketCRDResourcePlural,
+					couchbasev2.MemcachedBucketCRDResourcePlural,
 				},
 				Verbs: []string{
-					"get",
+					"list",
 				},
 			},
 			{
@@ -299,13 +302,17 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistra
 					{
 						Rule: admissionregistrationv1beta1.Rule{
 							APIGroups: []string{
-								couchbasev1.GroupName,
+								couchbasev2.GroupName,
 							},
 							Resources: []string{
-								couchbasev1.CRDResourcePlural,
+								couchbasev2.ClusterCRDResourcePlural,
+								couchbasev2.BucketCRDResourcePlural,
+								couchbasev2.EphemeralBucketCRDResourcePlural,
+								couchbasev2.MemcachedBucketCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",
+								"v2",
 							},
 						},
 						Operations: []admissionregistrationv1beta1.OperationType{
@@ -345,13 +352,17 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregist
 					{
 						Rule: admissionregistrationv1beta1.Rule{
 							APIGroups: []string{
-								couchbasev1.GroupName,
+								couchbasev2.GroupName,
 							},
 							Resources: []string{
-								couchbasev1.CRDResourcePlural,
+								couchbasev2.ClusterCRDResourcePlural,
+								couchbasev2.BucketCRDResourcePlural,
+								couchbasev2.EphemeralBucketCRDResourcePlural,
+								couchbasev2.MemcachedBucketCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",
+								"v2",
 							},
 						},
 						Operations: []admissionregistrationv1beta1.OperationType{

@@ -11,13 +11,14 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -59,7 +60,7 @@ func createPersistentVolumeClaimSpec(t *testing.T, k8s *types.Cluster, storageCl
 	}
 }
 
-func createPodSecurityContext(fsGroup int, clusterSpec *couchbasev1.ClusterSpec) {
+func createPodSecurityContext(fsGroup int, clusterSpec *couchbasev2.ClusterSpec) {
 	if framework.Global.KubeType == "kubernetes" {
 		fsGroupVal := int64(fsGroup)
 		sc := corev1.PodSecurityContext{FSGroup: &fsGroupVal}
@@ -109,7 +110,6 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 		t.Skip("storage class unsupported")
 	}
 
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverMaxCount"] = "3"
@@ -118,11 +118,9 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	serviceConfig1["defaultVolMnt"] = pvcName
 	serviceConfig1["dataVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -130,6 +128,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -138,7 +137,7 @@ func PersistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	}
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	// For event validation scheme
 	memberDownEvents := e2eutil.EventValidator{}
@@ -200,7 +199,6 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 
 	autofailoverTimeout := 30
 	totalTimeToRecover := 0
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverMaxCount"] = "3"
@@ -210,11 +208,9 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -222,6 +218,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -231,7 +228,7 @@ func PersistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	}
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	memberDownEvents := e2eutil.EventValidator{}
 	memberRecoveredEvents := e2eutil.EventValidator{}
@@ -306,20 +303,17 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	clusterSizeWithPvc2, _ := strconv.Atoi(serviceConfig3["size"])
 	clusterSize := clusterSizeWithOutPvc + clusterSizeWithPvc1 + clusterSizeWithPvc2
 	autofailoverTimeout := 30
-	bucketName := "PVBucket"
 	pvc1Name := serviceConfig2["defaultVolMnt"]
 	pvc2Name := serviceConfig3["defaultVolMnt"]
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverMaxCount"] = "3"
 	clusterConfig["autoFailoverTimeout"] = strconv.Itoa(autofailoverTimeout)
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
 		"service3": serviceConfig3,
-		"bucket1":  bucketConfig1,
 	}
 
 	// Pod member with singe node service to kill
@@ -332,6 +326,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1, pvcTemplate2}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	// To cross check number of persistent vol claims matches the defined spec
@@ -366,7 +361,7 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 	}
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	podMemberNameToKill := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberIdToKill)
 
@@ -420,9 +415,6 @@ func PersistentVolumeForSingleNodeServiceGeneric(t *testing.T, serviceConfig1, s
 // Create multi-node couchbase cluster with volumeClaimTemplates
 // Create test bucket and verify
 func TestPersistentVolumeCreateCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
@@ -431,6 +423,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
+	e2eutil.MustNewBucket(t, kubernetes, f.Namespace, e2espec.DefaultBucket)
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, f.Namespace, mdsGroupSize)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -488,7 +481,6 @@ func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
 	}
 
 	clusterSize := 4
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverMaxCount"] = "3"
@@ -498,11 +490,9 @@ func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -510,6 +500,7 @@ func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
@@ -541,7 +532,6 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 	}
 
 	clusterSize := 4
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverMaxCount"] = "3"
@@ -551,11 +541,9 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -563,6 +551,7 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
@@ -593,7 +582,6 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	clusterSize := 5
 	podMemberToKill := 3
 
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverOnDiskIssues"] = "true"
@@ -606,12 +594,10 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	serviceConfig2["indexVolMnt"] = pvcName
 	serviceConfig2["analyticsVolMnt"] = pvcName + "," + pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -619,6 +605,7 @@ func TestPersistentVolumeRemoveVolume(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	if err := e2eutil.RemovePersistentVolumesOfPod(targetKube.KubeClient, f.Namespace, testCouchbase.Name, podMemberToKill); err != nil {
@@ -975,7 +962,6 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	// Static configuration.
 	clusterSize := 5
 
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverOnDiskIssues"] = "true"
@@ -988,12 +974,10 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	serviceConfig2["indexVolMnt"] = pvcName
 	serviceConfig2["analyticsVolMnt"] = pvcName + "," + pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
 	}
 
 	// This will request storage claim of 2000Gi
@@ -1002,6 +986,7 @@ func TestPersistentVolumeCreateWithHugeStorage(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	// To cross check number of persistent vol claims matches the defined spec
@@ -1040,7 +1025,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
@@ -1048,11 +1032,9 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -1060,6 +1042,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	expectedPvcMap := map[string]int{}

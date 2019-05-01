@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -35,38 +35,38 @@ const (
 	tlsPortNameSuffix = "-tls"
 
 	// Admin service constants
-	adminServicePortName    = string(couchbasev1.AdminService)
-	adminServicePortNameTLS = string(couchbasev1.AdminService) + tlsPortNameSuffix
+	adminServicePortName    = string(couchbasev2.AdminService)
+	adminServicePortNameTLS = string(couchbasev2.AdminService) + tlsPortNameSuffix
 	adminServicePort        = 8091
 	adminServicePortTLS     = tlsBasePort + adminServicePort
 
 	// Index service constants
-	indexServicePortName    = string(couchbasev1.IndexService)
-	indexServicePortNameTLS = string(couchbasev1.IndexService) + tlsPortNameSuffix
+	indexServicePortName    = string(couchbasev2.IndexService)
+	indexServicePortNameTLS = string(couchbasev2.IndexService) + tlsPortNameSuffix
 	indexServicePort        = 8092
 	indexServicePortTLS     = tlsBasePort + indexServicePort
 
 	// Query service constants
-	queryServicePortName    = string(couchbasev1.QueryService)
-	queryServicePortNameTLS = string(couchbasev1.QueryService) + tlsPortNameSuffix
+	queryServicePortName    = string(couchbasev2.QueryService)
+	queryServicePortNameTLS = string(couchbasev2.QueryService) + tlsPortNameSuffix
 	queryServicePort        = 8093
 	queryServicePortTLS     = tlsBasePort + queryServicePort
 
 	// Full text search service constants
-	searchServicePortName    = string(couchbasev1.SearchService)
-	searchServicePortNameTLS = string(couchbasev1.SearchService) + tlsPortNameSuffix
+	searchServicePortName    = string(couchbasev2.SearchService)
+	searchServicePortNameTLS = string(couchbasev2.SearchService) + tlsPortNameSuffix
 	searchServicePort        = 8094
 	searchServicePortTLS     = tlsBasePort + searchServicePort
 
 	// Analytics service constants
-	analyticsServicePortName    = string(couchbasev1.AnalyticsService)
-	analyticsServicePortNameTLS = string(couchbasev1.AnalyticsService) + tlsPortNameSuffix
+	analyticsServicePortName    = string(couchbasev2.AnalyticsService)
+	analyticsServicePortNameTLS = string(couchbasev2.AnalyticsService) + tlsPortNameSuffix
 	analyticsServicePort        = 8095
 	analyticsServicePortTLS     = tlsBasePort + analyticsServicePort
 
 	// Eventing service constants
-	eventingServicePortName    = string(couchbasev1.EventingService)
-	eventingServicePortNameTLS = string(couchbasev1.EventingService) + tlsPortNameSuffix
+	eventingServicePortName    = string(couchbasev2.EventingService)
+	eventingServicePortNameTLS = string(couchbasev2.EventingService) + tlsPortNameSuffix
 	eventingServicePort        = 8096
 	eventingServicePortTLS     = tlsBasePort + eventingServicePort
 
@@ -113,8 +113,8 @@ const (
 	analyticsMetadataCallbackPort     = 9122
 
 	// Data service constants
-	dataServicePortName    = string(couchbasev1.DataService)
-	dataServicePortNameTLS = string(couchbasev1.DataService) + tlsPortNameSuffix
+	dataServicePortName    = string(couchbasev2.DataService)
+	dataServicePortNameTLS = string(couchbasev2.DataService) + tlsPortNameSuffix
 	dataServicePort        = 11210
 	dataServicePortTLS     = 11207
 )
@@ -170,8 +170,8 @@ var (
 	// servicePorts maps a service type to it's set of ports.  These are used in
 	// the generation of node ports to allow cluster access from outside of the
 	// pod (overlay) network.
-	servicePorts = map[couchbasev1.Service][]v1.ServicePort{
-		couchbasev1.AdminService: []v1.ServicePort{
+	servicePorts = map[couchbasev2.Service][]v1.ServicePort{
+		couchbasev2.AdminService: []v1.ServicePort{
 			{
 				Name:     adminServicePortName,
 				Port:     adminServicePort,
@@ -183,7 +183,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev1.IndexService: []v1.ServicePort{
+		couchbasev2.IndexService: []v1.ServicePort{
 			{
 				Name:     indexServicePortName,
 				Port:     indexServicePort,
@@ -195,7 +195,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev1.QueryService: []v1.ServicePort{
+		couchbasev2.QueryService: []v1.ServicePort{
 			{
 				Name:     queryServicePortName,
 				Port:     queryServicePort,
@@ -207,7 +207,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev1.SearchService: []v1.ServicePort{
+		couchbasev2.SearchService: []v1.ServicePort{
 			{
 				Name:     searchServicePortName,
 				Port:     searchServicePort,
@@ -219,7 +219,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev1.AnalyticsService: []v1.ServicePort{
+		couchbasev2.AnalyticsService: []v1.ServicePort{
 			{
 				Name:     analyticsServicePortName,
 				Port:     analyticsServicePort,
@@ -231,7 +231,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev1.EventingService: []v1.ServicePort{
+		couchbasev2.EventingService: []v1.ServicePort{
 			{
 				Name:     eventingServicePortName,
 				Port:     eventingServicePort,
@@ -243,7 +243,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev1.DataService: []v1.ServicePort{
+		couchbasev2.DataService: []v1.ServicePort{
 			{
 				Name:     dataServicePortName,
 				Port:     dataServicePort,
@@ -292,7 +292,7 @@ func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v
 }
 
 // dnsAdminConsoleName returns the DNS name for the admin console.
-func dnsAdminConsoleName(cluster *couchbasev1.CouchbaseCluster) string {
+func dnsAdminConsoleName(cluster *couchbasev2.CouchbaseCluster) string {
 	return "console." + cluster.Name + "." + cluster.Spec.DNS.Domain
 }
 
@@ -358,7 +358,7 @@ func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, own
 }
 
 // adminConsoleSelector generates a selector matching pods running all the requested services.
-func adminConsoleSelector(cluster *couchbasev1.CouchbaseCluster) map[string]string {
+func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	labels := LabelsForCluster(cluster.Name)
 	for _, s := range cluster.Spec.AdminConsoleServices {
 		k := "couchbase_service_" + s.String()
@@ -368,7 +368,7 @@ func adminConsoleSelector(cluster *couchbasev1.CouchbaseCluster) map[string]stri
 }
 
 // generateConsoleService creates a new Service resource based on the cluster specification.
-func generateConsoleService(cluster *couchbasev1.CouchbaseCluster) *v1.Service {
+func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 	// If the service is public, remove non TLS ports.
 	ports := filterInsecurePorts(uiServicePorts, cluster.Spec.IsAdminConsoleServiceTypePublic())
 
@@ -395,7 +395,7 @@ func generateConsoleService(cluster *couchbasev1.CouchbaseCluster) *v1.Service {
 		// AWS ELB does not support IP based session stickiness, instead we rely on
 		// the load balancer keeping TCP connection alive.  It's not perfect but we
 		// can work until NS server get into gear.
-		if cluster.Spec.Platform != couchbasev1.PlatformTypeAWS {
+		if cluster.Spec.Platform != couchbasev2.PlatformTypeAWS {
 			service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		}
 	} else {
@@ -450,7 +450,7 @@ func updateConsoleService(service, requested *v1.Service) bool {
 // UpdateAdminConsole looks for the cluster's admin console service, creates it if not
 // present but requested, deletes it if present but unrequested and performs udpdates
 // to the configurable service parameters.
-func UpdateAdminConsole(kubecli kubernetes.Interface, cluster *couchbasev1.CouchbaseCluster, status *couchbasev1.ClusterStatus) (ReconcileStatus, error) {
+func UpdateAdminConsole(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, status *couchbasev2.ClusterStatus) (ReconcileStatus, error) {
 	// Lookup the console service.
 	name := cluster.Name + "-ui"
 	service, err := GetService(kubecli, name, cluster.Namespace, nil)
@@ -498,10 +498,10 @@ func UpdateAdminConsole(kubecli kubernetes.Interface, cluster *couchbasev1.Couch
 
 // updateExposedPorts accepts a new or existing service and adds the allocated
 // node ports to a port status structure.
-func updateExposedPorts(portStatusMap couchbasev1.PortStatusMap, nodeName string, service *v1.Service) error {
+func updateExposedPorts(portStatusMap couchbasev2.PortStatusMap, nodeName string, service *v1.Service) error {
 	portStatus, ok := portStatusMap[nodeName]
 	if !ok {
-		portStatus = &couchbasev1.PortStatus{}
+		portStatus = &couchbasev2.PortStatus{}
 		portStatusMap[nodeName] = portStatus
 	}
 	for _, servicePort := range service.Spec.Ports {
@@ -547,31 +547,31 @@ func GetExposedServiceName(nodeName string) string {
 }
 
 // exposedfeatureSets is a mapping from feature name to a list of host ports to expose
-var exposedfeatureSets = map[string][]couchbasev1.Service{
-	couchbasev1.FeatureAdmin: []couchbasev1.Service{
-		couchbasev1.AdminService,
+var exposedfeatureSets = map[string][]couchbasev2.Service{
+	couchbasev2.FeatureAdmin: []couchbasev2.Service{
+		couchbasev2.AdminService,
 	},
-	couchbasev1.FeatureXDCR: []couchbasev1.Service{
-		couchbasev1.AdminService,
-		couchbasev1.IndexService,
-		couchbasev1.DataService,
+	couchbasev2.FeatureXDCR: []couchbasev2.Service{
+		couchbasev2.AdminService,
+		couchbasev2.IndexService,
+		couchbasev2.DataService,
 	},
-	couchbasev1.FeatureClient: []couchbasev1.Service{
-		couchbasev1.IndexService,
-		couchbasev1.QueryService,
-		couchbasev1.SearchService,
-		couchbasev1.AnalyticsService,
-		couchbasev1.EventingService,
-		couchbasev1.DataService,
+	couchbasev2.FeatureClient: []couchbasev2.Service{
+		couchbasev2.IndexService,
+		couchbasev2.QueryService,
+		couchbasev2.SearchService,
+		couchbasev2.AnalyticsService,
+		couchbasev2.EventingService,
+		couchbasev2.DataService,
 	},
 }
 
 // exposedFeatureSetToServiceList takes a requested feature set and returns
 // a list of unique service names
-func exposedFeatureSetToServiceList(featureSet couchbasev1.ExposedFeatureList) (couchbasev1.ServiceList, error) {
+func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (couchbasev2.ServiceList, error) {
 	// Nothing to do, exit
-	serviceList := couchbasev1.ServiceList{}
-	serviceSet := map[couchbasev1.Service]interface{}{}
+	serviceList := couchbasev2.ServiceList{}
+	serviceSet := map[couchbasev2.Service]interface{}{}
 	if featureSet == nil || len(featureSet) == 0 {
 		return serviceList, nil
 	}
@@ -595,7 +595,7 @@ func exposedFeatureSetToServiceList(featureSet couchbasev1.ExposedFeatureList) (
 }
 
 // listRequestedPorts return the set of ports requested by the specification.
-func listRequestedPorts(serviceNames couchbasev1.ServiceList) []v1.ServicePort {
+func listRequestedPorts(serviceNames couchbasev2.ServiceList) []v1.ServicePort {
 	ports := []v1.ServicePort{}
 	for _, serviceName := range serviceNames {
 		ports = append(ports, servicePorts[serviceName]...)
@@ -649,12 +649,12 @@ func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
 }
 
 // GetDNSName returns the public DNS name we expect to be created for the member.
-func GetDNSName(cluster *couchbasev1.CouchbaseCluster, hostname string) string {
+func GetDNSName(cluster *couchbasev2.CouchbaseCluster, hostname string) string {
 	return hostname + "." + cluster.Name + "." + cluster.Spec.DNS.Domain
 }
 
 // GetSRVName returns the public SRV name to create for service discovery.
-func GetSRVName(cluster *couchbasev1.CouchbaseCluster) string {
+func GetSRVName(cluster *couchbasev2.CouchbaseCluster) string {
 	return "_couchbases._tcp." + cluster.Name + "." + cluster.Spec.DNS.Domain + " 0 0 " + strconv.Itoa(dataServicePortTLS)
 }
 
@@ -672,14 +672,14 @@ func filterInsecurePorts(ports []v1.ServicePort, secure bool) []v1.ServicePort {
 
 // filterConfiguredPorts takes a set of ports and removes any that are not
 // configured for a specific server class.
-func filterConfiguredPorts(ports []v1.ServicePort, services couchbasev1.ServiceList) []v1.ServicePort {
+func filterConfiguredPorts(ports []v1.ServicePort, services couchbasev2.ServiceList) []v1.ServicePort {
 	// Admin is not explicitly enabled, it is always there
 	enabledPorts := listRequestedPorts(services)
 	return intersectPorts(ports, enabledPorts)
 }
 
 // memberServices returns the enabled services for a specific member.
-func memberServices(cluster *couchbasev1.CouchbaseCluster, members couchbaseutil.MemberSet, name string) (couchbasev1.ServiceList, error) {
+func memberServices(cluster *couchbasev2.CouchbaseCluster, members couchbaseutil.MemberSet, name string) (couchbasev2.ServiceList, error) {
 	member, ok := members[name]
 	if !ok {
 		return nil, cberrors.NewErrUnknownMember(name)
@@ -689,18 +689,18 @@ func memberServices(cluster *couchbasev1.CouchbaseCluster, members couchbaseutil
 		return nil, cberrors.NewErrUnknownServerClass(member.ServerConfig)
 	}
 	// Append the admin service, this is not explicitly enabled
-	return append(class.Services, couchbasev1.AdminService), nil
+	return append(class.Services, couchbasev2.AdminService), nil
 }
 
 // UpdateExposedFeatureStatus is used to communicate to clients which services have been
 // added or created by UpdateExposedFeatureStatus
 type UpdateExposedFeatureStatus struct {
-	Added   couchbasev1.ServiceList
-	Removed couchbasev1.ServiceList
+	Added   couchbasev2.ServiceList
+	Removed couchbasev2.ServiceList
 }
 
 // listExposedServices returns all services which are associated with specific pod ports.
-func listExposedServices(kubecli kubernetes.Interface, cluster *couchbasev1.CouchbaseCluster) ([]*v1.Service, error) {
+func listExposedServices(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster) ([]*v1.Service, error) {
 	// Get a list of all cluster services that belong to a specific nodes
 	clusterRequirement, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{cluster.Name})
 	if err != nil {
@@ -729,7 +729,7 @@ func listExposedServices(kubecli kubernetes.Interface, cluster *couchbasev1.Couc
 }
 
 // generateExposedService creates a Kubernetes Service resource for the requested member.
-func generateExposedService(name string, members couchbaseutil.MemberSet, cluster *couchbasev1.CouchbaseCluster, ports []v1.ServicePort) (*v1.Service, error) {
+func generateExposedService(name string, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (*v1.Service, error) {
 	// Define the new service name.
 	exposedServiceName := GetExposedServiceName(name)
 
@@ -764,7 +764,7 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 
 // createExposedServices creates external services for pods if required.  Don't create services if
 // there are no ports to expose or the service already exists.
-func createExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev1.CouchbaseCluster, ports []v1.ServicePort) (creations []*v1.Service, err error) {
+func createExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (creations []*v1.Service, err error) {
 	if !cluster.Spec.HasExposedFeatures() {
 		return
 	}
@@ -828,7 +828,7 @@ func updateExposedService(service, requested *v1.Service) bool {
 // updateExposedServices examines existing external services.  It first filters the allowable ports on
 // a per-member basis so as not to expose services not enabled or allowable by the specification.  It then
 // returns an services which require an update or deletion.
-func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev1.CouchbaseCluster, ports []v1.ServicePort) (updates, deletions, untouched []*v1.Service, err error) {
+func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (updates, deletions, untouched []*v1.Service, err error) {
 	for _, service := range services {
 		// Extract metadata from the service
 		memberName, ok := service.Labels[constants.LabelNode]
@@ -879,7 +879,7 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 // via feature sets.  There is some overlap between sets so we perform a boolean union
 // before processing.  The function returns lists of added and removed services so
 // client code can perform any notifications, these are lexically sorted for determinism.
-func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.MemberSet, cluster *couchbasev1.CouchbaseCluster, status *couchbasev1.ClusterStatus) (*UpdateExposedFeatureStatus, error) {
+func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, status *couchbasev2.ClusterStatus) (*UpdateExposedFeatureStatus, error) {
 	// For each feature set accumulate a unique set of services to expose, then map these to
 	// a set of ports we wish to expose.
 	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.ExposedFeatures)
@@ -912,7 +912,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 	}
 
 	// Buffer the port status as we go through
-	portStatus := map[string]*couchbasev1.PortStatus{}
+	portStatus := map[string]*couchbasev2.PortStatus{}
 
 	// Untouched nodes need to add their ports to the status.
 	for _, service := range untouched {
@@ -983,7 +983,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 
 // TEMPORARY HACK
 // Does exactly the same as above but tells us if we need to do anything
-func WouldUpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.MemberSet, cluster *couchbasev1.CouchbaseCluster) (bool, error) {
+func WouldUpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 	// For each feature set accumulate a unique set of services to expose
 	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.ExposedFeatures)
 	if err != nil {

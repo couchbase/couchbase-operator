@@ -1,12 +1,73 @@
-apiVersion: couchbase.com/v1
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket0
+spec:
+  memoryQuota: 100
+  replicas: 0
+  ioPriority: high
+  evictionPolicy: fullEviction
+  conflictResolution: seqno
+  enableFlush: true
+  enableIndexReplica: false
+  compressionMode: passive
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  memoryQuota: 100
+  replicas: 0
+  ioPriority: high
+  evictionPolicy: valueOnly
+  conflictResolution: seqno
+  enableFlush: true
+  enableIndexReplica: false
+  compressionMode: passive
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseMemcachedBucket
+metadata:
+  name: bucket2 
+spec:
+  memoryQuota: 100
+  enableFlush: true
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseEphemeralBucket
+metadata:
+  name: bucket3
+spec:
+  memoryQuota: 100
+  replicas: 3
+  ioPriority: low
+  evictionPolicy: noEviction
+  conflictResolution: lww
+  enableFlush: true
+  compressionMode: passive
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseEphemeralBucket
+metadata:
+  name: bucket4
+spec:
+  memoryQuota: 100
+  replicas: 3
+  ioPriority: low
+  evictionPolicy: nruEviction
+  conflictResolution: lww
+  enableFlush: true
+  compressionMode: passive
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
-  name: cb-example
+  name: cluster
   namespace: default
 spec:
   antiAffinity: false
-  baseImage: couchbase/server
-  version: enterprise-5.5.0
+  image: couchbase/server:enterprise-5.5.0
   authSecret: basic-test-secret
   exposeAdminConsole: false
   paused: false
@@ -35,44 +96,7 @@ spec:
     autoFailoverMaxCount: 1
     autoFailoverTimeout: 10
   buckets:
-    - name: default1
-      type: couchbase
-      memoryQuota: 100
-      replicas: 0
-      ioPriority: high
-      evictionPolicy: fullEviction
-      conflictResolution: seqno
-      enableFlush: true
-      enableIndexReplica: false
-    - name: default2
-      type: couchbase
-      memoryQuota: 100
-      replicas: 0
-      ioPriority: high
-      evictionPolicy: valueOnly
-      conflictResolution: seqno
-      enableFlush: true
-      enableIndexReplica: false
-    - name: default3
-      type: memcached
-      memoryQuota: 100
-      enableFlush: true
-    - name: default4
-      type: ephemeral
-      memoryQuota: 100
-      replicas: 3
-      ioPriority: low
-      evictionPolicy: noEviction
-      conflictResolution: lww
-      enableFlush: true
-    - name: default5
-      type: ephemeral
-      memoryQuota: 100
-      replicas: 3
-      ioPriority: low
-      evictionPolicy: nruEviction
-      conflictResolution: lww
-      enableFlush: true
+    managed: true
   servers:
     - size: 1
       name: all_services

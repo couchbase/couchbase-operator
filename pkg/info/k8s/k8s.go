@@ -3,7 +3,7 @@ package k8s
 import (
 	"fmt"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
@@ -20,7 +20,7 @@ import (
 // a context
 func InitContext(context *context.Context) error {
 	// Add our CRD to the global scheme
-	if err := couchbasev1.AddToScheme(scheme.Scheme); err != nil {
+	if err := couchbasev2.AddToScheme(scheme.Scheme); err != nil {
 		return err
 	}
 
@@ -115,8 +115,8 @@ func GetOperatorDeployment(context *context.Context) (*appsv1.Deployment, error)
 }
 
 // GetCouchbaseClusters returns all Couchbase Clusters in the namespace.
-func GetCouchbaseClusters(context *context.Context) (*couchbasev1.CouchbaseClusterList, error) {
-	clusters, err := context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(context.Namespace()).List(metav1.ListOptions{})
+func GetCouchbaseClusters(context *context.Context) (*couchbasev2.CouchbaseClusterList, error) {
+	clusters, err := context.CouchbaseClusterClient.CouchbaseV2().CouchbaseClusters(context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to poll CouchbaseCluster resources: %v", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -17,7 +18,7 @@ func TestCreateCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", 0, 1, 2)
@@ -36,7 +37,8 @@ func TestCreateBucketCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", 0, 1, 2)

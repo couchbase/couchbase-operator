@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -28,32 +30,31 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 
 	clusterSize := 3
 	numOfDocs := 50
-	bucketName := "defBucket"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 1, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":         clusterConfig,
 		"service1":        serviceConfig1,
-		"bucket1":         bucketConfig1,
 		"exposedFeatures": {"featureNames": "client"},
 	}
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.AnalyticsService, couchbasev2.DataService, couchbasev2.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.SearchService)
 	// Can get stuck on rebalancing.
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, "default", 0, numOfDocs)
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
 	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
@@ -62,19 +63,24 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	analyticsDataset := "testDataset1"
 
 	queries := []string{
-		"CREATE DATASET " + analyticsDataset + " ON `" + bucketName + "`",
+		"CREATE DATASET " + analyticsDataset + " ON `default`",
 		"CONNECT LINK Local",
 	}
 
+	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	// TODO: Kill me ASAP as it's DP code.
-	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	version, err := couchbaseutil.NewVersion(versionStr)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 	if version.Major() < 6 {
 		analyticsBucketName := "testAnalyticsBucket"
 		queries = []string{
-			`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
+			`create bucket ` + analyticsBucketName + ` with {"name": "default"}`,
 			`create dataset ` + analyticsDataset + ` on ` + analyticsBucketName,
 			`connect bucket ` + analyticsBucketName,
 		}
@@ -92,7 +98,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func insertAnalyticsDocument(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, bucket, docID, docType string) error {
+func insertAnalyticsDocument(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket, docID, docType string) error {
 	// Establishing a client connection is essentially random so if we tried
 	// to reuse this one there is a high probability that the target pod will
 	// be killed and this will constantly error.
@@ -140,29 +146,28 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 
 	clusterSize := 1
 	numOfDocs := 10
-	bucketName := "defBucket"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 1, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":         clusterConfig,
 		"service1":        serviceConfig1,
-		"bucket1":         bucketConfig1,
 		"exposedFeatures": map[string]string{"featureNames": "client"},
 	}
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.AnalyticsService, couchbasev2.DataService, couchbasev2.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.SearchService)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, "default", 0, numOfDocs)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
@@ -174,21 +179,26 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	analyticsDataset3 := "testDataset3"
 
 	queries := []string{
-		"CREATE DATASET " + analyticsDataset1 + " ON `" + bucketName + "`",
-		"CREATE DATASET " + analyticsDataset2 + " ON `" + bucketName + "` WHERE `valueType` = \"type1\"",
-		"CREATE DATASET " + analyticsDataset3 + " ON `" + bucketName + "` WHERE `valueType` = \"type2\"",
+		"CREATE DATASET " + analyticsDataset1 + " ON `default`",
+		"CREATE DATASET " + analyticsDataset2 + " ON `default` WHERE `valueType` = \"type1\"",
+		"CREATE DATASET " + analyticsDataset3 + " ON `default` WHERE `valueType` = \"type2\"",
 		"CONNECT LINK Local",
 	}
 
+	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	// TODO: Kill me ASAP as it's DP code.
-	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	version, err := couchbaseutil.NewVersion(versionStr)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 	if version.Major() < 6 {
 		analyticsBucketName := "testAnalyticsBucket"
 		queries = []string{
-			`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
+			`create bucket ` + analyticsBucketName + ` with {"name": "default"}`,
 			`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
 			`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
 			`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,
@@ -212,7 +222,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 
 	// Clone the cluster here to avoid read/write races
 	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *couchbasev1.CouchbaseCluster) {
+	go func(cluster *couchbasev2.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -225,7 +235,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 				if numOfDocs%2 != 0 {
 					docType = "type2"
 				}
-				if err = insertAnalyticsDocument(targetKube, cluster, bucketName, docID, docType); err != nil {
+				if err = insertAnalyticsDocument(targetKube, cluster, "default", docID, docType); err != nil {
 					break
 				}
 				if numOfDocs%2 == 0 {
@@ -297,7 +307,13 @@ func TestAnalyticsKillPods(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// TODO: Kill me ASAP as it's DP code.
+	version, err := couchbaseutil.NewVersion(versionStr)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -309,36 +325,35 @@ func TestAnalyticsKillPods(t *testing.T) {
 	clusterSizeOfAnalytics := 3
 	clusterSize := clusterSizeWoAnalytics + clusterSizeOfAnalytics + 1
 	numOfDocs := 10
-	bucketName := "defBucket"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "analytics"})
 	serviceConfig2 := e2eutil.GetServiceConfigMap(clusterSizeWoAnalytics, "test_config_2", []string{"data", "query", "index"})
 	serviceConfig3 := e2eutil.GetServiceConfigMap(clusterSizeOfAnalytics, "test_config_3", []string{"analytics"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 1, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":         clusterConfig,
 		"service1":        serviceConfig1,
 		"service2":        serviceConfig2,
 		"service3":        serviceConfig3,
-		"bucket1":         bucketConfig1,
 		"exposedFeatures": map[string]string{"featureNames": "client"},
 	}
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.AnalyticsService, couchbasev2.DataService, couchbasev2.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.SearchService)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	// Load default data set into couchbase bucket
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, "default", 0, numOfDocs)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
@@ -350,9 +365,9 @@ func TestAnalyticsKillPods(t *testing.T) {
 	analyticsDataset3 := "testDataset3"
 
 	queries := []string{
-		"CREATE DATASET " + analyticsDataset1 + " ON `" + bucketName + "`",
-		"CREATE DATASET " + analyticsDataset2 + " ON `" + bucketName + "` WHERE `valueType` = \"type1\"",
-		"CREATE DATASET " + analyticsDataset3 + " ON `" + bucketName + "` WHERE `valueType` = \"type2\"",
+		"CREATE DATASET " + analyticsDataset1 + " ON `default`",
+		"CREATE DATASET " + analyticsDataset2 + " ON `default` WHERE `valueType` = \"type1\"",
+		"CREATE DATASET " + analyticsDataset3 + " ON `default` WHERE `valueType` = \"type2\"",
 		"CONNECT LINK Local",
 	}
 
@@ -375,7 +390,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 
 	// Clone the cluster here to avoid read/write races
 	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *couchbasev1.CouchbaseCluster) {
+	go func(cluster *couchbasev2.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -388,7 +403,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 				if numOfDocs%2 != 0 {
 					docType = "type2"
 				}
-				if err = insertAnalyticsDocument(targetKube, cluster, bucketName, docID, docType); err != nil {
+				if err = insertAnalyticsDocument(targetKube, cluster, "default", docID, docType); err != nil {
 					break
 				}
 				if numOfDocs%2 == 0 {
@@ -473,7 +488,6 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 
 	numOfDocs := 100
 	clusterSize := 3
-	bucketName := "PVBucket"
 	pvcName := "couchbase"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverMaxCount"] = "3"
@@ -483,11 +497,9 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 1, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":         clusterConfig,
 		"service1":        serviceConfig1,
-		"bucket1":         bucketConfig1,
 		"exposedFeatures": map[string]string{"featureNames": "client"},
 	}
 
@@ -495,20 +507,22 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedEvents := e2eutil.EventValidator{}
 	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.AnalyticsService, couchbasev2.DataService, couchbasev2.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.SearchService)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 1, numOfDocs)
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, "default", 1, numOfDocs)
 
 	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
@@ -520,21 +534,26 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	analyticsDataset3 := "testDataset3"
 
 	queries := []string{
-		"CREATE DATASET " + analyticsDataset1 + " ON `" + bucketName + "`",
-		"CREATE DATASET " + analyticsDataset2 + " ON `" + bucketName + "` WHERE `valueType` = \"type1\"",
-		"CREATE DATASET " + analyticsDataset3 + " ON `" + bucketName + "` WHERE `valueType` = \"type2\"",
+		"CREATE DATASET " + analyticsDataset1 + " ON `default`",
+		"CREATE DATASET " + analyticsDataset2 + " ON `default` WHERE `valueType` = \"type1\"",
+		"CREATE DATASET " + analyticsDataset3 + " ON `default` WHERE `valueType` = \"type2\"",
 		"CONNECT LINK Local",
 	}
 
+	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	// TODO: Kill me ASAP as it's DP code.
-	version, err := couchbaseutil.NewVersion(f.CouchbaseServerVersion)
+	version, err := couchbaseutil.NewVersion(versionStr)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 	if version.Major() < 6 {
 		analyticsBucketName := "testAnalyticsBucket"
 		queries = []string{
-			`create bucket ` + analyticsBucketName + ` with {"name": "` + bucketName + `"}`,
+			`create bucket ` + analyticsBucketName + ` with {"name": "default"}`,
 			`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
 			`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
 			`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,

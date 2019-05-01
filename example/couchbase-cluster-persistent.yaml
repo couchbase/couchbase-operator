@@ -1,10 +1,23 @@
-apiVersion: couchbase.com/v1
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: default
+spec:
+  memoryQuota: 128
+  replicas: 1
+  ioPriority: high
+  evictionPolicy: fullEviction
+  conflictResolution: seqno
+  enableFlush: true
+  enableIndexReplica: false
+  compressionMode: passive
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  baseImage: couchbase/server
-  version: enterprise-6.0.1
+  image: couchbase/server:enterprise-6.0.1
   authSecret: cb-example-auth
   exposeAdminConsole: true
   adminConsoleServices:
@@ -22,15 +35,7 @@ spec:
     autoFailoverOnDataDiskIssuesTimePeriod: 120
     autoFailoverServerGroup: false
   buckets:
-    - name: default
-      type: couchbase
-      memoryQuota: 128
-      replicas: 1
-      ioPriority: high
-      evictionPolicy: fullEviction
-      conflictResolution: seqno
-      enableFlush: true
-      enableIndexReplica: false
+    managed: true
   servers:
     - size: 3
       name: all_services

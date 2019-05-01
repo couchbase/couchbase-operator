@@ -1,13 +1,11 @@
 package e2e
 
 import (
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -34,7 +32,7 @@ func TestResizeCluster(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
 	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
@@ -72,7 +70,8 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
 	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
@@ -292,7 +291,8 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Runtime configuration
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -332,7 +332,8 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -384,7 +385,8 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	clusterSize := 2
 
 	// create 2 node cluster with admin console
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// pause operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
@@ -445,10 +447,10 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// adding query service
 	t.Log("adding query service")
-	newService := couchbasev1.ServerConfig{
+	newService := couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_2",
-		Services: couchbasev1.ServiceList{couchbasev1.QueryService},
+		Services: couchbasev2.ServiceList{couchbasev2.QueryService},
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -463,10 +465,10 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// adding index service
 	t.Log("adding index service")
-	newService = couchbasev1.ServerConfig{
+	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_3",
-		Services: couchbasev1.ServiceList{couchbasev1.IndexService},
+		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -481,10 +483,10 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// adding search service
 	t.Log("adding search service")
-	newService = couchbasev1.ServerConfig{
+	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_4",
-		Services: couchbasev1.ServiceList{couchbasev1.SearchService},
+		Services: couchbasev2.ServiceList{couchbasev2.SearchService},
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -582,10 +584,10 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 
 	// adding query service
 	t.Log("adding query service")
-	newService := couchbasev1.ServerConfig{
+	newService := couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_2",
-		Services: couchbasev1.ServiceList{couchbasev1.QueryService},
+		Services: couchbasev2.ServiceList{couchbasev2.QueryService},
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -600,10 +602,10 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 
 	// adding index service
 	t.Log("adding index service")
-	newService = couchbasev1.ServerConfig{
+	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_3",
-		Services: couchbasev1.ServiceList{couchbasev1.IndexService},
+		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -618,10 +620,10 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 
 	// adding search services
 	t.Log("adding search service")
-	newService = couchbasev1.ServerConfig{
+	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size2,
 		Name:     "test_config_4",
-		Services: couchbasev1.ServiceList{couchbasev1.SearchService},
+		Services: couchbasev2.ServiceList{couchbasev2.SearchService},
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 
@@ -816,26 +818,26 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	clusterSize := mdsGroupSize1 + mdsGroupSize2
 
 	// Create the cluster with two server classes, and exposed features.
-	testCouchbase := e2espec.NewBasicClusterSpec(0, constants.WithoutBucket, constants.AdminHidden)
-	testCouchbase.Spec.ServerSettings = []couchbasev1.ServerConfig{
+	testCouchbase := e2espec.NewBasicClusterSpec(0, constants.AdminHidden)
+	testCouchbase.Spec.ServerSettings = []couchbasev2.ServerConfig{
 		{
 			Name: "data",
 			Size: mdsGroupSize1,
-			Services: couchbasev1.ServiceList{
-				couchbasev1.DataService,
-				couchbasev1.IndexService,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
 			},
 		},
 		{
 			Name: "query",
 			Size: mdsGroupSize2,
-			Services: couchbasev1.ServiceList{
-				couchbasev1.QueryService,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.QueryService,
 			},
 		},
 	}
-	testCouchbase.Spec.ExposedFeatures = couchbasev1.ExposedFeatureList{
-		couchbasev1.FeatureXDCR,
+	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureXDCR,
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
@@ -869,30 +871,16 @@ func TestManageMultipleClusters(t *testing.T) {
 	clusterSize := constants.Size2
 
 	// Create the clusters.
-	clusters := []*couchbasev1.CouchbaseCluster{}
+	clusters := []*couchbasev2.CouchbaseCluster{}
 	for index := 0; index < 3; index++ {
-		clusters = append(clusters, e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminExposed))
+		clusters = append(clusters, e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminExposed))
 	}
 
-	for index, testCouchbase := range clusters {
-		// When each cluster is ready create a uniquely named bucket and verify it appears in the
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	for _, testCouchbase := range clusters {
+		// When each cluster is ready create a bucket and verify it appears in the
 		// cluster status.
-		bucketName := fmt.Sprintf("default%d", index)
-		bucket := couchbasev1.BucketConfig{
-			BucketName:         bucketName,
-			BucketType:         pkg_constants.BucketTypeCouchbase,
-			BucketMemoryQuota:  constants.Mem256Mb,
-			BucketReplicas:     pkg_constants.BucketReplicasOne,
-			IoPriority:         pkg_constants.BucketIoPriorityHigh,
-			EvictionPolicy:     pkg_constants.BucketEvictionPolicyFullEviction,
-			ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
-			EnableFlush:        constants.BucketFlushEnabled,
-			EnableIndexReplica: constants.IndexReplicaEnabled,
-		}
-		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/BucketSettings/-", bucket), time.Minute)
-		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test(fmt.Sprintf("/Status/Buckets/%s/BucketName", bucketName), bucketName), time.Minute)
-
-		e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", constants.Mem256Mb), time.Minute)
+		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/Buckets/0/BucketName", "default"), time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		// Check the events match what we expect:
@@ -901,7 +889,7 @@ func TestManageMultipleClusters(t *testing.T) {
 		expectedEvents := []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 			e2eutil.ClusterCreateSequence(clusterSize),
-			eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucketName},
+			eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		}
 		ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 	}

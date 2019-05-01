@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -24,7 +25,7 @@ func TestPauseOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Pause the operator, kill a pod, ensure nothing comes back from the dead, then reenable the operator.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
@@ -63,7 +64,7 @@ func TestKillOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Kill the operator, wait for recovery and make sure nothing bad happened to the cluster.
 	e2eutil.MustKillOperatorAndWaitForRecovery(t, targetKube, f.Namespace)
@@ -89,14 +90,15 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	flush := false
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminExposed)
 
 	// When the cluster is ready, kill the operator, manually update the bucket.  Verify the
 	// bucket was updated and wait for it to revert as the operator regains mastership.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", &flush), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", &flush), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", flush), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", flush), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 3*time.Minute)
 
 	// Check the events match what we expect:

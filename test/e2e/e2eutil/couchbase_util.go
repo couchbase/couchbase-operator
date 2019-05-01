@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
@@ -36,7 +36,7 @@ import (
 type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]int) bool
 
 // newClient returns a new Couchbase management client (internal not go SDK)
-func newClient(kubeClient kubernetes.Interface, cl *couchbasev1.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
+func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
 	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.AuthSecret)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster) (*cbmgr.Couchbase, func(), error) {
+func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*cbmgr.Couchbase, func(), error) {
 	// Create a port forward and get a host connection string
 	host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
 	if err != nil {
@@ -120,7 +120,7 @@ func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev1.Couchbase
 	return client, cleanup, nil
 }
 
-func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster) (*cbmgr.Couchbase, func()) {
+func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*cbmgr.Couchbase, func()) {
 	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 	if err != nil {
 		Die(t, err)
@@ -129,7 +129,7 @@ func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *cou
 }
 
 // GetPod selects a random pod that may be running a specified service or set of services from the cluster.
-func GetPod(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, services []couchbasev1.Service) (*corev1.Pod, error) {
+func GetPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, services []couchbasev2.Service) (*corev1.Pod, error) {
 	appreq, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App})
 	if err != nil {
 		return nil, err
@@ -167,13 +167,13 @@ func GetPod(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, services 
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func GetHostURL(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, service couchbasev1.Service) (string, func(), error) {
+func GetHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, service couchbasev2.Service) (string, func(), error) {
 	// Forward port to a pod to the local host.  Pick a random pod this will prevent hangs
 	// if the pod we are always selecting isn't the one we need.
 
 	// Admin is special as it's enabled everyehere and doesn't have a label selector
-	services := []couchbasev1.Service{}
-	if service != couchbasev1.AdminService {
+	services := []couchbasev2.Service{}
+	if service != couchbasev2.AdminService {
 		services = append(services, service)
 	}
 
@@ -182,14 +182,14 @@ func GetHostURL(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, servi
 		return "", nil, err
 	}
 
-	portMap := map[couchbasev1.Service]string{
-		couchbasev1.AdminService:     "8091",
-		couchbasev1.IndexService:     "8092",
-		couchbasev1.QueryService:     "8093",
-		couchbasev1.SearchService:    "8094",
-		couchbasev1.AnalyticsService: "8095",
-		couchbasev1.EventingService:  "8096",
-		couchbasev1.DataService:      "11210",
+	portMap := map[couchbasev2.Service]string{
+		couchbasev2.AdminService:     "8091",
+		couchbasev2.IndexService:     "8092",
+		couchbasev2.QueryService:     "8093",
+		couchbasev2.SearchService:    "8094",
+		couchbasev2.AnalyticsService: "8095",
+		couchbasev2.EventingService:  "8096",
+		couchbasev2.DataService:      "11210",
 	}
 	targetPort, ok := portMap[service]
 	if !ok {
@@ -207,12 +207,12 @@ func GetHostURL(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, servi
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster) (string, func(), error) {
-	return GetHostURL(k8s, cluster, couchbasev1.AdminService)
+func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, func(), error) {
+	return GetHostURL(k8s, cluster, couchbasev2.AdminService)
 }
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
-func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -245,7 +245,7 @@ func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.Co
 	})
 }
 
-func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) {
+func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchBucketInfo(t, k8s, couchbase, bucketName, patches, timeout); err != nil {
 		Die(t, err)
 	}
@@ -266,7 +266,7 @@ func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 }
 
 // Inserts Json docs into couchbase bucket
-func InsertJsonDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
+func InsertJsonDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
 	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 	if err != nil {
 		return err
@@ -303,14 +303,14 @@ func InsertJsonDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev1.Couchbase
 	return nil
 }
 
-func MustInsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) {
+func MustInsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) {
 	if err := InsertJsonDocsIntoBucket(k8s, cluster, bucketName, docStartIndex, numOfDocs); err != nil {
 		Die(t, err)
 	}
 }
 
 // Add a node to the cluster
-func AddNode(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, services couchbasev1.ServiceList, member *couchbaseutil.Member) error {
+func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member *couchbaseutil.Member) error {
 	username, password, err := GetClusterAuth(k8s.KubeClient, couchbase.Namespace, k8s.DefaultSecret.Name)
 	if err != nil {
 		return err
@@ -379,14 +379,14 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, servic
 	return retryutil.Retry(ctx, time.Second, IntMax, callback)
 }
 
-func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, services couchbasev1.ServiceList, member *couchbaseutil.Member) {
+func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member *couchbaseutil.Member) {
 	if err := AddNode(k8s, couchbase, services, member); err != nil {
 		Die(t, err)
 	}
 }
 
 // EjectMember removes the given member index from the cluster,
-func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, index int, timeout time.Duration) error {
+func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -434,7 +434,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.Couchb
 	return nil
 }
 
-func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, index int, timeout time.Duration) {
+func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) {
 	if err := EjectMember(t, k8s, couchbase, index, timeout); err != nil {
 		Die(t, err)
 	}
@@ -449,7 +449,7 @@ func MemberFromSpecProps(name, namespace, serverConfig string, memberIndex int) 
 	}
 }
 
-func FailoverNode(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, index int, timeout time.Duration) error {
+func FailoverNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -473,13 +473,13 @@ func FailoverNode(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, i
 	})
 }
 
-func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, index int, timeout time.Duration) {
+func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) {
 	if err := FailoverNode(k8s, couchbase, index, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) error {
+func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -507,13 +507,13 @@ func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *couchbasev1.
 	})
 }
 
-func MustVerifyClusterBalancedAndHealthy(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) {
+func MustVerifyClusterBalancedAndHealthy(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := VerifyClusterBalancedAndHealthy(k8s, couchbase, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, numUnhealthy int, timeout time.Duration) error {
+func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, numUnhealthy int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -541,14 +541,14 @@ func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseC
 	})
 }
 
-func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, numUnhealthy int, timeout time.Duration) {
+func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, numUnhealthy int, timeout time.Duration) {
 	if err := WaitForUnhealthyNodes(k8s, couchbase, numUnhealthy, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 // PatchCouchbaseInfo tries patching the cluster information returned directly from Couchbase server.
-func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -569,13 +569,13 @@ func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1
 	})
 }
 
-func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchCouchbaseInfo(t, k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -596,13 +596,13 @@ func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 	})
 }
 
-func MustPatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+func MustPatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchAutoFailoverInfo(t, k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -623,13 +623,13 @@ func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 	})
 }
 
-func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchIndexSettingInfo(t, k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) error {
+func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -653,7 +653,7 @@ func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.Cou
 	})
 }
 
-func MustVerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) {
+func MustVerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) {
 	if err := VerifyServices(t, k8s, couchbase, timeout, value, verifiers...); err != nil {
 		Die(t, err)
 	}
@@ -688,14 +688,14 @@ func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[s
 	}
 }
 
-func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev1.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) {
+func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) {
 	if responseData, err := DeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc); err != nil {
 		t.Log(string(responseData))
 		Die(t, err)
 	}
 }
 
-func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev1.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) ([]byte, error) {
+func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -718,7 +718,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		var eventingUrl string
 		var cleanup func()
 		var err error
-		if eventingUrl, cleanup, err = GetHostURL(targetKube, cluster, couchbasev1.EventingService); err != nil {
+		if eventingUrl, cleanup, err = GetHostURL(targetKube, cluster, couchbasev2.EventingService); err != nil {
 			t.Log(err)
 			return false, retryutil.RetryOkError(err)
 		}

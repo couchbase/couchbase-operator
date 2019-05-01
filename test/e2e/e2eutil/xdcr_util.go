@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -73,7 +73,7 @@ func FlushBucket(hostUrl, bucketName, hostUsername, hostPassword string) ([]byte
 // to create a defined number of documents.  The prefix is randomized so subsequent
 // runs do not collide.  Documents are inserted one at a time, so we can keep a count
 // of exactly how many were successfully committed.
-func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, bucket string, items int) error {
+func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int) error {
 	document := RandomSuffix()
 	for i := 0; i < items; i++ {
 		callback := func() (bool, error) {
@@ -108,7 +108,7 @@ func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.Couch
 	return nil
 }
 
-func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, bucket string, items int) {
+func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucket string, items int) {
 	if err := PopulateBucket(t, k8s, couchbase, bucket, items); err != nil {
 		Die(t, err)
 	}
@@ -116,7 +116,7 @@ func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1
 
 // VerifyDocCountInBucket polls the Couchbase API for the named bucket and checks whether the
 // document count matches the expected number of items.
-func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
+func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -137,7 +137,7 @@ func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbase
 	})
 }
 
-func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, bucket string, items int, timeout time.Duration) {
+func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) {
 	if err := VerifyDocCountInBucket(t, k8s, cluster, bucket, items, timeout); err != nil {
 		Die(t, err)
 	}
@@ -160,7 +160,7 @@ func GetRemoteUuid(hostUrl, cbUsername, cbPassword string) (uuid string, err err
 
 // CreateDestClusterReference polls the destination cluster to discover the node port of a pod and uses that to
 // initialize connection on the source cluster.
-func CreateDestClusterReference(k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev1.CouchbaseCluster, username, password string) error {
+func CreateDestClusterReference(k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
@@ -182,11 +182,21 @@ func CreateDestClusterReference(k8sSrc, k8sDst *types.Cluster, src, dst *couchba
 		}
 		defer cleanup()
 
+		cluster, err := k8sDst.CRClient.CouchbaseV2().CouchbaseClusters(dst.Namespace).Get(dst.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		ports, ok := cluster.Status.ExposedPorts[pod.Name]
+		if !ok {
+			return false, retryutil.RetryOkError(fmt.Errorf("admin service port not exposed"))
+		}
+
 		// Make the request
 		values := url.Values{}
-		values.Add("uuid", dst.Status.ClusterID)
-		values.Add("name", dst.Name)
-		values.Add("hostname", pod.Status.HostIP+":"+strconv.Itoa(int(dst.Status.ExposedPorts[pod.Name].AdminServicePort)))
+		values.Add("uuid", cluster.Status.ClusterID)
+		values.Add("name", cluster.Name)
+		values.Add("hostname", pod.Status.HostIP+":"+strconv.Itoa(int(ports.AdminServicePort)))
 		values.Add("username", username)
 		values.Add("password", password)
 
@@ -199,7 +209,7 @@ func CreateDestClusterReference(k8sSrc, k8sDst *types.Cluster, src, dst *couchba
 	return retryutil.Retry(ctx, 5*time.Second, IntMax, callback)
 }
 
-func MustCreateDestClusterReference(t *testing.T, k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev1.CouchbaseCluster, username, password string) {
+func MustCreateDestClusterReference(t *testing.T, k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password string) {
 	if err := CreateDestClusterReference(k8sSrc, k8sDst, src, dst, username, password); err != nil {
 		Die(t, err)
 	}
@@ -232,7 +242,7 @@ func DeleteXdcrClusterReferences(hostUsername, hostPassword string, xdcrClusterR
 	return err
 }
 
-func CreateXdcrBucketReplication(k8s *types.Cluster, src, dst *couchbasev1.CouchbaseCluster, username, password, srcbucket, dstBucket string) error {
+func CreateXdcrBucketReplication(k8s *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password, srcbucket, dstBucket string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
@@ -259,7 +269,7 @@ func CreateXdcrBucketReplication(k8s *types.Cluster, src, dst *couchbasev1.Couch
 	return retryutil.Retry(ctx, 5*time.Second, IntMax, callback)
 }
 
-func MustCreateXdcrBucketReplication(t *testing.T, k8s *types.Cluster, src, dst *couchbasev1.CouchbaseCluster, username, password, srcbucket, dstBucket string) {
+func MustCreateXdcrBucketReplication(t *testing.T, k8s *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password, srcbucket, dstBucket string) {
 	if err := CreateXdcrBucketReplication(k8s, src, dst, username, password, srcbucket, dstBucket); err != nil {
 		Die(t, err)
 	}

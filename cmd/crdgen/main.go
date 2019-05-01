@@ -1,52 +1,51 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v2"
 
 	"github.com/ghodss/yaml"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
-var outfile string
+var (
+	crds []interface{}
+)
+
+// buffer post processes raw output strings and buffers them
+func buffer(crd interface{}) {
+	crds = append(crds, crd)
+}
+
+// dump formats the CRDs as YAML and echos to standard out
+func dump() error {
+	var yamls []string
+
+	for _, crd := range crds {
+		data, err := yaml.Marshal(crd)
+		if err != nil {
+			return err
+		}
+		// Hack: the status attribute is formatted, but the API rejects this so
+		// we need a way to rid ourselves of it.
+		parts := strings.Split(string(data), "\nstatus:\n")
+		yamls = append(yamls, parts[0])
+	}
+
+	fmt.Println(strings.Join(yamls, "\n---\n"))
+	return nil
+}
 
 func main() {
-	flag.StringVar(&outfile, "outfile", "", "The file to write the crd to")
-	flag.Parse()
-
-	if outfile == "" {
-		fmt.Println("The outfile parameter is required")
-		os.Exit(1)
-	}
-
-	crd := k8sutil.GetCRD()
-	resource := struct {
-		APIVersion string `json:"apiVersion"`
-		Kind       string `json:"kind"`
-		MetaData   struct {
-			Name string `json:"name"`
-		} `json:"metadata"`
-		Spec apiextensionsv1beta1.CustomResourceDefinitionSpec `json:"spec"`
-	}{
-		APIVersion: apiextensionsv1beta1.SchemeGroupVersion.String(),
-		Kind:       "CustomResourceDefinition",
-		Spec:       crd.Spec,
-	}
-	resource.MetaData.Name = crd.Name
-
-	data, err := yaml.Marshal(resource)
-	if err != nil {
-		fmt.Printf("Error marshaling crd: %s\n", err)
-		os.Exit(1)
-	}
-
-	err = ioutil.WriteFile(outfile, data, 0644)
-	if err != nil {
-		fmt.Printf("Error writing crd to %s: %s\n", outfile, err)
+	buffer(v2.GetCouchbaseBucketCRD())
+	buffer(v2.GetCouchbaseEphemeralBucketCRD())
+	buffer(v2.GetCouchbaseMemcachedBucketCRD())
+	buffer(k8sutil.GetCRD())
+	if err := dump(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }

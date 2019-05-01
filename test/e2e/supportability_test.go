@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -376,7 +376,7 @@ func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.In
 	pvcDir := namespaceDir + "/persistentvolumeclaim"
 
 	// Cluster dependent file - couchbasecluster, endpoints, pods, secrets
-	clusters, err := crClient.CouchbaseV1().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	clusters, err := crClient.CouchbaseV2().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.New("Failed to list clusters: " + err.Error())
 	}
@@ -643,7 +643,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 
 	// Deploy cb server for cbopinfo validation
-	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
+	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
 
 	for _, arg := range validArgumentList {
 		t.Run(arg.Name, func(t *testing.T) {
@@ -801,26 +801,26 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	cluster1Size := constants.Size3
 	cluster2Size := constants.Size3
 	cluster3Size := constants.Size1
-	var cluster1, cluster2, cluster3 *couchbasev1.CouchbaseCluster
+	var cluster1, cluster2, cluster3 *couchbasev2.CouchbaseCluster
 	cluster1Err := make(chan error)
 	cluster2Err := make(chan error)
 	cluster3Err := make(chan error)
 
 	go func() {
 		var err error
-		cluster1, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster1Size, constants.WithoutBucket, constants.AdminHidden)
+		cluster1, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster1Size, constants.AdminHidden)
 		cluster1Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster2, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster2Size, constants.WithoutBucket, constants.AdminHidden)
+		cluster2, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster2Size, constants.AdminHidden)
 		cluster2Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster3, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster3Size, constants.WithoutBucket, constants.AdminHidden)
+		cluster3, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster3Size, constants.AdminHidden)
 		cluster3Err <- err
 	}()
 
@@ -1107,7 +1107,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithoutBucket, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
 
 	// Create a service account with no permissions.
 	if err := framework.RecreateServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name); err != nil {
@@ -1233,7 +1233,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	}
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 	defer e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
@@ -1322,7 +1322,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Collect logs with invalid operator-image-name
 	t.Log("Collecting logs using invalid -operator-image arg value")
@@ -1411,7 +1411,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	t.Log("Collecting logs using invalid operator-image value")
 	args := argumentList{}
@@ -1484,7 +1484,6 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	clusterSize := 5
 	newMemberIndex := clusterSize
 	podMembersToKill := []int{2, 3, 4}
-	bucketName := "PVBucket"
 	pvcName := "couchbase-log-pv"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverOnDiskIssues"] = "true"
@@ -1496,7 +1495,6 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query", "eventing"})
 	serviceConfig2["logVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	otherConfig1 := map[string]string{
 		"logRetentionTime":  "2h",
 		"logRetentionCount": "3",
@@ -1506,7 +1504,6 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
 		"other1":   otherConfig1,
 	}
 
@@ -1515,6 +1512,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
@@ -1525,7 +1523,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	}
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", "default")
 
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
@@ -1595,7 +1593,6 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	clusterSize := 6
 	serverIndexToResize := 1
 	podMemberToKill := 3
-	bucketName := "PVBucket"
 	pvcName := "couchbase-log-pv"
 	clusterConfig := e2eutil.BasicClusterConfig
 	clusterConfig["autoFailoverOnDiskIssues"] = "true"
@@ -1606,13 +1603,10 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query"})
 	serviceConfig2["logVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushDisabled, constants.IndexReplicaDisabled)
-
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -1621,6 +1615,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Cb cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
@@ -1632,7 +1627,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	}
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", "default")
 
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
@@ -1745,7 +1740,6 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	clusterSize := 7
-	bucketName := "PVBucket"
 	pvcName := "couchbase-log-pv"
 	serviceIndexToResize := 1
 	clusterConfig := e2eutil.BasicClusterConfig
@@ -1757,7 +1751,6 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size5, "test_config_2", []string{"search", "query", "eventing"})
 	serviceConfig2["logVolMnt"] = pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushDisabled, constants.IndexReplicaDisabled)
 	otherConfig1 := map[string]string{
 		"logRetentionTime":  "2h",
 		"logRetentionCount": "3",
@@ -1767,7 +1760,6 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
 		"other1":   otherConfig1,
 	}
 
@@ -1776,6 +1768,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
@@ -1786,7 +1779,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	}
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", "default")
 
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{
@@ -2006,11 +1999,9 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	serviceConfig1["indexVolMnt"] = pvcName
 	serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -2018,6 +2009,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 
@@ -2187,21 +2179,18 @@ func TestLogRedactionVerify(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	bucketName := "default"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size1, "test_config_1", []string{"data"})
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_2", []string{"query", "index", "analytics"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
 	}
 
 	// Create Couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 
 	// Collect logs
 	args := argumentList{}
@@ -2265,11 +2254,9 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	serviceConfig1["indexVolMnt"] = pvcName
 	serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
 
-	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
@@ -2278,6 +2265,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 
@@ -2366,19 +2354,17 @@ func TestLogCollectListJson(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	bucketName := "default"
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size1, "test_config_1", []string{"data"})
 	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_2", []string{"query", "index", "analytics"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", constants.Mem256Mb, 2, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
-		"bucket1":  bucketConfig1,
 	}
 
 	// Create Couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
 

@@ -33,7 +33,7 @@ $(BINARY): $(SOURCE)
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/crdgen ./cmd/crdgen/
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopinfo ./cmd/cbopinfo
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopcfg ./cmd/cbopcfg
-	build/bin/crdgen -outfile example/crd.yaml
+	build/bin/crdgen > example/crd.yaml
 
 # NOTE: This target is only for local development. While we use this Dockerfile
 # (for now), the actual "docker build" command is located in the Jenkins job

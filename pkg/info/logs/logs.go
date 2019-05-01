@@ -225,7 +225,6 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	// as the app is not "couchbase".  This has the knock on effect that the logs
 	// will be named consistently.
 	podName := pvc.Labels["couchbase_node"]
-	serverImage := strings.Split(context.Config.ServerImage, ":")
 	logVolumeName := "logs"
 
 	// Create the pod.
@@ -241,7 +240,7 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
-				k8sutil.CouchbaseContainer(serverImage[0], serverImage[1]),
+				k8sutil.CouchbaseContainer(context.Config.ServerImage),
 			},
 			RestartPolicy: v1.RestartPolicyNever,
 			Volumes: []v1.Volume{

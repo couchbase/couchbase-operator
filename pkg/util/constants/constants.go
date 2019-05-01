@@ -35,6 +35,10 @@ var (
 	BucketIndexReplicasEnabled  = true
 	BucketIndexReplicasDisabled = false
 
+	BucketCompressionModeOff     = "off"
+	BucketCompressionModePassive = "passive"
+	BucketCompressionModeActive  = "active"
+
 	IndexStorageModeMemoryOptimized = "memory_optimized"
 	IndexStorageModePlasma          = "plasma"
 

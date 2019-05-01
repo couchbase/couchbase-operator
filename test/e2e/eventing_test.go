@@ -1,14 +1,73 @@
 package e2e
 
 import (
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"os"
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	bucketNames = []string{
+		sourceBucket.Name,
+		destinationBucket.Name,
+		metadataBucket.Name,
+	}
+
+	sourceBucket = &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "source",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        100,
+			Replicas:           1,
+			IoPriority:         "high",
+			EvictionPolicy:     "fullEviction",
+			ConflictResolution: "seqno",
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    "passive",
+		},
+	}
+
+	destinationBucket = &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "destination",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        100,
+			Replicas:           1,
+			IoPriority:         "high",
+			EvictionPolicy:     "fullEviction",
+			ConflictResolution: "seqno",
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    "passive",
+		},
+	}
+
+	metadataBucket = &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "metadata",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        100,
+			Replicas:           1,
+			IoPriority:         "high",
+			EvictionPolicy:     "fullEviction",
+			ConflictResolution: "seqno",
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    "passive",
+		},
+	}
 )
 
 // Creates config map of 2 service groups and required bucket data
@@ -16,18 +75,10 @@ func createEventingConfigMap(nonEventingNodes, eventingNodes int) map[string]map
 	clusterConfig := e2eutil.BasicClusterConfig2
 	serviceConfig1 := e2eutil.GetServiceConfigMap(nonEventingNodes, "test_config_1", []string{"data", "query", "index"})
 	serviceConfig2 := e2eutil.GetServiceConfigMap(eventingNodes, "test_config_2", []string{"eventing"})
-	bucket1 := e2eutil.GetBucketConfigMap("eventingSrc", "couchbase", "high", 100, 1, true, false)
-	bucket2 := e2eutil.GetBucketConfigMap("eventingMetaBucket", "couchbase", "high", 100, 1, true, false)
-	bucket3 := e2eutil.GetBucketConfigMap("eventingDst", "couchbase", "high", 100, 1, true, false)
 	return map[string]map[string]string{
-		"cluster":              clusterConfig,
-		"service1":             serviceConfig1,
-		"service2":             serviceConfig2,
-		"bucket1":              bucket1,
-		"bucket2":              bucket2,
-		"bucket3":              bucket3,
-		"exposedFeatures":      map[string]string{"featureNames": "client"},
-		"adminConsoleServices": map[string]string{"services": "data,eventing"},
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
+		"service2": serviceConfig2,
 	}
 }
 
@@ -35,9 +86,6 @@ func createEventingConfigMap(nonEventingNodes, eventingNodes int) map[string]map
 // Create 3 buckets for eventing to work
 // Deploy eventing function to verify the results in destination bucket
 func TestEventingCreateEventingCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -47,45 +95,34 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	clusterConfig["autoFailoverMaxCount"] = "3"
 	clusterConfig["autoFailoverTimeout"] = "10"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "eventing"})
-	bucket1 := e2eutil.GetBucketConfigMap("eventingSrc", "couchbase", "high", 100, 1, true, false)
-	bucket2 := e2eutil.GetBucketConfigMap("eventingMetaBucket", "couchbase", "high", 100, 1, true, false)
-	bucket3 := e2eutil.GetBucketConfigMap("eventingDst", "couchbase", "high", 100, 1, true, false)
 	configMap := map[string]map[string]string{
-		"cluster":         clusterConfig,
-		"service1":        serviceConfig1,
-		"bucket1":         bucket1,
-		"bucket2":         bucket2,
-		"bucket3":         bucket3,
-		"exposedFeatures": map[string]string{"featureNames": "client"},
+		"cluster":  clusterConfig,
+		"service1": serviceConfig1,
 	}
 
 	// Creating cluster with eventing
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket1["bucketName"])
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket2["bucketName"])
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucket3["bucketName"])
-
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 1, numOfDocs)
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, sourceBucket.Name, 1, numOfDocs)
 
 	eventingFuncName := "eventingFunc"
-	eventingSrcBucketName := "eventingSrc"
-	eventingMetaBucketName := "eventingMetaBucket"
-	eventingDstBucketName := "eventingDst"
+	eventingSrcBucketName := sourceBucket.Name
+	eventingMetaBucketName := metadataBucket.Name
+	eventingDstBucketName := destinationBucket.Name
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
 	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
 
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -106,27 +143,18 @@ func TestEventingResizeCluster(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket1"]["bucketName"])
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket2"]["bucketName"])
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
-
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs)
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, sourceBucket.Name, 0, numOfDocs)
 
 	eventingFuncName := "eventingFunc"
-	eventingSrcBucketName := "eventingSrc"
-	eventingMetaBucketName := "eventingMetaBucket"
-	eventingDstBucketName := "eventingDst"
+	eventingSrcBucketName := sourceBucket.Name
+	eventingMetaBucketName := metadataBucket.Name
+	eventingDstBucketName := destinationBucket.Name
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
 	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
@@ -140,7 +168,7 @@ func TestEventingResizeCluster(t *testing.T) {
 
 	// Clone the cluster here to avoid read/write races
 	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *couchbasev1.CouchbaseCluster) {
+	go func(cluster *couchbasev2.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -148,7 +176,7 @@ func TestEventingResizeCluster(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, sourceBucket.Name, numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
@@ -166,45 +194,8 @@ func TestEventingResizeCluster(t *testing.T) {
 	}()
 
 	// Don't scale this too high or it will pwn your laptop and the cluster will go unresponsive
-	eventingClusterSizes := []int{2, 4, 3}
-	prevClusterSize := clusterSize
-	memberToBeAdded := clusterSize
-	for _, eventingNodes = range eventingClusterSizes {
-		membersAdded := []int{}
-		membersRemoved := []int{}
-		clusterSize = nonEventingNodes + eventingNodes
-		sizeDiff := clusterSize - prevClusterSize
-		if sizeDiff > 0 {
-			for memberId := prevClusterSize; memberId < clusterSize; memberId++ {
-				membersAdded = append(membersAdded, memberToBeAdded)
-				memberToBeAdded++
-			}
-		} else {
-			for memberId := memberToBeAdded + sizeDiff; memberId < memberToBeAdded; memberId++ {
-				membersRemoved = append(membersRemoved, memberId)
-			}
-		}
-
-		// Resize cluster and wait for healthy cluster
-		service := 1
-		testCouchbase = e2eutil.MustResizeCluster(t, service, eventingNodes, targetKube, testCouchbase, 20*time.Minute)
-
-		switch {
-		case clusterSize-prevClusterSize > 0:
-			for _, memberIndex := range membersAdded {
-				expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-			}
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-
-		case clusterSize-prevClusterSize < 0:
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-			for _, memberIndex := range membersRemoved {
-				expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberIndex)
-			}
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-		}
-		prevClusterSize = clusterSize
+	for _, eventingNodes = range []int{2, 4, 3} {
+		testCouchbase = e2eutil.MustResizeCluster(t, 1, eventingNodes, targetKube, testCouchbase, 20*time.Minute)
 	}
 
 	// To stop background data insertion and wait for function to complete.
@@ -220,6 +211,14 @@ func TestEventingResizeCluster(t *testing.T) {
 
 	// Cross check number of docs inserted reflected in eventing
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		e2eutil.ClusterScaleDownSequence(1),
+		e2eutil.ClusterScaleUpSequence(2),
+		e2eutil.ClusterScaleDownSequence(1),
+	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -240,27 +239,18 @@ func TestEventingKillEventingPods(t *testing.T) {
 	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
 
 	// Creating cluster with eventing
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
+	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket1"]["bucketName"])
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket2"]["bucketName"])
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", configMap["bucket3"]["bucketName"])
-
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, configMap["bucket1"]["bucketName"], 0, numOfDocs)
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, sourceBucket.Name, 0, numOfDocs)
 
 	eventingFuncName := "eventingFunc"
-	eventingSrcBucketName := "eventingSrc"
-	eventingMetaBucketName := "eventingMetaBucket"
-	eventingDstBucketName := "eventingDst"
+	eventingSrcBucketName := sourceBucket.Name
+	eventingMetaBucketName := metadataBucket.Name
+	eventingDstBucketName := destinationBucket.Name
 	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
 
 	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
@@ -274,7 +264,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	// Clone the cluster here to avoid read/write races
 	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *couchbasev1.CouchbaseCluster) {
+	go func(cluster *couchbasev2.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -282,7 +272,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 			case <-stopDataInsertion:
 				break OuterLoop
 			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, configMap["bucket1"]["bucketName"], numOfDocs, 1); err == nil {
+				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, sourceBucket.Name, numOfDocs, 1); err == nil {
 					numOfDocs++
 				}
 			}
@@ -303,16 +293,8 @@ func TestEventingKillEventingPods(t *testing.T) {
 	for _, memberId := range []int{2, 3, 4} {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, memberId, true)
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 30*time.Second)
-		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberDown", memberId)
-		expectedEvents.AddClusterPodEvent(testCouchbase, "FailedOver", memberId)
-
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberToBeAdded), 3*time.Minute)
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", newMemberToBeAdded)
-
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-		expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberId)
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 		newMemberToBeAdded++
 	}
 
@@ -329,6 +311,12 @@ func TestEventingKillEventingPods(t *testing.T) {
 
 	// Cross check number of docs inserted reflected in eventing
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Repeat{Times: 3, Validator: e2eutil.PodDownFailoverRecoverySequence()},
+	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

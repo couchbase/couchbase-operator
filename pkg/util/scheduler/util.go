@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,11 +152,11 @@ type k8sPodGetter struct {
 	// client is a client for accessing Kubernetes
 	client kubernetes.Interface
 	// cluster points to a Couchbase cluster object
-	cluster *couchbasev1.CouchbaseCluster
+	cluster *couchbasev2.CouchbaseCluster
 }
 
 // NewK8SPodGetter allocates and initializes a new k8sPodGetter
-func NewK8SPodGetter(client kubernetes.Interface, cluster *couchbasev1.CouchbaseCluster) PodGetter {
+func NewK8SPodGetter(client kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster) PodGetter {
 	return &k8sPodGetter{
 		client:  client,
 		cluster: cluster,

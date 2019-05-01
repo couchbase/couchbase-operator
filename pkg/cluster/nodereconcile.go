@@ -3,7 +3,7 @@ package cluster
 import (
 	"fmt"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
@@ -183,7 +183,9 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 		needsReconcile = true
 	}
 
-	if candidate, _ := c.needsUpgrade(); candidate != nil {
+	if candidate, _, err := c.needsUpgrade(); err != nil {
+		return err
+	} else if candidate != nil {
 		needsReconcile = true
 	}
 	// TEMPORARY HACK END
@@ -569,16 +571,24 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 	}
 
 	// Nothing to do, move along.
-	candidate, targetCount := c.needsUpgrade()
+	candidate, targetCount, err := c.needsUpgrade()
+	if err != nil {
+		return err
+	}
 	if candidate == nil {
 		r.transitionState(ReconcileServerGroups)
 		return nil
 	}
 
-	log.Info("Pod upgrading", "cluster", c.cluster.Name, "name", candidate.Name, "source", candidate.Version, "target", c.cluster.Spec.Version)
-	status := &couchbasev1.UpgradeStatus{
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Pod upgrading", "cluster", c.cluster.Name, "name", candidate.Name, "source", candidate.Version, "target", targetVersion)
+	status := &couchbasev2.UpgradeStatus{
 		Source:      candidate.Version,
-		Target:      c.cluster.Spec.Version,
+		Target:      targetVersion,
 		TargetCount: targetCount,
 		TotalCount:  len(c.members),
 	}

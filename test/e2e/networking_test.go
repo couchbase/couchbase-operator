@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -32,9 +32,10 @@ func TestExposedFeatureIP(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
-	testCouchbase.Spec.ExposedFeatures = couchbasev1.ExposedFeatureList{
-		couchbasev1.FeatureClient,
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureClient,
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
@@ -65,18 +66,19 @@ func TestExposedFeatureDNS(t *testing.T) {
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.ExposedFeatures = couchbasev1.ExposedFeatureList{
-		couchbasev1.FeatureClient,
+	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureClient,
 	}
 	testCouchbase.Spec.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev1.DNS{
+	testCouchbase.Spec.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev1.TLSPolicy{
-		Static: &couchbasev1.StaticTLS{
-			Member: &couchbasev1.MemberSecret{
+	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -111,18 +113,19 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.ExposedFeatures = couchbasev1.ExposedFeatureList{
-		couchbasev1.FeatureClient,
+	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureClient,
 	}
 	testCouchbase.Spec.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev1.DNS{
+	testCouchbase.Spec.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev1.TLSPolicy{
-		Static: &couchbasev1.StaticTLS{
-			Member: &couchbasev1.MemberSecret{
+	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -166,18 +169,19 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.ExposedFeatures = couchbasev1.ExposedFeatureList{
-		couchbasev1.FeatureClient,
+	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureClient,
 	}
 	testCouchbase.Spec.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev1.DNS{
+	testCouchbase.Spec.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev1.TLSPolicy{
-		Static: &couchbasev1.StaticTLS{
-			Member: &couchbasev1.MemberSecret{
+	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -215,15 +219,16 @@ func TestConsoleServiceDNS(t *testing.T) {
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev1.DNS{
+	testCouchbase.Spec.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev1.TLSPolicy{
-		Static: &couchbasev1.StaticTLS{
-			Member: &couchbasev1.MemberSecret{
+	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -257,15 +262,16 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev1.DNS{
+	testCouchbase.Spec.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev1.TLSPolicy{
-		Static: &couchbasev1.StaticTLS{
-			Member: &couchbasev1.MemberSecret{
+	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -308,15 +314,16 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev1.DNS{
+	testCouchbase.Spec.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev1.TLSPolicy{
-		Static: &couchbasev1.StaticTLS{
-			Member: &couchbasev1.MemberSecret{
+	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -327,7 +327,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		ctx2 = nil
 	}
 
-	var testCouchbase1 *couchbasev1.CouchbaseCluster
+	var testCouchbase1 *couchbasev2.CouchbaseCluster
 	errChan := make(chan error)
 	// Create Cluster1 in async manner
 	go func() {

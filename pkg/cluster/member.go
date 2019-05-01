@@ -52,15 +52,22 @@ func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	return nil
 }
 
-func (c *Cluster) newMember(id int, serverSpecName, version string) *couchbaseutil.Member {
+func (c *Cluster) newMember(id int, serverSpecName, image string) (*couchbaseutil.Member, error) {
+	version, err := k8sutil.CouchbaseVersion(image)
+	if err != nil {
+		return nil, err
+	}
+
 	name := couchbaseutil.CreateMemberName(c.cluster.Name, id)
-	return &couchbaseutil.Member{
+	member := &couchbaseutil.Member{
 		Name:         name,
 		Namespace:    c.cluster.Namespace,
 		ServerConfig: serverSpecName,
 		SecureClient: false,
 		Version:      version,
 	}
+
+	return member, nil
 }
 
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {

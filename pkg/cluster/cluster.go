@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -80,8 +80,8 @@ type Config struct {
 
 type Cluster struct {
 	config      Config
-	cluster     *couchbasev1.CouchbaseCluster
-	status      couchbasev1.ClusterStatus
+	cluster     *couchbasev2.CouchbaseCluster
+	status      couchbasev2.ClusterStatus
 	members     couchbaseutil.MemberSet
 	eventsCli   corev1.EventInterface
 	username    string
@@ -95,18 +95,11 @@ type Cluster struct {
 	forceUpdate bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
 }
 
-func New(config Config, cl *couchbasev1.CouchbaseCluster) (*Cluster, error) {
+func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
 		config:  config,
 		status:  *(cl.Status.DeepCopy()),
 		cluster: cl,
-	}
-
-	// I have no idea what's going on here, defaults are set by the admission controller
-	// but by the time that happens we are already processing the request in which the
-	// name is blank???
-	if c.cluster.Spec.ClusterSettings.ClusterName == "" {
-		c.cluster.Spec.ClusterSettings.ClusterName = c.cluster.Name
 	}
 
 	kubeconfig, err := rest.InClusterConfig()
@@ -133,7 +126,7 @@ func New(config Config, cl *couchbasev1.CouchbaseCluster) (*Cluster, error) {
 
 	// Set up our event logger.  Note that this will cache and aggregate
 	// events over a 10 minute window.
-	if err := couchbasev1.AddToScheme(scheme.Scheme); err != nil {
+	if err := couchbasev2.AddToScheme(scheme.Scheme); err != nil {
 		log.Error(err, "Error adding scheme to client-go for event broadcasting", "cluster", c.cluster.Name)
 		return nil, err
 	}
@@ -154,17 +147,17 @@ func New(config Config, cl *couchbasev1.CouchbaseCluster) (*Cluster, error) {
 
 	if err := c.setup(); err != nil {
 		log.Error(err, "Cluster setup failed", "cluster", c.cluster.Name)
-		if c.status.Phase != couchbasev1.ClusterPhaseFailed {
+		if c.status.Phase != couchbasev2.ClusterPhaseFailed {
 			c.status.SetReason(err.Error())
-			c.status.SetPhase(couchbasev1.ClusterPhaseFailed)
+			c.status.SetPhase(couchbasev2.ClusterPhaseFailed)
 			if err := c.updateCRStatus(); err != nil {
-				log.Error(err, "Failed to update cluster phase", "cluster", c.cluster.Name, "phase", couchbasev1.ClusterPhaseFailed)
+				log.Error(err, "Failed to update cluster phase", "cluster", c.cluster.Name, "phase", couchbasev2.ClusterPhaseFailed)
 			}
 		}
 		return nil, err
 	}
 
-	c.status.SetPhase(couchbasev1.ClusterPhaseRunning)
+	c.status.SetPhase(couchbasev2.ClusterPhaseRunning)
 	if err := c.updateCRStatus(); err != nil {
 		log.Error(err, "Status update failed", "cluster", c.cluster.Name)
 	}
@@ -183,11 +176,11 @@ func (c *Cluster) Delete() {
 func (c *Cluster) setup() error {
 	var shouldCreateCluster bool
 	switch c.status.Phase {
-	case couchbasev1.ClusterPhaseNone:
+	case couchbasev2.ClusterPhaseNone:
 		shouldCreateCluster = true
-	case couchbasev1.ClusterPhaseCreating:
+	case couchbasev2.ClusterPhaseCreating:
 		return cberrors.ErrClusterCreating
-	case couchbasev1.ClusterPhaseRunning:
+	case couchbasev2.ClusterPhaseRunning:
 		shouldCreateCluster = false
 	default:
 		return fmt.Errorf("unexpected cluster phase: %s", c.status.Phase)
@@ -240,19 +233,19 @@ func (c *Cluster) setup() error {
 
 func (c *Cluster) create() error {
 	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.cluster.Name)
-	c.status.SetPhase(couchbasev1.ClusterPhaseCreating)
-	c.status.SetVersion(c.cluster.Spec.Version)
+	c.status.SetPhase(couchbasev2.ClusterPhaseCreating)
+	c.status.SetVersion(c.cluster.Spec.Image)
 
 	if err := c.updateCRStatus(); err != nil {
 		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
-			couchbasev1.ClusterPhaseCreating, err)
+			couchbasev2.ClusterPhaseCreating, err)
 	}
 
 	if len(c.cluster.Spec.ServerSettings) == 0 {
 		return fmt.Errorf("cluster create: no server specification defined")
 	}
 
-	idx := c.indexOfServerConfigWithService(couchbasev1.DataService)
+	idx := c.indexOfServerConfigWithService(couchbasev2.DataService)
 	if idx == -1 {
 		return fmt.Errorf("cluster create: at least one server specification must contain the `data` service")
 	}
@@ -372,7 +365,7 @@ func (c *Cluster) runReconcile() {
 
 // Update is called periodically or on a CR change, print out any diffs in the spec
 // then update the specification and unconditionally reconcile.
-func (c *Cluster) Update(cluster *couchbasev1.CouchbaseCluster) {
+func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {
 		c.logSpecUpdate(c.cluster.Spec, cluster.Spec)
 		c.cluster = cluster
@@ -381,7 +374,7 @@ func (c *Cluster) Update(cluster *couchbasev1.CouchbaseCluster) {
 	c.runReconcile()
 }
 
-func (c *Cluster) logSpecUpdate(oldSpec, newSpec couchbasev1.ClusterSpec) {
+func (c *Cluster) logSpecUpdate(oldSpec, newSpec couchbasev2.ClusterSpec) {
 	oldSpecBytes, err := yaml.Marshal(oldSpec)
 	if err != nil {
 		log.Error(err, "YAML marshal failed", "cluster", c.cluster.Name)
@@ -403,7 +396,7 @@ func (c *Cluster) updateCRStatus() error {
 	// hence what's in etcd need not reflect what's locally cached and the k8s
 	// server will reject any updates that fail the CAS test.  We only pick up
 	// these updates between reconcile executions (see handleUpdateEvent).
-	cluster, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	cluster, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -415,7 +408,7 @@ func (c *Cluster) updateCRStatus() error {
 
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.status
-	if _, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
+	if _, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 		return err
 	}
 	return nil
@@ -425,10 +418,9 @@ func (c *Cluster) isSecureClient() bool {
 	return c.cluster.Spec.TLS.IsSecureClient()
 }
 
-func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev1.ServerConfig) error {
-	version := c.cluster.Spec.Version
-	log.Info("Creating pod", "cluster", c.cluster.Name, "name", m.Name, "version", version)
-	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, ctx)
+func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+	log.Info("Creating pod", "cluster", c.cluster.Name, "name", m.Name, "image", c.cluster.Spec.Image)
+	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, serverSpec, ctx)
 	return err
 }
 
@@ -656,7 +648,7 @@ func (c *Cluster) initCouchbaseClient() error {
 	return nil
 }
 
-func (c *Cluster) indexOfServerConfigWithService(svc couchbasev1.Service) int {
+func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 	for idx, serverSpec := range c.cluster.Spec.ServerSettings {
 		for _, service := range serverSpec.Services {
 			if service == svc {

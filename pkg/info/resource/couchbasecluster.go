@@ -1,7 +1,7 @@
 package resource
 
 import (
-	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -15,7 +15,7 @@ import (
 type couchbaseClusterResource struct {
 	context *context.Context
 	// pods is the raw output from listing couchbaseClusters
-	couchbaseClusters []v1.CouchbaseCluster
+	couchbaseClusters []couchbasev2.CouchbaseCluster
 }
 
 // NewCouchbaseClusterResource initializes a new pod resource
@@ -33,7 +33,7 @@ func (r *couchbaseClusterResource) Kind() string {
 func (r *couchbaseClusterResource) Fetch() error {
 	// We have to manually filter here as couchbaseCluster are not labelled and field
 	// selectors aren't up to matching based on name (multiple couchbaseClusters that is)
-	couchbaseClusters, err := r.context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(r.context.Namespace()).List(metav1.ListOptions{})
+	couchbaseClusters, err := r.context.CouchbaseClusterClient.CouchbaseV2().CouchbaseClusters(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (r *couchbaseClusterResource) Fetch() error {
 	}
 
 	// Scan the list of couchbaseClusters and select only the requested ones
-	r.couchbaseClusters = []v1.CouchbaseCluster{}
+	r.couchbaseClusters = []couchbasev2.CouchbaseCluster{}
 	for _, couchbaseCluster := range couchbaseClusters.Items {
 		if _, ok := requested[couchbaseCluster.Name]; ok {
 			r.couchbaseClusters = append(r.couchbaseClusters, couchbaseCluster)

@@ -5,18 +5,20 @@ import (
 	"strconv"
 	"strings"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // cluster settings
 var (
-	defaultClusterSettings = couchbasev1.ClusterConfig{
+	defaultClusterSettings = couchbasev2.ClusterConfig{
 		DataServiceMemQuota:                    e2e_constants.Mem256Mb,
 		IndexServiceMemQuota:                   e2e_constants.Mem256Mb,
 		SearchServiceMemQuota:                  e2e_constants.Mem256Mb,
@@ -31,41 +33,71 @@ var (
 
 // bucket settings
 var (
-	DefaultBucketSettings = couchbasev1.BucketConfig{
-		BucketName:         "default",
-		BucketType:         constants.BucketTypeCouchbase,
-		BucketMemoryQuota:  e2e_constants.Mem256Mb,
-		BucketReplicas:     constants.BucketReplicasOne,
-		IoPriority:         constants.BucketIoPriorityHigh,
-		EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: constants.BucketConflictResolutionSeqno,
-		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: constants.BucketIndexReplicasDisabled,
+	DefaultBucket = &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2e_constants.Mem256Mb,
+			Replicas:           constants.BucketReplicasOne,
+			IoPriority:         constants.BucketIoPriorityHigh,
+			EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+			ConflictResolution: constants.BucketConflictResolutionSeqno,
+			EnableFlush:        constants.BucketFlushEnabled,
+			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
+			CompressionMode:    cbmgr.CompressionModePassive,
+		},
+	}
+
+	DefaultBucketTwoReplicas = &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2e_constants.Mem256Mb,
+			Replicas:           constants.BucketReplicasTwo,
+			IoPriority:         constants.BucketIoPriorityHigh,
+			EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+			ConflictResolution: constants.BucketConflictResolutionSeqno,
+			EnableFlush:        constants.BucketFlushEnabled,
+			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
+			CompressionMode:    cbmgr.CompressionModePassive,
+		},
+	}
+
+	DefaultBucketThreeReplicas = &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2e_constants.Mem256Mb,
+			Replicas:           constants.BucketReplicasThree,
+			IoPriority:         constants.BucketIoPriorityHigh,
+			EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
+			ConflictResolution: constants.BucketConflictResolutionSeqno,
+			EnableFlush:        constants.BucketFlushEnabled,
+			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
+			CompressionMode:    cbmgr.CompressionModePassive,
+		},
 	}
 )
 
 // server settings
 var (
-	defaultServerSettings = couchbasev1.ServerConfig{
+	defaultServerSettings = couchbasev2.ServerConfig{
 		Size: e2e_constants.Size1,
 		Name: "test_config_1",
-		Services: couchbasev1.ServiceList{
-			couchbasev1.DataService,
-			couchbasev1.QueryService,
-			couchbasev1.IndexService,
+		Services: couchbasev2.ServiceList{
+			couchbasev2.DataService,
+			couchbasev2.QueryService,
+			couchbasev2.IndexService,
 		},
 	}
 )
 
-func SetCbBaseImage(baseImageName string) {
-	if baseImageName = strings.TrimSpace(baseImageName); baseImageName != "" {
-		e2e_constants.CbServerBaseImage = baseImageName
-	}
-}
-
-func SetCbImageVersion(cbImgVer string) {
-	if cbImgVer = strings.TrimSpace(cbImgVer); cbImgVer != "" {
-		e2e_constants.CbServerVersion = cbImgVer
+func SetCouchbaseServerImage(imageName string) {
+	if imageName = strings.TrimSpace(imageName); imageName != "" {
+		e2e_constants.CouchbaseServerImage = imageName
 	}
 }
 
@@ -77,12 +109,8 @@ func SetStorageClassName(storageClassNameIn string) {
 	}
 }
 
-func GetCouchbaseDockerImgName() string {
-	return e2e_constants.CbServerBaseImage + ":" + e2e_constants.CbServerVersion
-}
-
-func GenerateValidBucketSettings(bucketTypes []string) []couchbasev1.BucketConfig {
-	generatedSettings := []couchbasev1.BucketConfig{}
+func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
+	buckets := []runtime.Object{}
 	for _, bucketType := range bucketTypes {
 		switch {
 		case bucketType == constants.BucketTypeCouchbase:
@@ -100,18 +128,21 @@ func GenerateValidBucketSettings(bucketTypes []string) []couchbasev1.BucketConfi
 							for _, conflictResolution := range conflictResolutions {
 								for _, enableFlush := range enableFlushes {
 									for _, enableIndexReplica := range enableIndexReplicas {
-										bucketSetting := couchbasev1.BucketConfig{
-											BucketName:         "default",
-											BucketType:         bucketType,
-											BucketMemoryQuota:  bucketMemoryQuota,
-											BucketReplicas:     bucketReplica,
-											IoPriority:         ioPriority,
-											EvictionPolicy:     evictionPolicy,
-											ConflictResolution: conflictResolution,
-											EnableFlush:        enableFlush,
-											EnableIndexReplica: enableIndexReplica,
-										}
-										generatedSettings = append(generatedSettings, bucketSetting)
+										buckets = append(buckets, &couchbasev2.CouchbaseBucket{
+											ObjectMeta: metav1.ObjectMeta{
+												Name: "default",
+											},
+											Spec: couchbasev2.CouchbaseBucketSpec{
+												MemoryQuota:        bucketMemoryQuota,
+												Replicas:           bucketReplica,
+												IoPriority:         ioPriority,
+												EvictionPolicy:     evictionPolicy,
+												ConflictResolution: conflictResolution,
+												EnableFlush:        enableFlush,
+												EnableIndexReplica: enableIndexReplica,
+												CompressionMode:    "passive",
+											},
+										})
 									}
 								}
 							}
@@ -124,13 +155,15 @@ func GenerateValidBucketSettings(bucketTypes []string) []couchbasev1.BucketConfi
 			enableFlushes := []bool{true, false}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, enableFlush := range enableFlushes {
-					bucketSetting := couchbasev1.BucketConfig{
-						BucketName:        "default",
-						BucketType:        bucketType,
-						BucketMemoryQuota: bucketMemoryQuota,
-						EnableFlush:       enableFlush,
-					}
-					generatedSettings = append(generatedSettings, bucketSetting)
+					buckets = append(buckets, &couchbasev2.CouchbaseMemcachedBucket{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "default",
+						},
+						Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
+							MemoryQuota: bucketMemoryQuota,
+							EnableFlush: enableFlush,
+						},
+					})
 				}
 			}
 		case bucketType == constants.BucketTypeEphemeral:
@@ -146,17 +179,20 @@ func GenerateValidBucketSettings(bucketTypes []string) []couchbasev1.BucketConfi
 						for _, evictionPolicy := range evictionPolicies {
 							for _, conflictResolution := range conflictResolutions {
 								for _, enableFlush := range enableFlushes {
-									bucketSetting := couchbasev1.BucketConfig{
-										BucketName:         "default",
-										BucketType:         bucketType,
-										BucketMemoryQuota:  bucketMemoryQuota,
-										BucketReplicas:     bucketReplica,
-										IoPriority:         ioPriority,
-										EvictionPolicy:     evictionPolicy,
-										ConflictResolution: conflictResolution,
-										EnableFlush:        enableFlush,
-									}
-									generatedSettings = append(generatedSettings, bucketSetting)
+									buckets = append(buckets, &couchbasev2.CouchbaseEphemeralBucket{
+										ObjectMeta: metav1.ObjectMeta{
+											Name: "default",
+										},
+										Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+											MemoryQuota:        bucketMemoryQuota,
+											Replicas:           bucketReplica,
+											IoPriority:         ioPriority,
+											EvictionPolicy:     evictionPolicy,
+											ConflictResolution: conflictResolution,
+											EnableFlush:        enableFlush,
+											CompressionMode:    "passive",
+										},
+									})
 								}
 							}
 						}
@@ -166,30 +202,27 @@ func GenerateValidBucketSettings(bucketTypes []string) []couchbasev1.BucketConfi
 		}
 	}
 
-	return generatedSettings
+	return buckets
 }
 
 // basic 3 node cluster
-func NewBasicCluster(genName, secretName string, size int, withBucket bool, exposed bool) *couchbasev1.CouchbaseCluster {
-	bucketConfig := []couchbasev1.BucketConfig{}
-	if withBucket {
-		bucketSettings := DefaultBucketSettings
-		bucketSettings.BucketName = "default"
-		bucketConfig = []couchbasev1.BucketConfig{bucketSettings}
-	}
-	spec := couchbasev1.ClusterSpec{
-		BaseImage:       e2e_constants.CbServerBaseImage,
-		Version:         e2e_constants.CbServerVersion,
-		AuthSecret:      e2e_constants.KubeTestSecretName,
-		ClusterSettings: defaultClusterSettings,
-		BucketSettings:  bucketConfig,
-		ServerSettings: []couchbasev1.ServerConfig{couchbasev1.ServerConfig{
+func NewBasicCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
+	spec := couchbasev2.ClusterSpec{
+		Image:                     e2e_constants.CouchbaseServerImage,
+		AuthSecret:                e2e_constants.KubeTestSecretName,
+		ClusterSettings:           defaultClusterSettings,
+		AdminConsoleServiceType:   "NodePort",
+		ExposedFeatureServiceType: "NodePort",
+		Buckets: couchbasev2.Buckets{
+			Managed: true,
+		},
+		ServerSettings: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
 			Size: size,
 			Name: "test_config_1",
-			Services: couchbasev1.ServiceList{
-				couchbasev1.DataService,
-				couchbasev1.QueryService,
-				couchbasev1.IndexService,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.QueryService,
+				couchbasev2.IndexService,
 			},
 		}},
 		ExposedFeatures: []string{},
@@ -197,33 +230,28 @@ func NewBasicCluster(genName, secretName string, size int, withBucket bool, expo
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
 		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev1.ServiceList{
-			couchbasev1.DataService,
+		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+			couchbasev2.DataService,
 		}
 	}
 	return crd
 }
 
-func NewBasicClusterSpec(size int, bucket, console bool) *couchbasev1.CouchbaseCluster {
-	bucketConfig := []couchbasev1.BucketConfig{}
-	if bucket {
-		bucketSettings := DefaultBucketSettings
-		bucketSettings.BucketName = "default"
-		bucketConfig = []couchbasev1.BucketConfig{bucketSettings}
-	}
-	spec := couchbasev1.ClusterSpec{
-		BaseImage:       e2e_constants.CbServerBaseImage,
-		Version:         e2e_constants.CbServerVersion,
+func NewBasicClusterSpec(size int, console bool) *couchbasev2.CouchbaseCluster {
+	spec := couchbasev2.ClusterSpec{
+		Image:           e2e_constants.CouchbaseServerImage,
 		AuthSecret:      e2e_constants.KubeTestSecretName,
 		ClusterSettings: defaultClusterSettings,
-		BucketSettings:  bucketConfig,
-		ServerSettings: []couchbasev1.ServerConfig{couchbasev1.ServerConfig{
+		Buckets: couchbasev2.Buckets{
+			Managed: true,
+		},
+		ServerSettings: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
 			Size: size,
 			Name: "test_config_1",
-			Services: couchbasev1.ServiceList{
-				couchbasev1.DataService,
-				couchbasev1.QueryService,
-				couchbasev1.IndexService,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.QueryService,
+				couchbasev2.IndexService,
 			},
 		}},
 		ExposedFeatures: []string{},
@@ -231,8 +259,8 @@ func NewBasicClusterSpec(size int, bucket, console bool) *couchbasev1.CouchbaseC
 	crd := NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 	if console {
 		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev1.ServiceList{
-			couchbasev1.DataService,
+		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+			couchbasev2.DataService,
 		}
 	}
 	return crd
@@ -240,25 +268,24 @@ func NewBasicClusterSpec(size int, bucket, console bool) *couchbasev1.CouchbaseC
 
 // NewSupportableClusterSpec returns a basic supportable cluster spec with a stateful and stateless
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
-func NewSupportableClusterSpec(size int) couchbasev1.ClusterSpec {
-	spec := couchbasev1.ClusterSpec{
-		BaseImage:       e2e_constants.CbServerBaseImage,
-		Version:         e2e_constants.CbServerVersion,
+func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
+	spec := couchbasev2.ClusterSpec{
+		Image:           e2e_constants.CouchbaseServerImage,
 		AuthSecret:      e2e_constants.KubeTestSecretName,
 		ClusterSettings: defaultClusterSettings,
-		BucketSettings: []couchbasev1.BucketConfig{
-			DefaultBucketSettings,
+		Buckets: couchbasev2.Buckets{
+			Managed: true,
 		},
-		ServerSettings: []couchbasev1.ServerConfig{
+		ServerSettings: []couchbasev2.ServerConfig{
 			{
 				Name: "stateful",
 				Size: size,
-				Services: couchbasev1.ServiceList{
-					couchbasev1.DataService,
-					couchbasev1.IndexService,
+				Services: couchbasev2.ServiceList{
+					couchbasev2.DataService,
+					couchbasev2.IndexService,
 				},
-				Pod: &couchbasev1.PodPolicy{
-					VolumeMounts: &couchbasev1.VolumeMounts{
+				Pod: &couchbasev2.PodPolicy{
+					VolumeMounts: &couchbasev2.VolumeMounts{
 						DefaultClaim: "couchbase",
 					},
 				},
@@ -266,11 +293,11 @@ func NewSupportableClusterSpec(size int) couchbasev1.ClusterSpec {
 			{
 				Name: "stateless",
 				Size: size,
-				Services: couchbasev1.ServiceList{
-					couchbasev1.QueryService,
+				Services: couchbasev2.ServiceList{
+					couchbasev2.QueryService,
 				},
-				Pod: &couchbasev1.PodPolicy{
-					VolumeMounts: &couchbasev1.VolumeMounts{
+				Pod: &couchbasev2.PodPolicy{
+					VolumeMounts: &couchbasev2.VolumeMounts{
 						LogsClaim: "couchbase",
 					},
 				},
@@ -304,32 +331,27 @@ func NewSupportableClusterSpec(size int) couchbasev1.ClusterSpec {
 
 // NewSupportableCluster returns a basic supportable cluster with a stateful and stateless
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
-func NewSupportableCluster(size int) *couchbasev1.CouchbaseCluster {
+func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
 	spec := NewSupportableClusterSpec(size)
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
 // basic 3 node cluster with Xdcr cluster
-func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, exposed bool) *couchbasev1.CouchbaseCluster {
-	bucketConfig := []couchbasev1.BucketConfig{}
-	if withBucket {
-		bucketSettings := DefaultBucketSettings
-		bucketSettings.BucketName = "default"
-		bucketConfig = []couchbasev1.BucketConfig{bucketSettings}
-	}
-	spec := couchbasev1.ClusterSpec{
-		BaseImage:       e2e_constants.CbServerBaseImage,
-		Version:         e2e_constants.CbServerVersion,
+func NewBasicXdcrCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
+	spec := couchbasev2.ClusterSpec{
+		Image:           e2e_constants.CouchbaseServerImage,
 		AuthSecret:      e2e_constants.KubeTestSecretName,
 		ClusterSettings: defaultClusterSettings,
-		BucketSettings:  bucketConfig,
-		ServerSettings: []couchbasev1.ServerConfig{couchbasev1.ServerConfig{
+		Buckets: couchbasev2.Buckets{
+			Managed: true,
+		},
+		ServerSettings: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
 			Size: size,
 			Name: "test_config_1",
-			Services: couchbasev1.ServiceList{
-				couchbasev1.DataService,
-				couchbasev1.QueryService,
-				couchbasev1.IndexService,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.QueryService,
+				couchbasev2.IndexService,
 			},
 		}},
 		ExposedFeatures: []string{"xdcr"},
@@ -339,15 +361,15 @@ func NewBasicXdcrCluster(genName, secretName string, size int, withBucket, expos
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
 		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev1.ServiceList{
-			couchbasev1.DataService,
+		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+			couchbasev2.DataService,
 		}
 	}
 	return crd
 }
 
 // new custom cluster
-func CreateClusterSpec(genName, secretName string, config map[string]map[string]string) couchbasev1.ClusterSpec {
+func CreateClusterSpec(genName, secretName string, config map[string]map[string]string) couchbasev2.ClusterSpec {
 	keys := []string{}
 	for key := range config {
 		keys = append(keys, key)
@@ -355,15 +377,16 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 	sort.Strings(keys)
 
 	// Spec object to return
-	spec := couchbasev1.ClusterSpec{
-		BaseImage:            e2e_constants.CbServerBaseImage,
-		Version:              e2e_constants.CbServerVersion,
-		AuthSecret:           secretName,
-		ClusterSettings:      defaultClusterSettings,
-		BucketSettings:       []couchbasev1.BucketConfig{},
-		ServerSettings:       []couchbasev1.ServerConfig{},
-		AdminConsoleServices: couchbasev1.ServiceList{},
-		ExposedFeatures:      couchbasev1.ExposedFeatureList{},
+	spec := couchbasev2.ClusterSpec{
+		Image:           e2e_constants.CouchbaseServerImage,
+		AuthSecret:      secretName,
+		ClusterSettings: defaultClusterSettings,
+		Buckets: couchbasev2.Buckets{
+			Managed: true,
+		},
+		ServerSettings:       []couchbasev2.ServerConfig{},
+		AdminConsoleServices: couchbasev2.ServiceList{},
+		ExposedFeatures:      couchbasev2.ExposedFeatureList{},
 		ServerGroups:         []string{},
 	}
 
@@ -408,45 +431,11 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 				}
 			}
 
-		// Update Buckets configs in ClusterSpec
-		case strings.Contains(key, "bucket"):
-			bucketSettings := DefaultBucketSettings
-			for setting := range config[key] {
-				switch setting {
-				case "bucketName":
-					bucketSettings.BucketName = config[key][setting]
-				case "bucketType":
-					bucketSettings.BucketType = config[key][setting]
-				case "bucketMemoryQuota":
-					bucketMemoryQuota, _ := strconv.Atoi(config[key][setting])
-					bucketSettings.BucketMemoryQuota = bucketMemoryQuota
-				case "bucketReplicas":
-					bucketReplicas, _ := strconv.Atoi(config[key][setting])
-					bucketSettings.BucketReplicas = bucketReplicas
-				case "ioPriority":
-					ioPriority := config[key][setting]
-					bucketSettings.IoPriority = ioPriority
-				case "evictionPolicy":
-					policy := config[key][setting]
-					bucketSettings.EvictionPolicy = policy
-				case "conflictResolution":
-					confResoultion := config[key][setting]
-					bucketSettings.ConflictResolution = confResoultion
-				case "enableFlush":
-					enableFlush, _ := strconv.ParseBool(config[key][setting])
-					bucketSettings.EnableFlush = enableFlush
-				case "enableIndexReplica":
-					enableIndexReplica, _ := strconv.ParseBool(config[key][setting])
-					bucketSettings.EnableIndexReplica = enableIndexReplica
-				}
-			}
-			spec.BucketSettings = append(spec.BucketSettings, bucketSettings)
-
 		// Modify Service in ClusterSpec
 		case strings.Contains(key, "service"):
 			serverSettings := defaultServerSettings
-			volumeMnt := &couchbasev1.VolumeMounts{}
-			podPolicy := &couchbasev1.PodPolicy{VolumeMounts: nil}
+			volumeMnt := &couchbasev2.VolumeMounts{}
+			podPolicy := &couchbasev2.PodPolicy{VolumeMounts: nil}
 			podPolicy.Resources = v1.ResourceRequirements{
 				Limits:   make(v1.ResourceList),
 				Requests: make(v1.ResourceList),
@@ -460,7 +449,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 					size, _ := strconv.Atoi(config[key][setting])
 					serverSettings.Size = size
 				case "services":
-					serverSettings.Services = couchbasev1.NewServiceList(strings.Split(config[key][setting], ","))
+					serverSettings.Services = couchbasev2.NewServiceList(strings.Split(config[key][setting], ","))
 				case "serverGroups":
 					serverSettings.ServerGroups = strings.Split(config[key][setting], ",")
 				case "resourceMemLimit":
@@ -507,7 +496,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 		// Updates AdminConsoleServices in ClusterSpec
 		case key == "adminConsoleServices":
 			for _, serviceName := range strings.Split(config[key]["services"], ",") {
-				spec.AdminConsoleServices = append(spec.AdminConsoleServices, couchbasev1.Service(serviceName))
+				spec.AdminConsoleServices = append(spec.AdminConsoleServices, couchbasev2.Service(serviceName))
 			}
 
 		// Sets ServerGroups in ClusterSpec
@@ -518,10 +507,6 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 		case strings.Contains(key, "other"):
 			for setting := range config[key] {
 				switch setting {
-				case "baseImageName":
-					spec.BaseImage = config[key][setting]
-				case "versionNum":
-					spec.Version = config[key][setting]
 				case "antiAffinity":
 					if config[key][setting] == "on" {
 						spec.AntiAffinity = true
@@ -541,30 +526,30 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 	return spec
 }
 
-func CreateClusterCRD(genName string, adminConsoleExposed bool, spec couchbasev1.ClusterSpec) *couchbasev1.CouchbaseCluster {
+func CreateClusterCRD(genName string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
 	crd := NewClusterCRD(genName, spec)
 	if adminConsoleExposed {
 		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev1.ServiceList{
-			couchbasev1.DataService,
+		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+			couchbasev2.DataService,
 		}
 	}
 	return crd
 }
 
-func NewMultiCluster(genName, secretName string, config map[string]map[string]string, exposed bool) *couchbasev1.CouchbaseCluster {
+func NewMultiCluster(genName, secretName string, config map[string]map[string]string, exposed bool) *couchbasev2.CouchbaseCluster {
 	spec := CreateClusterSpec(genName, secretName, config)
 	return CreateClusterCRD(genName, exposed, spec)
 }
 
 // Stateful 3 node cluster with a single volume.
 // Spec will request 1Gb of storage (minikube default is 5gb).
-func NewStatefulCluster(genName, secretName string, size int, withBucket bool, exposed bool) *couchbasev1.CouchbaseCluster {
+func NewStatefulCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
 
-	crd := NewBasicCluster(genName, secretName, size, withBucket, exposed)
+	crd := NewBasicCluster(genName, secretName, size, exposed)
 	couchbase := "couchbase"
-	crd.Spec.ServerSettings[0].Pod = &couchbasev1.PodPolicy{
-		VolumeMounts: &couchbasev1.VolumeMounts{DefaultClaim: couchbase},
+	crd.Spec.ServerSettings[0].Pod = &couchbasev2.PodPolicy{
+		VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: couchbase},
 	}
 
 	storagePolicy := CreatePodPolicy(v1.ResourceStorage, 1, 1, "Gi")
@@ -586,11 +571,11 @@ func NewStatefulCluster(genName, secretName string, size int, withBucket bool, e
 // specification with it.  The cluster name may be dynamically generated by the
 // K8S manager or explicitly defined where we need to know it ahead of time e.g.
 // TLS.  TLS policy is also applied based on global settings
-func NewClusterCRD(genName string, spec couchbasev1.ClusterSpec) *couchbasev1.CouchbaseCluster {
-	return &couchbasev1.CouchbaseCluster{
+func NewClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
+	return &couchbasev2.CouchbaseCluster{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       couchbasev1.CRDResourceKind,
-			APIVersion: couchbasev1.SchemeGroupVersion.String(),
+			Kind:       couchbasev2.ClusterCRDResourceKind,
+			APIVersion: couchbasev2.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: genName,
@@ -600,13 +585,13 @@ func NewClusterCRD(genName string, spec couchbasev1.ClusterSpec) *couchbasev1.Co
 }
 
 // Create Pod Policy with memory limit and requests in MB
-func CreateMemoryPodPolicy(request, limit int) *couchbasev1.PodPolicy {
+func CreateMemoryPodPolicy(request, limit int) *couchbasev2.PodPolicy {
 	return CreatePodPolicy(v1.ResourceMemory, request, limit, "Mi")
 }
 
 // Create limit and request pod policy according to scale... ie 'Mi, Gi' where applicable
-func CreatePodPolicy(resourceName v1.ResourceName, request, limit int, scale string) *couchbasev1.PodPolicy {
-	podPolicy := &couchbasev1.PodPolicy{}
+func CreatePodPolicy(resourceName v1.ResourceName, request, limit int, scale string) *couchbasev2.PodPolicy {
+	podPolicy := &couchbasev2.PodPolicy{}
 	podPolicy.Resources = v1.ResourceRequirements{
 		Limits:   make(v1.ResourceList),
 		Requests: make(v1.ResourceList),

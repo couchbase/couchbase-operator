@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +43,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (recon
 	}
 
 	// Check the status of the cluster object.
-	couchbase := &couchbasev1.CouchbaseCluster{}
+	couchbase := &couchbasev2.CouchbaseCluster{}
 	if err := r.client.Get(context.Background(), request.NamespacedName, couchbase); err != nil {
 		if errors.IsNotFound(err) {
 			// Cluster deleted
@@ -111,7 +111,7 @@ func AddToManager(mgr manager.Manager, timeout string) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &couchbasev1.CouchbaseCluster{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &couchbasev2.CouchbaseCluster{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}

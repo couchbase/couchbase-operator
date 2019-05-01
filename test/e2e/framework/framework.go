@@ -16,11 +16,12 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	validationv2 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -49,7 +50,7 @@ func Init() {
 		os.Exit(1)
 	}
 
-	if err := couchbasev1.AddToScheme(scheme.Scheme); err != nil {
+	if err := couchbasev2.AddToScheme(scheme.Scheme); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -154,19 +155,19 @@ func Setup(t *testing.T) (err error) {
 
 	// Initialize Global from runtime info
 	Global = &Framework{
-		Namespace:                     runtimeParams.Namespace,
-		KubeType:                      runtimeParams.KubeType,
-		KubeVersion:                   runtimeParams.KubeVersion,
-		OpImage:                       runtimeParams.OperatorImage,
-		SkipTeardown:                  runtimeParams.SkipTearDown,
-		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
-		SuiteYmlData:                  suiteData,
-		ClusterConfFile:               runtimeParams.ClusterConfFile,
-		ClusterSpec:                   types.ClusterMap{},
-		CouchbaseServerVersion:        runtimeParams.CbServerImgVer,
-		CouchbaseServerUpgradeVersion: runtimeParams.CbServerImgVerUpgrade,
-		StorageClassName:              runtimeParams.StorageClassName,
-		TestRetries:                   testRetries,
+		Namespace:                   runtimeParams.Namespace,
+		KubeType:                    runtimeParams.KubeType,
+		KubeVersion:                 runtimeParams.KubeVersion,
+		OpImage:                     runtimeParams.OperatorImage,
+		SkipTeardown:                runtimeParams.SkipTearDown,
+		CollectLogs:                 runtimeParams.CollectLogsOnFailure,
+		SuiteYmlData:                suiteData,
+		ClusterConfFile:             runtimeParams.ClusterConfFile,
+		ClusterSpec:                 types.ClusterMap{},
+		CouchbaseServerImage:        runtimeParams.CouchbaseServerImage,
+		CouchbaseServerImageUpgrade: runtimeParams.CouchbaseServerImageUpgrade,
+		StorageClassName:            runtimeParams.StorageClassName,
+		TestRetries:                 testRetries,
 	}
 
 	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0)
@@ -189,8 +190,7 @@ func Setup(t *testing.T) (err error) {
 
 	// Setting required spec values from test_config yaml
 	e2espec.SetStorageClassName(runtimeParams.StorageClassName)
-	e2espec.SetCbBaseImage(runtimeParams.CbServerBaseImage)
-	e2espec.SetCbImageVersion(runtimeParams.CbServerImgVer)
+	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
 
 	logrus.Info("Docker Registry")
 	logrus.Info(" →  server: " + runtimeParams.DockerServer)
@@ -199,7 +199,7 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info("Container Images")
 	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
-	logrus.Info(" →  couchbase server: " + e2espec.GetCouchbaseDockerImgName())
+	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
 	logrus.Info("Kubernetes")
 	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
 	logrus.Info("Logs")
@@ -252,12 +252,12 @@ func DeleteCouchbaseServices(kubeClient kubernetes.Interface) error {
 
 func DeleteCouchbaseClusters(kubeClient kubernetes.Interface, crClient versioned.Interface) error {
 	logrus.Info("Deleting Couchbase clusters")
-	clusters, err := crClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
+	clusters, err := crClient.CouchbaseV2().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
 	if err != nil && !k8sutil.IsKubernetesResourceNotFoundError(err) {
 		return err
 	}
 	for _, cluster := range clusters.Items {
-		if err := crClient.CouchbaseV1().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := crClient.CouchbaseV2().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 		logrus.Infof("Deleted Couchbase cluster: %s", cluster.Name)
@@ -295,11 +295,6 @@ func DeleteAdmissionController(client kubernetes.Interface) error {
 func cleanUpNamespace() (err error) {
 	logrus.Infof("Cleaning up namespace: %s", Global.Namespace)
 	for _, targetKube := range Global.ClusterSpec {
-		// Clean-up Jobs
-		if err := DeleteAllJobs(targetKube.KubeClient); err != nil {
-			return err
-		}
-
 		// Remove secrets
 		if targetKube.DefaultSecret != nil {
 			if err := e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, targetKube.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
@@ -314,15 +309,8 @@ func cleanUpNamespace() (err error) {
 			return err
 		}
 
-		// Clear all couchbase clusters
-		if err := DeleteCouchbaseClusters(targetKube.KubeClient, targetKube.CRClient); err != nil {
-			return err
-		}
-
-		// Clean-up Couchbase services
-		if err := DeleteCouchbaseServices(targetKube.KubeClient); err != nil {
-			return err
-		}
+		// Blow away any couchbase cluster resources (and friends)
+		e2eutil.CleanK8Cluster(targetKube, Global.Namespace)
 	}
 
 	// TODO: check all deleted and wait
@@ -384,6 +372,15 @@ func RecreateCRDs(k8s *types.Cluster) error {
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(k8sutil.GetCRD()); err != nil {
 		return err
 	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseBucketCRD()); err != nil {
+		return err
+	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseEphemeralBucketCRD()); err != nil {
+		return err
+	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseMemcachedBucketCRD()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -429,18 +426,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	if err := DeleteCouchbaseClusters(targetKube.KubeClient, targetKube.CRClient); err != nil {
-		return err
-	}
-
-	if err := DeleteAllJobs(targetKube.KubeClient); err != nil {
-		return err
-	}
-	time.Sleep(2 * time.Second)
-
-	if err := DeleteCouchbaseServices(targetKube.KubeClient); err != nil {
-		return err
-	}
+	e2eutil.CleanK8Cluster(targetKube, Global.Namespace)
 
 	logrus.Info("Deleting orphaned pods")
 	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})

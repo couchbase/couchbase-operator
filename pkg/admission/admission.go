@@ -12,7 +12,8 @@ import (
 	"github.com/golang/glog"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	couchbaseclient "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
@@ -47,7 +48,7 @@ func addToScheme(scheme *runtime.Scheme) error {
 }
 
 // getClient returns a new Kubernetes client
-func getClient() *kubernetes.Clientset {
+func getClient() kubernetes.Interface {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		glog.Fatal(err)
@@ -59,13 +60,13 @@ func getClient() *kubernetes.Clientset {
 	return clientset
 }
 
-// getCouchbaseClusterClient returns a new CouchbaseCluster client
-func getCouchbaseClusterClient() *couchbaseclient.Clientset {
+// getCouchbaseClient returns a new Couchbase Kubernetes client.
+func getCouchbaseClient() versioned.Interface {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		glog.Fatal(err)
 	}
-	clientset, err := couchbaseclient.NewForConfig(config)
+	clientset, err := versioned.NewForConfig(config)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -111,6 +112,74 @@ func errorResponse(err error) *admissionv1beta1.AdmissionResponse {
 	}
 }
 
+// decodeObject decodes a cluster from an admission review and returns a versioned
+// structure.
+func decodeObject(ar admissionv1beta1.AdmissionReview, raw runtime.RawExtension) (runtime.Object, error) {
+	var object runtime.Object
+	switch ar.Request.Kind.Kind {
+	case couchbasev2.ClusterCRDResourceKind:
+		switch ar.Request.Resource.Version {
+		case "v1":
+			object = &couchbasev1.CouchbaseCluster{}
+		case "v2":
+			object = &couchbasev2.CouchbaseCluster{}
+		default:
+			return nil, fmt.Errorf("unhandled resource version %s", ar.Request.Resource.Version)
+		}
+	case couchbasev2.BucketCRDResourceKind:
+		object = &couchbasev2.CouchbaseBucket{}
+	case couchbasev2.EphemeralBucketCRDResourceKind:
+		object = &couchbasev2.CouchbaseEphemeralBucket{}
+	case couchbasev2.MemcachedBucketCRDResourceKind:
+		object = &couchbasev2.CouchbaseMemcachedBucket{}
+	}
+
+	deserializer := codecs.UniversalDeserializer()
+	var err error
+	object, _, err = deserializer.Decode(raw.Raw, nil, object)
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+// getSpec returns the cluster specification from an abstract cluster type.
+func getSpec(resource runtime.Object) (interface{}, error) {
+	switch t := resource.(type) {
+	case *couchbasev1.CouchbaseCluster:
+		return t.Spec, nil
+	case *couchbasev2.CouchbaseCluster:
+		return t.Spec, nil
+	case *couchbasev2.CouchbaseBucket:
+		return t.Spec, nil
+	case *couchbasev2.CouchbaseEphemeralBucket:
+		return t.Spec, nil
+	case *couchbasev2.CouchbaseMemcachedBucket:
+		return t.Spec, nil
+	default:
+		return nil, fmt.Errorf("unhandled type %v", t)
+	}
+}
+
+// deepCopy returns a clone of an abstract cluster type.
+func deepCopy(resource runtime.Object) (runtime.Object, error) {
+	switch t := resource.(type) {
+	case *couchbasev1.CouchbaseCluster:
+		return t.DeepCopy(), nil
+	case *couchbasev2.CouchbaseCluster:
+		return t.DeepCopy(), nil
+	case *couchbasev2.CouchbaseBucket:
+		return t.DeepCopy(), nil
+	case *couchbasev2.CouchbaseEphemeralBucket:
+		return t.DeepCopy(), nil
+	case *couchbasev2.CouchbaseMemcachedBucket:
+		return t.DeepCopy(), nil
+	default:
+		return nil, fmt.Errorf("unhandled type %v", t)
+	}
+}
+
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the
 // operator.  This is for things which cannot be achieved with JSON schema v3 only.
 func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
@@ -118,23 +187,9 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 		glog.Info("validating couchbasecluster")
 	}
 
-	// Check the resource is valid
-	couchbaseClustersResource := metav1.GroupVersionResource{
-		Group:    couchbasev1.GroupName,
-		Version:  "v1",
-		Resource: couchbasev1.CRDResourcePlural,
-	}
-	if ar.Request.Resource != couchbaseClustersResource {
-		err := fmt.Errorf("expect resource %s to be %s", ar.Request.Resource, couchbaseClustersResource)
-		glog.Error(err)
-		return errorResponse(err)
-	}
-
 	// Decode the CouchbaseCluster object
-	raw := ar.Request.Object.Raw
-	couchbaseCluster := couchbasev1.CouchbaseCluster{}
-	deserializer := codecs.UniversalDeserializer()
-	if _, _, err := deserializer.Decode(raw, nil, &couchbaseCluster); err != nil {
+	couchbaseCluster, err := decodeObject(ar, ar.Request.Object)
+	if err != nil {
 		glog.Error(err)
 		return errorResponse(err)
 	}
@@ -146,22 +201,20 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 
 	// Check that the CouchbaseCluster is correctly configured with respect to an existing resource
 	if ar.Request.Operation == admissionv1beta1.Update {
-		existingCouchbaseCluser, err := getCouchbaseClusterClient().CouchbaseV1().CouchbaseClusters(couchbaseCluster.Namespace).Get(couchbaseCluster.Name, metav1.GetOptions{})
+		existingCouchbaseCluser, err := decodeObject(ar, ar.Request.OldObject)
 		if err != nil {
 			glog.Error(err)
 			return errorResponse(err)
 		}
 		// Note: the we cannot raise warnings as the Result field is only consulted if Allowed is false
-		if err := validator.CheckImmutableFields(existingCouchbaseCluser, &couchbaseCluster); err != nil {
+		if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
 			glog.Error(err)
 			return errorResponse(err)
 		}
 	}
 
-	v := validator.New(getClient())
-
 	// Check that the CouchbaseCluster is correctly configured
-	if err := v.CheckConstraints(&couchbaseCluster); err != nil {
+	if err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient()), couchbaseCluster); err != nil {
 		glog.Error(err)
 		return errorResponse(err)
 	}
@@ -176,23 +229,9 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 		glog.Info("mutating couchbasecluster")
 	}
 
-	// Check the resource is valid
-	couchbaseClustersResource := metav1.GroupVersionResource{
-		Group:    couchbasev1.GroupName,
-		Version:  "v1",
-		Resource: couchbasev1.CRDResourcePlural,
-	}
-	if ar.Request.Resource != couchbaseClustersResource {
-		err := fmt.Errorf("expect resource %s to be %s", ar.Request.Resource, couchbaseClustersResource)
-		glog.Error(err)
-		return errorResponse(err)
-	}
-
 	// Decode the CouchbaseCluster object
-	raw := ar.Request.Object.Raw
-	couchbaseCluster := couchbasev1.CouchbaseCluster{}
-	deserializer := codecs.UniversalDeserializer()
-	if _, _, err := deserializer.Decode(raw, nil, &couchbaseCluster); err != nil {
+	couchbaseCluster, err := decodeObject(ar, ar.Request.Object)
+	if err != nil {
 		glog.Error(err)
 		return errorResponse(err)
 	}
@@ -206,14 +245,29 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 
 	// Duplicate the cluster and apply default values.  If the cluster has been
 	// mutated send a patch pack to the server to be applied.
-	mutatedCouchbaseCluster := couchbaseCluster.DeepCopy()
+	mutatedCouchbaseCluster, err := deepCopy(couchbaseCluster)
+	if err != nil {
+		glog.Error(err)
+		return errorResponse(err)
+	}
 	validator.ApplyDefaults(mutatedCouchbaseCluster)
-	if !reflect.DeepEqual(couchbaseCluster.Spec, mutatedCouchbaseCluster.Spec) {
+	oldSpec, err := getSpec(couchbaseCluster)
+	if err != nil {
+		glog.Error(err)
+		return errorResponse(err)
+	}
+	newSpec, err := getSpec(mutatedCouchbaseCluster)
+	if err != nil {
+		glog.Error(err)
+		return errorResponse(err)
+	}
+
+	if !reflect.DeepEqual(oldSpec, newSpec) {
 		patch := jsonpatch.PatchList{
 			jsonpatch.Patch{
 				Op:    jsonpatch.Replace,
 				Path:  "/spec",
-				Value: mutatedCouchbaseCluster.Spec,
+				Value: newSpec,
 			},
 		}
 		data, err := json.Marshal(patch)

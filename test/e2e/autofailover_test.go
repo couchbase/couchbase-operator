@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -33,19 +34,16 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	// Create cluster spec for RZA feature
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
-	bucketName := "testBucket"
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 2, true)
 	clusterConfig["autoFailoverTimeout"] = "10"
 	clusterConfig["autoFailoverMaxCount"] = "2"
 	clusterConfig["autoFailoverServerGroup"] = "true"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 1, true, false)
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -55,6 +53,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// Create a map for server-groups based on deployed cb-server nodes
@@ -229,14 +228,13 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 
 	clusterConfig := e2eutil.GetClusterConfigMap(256, 256, 256, 256, 1024, 30, 3, true)
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap("default", "couchbase", "high", constants.Mem256Mb, constants.Size3, constants.BucketFlushEnabled, constants.IndexReplicaDisabled)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	// Create the cluster.
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketThreeReplicas)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	// When ready, kill the victim nodes, expect a rebalance to happen eventually as they
@@ -284,15 +282,12 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	clusterConfig["autoFailoverOnDiskIssues"] = "true"
 	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
 
-	bucketName := "testBucket"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.GetBucketConfigMap(bucketName, "couchbase", "high", 100, 2, true, false)
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
-
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -301,7 +296,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 	}
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
+	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
@@ -316,7 +311,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 			"-n", "127.0.0.1:8091",
 			"-u", "Administrator",
 			"-p", "password",
-			"-b", bucketName,
+			"-b", "default",
 			"-j",
 			"-s", "100000",
 			"-i", "10000",
@@ -333,7 +328,7 @@ func TestDiskFailureAutoFailover(t *testing.T) {
 
 	t.Log("Entering sleep to load data")
 	time.Sleep(time.Second * 20)
-	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podName, "rm -vf /opt/couchbase/var/lib/couchbase/data/"+bucketName+"/*")
+	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podName, "rm -vf /opt/couchbase/var/lib/couchbase/data/default/*")
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")

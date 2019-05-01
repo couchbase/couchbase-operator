@@ -1,21 +1,20 @@
 package constants
 
 import (
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	util_const "github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
 const (
-	// CommunityEditionVersion is a version of CE that exists.  Sadly we have to
+	// CommunityEditionImage is a version of CE that exists.  Sadly we have to
 	// hard code this (not do a regex replace) as this only gets major releases,
 	// mo minors or patches.
-	CommunityEditionVersion = "community-6.0.0"
+	CommunityEditionImage = "couchbase/server:community-6.0.0"
 )
 
 // These values can be updated from e2espec/crd.go
 var (
-	CbServerBaseImage = "couchbase/server"
-	CbServerVersion   = "enterprise-5.5.0"
+	CouchbaseServerImage = "couchbase/server:enterprise-5.5.3"
 )
 
 // Const Ansible setting string
@@ -41,15 +40,15 @@ var (
 	CouchbaseServerPodLabelStr = CouchbaseLabel + "," + CouchbaseServerClusterKey + "="
 
 	// List of Couchbase-cluster services
-	StatefulCbServiceList = couchbasev1.ServiceList{
-		couchbasev1.DataService,
-		couchbasev1.IndexService,
-		couchbasev1.AnalyticsService,
+	StatefulCbServiceList = couchbasev2.ServiceList{
+		couchbasev2.DataService,
+		couchbasev2.IndexService,
+		couchbasev2.AnalyticsService,
 	}
-	StatelessCbServiceList = couchbasev1.ServiceList{
-		couchbasev1.QueryService,
-		couchbasev1.SearchService,
-		couchbasev1.EventingService,
+	StatelessCbServiceList = couchbasev2.ServiceList{
+		couchbasev2.QueryService,
+		couchbasev2.SearchService,
+		couchbasev2.EventingService,
 	}
 )
 

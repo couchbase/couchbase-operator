@@ -3,7 +3,7 @@ package scheduler
 import (
 	"testing"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,22 +40,22 @@ var (
 	// Defines a cluster with a global server group definition
 	// and an override for serverClass2.  Randomize the order of
 	// the groups to ensure they are picked in order
-	fixtureCluster = &couchbasev1.CouchbaseCluster{
+	fixtureCluster = &couchbasev2.CouchbaseCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,
 		},
-		Spec: couchbasev1.ClusterSpec{
+		Spec: couchbasev2.ClusterSpec{
 			ServerGroups: []string{
 				serverGroup3,
 				serverGroup1,
 				serverGroup2,
 			},
-			ServerSettings: []couchbasev1.ServerConfig{
-				couchbasev1.ServerConfig{
+			ServerSettings: []couchbasev2.ServerConfig{
+				couchbasev2.ServerConfig{
 					Name: serverClass1,
 				},
-				couchbasev1.ServerConfig{
+				couchbasev2.ServerConfig{
 					Name: serverClass2,
 					ServerGroups: []string{
 						serverGroup2,
@@ -68,17 +68,17 @@ var (
 
 	// Defines a cluster with invalid configuration; serverClass2 enables
 	// scheduling however there is no global default for serverClass1
-	fixtureClusterInvalid = &couchbasev1.CouchbaseCluster{
+	fixtureClusterInvalid = &couchbasev2.CouchbaseCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,
 		},
-		Spec: couchbasev1.ClusterSpec{
-			ServerSettings: []couchbasev1.ServerConfig{
-				couchbasev1.ServerConfig{
+		Spec: couchbasev2.ClusterSpec{
+			ServerSettings: []couchbasev2.ServerConfig{
+				couchbasev2.ServerConfig{
 					Name: serverClass1,
 				},
-				couchbasev1.ServerConfig{
+				couchbasev2.ServerConfig{
 					Name: serverClass2,
 					ServerGroups: []string{
 						serverGroup1,

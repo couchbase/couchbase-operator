@@ -31,8 +31,8 @@ func TestDenyCommunityEdition(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
-	testCouchbase.Spec.Version = constants.CommunityEditionVersion
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.Image = constants.CommunityEditionImage
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// Expect the cluster to enter a failed state
@@ -51,7 +51,7 @@ func TestEditServiceConfig(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// When ready update the server class size and wait for the cluster to be scaled.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Size", clusterSize+1), time.Minute)
@@ -82,7 +82,8 @@ func TestNodeManualFailover(t *testing.T) {
 	clusterSize := constants.Size2
 
 	// create 2 node cluster with admin console
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// When ready failover a node, expect it to be added back in.
 	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, 0, time.Minute)
@@ -115,7 +116,8 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -164,7 +166,8 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	victimIndex := 2
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -213,7 +216,8 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	victim2Index := scaledClusterSize
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Runtime configuration.
 	victim1Name := couchbaseutil.CreateMemberName(testCouchbase.Name, victim1Index)
@@ -277,7 +281,8 @@ func TestRemoveForeignNode(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// Runtime configuration.
 	foreignNodeName := testCouchbase.Name + "-hrisovalantis" // (this is Greek ;p)
@@ -321,7 +326,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Kill a single pod and wait for the cluster to recover.
@@ -362,7 +367,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Kill a two pods and wait for the cluster to recover.
@@ -405,7 +410,8 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Kill a single pod and wait for the cluster to recover.
@@ -447,7 +453,8 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Kill a two pods and wait for the cluster to recover.
@@ -491,8 +498,9 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
-	testCouchbase.Spec.BucketSettings[0].BucketReplicas = 2
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	// TODO: testCouchbase.Spec.BucketSettings[0].BucketReplicas = 2
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Kill a single pod and wait for the cluster to recover.
@@ -534,8 +542,9 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
-	testCouchbase.Spec.BucketSettings[0].BucketReplicas = 2
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	// TODO: testCouchbase.Spec.BucketSettings[0].BucketReplicas = 2
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Kill a two pods and wait for the cluster to recover.
@@ -575,7 +584,8 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Runtime configuration
@@ -617,13 +627,12 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -665,13 +674,12 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 		"indexStorageSetting":   "memory_optimized",
 		"autoFailoverTimeout":   strconv.Itoa(autofailoverTimeout)}
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
@@ -714,14 +722,13 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	// Create cluster spec for RZA feature
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
-		"bucket1":  bucketConfig1,
 	}
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// Set taint properties

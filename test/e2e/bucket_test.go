@@ -1,10 +1,11 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -14,6 +15,9 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/gocbmgr"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestBucketAddRemoveBasic(t *testing.T) {
@@ -23,45 +27,67 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 
 	// Static configuration
 	clusterSize := 3
+	names := []string{
+		"bucket1",
+		"bucket2",
+		"bucket3",
+		"bucket4",
+	}
 
-	bucket1 := couchbasev1.BucketConfig{
-		BucketName:         "default1",
-		BucketType:         pkg_constants.BucketTypeCouchbase,
-		BucketMemoryQuota:  constants.Mem256Mb,
-		BucketReplicas:     pkg_constants.BucketReplicasOne,
-		IoPriority:         pkg_constants.BucketIoPriorityHigh,
-		EvictionPolicy:     pkg_constants.BucketEvictionPolicyFullEviction,
-		ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
-		EnableFlush:        constants.BucketFlushEnabled,
-		EnableIndexReplica: constants.IndexReplicaEnabled,
+	buckets := []runtime.Object{
+		&couchbasev2.CouchbaseBucket{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: names[0],
+			},
+			Spec: couchbasev2.CouchbaseBucketSpec{
+				MemoryQuota:        constants.Mem256Mb,
+				Replicas:           pkg_constants.BucketReplicasOne,
+				IoPriority:         pkg_constants.BucketIoPriorityHigh,
+				EvictionPolicy:     pkg_constants.BucketEvictionPolicyFullEviction,
+				ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
+				EnableFlush:        constants.BucketFlushEnabled,
+				EnableIndexReplica: constants.IndexReplicaEnabled,
+				CompressionMode:    "passive",
+			},
+		},
+		&couchbasev2.CouchbaseMemcachedBucket{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: names[1],
+			},
+			Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
+				MemoryQuota: constants.Mem256Mb,
+				EnableFlush: constants.BucketFlushDisabled,
+			},
+		},
+		&couchbasev2.CouchbaseEphemeralBucket{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: names[2],
+			},
+			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+				MemoryQuota:        101,
+				Replicas:           pkg_constants.BucketReplicasOne,
+				IoPriority:         pkg_constants.BucketIoPriorityHigh,
+				EvictionPolicy:     pkg_constants.BucketEvictionPolicyNoEviction,
+				ConflictResolution: pkg_constants.BucketConflictResolutionTimestamp,
+				EnableFlush:        constants.BucketFlushEnabled,
+				CompressionMode:    "passive",
+			},
+		},
+		&couchbasev2.CouchbaseEphemeralBucket{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: names[3],
+			},
+			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+				MemoryQuota:        101,
+				Replicas:           pkg_constants.BucketReplicasOne,
+				IoPriority:         pkg_constants.BucketIoPriorityHigh,
+				EvictionPolicy:     pkg_constants.BucketEvictionPolicyNRUEviction,
+				ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
+				EnableFlush:        constants.BucketFlushEnabled,
+				CompressionMode:    "passive",
+			},
+		},
 	}
-	bucket2 := couchbasev1.BucketConfig{
-		BucketName:        "default2",
-		BucketType:        pkg_constants.BucketTypeMemcached,
-		BucketMemoryQuota: constants.Mem256Mb,
-		EnableFlush:       constants.BucketFlushDisabled,
-	}
-	bucket3 := couchbasev1.BucketConfig{
-		BucketName:         "default3",
-		BucketType:         pkg_constants.BucketTypeEphemeral,
-		BucketMemoryQuota:  101,
-		BucketReplicas:     pkg_constants.BucketReplicasOne,
-		IoPriority:         pkg_constants.BucketIoPriorityHigh,
-		EvictionPolicy:     pkg_constants.BucketEvictionPolicyNoEviction,
-		ConflictResolution: pkg_constants.BucketConflictResolutionTimestamp,
-		EnableFlush:        constants.BucketFlushEnabled,
-	}
-	bucket4 := couchbasev1.BucketConfig{
-		BucketName:         "default4",
-		BucketType:         pkg_constants.BucketTypeEphemeral,
-		BucketMemoryQuota:  101,
-		BucketReplicas:     pkg_constants.BucketReplicasOne,
-		IoPriority:         pkg_constants.BucketIoPriorityHigh,
-		EvictionPolicy:     pkg_constants.BucketEvictionPolicyNRUEviction,
-		ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
-		EnableFlush:        constants.BucketFlushEnabled,
-	}
-	bucketSettingsList := []couchbasev1.BucketConfig{bucket1, bucket2, bucket3, bucket4}
 
 	clusterConfig := e2eutil.BasicClusterConfig2
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
@@ -75,34 +101,23 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	bucketConfigs := []couchbasev1.BucketConfig{}
-	buckets := []string{}
-
-	for i, bucketSetting := range bucketSettingsList {
-		bucketConfigs = append(bucketConfigs, bucketSetting)
-
-		// add bucket
-		t.Logf("Desired Bucket Properties: %v\n", bucketSetting)
-		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings", bucketConfigs), time.Minute)
-
-		buckets = append(buckets, bucketSetting.BucketName)
-
-		t.Logf("Waiting For Bucket To Be Created \n")
-		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, buckets, 2*time.Minute)
+	for i, bucket := range buckets {
+		e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
+		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, names[:i+1], 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		currentBuckets, err := client.GetBuckets()
 		if err != nil && len(currentBuckets) != i+1 {
-			t.Fatalf("failed to see all buckets from client")
+			e2eutil.Die(t, fmt.Errorf("failed to see all buckets from client"))
 		}
 	}
-	// delete all buckets
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket1.BucketName, 2*time.Minute)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket2.BucketName, 2*time.Minute)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket3.BucketName, 2*time.Minute)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket4.BucketName, 2*time.Minute)
 
+	for _, bucket := range buckets {
+		e2eutil.MustDeleteBucket(t, targetKube, f.Namespace, bucket)
+	}
+	for _, name := range names {
+		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, name, 2*time.Minute)
+	}
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	currentBuckets, err := client.GetBuckets()
@@ -116,8 +131,8 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	// * Buckets removed
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: len(bucketSettingsList), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
-		eventschema.Repeat{Times: len(bucketSettingsList), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted}},
+		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted}},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -130,38 +145,17 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithoutBucket, constants.AdminHidden)
-
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
-	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
-	for _, bucketSetting := range bucketSettingsList {
-		newConfig := []couchbasev1.BucketConfig{bucketSetting}
-
-		// add bucket
-		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings", newConfig), time.Minute)
-		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucketSetting.BucketName}, 2*time.Minute)
+	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
+	for _, bucket := range buckets {
+		e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
+		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-		currentBuckets, err := client.GetBuckets()
-		if err != nil && len(currentBuckets) != 1 {
-			t.Fatalf("failed to see all buckets from client")
-		}
-
-		e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", bucketSetting.BucketMemoryQuota), time.Minute)
-
-		// delete bucket
-		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/BucketSettings"), time.Minute)
-		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucketSetting.BucketName, 2*time.Minute)
+		e2eutil.MustDeleteBucket(t, targetKube, f.Namespace, bucket)
+		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, "default", 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-		currentBuckets, err = client.GetBuckets()
-		if err != nil && len(currentBuckets) != 0 {
-			t.Fatalf("failed to see no buckets from client")
-		}
 	}
 
 	// Check the events match what we expect:
@@ -170,7 +164,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{
-			Times: len(bucketSettingsList),
+			Times: len(buckets),
 			Validator: eventschema.Sequence{
 				Validators: []eventschema.Validatable{
 					eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -194,31 +188,32 @@ func TestEditBucket(t *testing.T) {
 	disabled := false
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	bucket := e2eutil.MustNewBucket(t, kubernetes, f.Namespace, e2espec.DefaultBucket)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, constants.Size1, constants.AdminExposed)
 
 	// Create a direct connection to a couchbase node.
 	// When healthy change the memory quota, replicas, whether flushes are allowed and the compression mode.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketMemoryQuota", 128), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", 128), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", 128), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketMemoryQuota", 256), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", 256), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", 256), time.Minute)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketReplicas", 2), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/Replicas", 2), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 2), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/BucketReplicas", 1), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/Replicas", 1), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EnableFlush", disabled), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &disabled), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/EnableFlush", enabled), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &enabled), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/EnableFlush", disabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", disabled), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/EnableFlush", enabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", enabled), time.Minute)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionModeActive), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionModeActive), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeActive), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionModeOff), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionModeOff), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeOff), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings/0/CompressionMode", cbmgr.CompressionModePassive), time.Minute)
+	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionModePassive), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModePassive), time.Minute)
 
 	// Avoid a race where Couchbase has been updated but the event not raise yet.
@@ -259,13 +254,14 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	disabled := false
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminExposed)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Replace("/EnableFlush", &disabled), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &disabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Replace("/EnableFlush", disabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", disabled), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 30*time.Second)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", &enabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", enabled), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Replace("/BucketReplicas", 3), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 3), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 30*time.Second)

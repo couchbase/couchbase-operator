@@ -5,7 +5,7 @@ import (
 	"io"
 	"sort"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"k8s.io/api/core/v1"
@@ -25,7 +25,7 @@ type stripeSchedulerImpl struct {
 
 // getServerGroupsForClass gets the list of server groups to schedule pods across
 // given a specific server class name
-func getServerGroupsForClass(cluster *couchbasev1.CouchbaseCluster, class *couchbasev1.ServerConfig) ([]string, error) {
+func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couchbasev2.ServerConfig) ([]string, error) {
 	// Determine the server groups to use, defaulting to the global configuration
 	// if server configuration specific settings do not exist.
 	serverGroups := class.ServerGroups
@@ -41,7 +41,7 @@ func getServerGroupsForClass(cluster *couchbasev1.CouchbaseCluster, class *couch
 
 // NewStripeScheduler creates an initializes a new sripe scheduler, caching
 // state from the current set of pods for the cluster
-func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev1.CouchbaseCluster) (Scheduler, error) {
+func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
 	// Initialize data structures, creating maps for each server class
 	// and empty lists for each server group defined for that class
 	sched := &stripeSchedulerImpl{

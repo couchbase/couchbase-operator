@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -17,7 +18,7 @@ import (
 
 // Generic function to run rebalance out test case
 // Rebalance out xdcrCluster nodes one by one for the provided clustersize
-func rebalanceOutXdcrNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, clusterSize int, expectedEvents *e2eutil.EventValidator) {
+func rebalanceOutXdcrNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, clusterSize int, expectedEvents *e2eutil.EventValidator) {
 	nextNodeToBeAdded := clusterSize
 
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
@@ -50,7 +51,7 @@ func rebalanceOutXdcrNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 
 // Generic function to kill xdcrCluster nodes
 // Will kill all the nodes one by one for the given clusterSize number and wait for the new pod to get replaced
-func killXdcrNodes(t *testing.T, cbCluster *couchbasev1.CouchbaseCluster, clusterSize int, k8s *types.Cluster, expectedEvents *e2eutil.EventValidator) error {
+func killXdcrNodes(t *testing.T, cbCluster *couchbasev2.CouchbaseCluster, clusterSize int, k8s *types.Cluster, expectedEvents *e2eutil.EventValidator) error {
 	f := framework.Global
 	targetKube := k8s
 	nextNodeToBeAdded := clusterSize
@@ -78,7 +79,7 @@ func killXdcrNodes(t *testing.T, cbCluster *couchbasev1.CouchbaseCluster, cluste
 }
 
 // Generic function to resize the xdcrCluster to the given clusterSize value and wait for healthy cluster
-func resizeXdcrCluster(t *testing.T, cbCluster *couchbasev1.CouchbaseCluster, clusterSize int, k8s *types.Cluster) *couchbasev1.CouchbaseCluster {
+func resizeXdcrCluster(t *testing.T, cbCluster *couchbasev2.CouchbaseCluster, clusterSize int, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 	service := 0
 	targetKube := k8s
 	return e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, cbCluster, 5*time.Minute)
@@ -100,15 +101,21 @@ func XdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, targetCluste
 	cbPassword := "password"
 
 	// Create the clusters.
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, k8s1, f.Namespace, e2espec.DefaultBucket)
+	if k8s1.Config.Host != k8s2.Config.Host {
+		e2eutil.MustNewBucket(t, k8s2, f.Namespace, e2espec.DefaultBucket)
+	}
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminExposed)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedCluster1Events := e2eutil.EventValidator{}
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", memberIndex)
 	}
-	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceStarted")
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
 	expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")
@@ -118,7 +125,7 @@ func XdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, targetCluste
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedCluster2Events.AddClusterPodEvent(xdcrCluster2, "AddNewMember", memberIndex)
 	}
-	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceStarted")
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
@@ -185,15 +192,21 @@ func CreateXdcrCluster(t *testing.T, k8s1, k8s2 *types.Cluster) {
 	cbPassword := "password"
 
 	// Create the clusters.
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, k8s1, f.Namespace, e2espec.DefaultBucket)
+	if k8s1.Config.Host != k8s2.Config.Host {
+		e2eutil.MustNewBucket(t, k8s2, f.Namespace, e2espec.DefaultBucket)
+	}
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminExposed)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedCluster1Events := e2eutil.EventValidator{}
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", memberIndex)
 	}
-	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceStarted")
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
 	expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")
@@ -203,7 +216,7 @@ func CreateXdcrCluster(t *testing.T, k8s1, k8s2 *types.Cluster) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedCluster2Events.AddClusterPodEvent(xdcrCluster2, "AddNewMember", memberIndex)
 	}
-	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceStarted")
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
@@ -232,15 +245,21 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *typ
 	cbPassword := "password"
 
 	// Create the clusters.
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, xdcrCluster1Size, constants.WithBucket, constants.AdminExposed)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, xdcrCluster2Size, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, k8s1, f.Namespace, e2espec.DefaultBucket)
+	if k8s1.Config.Host != k8s2.Config.Host {
+		e2eutil.MustNewBucket(t, k8s2, f.Namespace, e2espec.DefaultBucket)
+	}
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, xdcrCluster1Size, constants.AdminExposed)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, xdcrCluster2Size, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedCluster1Events := e2eutil.EventValidator{}
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "AdminConsoleServiceCreate")
 	for memberIndex := 0; memberIndex < xdcrCluster1Size; memberIndex++ {
 		expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", memberIndex)
 	}
-	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceStarted")
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
 	expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")
@@ -250,7 +269,7 @@ func ClusterNodeDownWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *typ
 	for memberIndex := 0; memberIndex < xdcrCluster2Size; memberIndex++ {
 		expectedCluster2Events.AddClusterPodEvent(xdcrCluster2, "AddNewMember", memberIndex)
 	}
-	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceStarted")
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "RebalanceCompleted")
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
@@ -299,19 +318,25 @@ func ClusterAddNodeWithXdcr(t *testing.T, triggerDuring string, k8s1, k8s2 *type
 	cbPassword := "password"
 
 	// Create the clusters.
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, k8s1, f.Namespace, e2espec.DefaultBucket)
+	if k8s1.Config.Host != k8s2.Config.Host {
+		e2eutil.MustNewBucket(t, k8s2, f.Namespace, e2espec.DefaultBucket)
+	}
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminExposed)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedCluster1Events := e2eutil.EventValidator{}
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "AdminConsoleServiceCreate")
 	expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", 0)
-	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")
 
 	expectedCluster2Events := e2eutil.EventValidator{}
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "AdminConsoleServiceCreate")
 	expectedCluster2Events.AddClusterPodEvent(xdcrCluster2, "AddNewMember", 0)
-	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
 	errChan := make(chan error)
@@ -371,19 +396,25 @@ func ClusterNodeXdcrServiceKill(t *testing.T, triggerDuring string, k8s1, k8s2 *
 	cbPassword := "password"
 
 	// Create the clusters.
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.WithBucket, constants.AdminExposed)
+	e2eutil.MustNewBucket(t, k8s1, f.Namespace, e2espec.DefaultBucket)
+	if k8s1.Config.Host != k8s2.Config.Host {
+		e2eutil.MustNewBucket(t, k8s2, f.Namespace, e2espec.DefaultBucket)
+	}
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminExposed)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	expectedCluster1Events := e2eutil.EventValidator{}
 	expectedCluster1Events.AddClusterEvent(xdcrCluster1, "AdminConsoleServiceCreate")
 	expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", 0)
-	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")
 
 	expectedCluster2Events := e2eutil.EventValidator{}
 	expectedCluster2Events.AddClusterEvent(xdcrCluster2, "AdminConsoleServiceCreate")
 	expectedCluster2Events.AddClusterPodEvent(xdcrCluster2, "AddNewMember", 0)
-	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+	expectedCluster2Events.AddClusterNodeServiceEvent(xdcrCluster2, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 	expectedCluster2Events.AddClusterBucketEvent(xdcrCluster2, "Create", "default")
 
 	if triggerDuring == "duringXdcrSetup" {
@@ -438,8 +469,14 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	defer teardown2()
 
 	// Create the clusters.
-	xdcrCluster1 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, tls1)
-	xdcrCluster2 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden, tls2)
+	e2eutil.MustNewBucket(t, k8s1, f.Namespace, e2espec.DefaultBucket)
+	if k8s1.Config.Host != k8s2.Config.Host {
+		e2eutil.MustNewBucket(t, k8s2, f.Namespace, e2espec.DefaultBucket)
+	}
+	xdcrCluster1 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminHidden, tls1)
+	xdcrCluster2 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminHidden, tls2)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the XDCR connection.  Ensure TLS is enabled.
 	e2eutil.MustCreateDestClusterReference(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, cbUsername, cbPassword)
@@ -478,7 +515,7 @@ func TestXdcrCreateK8SVMCluster(t *testing.T) {
 		for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 			expectedCluster1Events.AddClusterPodEvent(xdcrCluster1, "AddNewMember", memberIndex)
 		}
-		expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev1.AdminService, couchbasev1.DataService, couchbasev1.IndexService)
+		expectedCluster1Events.AddClusterNodeServiceEvent(xdcrCluster1, "Create", couchbasev2.AdminService, couchbasev2.DataService, couchbasev2.IndexService)
 		expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceStarted")
 		expectedCluster1Events.AddClusterEvent(xdcrCluster1, "RebalanceCompleted")
 		expectedCluster1Events.AddClusterBucketEvent(xdcrCluster1, "Create", "default")

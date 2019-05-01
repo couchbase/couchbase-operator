@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
@@ -48,7 +48,7 @@ type NodeServices struct {
 
 // validateAlternateAddresses looks at the node services, verifying that the correct number
 // exist and external alternate addresses are specified.
-func (nodeServices *NodeServices) validateAlternateAddresses(couchbase *couchbasev1.CouchbaseCluster) error {
+func (nodeServices *NodeServices) validateAlternateAddresses(couchbase *couchbasev2.CouchbaseCluster) error {
 	if len(nodeServices.NodesExt) != couchbase.Spec.TotalSize() {
 		return fmt.Errorf("found %d nodes, expected %d", len(nodeServices.NodesExt), couchbase.Spec.TotalSize())
 	}
@@ -63,8 +63,8 @@ func (nodeServices *NodeServices) validateAlternateAddresses(couchbase *couchbas
 }
 
 // getNodeServices polls the Couchbase API, gets and decodes external addressability configuration.
-func getNodeServices(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster) (*NodeServices, error) {
-	host, cleanup, err := GetHostURL(k8s, couchbase, couchbasev1.AdminService)
+func getNodeServices(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (*NodeServices, error) {
+	host, cleanup, err := GetHostURL(k8s, couchbase, couchbasev2.AdminService)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func getNodeServices(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster
 }
 
 // getKubernetesNodeServices lists the Kubernetes node services created by the operator.
-func getKubernetesNodeServices(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster) (*corev1.ServiceList, error) {
+func getKubernetesNodeServices(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (*corev1.ServiceList, error) {
 	appreq, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App})
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func getKubernetesNodeServices(k8s *types.Cluster, couchbase *couchbasev1.Couchb
 
 // CheckForIPAlternateAddresses gets external addressability configuration from the Couchbase API
 // and checks that alternate addresses are defined and IPv4 addresses.
-func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) error {
+func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -145,7 +145,7 @@ func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev1.Cou
 	})
 }
 
-func MustCheckForIPAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) {
+func MustCheckForIPAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := CheckForIPAlternateAddresses(k8s, couchbase, timeout); err != nil {
 		Die(t, err)
 	}
@@ -153,7 +153,7 @@ func MustCheckForIPAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbas
 
 // CheckForDNSAlternateAddresses gets external addressability configuration from the Couchbase API
 // and checks that alternate addresses are defined and DNS names in the requested domain.
-func CheckForDNSAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, domain string, timeout time.Duration) error {
+func CheckForDNSAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -177,7 +177,7 @@ func CheckForDNSAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev1.Co
 	})
 }
 
-func MustCheckForDNSAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, domain string, timeout time.Duration) {
+func MustCheckForDNSAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) {
 	if err := CheckForDNSAlternateAddresses(k8s, couchbase, domain, timeout); err != nil {
 		Die(t, err)
 	}
@@ -185,7 +185,7 @@ func MustCheckForDNSAlternateAddresses(t *testing.T, k8s *types.Cluster, couchba
 
 // CheckForDNSServiceAnnotations gets all node services defined for the cluster and
 // checks that the DDNS annotations exist and in the requested domain.
-func CheckForDNSServiceAnnotations(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, domain string, timeout time.Duration) error {
+func CheckForDNSServiceAnnotations(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -214,14 +214,14 @@ func CheckForDNSServiceAnnotations(k8s *types.Cluster, couchbase *couchbasev1.Co
 	})
 }
 
-func MustCheckForDNSServiceAnnotations(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, domain string, timeout time.Duration) {
+func MustCheckForDNSServiceAnnotations(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) {
 	if err := CheckForDNSServiceAnnotations(k8s, couchbase, domain, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 // CheckForNodeServiceType checks that the node service type is as expected.
-func CheckForNodeServiceType(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) error {
+func CheckForNodeServiceType(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -245,14 +245,14 @@ func CheckForNodeServiceType(k8s *types.Cluster, couchbase *couchbasev1.Couchbas
 	})
 }
 
-func MustCheckForNodeServiceType(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) {
+func MustCheckForNodeServiceType(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) {
 	if err := CheckForNodeServiceType(k8s, couchbase, serviceType, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 // CheckForDNSAdminAnnotation checks that a DNS annotaion is added to the console service.
-func CheckForDNSAdminAnnotation(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, domain string, timeout time.Duration) error {
+func CheckForDNSAdminAnnotation(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -275,14 +275,14 @@ func CheckForDNSAdminAnnotation(k8s *types.Cluster, couchbase *couchbasev1.Couch
 	})
 }
 
-func MustCheckForDNSAdminAnnotation(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, domain string, timeout time.Duration) {
+func MustCheckForDNSAdminAnnotation(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) {
 	if err := CheckForDNSAdminAnnotation(k8s, couchbase, domain, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 // CheckForConsoleServiceType checks that the console service is of the epxected type.
-func CheckForConsoleServiceType(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) error {
+func CheckForConsoleServiceType(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -300,14 +300,14 @@ func CheckForConsoleServiceType(k8s *types.Cluster, couchbase *couchbasev1.Couch
 	})
 }
 
-func MustCheckForConsoleServiceType(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) {
+func MustCheckForConsoleServiceType(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) {
 	if err := CheckForConsoleServiceType(k8s, couchbase, serviceType, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 // CheckConsoleServiceStatus checks that if Console service type is LoadBalancer then an ingress route is established
-func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) error {
+func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -334,7 +334,7 @@ func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev1.Couchb
 	})
 }
 
-func MustCheckConsoleServiceStatus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration) {
+func MustCheckConsoleServiceStatus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := CheckConsoleServiceStatus(k8s, couchbase, timeout); err != nil {
 		Die(t, err)
 	}

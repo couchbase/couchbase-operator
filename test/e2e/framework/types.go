@@ -27,11 +27,11 @@ type Framework struct {
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
 	TestClusters []string
-	// CouchbaseServerVersion is the version of Couchbase server we are running with
-	CouchbaseServerVersion string
-	// CouchbaseServerUpgradeVersion is the version of Couchbase server we are upgrading to
-	CouchbaseServerUpgradeVersion string
-	StorageClassName              string
+	// CouchbaseServerImage is the image of Couchbase server we are running with
+	CouchbaseServerImage string
+	// CouchbaseServerImageUpgrade is the image of Couchbase server we are upgrading to
+	CouchbaseServerImageUpgrade string
+	StorageClassName            string
 	// TestRetries allows you to retry a test N times before giving up.
 	TestRetries int `yaml:"testRetries"`
 }
@@ -67,14 +67,13 @@ type KubeConfData struct {
 
 // Struct to read and store test_config yaml passed by the user during testing
 type TestRunParam struct {
-	KubeType                 string `yaml:"kube-type"`
-	Namespace                string `yaml:"namespace"`
-	OperatorImage            string `yaml:"operator-image"`
-	AdmissionControllerImage string `yaml:"admission-controller-image"`
-	CbServerBaseImage        string `yaml:"cbServerBaseImage"`
-	CbServerImgVer           string `yaml:"cbServerImageVersion"`
-	CbServerImgVerUpgrade    string `yaml:"cbServerImageVersionUpgrade"`
-	SuiteToRun               string `yaml:"suite"`
+	KubeType                    string `yaml:"kube-type"`
+	Namespace                   string `yaml:"namespace"`
+	OperatorImage               string `yaml:"operator-image"`
+	AdmissionControllerImage    string `yaml:"admission-controller-image"`
+	CouchbaseServerImage        string `yaml:"couchbase-server-image"`
+	CouchbaseServerImageUpgrade string `yaml:"couchbase-server-image-upgrade"`
+	SuiteToRun                  string `yaml:"suite"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`

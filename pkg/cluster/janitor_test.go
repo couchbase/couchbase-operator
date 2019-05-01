@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	corev1 "k8s.io/api/core/v1"
@@ -16,11 +16,11 @@ var (
 	// clusterFixture is a basic cluster with a 1 minute log retention time
 	// and a maximum retention of 3 logs.
 	clusterFixture = &Cluster{
-		cluster: &couchbasev1.CouchbaseCluster{
+		cluster: &couchbasev2.CouchbaseCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 			},
-			Spec: couchbasev1.ClusterSpec{
+			Spec: couchbasev2.ClusterSpec{
 				LogRetentionTime:  "1m",
 				LogRetentionCount: 3,
 			},

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -14,8 +14,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func GetCouchbaseCluster(crClient versioned.Interface, name, namespace string) (*couchbasev1.CouchbaseCluster, error) {
-	return crClient.CouchbaseV1().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
+func GetCouchbaseCluster(crClient versioned.Interface, name, namespace string) (*couchbasev2.CouchbaseCluster, error) {
+	return crClient.CouchbaseV2().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
 }
 
 // Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest)
@@ -27,6 +27,10 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (E
 
 	events := EventList{}
 	for _, item := range list.Items {
+		// Filter out events we have no control over
+		if item.Reason == "FailedToUpdateEndpoint" {
+			continue
+		}
 		events.AddEvent(item)
 	}
 

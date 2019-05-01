@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	"k8s.io/api/core/v1"
@@ -46,7 +46,7 @@ const (
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
 
-func MemberCreationFailedEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func MemberCreationFailedEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeWarning
 	event.Reason = EventReasonMemberCreationFailed
@@ -54,7 +54,7 @@ func MemberCreationFailedEvent(memberName string, cl *couchbasev1.CouchbaseClust
 	return event
 }
 
-func MemberAddEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func MemberAddEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonNewMemberAdded
@@ -62,7 +62,7 @@ func MemberAddEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Eve
 	return event
 }
 
-func MemberRemoveEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func MemberRemoveEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonMemberRemoved
@@ -70,7 +70,7 @@ func MemberRemoveEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.
 	return event
 }
 
-func MemberDownEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func MemberDownEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeWarning
 	event.Reason = EventReasonMemberDown
@@ -78,7 +78,7 @@ func MemberDownEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Ev
 	return event
 }
 
-func MemberRecoveredEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func MemberRecoveredEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonMemberRecovered
@@ -86,7 +86,7 @@ func MemberRecoveredEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *
 	return event
 }
 
-func MemberFailedOverEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func MemberFailedOverEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeWarning
 	event.Reason = EventReasonMemberFailedOver
@@ -94,7 +94,7 @@ func MemberFailedOverEvent(memberName string, cl *couchbasev1.CouchbaseCluster) 
 	return event
 }
 
-func RebalanceStartedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func RebalanceStartedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRebalanceStarted
@@ -102,7 +102,7 @@ func RebalanceStartedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func RebalanceIncompleteEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func RebalanceIncompleteEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRebalanceIncomplete
@@ -110,7 +110,7 @@ func RebalanceIncompleteEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func RebalanceCompletedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func RebalanceCompletedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRebalanceCompleted
@@ -118,7 +118,7 @@ func RebalanceCompletedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func FailedAddNodeEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func FailedAddNodeEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonFailedAddNode
@@ -126,7 +126,7 @@ func FailedAddNodeEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1
 	return event
 }
 
-func FailedAddBackNodeEvent(memberName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func FailedAddBackNodeEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonFailedAddBackNode
@@ -134,7 +134,7 @@ func FailedAddBackNodeEvent(memberName string, cl *couchbasev1.CouchbaseCluster)
 	return event
 }
 
-func BucketCreateEvent(bucketName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func BucketCreateEvent(bucketName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBucketCreated
@@ -142,7 +142,7 @@ func BucketCreateEvent(bucketName string, cl *couchbasev1.CouchbaseCluster) *v1.
 	return event
 }
 
-func BucketDeleteEvent(bucketName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func BucketDeleteEvent(bucketName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBucketDeleted
@@ -150,7 +150,7 @@ func BucketDeleteEvent(bucketName string, cl *couchbasev1.CouchbaseCluster) *v1.
 	return event
 }
 
-func BucketEditEvent(bucketName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func BucketEditEvent(bucketName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBucketEdited
@@ -158,7 +158,7 @@ func BucketEditEvent(bucketName string, cl *couchbasev1.CouchbaseCluster) *v1.Ev
 	return event
 }
 
-func AdminConsoleSvcCreateEvent(svcName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func AdminConsoleSvcCreateEvent(svcName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonServiceCreated
@@ -166,7 +166,7 @@ func AdminConsoleSvcCreateEvent(svcName string, cl *couchbasev1.CouchbaseCluster
 	return event
 }
 
-func AdminConsoleSvcDeleteEvent(svcName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func AdminConsoleSvcDeleteEvent(svcName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonServiceDeleted
@@ -174,7 +174,7 @@ func AdminConsoleSvcDeleteEvent(svcName string, cl *couchbasev1.CouchbaseCluster
 	return event
 }
 
-func NodeServiceCreateEvent(service couchbasev1.Service, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func NodeServiceCreateEvent(service couchbasev2.Service, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonNodeServiceCreated
@@ -182,7 +182,7 @@ func NodeServiceCreateEvent(service couchbasev1.Service, cl *couchbasev1.Couchba
 	return event
 }
 
-func NodeServiceDeleteEvent(service couchbasev1.Service, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func NodeServiceDeleteEvent(service couchbasev2.Service, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonNodeServiceDeleted
@@ -190,7 +190,7 @@ func NodeServiceDeleteEvent(service couchbasev1.Service, cl *couchbasev1.Couchba
 	return event
 }
 
-func UpgradeStartedEvent(sourceVersion, targetVersion string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func UpgradeStartedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonUpgradeStarted
@@ -198,7 +198,7 @@ func UpgradeStartedEvent(sourceVersion, targetVersion string, cl *couchbasev1.Co
 	return event
 }
 
-func UpgradeFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func UpgradeFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonUpgradeFinished
@@ -206,7 +206,7 @@ func UpgradeFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev1.C
 	return event
 }
 
-func RollbackStartedEvent(sourceVersion, targetVersion string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func RollbackStartedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRollbackStarted
@@ -214,7 +214,7 @@ func RollbackStartedEvent(sourceVersion, targetVersion string, cl *couchbasev1.C
 	return event
 }
 
-func RollbackFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func RollbackFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRollbackFinished
@@ -222,7 +222,7 @@ func RollbackFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev1.
 	return event
 }
 
-func ClusterSettingsEditedEvent(settingName string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func ClusterSettingsEditedEvent(settingName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonClusterSettingsEdited
@@ -230,7 +230,7 @@ func ClusterSettingsEditedEvent(settingName string, cl *couchbasev1.CouchbaseClu
 	return event
 }
 
-func MemberVolumeUnhealthyEvent(memberName string, reason string, cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func MemberVolumeUnhealthyEvent(memberName string, reason string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonVolumeUnhealthy
@@ -238,7 +238,7 @@ func MemberVolumeUnhealthyEvent(memberName string, reason string, cl *couchbasev
 	return event
 }
 
-func TLSUpdatedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func TLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonTLSUpdated
@@ -246,7 +246,7 @@ func TLSUpdatedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func TLSInvalidEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonTLSInvalid
@@ -254,7 +254,7 @@ func TLSInvalidEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func TLSUpdateFailedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func TLSUpdateFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonTLSUpdateFailed
@@ -262,7 +262,7 @@ func TLSUpdateFailedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func newClusterEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
+func newClusterEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	t := time.Now()
 	return &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
@@ -270,8 +270,8 @@ func newClusterEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 			Namespace:    cl.Namespace,
 		},
 		InvolvedObject: v1.ObjectReference{
-			APIVersion:      couchbasev1.SchemeGroupVersion.String(),
-			Kind:            couchbasev1.CRDResourceKind,
+			APIVersion:      couchbasev2.SchemeGroupVersion.String(),
+			Kind:            couchbasev2.ClusterCRDResourceKind,
 			Name:            cl.Name,
 			Namespace:       cl.Namespace,
 			UID:             cl.UID,
