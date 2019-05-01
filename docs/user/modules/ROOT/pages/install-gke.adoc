@@ -133,7 +133,7 @@ You can select which cluster context to use by default with the following Kubern
 
 [source,console]
 ----
-kubectl config use-context gke_my-project_my-cluster-us-east1
+kubectl config use-context gke_my-project_us-east1_my-cluster-us-east1
 ----
 
 Other contexts you may have created can be seen with the `kubectl config get-contexts` command.
