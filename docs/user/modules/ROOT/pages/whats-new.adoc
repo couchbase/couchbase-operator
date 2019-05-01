@@ -47,7 +47,7 @@ The Operator now offers full production support on the following public Kubernet
 * Google Kubernetes Engine (GKE)
 * Microsoft Azure Kubernetes Service (AKS)
 
-See xref:cloud-intro[Cloud Environment Setup]
+See xref:cloud-intro.adoc[Cloud Environment Setup]
 
 == Rolling Upgrade of Kubernetes Clusters
 
