@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -792,7 +792,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	cluster1Size := constants.Size3
 	cluster2Size := constants.Size3
 	cluster3Size := constants.Size1
-	var cluster1, cluster2, cluster3 *api.CouchbaseCluster
+	var cluster1, cluster2, cluster3 *couchbasev1.CouchbaseCluster
 	cluster1Err := make(chan error)
 	cluster2Err := make(chan error)
 	cluster3Err := make(chan error)

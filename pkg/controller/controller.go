@@ -10,7 +10,7 @@ import (
 
 	sdk "github.com/operator-framework/operator-sdk/pkg/sdk"
 
-	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -38,7 +38,7 @@ func init() {
 
 type Event struct {
 	Type   kwatch.EventType
-	Object *cbapi.CouchbaseCluster
+	Object *couchbasev1.CouchbaseCluster
 }
 
 type Controller struct {
@@ -88,7 +88,7 @@ func (c *Controller) Start() {
 	}
 	probe.SetReady()
 
-	sdk.Watch(cbapi.SchemeGroupVersion.String(), cbapi.CRDResourceKind, c.Config.Namespace, 0)
+	sdk.Watch(couchbasev1.SchemeGroupVersion.String(), couchbasev1.CRDResourceKind, c.Config.Namespace, 0)
 	sdk.Handle((sdk.Handler)(c))
 	sdk.Run(context.TODO())
 
@@ -96,7 +96,7 @@ func (c *Controller) Start() {
 }
 
 func (c *Controller) Handle(ctx context.Context, event sdk.Event) error {
-	if cluster, ok := event.Object.(*cbapi.CouchbaseCluster); ok {
+	if cluster, ok := event.Object.(*couchbasev1.CouchbaseCluster); ok {
 		cluster.Initialize()
 		ev := &Event{
 			Type:   kwatch.Added,

@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -731,7 +731,7 @@ var testDefs = []testDef{
 // expected errors that may be triggered by CRD validation.  The return bool indicates
 // whether we need to continue (e.g. a CRD validation failure that was expected, we can
 // just stop the test now).
-func loadCustomResource(t *testing.T, tc testDef, path string) (*api.CouchbaseCluster, bool) {
+func loadCustomResource(t *testing.T, tc testDef, path string) (*couchbasev1.CouchbaseCluster, bool) {
 	raw, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -775,9 +775,9 @@ func TestValidation(t *testing.T) {
 		t.Fatalf("Failed to register CRD scheme due to %v", err)
 	}
 
-	err = api.AddToScheme(scheme.Scheme)
+	err = couchbasev1.AddToScheme(scheme.Scheme)
 	if err != nil {
-		t.Fatalf("Failed to register CouchbaseCluster scheme due to %v", err)
+		t.Fatalf("Failed to register CRD scheme: %v", err)
 	}
 
 	for _, tc := range testDefs {

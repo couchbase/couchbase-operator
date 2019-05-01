@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
@@ -462,7 +462,7 @@ func CheckHealth(url string, tc *tls.Config) (bool, error) {
 	return true, nil
 }
 
-func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services cbapi.ServiceList) error {
+func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchbasev1.ServiceList) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
@@ -602,7 +602,7 @@ func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath
 }
 
 func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
-	services cbapi.ServiceList, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
+	services couchbasev1.ServiceList, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
@@ -665,7 +665,7 @@ func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
 	return c.client.CompareRebalanceStatus(cbmgr.RebalanceStatusRunning)
 }
 
-func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *cbapi.BucketConfig) error {
+func (c *CouchbaseClient) CreateBucket(ms MemberSet, config *couchbasev1.BucketConfig) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	bucket := ApiBucketToCbmgr(config)
@@ -689,21 +689,21 @@ func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucketName string) error {
 	return c.client.DeleteBucket(bucketName)
 }
 
-func (c *CouchbaseClient) EditBucket(ms MemberSet, config *cbapi.BucketConfig) error {
+func (c *CouchbaseClient) EditBucket(ms MemberSet, config *couchbasev1.BucketConfig) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	bucket := ApiBucketToCbmgr(config)
 
 	return c.client.EditBucket(bucket)
 }
 
-func (c *CouchbaseClient) GetBuckets(ms MemberSet) ([]*cbapi.BucketConfig, error) {
+func (c *CouchbaseClient) GetBuckets(ms MemberSet) ([]*couchbasev1.BucketConfig, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	buckets, err := c.client.GetBuckets()
 	if err != nil {
 		return nil, err
 	}
 
-	rv := make([]*cbapi.BucketConfig, len(buckets))
+	rv := make([]*couchbasev1.BucketConfig, len(buckets))
 	for i, bucket := range buckets {
 		rv[i] = CbmgrBucketToApiBucket(bucket)
 	}
@@ -728,7 +728,7 @@ func (c *CouchbaseClient) GetBucketNames(ms MemberSet) ([]string, error) {
 
 // compare spec buckets to couchbase buckets and add to list of buckets
 // that need editing
-func (c *CouchbaseClient) GetBucketsToEdit(ms MemberSet, spec *cbapi.ClusterSpec) ([]string, error) {
+func (c *CouchbaseClient) GetBucketsToEdit(ms MemberSet, spec *couchbasev1.ClusterSpec) ([]string, error) {
 	bucketNames := []string{}
 	clusterBuckets, err := c.GetBuckets(ms)
 	if err != nil {
@@ -904,7 +904,7 @@ func (c *CouchbaseClient) UpdateServerGroups(ms MemberSet, revision string, grou
 	return c.client.UpdateServerGroups(revision, groups)
 }
 
-func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
+func ApiBucketToCbmgr(config *couchbasev1.BucketConfig) *cbmgr.Bucket {
 	rv := &cbmgr.Bucket{
 		BucketName:        config.BucketName,
 		BucketType:        config.BucketType,
@@ -932,8 +932,8 @@ func ApiBucketToCbmgr(config *cbapi.BucketConfig) *cbmgr.Bucket {
 	return rv
 }
 
-func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) *cbapi.BucketConfig {
-	rv := &cbapi.BucketConfig{
+func CbmgrBucketToApiBucket(bucket *cbmgr.Bucket) *couchbasev1.BucketConfig {
+	rv := &couchbasev1.BucketConfig{
 		BucketName:        bucket.BucketName,
 		BucketType:        bucket.BucketType,
 		BucketMemoryQuota: bucket.BucketMemoryQuota,

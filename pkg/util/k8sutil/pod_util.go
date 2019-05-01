@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	cbapi "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -35,7 +35,7 @@ const (
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig, ctx context.Context) (*v1.Pod, error) {
+func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *couchbasev1.CouchbaseCluster, m *couchbaseutil.Member, version string, config couchbasev1.ServerConfig, ctx context.Context) (*v1.Pod, error) {
 
 	pod, err := createCouchbasePodSpec(m, cluster.Name, cluster.Spec, version, config, cluster.AsOwner())
 	if err != nil {
@@ -59,7 +59,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused
-func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs cbapi.ClusterSpec, config cbapi.ServerConfig, version string, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
+func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs couchbasev1.ClusterSpec, config couchbasev1.ServerConfig, version string, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
 
 	volumes := pod.Spec.Volumes
 	mounts := []v1.VolumeMount{}
@@ -118,7 +118,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 				// Bootstraping the persisted volume when creating for the first time
 				// so that it has couchbase/etc directory from the install, because
 				// when the volume is mounted into the container the path is overwritten
-				if mountName == cbapi.DefaultVolumeMount {
+				if mountName == couchbasev1.DefaultVolumeMount {
 					initContainer := couchbaseInitContainer(cs.BaseImage, version, claim.Name)
 					pod.Spec.InitContainers = []v1.Container{initContainer}
 				}
@@ -137,7 +137,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 			volumes = append(volumes, volume)
 
 			// Mount point for Pod Container spec to reference volume by name.
-			if mountName == cbapi.DefaultVolumeMount {
+			if mountName == couchbasev1.DefaultVolumeMount {
 
 				// Default mount consits of 2 mounts for default(config) and etc data
 				configMount := v1.VolumeMount{
@@ -174,8 +174,8 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 }
 
 // Get all paths to that should be persisted within pod
-func getPathsToPersist(mounts *cbapi.VolumeMounts) (map[cbapi.VolumeMountName]string, error) {
-	mountPaths := make(map[cbapi.VolumeMountName]string)
+func getPathsToPersist(mounts *couchbasev1.VolumeMounts) (map[couchbasev1.VolumeMountName]string, error) {
+	mountPaths := make(map[couchbasev1.VolumeMountName]string)
 	defaultClaim := mounts.DefaultClaim
 	dataClaim := mounts.DataClaim
 	indexClaim := mounts.IndexClaim
@@ -190,20 +190,20 @@ func getPathsToPersist(mounts *cbapi.VolumeMounts) (map[cbapi.VolumeMountName]st
 		if defaultClaim != "" || hasSecondaryMounts {
 			return mountPaths, fmt.Errorf("other mounts cannot be used in with `logs` mount")
 		}
-		mountPaths[cbapi.LogsVolumeMount] = logsClaim
+		mountPaths[couchbasev1.LogsVolumeMount] = logsClaim
 		return mountPaths, nil
 	}
 	if defaultClaim != "" {
-		mountPaths[cbapi.DefaultVolumeMount] = defaultClaim
+		mountPaths[couchbasev1.DefaultVolumeMount] = defaultClaim
 		if dataClaim != "" {
-			mountPaths[cbapi.DataVolumeMount] = dataClaim
+			mountPaths[couchbasev1.DataVolumeMount] = dataClaim
 		}
 		if indexClaim != "" {
-			mountPaths[cbapi.IndexVolumeMount] = indexClaim
+			mountPaths[couchbasev1.IndexVolumeMount] = indexClaim
 		}
 		if analyticsClaims != nil {
 			for mount, claim := range mounts.GetAnalyticsMountClaims() {
-				mountPaths[cbapi.VolumeMountName(mount)] = claim
+				mountPaths[couchbasev1.VolumeMountName(mount)] = claim
 			}
 		}
 	} else if hasSecondaryMounts {
@@ -213,19 +213,19 @@ func getPathsToPersist(mounts *cbapi.VolumeMounts) (map[cbapi.VolumeMountName]st
 	return mountPaths, nil
 }
 
-func pathForVolumeMountName(id cbapi.VolumeMountName) string {
+func pathForVolumeMountName(id couchbasev1.VolumeMountName) string {
 	var path string
 	switch id {
-	case cbapi.DefaultVolumeMount:
+	case couchbasev1.DefaultVolumeMount:
 		return couchbaseVolumeDefaultConfigDir
-	case cbapi.DataVolumeMount:
+	case couchbasev1.DataVolumeMount:
 		path = CouchbaseVolumeMountDataDir
-	case cbapi.IndexVolumeMount:
+	case couchbasev1.IndexVolumeMount:
 		path = CouchbaseVolumeMountIndexDir
-	case cbapi.LogsVolumeMount:
+	case couchbasev1.LogsVolumeMount:
 		path = CouchbaseVolumeMountLogsDir
 	default:
-		if strings.Contains(string(id), string(cbapi.AnalyticsVolumeMount)) {
+		if strings.Contains(string(id), string(couchbasev1.AnalyticsVolumeMount)) {
 			// path resolves to /mnt/analytics-00 when matching on analytics volume
 			path = fmt.Sprintf("/mnt/%s", id)
 		}
@@ -317,12 +317,12 @@ func listPersistentVolumeClaims(kubeCli kubernetes.Interface, namespace string, 
 // Names of persistent volume claims are combinations of
 // Member name, mount type, and mount index.
 // ie...: cb-example-0000-default-00, pvc-data-cb-example-0000-01-index
-func NameForPersistentVolumeClaim(memberName string, index int, mountName cbapi.VolumeMountName) string {
+func NameForPersistentVolumeClaim(memberName string, index int, mountName couchbasev1.VolumeMountName) string {
 	return fmt.Sprintf("%s-%s-%02d", memberName, mountName, index)
 }
 
 // Couchbase pod spec with default configuration
-func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, version string, ns cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
+func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs couchbasev1.ClusterSpec, version string, ns couchbasev1.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
 
 	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
@@ -366,7 +366,7 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbap
 	return pod, nil
 }
 
-func createCouchbasePodLabels(memberName, clusterName string, ns cbapi.ServerConfig) map[string]string {
+func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev1.ServerConfig) map[string]string {
 	labels := map[string]string{
 		constants.LabelApp:      constants.App,
 		constants.LabelNode:     memberName,
@@ -624,7 +624,7 @@ func PodWithNodeSelector(p *v1.Pod, ns map[string]string) *v1.Pod {
 	return p
 }
 
-func applyPodPolicy(pod *v1.Pod, policy *cbapi.PodPolicy) {
+func applyPodPolicy(pod *v1.Pod, policy *couchbasev1.PodPolicy) {
 	if policy == nil {
 		return
 	}
@@ -664,7 +664,7 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 }
 
 // Adds any necessary pod prerequisites before enabling TLS
-func applyPodTlsConfiguration(cs cbapi.ClusterSpec, pod *v1.Pod) error {
+func applyPodTlsConfiguration(cs couchbasev1.ClusterSpec, pod *v1.Pod) error {
 	if cs.TLS != nil {
 		// Static configuration:
 		// * Defines a volume which contains the secrets necessary
@@ -821,7 +821,7 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume
-func IsPodRecoverable(kubeCli kubernetes.Interface, config cbapi.ServerConfig, podName, clusterName, namespace string) error {
+func IsPodRecoverable(kubeCli kubernetes.Interface, config couchbasev1.ServerConfig, podName, clusterName, namespace string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return cberrors.ErrNoVolumeMounts{}

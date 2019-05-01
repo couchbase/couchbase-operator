@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -24,7 +24,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	// Static configuration
 	clusterSize := 3
 
-	bucket1 := api.BucketConfig{
+	bucket1 := couchbasev1.BucketConfig{
 		BucketName:         "default1",
 		BucketType:         pkg_constants.BucketTypeCouchbase,
 		BucketMemoryQuota:  constants.Mem256Mb,
@@ -35,13 +35,13 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		EnableFlush:        constants.BucketFlushEnabled,
 		EnableIndexReplica: constants.IndexReplicaEnabled,
 	}
-	bucket2 := api.BucketConfig{
+	bucket2 := couchbasev1.BucketConfig{
 		BucketName:        "default2",
 		BucketType:        pkg_constants.BucketTypeMemcached,
 		BucketMemoryQuota: constants.Mem256Mb,
 		EnableFlush:       constants.BucketFlushDisabled,
 	}
-	bucket3 := api.BucketConfig{
+	bucket3 := couchbasev1.BucketConfig{
 		BucketName:         "default3",
 		BucketType:         pkg_constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
@@ -51,7 +51,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		ConflictResolution: pkg_constants.BucketConflictResolutionTimestamp,
 		EnableFlush:        constants.BucketFlushEnabled,
 	}
-	bucket4 := api.BucketConfig{
+	bucket4 := couchbasev1.BucketConfig{
 		BucketName:         "default4",
 		BucketType:         pkg_constants.BucketTypeEphemeral,
 		BucketMemoryQuota:  101,
@@ -61,7 +61,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
 		EnableFlush:        constants.BucketFlushEnabled,
 	}
-	bucketSettingsList := []api.BucketConfig{bucket1, bucket2, bucket3, bucket4}
+	bucketSettingsList := []couchbasev1.BucketConfig{bucket1, bucket2, bucket3, bucket4}
 
 	clusterConfig := e2eutil.BasicClusterConfig2
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
@@ -75,7 +75,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
 
-	bucketConfigs := []api.BucketConfig{}
+	bucketConfigs := []couchbasev1.BucketConfig{}
 	buckets := []string{}
 
 	for i, bucketSetting := range bucketSettingsList {
@@ -139,7 +139,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 	bucketSettingsList := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucketSetting := range bucketSettingsList {
-		newConfig := []api.BucketConfig{bucketSetting}
+		newConfig := []couchbasev1.BucketConfig{bucketSetting}
 
 		// add bucket
 		testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/BucketSettings", newConfig), time.Minute)

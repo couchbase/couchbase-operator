@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -59,7 +59,7 @@ func createPersistentVolumeClaimSpec(t *testing.T, k8s *types.Cluster, storageCl
 	}
 }
 
-func createPodSecurityContext(fsGroup int, clusterSpec *v1.ClusterSpec) {
+func createPodSecurityContext(fsGroup int, clusterSpec *couchbasev1.ClusterSpec) {
 	if framework.Global.KubeType == "kubernetes" {
 		fsGroupVal := int64(fsGroup)
 		sc := corev1.PodSecurityContext{FSGroup: &fsGroupVal}

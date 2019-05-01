@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -103,7 +103,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	c.status.ClearCondition(api.ClusterConditionScaling)
+	c.status.ClearCondition(couchbasev1.ClusterConditionScaling)
 	c.status.SetReadyCondition()
 
 	return nil
@@ -144,7 +144,7 @@ func (c *Cluster) logFailedMember(name string) {
 }
 
 // Create a new Couchbase cluster member
-func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Member, err error) {
+func (c *Cluster) createMember(serverSpec couchbasev1.ServerConfig) (m *couchbaseutil.Member, err error) {
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
@@ -230,7 +230,7 @@ func (c *Cluster) createMember(serverSpec api.ServerConfig) (m *couchbaseutil.Me
 }
 
 // Creates and adds a new Couchbase cluster member
-func (c *Cluster) addMember(serverSpec api.ServerConfig) (*couchbaseutil.Member, error) {
+func (c *Cluster) addMember(serverSpec couchbasev1.ServerConfig) (*couchbaseutil.Member, error) {
 	// Save the existing members now, these will be the set we use to add the new node via
 	ms := c.members.Copy()
 
@@ -392,7 +392,7 @@ func (c *Cluster) reconcileBuckets() error {
 		c.logger.Infof("Created bucketName %s", bucketName)
 	}
 
-	c.status.ClearCondition(api.ClusterConditionManageBuckets)
+	c.status.ClearCondition(couchbasev1.ClusterConditionManageBuckets)
 
 	return nil
 }
@@ -473,7 +473,7 @@ func (c *Cluster) editClusterBucket(bucketName string) error {
 
 // Validate edit bucket returns error on attempts
 // to change immutable attributes
-func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
+func (c *Cluster) validateEditBucket(config *couchbasev1.BucketConfig) error {
 
 	bucketName := config.BucketName
 	if statusBucket, ok := c.status.Buckets[bucketName]; ok {
@@ -497,7 +497,7 @@ func (c *Cluster) validateEditBucket(config *api.BucketConfig) error {
 }
 
 // initializes the first member in the cluster
-func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
+func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev1.ServerConfig) error {
 	c.logger.Infof("Initializing the first node in the cluster")
 	settings := c.cluster.Spec.ClusterSettings
 
@@ -532,7 +532,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec api.ServerConfi
 }
 
 // Initialize a member with TLS certificates
-func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs api.ClusterSpec) error {
+func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs couchbasev1.ClusterSpec) error {
 	if cs.TLS != nil {
 		// Static configuration:
 		// * Upload the cluster CA certifcate
@@ -945,7 +945,7 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
-	c.status.ClearCondition(api.ClusterConditionManageConfig)
+	c.status.ClearCondition(couchbasev1.ClusterConditionManageConfig)
 	return nil
 }
 
@@ -1131,7 +1131,7 @@ func (c *Cluster) didDeltaRecoveryFail(err error) bool {
 // Gets paths to use when initializing data, index, and analytics service.
 // Default paths are used unless a claim is specified for the service in which
 // case a custom mount path is used
-func getServiceDataPaths(mounts *api.VolumeMounts) (string, string, []string) {
+func getServiceDataPaths(mounts *couchbasev1.VolumeMounts) (string, string, []string) {
 	dataPath := constants.DefaultDataPath
 	indexPath := constants.DefaultDataPath
 	analyticsPaths := []string{}
@@ -1169,29 +1169,29 @@ func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int) {
 
 // reportUpgrade looks at the current state and any existing upgrade status
 // condition, makes condition updates and raises events.
-func (c *Cluster) reportUpgrade(status *api.UpgradeStatus) error {
+func (c *Cluster) reportUpgrade(status *couchbasev1.UpgradeStatus) error {
 	// Look for an existing condition
-	condition := c.status.GetCondition(api.ClusterConditionUpgrading)
+	condition := c.status.GetCondition(couchbasev1.ClusterConditionUpgrading)
 
 	if condition == nil {
 		// No existing condition, we are guaranteed to be upgrading.
-		status.State = api.UpgradingMessageStateUpgrading
+		status.State = couchbasev1.UpgradingMessageStateUpgrading
 		c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
 	} else {
 		// There is an existing condition, check to see which way we are going.
 		// If we have switched directions we will need a new event.
-		oldStatus := api.NewUpgradeStatus(condition.Message)
+		oldStatus := couchbasev1.NewUpgradeStatus(condition.Message)
 		if status.Target != oldStatus.Target {
 			version, _ := couchbaseutil.NewVersion(status.Target)
 			oldVersion, _ := couchbaseutil.NewVersion(oldStatus.Target)
 			switch version.Compare(oldVersion) {
 			case 1:
 				// Upgrading
-				status.State = api.UpgradingMessageStateUpgrading
+				status.State = couchbasev1.UpgradingMessageStateUpgrading
 				c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
 			case -1:
 				// Rolling back
-				status.State = api.UpgradingMessageStateRollback
+				status.State = couchbasev1.UpgradingMessageStateRollback
 				c.raiseEvent(k8sutil.RollbackStartedEvent(status.Source, status.Target, c.cluster))
 			}
 		} else {
@@ -1218,20 +1218,20 @@ func (c *Cluster) reportUpgradeComplete() error {
 	}
 
 	// There is no condition, we weren't upgrading, do nothing
-	condition := c.status.GetCondition(api.ClusterConditionUpgrading)
+	condition := c.status.GetCondition(couchbasev1.ClusterConditionUpgrading)
 	if condition == nil {
 		return nil
 	}
 
-	status := api.NewUpgradeStatus(condition.Message)
+	status := couchbasev1.NewUpgradeStatus(condition.Message)
 	switch status.State {
-	case api.UpgradingMessageStateUpgrading:
+	case couchbasev1.UpgradingMessageStateUpgrading:
 		c.raiseEvent(k8sutil.UpgradeFinishedEvent(status.Source, status.Target, c.cluster))
-	case api.UpgradingMessageStateRollback:
+	case couchbasev1.UpgradingMessageStateRollback:
 		c.raiseEvent(k8sutil.RollbackFinishedEvent(status.Source, status.Target, c.cluster))
 	}
 
-	c.status.ClearCondition(api.ClusterConditionUpgrading)
+	c.status.ClearCondition(couchbasev1.ClusterConditionUpgrading)
 	c.status.CurrentVersion = c.cluster.Spec.Version
 
 	if err := c.updateCRStatus(); err != nil {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 )
@@ -21,7 +21,7 @@ type nullSchedulerImpl struct {
 }
 
 // NewNullScheduler returns a new null scheduler
-func NewNullScheduler(podGetter PodGetter, cluster *api.CouchbaseCluster) (Scheduler, error) {
+func NewNullScheduler(podGetter PodGetter, cluster *couchbasev1.CouchbaseCluster) (Scheduler, error) {
 	// Add existing servers to the server list, we need this for scheduling
 	// pod removal
 	sched := &nullSchedulerImpl{

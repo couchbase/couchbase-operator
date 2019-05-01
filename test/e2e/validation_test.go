@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/decoder"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -61,7 +61,7 @@ func (failures *failureList) CheckFailures(t *testing.T) {
 	}
 }
 
-func YAMLToCluster(yamlPath string) (*api.CouchbaseCluster, error) {
+func YAMLToCluster(yamlPath string) (*couchbasev1.CouchbaseCluster, error) {
 	raw, err := ioutil.ReadFile(yamlPath)
 	if err != nil {
 		return nil, err
@@ -103,9 +103,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			defer teardown()
 
 			testCouchbase.Spec.AuthSecret = targetKube.DefaultSecret.Name
-			testCouchbase.Spec.TLS = &api.TLSPolicy{
-				Static: &api.StaticTLS{
-					Member: &api.MemberSecret{
+			testCouchbase.Spec.TLS = &couchbasev1.TLSPolicy{
+				Static: &couchbasev1.StaticTLS{
+					Member: &couchbasev1.MemberSecret{
 						ServerSecret: ctx.ClusterSecretName,
 					},
 					OperatorSecret: ctx.OperatorSecretName,
@@ -215,13 +215,13 @@ func TestNegValidationCreate(t *testing.T) {
 		// Spec.ExposedFeatures list validation
 		{
 			name:           "TestValidateExposedFeaturesEnumInvalid",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatures", api.ExposedFeatureList{api.FeatureAdmin, "cleint", api.FeatureXDCR}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatures", couchbasev1.ExposedFeatureList{couchbasev1.FeatureAdmin, "cleint", couchbasev1.FeatureXDCR}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.exposedFeatures in body should be one of [admin xdcr client]"},
 		},
 		{
 			name:           "TestValidateExposedFeaturesUnique",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatures", api.ExposedFeatureList{api.FeatureAdmin, api.FeatureClient, api.FeatureXDCR, api.FeatureAdmin}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatures", couchbasev1.ExposedFeatureList{couchbasev1.FeatureAdmin, couchbasev1.FeatureClient, couchbasev1.FeatureXDCR, couchbasev1.FeatureAdmin}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.exposedFeatures in body shouldn't contain duplicates"},
 		},
@@ -386,7 +386,7 @@ func TestNegValidationCreate(t *testing.T) {
 		// Server settings validation
 		{
 			name:           "TestValidateServerServicesEnumInvalid",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.Service("indxe"), api.QueryService, api.SearchService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.Service("indxe"), couchbasev1.QueryService, couchbasev1.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers.services in body should be one of [data index query search eventing analytics]"},
 		},
@@ -398,13 +398,13 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateAdminConsoleServicesUnique",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.IndexService, api.SearchService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.IndexService, couchbasev1.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 		{
 			name:           "TestValidateServerServicesUnique",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.IndexService, api.DataService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body shouldn't contain duplicates"},
 		},
@@ -416,7 +416,7 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestNoDataService",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", []api.ServerConfig{{Name: "test", Size: 1, Services: api.ServiceList{api.IndexService}}}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", []couchbasev1.ServerConfig{{Name: "test", Size: 1, Services: couchbasev1.ServiceList{couchbasev1.IndexService}}}),
 			shouldFail:     true,
 			expectedErrors: []string{`at least one "data" service in spec.servers[*].services is required`},
 		},
@@ -438,7 +438,7 @@ func TestNegValidationCreate(t *testing.T) {
 		// Admin console services field validation
 		{
 			name:           "TestValidateAdminConsoleServicesEnumInvalid",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.Service("indxe"), api.QueryService, api.SearchService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.Service("indxe"), couchbasev1.QueryService, couchbasev1.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
@@ -481,7 +481,7 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateDefaultVolumeMountRequiredForStatefulServices",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Services", api.ServiceList{api.DataService, api.QueryService, api.SearchService, api.EventingService, api.AnalyticsService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Services", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.QueryService, couchbasev1.SearchService, couchbasev1.EventingService, couchbasev1.AnalyticsService}),
 			shouldFail:     true,
 			expectedErrors: []string{"default in spec.servers[3].pod.volumeMounts is required"},
 		},
@@ -596,7 +596,7 @@ func TestNegValidationCreate(t *testing.T) {
 	for _, statefulService := range constants.StatefulCbServiceList {
 		testCase := testDef{
 			name:           "TestValidateDefaultVolumeMountRequiredForStatefulService_" + string(statefulService),
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Services", api.ServiceList{api.QueryService, api.SearchService, api.EventingService, statefulService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/3/Services", couchbasev1.ServiceList{couchbasev1.QueryService, couchbasev1.SearchService, couchbasev1.EventingService, statefulService}),
 			shouldFail:     true,
 			expectedErrors: []string{"default in spec.servers[3].pod.volumeMounts is required"},
 		}
@@ -731,13 +731,13 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name:           "TestValidateAdminConsoleServicesUnique",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.SearchService, api.DataService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService, couchbasev1.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 		{
 			name:           "TestValidateAdminConsoleServicesEnumInvalid",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.Service("xxxxx")}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.Service("xxxxx")}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
@@ -968,13 +968,13 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name:           "TestValidateApplyAdminConsoleServicesUnique",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.SearchService, api.DataService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService, couchbasev1.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body shouldn't contain duplicates"},
 		},
 		{
 			name:           "TestValidateApplyAdminConsoleServicesEnumInvalid",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", api.ServiceList{api.DataService, api.IndexService, api.QueryService, api.Service("xxxxx")}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.Service("xxxxx")}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
 		},
@@ -1047,13 +1047,13 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		// ServerSettings service update
 		{
 			name:           "TestValidateApplyServerServicesImmutable_1",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.IndexService, api.SearchService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.SearchService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body cannot be updated"},
 		},
 		{
 			name:           "TestValidateApplyServerServicesImmutable_2",
-			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", api.ServiceList{api.DataService, api.DataService}),
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", couchbasev1.ServiceList{couchbasev1.DataService, couchbasev1.DataService}),
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body cannot be updated"},
 		},

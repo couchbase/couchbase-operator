@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -35,7 +35,7 @@ var retryInterval = 10 * time.Second
 type filterFunc func(*v1.Pod) bool
 type filterFuncDaemonSet func(*v1beta1.DaemonSet) bool
 
-func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *api.CouchbaseCluster, size int, timeout time.Duration) error {
+func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, size int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -56,13 +56,13 @@ func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *api.CouchbaseCluster
 	})
 }
 
-func MustWaitUntilPodSizeReached(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, size int, timeout time.Duration) {
+func MustWaitUntilPodSizeReached(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, size int, timeout time.Duration) {
 	if err := WaitUntilPodSizeReached(k8s, couchbase, size, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *api.CouchbaseCluster, buckets []string, timeout time.Duration) error {
+func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, buckets []string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -81,13 +81,13 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *api.CouchbaseCluster,
 	})
 }
 
-func MustWaitUntilBucketsExists(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, buckets []string, timeout time.Duration) {
+func MustWaitUntilBucketsExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, buckets []string, timeout time.Duration) {
 	if err := WaitUntilBucketsExists(k8s, couchbase, buckets, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *api.CouchbaseCluster, bucket string, timeout time.Duration) error {
+func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, bucket string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -102,7 +102,7 @@ func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *api.CouchbaseCluste
 	})
 }
 
-func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, bucket string, timeout time.Duration) {
+func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, bucket string, timeout time.Duration) {
 	if err := WaitUntilBucketNotExists(k8s, couchbase, bucket, timeout); err != nil {
 		Die(t, err)
 	}
@@ -110,7 +110,7 @@ func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *a
 
 // WaitClusterPhaseFailed expects the cluster to enter a failed state, useful for passing
 // quickly rather than wating for a cluster to not become healthy
-func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *api.CouchbaseCluster, timeout time.Duration) error {
+func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *couchbasev1.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -119,18 +119,18 @@ func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *api.
 		if err != nil {
 			return false, err
 		}
-		return cluster.Status.Phase == api.ClusterPhaseFailed, nil
+		return cluster.Status.Phase == couchbasev1.ClusterPhaseFailed, nil
 	})
 	return err
 }
 
-func MustWaitClusterPhaseFailed(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, timeout time.Duration) {
+func MustWaitClusterPhaseFailed(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, timeout time.Duration) {
 	if err := WaitClusterPhaseFailed(t, k8s.CRClient, cluster, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, timeout time.Duration) error {
+func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
 	defer cancel()
@@ -148,23 +148,23 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.Cou
 
 		LogfWithTimestamp(t, "Cluster Status Conditions: (%v)", cl.Status.Conditions)
 
-		healthyConditions := map[api.ClusterConditionType]struct {
+		healthyConditions := map[couchbasev1.ClusterConditionType]struct {
 			healthyCondition v1.ConditionStatus
 			message          string
 		}{
-			api.ClusterConditionAvailable: {
+			couchbasev1.ClusterConditionAvailable: {
 				v1.ConditionTrue,
 				"Cluster not available ...",
 			},
-			api.ClusterConditionBalanced: {
+			couchbasev1.ClusterConditionBalanced: {
 				v1.ConditionTrue,
 				"Cluster unbalanced ...",
 			},
-			api.ClusterConditionScaling: {
+			couchbasev1.ClusterConditionScaling: {
 				v1.ConditionFalse,
 				"Cluster scaling ...",
 			},
-			api.ClusterConditionUpgrading: {
+			couchbasev1.ClusterConditionUpgrading: {
 				v1.ConditionFalse,
 				"Cluster upgrading ...",
 			},
@@ -191,13 +191,13 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.Cou
 	return nil
 }
 
-func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, timeout time.Duration) {
+func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, timeout time.Duration) {
 	if err := WaitClusterStatusHealthy(t, k8s, cluster, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, retries int) error {
+func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *couchbasev1.CouchbaseCluster, retries int) error {
 	undeletedPods, err := WaitPodsDeleted(kubeClient, cl.Namespace, retries, k8sutil.ClusterListOpt(cl.Name))
 	if err != nil {
 		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
@@ -231,7 +231,7 @@ func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *api
 	return nil
 }
 
-func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName string, cl *api.CouchbaseCluster) error {
+func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName string, cl *couchbasev1.CouchbaseCluster) error {
 	undeletedPods, err := WaitPodsDeleted(kubeClient, cl.Namespace, 3, k8sutil.NodeListOpt(cl.Name, podName))
 	if err != nil {
 		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
@@ -322,9 +322,9 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label strin
 }
 
 // waits until the provided condition type occurs with associated status
-func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, event *v1.Event, timeout time.Duration) error {
+func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev1.CouchbaseCluster, event *v1.Event, timeout time.Duration) error {
 	opts := metav1.ListOptions{
-		TypeMeta: metav1.TypeMeta{Kind: api.CRDResourceKind},
+		TypeMeta: metav1.TypeMeta{Kind: couchbasev1.CRDResourceKind},
 	}
 	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(opts)
 	if err != nil {
@@ -366,16 +366,16 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
-func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
+func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
 	if err := WaitForClusterEvent(k8s.KubeClient, cl, event, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 // waits until the provided condition type occurs with associated status
-func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.CouchbaseCluster, eventList EventList, maxExpectedEvents int, timeout time.Duration) (EventList, error) {
+func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *couchbasev1.CouchbaseCluster, eventList EventList, maxExpectedEvents int, timeout time.Duration) (EventList, error) {
 	opts := metav1.ListOptions{
-		TypeMeta: metav1.TypeMeta{Kind: api.CRDResourceKind},
+		TypeMeta: metav1.TypeMeta{Kind: couchbasev1.CRDResourceKind},
 	}
 	occuredEvents := EventList{}
 	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(opts)
@@ -413,7 +413,7 @@ func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *api.Couchba
 }
 
 // waits until the provided condition type with associated status after specified timestamp
-func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, timeout time.Duration) error {
+func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType couchbasev1.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev1.CouchbaseCluster, timeout time.Duration) error {
 	after := time.Now()
 	timeoutChan := time.After(timeout)
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
@@ -446,7 +446,7 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 	}
 }
 
-func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType api.ClusterConditionType, status v1.ConditionStatus, cl *api.CouchbaseCluster, timeout time.Duration) {
+func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev1.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev1.CouchbaseCluster, timeout time.Duration) {
 	if err := WaitForClusterCondition(t, k8s.CRClient, conditionType, status, cl, timeout); err != nil {
 		Die(t, err)
 	}
@@ -668,7 +668,7 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 // WaitForRebalanceProgress waits until a rebalance is running and the progress is greater
 // than or eual to the defined threshold.  This allows us to kill pods during a rebalance
 // with greater confidence that some vbuckets have migrated to the new master.
-func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, threshold float64, timeout time.Duration) error {
+func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, threshold float64, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -703,7 +703,7 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.C
 	})
 }
 
-func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, threshold float64, timeout time.Duration) {
+func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, threshold float64, timeout time.Duration) {
 	if err := WaitForRebalanceProgress(t, k8s, couchbase, threshold, timeout); err != nil {
 		Die(t, err)
 	}
@@ -711,7 +711,7 @@ func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *a
 
 // WaitForFirstPodContainerWaiting waits for the first pods's container to enter a waiting state
 // with optional reasons to validate.
-func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *api.CouchbaseCluster, timeout time.Duration, reasons ...string) error {
+func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration, reasons ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -749,7 +749,7 @@ func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *api.Couchbas
 	})
 }
 
-func MustWaitForFirstPodContainerWaiting(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster, timeout time.Duration, reasons ...string) {
+func MustWaitForFirstPodContainerWaiting(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster, timeout time.Duration, reasons ...string) {
 	if err := WaitForFirstPodContainerWaiting(k8s, couchbase, timeout, reasons...); err != nil {
 		Die(t, err)
 	}

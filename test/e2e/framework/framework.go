@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
@@ -50,7 +50,7 @@ func Init() {
 		os.Exit(1)
 	}
 
-	if err := api.AddToScheme(scheme.Scheme); err != nil {
+	if err := couchbasev1.AddToScheme(scheme.Scheme); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

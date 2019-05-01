@@ -3,7 +3,7 @@ package e2eutil
 import (
 	"fmt"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -57,88 +57,88 @@ func (e *EventList) AppendEventList(eventsList EventList) {
 	*e = append(*e, eventsList...)
 }
 
-func (e *EventList) AddMemberCreationFailedEvent(cl *api.CouchbaseCluster, memberId int) {
+func (e *EventList) AddMemberCreationFailedEvent(cl *couchbasev1.CouchbaseCluster, memberId int) {
 	event := NewMemberCreationFailedEvent(cl, memberId)
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddMemberAddEvent(cl *api.CouchbaseCluster, memberId int) {
+func (e *EventList) AddMemberAddEvent(cl *couchbasev1.CouchbaseCluster, memberId int) {
 	event := NewMemberAddEvent(cl, memberId)
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddMemberRemoveEvent(cl *api.CouchbaseCluster, memberId int) {
+func (e *EventList) AddMemberRemoveEvent(cl *couchbasev1.CouchbaseCluster, memberId int) {
 	event := NewMemberRemoveEvent(cl, memberId)
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddMemberDownEvent(cl *api.CouchbaseCluster, memberId int) {
+func (e *EventList) AddMemberDownEvent(cl *couchbasev1.CouchbaseCluster, memberId int) {
 	event := NewMemberDownEvent(cl, memberId)
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddMemberFailedOverEvent(cl *api.CouchbaseCluster, memberId int) {
+func (e *EventList) AddMemberFailedOverEvent(cl *couchbasev1.CouchbaseCluster, memberId int) {
 	event := NewMemberFailedOverEvent(cl, memberId)
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddRebalanceStartedEvent(cl *api.CouchbaseCluster) {
+func (e *EventList) AddRebalanceStartedEvent(cl *couchbasev1.CouchbaseCluster) {
 	*e = append(*e, *k8sutil.RebalanceStartedEvent(cl))
 }
 
-func (e *EventList) AddRebalanceIncompleteEvent(cl *api.CouchbaseCluster) {
+func (e *EventList) AddRebalanceIncompleteEvent(cl *couchbasev1.CouchbaseCluster) {
 	*e = append(*e, *k8sutil.RebalanceIncompleteEvent(cl))
 }
 
-func (e *EventList) AddRebalanceCompletedEvent(cl *api.CouchbaseCluster) {
+func (e *EventList) AddRebalanceCompletedEvent(cl *couchbasev1.CouchbaseCluster) {
 	*e = append(*e, *k8sutil.RebalanceCompletedEvent(cl))
 }
 
-func (e *EventList) AddFailedAddNodeEvent(cl *api.CouchbaseCluster, memberId int) {
+func (e *EventList) AddFailedAddNodeEvent(cl *couchbasev1.CouchbaseCluster, memberId int) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	event := k8sutil.FailedAddNodeEvent(name, cl)
 	*e = append(*e, *event)
 }
 
-func (e *EventList) AddBucketCreateEvent(cl *api.CouchbaseCluster, bucketName string) {
+func (e *EventList) AddBucketCreateEvent(cl *couchbasev1.CouchbaseCluster, bucketName string) {
 	*e = append(*e, *k8sutil.BucketCreateEvent(bucketName, cl))
 }
 
-func (e *EventList) AddBucketDeleteEvent(cl *api.CouchbaseCluster, bucketName string) {
+func (e *EventList) AddBucketDeleteEvent(cl *couchbasev1.CouchbaseCluster, bucketName string) {
 	*e = append(*e, *k8sutil.BucketDeleteEvent(bucketName, cl))
 }
 
-func (e *EventList) AddBucketEditEvent(cl *api.CouchbaseCluster, bucketName string) {
+func (e *EventList) AddBucketEditEvent(cl *couchbasev1.CouchbaseCluster, bucketName string) {
 	*e = append(*e, *k8sutil.BucketEditEvent(bucketName, cl))
 }
 
-func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *api.CouchbaseCluster) {
+func (e *EventList) AddAdminConsoleSvcCreateEvent(cl *couchbasev1.CouchbaseCluster) {
 	*e = append(*e, *k8sutil.AdminConsoleSvcCreateEvent(cl.Name+"-ui", cl))
 }
 
-func (e *EventList) NodeServiceCreateEvent(cl *api.CouchbaseCluster, serviceName api.Service) {
+func (e *EventList) NodeServiceCreateEvent(cl *couchbasev1.CouchbaseCluster, serviceName couchbasev1.Service) {
 	*e = append(*e, *k8sutil.NodeServiceCreateEvent(serviceName, cl))
 }
 
-func (e *EventList) AddClusterSettingsEditedEvent(cl *api.CouchbaseCluster, settingName string) {
+func (e *EventList) AddClusterSettingsEditedEvent(cl *couchbasev1.CouchbaseCluster, settingName string) {
 	*e = append(*e, *k8sutil.ClusterSettingsEditedEvent(settingName, cl))
 }
 
-func (e *EventList) AddMemberRecoveredEvent(cl *api.CouchbaseCluster, memberId int) {
+func (e *EventList) AddMemberRecoveredEvent(cl *couchbasev1.CouchbaseCluster, memberId int) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	*e = append(*e, *k8sutil.MemberRecoveredEvent(name, cl))
 }
 
-func (e *EventList) AddNodeServiceCreateEvent(cl *api.CouchbaseCluster, serviceName api.Service) {
+func (e *EventList) AddNodeServiceCreateEvent(cl *couchbasev1.CouchbaseCluster, serviceName couchbasev1.Service) {
 	*e = append(*e, *k8sutil.NodeServiceCreateEvent(serviceName, cl))
 }
 
-func (e *EventList) AddMemberVolumeUnhealthyEvent(cl *api.CouchbaseCluster, memberId int, reason string) {
+func (e *EventList) AddMemberVolumeUnhealthyEvent(cl *couchbasev1.CouchbaseCluster, memberId int, reason string) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	*e = append(*e, *k8sutil.MemberVolumeUnhealthyEvent(name, reason, cl))
 }
 
-func (e *EventList) AddTLSInvalidEvent(cl *api.CouchbaseCluster) {
+func (e *EventList) AddTLSInvalidEvent(cl *couchbasev1.CouchbaseCluster) {
 	*e = append(*e, *TLSInvalidEvent(cl))
 }
 
@@ -155,62 +155,62 @@ func EventListCompareFailedString(expected, actual EventList) string {
 	return fmt.Sprintf("Expected events to be:\n%s\nbut got:\n%s", expected, actual)
 }
 
-func NewMemberCreationFailedEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+func NewMemberCreationFailedEvent(cl *couchbasev1.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberCreationFailedEvent(name, cl)
 }
 
-func NewMemberAddEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+func NewMemberAddEvent(cl *couchbasev1.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberAddEvent(name, cl)
 }
 
-func NewMemberRemoveEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+func NewMemberRemoveEvent(cl *couchbasev1.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberRemoveEvent(name, cl)
 }
 
-func FailedAddNodeEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+func FailedAddNodeEvent(cl *couchbasev1.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.FailedAddNodeEvent(name, cl)
 }
 
-func NewMemberDownEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+func NewMemberDownEvent(cl *couchbasev1.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberDownEvent(name, cl)
 }
 
-func NewMemberFailedOverEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+func NewMemberFailedOverEvent(cl *couchbasev1.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberFailedOverEvent(name, cl)
 }
 
-func RebalanceStartedEvent(cl *api.CouchbaseCluster) *v1.Event {
+func RebalanceStartedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceStartedEvent(cl)
 }
 
-func RebalanceCompletedEvent(cl *api.CouchbaseCluster) *v1.Event {
+func RebalanceCompletedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceCompletedEvent(cl)
 }
 
-func RebalanceIncompleteEvent(cl *api.CouchbaseCluster) *v1.Event {
+func RebalanceIncompleteEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceIncompleteEvent(cl)
 }
 
-func MemberRecoveredEvent(cl *api.CouchbaseCluster, memberId int) *v1.Event {
+func MemberRecoveredEvent(cl *couchbasev1.CouchbaseCluster, memberId int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return k8sutil.MemberRecoveredEvent(name, cl)
 }
 
-func TLSUpdatedEvent(cl *api.CouchbaseCluster) *v1.Event {
+func TLSUpdatedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return k8sutil.TLSUpdatedEvent(cl)
 }
 
-func TLSInvalidEvent(cl *api.CouchbaseCluster) *v1.Event {
+func TLSInvalidEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return k8sutil.TLSInvalidEvent(cl)
 }
 
-func TLSUpdateFailedEvent(cl *api.CouchbaseCluster) *v1.Event {
+func TLSUpdateFailedEvent(cl *couchbasev1.CouchbaseCluster) *v1.Event {
 	return k8sutil.TLSUpdateFailedEvent(cl)
 }
 
@@ -224,7 +224,7 @@ func createEventFrom(event v1.Event) eventschema.Event {
 	}
 }
 
-func (eventsequence *EventValidator) AddClusterEvent(cbCluster *api.CouchbaseCluster, eventType string) {
+func (eventsequence *EventValidator) AddClusterEvent(cbCluster *couchbasev1.CouchbaseCluster, eventType string) {
 	var eventToAppend v1.Event
 	switch eventType {
 	case "AdminConsoleServiceCreate":
@@ -239,7 +239,7 @@ func (eventsequence *EventValidator) AddClusterEvent(cbCluster *api.CouchbaseClu
 	*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 }
 
-func (eventsequence *EventValidator) AddClusterNodeServiceEvent(cbCluster *api.CouchbaseCluster, eventType string, serviceList ...api.Service) {
+func (eventsequence *EventValidator) AddClusterNodeServiceEvent(cbCluster *couchbasev1.CouchbaseCluster, eventType string, serviceList ...couchbasev1.Service) {
 	switch eventType {
 	case "Create":
 		for _, service := range serviceList {
@@ -249,7 +249,7 @@ func (eventsequence *EventValidator) AddClusterNodeServiceEvent(cbCluster *api.C
 	}
 }
 
-func (eventsequence *EventValidator) AddClusterPodEvent(cbCluster *api.CouchbaseCluster, eventType string, cbMemberIdList ...int) {
+func (eventsequence *EventValidator) AddClusterPodEvent(cbCluster *couchbasev1.CouchbaseCluster, eventType string, cbMemberIdList ...int) {
 	switch eventType {
 	case "AddNewMember":
 		for _, cbMemberId := range cbMemberIdList {
@@ -289,7 +289,7 @@ func (eventsequence *EventValidator) AddClusterPodEvent(cbCluster *api.Couchbase
 	}
 }
 
-func (eventsequence *EventValidator) AddOptionalClusterPodEvent(cbCluster *api.CouchbaseCluster, eventType string, cbMemberId int) {
+func (eventsequence *EventValidator) AddOptionalClusterPodEvent(cbCluster *couchbasev1.CouchbaseCluster, eventType string, cbMemberId int) {
 	switch eventType {
 	case "MemberDown":
 		eventToAppend := NewMemberDownEvent(cbCluster, cbMemberId)
@@ -297,7 +297,7 @@ func (eventsequence *EventValidator) AddOptionalClusterPodEvent(cbCluster *api.C
 	}
 }
 
-func (eventsequence *EventValidator) AddClusterBucketEvent(cbCluster *api.CouchbaseCluster, eventType string, bucketNameList ...string) {
+func (eventsequence *EventValidator) AddClusterBucketEvent(cbCluster *couchbasev1.CouchbaseCluster, eventType string, bucketNameList ...string) {
 	switch eventType {
 	case "Create":
 		for _, bucketName := range bucketNameList {
@@ -336,12 +336,12 @@ func (eventsequence *EventValidator) AddAnyOfEvents(eventList EventValidator) {
 	*eventsequence = append(*eventsequence, anyOfEvents)
 }
 
-func (eventsequence *EventValidator) AddClusterSettingsEditedEvent(cbCluster *api.CouchbaseCluster, settingName string) {
+func (eventsequence *EventValidator) AddClusterSettingsEditedEvent(cbCluster *couchbasev1.CouchbaseCluster, settingName string) {
 	eventToAppend := *k8sutil.ClusterSettingsEditedEvent(settingName, cbCluster)
 	*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))
 }
 
-func (eventsequence *EventValidator) AddMemberVolumeUnhealthyEvent(cbCluster *api.CouchbaseCluster, memberId int, reason string) {
+func (eventsequence *EventValidator) AddMemberVolumeUnhealthyEvent(cbCluster *couchbasev1.CouchbaseCluster, memberId int, reason string) {
 	cbMemberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberId)
 	eventToAppend := *k8sutil.MemberVolumeUnhealthyEvent(cbMemberName, reason, cbCluster)
 	*eventsequence = append(*eventsequence, createEventFrom(eventToAppend))

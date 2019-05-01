@@ -26,7 +26,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
 	"k8s.io/api/core/v1"
@@ -153,7 +153,7 @@ func GetBucketConfigMap(bucketName, bucketType, ioPriority string, memQuotaInMB,
 
 // newClusterFromSpec creates a cluster and waits for various ready conditions.
 // Performs retries and garbage collection in the event of transient failure
-func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev1.CouchbaseCluster) (*couchbasev1.CouchbaseCluster, error) {
 	// Create the cluster.
 	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 	if err != nil {
@@ -180,7 +180,7 @@ func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clus
 	return updatedCluster, nil
 }
 
-func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) *api.CouchbaseCluster {
+func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev1.CouchbaseCluster) *couchbasev1.CouchbaseCluster {
 	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		Die(t, err)
@@ -188,7 +188,7 @@ func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, 
 	return cluster
 }
 
-func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev1.CouchbaseCluster) (*couchbasev1.CouchbaseCluster, error) {
 	// Create the cluster
 	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 	if err != nil {
@@ -197,7 +197,7 @@ func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string,
 	return cluster, nil
 }
 
-func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *api.CouchbaseCluster) *api.CouchbaseCluster {
+func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev1.CouchbaseCluster) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewClusterFromSpecAsync(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		Die(t, err)
@@ -206,17 +206,17 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace str
 }
 
 // Creates Cluster Spec object and returns it
-func CreateClusterSpec(secretName string, config map[string]map[string]string) api.ClusterSpec {
+func CreateClusterSpec(secretName string, config map[string]map[string]string) couchbasev1.ClusterSpec {
 	return e2espec.CreateClusterSpec(constants.ClusterNamePrefix, secretName, config)
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev1.ClusterSpec) (*couchbasev1.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	return newClusterFromSpec(t, k8s, namespace, crd)
 }
 
-func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) *api.CouchbaseCluster {
+func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev1.ClusterSpec) *couchbasev1.CouchbaseCluster {
 	cluster, err := CreateClusterFromSpec(t, k8s, namespace, adminConsoleExposed, spec)
 	if err != nil {
 		Die(t, err)
@@ -225,13 +225,13 @@ func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace strin
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev1.ClusterSpec, ctx *TlsContext) (*couchbasev1.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	if ctx != nil {
 		crd.Name = ctx.ClusterName
-		crd.Spec.TLS = &api.TLSPolicy{
-			Static: &api.StaticTLS{
-				Member: &api.MemberSecret{
+		crd.Spec.TLS = &couchbasev1.TLSPolicy{
+			Static: &couchbasev1.StaticTLS{
+				Member: &couchbasev1.MemberSecret{
 					ServerSecret: ctx.ClusterSecretName,
 				},
 				OperatorSecret: ctx.OperatorSecretName,
@@ -242,19 +242,19 @@ func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace
 }
 
 // Creates Couchbase cluster object and returns it
-func CreateClusterFromSpecNoWait(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec api.ClusterSpec) (*api.CouchbaseCluster, error) {
+func CreateClusterFromSpecNoWait(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev1.ClusterSpec) (*couchbasev1.CouchbaseCluster, error) {
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	return CreateCluster(t, k8s.CRClient, namespace, crd)
 }
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewClusterBasic(t, k8s, namespace, size, withBucket, exposed)
 	if err != nil {
 		Die(t, err)
@@ -263,12 +263,12 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 }
 
 // NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
-func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.TLS = &api.TLSPolicy{
-		Static: &api.StaticTLS{
-			Member: &api.MemberSecret{
+	clusterSpec.Spec.TLS = &couchbasev1.TLSPolicy{
+		Static: &couchbasev1.StaticTLS{
+			Member: &couchbasev1.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -277,7 +277,7 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
+func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewTLSClusterBasic(t, k8s, namespace, size, withBucket, exposed, ctx)
 	if err != nil {
 		Die(t, err)
@@ -286,12 +286,12 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 }
 
 // NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
-func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.TLS = &api.TLSPolicy{
-		Static: &api.StaticTLS{
-			Member: &api.MemberSecret{
+	clusterSpec.Spec.TLS = &couchbasev1.TLSPolicy{
+		Static: &couchbasev1.StaticTLS{
+			Member: &couchbasev1.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -308,12 +308,12 @@ func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace strin
 }
 
 // NewTlsXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
-func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.TLS = &api.TLSPolicy{
-		Static: &api.StaticTLS{
-			Member: &api.MemberSecret{
+	clusterSpec.Spec.TLS = &couchbasev1.TLSPolicy{
+		Static: &couchbasev1.StaticTLS{
+			Member: &couchbasev1.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -322,7 +322,7 @@ func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *api.CouchbaseCluster {
+func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool, ctx *TlsContext) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewTlsXdcrClusterBasic(t, k8s, namespace, size, withBucket, exposed, ctx)
 	if err != nil {
 		Die(t, err)
@@ -332,7 +332,7 @@ func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace stri
 
 // NewXdcrClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {
@@ -342,7 +342,7 @@ func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 	return cluster, err
 }
 
-func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewXdcrClusterBasic(t, k8s, namespace, size, withBucket, exposed)
 	if err != nil {
 		Die(t, err)
@@ -350,19 +350,19 @@ func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string,
 	return cluster
 }
 
-func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an
 // error is encountered and performing garbage collection
-func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*api.CouchbaseCluster, error) {
+func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewStatefulCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, withBucket, exposed)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
+func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, withBucket bool, exposed bool) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewStatefulCluster(t, k8s, namespace, size, withBucket, exposed)
 	if err != nil {
 		Die(t, err)
@@ -373,14 +373,14 @@ func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, 
 // NewSupportableCluster creates a cluster with two MDS groups of 'size'.  The first is
 // a stateful group with data and index enabled.  The second is a stateless group with
 // query enabled.
-func NewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*api.CouchbaseCluster, error) {
+func NewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev1.CouchbaseCluster, error) {
 	spec := e2espec.NewSupportableCluster(size)
 	return newClusterFromSpec(t, k8s, namespace, spec)
 }
 
 // MustNewSupportableCluster creates a supportable cluster as described by NewSupportableCluster
 // but dies on error.
-func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) *api.CouchbaseCluster {
+func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewSupportableCluster(t, k8s, namespace, size)
 	if err != nil {
 		Die(t, err)
@@ -391,12 +391,12 @@ func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace strin
 // NewSupportableTLSCluster creates a cluster with two MDS groups of 'size'.  The first is
 // a stateful group with data and index enabled.  The second is a stateless group with
 // query enabled.
-func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*api.CouchbaseCluster, error) {
+func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev1.CouchbaseCluster, error) {
 	cluster := e2espec.NewClusterCRD("", e2espec.NewSupportableClusterSpec(size))
 	cluster.Name = ctx.ClusterName
-	cluster.Spec.TLS = &api.TLSPolicy{
-		Static: &api.StaticTLS{
-			Member: &api.MemberSecret{
+	cluster.Spec.TLS = &couchbasev1.TLSPolicy{
+		Static: &couchbasev1.StaticTLS{
+			Member: &couchbasev1.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
 			},
 			OperatorSecret: ctx.OperatorSecretName,
@@ -407,7 +407,7 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 
 // MustNewSupportableTLSCluster creates a supportable cluster as described by NewSupportableTLSCluster
 // but dies on error.
-func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *api.CouchbaseCluster {
+func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewSupportableTLSCluster(t, k8s, namespace, size, ctx)
 	if err != nil {
 		Die(t, err)
@@ -417,12 +417,12 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace st
 
 // NewClusterMulti creates a multi cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*api.CouchbaseCluster, error) {
+func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, exposed)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) *api.CouchbaseCluster {
+func MustNewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewClusterMulti(t, k8s, namespace, config, exposed)
 	if err != nil {
 		Die(t, err)
@@ -432,12 +432,12 @@ func MustNewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, con
 
 // NewClusterMultiNoWait creates a multi cluster, but doesn't wait for any events.
 // Used in cases where the cluster is expected to fail
-func NewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) (*api.CouchbaseCluster, error) {
+func NewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) (*couchbasev1.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, false)
 	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
-func MustNewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) *api.CouchbaseCluster {
+func MustNewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) *couchbasev1.CouchbaseCluster {
 	cluster, err := NewClusterMultiNoWait(t, k8s, namespace, config)
 	if err != nil {
 		Die(t, err)
@@ -445,12 +445,12 @@ func MustNewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace strin
 	return cluster
 }
 
-func AddServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, newService api.ServerConfig, timeout time.Duration) (*api.CouchbaseCluster, error) {
+func AddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, newService couchbasev1.ServerConfig, timeout time.Duration) (*couchbasev1.CouchbaseCluster, error) {
 	settings := append(cl.Spec.ServerSettings, newService)
 	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", settings), timeout)
 }
 
-func MustAddServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, newService api.ServerConfig, timeout time.Duration) *api.CouchbaseCluster {
+func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, newService couchbasev1.ServerConfig, timeout time.Duration) *couchbasev1.CouchbaseCluster {
 	couchbase, err := AddServices(t, k8s, cl, newService, timeout)
 	if err != nil {
 		Die(t, err)
@@ -458,8 +458,8 @@ func MustAddServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster,
 	return couchbase
 }
 
-func RemoveServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, removeServiceName string, timeout time.Duration) (*api.CouchbaseCluster, error) {
-	newServiceConfig := []api.ServerConfig{}
+func RemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, removeServiceName string, timeout time.Duration) (*couchbasev1.CouchbaseCluster, error) {
+	newServiceConfig := []couchbasev1.ServerConfig{}
 	for _, service := range cl.Spec.ServerSettings {
 		if service.Name != removeServiceName {
 			newServiceConfig = append(newServiceConfig, service)
@@ -468,7 +468,7 @@ func RemoveServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, 
 	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", newServiceConfig), timeout)
 }
 
-func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, removeServiceName string, timeout time.Duration) *api.CouchbaseCluster {
+func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, removeServiceName string, timeout time.Duration) *couchbasev1.CouchbaseCluster {
 	couchbase, err := RemoveServices(t, k8s, cl, removeServiceName, timeout)
 	if err != nil {
 		Die(t, err)
@@ -476,8 +476,8 @@ func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseClust
 	return couchbase
 }
 
-func ScaleServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) (*api.CouchbaseCluster, error) {
-	newServiceConfig := []api.ServerConfig{}
+func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) (*couchbasev1.CouchbaseCluster, error) {
+	newServiceConfig := []couchbasev1.ServerConfig{}
 	for _, service := range cl.Spec.ServerSettings {
 		for serviceName, size := range servicesMap {
 			if serviceName == service.Name {
@@ -489,7 +489,7 @@ func ScaleServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, s
 	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", newServiceConfig), timeout)
 }
 
-func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) *api.CouchbaseCluster {
+func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) *couchbasev1.CouchbaseCluster {
 	couchbase, err := ScaleServices(t, k8s, cl, servicesMap, timeout)
 	if err != nil {
 		Die(t, err)
@@ -498,7 +498,7 @@ func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluste
 }
 
 // PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster
-func PatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*api.CouchbaseCluster, error) {
+func PatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev1.CouchbaseCluster, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -533,7 +533,7 @@ func PatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluste
 }
 
 // MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error
-func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) *api.CouchbaseCluster {
+func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev1.CouchbaseCluster {
 	cluster, err := PatchCluster(t, k8s, cluster, patches, timeout)
 	if err != nil {
 		Die(t, err)
@@ -542,13 +542,13 @@ func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCl
 }
 
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
-func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *api.CouchbaseCluster, patches jsonpatch.PatchSet) {
+func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, patches jsonpatch.PatchSet) {
 	if _, err := PatchCluster(t, k8s, cluster, patches, 30*time.Second); err == nil {
 		Die(t, fmt.Errorf("cluster patch applied unexpectedly"))
 	}
 }
 
-func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *api.CouchbaseCluster) {
+func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *couchbasev1.CouchbaseCluster) {
 	if err := DeleteCluster(t, crClient, kubeClient, cluster, 10); err != nil {
 		Die(t, err)
 	}
@@ -570,7 +570,7 @@ func CleanUpCluster(t *testing.T, k8s *types.Cluster, namespace, logDir, kubeNam
 	CleanK8Cluster(t, k8s, namespace)
 }
 
-func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cbCluster *api.CouchbaseCluster) {
+func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cbCluster *couchbasev1.CouchbaseCluster) {
 	t.Logf("Attempting to delete: [%v]", cbCluster.Name)
 	if err := k8sutil.DeleteCouchbaseCluster(crClient, cbCluster); err != nil {
 		t.Logf("Error: %v", err)
@@ -694,12 +694,12 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 	}
 }
 
-func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster) (*couchbasev1.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
 	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/ServerSettings/%d/Size", service), clusterSize), 30*time.Second)
 }
 
-func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster) *api.CouchbaseCluster {
+func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster) *couchbasev1.CouchbaseCluster {
 	cluster, err := ResizeClusterNoWait(t, service, clusterSize, k8s, cl)
 	if err != nil {
 		Die(t, err)
@@ -709,7 +709,7 @@ func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *ty
 
 // ResizeCluster resizes the MDS service to the desired size and waits until the cluster is
 // healthy.
-func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, timeout time.Duration) (*api.CouchbaseCluster, error) {
+func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, timeout time.Duration) (*couchbasev1.CouchbaseCluster, error) {
 	cluster, err := ResizeClusterNoWait(t, service, clusterSize, k8s, cl)
 	if err != nil {
 		return cl, err
@@ -720,7 +720,7 @@ func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluste
 	return cluster, nil
 }
 
-func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *api.CouchbaseCluster, timeout time.Duration) *api.CouchbaseCluster {
+func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, timeout time.Duration) *couchbasev1.CouchbaseCluster {
 	cluster, err := ResizeCluster(t, service, clusterSize, k8s, cl, timeout)
 	if err != nil {
 		Die(t, err)
@@ -728,7 +728,7 @@ func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cl
 	return cluster
 }
 
-func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, numToKill int) {
+func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev1.CouchbaseCluster, numToKill int) {
 	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 	if err != nil {
 		Die(t, err)
@@ -756,19 +756,19 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *api.CouchbaseClust
 	}
 }
 
-func KillPodForMember(kubeCli kubernetes.Interface, cl *api.CouchbaseCluster, memberId int) error {
+func KillPodForMember(kubeCli kubernetes.Interface, cl *couchbasev1.CouchbaseCluster, memberId int) error {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	return KillMember(kubeCli, cl.Namespace, cl.Name, name, true)
 }
 
-func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *api.CouchbaseCluster, memberId int, removeVolumes bool) {
+func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, memberId int, removeVolumes bool) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
 	if err := KillMember(k8s.KubeClient, cl.Namespace, cl.Name, name, removeVolumes); err != nil {
 		Die(t, err)
 	}
 }
 
-func CreateMemberPod(k8s *types.Cluster, cl *api.CouchbaseCluster, m *couchbaseutil.Member) (*v1.Pod, error) {
+func CreateMemberPod(k8s *types.Cluster, cl *couchbasev1.CouchbaseCluster, m *couchbaseutil.Member) (*v1.Pod, error) {
 	podGetter := scheduler.NewNullPodGetter()
 	scheduler, _ := scheduler.NewNullScheduler(podGetter, cl)
 
@@ -1010,7 +1010,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 // Construct expected name for the PersistentVolumeClaim which belongs to member
 // where 'index' specifies the Nth claim generated from the specs template.
 // Only specs with multiple VolumeMounts should return volumes with index > 0
-func GetMemberPVC(kubeCli kubernetes.Interface, namespace, memberName string, index int, mountName api.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
+func GetMemberPVC(kubeCli kubernetes.Interface, namespace, memberName string, index int, mountName couchbasev1.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
 	name := k8sutil.NameForPersistentVolumeClaim(memberName, index, mountName)
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }
@@ -1151,7 +1151,7 @@ func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, membe
 
 // MustDeletePodServices deletes all services in the cluster namespace that
 // belong to individual pods.
-func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *api.CouchbaseCluster) {
+func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev1.CouchbaseCluster) {
 	selector := constants.CouchbaseServerPodLabelStr + couchbase.Name
 	services, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {

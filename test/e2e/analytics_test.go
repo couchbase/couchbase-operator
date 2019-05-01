@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -46,8 +46,8 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
 	// Can get stuck on rebalancing.
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -92,7 +92,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func insertAnalyticsDocument(k8s *types.Cluster, cluster *api.CouchbaseCluster, bucket, docID, docType string) error {
+func insertAnalyticsDocument(k8s *types.Cluster, cluster *couchbasev1.CouchbaseCluster, bucket, docID, docType string) error {
 	// Establishing a client connection is essentially random so if we tried
 	// to reuse this one there is a high probability that the target pod will
 	// be killed and this will constantly error.
@@ -158,8 +158,8 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
 	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, bucketName, 0, numOfDocs)
@@ -212,7 +212,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 
 	// Clone the cluster here to avoid read/write races
 	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *api.CouchbaseCluster) {
+	go func(cluster *couchbasev1.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -331,8 +331,8 @@ func TestAnalyticsKillPods(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
@@ -375,7 +375,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 
 	// Clone the cluster here to avoid read/write races
 	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *api.CouchbaseCluster) {
+	go func(cluster *couchbasev1.CouchbaseCluster) {
 		var err error
 	OuterLoop:
 		for {
@@ -502,8 +502,8 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.AnalyticsService, couchbasev1.DataService, couchbasev1.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev1.IndexService, couchbasev1.QueryService, couchbasev1.SearchService)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)

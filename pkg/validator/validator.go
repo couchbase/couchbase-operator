@@ -3,7 +3,7 @@ package validator
 import (
 	"fmt"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -113,7 +113,7 @@ func New(client kubernetes.Interface) Validator {
 	}
 }
 
-func (v *Validator) Create(resource *api.CouchbaseCluster) error {
+func (v *Validator) Create(resource *couchbasev1.CouchbaseCluster) error {
 	ApplyDefaults(resource)
 	if err := v.CheckConstraints(resource); err != nil {
 		return err
@@ -122,7 +122,7 @@ func (v *Validator) Create(resource *api.CouchbaseCluster) error {
 	return nil
 }
 
-func (v *Validator) Update(current, updated *api.CouchbaseCluster) error {
+func (v *Validator) Update(current, updated *couchbasev1.CouchbaseCluster) error {
 	ApplyDefaults(updated)
 
 	err := CheckImmutableFields(current, updated)
@@ -138,7 +138,7 @@ func (v *Validator) Update(current, updated *api.CouchbaseCluster) error {
 	return nil
 }
 
-func ApplyDefaults(customResource *api.CouchbaseCluster) {
+func ApplyDefaults(customResource *couchbasev1.CouchbaseCluster) {
 	if customResource.Spec.BaseImage == "" {
 		customResource.Spec.BaseImage = DefaultBaseImage
 	}
@@ -210,7 +210,7 @@ func uniqueString(strList []string) bool {
 	return len(set) == len(strList)
 }
 
-func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error {
+func (v *Validator) CheckConstraints(customResource *couchbasev1.CouchbaseCluster) error {
 	// Custom validation
 	errs := []error{}
 
@@ -407,7 +407,7 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d].pod", index)))
 			} else {
 				// These stateful services must have a "default" mount
-				if class.Services.ContainsAny(api.DataService, api.IndexService, api.AnalyticsService) &&
+				if class.Services.ContainsAny(couchbasev1.DataService, couchbasev1.IndexService, couchbasev1.AnalyticsService) &&
 					class.Pod.VolumeMounts.DefaultClaim == "" {
 					errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index)))
 				}
@@ -435,14 +435,14 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 			hasSecondaryMounts := len(secondaryMounts) > 0
 
 			// Check the associated service is enabled
-			if mounts.DataClaim != "" && !config.Services.Contains(api.DataService) {
-				errs = append(errs, errors.Required(string(api.DataService), fmt.Sprintf("spec.servers[%d].services", index)))
+			if mounts.DataClaim != "" && !config.Services.Contains(couchbasev1.DataService) {
+				errs = append(errs, errors.Required(string(couchbasev1.DataService), fmt.Sprintf("spec.servers[%d].services", index)))
 			}
-			if mounts.IndexClaim != "" && !config.Services.Contains(api.IndexService) {
-				errs = append(errs, errors.Required(string(api.IndexService), fmt.Sprintf("spec.servers[%d].services", index)))
+			if mounts.IndexClaim != "" && !config.Services.Contains(couchbasev1.IndexService) {
+				errs = append(errs, errors.Required(string(couchbasev1.IndexService), fmt.Sprintf("spec.servers[%d].services", index)))
 			}
-			if mounts.AnalyticsClaims != nil && !config.Services.Contains(api.AnalyticsService) {
-				errs = append(errs, errors.Required(string(api.AnalyticsService), fmt.Sprintf("spec.servers[%d].services", index)))
+			if mounts.AnalyticsClaims != nil && !config.Services.Contains(couchbasev1.AnalyticsService) {
+				errs = append(errs, errors.Required(string(couchbasev1.AnalyticsService), fmt.Sprintf("spec.servers[%d].services", index)))
 			}
 
 			templateNames := customResource.Spec.GetVolumeClaimTemplateNames()
@@ -567,7 +567,7 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 //   * in date
 //   * have the correct attributes
 // * leaf certificate has the correct SANs
-func (v *Validator) validateTLS(cluster *api.CouchbaseCluster, zones []string) (errs []error) {
+func (v *Validator) validateTLS(cluster *couchbasev1.CouchbaseCluster, zones []string) (errs []error) {
 	if cluster.Spec.TLS != nil {
 		// CRD validation requires all the necessary fields are populated
 		operatorSecretName := cluster.Spec.TLS.Static.OperatorSecret
@@ -626,7 +626,7 @@ func (e *UpdateError) Error() string {
 	return fmt.Sprintf("%s in %s cannot be updated", e.field, e.in)
 }
 
-func CheckImmutableFields(current, updated *api.CouchbaseCluster) error {
+func CheckImmutableFields(current, updated *couchbasev1.CouchbaseCluster) error {
 	errs := []error{}
 
 	if current.Spec.AntiAffinity != updated.Spec.AntiAffinity {
@@ -677,7 +677,7 @@ func CheckImmutableFields(current, updated *api.CouchbaseCluster) error {
 	hasIndexSvc := false
 	for _, cur := range current.Spec.ServerSettings {
 		for _, svc := range cur.Services {
-			if svc == api.IndexService {
+			if svc == couchbasev1.IndexService {
 				hasIndexSvc = true
 			}
 		}
@@ -685,7 +685,7 @@ func CheckImmutableFields(current, updated *api.CouchbaseCluster) error {
 
 	for _, up := range updated.Spec.ServerSettings {
 		for _, svc := range up.Services {
-			if svc == api.IndexService {
+			if svc == couchbasev1.IndexService {
 				hasIndexSvc = true
 			}
 		}
@@ -775,7 +775,7 @@ func CheckImmutableFields(current, updated *api.CouchbaseCluster) error {
 	// * Deny downgrades if no upgrade in progress
 	// * Deny upgrade if across major versions
 	// * Deny rollback if it doesn't match the current version
-	upgradeCondition := current.Status.GetCondition(api.ClusterConditionUpgrading)
+	upgradeCondition := current.Status.GetCondition(couchbasev1.ClusterConditionUpgrading)
 	if upgradeCondition == nil && current.Spec.Version != updated.Spec.Version {
 		src, err := couchbaseutil.NewVersion(current.Spec.Version)
 		if err != nil {

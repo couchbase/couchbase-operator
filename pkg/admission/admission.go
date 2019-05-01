@@ -11,8 +11,8 @@ import (
 
 	"github.com/golang/glog"
 
-	couchbaseclusterv1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	couchbaseclusterclientv1 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbaseclient "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
@@ -40,7 +40,7 @@ func addToScheme(scheme *runtime.Scheme) error {
 	if err := admissionregistrationv1beta1.AddToScheme(scheme); err != nil {
 		return err
 	}
-	if err := couchbaseclusterv1.AddToScheme(scheme); err != nil {
+	if err := couchbasev1.AddToScheme(scheme); err != nil {
 		return err
 	}
 	return nil
@@ -60,12 +60,12 @@ func getClient() *kubernetes.Clientset {
 }
 
 // getCouchbaseClusterClient returns a new CouchbaseCluster client
-func getCouchbaseClusterClient() *couchbaseclusterclientv1.Clientset {
+func getCouchbaseClusterClient() *couchbaseclient.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		glog.Fatal(err)
 	}
-	clientset, err := couchbaseclusterclientv1.NewForConfig(config)
+	clientset, err := couchbaseclient.NewForConfig(config)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -120,9 +120,9 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 
 	// Check the resource is valid
 	couchbaseClustersResource := metav1.GroupVersionResource{
-		Group:    couchbaseclusterv1.GroupName,
+		Group:    couchbasev1.GroupName,
 		Version:  "v1",
-		Resource: couchbaseclusterv1.CRDResourcePlural,
+		Resource: couchbasev1.CRDResourcePlural,
 	}
 	if ar.Request.Resource != couchbaseClustersResource {
 		err := fmt.Errorf("expect resource %s to be %s", ar.Request.Resource, couchbaseClustersResource)
@@ -132,7 +132,7 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 
 	// Decode the CouchbaseCluster object
 	raw := ar.Request.Object.Raw
-	couchbaseCluster := couchbaseclusterv1.CouchbaseCluster{}
+	couchbaseCluster := couchbasev1.CouchbaseCluster{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &couchbaseCluster); err != nil {
 		glog.Error(err)
@@ -178,9 +178,9 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 
 	// Check the resource is valid
 	couchbaseClustersResource := metav1.GroupVersionResource{
-		Group:    couchbaseclusterv1.GroupName,
+		Group:    couchbasev1.GroupName,
 		Version:  "v1",
-		Resource: couchbaseclusterv1.CRDResourcePlural,
+		Resource: couchbasev1.CRDResourcePlural,
 	}
 	if ar.Request.Resource != couchbaseClustersResource {
 		err := fmt.Errorf("expect resource %s to be %s", ar.Request.Resource, couchbaseClustersResource)
@@ -190,7 +190,7 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 
 	// Decode the CouchbaseCluster object
 	raw := ar.Request.Object.Raw
-	couchbaseCluster := couchbaseclusterv1.CouchbaseCluster{}
+	couchbaseCluster := couchbasev1.CouchbaseCluster{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &couchbaseCluster); err != nil {
 		glog.Error(err)

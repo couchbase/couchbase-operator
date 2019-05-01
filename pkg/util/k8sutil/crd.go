@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
@@ -20,7 +20,7 @@ import (
 
 // CouchbaseClusterCRUpdateFunc is a function to be used when atomically
 // updating a Cluster CR.
-type CouchbaseClusterCRUpdateFunc func(*api.CouchbaseCluster)
+type CouchbaseClusterCRUpdateFunc func(*couchbasev1.CouchbaseCluster)
 
 func CreateCRD(clientset apiextensionsclient.Interface, version constants.KubernetesVersion) error {
 	crd := createCRD(version)
@@ -35,15 +35,15 @@ func GetCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 func createCRD(version constants.KubernetesVersion) *apiextensionsv1beta1.CustomResourceDefinition {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: api.CRDName,
+			Name: couchbasev1.CRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   api.SchemeGroupVersion.Group,
-			Version: api.SchemeGroupVersion.Version,
+			Group:   couchbasev1.SchemeGroupVersion.Group,
+			Version: couchbasev1.SchemeGroupVersion.Version,
 			Scope:   apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:     api.CRDResourcePlural,
-				Kind:       api.CRDResourceKind,
+				Plural:     couchbasev1.CRDResourcePlural,
+				Kind:       couchbasev1.CRDResourceKind,
 				ShortNames: []string{"couchbase", "cbc"},
 			},
 		},
@@ -58,7 +58,7 @@ func createCRD(version constants.KubernetesVersion) *apiextensionsv1beta1.Custom
 
 func WaitCRDReady(clientset apiextensionsclient.Interface) error {
 	err := retryutil.Retry(context.Background(), 5*time.Second, 20, func() (bool, error) {
-		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(api.CRDName, metav1.GetOptions{})
+		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(couchbasev1.CRDName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
