@@ -13,14 +13,13 @@ This is by far the simplest deployment.
 Since both Couchbase Server clusters are in the same pod network, and both have access to DNS, XDCR will just work out of the box.
 xref:tls.adoc[TLS] can also be used to secure communications with a wildcard certificate.
 
-=== XDCR to a Different Kubernetes Cluster with Public DNS (Experimental)
+=== XDCR to a Different Kubernetes Cluster with Public DNS
 
-IMPORTANT: XDCR and client connections from different Kubernetes clusters via public DNS is not supported in production, and can only work on Couchbase Server versions greater than 5.5.3 and 6.0.1.
-For production use-cases, use one of the other options described in this topic.
-
-This option is the most flexible as it allows establishment of XDCR and use of clients from anywhere.
+This option allows xref:network-requirements.adoc#public-connectivity-ddns[public connectivity] and is the most flexible as it allows establishment of XDCR and use of clients from anywhere.
 It requires that the Kubernetes cluster is able to create publicly-addressable load balancer services, and the use of a  dynamic DNS (DDNS) provider.
 Use of xref:tls.adoc[TLS] is mandatory.
+
+IMPORTANT: Ensure that your clients are xref:network-requirements.adoc#table-public-connectivity[supported with public connectivity] before using this network model.
 
 === XDCR to a Different Kubernetes Cluster with Routed Networking
 
@@ -41,10 +40,7 @@ TLS is currently not supported since addressing is via IP address in this scenar
 
 As the pods from one network are routable from the other and you have dynamic DNS, establishing an XDCR connection with the target is as easy as specifying something similar to `cb-example-0000.cb-example.default.svc:8091` as per usual.
 
-=== XDCR to a Different Kubernetes Cluster with Public DNS (Experimental)
-
-IMPORTANT: XDCR and client connections from different Kubernetes clusters via public DNS is not supported in production, and can only work on Couchbase Server versions greater than 5.5.3 and 6.0.1.
-For production use-cases, use one of the other options described in this topic.
+=== XDCR to a Different Kubernetes Cluster with Public DNS
 
 The diagram below depicts the network flow when establishing an XDCR connection via DNS and the `spec.exposedFeatures` property.
 

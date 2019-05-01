@@ -93,3 +93,50 @@ image::network-external-ddns-public.png[Out-of-cluster Networking with Public IP
 &check; Supports addressability from the Internet
 
 NOTE: This form of client connectivity is compatible with the Kubernetes https://github.com/kubernetes-incubator/external-dns[external-dns^] project.
+
+.Supported Clients for Public Connectivity
+[#table-public-connectivity,cols="1,2",options="header"]
+|===
+| Client | Version
+
+| Couchbase Server (XDCR)
+| 6.0.1+
+
+5.5.3+
+
+| Node.js SDK
+a| 2.5.0+
+
+NOTE: When not using the embedded `libcouchbase` and choosing to build with an external installation, `libcouchbase` 2.9.2+ is required.
+
+| PHP SDK
+| Any supported version using `libcouchbase` 2.9.2+
+
+| Python SDK
+| Any supported version using `libcouchbase` 2.9.2+
+
+| C SDK (a.k.a. `libcouchbase`)
+| 2.9.2+
+
+| Java SDK
+a| Not yet supported
+
+NOTE: Known issue with host name resolution (https://issues.couchbase.com/browse/JVMCBC-654[JVMCBC-654^]).
+
+| .NET SDK
+a| Not yet supported
+
+NOTE: Known issue with hostname resolution https://issues.couchbase.com/browse/NCBC-1927[NCBC-1927^].
+
+| Go SDK
+a| 1.6.1+
+
+NOTE: Initial SDK multi-network configuration was added in 1.4.0 with an issue which made it incompatible with the Operator's public connectivity feature.
+This was addressed in 1.6.1 (https://issues.couchbase.com/browse/GOCBC-431[GOCBC-431^]).
+
+| Couchbase Sync Gateway
+| Not yet supported
+
+| Couchbase Connectors
+| Not yet supported
+|===
