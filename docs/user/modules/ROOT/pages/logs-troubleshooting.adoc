@@ -46,7 +46,7 @@ time="2018-01-23T22:56:51Z" level=info msg="I'm the leader, attempt to start the
 time="2018-01-23T22:56:51Z" level=info msg="Creating the couchbase-operator controller" module=main
 ----
 
-You can even use the deployment to show the logs as the name is not auto-generated, the underlying command will automatically select a pod, in this case we only allow one so will behave correctly:
+You can even use the deployment to show the logs using the auto-generated name. The underlying command will automatically select a pod. In this case we only allow one, so it will behave correctly:
 [source,console]
 ----
 $ kubectl logs deployment/couchbase-operator
@@ -76,8 +76,8 @@ time="2018-01-23T22:56:51Z" level=info msg="I'm the leader, attempt to start the
 time="2018-01-23T22:56:51Z" level=info msg="Creating the couchbase-operator controller" module=main
 ----
 
-You can even use the deployment to show the logs as the name is not auto-generated, the underlying command will automatically select a pod,
-in this case we only allow one so will behave correctly:
+You can even use the deployment to show the logs using the auto-generated name. The underlying command will automatically select a pod. In this case we only allow one, so it will behave correctly:
+
 [source,console]
 ----
 $ oc logs deployment/couchbase-operator
