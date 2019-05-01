@@ -306,3 +306,28 @@ It will ensure that, if specified, the cluster TLS secrets are present and corre
 storage.k8s.io/storageclasses::
 Used by the admission controller to look for storage class references in the `CouchbaseCluster` specification.
 It will ensure that, if present, any storage class templates reference existing storage classes.
+
+== Uninstalling the Admission Controller
+
+Run the following command to uninstall the admission controller:
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+kubectl delete -f admission.yaml
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+oc delete -f admission.yaml
+----
+--
+====
