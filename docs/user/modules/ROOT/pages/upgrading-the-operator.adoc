@@ -125,7 +125,7 @@ OpenShift::
 ...
       containers:
       - name: couchbase-operator
-        image: registry.connect.redhat.com/couchbase/operator:1.2.0-1
+        image: registry.connect.redhat.com/couchbase/operator:1.2.0-2
 ...
 ----
 --

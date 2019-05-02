@@ -227,7 +227,7 @@ You have access to the following projects and can switch between them with 'oc p
 
 Using project "myproject".
 
-$ cbopinfo --namespace myproject --operator-image couchbase/operator:1.2.0-1
+$ cbopinfo --namespace myproject --operator-image couchbase/operator:1.2.0-2
 Wrote cluster information to cbopinfo-20180801T141838+0100.tar.gz
 ----
 
