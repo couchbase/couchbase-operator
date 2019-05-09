@@ -32,6 +32,13 @@ image::network-in-cluster.png[In-cluster Networking]
 This form of client connectivity uses Kubernetes `NodePort` services to connect to the Couchbase cluster.
 The Operator ensures that `NodePort` addresses are synchronized with Couchbase Server so that they are correctly advertised to clients.
 
+[IMPORTANT]
+====
+This form of client connectivity has the same client compatibility requirements as <<public-connectivity-ddns,Out-of-cluster Networking with Public IP-based Addressing and Dynamic DNS>>.
+
+Refer to <<table-public-connectivity,Supported Clients for Public Connectivity>> for a list of clients that are supported with this networking model.
+====
+
 image::network-external-ip.png[Out-of-cluster Networking with Private IP-based Addressing]
 
 &check; Supports all https://github.com/containernetworking/cni[CNI^] network types
