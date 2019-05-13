@@ -139,6 +139,10 @@ func (v *Validator) Update(current, updated *couchbasev1.CouchbaseCluster) error
 }
 
 func ApplyDefaults(customResource *couchbasev1.CouchbaseCluster) {
+	if customResource.Spec.ClusterSettings.ClusterName == "" {
+		customResource.Spec.ClusterSettings.ClusterName = customResource.Name
+	}
+
 	if customResource.Spec.BaseImage == "" {
 		customResource.Spec.BaseImage = DefaultBaseImage
 	}

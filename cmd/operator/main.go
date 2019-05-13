@@ -7,177 +7,107 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/apis"
 	"github.com/couchbase/couchbase-operator/pkg/chaos"
-	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/controller"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/logutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/probe"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
-	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
+	"github.com/operator-framework/operator-sdk/pkg/leader"
+	"github.com/operator-framework/operator-sdk/pkg/log/zap"
+
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 var (
 	listenAddr       string
-	name             string
-	namespace        string
-	logLevel         string
-	createCrd        bool
 	printVersion     bool
-	verifyVersion    bool
-	enableUpgrades   bool
 	podCreateTimeout string
 	chaosLevel       int
 
-	mainLogger *logrus.Entry
+	metricsHost       = "0.0.0.0"
+	metricsPort int32 = 8383
 )
+
+var log = logf.Log.WithName("main")
 
 // create controller from initialised config
 func main() {
-	flag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
-	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
-	flag.BoolVar(&createCrd, "create-crd", false, "Create the crd if it does not exist")
-	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
-	flag.BoolVar(&verifyVersion, "verify-version", true, "Skip verification of required couchbase min version")
-	flag.StringVar(&logLevel, "log-level", "info", "Sets the logging level (panic, fatal, error, warn, info, debug)")
-	flag.StringVar(&podCreateTimeout, "pod-create-timeout", "5m", "Sets the amount of time to wait for Pod creation to complete")
-	flag.Parse()
-	logrus.SetOutput(os.Stdout)
-	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
+	pflag.CommandLine.AddFlagSet(zap.FlagSet())
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
-	if level, err := logrus.ParseLevel(logLevel); err != nil {
-		mainLogger.Fatalf("Invalid log level: %s", logLevel)
-	} else {
-		logutil.SetLogLevel(level)
-	}
+	pflag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
+	pflag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
+	pflag.BoolVar(&printVersion, "version", false, "Show version and quit")
+	pflag.StringVar(&podCreateTimeout, "pod-create-timeout", "10m", "Sets the amount of time to wait for Pod creation to complete")
+	pflag.Parse()
 
-	namespace = os.Getenv("MY_POD_NAMESPACE")
-	if len(namespace) == 0 {
-		mainLogger.Fatalf("Must set env MY_POD_NAMESPACE")
-	}
-	name = os.Getenv("MY_POD_NAME")
-	if len(name) == 0 {
-		mainLogger.Fatalf("Must set env MY_POD_NAME")
-	}
-
-	if printVersion {
-		fmt.Println(version.Application, version.Version)
-		os.Exit(0)
-	}
+	logf.SetLogger(zap.Logger())
 
 	// Log the version, branch and revision so we know
 	// * Version feature set
 	// * Whether this is an official or development branch
 	// * The exact commit defects are raised against
-	mainLogger.Infof("%s v%s (%s)", version.Application, version.Version, revision.Revision())
-
-	id, err := os.Hostname()
-	if err != nil {
-		mainLogger.Fatalf("Failed to get container hostname: %v", err)
+	log.Info(version.Application, "version", version.Version, "revision", revision.Revision())
+	if printVersion {
+		os.Exit(0)
 	}
 
-	kubecli := k8sutil.MustNewKubeClient()
+	namespace, err := k8sutil.GetWatchNamespace()
+	if err != nil {
+		log.Error(err, "Failed to get watch namespace")
+		os.Exit(1)
+	}
 
-	http.HandleFunc(probe.HTTPReadyzEndpoint, probe.ReadyzHandler)
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Error(err, "Error getting config")
+		os.Exit(1)
+	}
+
+	if err := leader.Become(context.Background(), "couchbase-operator"); err != nil {
+		log.Error(err, "Error becoming leader")
+		os.Exit(1)
+	}
+
+	log.V(1).Info("Initializing resource manager.")
+
+	mgr, err := manager.New(cfg, manager.Options{
+		Namespace:          namespace,
+		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+	})
+	if err != nil {
+		log.Error(err, "Error initializing manager")
+		os.Exit(1)
+	}
+
+	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "Error adding data types to scheme")
+		os.Exit(1)
+	}
+
+	log.V(1).Info("Initializing controller.")
+
+	if err := controller.AddToManager(mgr, podCreateTimeout); err != nil {
+		log.Error(err, "Error adding controller to manager")
+		os.Exit(1)
+	}
+
 	go func() { _ = http.ListenAndServe(listenAddr, nil) }()
 
-	mainLogger.Info("Obtaining resource lock")
-	rl, err := resourcelock.New(resourcelock.EndpointsResourceLock,
-		namespace,
-		"couchbase-operator",
-		kubecli.CoreV1(),
-		resourcelock.ResourceLockConfig{
-			Identity:      id,
-			EventRecorder: createRecorder(kubecli, name, namespace),
-		})
-	if err != nil {
-		mainLogger.Fatalf("Error creating resource lock: %v", err)
+	chaos.Start(context.Background(), mgr, namespace, chaosLevel)
+
+	log.V(1).Info("Starting resource manager.")
+
+	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+		log.Error(err, "Error starting resource manager")
+		os.Exit(1)
 	}
-
-	mainLogger.Info("Attempting to be elected the couchbase-operator leader")
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 10 * time.Second,
-		RetryPeriod:   2 * time.Second,
-		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: run,
-			OnStoppedLeading: func() {
-				mainLogger.Fatalf("Leader election lost")
-			},
-		},
-	})
-}
-
-func run(stop <-chan struct{}) {
-	mainLogger.Info("I'm the leader, attempt to start the operator")
-	cfg := newControllerConfig()
-
-	chaos.Start(context.Background(), cfg.KubeCli, cfg.Namespace, chaosLevel)
-
-	c := controller.New(cfg)
-	c.Start()
-}
-
-func newControllerConfig() controller.Config {
-	mainLogger.Info("Creating the couchbase-operator controller")
-	kubecli := k8sutil.MustNewKubeClient()
-
-	serviceAccount, err := getMyPodServiceAccount(kubecli)
-	if err != nil {
-		mainLogger.Fatalf("Fail to get my pod's service account: %v", err)
-	}
-
-	cfg := controller.Config{
-		Namespace:        namespace,
-		ServiceAccount:   serviceAccount,
-		KubeCli:          kubecli,
-		CouchbaseCRCli:   client.MustNewInCluster(),
-		CreateCrd:        createCrd,
-		VerifyVersion:    verifyVersion,
-		EnableUpgrades:   enableUpgrades,
-		PodCreateTimeout: podCreateTimeout,
-	}
-
-	return cfg
-}
-
-func getMyPodServiceAccount(kubecli kubernetes.Interface) (string, error) {
-	var sa string
-	err := retryutil.Retry(context.Background(), 5*time.Second, 100, func() (bool, error) {
-		pod, err := kubecli.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			mainLogger.Errorf("Fail to get operator pod (%s): %v", name, err)
-			return false, nil
-		}
-		sa = pod.Spec.ServiceAccountName
-		return true, nil
-	})
-
-	if err != nil {
-		mainLogger.Infof("Found pod service account: %s", sa)
-	}
-	return sa, err
-}
-
-func createRecorder(kubecli kubernetes.Interface, name, namespace string) record.EventRecorder {
-	mainLogger.Info("Starting event recorder")
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logrus.WithField("module", "event_recorder").Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubecli.CoreV1().RESTClient()).Events(namespace)})
-	return eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: name})
 }

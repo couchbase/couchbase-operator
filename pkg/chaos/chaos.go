@@ -6,27 +6,27 @@ import (
 	"os"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/api/core/v1"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // Monkeys knows how to crush pods and nodes.
 type Monkeys struct {
-	kubecli kubernetes.Interface
+	mgr manager.Manager
 }
 
-func NewMonkeys(kubecli kubernetes.Interface) *Monkeys {
-	return &Monkeys{kubecli: kubecli}
+func NewMonkeys(mgr manager.Manager) *Monkeys {
+	return &Monkeys{mgr: mgr}
 }
 
 type CrashConfig struct {
 	Namespace string
-	Selector  labels.Selector
+	Selector  map[string]string
 
 	KillRate          rate.Limit
 	CbKillProbability float64
@@ -38,17 +38,16 @@ type CrashConfig struct {
 
 // TODO: respect context in k8s operations.
 func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
+	cli := m.mgr.GetClient()
 	burst := int(c.KillRate)
 	if burst <= 0 {
 		burst = 1
 	}
 	limiter := rate.NewLimiter(c.KillRate, burst)
-	ls := c.Selector.String()
-	ns := c.Namespace
 	for {
 		err := limiter.Wait(ctx)
 		if err != nil { // user cancellation
-			c.logger.Infof("crushPods is canceled for selector %v by the user: %v", ls, err)
+			c.logger.Infof("crushPods is canceled by the user: %v", err)
 			return
 		}
 
@@ -64,13 +63,14 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 			continue
 		}
 
-		pods, err := m.kubecli.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: ls})
+		pods := &corev1.PodList{}
+		err = cli.List(ctx, client.InNamespace(c.Namespace).MatchingLabels(c.Selector), pods)
 		if err != nil {
-			c.logger.Errorf("failed to list pods for selector %v: %v", ls, err)
+			c.logger.Errorf("failed to list pods for selector %v: %v", c.Selector, err)
 			continue
 		}
 		if len(pods.Items) == 0 {
-			c.logger.Infof("no pods to kill for selector %v", ls)
+			c.logger.Infof("no pods to kill for selector %v", c.Selector)
 			continue
 		}
 
@@ -87,27 +87,27 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 			}
 		}
 
-		c.logger.Infof("start to kill %d pods for selector %v", max, ls)
+		c.logger.Infof("start to kill %d pods for selector %v", max, c.Selector)
 
-		tokills := make(map[string]struct{})
+		tokills := []*corev1.Pod{}
 		for len(tokills) < max {
-			tokills[pods.Items[rand.Intn(len(pods.Items))].Name] = struct{}{}
+			tokills = append(tokills, &pods.Items[rand.Intn(len(pods.Items))])
 		}
 
-		for tokill := range tokills {
-			err = k8sutil.DeletePod(m.kubecli, ns, tokill, metav1.NewDeleteOptions(0))
+		for _, tokill := range tokills {
+			err = cli.Delete(ctx, tokill)
 			if err != nil {
-				c.logger.Errorf("failed to kill pod %v: %v", tokill, err)
+				c.logger.Errorf("failed to kill pod %v: %v", tokill.Name, err)
 				continue
 			}
-			c.logger.Infof("killed pod %v for selector %v", tokill, ls)
+			c.logger.Infof("killed pod %v for selector %v", tokill.Name, c.Selector)
 		}
 	}
 }
 
-func Start(ctx context.Context, kubecli kubernetes.Interface, ns string, chaosLevel int) {
-	m := NewMonkeys(kubecli)
-	ls := labels.SelectorFromSet(map[string]string{"app": "couchbase"})
+func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) {
+	m := NewMonkeys(mgr)
+	ls := map[string]string{"app": "couchbase"}
 	logger := logrus.WithField("module", "chaos")
 
 	switch chaosLevel {

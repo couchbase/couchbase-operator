@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -53,11 +54,8 @@ type clusterEvent struct {
 }
 
 type Config struct {
-	ServiceAccount   string
 	KubeCli          kubernetes.Interface
 	CouchbaseCRCli   versioned.Interface
-	LogLevel         logrus.Level
-	EnableUpgrades   bool
 	PodCreateTimeout string
 }
 
@@ -93,21 +91,37 @@ type Cluster struct {
 	loopStatus string
 }
 
-func New(config Config, cl *couchbasev1.CouchbaseCluster) *Cluster {
+func New(config Config, cl *couchbasev1.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
 		logger: logrus.New().WithFields(logrus.Fields{
 			"module":       "cluster",
 			"cluster-name": cl.Name,
 		}),
-		config:    config,
-		status:    *(cl.Status.DeepCopy()),
-		cluster:   cl,
-		eventCh:   make(chan *clusterEvent, 100),
-		stopCh:    make(chan struct{}),
-		eventsCli: config.KubeCli.CoreV1().Events(cl.Namespace),
+		config:  config,
+		status:  *(cl.Status.DeepCopy()),
+		cluster: cl,
+		eventCh: make(chan *clusterEvent, 100),
+		stopCh:  make(chan struct{}),
 	}
 
-	c.logger.Logger.SetLevel(c.config.LogLevel)
+	kubeconfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	kubeclient, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	couchbaseclient, err := versioned.NewForConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	c.config.KubeCli = kubeclient
+	c.config.CouchbaseCRCli = couchbaseclient
+	c.eventsCli = c.config.KubeCli.CoreV1().Events(cl.Namespace)
 
 	// Cancel is used to abort the go routine when the operator is deleted
 	// The logger value is used by other clients who don't have access to the
@@ -119,19 +133,18 @@ func New(config Config, cl *couchbasev1.CouchbaseCluster) *Cluster {
 	// events over a 10 minute window.
 	if err := couchbasev1.AddToScheme(scheme.Scheme); err != nil {
 		c.logger.Errorf("Error adding scheme to client-go for event broadcasting: %s", err.Error())
-		return nil
+		return nil, err
 	}
 	broadcaster := record.NewBroadcaster()
 	c.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: os.Getenv(constants.EnvOperatorPodName)})
-	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: config.KubeCli.CoreV1().Events(c.cluster.Namespace)})
+	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: c.config.KubeCli.CoreV1().Events(c.cluster.Namespace)})
 
 	c.logger.Info("Watching new cluster")
 
 	// Initialize the scheduler for the initial pod
-	var err error
 	if c.scheduler, err = scheduler.New(c.config.KubeCli, c.cluster); err != nil {
 		c.logger.Errorf("Error initializing pod scheduler: %s", err.Error())
-		return nil
+		return nil, err
 	}
 
 	// Spawn the janitor process which monitors persistent log volumes.
@@ -153,7 +166,7 @@ func New(config Config, cl *couchbasev1.CouchbaseCluster) *Cluster {
 		c.run()
 	}()
 
-	return c
+	return c, nil
 }
 
 func (c *Cluster) Update(cl *couchbasev1.CouchbaseCluster) {
@@ -452,7 +465,6 @@ func (c *Cluster) updateCRStatus() error {
 	if _, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 		return err
 	}
-
 	return nil
 }
 

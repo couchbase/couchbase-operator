@@ -2,292 +2,113 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"time"
-
-	sdk "github.com/operator-framework/operator-sdk/pkg/sdk"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/logutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/probe"
 
-	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 
-	kwatch "k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var (
-	initRetryWaitTime = 30 * time.Second
-)
+// log is the logger for this module.
+var log = logf.Log.WithName("controller")
 
-// TODO: get rid of this once we use workqueue
-var pt *panicTimer
-
-func init() {
-	pt = newPanicTimer(time.Minute, "unexpected long blocking (> 1 Minute) when handling cluster event")
+// CouchbaseClusterReconciler is a reconciler object that implements to Reconciler interface
+// as defined by the controller-runtime.
+type CouchbaseClusterReconciler struct {
+	client           client.Client
+	clusters         *ManagedClusters
+	podCreateTimeout string
 }
 
-type Event struct {
-	Type   kwatch.EventType
-	Object *couchbasev1.CouchbaseCluster
-}
+// Reconcile is triggered when an event occurs on a watched resource.
+// TODO: The reconcile.Result allows events to be requeued which *may*
+// allow us to do away with the separate go routine sitting in a loop,
+// or it may just fill up with events due to status updates...
+func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.V(2).Info("Received couchbase cluster event", "cluster", request.NamespacedName)
 
-type Controller struct {
-	Config
-	logger   *logrus.Entry
-	clusters *ManagedClusters
-}
-
-type Config struct {
-	MasterHost       string
-	Namespace        string
-	ServiceAccount   string
-	CreateCrd        bool
-	EnableUpgrades   bool
-	KubeCli          kubernetes.Interface
-	CouchbaseCRCli   versioned.Interface
-	VerifyVersion    bool
-	PodCreateTimeout string
-}
-
-func New(cfg Config) *Controller {
-	controller := &Controller{
-		Config:   cfg,
-		logger:   logrus.WithField("module", "controller"),
-		clusters: CreateManagedClusters(),
-	}
-
-	http.HandleFunc("/v1/settings/logging", controller.SettingsLoggingHandler)
-	http.HandleFunc("/v1/stats/cluster", controller.StatsClusterHandler)
-	return controller
-}
-
-func (c *Controller) Start() {
-
-	if c.Config.CreateCrd {
-		for {
-			err := c.initResource()
-			if err == nil {
-				break
+	// Check the status of the cluster object.
+	couchbase := &couchbasev1.CouchbaseCluster{}
+	if err := r.client.Get(context.Background(), request.NamespacedName, couchbase); err != nil {
+		if errors.IsNotFound(err) {
+			// Cluster deleted
+			cluster, ok := r.clusters.Load(request.NamespacedName.String())
+			if !ok {
+				log.V(2).Info("Cluster deleted but unknown", "cluster", request.NamespacedName)
+				return reconcile.Result{}, nil
 			}
-			c.logger.Errorf("Initialization failed: %v", err)
-			c.logger.Infof("Retry initialization in %v...", initRetryWaitTime)
-			time.Sleep(initRetryWaitTime)
-		}
 
-		c.logger.Infof("CRD initialized, listening for events...")
+			log.V(2).Info("Deleting cluster", "cluster", request.NamespacedName)
+
+			cluster.Delete()
+			r.clusters.Delete(request.NamespacedName.String())
+			return reconcile.Result{}, nil
+		}
+		log.Error(err, "Failed to get CouchbaseCluster", "cluster", request.NamespacedName)
+		return reconcile.Result{}, err
 	}
-	probe.SetReady()
 
-	sdk.Watch(couchbasev1.SchemeGroupVersion.String(), couchbasev1.CRDResourceKind, c.Config.Namespace, 0)
-	sdk.Handle((sdk.Handler)(c))
-	sdk.Run(context.TODO())
+	// Ignore failed clusters.
+	if couchbase.Status.IsFailed() {
+		err := fmt.Errorf("cluster %s failed", request.NamespacedName)
+		log.Error(err, "Ignoring failed cluster", "cluster", request.NamespacedName)
+		return reconcile.Result{}, err
+	}
 
-	panic("unreachable")
-}
+	// See if we know about the cluster already.
+	c, ok := r.clusters.Load(request.NamespacedName.String())
+	if !ok {
+		// Cluster created or detected during a restart, start a new management routine.
+		log.V(2).Info("Creating cluster", "cluster", request.NamespacedName)
 
-func (c *Controller) Handle(ctx context.Context, event sdk.Event) error {
-	if cluster, ok := event.Object.(*couchbasev1.CouchbaseCluster); ok {
-		cluster.Initialize()
-		ev := &Event{
-			Type:   kwatch.Added,
-			Object: cluster,
-		}
-
-		if event.Deleted {
-			ev.Type = kwatch.Deleted
-		} else if _, ok := c.clusters.Load(ev.Object.Name); ok { // re-watch or restart could give ADD event
-			ev.Type = kwatch.Modified
-		}
-
-		pt.start()
-		err := c.handleClusterEvent(ev)
+		c, err := cluster.New(cluster.Config{PodCreateTimeout: r.podCreateTimeout}, couchbase)
 		if err != nil {
-			logrus.Warningf("Fail to handle event: %v", err)
+			log.Error(err, "Failed to create Couchbase cluster", "cluster", request.NamespacedName)
+			return reconcile.Result{}, err
 		}
-		pt.stop()
+
+		r.clusters.Store(request.NamespacedName.String(), c)
+		return reconcile.Result{}, nil
 	}
 
-	return nil
+	// Existing cluster updated
+	// TODO: We should just reload the cluster and aggregate other resources in
+	// the cluster controller and check for updates there.
+	log.V(2).Info("Updating cluster", "cluster", request.NamespacedName)
+
+	c.Update(couchbase)
+
+	return reconcile.Result{}, nil
 }
 
-func (c *Controller) initResource() error {
-	version, err := k8sutil.GetKubernetesVersion(c.Config.KubeCli)
+// AddToManager registers a controller reconciler with the manager and triggers updates
+// when CouchbaseCluster objects are modified.
+func AddToManager(mgr manager.Manager, timeout string) error {
+
+	r := &CouchbaseClusterReconciler{
+		client:           mgr.GetClient(),
+		clusters:         CreateManagedClusters(),
+		podCreateTimeout: timeout,
+	}
+
+	c, err := controller.New("couchbase-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		c.logger.Logger.Warnf("Unable to get server version due to %v, skipping validation registration", err)
+		return err
 	}
 
-	if version < constants.KubernetesVersion1_8 {
-		return fmt.Errorf("kubernetes version %s is too old, %s is minimum supported version ",
-			version, constants.KubernetesVersion1_8)
+	err = c.Watch(&source.Kind{Type: &couchbasev1.CouchbaseCluster{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
 	}
 
-	kubeExtClient := k8sutil.MustNewKubeExtClient()
-	err = k8sutil.CreateCRD(kubeExtClient, version)
-	if err != nil && !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
-		return fmt.Errorf("fail to create CRD: %v", err)
-	}
-
-	return k8sutil.WaitCRDReady(kubeExtClient)
-}
-
-func (c *Controller) handleClusterEvent(event *Event) error {
-	clus := event.Object
-
-	if clus.Status.IsFailed() {
-		if event.Type == kwatch.Deleted {
-			c.clusters.Delete(clus.Name)
-			return nil
-		}
-		return fmt.Errorf("ignore failed cluster (%s). Please delete its CR", clus.Name)
-	}
-
-	switch event.Type {
-	case kwatch.Added:
-		if _, ok := c.clusters.Load(clus.Name); ok {
-			return fmt.Errorf("unsafe state. cluster (%s) was created before but we received event (%s)", clus.Name, event.Type)
-		}
-
-		if c.VerifyVersion {
-			err := couchbaseutil.VerifyVersion(clus.Spec.Version)
-			if err != nil {
-				return fmt.Errorf("cluster create failed, Please delete its CR: %s, %v", clus.Name, err)
-			}
-		}
-
-		// We need to explicitly obtain the lock here and not call the Store() function
-		// because we need to ensure that the cluster is created and inserted into the
-		// cluster map before releasing the lock. This is because config updates to
-		// clusters (like changing the log level) only apply to clusters in the map. By
-		// obtaining the lock to create a cluster and insert it into the map we can
-		// ensure that the cluster is in the map when the config updates are applied.
-		c.clusters.Lock.Lock()
-		if toAdd := cluster.New(c.makeClusterConfig(), clus); toAdd != nil {
-			c.clusters.Values[clus.Name] = toAdd
-		}
-		c.clusters.Lock.Unlock()
-
-	case kwatch.Modified:
-		clusterContext, ok := c.clusters.Load(clus.Name)
-		if !ok {
-			return fmt.Errorf("unsafe state. cluster (%s) was never created but we received event (%s)", clus.Name, event.Type)
-		}
-		clusterContext.Update(clus)
-
-	case kwatch.Deleted:
-		clusterContext, ok := c.clusters.Load(clus.Name)
-		if !ok {
-			return fmt.Errorf("unsafe state. cluster (%s) was never created but we received event (%s)", clus.Name, event.Type)
-		}
-		clusterContext.Delete()
-		c.clusters.Delete(clus.Name)
-	}
 	return nil
-}
-
-func (c *Controller) makeClusterConfig() cluster.Config {
-	return cluster.Config{
-		ServiceAccount:   c.Config.ServiceAccount,
-		KubeCli:          c.Config.KubeCli,
-		CouchbaseCRCli:   c.Config.CouchbaseCRCli,
-		LogLevel:         logutil.LogLevel(),
-		EnableUpgrades:   c.Config.EnableUpgrades,
-		PodCreateTimeout: c.Config.PodCreateTimeout,
-	}
-}
-
-func (c *Controller) SettingsLoggingHandler(w http.ResponseWriter, r *http.Request) {
-	type LoggerSettings struct {
-		LogLevel string `json:"logLevel"`
-	}
-
-	if r.Method == http.MethodGet {
-		var response LoggerSettings
-		response.LogLevel = logutil.LogLevel().String()
-
-		data, err := json.Marshal(response)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-
-		w.Header().Add("Content-Type", "application/json")
-		_, _ = w.Write(data)
-	} else if r.Method == http.MethodPost {
-		if r.Header.Get("Content-Type") != "application/json" {
-			w.WriteHeader(http.StatusUnsupportedMediaType)
-			_, _ = w.Write([]byte("Content-Type must be application/json"))
-			return
-		}
-
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(err.Error()))
-			return
-		}
-
-		var request LoggerSettings
-		err = json.Unmarshal(body, &request)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(err.Error()))
-			return
-		}
-
-		level, err := logrus.ParseLevel(request.LogLevel)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(err.Error()))
-			return
-		}
-
-		logutil.SetLogLevel(level)
-		c.clusters.Range(func(key string, value *cluster.Cluster) bool {
-			value.SetLoggingLevel(level)
-			return true
-		})
-
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-}
-
-func (c *Controller) StatsClusterHandler(w http.ResponseWriter, r *http.Request) {
-
-	type Stats struct {
-		Clusters map[string]*cluster.ClusterStats `json:"clusters"`
-	}
-
-	if r.Method == http.MethodGet {
-		response := &Stats{
-			Clusters: make(map[string]*cluster.ClusterStats),
-		}
-
-		c.clusters.Range(func(key string, value *cluster.Cluster) bool {
-			response.Clusters[key] = value.Stats()
-			return true
-		})
-
-		data, err := json.Marshal(response)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(err.Error()))
-			return
-		}
-
-		w.Header().Add("Content-Type", "application/json")
-		_, _ = w.Write(data)
-	} else {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
 }

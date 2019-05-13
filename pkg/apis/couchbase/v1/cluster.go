@@ -28,12 +28,6 @@ type CouchbaseCluster struct {
 	Status            ClusterStatus `json:"status"`
 }
 
-func (c *CouchbaseCluster) Initialize() {
-	if c.Spec.ClusterSettings.ClusterName == "" {
-		c.Spec.ClusterSettings.ClusterName = c.Name
-	}
-}
-
 func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	trueVar := true
 	return metav1.OwnerReference{

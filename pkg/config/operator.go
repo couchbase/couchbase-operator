@@ -7,7 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -66,9 +65,20 @@ func GetOperatorRole() *rbacv1.Role {
 					"",
 				},
 				Resources: []string{
+					"configmaps",
+				},
+				Verbs: []string{
+					"get",    // used by the controller-runtime for leadership.
+					"create", // used by the controller-runtime for leadership.
+				},
+			},
+			{
+				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
 					"pods",
 					"services",
-					"endpoints",
 					"persistentvolumeclaims",
 				},
 				Verbs: []string{
@@ -205,11 +215,11 @@ func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deploym
 							},
 							Args: []string{
 								"--pod-create-timeout=10m",
-								"--create-crd=false",
+								"--zap-level=1",
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name: "MY_POD_NAMESPACE",
+									Name: "WATCH_NAMESPACE",
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
 											FieldPath: "metadata.namespace",
@@ -217,7 +227,7 @@ func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deploym
 									},
 								},
 								{
-									Name: "MY_POD_NAME",
+									Name: "POD_NAME",
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
 											FieldPath: "metadata.name",
@@ -230,17 +240,10 @@ func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deploym
 									Name:          "http",
 									ContainerPort: 8080,
 								},
-							},
-							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/readyz",
-										Port: intstr.FromString("http"),
-									},
+								{
+									Name:          "prometheus",
+									ContainerPort: 8383,
 								},
-								InitialDelaySeconds: 3,
-								PeriodSeconds:       3,
-								FailureThreshold:    20,
 							},
 						},
 					},
