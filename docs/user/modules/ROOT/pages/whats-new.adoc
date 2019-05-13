@@ -39,6 +39,9 @@ This release introduces support for connecting clients to the Couchbase cluster 
 
 See xref:network-requirements.adoc#public-connectivity-ddns[Public Connectivity]
 
+NOTE: Couchbase clients must meet certain requirements to support public connectivity, and not all clients are supported at this time.
+Refer to xref:network-requirements.adoc#table-public-connectivity[Supported Clients for Public Connectivity] for more information.
+
 == Support for Public Kubernetes Services
 
 The Operator now offers full production support on the following public Kubernetes services:

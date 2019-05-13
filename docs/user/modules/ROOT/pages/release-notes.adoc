@@ -44,6 +44,11 @@ The admission controller is installed separately and replaces the `cbopctl` comm
 +
 The primary purpose of the admission controller is to validate Couchbase cluster configuration changes before the Operator acts on them, thus protecting your Couchbase deployment (and the Operator) from any accidental damage that might arise from an invalid configuration.
 
+* This release introduces support for connecting clients to the Couchbase cluster over the internet via public IP-based addressing and dynamic DNS, also known as public connectivity.
++
+Couchbase clients must meet certain requirements to support public connectivity, and not all clients are supported at this time.
+Refer to xref:network-requirements.adoc#table-public-connectivity[Supported Clients for Public Connectivity] for more information.
+
 * The log collection experience for xref:cbopinfo.adoc[cbopinfo --collectinfo] has been unified for stateful and stateless deployments.
  ** A new table column defines the type of log collection that is applicable, along with a column specifying the detachment time of the logs persistent volume (stateless deployments only).
  ** Selection now defaults to all logs.
