@@ -336,6 +336,22 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:cc45ef4fed27b5ce6d319d6a4212a34a3d5ccdb475748ac0a04f9305bce7c29d"
+  name = "github.com/gophercloud/gophercloud"
+  packages = [
+    ".",
+    "openstack",
+    "openstack/identity/v2/tenants",
+    "openstack/identity/v2/tokens",
+    "openstack/identity/v3/tokens",
+    "openstack/utils",
+    "pagination",
+  ]
+  pruneopts = "UT"
+  revision = "7892efa714f10951c5483a28c7471d8051b12975"
+
+[[projects]]
+  branch = "master"
   digest = "1:b4395b2a4566c24459af3d04009b39cc21762fc77ec7bf7a1aa905c91e8f018d"
   name = "github.com/gregjones/httpcache"
   packages = [
@@ -919,7 +935,7 @@
   version = "kubernetes-1.13.1"
 
 [[projects]]
-  digest = "1:08a3decff6bea38bb40489d09e217d9a2190dc659b12e928f359912074b4b72c"
+  digest = "1:4e360141f96434a2f6c1a090469e500784f057170619e1e7c4f84de520951222"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -967,6 +983,7 @@
     "plugin/pkg/client/auth/exec",
     "plugin/pkg/client/auth/gcp",
     "plugin/pkg/client/auth/oidc",
+    "plugin/pkg/client/auth/openstack",
     "rest",
     "rest/watch",
     "restmapper",
@@ -1125,6 +1142,7 @@
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/pkg/log/zap",
     "github.com/sirupsen/logrus",
+    "github.com/spf13/pflag",
     "golang.org/x/time/rate",
     "gopkg.in/ini.v1",
     "gopkg.in/yaml.v2",
@@ -1162,6 +1180,7 @@
     "k8s.io/client-go/plugin/pkg/client/auth/azure",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/plugin/pkg/client/auth/oidc",
+    "k8s.io/client-go/plugin/pkg/client/auth/openstack",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
