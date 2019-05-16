@@ -511,7 +511,6 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 											Type: "object",
 											Required: []string{
 												"resources",
-												"storageClassName",
 											},
 											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 												"storageClassName": apiextensionsv1beta1.JSONSchemaProps{

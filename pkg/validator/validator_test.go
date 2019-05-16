@@ -500,14 +500,6 @@ var testDefs = []testDef{
 		),
 	},
 	{
-		name:        "TestClaimTemplateRequiresStorageClass",
-		path:        "tests/0059.yaml",
-		description: "Tests that storage class is specified",
-		expectedErr: errors.CompositeValidationError(
-			errors.Required("spec.volumeClaimTemplates.spec.storageClassName", "body"),
-		),
-	},
-	{
 		name:         "TestClaimTemplateRequiresStorageRequests",
 		existingPath: "tests/0050.yaml",
 		path:         "tests/0060.yaml",
