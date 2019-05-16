@@ -16,8 +16,11 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/gocbmgr"
-	"github.com/sirupsen/logrus"
+
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("couchbaseutil")
 
 type NodeState int
 
@@ -633,8 +636,6 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait b
 			}
 
 			if wait {
-				logger := c.ctx.Value("logger").(*logrus.Entry)
-
 				progress := c.client.NewRebalanceProgress()
 				for {
 					status, ok := <-progress.Status()
@@ -643,9 +644,9 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait b
 					}
 					switch status.Status {
 					case cbmgr.RebalanceStatusUnknown:
-						logger.Infof("Rebalance progress: unknown")
+						log.Info("Rebalancing", "progress", "unknown")
 					case cbmgr.RebalanceStatusRunning:
-						logger.Infof("Rebalance progress: %f", status.Progress)
+						log.Info("Rebalancing", "progress", status.Progress)
 					}
 				}
 			}

@@ -3,9 +3,7 @@ package cluster
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -19,7 +17,9 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
-	"github.com/sirupsen/logrus"
+
+	"github.com/ghodss/yaml"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,30 +28,24 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
+var log = logf.Log.WithName("cluster")
+
 var (
-	reconcileInterval = 8 * time.Second
 	// Be very aggressive here.  If pods are deleted with volumes missing then
 	// they stay Terminating forever.  This should emulate --grace-period=0 --force
 	// See: https://github.com/kubernetes/kubernetes/issues/51835
 	podTerminationGracePeriod = int64(0)
 )
 
-type clusterEventType string
-
 const (
-	eventDeleteCluster      clusterEventType = "Delete"
-	eventModifyCluster      clusterEventType = "Modify"
-	tlsOperatorSecretCACert string           = "ca.crt"
-	tlsOperatorSecretCert   string           = "couchbase-operator.crt"
-	tlsOperatorSecretKey    string           = "couchbase-operator.key"
+	tlsOperatorSecretCACert string = "ca.crt"
+	tlsOperatorSecretCert   string = "couchbase-operator.crt"
+	tlsOperatorSecretKey    string = "couchbase-operator.key"
 )
-
-type clusterEvent struct {
-	typ     clusterEventType
-	cluster *couchbasev1.CouchbaseCluster
-}
 
 type Config struct {
 	KubeCli          kubernetes.Interface
@@ -70,38 +64,37 @@ type ClusterStats struct {
 }
 
 type Cluster struct {
-	logger     *logrus.Entry
-	config     Config
-	cluster    *couchbasev1.CouchbaseCluster
-	status     couchbasev1.ClusterStatus
-	eventCh    chan *clusterEvent
-	stopCh     chan struct{}
-	members    couchbaseutil.MemberSet
-	eventsCli  corev1.EventInterface
-	username   string
-	password   string
-	client     *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
-	ctx        context.Context                // Context used to cancel long running operations
-	cancel     context.CancelFunc             // Closure on the context to indicate cancellation
-	lastEvent  time.Time                      // When we raised the last event (see raiseEvent)
-	recorder   record.EventRecorder           // Buffers and aggegates events
-	scheduler  scheduler.Scheduler            // Pod placement scheduler
-	lastLoopSt time.Time
-	lastLoopEn time.Time
-	loopStatus string
+	config      Config
+	cluster     *couchbasev1.CouchbaseCluster
+	status      couchbasev1.ClusterStatus
+	members     couchbaseutil.MemberSet
+	eventsCli   corev1.EventInterface
+	username    string
+	password    string
+	client      *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
+	ctx         context.Context                // Context used to cancel long running operations
+	cancel      context.CancelFunc             // Closure on the context to indicate cancellation
+	lastEvent   time.Time                      // When we raised the last event (see raiseEvent)
+	recorder    record.EventRecorder           // Buffers and aggegates events
+	scheduler   scheduler.Scheduler            // Pod placement scheduler
+	lastLoopSt  time.Time
+	lastLoopEn  time.Time
+	loopStatus  string
+	forceUpdate bool // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
 }
 
 func New(config Config, cl *couchbasev1.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
-		logger: logrus.New().WithFields(logrus.Fields{
-			"module":       "cluster",
-			"cluster-name": cl.Name,
-		}),
 		config:  config,
 		status:  *(cl.Status.DeepCopy()),
 		cluster: cl,
-		eventCh: make(chan *clusterEvent, 100),
-		stopCh:  make(chan struct{}),
+	}
+
+	// I have no idea what's going on here, defaults are set by the admission controller
+	// but by the time that happens we are already processing the request in which the
+	// name is blank???
+	if c.cluster.Spec.ClusterSettings.ClusterName == "" {
+		c.cluster.Spec.ClusterSettings.ClusterName = c.cluster.Name
 	}
 
 	kubeconfig, err := rest.InClusterConfig()
@@ -124,75 +117,55 @@ func New(config Config, cl *couchbasev1.CouchbaseCluster) (*Cluster, error) {
 	c.eventsCli = c.config.KubeCli.CoreV1().Events(cl.Namespace)
 
 	// Cancel is used to abort the go routine when the operator is deleted
-	// The logger value is used by other clients who don't have access to the
-	// per cluster log
 	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.ctx = context.WithValue(c.ctx, "logger", c.logger)
 
 	// Set up our event logger.  Note that this will cache and aggregate
 	// events over a 10 minute window.
 	if err := couchbasev1.AddToScheme(scheme.Scheme); err != nil {
-		c.logger.Errorf("Error adding scheme to client-go for event broadcasting: %s", err.Error())
+		log.Error(err, "Error adding scheme to client-go for event broadcasting", "cluster", c.cluster.Name)
 		return nil, err
 	}
 	broadcaster := record.NewBroadcaster()
 	c.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: os.Getenv(constants.EnvOperatorPodName)})
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: c.config.KubeCli.CoreV1().Events(c.cluster.Namespace)})
 
-	c.logger.Info("Watching new cluster")
+	log.Info("Watching new cluster", "cluster", c.cluster.Name)
 
 	// Initialize the scheduler for the initial pod
 	if c.scheduler, err = scheduler.New(c.config.KubeCli, c.cluster); err != nil {
-		c.logger.Errorf("Error initializing pod scheduler: %s", err.Error())
+		log.Error(err, "Error initializing pod scheduler", "cluster", c.cluster.Name)
 		return nil, err
 	}
 
 	// Spawn the janitor process which monitors persistent log volumes.
 	go newJanitor(c).run()
 
-	go func() {
-		if err := c.setup(); err != nil {
-			c.logger.Errorf("Cluster setup failed: %v", err)
-			if c.status.Phase != couchbasev1.ClusterPhaseFailed {
-				c.status.SetReason(err.Error())
-				c.status.SetPhase(couchbasev1.ClusterPhaseFailed)
-				if err := c.updateCRStatus(); err != nil {
-					c.logger.Errorf("Failed to update cluster phase (%v): %v",
-						couchbasev1.ClusterPhaseFailed, err)
-				}
+	if err := c.setup(); err != nil {
+		log.Error(err, "Cluster setup failed", "cluster", c.cluster.Name)
+		if c.status.Phase != couchbasev1.ClusterPhaseFailed {
+			c.status.SetReason(err.Error())
+			c.status.SetPhase(couchbasev1.ClusterPhaseFailed)
+			if err := c.updateCRStatus(); err != nil {
+				log.Error(err, "Failed to update cluster phase", "cluster", c.cluster.Name, "phase", couchbasev1.ClusterPhaseFailed)
 			}
-			return
 		}
-		c.run()
-	}()
+		return nil, err
+	}
+
+	c.status.SetPhase(couchbasev1.ClusterPhaseRunning)
+	if err := c.updateCRStatus(); err != nil {
+		log.Error(err, "Status update failed", "cluster", c.cluster.Name)
+	}
+	log.Info("Running", "cluster", c.cluster.Name)
+
+	c.runReconcile()
 
 	return c, nil
 }
 
-func (c *Cluster) Update(cl *couchbasev1.CouchbaseCluster) {
-	c.send(&clusterEvent{
-		typ:     eventModifyCluster,
-		cluster: cl,
-	})
-}
-
 func (c *Cluster) Delete() {
-	// Inhibit logging as this will just be error messages
-	c.logger.Logger.Out = ioutil.Discard
 	// Notify client operations to stop what they are doing e.g. abort retry loops
 	c.cancel()
-	c.send(&clusterEvent{typ: eventDeleteCluster})
-}
-
-func (c *Cluster) send(ev *clusterEvent) {
-	select {
-	case c.eventCh <- ev:
-		l, ecap := len(c.eventCh), cap(c.eventCh)
-		if l > int(float64(ecap)*0.8) {
-			c.logger.Warningf("eventCh buffer is almost full [%d/%d]", l, ecap)
-		}
-	case <-c.stopCh:
-	}
 }
 
 func (c *Cluster) setup() error {
@@ -221,7 +194,7 @@ func (c *Cluster) setup() error {
 			return err
 		}
 	} else {
-		c.logger.Infof("Cluster already exists, the operator will now manage it")
+		log.Info("Cluster already exists, the operator will now manage it", "cluster", c.cluster.Name)
 
 		// TLS may have updated across the restart, so the client CA is valid
 		// but the rest of the cluster is uncontactable.  For this we need a
@@ -254,7 +227,7 @@ func (c *Cluster) setup() error {
 }
 
 func (c *Cluster) create() error {
-	c.logger.Infof("Cluster does not exist so the operator is attempting to create it")
+	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.cluster.Name)
 	c.status.SetPhase(couchbasev1.ClusterPhaseCreating)
 	c.status.SetVersion(c.cluster.Spec.Version)
 
@@ -284,7 +257,7 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	c.logger.Infof("Operator added member (%s) to manage", m.Name)
+	log.Info("Operator added member", "cluster", c.cluster.Name, "name", m.Name)
 	c.raiseEvent(k8sutil.MemberAddEvent(m.Name, c.cluster))
 
 	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
@@ -302,7 +275,7 @@ func (c *Cluster) create() error {
 }
 
 func (c *Cluster) setupServices() error {
-	c.logger.Infof("Creating headless service for data nodes")
+	log.Info("Creating headless service for DNS", "cluster", c.cluster.Name)
 	err := k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
 	if err != nil {
 		return err
@@ -320,14 +293,14 @@ func (c *Cluster) setupServices() error {
 //
 // It accepts a flag forcing it update internal state from Kubernetes, and returns a
 // similar flag to indicate we require a forced update with the next invocation.
-func (c *Cluster) runReconcile(forceUpdate bool) bool {
+func (c *Cluster) runReconcile() {
 	// Always gather runloop statistics.
 	defer c.setLastLoopTimes(time.Now())
 
 	// Always update the cluster status.
 	defer func() {
 		if err := c.updateCRStatus(); err != nil {
-			c.logger.Warningf("periodic update CR status failed: %v", err)
+			log.Error(err, "Status update failed", "cluster", c.cluster.Name)
 		}
 	}()
 
@@ -337,8 +310,8 @@ func (c *Cluster) runReconcile(forceUpdate bool) bool {
 	// If the user has requested that we pause operations.
 	if c.cluster.Spec.Paused {
 		c.status.PauseControl()
-		c.logger.Infof("control is paused, skipping reconciliation")
-		return false
+		log.Info("Operator paused, skipping", "cluster", c.cluster.Name)
+		return
 	}
 
 	// Otherwise indicate that we are in control.
@@ -346,67 +319,45 @@ func (c *Cluster) runReconcile(forceUpdate bool) bool {
 
 	running, pending, err := c.pollPods()
 	if err != nil {
-		c.logger.Errorf("fail to poll pods: %v", err)
-		return false
+		log.Error(err, "Failed to list pods", "cluster", c.cluster.Name)
+		return
 	}
 
 	if len(pending) > 0 {
 		// Pod startup might take long, e.g. pulling image. It would
 		// deterministically become running or succeeded/failed later.
-		c.logger.Infof("skip reconciliation: running (%v), pending (%v)",
-			k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
-		return false
+		log.Info("Pods pending creation, skipping", "cluster", c.cluster.Name, "running", len(running), "pending", len(pending))
+		return
 	}
 
 	// When cluster is being restored or reconcile error has occurred then
 	// then the memberset can be updated from the status of running pods and
 	// persistent volumes.
-	if forceUpdate || c.members.Empty() {
+	if c.forceUpdate || c.members.Empty() {
+		c.forceUpdate = false
 		if err := c.updateMembers(podsToMemberSet(running, c.isSecureClient())); err != nil {
-			c.logger.Errorf("failed to update members: %v", err)
-			return true
+			log.Error(err, "Failed to update members", "cluster", c.cluster.Name)
+			c.forceUpdate = true
+			return
 		}
 	}
 
 	// Finally reconcile state according to the specification.
 	if err := c.reconcile(running); err != nil {
-		c.logger.Errorf("failed to reconcile: %v", err)
+		log.Error(err, "Reconciliation failed", "cluster", c.cluster.Name)
+		return
 	}
-
-	return false
 }
 
-func (c *Cluster) run() {
-	c.status.SetPhase(couchbasev1.ClusterPhaseRunning)
-	if err := c.updateCRStatus(); err != nil {
-		c.logger.Warningf("update initial CR status failed: %v", err)
+// Update is called periodically or on a CR change, print out any diffs in the spec
+// then update the specification and unconditionally reconcile.
+func (c *Cluster) Update(cluster *couchbasev1.CouchbaseCluster) {
+	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {
+		c.logSpecUpdate(c.cluster.Spec, cluster.Spec)
+		c.cluster = cluster
 	}
-	c.logger.Infof("start running...")
 
-	// First reconcile should happen instantly, no point in waiting.
-	reconcileTrigger := time.After(0)
-
-	// We prioritise runnning the reconciliation as processing cluster updates
-	// could prevent us from ever running it and leaving the cluster in a
-	// degraded state.
-	forceUpdate := false
-	for {
-		select {
-		case <-reconcileTrigger:
-			forceUpdate = c.runReconcile(forceUpdate)
-			reconcileTrigger = time.After(reconcileInterval)
-
-		case event := <-c.eventCh:
-			switch event.typ {
-			case eventModifyCluster:
-				c.handleUpdateEvent(event)
-			case eventDeleteCluster:
-				return
-			default:
-				panic("unknown event type" + event.typ)
-			}
-		}
-	}
+	c.runReconcile()
 }
 
 func (c *Cluster) setLastLoopTimes(st time.Time) {
@@ -415,33 +366,20 @@ func (c *Cluster) setLastLoopTimes(st time.Time) {
 	c.loopStatus = "sleeping"
 }
 
-func (c *Cluster) handleUpdateEvent(event *clusterEvent) {
-	oldSpec := c.cluster.Spec.DeepCopy()
-	c.cluster = event.cluster
-
-	if !reflect.DeepEqual(event.cluster.Spec, *oldSpec) {
-		c.logSpecUpdate(*oldSpec, event.cluster.Spec)
-	}
-}
-
 func (c *Cluster) logSpecUpdate(oldSpec, newSpec couchbasev1.ClusterSpec) {
-	oldSpecBytes, err := json.MarshalIndent(oldSpec, "", "    ")
+	oldSpecBytes, err := yaml.Marshal(oldSpec)
 	if err != nil {
-		c.logger.Errorf("failed to marshal cluster spec: %v", err)
+		log.Error(err, "YAML marshal failed", "cluster", c.cluster.Name)
 	}
-	newSpecBytes, err := json.MarshalIndent(newSpec, "", "    ")
+	newSpecBytes, err := yaml.Marshal(newSpec)
 	if err != nil {
-		c.logger.Errorf("failed to marshal cluster spec: %v", err)
+		log.Error(err, "YAML marshal failed", "cluster", c.cluster.Name)
 	}
 
-	c.logger.Infof("spec update: Old Spec:")
-	for _, m := range strings.Split(string(oldSpecBytes), "\n") {
-		c.logger.Info(m)
-	}
-
-	c.logger.Infof("New Spec:")
-	for _, m := range strings.Split(string(newSpecBytes), "\n") {
-		c.logger.Info(m)
+	log.Info("Specification updated", "cluster", c.cluster.Name)
+	diff := cmp.Diff(string(oldSpecBytes), string(newSpecBytes))
+	for _, m := range strings.Split(diff, "\n") {
+		log.Info(m, "cluster", c.cluster.Name)
 	}
 }
 
@@ -474,7 +412,7 @@ func (c *Cluster) isSecureClient() bool {
 
 func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev1.ServerConfig) error {
 	version := c.cluster.Spec.Version
-	c.logger.Infof("Creating a pod (%s) running Couchbase %s", m.Name, version)
+	log.Info("Creating pod", "cluster", c.cluster.Name, "name", m.Name, "version", version)
 	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, ctx)
 	return err
 }
@@ -486,11 +424,11 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
 	err := k8sutil.DeleteCouchbasePod(c.config.KubeCli, c.cluster.Namespace, c.cluster.Name, name, opts, removeVolumes)
 	if err != nil {
-		c.logger.Errorf("error occurred during pod deletion (%s)", err)
+		log.Error(err, "Pod deletion failed", "cluster", c.cluster.Name)
 		return err
 	}
 
-	c.logger.Infof("deleted pod (%s)", name)
+	log.Info("Pod deleted", "cluster", c.cluster.Name, "name", name)
 	return nil
 }
 
@@ -548,7 +486,7 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 	if config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig); config != nil {
 		err := k8sutil.IsPodRecoverable(c.config.KubeCli, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
 		if err != nil {
-			c.logger.Warningf("%s is unrecoverable: %v", m.Name, err)
+			log.Error(err, "Pod unrecoverable", "cluster", c.cluster.Name, "name", m.Name)
 		} else {
 			recoverable = true
 		}
@@ -575,7 +513,7 @@ func (c *Cluster) recoverClusterDown() error {
 			if err := c.recreatePod(m); err != nil {
 				return fmt.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
 			} else {
-				c.logger.Infof("recovering node %s", m.ClientURL())
+				log.Info("Pod recovering", "cluster", c.cluster.Name, "name", m.Name)
 				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 				break
 			}
@@ -597,12 +535,11 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 			continue
 		}
 		if len(pod.OwnerReferences) < 1 {
-			c.logger.Warningf("pollPods: ignore pod %v: no owner", pod.Name)
+			log.Info("Pod ignored, no owner", "cluster", c.cluster.Name, "name", pod.Name)
 			continue
 		}
 		if pod.OwnerReferences[0].UID != c.cluster.UID {
-			c.logger.Warningf("pollPods: ignore pod %v: owner (%v) is not %v",
-				pod.Name, pod.OwnerReferences[0].UID, c.cluster.UID)
+			log.Info("Pod ignored, invalid owner", "cluster", c.cluster.Name, "name", pod.Name, "cluster_uid", c.cluster.UID, "pod_uid", pod.OwnerReferences[0].UID)
 			continue
 		}
 		switch pod.Status.Phase {
@@ -664,11 +601,7 @@ func (c *Cluster) setupAuth(authSecret string) error {
 }
 
 func (c *Cluster) initCouchbaseClient() error {
-	secureStr := ""
-	if c.isSecureClient() {
-		secureStr = "secure "
-	}
-	c.logger.Infof("Setting up %sclient for operator communication with the cluster", secureStr)
+	log.Info("Couchbase client starting", "cluster", c.cluster.Name)
 
 	c.client = couchbaseutil.NewCouchbaseClient(c.ctx, c.cluster.Name, c.username, c.password)
 
@@ -752,7 +685,7 @@ func (c *Cluster) raiseEvent(event *v1.Event) {
 
 	// Post the event to kubernetes
 	if _, err := c.eventsCli.Create(event); err != nil {
-		c.logger.Errorf("failed to create new %s event: %v", event.Reason, err)
+		log.Error(err, "Event creation failed", "cluster", c.cluster.Name, "event", event.Reason)
 	}
 
 	// Update the last event timestamp
@@ -774,7 +707,7 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	// Get running pods to ensure ready nodes exists
 	running, _, err := c.pollPods()
 	if err != nil {
-		c.logger.Errorf("fail to poll pods: %v", err)
+		log.Error(err, "Pod discovery failed", "cluster", c.cluster.Name)
 		return c.members
 	}
 	podMembers := podsToMemberSet(running, c.isSecureClient())
@@ -788,7 +721,7 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	if members.Empty() && c.members != nil {
 		err := c.updateMembers(podMembers)
 		if err != nil {
-			c.logger.Errorf("failed to update members: %v", err)
+			log.Error(err, "Member update failed", "cluster", c.cluster.Name)
 		}
 		members = c.members
 	}
@@ -817,7 +750,7 @@ func (c *Cluster) getPodIndex() int {
 func (c *Cluster) setPodIndex(index int) {
 	c.status.Members.Index = index
 	if err := c.updateCRStatus(); err != nil {
-		c.logger.Warnf("failed to update custom resource pod index: %v", err)
+		log.Error(err, "Pod index update failed", "cluster", c.cluster.Name)
 	}
 }
 
@@ -833,17 +766,14 @@ func (c *Cluster) decPodIndex() {
 	c.setPodIndex(index - 1)
 }
 
-func (c *Cluster) SetLoggingLevel(level logrus.Level) {
-	c.logger.Logger.SetLevel(level)
-}
-
+// TODO: Prometheus please
 func (c *Cluster) Stats() *ClusterStats {
 	return &ClusterStats{
 		LastReconcileStartTime:    c.lastLoopSt,
 		LastReconcileEndTime:      c.lastLoopEn,
 		LastCompletedLoopDuration: c.lastLoopEn.Sub(c.lastLoopSt).Seconds(),
 		ReconcileLoopStatus:       c.loopStatus,
-		ReconcileLoopSleepTime:    int(reconcileInterval.Seconds()),
+		ReconcileLoopSleepTime:    10,
 		ControlPaused:             c.status.ControlPaused,
 		ClusterPhase:              string(c.status.Phase),
 	}
@@ -853,12 +783,12 @@ func (c *Cluster) logStatus(status *couchbaseutil.ClusterStatus) {
 	// We are performing an action log the cluster status
 	b := &bytes.Buffer{}
 	if err := status.LogStatus(b); err != nil {
-		c.logger.Warnf("failed to log cluster status: %v", err)
+		log.Error(err, "Cluster status dump failed", "cluster", c.cluster.Name)
 	}
 	if err := c.scheduler.LogStatus(b); err != nil {
-		c.logger.Warnf("failed to log scheduler status: %v", err)
+		log.Error(err, "Scheduler status dump failed", "cluster", c.cluster.Name)
 	}
 	for _, line := range strings.Split(b.String(), "\n") {
-		c.logger.Info(line)
+		log.Info(line, "cluster", c.cluster.Name)
 	}
 }

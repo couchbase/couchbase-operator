@@ -70,7 +70,7 @@ func (c *Cluster) operatorUpgrade() error {
 	cluster := c.cluster.DeepCopy()
 	validator.ApplyDefaults(c.cluster)
 	if !reflect.DeepEqual(c.cluster, cluster) {
-		c.logger.Infof("upgrading %s/%s to version %s", cluster.Kind, cluster.Name, version.Version)
+		log.Info("Upgrading resource", "cluster", c.cluster.Name, "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
 		cluster, err := c.config.CouchbaseCRCli.CouchbaseV1().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
 		if err != nil {
 			return err
@@ -97,7 +97,7 @@ func (c *Cluster) operatorUpgrade() error {
 				if !isActionable {
 					continue
 				}
-				c.logger.Infof("upgrading %s/%s to version %s", resource.kind(), resource.name(item), versionRange.to)
+				log.Info("Upgrading resource", "cluster", c.cluster.Name, "kind", resource.kind(), "name", resource.name(item), "version", versionRange.to)
 				if err := resource.perform(item, action); err != nil {
 					return err
 				}

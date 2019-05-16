@@ -22,8 +22,8 @@ import (
 )
 
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
-	c.logger.Debug("Start reconciling")
-	defer c.logger.Debug("Finish reconciling")
+	log.V(1).Info("Reconciliation starting", "cluster", c.cluster.Name)
+	defer log.V(1).Info("Reconciliation completed", "cluster", c.cluster.Name)
 
 	// First thing we must do is fix up TLS or we may not be able to talk to the
 	// cluster for anything else.
@@ -49,7 +49,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	// Update the status and ready list before doing anything.
 	status, err := c.client.GetClusterStatus(c.members)
 	if err != nil {
-		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %v", err)
+		log.Error(err, "Cluster state collection failed, skipping", "cluster", c.cluster.Name)
 		return err
 	}
 
@@ -67,7 +67,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	if err := c.reconcileClusterSettings(); err != nil {
-		c.logger.Warnf("%s", err.Error())
 		return err
 	}
 
@@ -77,7 +76,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	// Update the status and ready list to reflect any new members added.
 	if status, err = c.client.GetClusterStatus(c.members); err != nil {
-		c.logger.Warnf("Unable to get cluster state, skiping reconcile loop: %v", err)
 		return err
 	}
 
@@ -139,7 +137,7 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
 // logFailedMember outputs any debug information we can about a failed member creation.
 func (c *Cluster) logFailedMember(name string) {
 	for _, line := range k8sutil.LogPod(c.config.KubeCli, c.cluster.Namespace, name) {
-		c.logger.Warn(line)
+		log.Info(line, "cluster", c.cluster.Name)
 	}
 }
 
@@ -183,7 +181,7 @@ func (c *Cluster) createMember(serverSpec couchbasev1.ServerConfig) (m *couchbas
 		// We will delete the pod on error, so collect any ephemeral debug we can before
 		// discarding it forever.  This will capture errors such as users specifying the
 		// wrong image name (pull error), PVCs taking an age to become bound etc.
-		c.logger.Warnf("member %s creation failed", newMember.Name)
+		log.Error(err, "Pod creation failed", "cluster", c.cluster.Name)
 		c.logFailedMember(newMember.Name)
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		return nil, err
@@ -246,7 +244,7 @@ func (c *Cluster) addMember(serverSpec couchbasev1.ServerConfig) (*couchbaseutil
 		return newMember, err
 	}
 
-	c.logger.Infof("added member (%s)", newMember.Name)
+	log.Info("Pod added to cluster", "cluster", c.cluster.Name, "name", newMember.Name)
 	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name, c.cluster))
 
 	return newMember, nil
@@ -369,7 +367,7 @@ func (c *Cluster) reconcileBuckets() error {
 			c.status.SetBucketManagementFailedCondition("Bucket delete failed", msg)
 			return fmt.Errorf("unable to delete bucketName named - %s: %v", bucketName, err)
 		}
-		c.logger.Infof("Removed bucketName %s", bucketName)
+		log.Info("Bucket deleted", "cluster", c.cluster.Name, "name", bucketName)
 	}
 
 	for _, bucketName := range bucketsToEdit {
@@ -379,7 +377,7 @@ func (c *Cluster) reconcileBuckets() error {
 			c.status.SetBucketManagementFailedCondition("Bucket edit failed", msg)
 			return fmt.Errorf("unable to edit bucketName named - %s: %v", bucketName, err)
 		}
-		c.logger.Infof("Edited bucketName %s", bucketName)
+		log.Info("Bucket updated", "cluster", c.cluster.Name, "name", bucketName)
 	}
 
 	for _, bucketName := range bucketsToAdd {
@@ -389,7 +387,7 @@ func (c *Cluster) reconcileBuckets() error {
 			c.status.SetBucketManagementFailedCondition("Bucket add failed", msg)
 			return fmt.Errorf("unable to create bucketName named - %s: %v", bucketName, err)
 		}
-		c.logger.Infof("Created bucketName %s", bucketName)
+		log.Info("Bucket created", "cluster", c.cluster.Name, "name", bucketName)
 	}
 
 	c.status.ClearCondition(couchbasev1.ClusterConditionManageBuckets)
@@ -402,20 +400,20 @@ func (c *Cluster) reconcileBuckets() error {
 func (c *Cluster) reconcileAdminService() {
 	status, err := k8sutil.UpdateAdminConsole(c.config.KubeCli, c.cluster, &c.status)
 	if err != nil {
-		c.logger.Warnf("error reconciling admin console service: %v", err)
+		log.Error(err, "UI service update failed", "cluster", c.cluster.Name)
 		return
 	}
 
 	serviceName := k8sutil.ConsoleServiceName(c.cluster.Name)
 	switch status {
 	case k8sutil.ReconcileStatusCreated:
-		c.logger.Infof("Created service %s for admin console", serviceName)
+		log.Info("UI service created", "cluster", c.cluster.Name, "name", serviceName)
 		c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(serviceName, c.cluster))
 	case k8sutil.ReconcileStatusDeleted:
-		c.logger.Infof("Deleted service %s for admin console", serviceName)
+		log.Info("UI service deleted", "cluster", c.cluster.Name, "name", serviceName)
 		c.raiseEvent(k8sutil.AdminConsoleSvcDeleteEvent(serviceName, c.cluster))
 	case k8sutil.ReconcileStatusUpdated:
-		c.logger.Infof("Updated service %s for admin console", serviceName)
+		log.Info("UI service updated", "cluster", c.cluster.Name, "name", serviceName)
 	}
 }
 
@@ -498,7 +496,7 @@ func (c *Cluster) validateEditBucket(config *couchbasev1.BucketConfig) error {
 
 // initializes the first member in the cluster
 func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev1.ServerConfig) error {
-	c.logger.Infof("Initializing the first node in the cluster")
+	log.Info("Initial pod creating", "cluster", c.cluster.Name)
 	settings := c.cluster.Spec.ClusterSettings
 
 	defaults := &cbmgr.PoolsDefaults{
@@ -855,7 +853,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
-			c.logger.Warnf("unable to poll external addresses for pod %s", member.Name)
+			log.Info("External address collection failed", "cluster", c.cluster.Name, "name", member.Name)
 			return nil
 		}
 
@@ -900,7 +898,7 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
-			c.logger.Warnf("unable to poll external addresses for pod %s", member.Name)
+			log.Info("External address collection failed", "cluster", c.cluster.Name, "name", member.Name)
 			return false, nil
 		}
 
@@ -955,7 +953,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// Get the existing settings
 	failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
 	if err != nil {
-		c.logger.Warnf("Failed to get auto-failover settings during reconcile: `%v` Will retry...", err)
+		log.Error(err, "Auto-failover settings collection failed", "cluster", c.cluster.Name)
 		return err
 	}
 
@@ -990,13 +988,12 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
 		err = c.client.SetAutoFailoverSettings(c.readyMembers(), specFailoverSettings)
 		if err != nil {
+			log.Error(err, "Auto-failover settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)
-			c.logger.Warnf(message + " Will retry...")
 			c.status.SetConfigRejectedCondition(message)
 			return err
-		} else {
-			c.logger.Info("Updated autofailover settings")
 		}
+		log.Info("Auto-failover settings updated", "cluster", c.cluster.Name)
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("autofailover", c.cluster))
 	}
 
@@ -1007,7 +1004,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	info, err := c.client.GetClusterInfo(c.readyMembers())
 	if err != nil {
-		c.logger.Warnf("Failed to get memory quotas/cluster name settings during reconcile: `%v` Will retry...", err)
+		log.Error(err, "Cluster settings collection failed", "cluster", c.cluster.Name)
 		return err
 	}
 
@@ -1025,13 +1022,12 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 
 	if !reflect.DeepEqual(current, requested) {
 		if err := c.client.SetPoolsDefault(c.readyMembers(), requested); err != nil {
+			log.Error(err, "Cluster settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
-			c.logger.Warnf(message + " Will retry...")
 			c.status.SetConfigRejectedCondition(message)
 			return err
-		} else {
-			c.logger.Info("Updated memory quota settings or cluster name")
 		}
+		log.Info("Cluster settings updated", "cluster", c.cluster.Name)
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memory quota", c.cluster))
 	}
 
@@ -1043,20 +1039,19 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 	actual, err := c.client.GetUpdatesEnabled(c.readyMembers())
 	if err != nil {
-		c.logger.Warnf("Failed to get software notification settings during reconcile: `%v` Will retry...", err)
+		log.Error(err, "Software notification settings collection failed", "cluster", c.cluster.Name)
 		return err
 	}
 
 	requested := c.cluster.Spec.SoftwareUpdateNotifications
 	if actual != requested {
 		if err := c.client.SetUpdatesEnabled(c.readyMembers(), requested); err != nil {
+			log.Error(err, "Software notification settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
-			c.logger.Warnf(message + " Will retry...")
 			c.status.SetConfigRejectedCondition(message)
 			return err
-		} else {
-			c.logger.Info("Updated software notification settings")
 		}
+		log.Info("Software notification settings updated", "cluster", c.cluster.Name)
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
 	}
 
@@ -1067,20 +1062,19 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 func (c *Cluster) reconcileIndexStorageSettings() error {
 	settings, err := c.client.GetIndexSettings(c.readyMembers(), c.username, c.password)
 	if err != nil {
-		c.logger.Warnf("Failed to get index settings during reconcile: `%v` Will retry...", err)
+		log.Error(err, "Index storage settings collection failed", "cluster", c.cluster.Name)
 		return err
 	}
 
 	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
 	if specStorageMode != string(settings.StorageMode) {
 		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, specStorageMode, settings); err != nil {
+			log.Error(err, "Index storage settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
-			c.logger.Warnf(message + " Will retry...")
 			c.status.SetConfigRejectedCondition(message)
 			return err
-		} else {
-			c.logger.Info("Updated index settings")
 		}
+		log.Info("Index storage settings updated", "cluster", c.cluster.Name)
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 	}
 

@@ -6,14 +6,17 @@ import (
 	"os"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("chaos")
 
 // Monkeys knows how to crush pods and nodes.
 type Monkeys struct {
@@ -26,14 +29,13 @@ func NewMonkeys(mgr manager.Manager) *Monkeys {
 
 type CrashConfig struct {
 	Namespace string
-	Selector  map[string]string
+	Selector  labels.Set
 
 	KillRate          rate.Limit
 	CbKillProbability float64
 	OpKillProbability float64
 	KillMax           int
 	MinPods           int
-	logger            *logrus.Entry
 }
 
 // TODO: respect context in k8s operations.
@@ -47,30 +49,30 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 	for {
 		err := limiter.Wait(ctx)
 		if err != nil { // user cancellation
-			c.logger.Infof("crushPods is canceled by the user: %v", err)
+			log.Error(err, "crushPods is canceled by the user")
 			return
 		}
 
 		if p := rand.Float64(); p < c.OpKillProbability {
-			c.logger.Infof("killing operator pod: probability: %v, got p: %v", c.OpKillProbability, p)
+			log.Info("Killing operator pod", "value", p, "threshold", c.OpKillProbability)
 			time.Sleep(5 * time.Second)
 			// fare thee well
 			os.Exit(0)
 		}
 
 		if p := rand.Float64(); p > c.CbKillProbability {
-			c.logger.Infof("skip killing pod: probability: %v, got p: %v", c.CbKillProbability, p)
+			log.Info("Skipping pod deletion", "value", p, "threshold", c.CbKillProbability)
 			continue
 		}
 
 		pods := &corev1.PodList{}
 		err = cli.List(ctx, client.InNamespace(c.Namespace).MatchingLabels(c.Selector), pods)
 		if err != nil {
-			c.logger.Errorf("failed to list pods for selector %v: %v", c.Selector, err)
+			log.Error(err, "failed to list pods", "selector", c.Selector.String())
 			continue
 		}
 		if len(pods.Items) == 0 {
-			c.logger.Infof("no pods to kill for selector %v", c.Selector)
+			log.Info("No pods listed", "selector", c.Selector.String())
 			continue
 		}
 
@@ -82,12 +84,12 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 		if len(pods.Items)-max < c.MinPods {
 			max -= 1
 			if max == 0 {
-				c.logger.Infof("skip killing pod: min pods required %d", c.MinPods)
+				log.Info("Too few pods to kill", "minimum_alive", c.MinPods, "pods_total", len(pods.Items), "pods_to_kill", max)
 				continue
 			}
 		}
 
-		c.logger.Infof("start to kill %d pods for selector %v", max, c.Selector)
+		log.Info("Killing pods", "number", max, "selector", c.Selector.String())
 
 		tokills := []*corev1.Pod{}
 		for len(tokills) < max {
@@ -97,23 +99,23 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 		for _, tokill := range tokills {
 			err = cli.Delete(ctx, tokill)
 			if err != nil {
-				c.logger.Errorf("failed to kill pod %v: %v", tokill.Name, err)
+				log.Error(err, "Failed to kill pod", "name", tokill.Name)
 				continue
 			}
-			c.logger.Infof("killed pod %v for selector %v", tokill.Name, c.Selector)
+			log.Info("Killed pod", "name", tokill.Name, "selector", c.Selector.String())
 		}
 	}
 }
 
 func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) {
 	m := NewMonkeys(mgr)
-	ls := map[string]string{"app": "couchbase"}
-	logger := logrus.WithField("module", "chaos")
+	ls := labels.Set{"app": "couchbase"}
 
+	var c *CrashConfig
+	var wait time.Duration
 	switch chaosLevel {
 	case 1:
-		logger.Info("chaos level = 1: randomly kill one couchbase pod every 30 seconds at 50%")
-		c := &CrashConfig{
+		c = &CrashConfig{
 			Namespace: ns,
 			Selector:  ls,
 
@@ -122,15 +124,10 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 			OpKillProbability: 0,
 			KillMax:           2,
 			MinPods:           1,
-			logger:            logger,
 		}
-		go func() {
-			time.Sleep(30 * time.Second)
-			m.CrushPods(ctx, c)
-		}()
+		wait = 30 * time.Second
 	case 2:
-		logger.Info("chaos level = 2: randomly kill at most two couchbase pod with at least 1 alive every 2 minutes at 50%")
-		c := &CrashConfig{
+		c = &CrashConfig{
 			Namespace: ns,
 			Selector:  ls,
 
@@ -139,15 +136,10 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 			OpKillProbability: 0,
 			KillMax:           2,
 			MinPods:           1,
-			logger:            logger,
 		}
-		go func() {
-			time.Sleep(300 * time.Second)
-			m.CrushPods(ctx, c)
-		}()
+		wait = 300 * time.Second
 	case 3:
-		logger.Info("chaos level = 3: randomly kill at most two couchbase pod every 2 minutes at 50%")
-		c := &CrashConfig{
+		c = &CrashConfig{
 			Namespace: ns,
 			Selector:  ls,
 
@@ -156,15 +148,10 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 			OpKillProbability: 0,
 			KillMax:           2,
 			MinPods:           0,
-			logger:            logger,
 		}
-		go func() {
-			time.Sleep(300 * time.Second)
-			m.CrushPods(ctx, c)
-		}()
+		wait = 300 * time.Second
 	case 4:
-		logger.Info("chaos level = 4: randomly kill at most five couchbase pods every 30 seconds at 50%")
-		c := &CrashConfig{
+		c = &CrashConfig{
 			Namespace: ns,
 			Selector:  ls,
 
@@ -173,15 +160,10 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 			OpKillProbability: 0,
 			KillMax:           5,
 			MinPods:           0,
-			logger:            logger,
 		}
-		go func() {
-			time.Sleep(300 * time.Second)
-			m.CrushPods(ctx, c)
-		}()
+		wait = 300 * time.Second
 	case 5:
-		logger.Info("chaos level = 5: randomly kill couchbase pods (50%) or operator (20%) every 2 minutes")
-		c := &CrashConfig{
+		c = &CrashConfig{
 			Namespace: ns,
 			Selector:  ls,
 
@@ -190,13 +172,15 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 			OpKillProbability: 0.2,
 			KillMax:           2,
 			MinPods:           0,
-			logger:            logger,
 		}
+		wait = 300 * time.Second
+	}
+
+	if c != nil {
+		log.Info("Unleashing chaos monkies.", "rate", c.KillRate, "pod_threshold", c.CbKillProbability, "operator_threshold", c.OpKillProbability, "max_kills", c.KillMax, "min_pods", c.MinPods)
 		go func() {
-			time.Sleep(300 * time.Second)
+			time.Sleep(wait)
 			m.CrushPods(ctx, c)
 		}()
-
-	default:
 	}
 }

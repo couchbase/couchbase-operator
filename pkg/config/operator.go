@@ -215,7 +215,6 @@ func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deploym
 							},
 							Args: []string{
 								"--pod-create-timeout=10m",
-								"--zap-level=1",
 							},
 							Env: []corev1.EnvVar{
 								{

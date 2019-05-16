@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/couchbase/gocbmgr"
-	"github.com/sirupsen/logrus"
+
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("retry util")
 
 type RetryError struct {
 	n int
@@ -73,11 +76,8 @@ func RetryOnErr(ctx context.Context, interval time.Duration, maxRetries int, tas
 
 		// run f() and check for err
 		if err := f(); err != nil {
-
 			// failed, log attempt
-			if logger, ok := ctx.Value("logger").(*logrus.Entry); ok {
-				logger.Debugf("%s: failed with error %v ...retrying", task, err)
-			}
+			log.Error(err, "Task failed", "cluster", clusterName, "task", task)
 			return false, RetryOkError(err)
 		}
 

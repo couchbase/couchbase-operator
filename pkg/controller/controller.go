@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
@@ -35,6 +36,11 @@ type CouchbaseClusterReconciler struct {
 // or it may just fill up with events due to status updates...
 func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.V(2).Info("Received couchbase cluster event", "cluster", request.NamespacedName)
+
+	// By using the requeue mechanism we can get a periodic and synchronous reconcile.
+	requeueResult := reconcile.Result{
+		RequeueAfter: 10 * time.Second,
+	}
 
 	// Check the status of the cluster object.
 	couchbase := &couchbasev1.CouchbaseCluster{}
@@ -77,7 +83,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (recon
 		}
 
 		r.clusters.Store(request.NamespacedName.String(), c)
-		return reconcile.Result{}, nil
+		return requeueResult, nil
 	}
 
 	// Existing cluster updated
@@ -87,7 +93,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (recon
 
 	c.Update(couchbase)
 
-	return reconcile.Result{}, nil
+	return requeueResult, nil
 }
 
 // AddToManager registers a controller reconciler with the manager and triggers updates

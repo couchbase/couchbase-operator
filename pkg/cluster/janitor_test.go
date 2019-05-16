@@ -2,25 +2,17 @@ package cluster
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"testing"
 	"time"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
-	"github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
-	// logger is used to black hole output from the janitor.
-	logger = logrus.Logger{
-		Out: ioutil.Discard,
-	}
-
 	// clusterFixture is a basic cluster with a 1 minute log retention time
 	// and a maximum retention of 3 logs.
 	clusterFixture = &Cluster{
@@ -33,7 +25,6 @@ var (
 				LogRetentionCount: 3,
 			},
 		},
-		logger: logrus.NewEntry(&logger),
 	}
 )
 

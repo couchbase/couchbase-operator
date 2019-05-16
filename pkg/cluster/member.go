@@ -70,7 +70,7 @@ func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 		c.cluster.Name,
 		c.isSecureClient())
 	if err != nil {
-		c.logger.Warningf("Error occured listing members: %v", err)
+		log.Error(err, "Member discovery failed", "cluster", c.cluster.Name)
 	} else {
 		members = pvcMembers
 	}

@@ -39,7 +39,7 @@ func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
 		return err
 	}
 	if !reflect.DeepEqual(cacert, oldcacert) {
-		c.logger.Infof("Reloading CA certificate for member %s", member.Name)
+		log.Info("Reloading CA certificate", "cluster", c.cluster.Name, "name", member.Name)
 		if err := c.client.UploadClusterCACert(member, cacert); err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func (c *Cluster) reloadChain(member *couchbaseutil.Member, cacert []byte) error
 // reloadChainAndVerify reloads the certificate chain for a member when necessary,
 // waiting until the certificate is presented by the server.
 func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []byte, cert *x509.Certificate) error {
-	c.logger.Infof("Reloading certificate chain for member %s", member.Name)
+	log.Info("Reloading certificate chain", "cluster", c.cluster.Name, "name", member.Name)
 
 	// Refresh the server certificate chain.
 	if err := c.reloadChain(member, cacert); err != nil {
