@@ -12,6 +12,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 type operatorCollector struct {
@@ -35,26 +37,8 @@ func (r *operatorCollector) Kind() string {
 	return "Operator"
 }
 
-// Fetch collects all operator data as defined for the resource
-func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
-	// Get a pod from the resource kind
-	pod, err := k8s.GetPod(r.context, resource)
-	if err != nil {
-		return err
-	}
-	if pod == nil {
-		return err
-	}
-
-	if len(pod.Spec.Containers) == 0 {
-		return fmt.Errorf("pod %s for resource %s/%s contains no containers", pod.Name, resource.Kind(), resource.Name())
-	}
-
-	// Filter out anything that isn't the operator rather than being very intrusive
-	if pod.Spec.Containers[0].Image != r.context.Config.OperatorImage {
-		return nil
-	}
-
+// collectHttp genericly collects paths from a specifc port and saves the data as the specified key.
+func (r *operatorCollector) collectHttp(pod *corev1.Pod, targetPort string, paths map[string]string) error {
 	port, err := netutil.GetFreePort()
 	if err != nil {
 		return fmt.Errorf("unable to allocate port %v", err)
@@ -66,23 +50,12 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 		Client:    r.context.KubeClient,
 		Namespace: r.context.Config.Namespace,
 		Pod:       pod.Name,
-		Port:      port + ":" + r.context.Config.OperatorRestPort,
+		Port:      port + ":" + targetPort,
 	}
 	if err := pf.ForwardPorts(); err != nil {
 		return fmt.Errorf("unable to forward port %s for pod %s", r.context.Config.OperatorRestPort, pod.Name)
 	}
 	defer pf.Close()
-
-	// Paths to collect.  Technically these are available via /debug/pprof but that returns
-	// HTML, which we aren't touching without some sane Xpath support.
-	paths := map[string]string{
-		"pprof.block":        "/debug/pprof/block?debug=1",
-		"pprof.goroutine":    "/debug/pprof/goroutine?debug=1",
-		"pprof.heap":         "/debug/pprof/heap?debug=1",
-		"pprof.mutex":        "/debug/pprof/mutex?debug=1",
-		"pprof.threadcreate": "/debug/pprof/threadcreate?debug=1",
-		"stats.cluster":      "/v1/stats/cluster",
-	}
 
 	// The port-forwarder is a bit chatty on error, but we can shut it up
 	restorer := portforward.Silent()
@@ -105,6 +78,50 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 			continue
 		}
 		r.data[name] = body
+	}
+
+	return nil
+}
+
+// Fetch collects all operator data as defined for the resource
+func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
+	// Get a pod from the resource kind
+	pod, err := k8s.GetPod(r.context, resource)
+	if err != nil {
+		return err
+	}
+	if pod == nil {
+		return err
+	}
+
+	if len(pod.Spec.Containers) == 0 {
+		return fmt.Errorf("pod %s for resource %s/%s contains no containers", pod.Name, resource.Kind(), resource.Name())
+	}
+
+	// Filter out anything that isn't the operator rather than being very intrusive
+	if pod.Spec.Containers[0].Image != r.context.Config.OperatorImage {
+		return nil
+	}
+
+	// Collect pprof data.  Technically these are available via /debug/pprof but that returns
+	// HTML, which we aren't touching without some sane Xpath support.
+	err = r.collectHttp(pod, r.context.Config.OperatorRestPort, map[string]string{
+		"pprof.block":        "/debug/pprof/block?debug=1",
+		"pprof.goroutine":    "/debug/pprof/goroutine?debug=1",
+		"pprof.heap":         "/debug/pprof/heap?debug=1",
+		"pprof.mutex":        "/debug/pprof/mutex?debug=1",
+		"pprof.threadcreate": "/debug/pprof/threadcreate?debug=1",
+	})
+	if err != nil {
+		return err
+	}
+
+	// Collect prometheus metrics.
+	err = r.collectHttp(pod, r.context.Config.OperatorMetricsPort, map[string]string{
+		"stats.cluster": "/metrics",
+	})
+	if err != nil {
+		return err
 	}
 
 	r.resource = resource

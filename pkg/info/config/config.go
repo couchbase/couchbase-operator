@@ -50,23 +50,26 @@ type Configuration struct {
 	OperatorImage string
 	// OperatorRestPort defines what port the operator is listening on for HTTP requests
 	OperatorRestPort string
+	// OperatorMetricsPort defines what port the operator is listening on for prometheus metrics
+	OperatorMetricsPort string
 	// ServerImage defines the server image to use for log collection
 	ServerImage string
 }
 
 const (
-	namespaceFlag          = "namespace"
-	kubeconfigFlag         = "kubeconfig"
-	contextFlag            = "context"
-	operatorImageFlag      = "operator-image"
-	operatorRestPortFlag   = "operator-rest-port"
-	serverImageFlag        = "server-image"
-	allFlag                = "all"
-	systemFlag             = "system"
-	collectInfoFlag        = "collectinfo"
-	collectInfoRedactFlag  = "collectinfo-redact"
-	collectInfoListFlag    = "collectinfo-list"
-	collectInfoCollectFlag = "collectinfo-collect"
+	namespaceFlag           = "namespace"
+	kubeconfigFlag          = "kubeconfig"
+	contextFlag             = "context"
+	operatorImageFlag       = "operator-image"
+	operatorRestPortFlag    = "operator-rest-port"
+	operatorMetricsPortFlag = "operator-metrics-port"
+	serverImageFlag         = "server-image"
+	allFlag                 = "all"
+	systemFlag              = "system"
+	collectInfoFlag         = "collectinfo"
+	collectInfoRedactFlag   = "collectinfo-redact"
+	collectInfoListFlag     = "collectinfo-list"
+	collectInfoCollectFlag  = "collectinfo-collect"
 )
 
 // flagToEnvVar converts a command line flag to a environment variable.
@@ -119,6 +122,7 @@ func Parse() Configuration {
 	flagSet.StringVar(&c.Context, contextFlag, lookupFlagFromEnvString(contextFlag, ""), "kubernetes cluster context")
 	flagSet.StringVar(&c.OperatorImage, operatorImageFlag, lookupFlagFromEnvString(operatorImageFlag, "couchbase/operator:"+version.Version), "operator image name")
 	flagSet.StringVar(&c.OperatorRestPort, operatorRestPortFlag, lookupFlagFromEnvString(operatorRestPortFlag, "8080"), "operator rest port")
+	flagSet.StringVar(&c.OperatorMetricsPort, operatorMetricsPortFlag, lookupFlagFromEnvString(operatorMetricsPortFlag, "8383"), "operator metrics port")
 	flagSet.StringVar(&c.ServerImage, serverImageFlag, lookupFlagFromEnvString(serverImageFlag, "couchbase/server:enterprise-6.0.1"), "couchbase server image")
 	flagSet.StringVar(&c.CollectInfoCollect, collectInfoCollectFlag, lookupFlagFromEnvString(collectInfoCollectFlag, ""), "collect couchbase server logs non-interactively, requires the -"+collectInfoFlag+" flag to be set")
 	flagSet.BoolVar(&c.All, allFlag, lookupFlagFromEnvBool(allFlag, false), "collect all resources from the namespace")

@@ -20,6 +20,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
@@ -39,7 +41,30 @@ var (
 	// they stay Terminating forever.  This should emulate --grace-period=0 --force
 	// See: https://github.com/kubernetes/kubernetes/issues/51835
 	podTerminationGracePeriod = int64(0)
+
+	reconcileTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "couchbase_reconcile_total",
+		Help: "Total reconcile operations performed on a specifc cluster",
+	}, []string{"namespace", "name", "result"})
+
+	reconcileFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "couchbase_reconcile_failures",
+		Help: "Total failed reconcile operations performed on a specifc cluster",
+	}, []string{"namespace", "name"})
+
+	reconcileDurationMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "couchbase_reconcile_time_seconds",
+		Help: "Length of time per reconcile for a specific cluster",
+	}, []string{"namespace", "name"})
 )
+
+func init() {
+	metrics.Registry.MustRegister(
+		reconcileTotalMetric,
+		reconcileFailureMetric,
+		reconcileDurationMetric,
+	)
+}
 
 const (
 	tlsOperatorSecretCACert string = "ca.crt"
@@ -51,16 +76,6 @@ type Config struct {
 	KubeCli          kubernetes.Interface
 	CouchbaseCRCli   versioned.Interface
 	PodCreateTimeout string
-}
-
-type ClusterStats struct {
-	LastReconcileStartTime    time.Time `json:"last_reconcile_loop_start_time,omitempty"`
-	LastReconcileEndTime      time.Time `json:"last_reconcile_loop_end_time,omitempty"`
-	LastCompletedLoopDuration float64   `json:"last_completed_loop_duration_sec,omitempty"`
-	ReconcileLoopStatus       string    `json:"reconcile_loop_status,omitempty"`
-	ReconcileLoopSleepTime    int       `json:"reconcile_loop_sleep_time,omitempty"`
-	ClusterPhase              string    `json:"clusterPhase"`
-	ControlPaused             bool      `json:"controlPaused"`
 }
 
 type Cluster struct {
@@ -77,10 +92,7 @@ type Cluster struct {
 	lastEvent   time.Time                      // When we raised the last event (see raiseEvent)
 	recorder    record.EventRecorder           // Buffers and aggegates events
 	scheduler   scheduler.Scheduler            // Pod placement scheduler
-	lastLoopSt  time.Time
-	lastLoopEn  time.Time
-	loopStatus  string
-	forceUpdate bool // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
+	forceUpdate bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
 }
 
 func New(config Config, cl *couchbasev1.CouchbaseCluster) (*Cluster, error) {
@@ -294,23 +306,23 @@ func (c *Cluster) setupServices() error {
 // It accepts a flag forcing it update internal state from Kubernetes, and returns a
 // similar flag to indicate we require a forced update with the next invocation.
 func (c *Cluster) runReconcile() {
-	// Always gather runloop statistics.
-	defer c.setLastLoopTimes(time.Now())
 
-	// Always update the cluster status.
+	// Always update the cluster status and reconcile loop time.
+	start := time.Now()
 	defer func() {
 		if err := c.updateCRStatus(); err != nil {
 			log.Error(err, "Status update failed", "cluster", c.cluster.Name)
 		}
-	}()
 
-	// Indicate that the reconcile function is getting run.
-	c.loopStatus = "running"
+		reconcileTime := time.Since(start)
+		reconcileDurationMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Observe(reconcileTime.Seconds())
+	}()
 
 	// If the user has requested that we pause operations.
 	if c.cluster.Spec.Paused {
 		c.status.PauseControl()
 		log.Info("Operator paused, skipping", "cluster", c.cluster.Name)
+		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "paused").Inc()
 		return
 	}
 
@@ -320,6 +332,8 @@ func (c *Cluster) runReconcile() {
 	running, pending, err := c.pollPods()
 	if err != nil {
 		log.Error(err, "Failed to list pods", "cluster", c.cluster.Name)
+		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
+		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 		return
 	}
 
@@ -327,6 +341,7 @@ func (c *Cluster) runReconcile() {
 		// Pod startup might take long, e.g. pulling image. It would
 		// deterministically become running or succeeded/failed later.
 		log.Info("Pods pending creation, skipping", "cluster", c.cluster.Name, "running", len(running), "pending", len(pending))
+		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "pending").Inc()
 		return
 	}
 
@@ -337,6 +352,8 @@ func (c *Cluster) runReconcile() {
 		c.forceUpdate = false
 		if err := c.updateMembers(podsToMemberSet(running, c.isSecureClient())); err != nil {
 			log.Error(err, "Failed to update members", "cluster", c.cluster.Name)
+			reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
+			reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 			c.forceUpdate = true
 			return
 		}
@@ -345,8 +362,12 @@ func (c *Cluster) runReconcile() {
 	// Finally reconcile state according to the specification.
 	if err := c.reconcile(running); err != nil {
 		log.Error(err, "Reconciliation failed", "cluster", c.cluster.Name)
+		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
+		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 		return
 	}
+
+	reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "success").Inc()
 }
 
 // Update is called periodically or on a CR change, print out any diffs in the spec
@@ -358,12 +379,6 @@ func (c *Cluster) Update(cluster *couchbasev1.CouchbaseCluster) {
 	}
 
 	c.runReconcile()
-}
-
-func (c *Cluster) setLastLoopTimes(st time.Time) {
-	c.lastLoopSt = st
-	c.lastLoopEn = time.Now()
-	c.loopStatus = "sleeping"
 }
 
 func (c *Cluster) logSpecUpdate(oldSpec, newSpec couchbasev1.ClusterSpec) {
@@ -764,19 +779,6 @@ func (c *Cluster) incPodIndex() {
 func (c *Cluster) decPodIndex() {
 	index := c.status.Members.Index
 	c.setPodIndex(index - 1)
-}
-
-// TODO: Prometheus please
-func (c *Cluster) Stats() *ClusterStats {
-	return &ClusterStats{
-		LastReconcileStartTime:    c.lastLoopSt,
-		LastReconcileEndTime:      c.lastLoopEn,
-		LastCompletedLoopDuration: c.lastLoopEn.Sub(c.lastLoopSt).Seconds(),
-		ReconcileLoopStatus:       c.loopStatus,
-		ReconcileLoopSleepTime:    10,
-		ControlPaused:             c.status.ControlPaused,
-		ClusterPhase:              string(c.status.Phase),
-	}
 }
 
 func (c *Cluster) logStatus(status *couchbaseutil.ClusterStatus) {
