@@ -6,11 +6,7 @@ import (
 	"time"
 
 	"github.com/couchbase/gocbmgr"
-
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
-
-var log = logf.Log.WithName("retry util")
 
 type RetryError struct {
 	n int
@@ -76,8 +72,6 @@ func RetryOnErr(ctx context.Context, interval time.Duration, maxRetries int, tas
 
 		// run f() and check for err
 		if err := f(); err != nil {
-			// failed, log attempt
-			log.Error(err, "Task failed", "cluster", clusterName, "task", task)
 			return false, RetryOkError(err)
 		}
 

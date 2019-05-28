@@ -120,20 +120,21 @@ const (
 )
 
 var (
-	// peerServicePorts is the list of ports to expose for the Couchbase cluster
-	// headless service.  This generates DNS A records for all pods, and SRV records
-	// pointing to all pods.
-	peerServicePorts = []v1.ServicePort{
-		{
-			Name:     couchbaseSRVName,
-			Port:     adminServicePort,
-			Protocol: v1.ProtocolTCP,
-		},
-		{
-			Name:     couchbaseSRVNameTLS,
-			Port:     adminServicePortTLS,
-			Protocol: v1.ProtocolTCP,
-		},
+	// Istio needs every port to be defined in a service in order for them to be
+	// picked up by the control plane and handled by the data plane.  Obviously
+	// Couchbase makes this particularly hard...
+	allTheThings = [][]int{
+		{4369},
+		{8091, 8096},
+		{9100, 9105},
+		{9110, 9118},
+		{9120, 9122},
+		{9999},
+		{11207},
+		{11209, 11211},
+		{11213},
+		{18091, 18096},
+		{21100, 21299},
 	}
 
 	// uiServicePorts is the list of ports used to expose the Couchbase admin console.
@@ -317,7 +318,27 @@ func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, own
 
 	// Create a service which defines A records for all pods, we use this internally
 	// to address nodes via stable names (IPs are not fixed)
-	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, peerServicePorts, labels, labels)
+	ports := []v1.ServicePort{}
+	for _, rule := range allTheThings {
+		switch len(rule) {
+		case 1:
+			ports = append(ports, v1.ServicePort{
+				Name: fmt.Sprintf("tcp-%v", rule[0]),
+				Port: int32(rule[0]),
+			})
+		case 2:
+			for i := rule[0]; i <= rule[1]; i++ {
+				ports = append(ports, v1.ServicePort{
+					Name: fmt.Sprintf("tcp-%v", i),
+					Port: int32(i),
+				})
+			}
+		default:
+			return fmt.Errorf("illegal port rule: %v", rule)
+		}
+	}
+
+	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, ports, labels, labels)
 	svc.Spec.ClusterIP = v1.ClusterIPNone
 	if _, err := createService(kubecli, ns, svc, owner); err != nil {
 		return err

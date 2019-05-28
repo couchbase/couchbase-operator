@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -30,6 +31,9 @@ func DumpOperatorYAML(conf *Config) error {
 		return err
 	}
 	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.OperatorImage, conf.ImagePullSecret)); err != nil {
+		return err
+	}
+	if err := DumpYAML(conf, "operator-service", GenerateOperatorService()); err != nil {
 		return err
 	}
 	return nil
@@ -258,4 +262,36 @@ func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deploym
 		}
 	}
 	return deployment
+}
+
+// Required by istio
+func GenerateOperatorService() *corev1.Service {
+	return &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Service",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: OperatorResourceName,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"app": OperatorResourceName,
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "http-pprof",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       8080,
+					TargetPort: intstr.FromInt(8080),
+				},
+				{
+					Name:       "http-prometheus",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       8383,
+					TargetPort: intstr.FromInt(8383),
+				},
+			},
+		},
+	}
 }
