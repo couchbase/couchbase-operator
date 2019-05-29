@@ -25,6 +25,9 @@ spec:
         imagePullPolicy: {{ .Values.couchbaseOperator.imagePullPolicy}}
         command:
         - couchbase-operator
+        args:
+        - "--create-crd={{ .Values.couchbaseOperator.createCrd }}"
+        - "--pod-create-timeout={{ .Values.couchbaseOperator.podCreateTimeout }}"
   {{- range $key, $value := .Values.couchbaseOperator.commandArgs }}
         - "--{{ $key }}={{ $value }}"
   {{- end }}
