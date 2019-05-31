@@ -35,7 +35,7 @@ func (r *podResource) Fetch() error {
 	if err != nil {
 		return err
 	}
-	r.pods, err = r.context.KubeClient.CoreV1().Pods(r.context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	r.pods, err = r.context.KubeClient.CoreV1().Pods(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (r *podResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), pod.Name, pod.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), pod.Name, pod.Name+".yaml"), string(data))
 	}
 	return nil
 }

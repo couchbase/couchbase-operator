@@ -138,7 +138,7 @@ func main() {
 	// Check there is something to collect, warn if not but continue so we get
 	// debug information about the operator itself
 	if len(clusters.Items) == 0 {
-		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Config.Namespace)
+		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Namespace())
 	} else {
 		anythingToCollect = true
 	}
@@ -146,7 +146,7 @@ func main() {
 	// Finally check to see if any requested CouchbaseClusters exist
 	for _, name := range context.Config.Clusters {
 		if !clusterExists(clusters, name) {
-			fmt.Println("requested cluster", name, "not found in namespace", context.Config.Namespace)
+			fmt.Println("requested cluster", name, "not found in namespace", context.Namespace())
 			os.Exit(1)
 		}
 	}
@@ -156,14 +156,14 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	} else if deployment == nil {
-		fmt.Println("no Couchbase Operator Deployment resource discovered in name space (check the -operator-image flag is correctly set)", context.Config.Namespace)
+		fmt.Println("no Couchbase Operator Deployment resource discovered in name space (check the -operator-image flag is correctly set)", context.Namespace())
 	} else {
 		anythingToCollect = true
 	}
 
 	// Bomb out if there is nothing of interest to collect from
 	if !anythingToCollect {
-		fmt.Println("nothing to collect in name space", context.Config.Namespace)
+		fmt.Println("nothing to collect in name space", context.Namespace())
 		os.Exit(1)
 	}
 
@@ -202,7 +202,7 @@ func main() {
 	if context.Config.System {
 		// Switch to collecting everything in the system namespace
 		context := context.Copy()
-		context.Config.Namespace = "kube-system"
+		context.NamespaceOverride = "kube-system"
 		context.Config.All = true
 
 		// Harvest and restore

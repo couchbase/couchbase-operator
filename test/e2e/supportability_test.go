@@ -347,13 +347,22 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, config *rest.Co
 }
 
 // Function to get autonomous-operator extended debug file list
-func getOperatorExtendedDebugFileList(namespace, deploymentName, cbopinfoLogDir string, reqFileList *[]string) {
+func getOperatorExtendedDebugFileList(namespace, deploymentName, cbopinfoLogDir string, pprof, metrics bool) []string {
 	namespaceDir := cbopinfoLogDir + "/" + namespace
 	deploymentDir := namespaceDir + "/deployment/" + deploymentName
-	debugFileList := []string{"pprof.block", "pprof.goroutine", "pprof.heap", "pprof.mutex", "pprof.threadcreate", "stats.cluster"}
-	for _, fileName := range debugFileList {
-		*reqFileList = append(*reqFileList, deploymentDir+"/"+fileName)
+
+	files := []string{}
+	if pprof {
+		files = append(files, "pprof.block", "pprof.goroutine", "pprof.heap", "pprof.mutex", "pprof.threadcreate")
 	}
+	if metrics {
+		files = append(files, "stats.cluster")
+	}
+
+	for index, file := range files {
+		files[index] = deploymentDir + "/" + file
+	}
+	return files
 }
 
 // Function to get couchbase cluster specific log file names
@@ -589,7 +598,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	operatorRestPort := strconv.Itoa(constants.OperatorRestPort)
 
 	// Validate args which won't produce output file
-	for _, arg := range []string{"-help", "-version"} {
+	for _, arg := range []string{"--help", "--version"} {
 		if _, err := runCbopinfoCmd([]string{arg}); err != nil {
 			t.Fatalf("Failed while providing arg %s: %v", arg, err)
 		}
@@ -599,37 +608,37 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	validArgumentList := []cbopinfoArg{
 		{
 			Name:     "TestValidateCbopinfoAll",
-			Arg:      "-all",
+			Arg:      "--all",
 			ArgValue: "",
 		},
 		{
 			Name:        "TestValidateCbopinfoKubeconfig",
-			Arg:         "-kubeconfig",
+			Arg:         "--kubeconfig",
 			ArgValue:    kubeConfPath,
-			ExpectedErr: "flag needs an argument: -kubeconfig",
+			ExpectedErr: "flag needs an argument: --kubeconfig",
 		},
 		{
 			Name:        "TestValidateCbopinfoNamespace",
-			Arg:         "-namespace",
+			Arg:         "--namespace",
 			ArgValue:    f.Namespace,
-			ExpectedErr: "flag needs an argument: -namespace",
+			ExpectedErr: "flag needs an argument: --namespace",
 		},
 		{
 			Name:     "TestValidateCbopinfoSystem",
-			Arg:      "-system",
+			Arg:      "--system",
 			ArgValue: "",
 		},
 		{
 			Name:        "TestValidateCbopinfoOperatorImage",
-			Arg:         "-operator-image",
+			Arg:         "--operator-image",
 			ArgValue:    f.OpImage,
-			ExpectedErr: "flag needs an argument: -operator-image",
+			ExpectedErr: "flag needs an argument: --operator-image",
 		},
 		{
 			Name:        "TestValidateCbopinfoOperatorRestPort",
-			Arg:         "-operator-rest-port",
+			Arg:         "--operator-rest-port",
 			ArgValue:    operatorRestPort,
-			ExpectedErr: "flag needs an argument: -operator-rest-port",
+			ExpectedErr: "flag needs an argument: --operator-rest-port",
 		},
 	}
 
@@ -738,14 +747,14 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 	validArgumentList := []cbopinfoArg{
 		{
 			Name:        "Unreachable '-kubeconfig' file",
-			Arg:         "-kubeconfig",
+			Arg:         "--kubeconfig",
 			ArgValue:    kubeconfig.Name(),
 			WillFail:    true,
 			ExpectedErr: "unable to discover cluster resources",
 		},
 		{
 			Name:        "Validating invalid '-kubeconfig' file missing",
-			Arg:         "-kubeconfig",
+			Arg:         "--kubeconfig",
 			ArgValue:    "/tmp/fileNotFound",
 			WillFail:    true,
 			ExpectedErr: "unable to initialize context: stat /tmp/fileNotFound: no such file or directory",
@@ -922,7 +931,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Log Verification for kube-system and single cb cluster")
 	reqFileList = []string{}
 	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "-system", cluster2.Name)
+	cmdArgs = append(commonArgs, "--system", cluster2.Name)
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr = strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
@@ -953,7 +962,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs from specific cb clusters")
 	reqFileList = []string{}
 	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "-system", cluster1.Name, cluster3.Name)
+	cmdArgs = append(commonArgs, "--system", cluster1.Name, cluster3.Name)
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr = strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
@@ -986,7 +995,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs from all available cb clusters")
 	reqFileList = []string{}
 	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "-system")
+	cmdArgs = append(commonArgs, "--system")
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr = strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
@@ -1021,7 +1030,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs with -collectinfo flag on single cb cluster")
 	reqFileList = []string{}
 	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "-collectinfo", "-collectinfo-collect", "all", cluster1.Name)
+	cmdArgs = append(commonArgs, "--collectinfo", "--collectinfo-collect", "all", cluster1.Name)
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr = strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
@@ -1052,7 +1061,7 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 	t.Log("Collecting logs with -all flag on all cb clusters")
 	reqFileList = []string{}
 	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "-all")
+	cmdArgs = append(commonArgs, "--all")
 	execOut, err = runCbopinfoCmd(cmdArgs)
 	execOutStr = strings.TrimSpace(string(execOut))
 	t.Logf("Returned: %s\n", execOutStr)
@@ -1110,6 +1119,10 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(f.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
+	}
+
+	if len(sa.Secrets) == 0 {
+		t.Skip("Cluster does not permit service account tokens")
 	}
 
 	secret, err := targetKube.KubeClient.CoreV1().Secrets(f.Namespace).Get(sa.Secrets[0].Name, metav1.GetOptions{})
@@ -1241,9 +1254,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 
 	// Verify file list
 	errMsgList := failureList{}
-	reqFileList := []string{}
-
-	getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &reqFileList)
+	reqFileList := getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, true)
 
 	isAllFlagSet := true
 	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
@@ -1343,7 +1354,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &excludedFileList, cbopinfoAllFlag); err != nil {
 			t.Error(err)
 		}
-		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
+		excludedFileList = append(excludedFileList, getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, true)...)
 
 		checkLogDirContentsForExcludedFiles(excludedFileList, &errMsgList)
 		if failureExists := errMsgList.PrintFailures(t); failureExists {
@@ -1376,14 +1387,13 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 		// Verify file list if untar is successful
 		errMsgList := failureList{}
 		reqFileList := []string{}
-		excludedFileList := []string{}
 		deploymentDir := logFileDir + "/" + f.Namespace + "/deployment"
 
 		// In invalid rest-port case, deployment yaml, logs will exists. Only rest-port files will be missing
 		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &reqFileList, cbopinfoAllFlag); err != nil {
 			t.Error(err)
 		}
-		getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &excludedFileList)
+		excludedFileList := getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, false)
 
 		checkLogDirContents(reqFileList, &errMsgList)
 		checkLogDirContentsForExcludedFiles(excludedFileList, &errMsgList)
@@ -1439,9 +1449,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 
 	// Verify file list
 	errMsgList := failureList{}
-	reqFileList := []string{}
-
-	getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, &reqFileList)
+	reqFileList := getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, true)
 
 	isAllFlagSet := true
 	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {

@@ -407,6 +407,14 @@
   version = "v0.3.7"
 
 [[projects]]
+  digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
+  name = "github.com/inconshreveable/mousetrap"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
+  version = "v1.0"
+
+[[projects]]
   digest = "1:f5a2051c55d05548d2d4fd23d244027b59fbd943217df8aa3b5e170ac2fd6e1b"
   name = "github.com/json-iterator/go"
   packages = ["."]
@@ -554,6 +562,14 @@
   version = "v1.4.1"
 
 [[projects]]
+  digest = "1:22799aea8fe96dd5693abdd1eaa14b1b29e3eafbdc7733fa155b3cb556c8a7ae"
+  name = "github.com/spf13/cobra"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "67fc4837d267bc9bfd6e47f77783fcc3dffc68de"
+  version = "v0.0.4"
+
+[[projects]]
   digest = "1:c1b1102241e7f645bc8e0c22ae352e8f0dc6484b6cb4d132fa9f24174e0119e2"
   name = "github.com/spf13/pflag"
   packages = ["."]
@@ -678,11 +694,15 @@
   revision = "2953c62de483abe29031e197e72d3b7061f65f91"
 
 [[projects]]
-  digest = "1:66a2f252a58b4fbbad0e4e180e1d85a83c222b6bce09c3dcdef3dc87c72eda7c"
+  digest = "1:dfcb3d446a3c6a6c71b74cf7baf366cd630a8cb43c3fcb741f34e49727da168d"
   name = "golang.org/x/text"
   packages = [
     "collate",
     "collate/build",
+    "encoding",
+    "encoding/internal",
+    "encoding/internal/identifier",
+    "encoding/unicode",
     "internal/colltab",
     "internal/gen",
     "internal/language",
@@ -690,7 +710,9 @@
     "internal/tag",
     "internal/triegen",
     "internal/ucd",
+    "internal/utf8internal",
     "language",
+    "runes",
     "secure/bidirule",
     "transform",
     "unicode/bidi",
@@ -893,7 +915,7 @@
   version = "kubernetes-1.13.1"
 
 [[projects]]
-  digest = "1:801b9527cb2cbe4a6573ed61ab9f285f228f6ae4187f3acefa1bd0e834e4e2f1"
+  digest = "1:0f259dbad2b1540c3095f3bcae1159448c99b520f1b7b977cf99235723551242"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/errors",
@@ -902,6 +924,7 @@
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
+    "pkg/apis/meta/v1/unstructured/unstructuredscheme",
     "pkg/apis/meta/v1beta1",
     "pkg/conversion",
     "pkg/conversion/queryparams",
@@ -947,6 +970,18 @@
   pruneopts = "UT"
   revision = "2b1284ed4c93a43499e781493253e2ac5959c4fd"
   version = "kubernetes-1.13.1"
+
+[[projects]]
+  branch = "release-1.12"
+  digest = "1:7991e5074de01462e0cf6ef77060895b50e9026d16152a6e925cb99b67a1f8ae"
+  name = "k8s.io/cli-runtime"
+  packages = [
+    "pkg/genericclioptions",
+    "pkg/genericclioptions/printers",
+    "pkg/genericclioptions/resource",
+  ]
+  pruneopts = "UT"
+  revision = "11047e25a94a7eaa541b92a8bbfd3e1243607219"
 
 [[projects]]
   digest = "1:4e360141f96434a2f6c1a090469e500784f057170619e1e7c4f84de520951222"
@@ -1156,6 +1191,7 @@
     "github.com/operator-framework/operator-sdk/pkg/k8sutil",
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/pkg/log/zap",
+    "github.com/prometheus/client_golang/prometheus",
     "github.com/sirupsen/logrus",
     "github.com/spf13/pflag",
     "golang.org/x/time/rate",
@@ -1187,6 +1223,7 @@
     "k8s.io/apimachinery/pkg/util/intstr",
     "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/watch",
+    "k8s.io/cli-runtime/pkg/genericclioptions",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/kubernetes",
@@ -1217,6 +1254,7 @@
     "sigs.k8s.io/controller-runtime/pkg/controller",
     "sigs.k8s.io/controller-runtime/pkg/handler",
     "sigs.k8s.io/controller-runtime/pkg/manager",
+    "sigs.k8s.io/controller-runtime/pkg/metrics",
     "sigs.k8s.io/controller-runtime/pkg/reconcile",
     "sigs.k8s.io/controller-runtime/pkg/runtime/log",
     "sigs.k8s.io/controller-runtime/pkg/runtime/scheme",

@@ -61,7 +61,7 @@ func listDetachedLogPVCs(context *context.Context) ([]*v1.PersistentVolumeClaim,
 	if err != nil {
 		return nil, err
 	}
-	pvcs, err := context.KubeClient.CoreV1().PersistentVolumeClaims(context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pvcs, err := context.KubeClient.CoreV1().PersistentVolumeClaims(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func listRunningPods(context *context.Context) ([]*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-	pods, err := context.KubeClient.CoreV1().Pods(context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := context.KubeClient.CoreV1().Pods(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}

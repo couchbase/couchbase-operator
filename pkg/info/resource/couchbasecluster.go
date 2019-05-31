@@ -33,7 +33,7 @@ func (r *couchbaseClusterResource) Kind() string {
 func (r *couchbaseClusterResource) Fetch() error {
 	// We have to manually filter here as couchbaseCluster are not labelled and field
 	// selectors aren't up to matching based on name (multiple couchbaseClusters that is)
-	couchbaseClusters, err := r.context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(r.context.Config.Namespace).List(metav1.ListOptions{})
+	couchbaseClusters, err := r.context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (r *couchbaseClusterResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), couchbaseCluster.Name, couchbaseCluster.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseCluster.Name, couchbaseCluster.Name+".yaml"), string(data))
 	}
 	return nil
 }

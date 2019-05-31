@@ -35,7 +35,7 @@ func (r *endpointResource) Fetch() error {
 	if err != nil {
 		return err
 	}
-	r.endpoints, err = r.context.KubeClient.CoreV1().Endpoints(r.context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	r.endpoints, err = r.context.KubeClient.CoreV1().Endpoints(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (r *endpointResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), endpoint.Name, endpoint.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), endpoint.Name, endpoint.Name+".yaml"), string(data))
 	}
 	return nil
 }

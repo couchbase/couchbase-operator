@@ -1,11 +1,6 @@
 package util
 
 import (
-	"fmt"
-	"os"
-	"os/user"
-	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,39 +11,6 @@ import (
 const (
 	Application = "cbopinfo"
 )
-
-// AbsolutePath takes a path, expands the the home directory if
-// included or appends the current directory if a relative path
-// is specified
-func AbsolutePath(path string) (string, error) {
-	// References a home directory
-	re, err := regexp.Compile(`^~([^/]+)?/`)
-	if err != nil {
-		return "", fmt.Errorf("unable to compile regular expression: %v", err)
-	}
-
-	matches := re.FindStringSubmatch(path)
-	if matches != nil {
-		// If no explicit directory was stated use HOME from the environment
-		// otherwise lookup the user home directory
-		if matches[1] == "" {
-			home, ok := os.LookupEnv("HOME")
-			if !ok {
-				return "", fmt.Errorf("HOME environment variable not set")
-			}
-			path = home + path[1:]
-		} else {
-			u, err := user.Lookup(matches[1])
-			if err != nil {
-				return "", fmt.Errorf("user not defined: %v", err)
-			}
-			path = u.HomeDir + path[len(matches[1])+1:]
-		}
-	}
-
-	// Handle relative paths and clean up the path
-	return filepath.Abs(path)
-}
 
 var (
 	// timestamp caches the timestamp returned by Timestamp()

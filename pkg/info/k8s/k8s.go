@@ -7,7 +7,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
-	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // InitContext performs Kubernetes specific initialization operations on
@@ -26,19 +24,10 @@ func InitContext(context *context.Context) error {
 		return err
 	}
 
-	// Load the Kubernetes configuration, expanding the file path as the
-	// Kubernetes client is pretty bad at handling typical strings, then
-	// silently fails
-	kubeconfigPath, err := util.AbsolutePath(context.Config.KubeConfig)
-	if err != nil {
-		return err
-	}
+	context.KubeConfigLoader = context.Config.ConfigFlags.ToRawKubeConfigLoader()
 
-	// Load the configuration and return a new client
-	context.KubeConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
-		&clientcmd.ConfigOverrides{CurrentContext: context.Config.Context},
-	).ClientConfig()
+	var err error
+	context.KubeConfig, err = context.KubeConfigLoader.ClientConfig()
 	if err != nil {
 		return err
 	}
@@ -68,11 +57,11 @@ func GetPod(context *context.Context, resource resource.ResourceReference) (*cor
 	// Inspect the resource kind and perform type specific processing
 	switch resource.Kind() {
 	case "Pod":
-		return context.KubeClient.CoreV1().Pods(context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
+		return context.KubeClient.CoreV1().Pods(context.Namespace()).Get(resource.Name(), metav1.GetOptions{})
 
 	case "Deployment":
 		// Grab the deployment
-		deployment, err := context.KubeClient.AppsV1().Deployments(context.Config.Namespace).Get(resource.Name(), metav1.GetOptions{})
+		deployment, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).Get(resource.Name(), metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +72,7 @@ func GetPod(context *context.Context, resource resource.ResourceReference) (*cor
 			return nil, err
 		}
 
-		pods, err := context.KubeClient.CoreV1().Pods(context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err := context.KubeClient.CoreV1().Pods(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +89,7 @@ func GetPod(context *context.Context, resource resource.ResourceReference) (*cor
 
 // GetDeployments returns all Deployments in the namespace.
 func GetDeployments(context *context.Context) (*appsv1.DeploymentList, error) {
-	deployments, err := context.KubeClient.AppsV1().Deployments(context.Config.Namespace).List(metav1.ListOptions{})
+	deployments, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to poll Deployment resources: %v", err)
 	}
@@ -127,7 +116,7 @@ func GetOperatorDeployment(context *context.Context) (*appsv1.Deployment, error)
 
 // GetCouchbaseClusters returns all Couchbase Clusters in the namespace.
 func GetCouchbaseClusters(context *context.Context) (*couchbasev1.CouchbaseClusterList, error) {
-	clusters, err := context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(context.Config.Namespace).List(metav1.ListOptions{})
+	clusters, err := context.CouchbaseClusterClient.CouchbaseV1().CouchbaseClusters(context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to poll CouchbaseCluster resources: %v", err)
 	}

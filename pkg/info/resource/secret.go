@@ -32,7 +32,7 @@ func (r *secretResource) Kind() string {
 // Fetch collects all secrets as defined by the configuration
 func (r *secretResource) Fetch() error {
 	var err error
-	r.secrets, err = r.context.KubeClient.CoreV1().Secrets(r.context.Config.Namespace).List(metav1.ListOptions{})
+	r.secrets, err = r.context.KubeClient.CoreV1().Secrets(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (r *secretResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), secret.Name, secret.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), secret.Name, secret.Name+".yaml"), string(data))
 	}
 	return nil
 }

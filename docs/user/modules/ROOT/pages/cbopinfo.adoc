@@ -87,6 +87,13 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 --
 ====
 
+[TIP]
+====
+The `cbopinfo` command conforms to Kubernetes cli-runtime specification and may be renamed to `kubernetes-couchbase-logs` and installed in your $PATH.
+It can then be invoked as a `kubectl` plugin with `kubectl couchbase logs`.
+This tightly integrates it with your normal workflow.
+====
+
 === Options
 
 --all::
@@ -173,12 +180,6 @@ all           # Collect all available logs
 --collectinfo-redact::
 If specified with the `--collectinfo` option, this will indicate that only redacted logs should be collected and downloaded.
 
---kubeconfig <config>::
-If specified, this points to a Kubernetes configuration file used to locate and poll the cluster API. If not set, it will default to `~/.kube/config`.
-
---namespace <namespace>::
-If specified, this selects which namespace to collect resources and logs from. If not set, it will default to `default`.
-
 --operator-image <image>::
 If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:1.2.0`.
 
@@ -191,15 +192,7 @@ If specified this defines the Couchbase Server image to use when collecting logs
 --system::
 If specified, this flag will additionally collect all resources from the `kube-system` namespace, which may be useful in diagnosing problems with cluster-level roles, custom resource definitions, or system services.
 
-[TIP]
---
-All options may also be specified as environment variables, with the command line arguments taking precedence.  For example:
-[source,console]
-----
-$ KUBECONFIG=/etc/kube/config SYSTEM=1 ALL=TRUE cbopinfo
-----
-Options which do not take any parameters must be specified as valid boolean strings as specified by the https://golang.org/pkg/strconv/#ParseBool[Go ParseBool function].
---
+INFO: `cbopinfo` supports all standard configuration options available in `cli-runtime` e.g. `--namespace`, `--context`, etc.
 
 == Examples
 

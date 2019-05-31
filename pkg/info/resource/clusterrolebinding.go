@@ -46,7 +46,7 @@ func (r *clusterRoleBindingResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), clusterRoleBinding.Name, clusterRoleBinding.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), clusterRoleBinding.Name, clusterRoleBinding.Name+".yaml"), string(data))
 	}
 	return nil
 }

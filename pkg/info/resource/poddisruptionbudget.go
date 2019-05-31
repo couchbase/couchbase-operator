@@ -36,7 +36,7 @@ func (r *podDisruptionBudgetResource) Fetch() error {
 	if err != nil {
 		return err
 	}
-	r.pdbs, err = r.context.KubeClient.PolicyV1beta1().PodDisruptionBudgets(r.context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	r.pdbs, err = r.context.KubeClient.PolicyV1beta1().PodDisruptionBudgets(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func (r *podDisruptionBudgetResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), pdb.Name, pdb.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), pdb.Name, pdb.Name+".yaml"), string(data))
 	}
 	return nil
 }

@@ -34,7 +34,7 @@ func (r *eventCollector) Kind() string {
 
 // Fetch collects all events as defined for the resource
 func (r *eventCollector) Fetch(resource resource.ResourceReference) error {
-	events, err := k8sutil.GetEventsForResource(r.context.KubeClient, r.context.Config.Namespace, resource.Kind(), resource.Name())
+	events, err := k8sutil.GetEventsForResource(r.context.KubeClient, r.context.Namespace(), resource.Kind(), resource.Name())
 	if err != nil {
 		return err
 	}
@@ -54,6 +54,6 @@ func (r *eventCollector) Write(b backend.Backend) error {
 		return err
 	}
 
-	_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.resource.Kind(), r.resource.Name(), "events.yaml"), string(data))
+	_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), "events.yaml"), string(data))
 	return nil
 }

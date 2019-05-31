@@ -50,7 +50,7 @@ func (r *logCollector) Fetch(resource resource.ResourceReference) error {
 		logOptions := &v1.PodLogOptions{
 			Container: container.Name,
 		}
-		req := r.context.KubeClient.CoreV1().Pods(r.context.Config.Namespace).GetLogs(pod.Name, logOptions)
+		req := r.context.KubeClient.CoreV1().Pods(r.context.Namespace()).GetLogs(pod.Name, logOptions)
 
 		readCloser, err := req.Stream()
 		if err != nil {
@@ -76,7 +76,7 @@ func (r *logCollector) Fetch(resource resource.ResourceReference) error {
 
 func (r *logCollector) Write(b backend.Backend) error {
 	for name, logs := range r.logs {
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.resource.Kind(), r.resource.Name(), name+".log"), logs.String())
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), name+".log"), logs.String())
 	}
 	return nil
 }

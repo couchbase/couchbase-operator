@@ -35,7 +35,7 @@ func (r *serviceResource) Fetch() error {
 	if err != nil {
 		return err
 	}
-	r.services, err = r.context.KubeClient.CoreV1().Services(r.context.Config.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	r.services, err = r.context.KubeClient.CoreV1().Services(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (r *serviceResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.Kind(), service.Name, service.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), service.Name, service.Name+".yaml"), string(data))
 	}
 	return nil
 }

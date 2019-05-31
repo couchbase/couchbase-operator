@@ -48,7 +48,7 @@ func (r *operatorCollector) collectHttp(pod *corev1.Pod, targetPort string, path
 	pf := portforward.PortForwarder{
 		Config:    r.context.KubeConfig,
 		Client:    r.context.KubeClient,
-		Namespace: r.context.Config.Namespace,
+		Namespace: r.context.Namespace(),
 		Pod:       pod.Name,
 		Port:      port + ":" + targetPort,
 	}
@@ -131,7 +131,7 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 func (r *operatorCollector) Write(b backend.Backend) error {
 	for name, data := range r.data {
 		if len(data) > 0 {
-			_ = b.WriteFile(util.ArchivePath(r.context.Config.Namespace, r.resource.Kind(), r.resource.Name(), name), string(data))
+			_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), name), string(data))
 		}
 	}
 	return nil
