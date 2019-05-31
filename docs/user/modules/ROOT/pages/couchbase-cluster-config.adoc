@@ -939,7 +939,7 @@ The metadata name identifies the claim template. This name is used by the `volum
 
 === storageClassName
 
-The `storageClassName` is required by the claim. A `storageClassName` provides a way for administrators to describe the classes of storage they offer. If no `storageClassName` is specified, then the default storage class is used.
+The `storageClassName` is optional for a claim. A `storageClassName` provides a way for administrators to describe the classes of storage they offer. If no `storageClassName` is specified, then the default storage class is used.
 
 Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/storage/storage-classes/[storage classes].
 
