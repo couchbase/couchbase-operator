@@ -6,20 +6,9 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-      - name: TestCreateCluster
-      - name: TestCreateBucketCluster
-      - name: TestResizeCluster
       - name: TestResizeClusterWithBucket
-      - name: TestEditClusterSettings
       - name: TestBasicMDSScaling
       - name: TestDenyCommunityEdition
-
-  - name: BucketTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestBucketAddRemoveBasic
-      - name: TestEditBucket
 
   - name: ServiceTests
     clusters:
@@ -34,7 +23,6 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-      - name: TestPodResourcesBasic
       - name: TestPodResourcesCannotBePlaced
       - name: TestFirstNodePodResourcesCannotBePlaced
       - name: TestRemoveServerClassWithNodeService
@@ -43,7 +31,6 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-      - name: TestRecoveryAfterOnePodFailureNoBucket
       - name: TestRecoveryAfterTwoPodFailureNoBucket
       - name: TestRecoveryAfterOnePodFailureBucketOneReplica
       - name: TestRecoveryAfterTwoPodFailureBucketOneReplica
@@ -54,7 +41,6 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-      - name: TestAntiAffinityOn
       - name: TestAntiAffinityOff
       - name: TestAntiAffinityOnCannotBePlaced
 
@@ -69,7 +55,6 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-      - name: TestTlsCreateCluster
       - name: TestTlsKillClusterNode
       - name: TestTlsResizeCluster
       - name: TestTLSRotate
@@ -89,7 +74,6 @@ tcGroups:
       - BasicCluster
       - NewCluster1
     testcases:
-      - name: TestXdcrCreateCluster
       - name: TestXdcrCreateTlsCluster
       - name: TestXdcrCreateK8SVMCluster
       - name: TestXdcrNodeDownDuringSetupDuringConfigure
@@ -103,15 +87,12 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-      - name: TestRzaCreateClusterWithStaticConfig
-      - name: TestRzaCreateClusterWithClassBasedConfig
       - name: TestRzaResizeCluster
 
   - name: PersistentVolumeTests
     clusters:
       - NewCluster1
     testcases:
-      - name: TestPersistentVolumeCreateCluster
       - name: TestPersistentVolumeAutoFailover
       - name: TestPersistentVolumeNodeFailover
 
@@ -128,29 +109,17 @@ tcGroups:
     clusters:
       - BasicCluster
     testcases:
-      - name: TestAnalyticsCreateDataSet
       - name: TestAnalyticsResizeCluster
-
-  - name: EventingTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestEventingCreateEventingCluster
 
   - name: SupportabilityTests
     clusters:
       - NewCluster1
     testcases:
-      - name: TestLogCollectValidateArguments
       - name: TestNegLogCollectValidateArgs
       - name: TestLogCollectUsingClusterNameAndNamespace
-      - name: TestExtendedDebugWithDefaultValues
       - name: TestExtendedDebugWithNonDefaultValues
-      - name: TestCollectLogFromEphemeralPodsUsingLogPV
       - name: TestCollectLogFromEphemeralPodsUsingLogPVKillProcess
       - name: TestCollectLogFromPvPodRecovered
-      - name: TestLogCollectWithDefaultRetentionAndSize
-      - name: TestLogRedactionVerify
       - name: TestLogRedactionWithPvVerify
       - name: TestLogCollectListJson
 
