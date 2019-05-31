@@ -35,7 +35,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -140,7 +139,6 @@ func CreateDeploymentObject(operatorImage string, operatorPort int) (deployment 
 	if operatorPort != 0 {
 		listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(operatorPort)
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
-		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(operatorPort)
 	}
 	return
 }

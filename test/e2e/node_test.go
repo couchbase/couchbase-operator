@@ -267,10 +267,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 // Expects: only nodes added by operator to be in cluster
 // 1. Create 1 node cluster
 // 2. Manually add 1 external member to cluster
-// 3. Request cluster resize to 2 members
-// 4. Verify that actual cluster size is 2 nodes
-// 5. Verify that external member was removed
-// 6. Verify that the 2 cluster nodes are healthy
+// 3. Verify that external member was removed
 func TestRemoveForeignNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -278,7 +275,6 @@ func TestRemoveForeignNode(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
-	scaleSize := 2
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
@@ -291,21 +287,18 @@ func TestRemoveForeignNode(t *testing.T) {
 		ServerConfig: testCouchbase.Spec.ServerSettings[0].Name,
 	}
 
-	// When ready create and add a new node, expect the operator to remove it while
-	// scaling up.
+	// When ready create and add a new node, expect the operator to remove it
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 	e2eutil.MustAddNode(t, targetKube, testCouchbase, testCouchbase.Spec.ServerSettings[0].Services, member)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaleSize, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, clusterSize, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
-	// * Scale up begins.
 	// * Foreign node is ejected.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: foreignNodeName},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
