@@ -1,5 +1,0 @@
-apiVersion: v1
-appVersion: "1.2"
-description: A Helm chart for Kubernetes
-name: couchbase-operator
-version: 0.1.2
