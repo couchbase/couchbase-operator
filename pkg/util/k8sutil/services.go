@@ -916,6 +916,9 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 
 	// Untouched nodes need to add their ports to the status.
 	for _, service := range untouched {
+		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
+			continue
+		}
 		if err := updateExposedPorts(portStatus, service.Labels[constants.LabelNode], service); err != nil {
 			return nil, err
 		}
