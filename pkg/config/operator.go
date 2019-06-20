@@ -139,7 +139,7 @@ func GetOperatorRole() *rbacv1.Role {
 				},
 				Verbs: []string{
 					"create", // used by the operator to create events.
-					"patch",  // used by client-go to create and update events.
+					"update", // used by the operator to update events.
 				},
 			},
 			{

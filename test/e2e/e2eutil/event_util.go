@@ -406,3 +406,14 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 		},
 	}
 }
+
+// ServerCrashRecoverySequence is generated when you kill NS server.
+func ServerCrashRecoverySequence() eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}

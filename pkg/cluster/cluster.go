@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -19,16 +18,14 @@ import (
 	"github.com/couchbase/gocbmgr"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/groupcache/lru"
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -83,23 +80,23 @@ type Cluster struct {
 	cluster     *couchbasev2.CouchbaseCluster
 	status      couchbasev2.ClusterStatus
 	members     couchbaseutil.MemberSet
-	eventsCli   corev1.EventInterface
 	username    string
 	password    string
 	client      *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
 	ctx         context.Context                // Context used to cancel long running operations
 	cancel      context.CancelFunc             // Closure on the context to indicate cancellation
 	lastEvent   time.Time                      // When we raised the last event (see raiseEvent)
-	recorder    record.EventRecorder           // Buffers and aggegates events
 	scheduler   scheduler.Scheduler            // Pod placement scheduler
 	forceUpdate bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
+	eventCache  *lru.Cache
 }
 
 func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
-		config:  config,
-		status:  *(cl.Status.DeepCopy()),
-		cluster: cl,
+		config:     config,
+		status:     *(cl.Status.DeepCopy()),
+		cluster:    cl,
+		eventCache: lru.New(1024),
 	}
 
 	kubeconfig, err := rest.InClusterConfig()
@@ -119,20 +116,9 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 
 	c.config.KubeCli = kubeclient
 	c.config.CouchbaseCRCli = couchbaseclient
-	c.eventsCli = c.config.KubeCli.CoreV1().Events(cl.Namespace)
 
 	// Cancel is used to abort the go routine when the operator is deleted
 	c.ctx, c.cancel = context.WithCancel(context.Background())
-
-	// Set up our event logger.  Note that this will cache and aggregate
-	// events over a 10 minute window.
-	if err := couchbasev2.AddToScheme(scheme.Scheme); err != nil {
-		log.Error(err, "Error adding scheme to client-go for event broadcasting", "cluster", c.cluster.Name)
-		return nil, err
-	}
-	broadcaster := record.NewBroadcaster()
-	c.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: os.Getenv(constants.EnvOperatorPodName)})
-	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: c.config.KubeCli.CoreV1().Events(c.cluster.Namespace)})
 
 	log.Info("Watching new cluster", "cluster", c.cluster.Name)
 
@@ -691,7 +677,7 @@ func (c *Cluster) raiseEvent(event *v1.Event) {
 	}
 
 	// Post the event to kubernetes
-	if _, err := c.eventsCli.Create(event); err != nil {
+	if _, err := c.config.KubeCli.CoreV1().Events(c.cluster.Namespace).Create(event); err != nil {
 		log.Error(err, "Event creation failed", "cluster", c.cluster.Name, "event", event.Reason)
 	}
 
@@ -702,7 +688,26 @@ func (c *Cluster) raiseEvent(event *v1.Event) {
 // raiseEventCached raises an event but first checks an LRU cache and optionally
 // aggregates events together
 func (c *Cluster) raiseEventCached(event *v1.Event) {
-	c.recorder.Event(c.cluster, event.Type, event.Reason, event.Message)
+	key := strings.Join([]string{event.Type, event.Reason, event.Message}, "")
+	entry, ok := c.eventCache.Get(key)
+	if ok {
+		e := entry.(*v1.Event)
+		if time.Since(e.LastTimestamp.Time) < 10*time.Minute {
+			e.Count++
+			e.LastTimestamp = metav1.Now()
+			e, err := c.config.KubeCli.CoreV1().Events(c.cluster.Namespace).Update(e)
+			if err != nil {
+				log.Error(err, "Event update failed", "cluster", c.cluster.Name, "event", event.Reason)
+			}
+			c.eventCache.Add(key, e)
+			return
+		}
+	}
+	e, err := c.config.KubeCli.CoreV1().Events(c.cluster.Namespace).Create(event)
+	if err != nil {
+		log.Error(err, "Event creation failed", "cluster", c.cluster.Name, "event", event.Reason)
+	}
+	c.eventCache.Add(key, e)
 }
 
 // clients should use ready members that are available to service requests
