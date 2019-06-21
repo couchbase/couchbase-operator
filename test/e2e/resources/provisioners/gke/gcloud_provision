@@ -30,6 +30,7 @@ Options:
 """
 
 import argparse
+import json
 import subprocess
 import sys
 import tempfile
@@ -117,9 +118,20 @@ def start(args):
 
     # Second pass create the clusters and configure Kubernetes clients.
     for region, _ in REGIONS.items():
+        versions = gcloud('container', 'get-server-config',
+                          '--region', region,
+                          '--format', 'json')
+        versions = json.loads(versions)
+        for master_version in versions['validMasterVersions']:
+            if master_version.startswith(args.cluster_version):
+                version = master_version
+                break
+        else:
+            raise RuntimeError('no valid versions found')
+
         # Create this regions's Kubernetes cluster.
         gcloud('container', 'clusters', 'create', args.name,
-               '--cluster-version', args.cluster_version,
+               '--cluster-version', version,
                '--region', region,
                '--machine-type', args.machine,
                '--network', args.name,
