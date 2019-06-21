@@ -285,3 +285,79 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
+
+// TestBucketUnmanaged ensures the operator doesn't touch buckets when they are
+// unmanaged.
+func TestBucketUnmanaged(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create a bucket.
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+
+	// Create a cluster with buckets unmanaged.
+	couchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	couchbase.Spec.Buckets.Managed = false
+	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, couchbase)
+
+	// Ensure the bucket doesn't get created.
+	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket.Name}, time.Minute); err == nil {
+		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, targetKube, couchbase, expectedEvents)
+}
+
+// TestBucketSelection ensures the operator only touches buckets that match the
+// label selector.
+func TestBucketSelection(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+	bucketName := "simba"
+	labels := map[string]string{
+		"loves": "nala",
+	}
+
+	// Create a default bucket and a labelled bucket.
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	bucket := e2espec.DefaultBucket.DeepCopy()
+	bucket.Name = bucketName
+	bucket.Labels = labels
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
+
+	// Create a cluster that selects only labelled buckets.
+	couchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	couchbase.Spec.Buckets.Selector = &metav1.LabelSelector{
+		MatchLabels: labels,
+	}
+	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, couchbase)
+
+	// Ensure the unlabelled bucket doesn't get created.
+	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket.Name}, time.Minute); err == nil {
+		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Only the labelled bucket is created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucketName},
+	}
+
+	ValidateEvents(t, targetKube, couchbase, expectedEvents)
+}

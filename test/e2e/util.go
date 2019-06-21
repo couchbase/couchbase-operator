@@ -26,6 +26,8 @@ var (
 		"TestCreateBucketCluster":                             TestCreateBucketCluster,
 		"TestBucketAddRemoveBasic":                            TestBucketAddRemoveBasic,
 		"TestEditBucket":                                      TestEditBucket,
+		"TestBucketUnmanaged":                                 TestBucketUnmanaged,
+		"TestBucketSelection":                                 TestBucketSelection,
 		"TestResizeCluster":                                   TestResizeCluster,
 		"TestEditClusterSettings":                             TestEditClusterSettings,
 		"TestRecoveryAfterOnePodFailureNoBucket":              TestRecoveryAfterOnePodFailureNoBucket,

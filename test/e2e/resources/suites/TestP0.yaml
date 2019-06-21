@@ -10,6 +10,13 @@ tcGroups:
       - name: TestBasicMDSScaling
       - name: TestDenyCommunityEdition
 
+  - name: BucketTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestBucketUnmanaged
+      - name: TestBucketSelection
+
   - name: ServiceTests
     clusters:
       - BasicCluster
