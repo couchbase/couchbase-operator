@@ -64,12 +64,12 @@ func ApplyDefaults(customResource *couchbasev2.CouchbaseCluster) {
 		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = DefaultAutoFailoverOnDataDiskIssuesTimePeriod
 	}
 
-	if customResource.Spec.AdminConsoleServiceType == "" {
-		customResource.Spec.AdminConsoleServiceType = corev1.ServiceTypeNodePort
+	if customResource.Spec.Networking.AdminConsoleServiceType == "" {
+		customResource.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeNodePort
 	}
 
-	if customResource.Spec.ExposedFeatureServiceType == "" {
-		customResource.Spec.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
+	if customResource.Spec.Networking.ExposedFeatureServiceType == "" {
+		customResource.Spec.Networking.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
 	}
 }
 
@@ -92,16 +92,16 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	errs := []error{}
 
 	// Basic schema openapi v3 validation (not provided by structural schema)
-	if !util.UniqueString(customResource.Spec.AdminConsoleServices.StringSlice()) {
-		errs = append(errs, errors.DuplicateItems("spec.adminConsoleServices", "body"))
+	if !util.UniqueString(customResource.Spec.Networking.AdminConsoleServices.StringSlice()) {
+		errs = append(errs, errors.DuplicateItems("spec.networking.adminConsoleServices", "body"))
 	}
-	if !util.UniqueString(customResource.Spec.ExposedFeatures) {
-		errs = append(errs, errors.DuplicateItems("spec.exposedFeatures", "body"))
+	if !util.UniqueString(customResource.Spec.Networking.ExposedFeatures) {
+		errs = append(errs, errors.DuplicateItems("spec.networking.exposedFeatures", "body"))
 	}
 	if !util.UniqueString(customResource.Spec.ServerGroups) {
 		errs = append(errs, errors.DuplicateItems("spec.serverGroups", "body"))
 	}
-	for i, class := range customResource.Spec.ServerSettings {
+	for i, class := range customResource.Spec.Servers {
 		if !util.UniqueString(class.Services.StringSlice()) {
 			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
 		}
@@ -109,18 +109,18 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
 		}
 	}
-	if customResource.Spec.ExposeAdminConsole && len(customResource.Spec.AdminConsoleServices) == 0 {
-		errs = append(errs, errors.Required("spec.adminConsoleServices", "body"))
+	if customResource.Spec.Networking.ExposeAdminConsole && len(customResource.Spec.Networking.AdminConsoleServices) == 0 {
+		errs = append(errs, errors.Required("spec.networking.adminConsoleServices", "body"))
 	}
 	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssues && customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
 		errs = append(errs, errors.Required("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body"))
 	}
 
 	// Referenced object validation
-	if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.AuthSecret); err != nil {
+	if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret); err != nil {
 		errs = append(errs, err)
 	} else if secret == nil {
-		errs = append(errs, fmt.Errorf("secret %s must exist", customResource.Spec.AuthSecret))
+		errs = append(errs, fmt.Errorf("secret %s must exist", customResource.Spec.Security.AdminSecret))
 	}
 
 	// Check to make sure:
@@ -128,18 +128,18 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// 2. The data service is specified on at least one node
 	unique := make(map[string]bool)
 	hasDataService := false
-	for i := range customResource.Spec.ServerSettings {
-		if _, ok := unique[customResource.Spec.ServerSettings[i].Name]; ok {
+	for i := range customResource.Spec.Servers {
+		if _, ok := unique[customResource.Spec.Servers[i].Name]; ok {
 			errs = append(errs, errors.DuplicateItems("spec.servers.name", "body"))
 		}
 
-		for _, svc := range customResource.Spec.ServerSettings[i].Services {
+		for _, svc := range customResource.Spec.Servers[i].Services {
 			if svc == "data" {
 				hasDataService = true
 			}
 		}
 
-		unique[customResource.Spec.ServerSettings[i].Name] = true
+		unique[customResource.Spec.Servers[i].Name] = true
 	}
 
 	if !hasDataService {
@@ -152,7 +152,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// 2. Log volumes can only be used on server classes containing query, search and eventing services.
 	//    Data, index and analytics volumes must use the default mount for data persistence.
 	anySupportable := false
-	for _, class := range customResource.Spec.ServerSettings {
+	for _, class := range customResource.Spec.Servers {
 		if class.Pod != nil && class.Pod.VolumeMounts != nil {
 			if class.Pod.VolumeMounts.DefaultClaim != "" || class.Pod.VolumeMounts.LogsClaim != "" {
 				anySupportable = true
@@ -161,7 +161,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	if anySupportable {
-		for index, class := range customResource.Spec.ServerSettings {
+		for index, class := range customResource.Spec.Servers {
 			// Volume mounts must be specified if any others are supportable
 			if class.Pod == nil || class.Pod.VolumeMounts == nil {
 				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d].pod", index)))
@@ -178,7 +178,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// validate persistent volume spec such that when volumeMounts are specified, claim for
 	// `default` must be provided, and all mounts much pair to associated persistentVolumeClaims.
 	// `logs` claim cannot be used in conjunction with `default` claim.
-	for index, config := range customResource.Spec.ServerSettings {
+	for index, config := range customResource.Spec.Servers {
 		if config.Pod != nil && config.Pod.VolumeMounts != nil {
 			mounts := config.Pod.VolumeMounts
 
@@ -294,8 +294,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	zones := []string{
 		customResource.Name + "." + customResource.Namespace + ".svc",
 	}
-	if customResource.Spec.DNS != nil {
-		zone := customResource.Name + "." + customResource.Spec.DNS.Domain
+	if customResource.Spec.Networking.DNS != nil {
+		zone := customResource.Name + "." + customResource.Spec.Networking.DNS.Domain
 		zones = append(zones, zone)
 	}
 
@@ -304,10 +304,10 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 	// Require that publically visible service ports have DNS information available.
 	if customResource.Spec.IsExposedFeatureServiceTypePublic() || customResource.Spec.IsAdminConsoleServiceTypePublic() {
-		if customResource.Spec.TLS == nil {
+		if customResource.Spec.Networking.TLS == nil {
 			errs = append(errs, errors.Required("spec.tls", "body"))
 		}
-		if customResource.Spec.DNS == nil {
+		if customResource.Spec.Networking.DNS == nil {
 			errs = append(errs, errors.Required("spec.dns", "body"))
 		}
 	}
@@ -374,10 +374,10 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 //   * have the correct attributes
 // * leaf certificate has the correct SANs
 func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zones []string) (errs []error) {
-	if cluster.Spec.TLS != nil {
+	if cluster.Spec.Networking.TLS != nil {
 		// CRD validation requires all the necessary fields are populated
-		operatorSecretName := cluster.Spec.TLS.Static.OperatorSecret
-		serverSecretName := cluster.Spec.TLS.Static.Member.ServerSecret
+		operatorSecretName := cluster.Spec.Networking.TLS.Static.OperatorSecret
+		serverSecretName := cluster.Spec.Networking.TLS.Static.Member.ServerSecret
 
 		var key []byte
 		var chain []byte
@@ -504,7 +504,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		errs = append(errs, util.NewUpdateError("spec.antiAffinity", "body"))
 	}
 
-	if current.Spec.AuthSecret != updated.Spec.AuthSecret {
+	if current.Spec.Security.AdminSecret != updated.Spec.Security.AdminSecret {
 		err := util.NewUpdateError("spec.authSecret", "body")
 		errs = append(errs, err)
 	}
@@ -513,8 +513,8 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		errs = append(errs, util.NewUpdateError("spec.serverGroups", "body"))
 	}
 
-	for _, cur := range current.Spec.ServerSettings {
-		for i, up := range updated.Spec.ServerSettings {
+	for _, cur := range current.Spec.Servers {
+		for i, up := range updated.Spec.Servers {
 			if cur.Name == up.Name {
 				if !util.StringArrayCompare(cur.ServerGroups, up.ServerGroups) {
 					errs = append(errs, util.NewUpdateError(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
@@ -530,7 +530,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 	// Check to see if either the old or new specification have the the index
 	// service defined. If they do then we cannot change the indexStorageSetting.
 	hasIndexSvc := false
-	for _, cur := range current.Spec.ServerSettings {
+	for _, cur := range current.Spec.Servers {
 		for _, svc := range cur.Services {
 			if svc == couchbasev2.IndexService {
 				hasIndexSvc = true
@@ -538,7 +538,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		}
 	}
 
-	for _, up := range updated.Spec.ServerSettings {
+	for _, up := range updated.Spec.Servers {
 		for _, svc := range up.Services {
 			if svc == couchbasev2.IndexService {
 				hasIndexSvc = true
@@ -552,7 +552,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 	}
 
 	// volume mounts cannot be added/removed nor can they specify different claim templates
-	for _, cur := range current.Spec.ServerSettings {
+	for _, cur := range current.Spec.Servers {
 		// If the current isn't in the updated it's being deleted, ignore
 		up := updated.Spec.GetServerConfigByName(cur.Name)
 		if up == nil {

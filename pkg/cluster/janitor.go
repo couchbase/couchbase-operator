@@ -201,10 +201,10 @@ func (j *janitor) updateDetachedAnnotations() error {
 // retention period.
 func (j *janitor) deleteTimedOutVolumes() error {
 	// An empty or zero value means do nothing
-	if j.cluster.cluster.Spec.LogRetentionTime == "" {
+	if j.cluster.cluster.Spec.Logging.LogRetentionTime == "" {
 		return nil
 	}
-	logRetentionTime, err := time.ParseDuration(j.cluster.cluster.Spec.LogRetentionTime)
+	logRetentionTime, err := time.ParseDuration(j.cluster.cluster.Spec.Logging.LogRetentionTime)
 	if err != nil {
 		return fmt.Errorf("logRetentionTime improperly formatted: %v", err)
 	}
@@ -235,7 +235,7 @@ func (j *janitor) deleteTimedOutVolumes() error {
 // count.
 func (j *janitor) deleteOverCapacityVolumes() error {
 	// A "zero" value means do nothing.
-	logRetentionCount := j.cluster.cluster.Spec.LogRetentionCount
+	logRetentionCount := j.cluster.cluster.Spec.Logging.LogRetentionCount
 	if logRetentionCount == 0 {
 		return nil
 	}

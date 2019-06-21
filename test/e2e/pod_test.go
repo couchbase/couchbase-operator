@@ -30,7 +30,7 @@ func TestPodResourcesBasic(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev2.PodPolicy{
+	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse(memReq),
@@ -63,7 +63,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev2.PodPolicy{
+	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse(memReq),
@@ -98,7 +98,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev2.PodPolicy{
+	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse(memReq),
@@ -133,7 +133,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.ServerSettings[0].Pod = &couchbasev2.PodPolicy{
+	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceMemory: resource.MustParse(memReq),

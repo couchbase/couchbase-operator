@@ -18,22 +18,24 @@ metadata:
   name: cb-example
 spec:
   image: couchbase/server:enterprise-6.0.1
-  authSecret: cb-example-auth
-  exposeAdminConsole: true
-  adminConsoleServiceType: LoadBalancer
-  adminConsoleServices:
-    - data
-  exposedFeatures:
-    - xdcr
-    - client
-  exposedFeatureServiceType: LoadBalancer
-  tls:
-    static:
-      member:
-        serverSecret: couchbase-server-tls
-      operatorSecret: couchbase-operator-tls
-  dns:
-    domain: us-east1.example.com
+  security:
+    adminSecret: cb-example-auth
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServiceType: LoadBalancer
+    adminConsoleServices:
+      - data
+    exposedFeatures:
+      - xdcr
+      - client
+    exposedFeatureServiceType: LoadBalancer
+    tls:
+      static:
+        member:
+          serverSecret: couchbase-server-tls
+        operatorSecret: couchbase-operator-tls
+    dns:
+      domain: us-east1.example.com
   platform: gce
   cluster:
     dataServiceMemoryQuota: 256

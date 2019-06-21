@@ -186,7 +186,7 @@ func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace
 	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
 	if ctx != nil {
 		crd.Name = ctx.ClusterName
-		crd.Spec.TLS = &couchbasev2.TLSPolicy{
+		crd.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 			Static: &couchbasev2.StaticTLS{
 				Member: &couchbasev2.MemberSecret{
 					ServerSecret: ctx.ClusterSecretName,
@@ -217,7 +217,7 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
 	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.TLS = &couchbasev2.TLSPolicy{
+	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -240,7 +240,7 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
 	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.TLS = &couchbasev2.TLSPolicy{
+	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -262,7 +262,7 @@ func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace strin
 func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
 	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.TLS = &couchbasev2.TLSPolicy{
+	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -345,7 +345,7 @@ func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace strin
 func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
 	cluster := e2espec.NewClusterCRD("", e2espec.NewSupportableClusterSpec(size))
 	cluster.Name = ctx.ClusterName
-	cluster.Spec.TLS = &couchbasev2.TLSPolicy{
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -438,8 +438,8 @@ func MustDeleteBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket
 }
 
 func AddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
-	settings := append(cl.Spec.ServerSettings, newService)
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", settings), timeout)
+	settings := append(cl.Spec.Servers, newService)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", settings), timeout)
 }
 
 func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -452,12 +452,12 @@ func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchbase
 
 func RemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	newServiceConfig := []couchbasev2.ServerConfig{}
-	for _, service := range cl.Spec.ServerSettings {
+	for _, service := range cl.Spec.Servers {
 		if service.Name != removeServiceName {
 			newServiceConfig = append(newServiceConfig, service)
 		}
 	}
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", newServiceConfig), timeout)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
 }
 
 func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -470,7 +470,7 @@ func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchb
 
 func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	newServiceConfig := []couchbasev2.ServerConfig{}
-	for _, service := range cl.Spec.ServerSettings {
+	for _, service := range cl.Spec.Servers {
 		for serviceName, size := range servicesMap {
 			if serviceName == service.Name {
 				service.Size = size
@@ -478,7 +478,7 @@ func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 		}
 		newServiceConfig = append(newServiceConfig, service)
 	}
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings", newServiceConfig), timeout)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
 }
 
 func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -746,7 +746,7 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/ServerSettings/%d/Size", service), clusterSize), 30*time.Second)
+	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/Servers/%d/Size", service), clusterSize), 30*time.Second)
 }
 
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
@@ -822,7 +822,7 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *co
 	podGetter := scheduler.NewNullPodGetter()
 	scheduler, _ := scheduler.NewNullScheduler(podGetter, cl)
 
-	for _, config := range cl.Spec.ServerSettings {
+	for _, config := range cl.Spec.Servers {
 		if config.Name == m.ServerConfig {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()

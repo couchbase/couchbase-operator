@@ -172,7 +172,7 @@ func (c *Cluster) setup() error {
 		return fmt.Errorf("unexpected cluster phase: %s", c.status.Phase)
 	}
 
-	if err := c.setupAuth(c.cluster.Spec.AuthSecret); err != nil {
+	if err := c.setupAuth(c.cluster.Spec.Security.AdminSecret); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func (c *Cluster) create() error {
 			couchbasev2.ClusterPhaseCreating, err)
 	}
 
-	if len(c.cluster.Spec.ServerSettings) == 0 {
+	if len(c.cluster.Spec.Servers) == 0 {
 		return fmt.Errorf("cluster create: no server specification defined")
 	}
 
@@ -243,7 +243,7 @@ func (c *Cluster) create() error {
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
-	m, err := c.createMember(c.cluster.Spec.ServerSettings[idx])
+	m, err := c.createMember(c.cluster.Spec.Servers[idx])
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func (c *Cluster) create() error {
 	log.Info("Operator added member", "cluster", c.cluster.Name, "name", m.Name)
 	c.raiseEvent(k8sutil.MemberAddEvent(m.Name, c.cluster))
 
-	if err := c.initMember(m, c.cluster.Spec.ServerSettings[idx]); err != nil {
+	if err := c.initMember(m, c.cluster.Spec.Servers[idx]); err != nil {
 		return err
 	}
 
@@ -271,7 +271,7 @@ func (c *Cluster) setupServices() error {
 	if err != nil {
 		return err
 	}
-	if c.cluster.Spec.ExposeAdminConsole {
+	if c.cluster.Spec.Networking.ExposeAdminConsole {
 		c.reconcileAdminService()
 	}
 	return nil
@@ -401,7 +401,7 @@ func (c *Cluster) updateCRStatus() error {
 }
 
 func (c *Cluster) isSecureClient() bool {
-	return c.cluster.Spec.TLS.IsSecureClient()
+	return c.cluster.Spec.Networking.TLS.IsSecureClient()
 }
 
 func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
@@ -600,7 +600,7 @@ func (c *Cluster) initCouchbaseClient() error {
 
 	if c.isSecureClient() {
 		// Grab the operator secret
-		secretName := c.cluster.Spec.TLS.Static.OperatorSecret
+		secretName := c.cluster.Spec.Networking.TLS.Static.OperatorSecret
 		secret, err := k8sutil.GetSecret(c.config.KubeCli, secretName, c.cluster.Namespace, nil)
 		if err != nil {
 			return err
@@ -635,7 +635,7 @@ func (c *Cluster) initCouchbaseClient() error {
 }
 
 func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
-	for idx, serverSpec := range c.cluster.Spec.ServerSettings {
+	for idx, serverSpec := range c.cluster.Spec.Servers {
 		for _, service := range serverSpec.Services {
 			if service == svc {
 				return idx

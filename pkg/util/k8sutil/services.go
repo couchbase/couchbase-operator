@@ -293,7 +293,7 @@ func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v
 
 // dnsAdminConsoleName returns the DNS name for the admin console.
 func dnsAdminConsoleName(cluster *couchbasev2.CouchbaseCluster) string {
-	return "console." + cluster.Name + "." + cluster.Spec.DNS.Domain
+	return "console." + cluster.Name + "." + cluster.Spec.Networking.DNS.Domain
 }
 
 // ConsoleServiceName generates the console service name.
@@ -360,7 +360,7 @@ func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, own
 // adminConsoleSelector generates a selector matching pods running all the requested services.
 func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	labels := LabelsForCluster(cluster.Name)
-	for _, s := range cluster.Spec.AdminConsoleServices {
+	for _, s := range cluster.Spec.Networking.AdminConsoleServices {
 		k := "couchbase_service_" + s.String()
 		labels[k] = "enabled"
 	}
@@ -379,10 +379,10 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 	selectors := adminConsoleSelector(cluster)
 
 	// Create the basic service.
-	service := createServiceManifest(ConsoleServiceName(cluster.Name), cluster.Spec.AdminConsoleServiceType, ports, labels, selectors)
+	service := createServiceManifest(ConsoleServiceName(cluster.Name), cluster.Spec.Networking.AdminConsoleServiceType, ports, labels, selectors)
 
 	// If a DNS domain is specified add a DNS name for use with TLS.
-	if cluster.Spec.DNS != nil {
+	if cluster.Spec.Networking.DNS != nil {
 		service.Annotations[constants.DNSAnnotation] = dnsAdminConsoleName(cluster)
 	}
 
@@ -459,7 +459,7 @@ func UpdateAdminConsole(kubecli kubernetes.Interface, cluster *couchbasev2.Couch
 	if err != nil {
 		switch {
 		case IsKubernetesResourceNotFoundError(err):
-			if !cluster.Spec.ExposeAdminConsole {
+			if !cluster.Spec.Networking.ExposeAdminConsole {
 				return ReconcileStatusUnchanged, nil
 			}
 			service = generateConsoleService(cluster)
@@ -475,7 +475,7 @@ func UpdateAdminConsole(kubecli kubernetes.Interface, cluster *couchbasev2.Couch
 	}
 
 	// If it exists but doesn't want to, delete it.
-	if !cluster.Spec.ExposeAdminConsole {
+	if !cluster.Spec.Networking.ExposeAdminConsole {
 		if err := DeleteService(kubecli, cluster.Namespace, name, nil); err != nil {
 			return ReconcileStatusError, err
 		}
@@ -650,12 +650,12 @@ func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
 
 // GetDNSName returns the public DNS name we expect to be created for the member.
 func GetDNSName(cluster *couchbasev2.CouchbaseCluster, hostname string) string {
-	return hostname + "." + cluster.Name + "." + cluster.Spec.DNS.Domain
+	return hostname + "." + cluster.Name + "." + cluster.Spec.Networking.DNS.Domain
 }
 
 // GetSRVName returns the public SRV name to create for service discovery.
 func GetSRVName(cluster *couchbasev2.CouchbaseCluster) string {
-	return "_couchbases._tcp." + cluster.Name + "." + cluster.Spec.DNS.Domain + " 0 0 " + strconv.Itoa(dataServicePortTLS)
+	return "_couchbases._tcp." + cluster.Name + "." + cluster.Spec.Networking.DNS.Domain + " 0 0 " + strconv.Itoa(dataServicePortTLS)
 }
 
 // filterInsecurePorts takes a set of ports and removes any that are not allowed
@@ -745,10 +745,10 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	// Create the new service
 	labels := labelsForNodeService(cluster.Name, name)
 	selectors := getNodeServiceSelectors(cluster, name)
-	service := createServiceManifest(exposedServiceName, cluster.Spec.ExposedFeatureServiceType, allowedPorts, labels, selectors)
+	service := createServiceManifest(exposedServiceName, cluster.Spec.Networking.ExposedFeatureServiceType, allowedPorts, labels, selectors)
 
 	// If a DNS domain is specified annotate with the pod DNS name.
-	if cluster.Spec.DNS != nil {
+	if cluster.Spec.Networking.DNS != nil {
 		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, name)
 		// TODO: data nodes only please
 		// TODO: await input from external-dns
@@ -882,7 +882,7 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, status *couchbasev2.ClusterStatus) (*UpdateExposedFeatureStatus, error) {
 	// For each feature set accumulate a unique set of services to expose, then map these to
 	// a set of ports we wish to expose.
-	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.ExposedFeatures)
+	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.Networking.ExposedFeatures)
 	if err != nil {
 		return nil, err
 	}
@@ -972,7 +972,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 	sort.Sort(ret.Removed)
 
 	// Finally update the status
-	status.ExposedFeatures = cluster.Spec.ExposedFeatures
+	status.ExposedFeatures = cluster.Spec.Networking.ExposedFeatures
 	if len(portStatus) == 0 {
 		portStatus = nil
 	}
@@ -985,7 +985,7 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 // Does exactly the same as above but tells us if we need to do anything
 func WouldUpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 	// For each feature set accumulate a unique set of services to expose
-	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.ExposedFeatures)
+	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.Networking.ExposedFeatures)
 	if err != nil {
 		return false, err
 	}

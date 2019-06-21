@@ -248,7 +248,7 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 					Type: "object",
 					Required: []string{
 						"image",
-						"authSecret",
+						"security",
 						"cluster",
 						"servers",
 					},
@@ -263,59 +263,104 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 						"antiAffinity": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "boolean",
 						},
-						"tls": apiextensionsv1beta1.JSONSchemaProps{
+						"security": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
 							Required: []string{
-								"static",
+								"adminSecret",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"static": apiextensionsv1beta1.JSONSchemaProps{
+								"adminSecret": apiextensionsv1beta1.JSONSchemaProps{
+									Type:      "string",
+									MinLength: &minimumStringLength,
+								},
+							},
+						},
+						"networking": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"tls": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "object",
 									Required: []string{
-										"member",
-										"operatorSecret",
+										"static",
 									},
 									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-										"member": apiextensionsv1beta1.JSONSchemaProps{
+										"static": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "object",
 											Required: []string{
-												"serverSecret",
+												"member",
+												"operatorSecret",
 											},
 											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-												"serverSecret": apiextensionsv1beta1.JSONSchemaProps{
+												"member": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Required: []string{
+														"serverSecret",
+													},
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"serverSecret": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+												},
+												"operatorSecret": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "string",
 												},
 											},
 										},
-										"operatorSecret": apiextensionsv1beta1.JSONSchemaProps{
+									},
+								},
+								"exposeAdminConsole": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
+								},
+								"adminConsoleServices": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "array",
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type:    "string",
+											Pattern: "^data|index|query|search|eventing|analytics$",
+										},
+									},
+								},
+								"exposedFeatures": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "array",
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type:    "string",
+											Pattern: "^admin|xdcr|client$",
+										},
+									},
+								},
+								"exposedFeatureServiceType": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: "^NodePort|LoadBalancer$",
+								},
+								"adminConsoleServiceType": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: "^NodePort|LoadBalancer$",
+								},
+								"dns": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Required: []string{
+										"domain",
+									},
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"domain": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "string",
 										},
 									},
 								},
 							},
 						},
-						"authSecret": apiextensionsv1beta1.JSONSchemaProps{
-							Type:      "string",
-							MinLength: &minimumStringLength,
-						},
-						"exposeAdminConsole": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "boolean",
-						},
-						"adminConsoleServices": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "array",
-							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-								Schema: &apiextensionsv1beta1.JSONSchemaProps{
+						"logging": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"logRetentionTime": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "string",
-									Pattern: "^data|index|query|search|eventing|analytics$",
+									Pattern: `^\d+(ns|us|ms|s|m|h)$`,
 								},
-							},
-						},
-						"exposedFeatures": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "array",
-							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-								Schema: &apiextensionsv1beta1.JSONSchemaProps{
-									Type:    "string",
-									Pattern: "^admin|xdcr|client$",
+								"logRetentionCount": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "integer",
+									Minimum: &minimumLogRetentionCount,
 								},
 							},
 						},
@@ -326,36 +371,6 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 							Type: "array",
 							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 								Schema: &apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-								},
-							},
-						},
-						"disableBucketManagement": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "boolean",
-						},
-						"logRetentionTime": apiextensionsv1beta1.JSONSchemaProps{
-							Type:    "string",
-							Pattern: `^\d+(ns|us|ms|s|m|h)$`,
-						},
-						"logRetentionCount": apiextensionsv1beta1.JSONSchemaProps{
-							Type:    "integer",
-							Minimum: &minimumLogRetentionCount,
-						},
-						"exposedFeatureServiceType": apiextensionsv1beta1.JSONSchemaProps{
-							Type:    "string",
-							Pattern: "^NodePort|LoadBalancer$",
-						},
-						"adminConsoleServiceType": apiextensionsv1beta1.JSONSchemaProps{
-							Type:    "string",
-							Pattern: "^NodePort|LoadBalancer$",
-						},
-						"dns": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "object",
-							Required: []string{
-								"domain",
-							},
-							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"domain": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
 							},

@@ -54,7 +54,7 @@ func TestEditServiceConfig(t *testing.T) {
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// When ready update the server class size and wait for the cluster to be scaled.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Size", clusterSize+1), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/Size", clusterSize+1), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
@@ -289,12 +289,12 @@ func TestRemoveForeignNode(t *testing.T) {
 	member := &couchbaseutil.Member{
 		Name:         foreignNodeName,
 		Namespace:    f.Namespace,
-		ServerConfig: testCouchbase.Spec.ServerSettings[0].Name,
+		ServerConfig: testCouchbase.Spec.Servers[0].Name,
 	}
 
 	// When ready create and add a new node, expect the operator to remove it
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
-	e2eutil.MustAddNode(t, targetKube, testCouchbase, testCouchbase.Spec.ServerSettings[0].Services, member)
+	e2eutil.MustAddNode(t, targetKube, testCouchbase, testCouchbase.Spec.Servers[0].Services, member)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, clusterSize, 5*time.Minute)
 

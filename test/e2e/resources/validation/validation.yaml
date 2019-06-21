@@ -66,25 +66,27 @@ metadata:
   name: cluster
   namespace: default
 spec:
-  antiAffinity: false
   image: couchbase/server:enterprise-5.5.0
-  authSecret: basic-test-secret
-  exposeAdminConsole: false
+  antiAffinity: false
   paused: false
-  disableBucketManagement: false
-  logRetentionTime: "24h"
-  logRetentionCount: 10
-  adminConsoleServices:
+  security:
+    adminSecret: basic-test-secret
+  networking:
+    exposeAdminConsole: false
+    adminConsoleServices:
       - data
       - index
       - query
       - search
+    dns:
+      domain: "example.com"
+  logging:
+    logRetentionTime: "24h"
+    logRetentionCount: 10
   serverGroups:
     - RzaGroup-1
     - RzaGroup-2
     - RzaGroup-3
-  dns:
-    domain: "example.com"
   cluster:
     dataServiceMemoryQuota: 600
     indexServiceMemoryQuota: 256

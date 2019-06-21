@@ -37,7 +37,7 @@ type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]
 
 // newClient returns a new Couchbase management client (internal not go SDK)
 func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
-	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.AuthSecret)
+	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.Security.AdminSecret)
 	if err != nil {
 		return nil, err
 	}

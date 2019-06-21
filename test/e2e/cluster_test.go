@@ -233,7 +233,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 5*time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/ServerSettings/0/Pod"), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Servers/0/Pod"), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events match what we expect:
@@ -795,7 +795,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 
 	// Create the cluster with two server classes, and exposed features.
 	testCouchbase := e2espec.NewBasicClusterSpec(0, constants.AdminHidden)
-	testCouchbase.Spec.ServerSettings = []couchbasev2.ServerConfig{
+	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "data",
 			Size: mdsGroupSize1,
@@ -812,13 +812,13 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 			},
 		},
 	}
-	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureXDCR,
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Remove a service and ensure things still work.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/ServerSettings/1"), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Servers/1"), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 

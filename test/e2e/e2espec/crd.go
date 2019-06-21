@@ -84,7 +84,7 @@ var (
 
 // server settings
 var (
-	defaultServerSettings = couchbasev2.ServerConfig{
+	defaultServers = couchbasev2.ServerConfig{
 		Size: e2e_constants.Size1,
 		Name: "test_config_1",
 		Services: couchbasev2.ServiceList{
@@ -208,15 +208,20 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 // basic 3 node cluster
 func NewBasicCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
-		Image:                     e2e_constants.CouchbaseServerImage,
-		AuthSecret:                e2e_constants.KubeTestSecretName,
-		ClusterSettings:           defaultClusterSettings,
-		AdminConsoleServiceType:   "NodePort",
-		ExposedFeatureServiceType: "NodePort",
+		Image: e2e_constants.CouchbaseServerImage,
+		Security: couchbasev2.CouchbaseClusterSecuritySpec{
+			AdminSecret: e2e_constants.KubeTestSecretName,
+		},
+		ClusterSettings: defaultClusterSettings,
+		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
+			AdminConsoleServiceType:   "NodePort",
+			ExposedFeatureServiceType: "NodePort",
+			ExposedFeatures:           []string{},
+		},
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		ServerSettings: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
+		Servers: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
 			Size: size,
 			Name: "test_config_1",
 			Services: couchbasev2.ServiceList{
@@ -225,12 +230,11 @@ func NewBasicCluster(genName, secretName string, size int, exposed bool) *couchb
 				couchbasev2.IndexService,
 			},
 		}},
-		ExposedFeatures: []string{},
 	}
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
-		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+		crd.Spec.Networking.ExposeAdminConsole = true
+		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
 			couchbasev2.DataService,
 		}
 	}
@@ -239,13 +243,18 @@ func NewBasicCluster(genName, secretName string, size int, exposed bool) *couchb
 
 func NewBasicClusterSpec(size int, console bool) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
-		Image:           e2e_constants.CouchbaseServerImage,
-		AuthSecret:      e2e_constants.KubeTestSecretName,
+		Image: e2e_constants.CouchbaseServerImage,
+		Security: couchbasev2.CouchbaseClusterSecuritySpec{
+			AdminSecret: e2e_constants.KubeTestSecretName,
+		},
+		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
+			ExposedFeatures: []string{},
+		},
 		ClusterSettings: defaultClusterSettings,
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		ServerSettings: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
+		Servers: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
 			Size: size,
 			Name: "test_config_1",
 			Services: couchbasev2.ServiceList{
@@ -254,12 +263,11 @@ func NewBasicClusterSpec(size int, console bool) *couchbasev2.CouchbaseCluster {
 				couchbasev2.IndexService,
 			},
 		}},
-		ExposedFeatures: []string{},
 	}
 	crd := NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 	if console {
-		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+		crd.Spec.Networking.ExposeAdminConsole = true
+		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
 			couchbasev2.DataService,
 		}
 	}
@@ -270,13 +278,15 @@ func NewBasicClusterSpec(size int, console bool) *couchbasev2.CouchbaseCluster {
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
 func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 	spec := couchbasev2.ClusterSpec{
-		Image:           e2e_constants.CouchbaseServerImage,
-		AuthSecret:      e2e_constants.KubeTestSecretName,
+		Image: e2e_constants.CouchbaseServerImage,
+		Security: couchbasev2.CouchbaseClusterSecuritySpec{
+			AdminSecret: e2e_constants.KubeTestSecretName,
+		},
 		ClusterSettings: defaultClusterSettings,
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		ServerSettings: []couchbasev2.ServerConfig{
+		Servers: []couchbasev2.ServerConfig{
 			{
 				Name: "stateful",
 				Size: size,
@@ -344,13 +354,18 @@ func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
 // basic 3 node cluster with Xdcr cluster
 func NewBasicXdcrCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
-		Image:           e2e_constants.CouchbaseServerImage,
-		AuthSecret:      e2e_constants.KubeTestSecretName,
+		Image: e2e_constants.CouchbaseServerImage,
+		Security: couchbasev2.CouchbaseClusterSecuritySpec{
+			AdminSecret: e2e_constants.KubeTestSecretName,
+		},
+		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
+			ExposedFeatures: []string{"xdcr"},
+		},
 		ClusterSettings: defaultClusterSettings,
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		ServerSettings: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
+		Servers: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
 			Size: size,
 			Name: "test_config_1",
 			Services: couchbasev2.ServiceList{
@@ -359,14 +374,13 @@ func NewBasicXdcrCluster(genName, secretName string, size int, exposed bool) *co
 				couchbasev2.IndexService,
 			},
 		}},
-		ExposedFeatures: []string{"xdcr"},
 	}
 	spec.ClusterSettings.AutoFailoverTimeout = 30
 	spec.ClusterSettings.AutoFailoverMaxCount = 3
 	crd := NewClusterCRD(genName, spec)
 	if exposed {
-		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+		crd.Spec.Networking.ExposeAdminConsole = true
+		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
 			couchbasev2.DataService,
 		}
 	}
@@ -383,16 +397,20 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 
 	// Spec object to return
 	spec := couchbasev2.ClusterSpec{
-		Image:           e2e_constants.CouchbaseServerImage,
-		AuthSecret:      secretName,
+		Image: e2e_constants.CouchbaseServerImage,
+		Security: couchbasev2.CouchbaseClusterSecuritySpec{
+			AdminSecret: secretName,
+		},
+		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
+			ExposedFeatures:      []string{},
+			AdminConsoleServices: couchbasev2.ServiceList{},
+		},
 		ClusterSettings: defaultClusterSettings,
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		ServerSettings:       []couchbasev2.ServerConfig{},
-		AdminConsoleServices: couchbasev2.ServiceList{},
-		ExposedFeatures:      couchbasev2.ExposedFeatureList{},
-		ServerGroups:         []string{},
+		Servers:      []couchbasev2.ServerConfig{},
+		ServerGroups: []string{},
 	}
 
 	for _, key := range keys {
@@ -438,7 +456,7 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 
 		// Modify Service in ClusterSpec
 		case strings.Contains(key, "service"):
-			serverSettings := defaultServerSettings
+			serverSettings := defaultServers
 			volumeMnt := &couchbasev2.VolumeMounts{}
 			podPolicy := &couchbasev2.PodPolicy{VolumeMounts: nil}
 			podPolicy.Resources = v1.ResourceRequirements{
@@ -492,16 +510,16 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 					serverSettings.Pod.VolumeMounts.LogsClaim = config[key][setting]
 				}
 			}
-			spec.ServerSettings = append(spec.ServerSettings, serverSettings)
+			spec.Servers = append(spec.Servers, serverSettings)
 
 		// Sets ExposedFeatures in ClusterSpec
 		case key == "exposedFeatures":
-			spec.ExposedFeatures = strings.Split(config[key]["featureNames"], ",")
+			spec.Networking.ExposedFeatures = strings.Split(config[key]["featureNames"], ",")
 
 		// Updates AdminConsoleServices in ClusterSpec
 		case key == "adminConsoleServices":
 			for _, serviceName := range strings.Split(config[key]["services"], ",") {
-				spec.AdminConsoleServices = append(spec.AdminConsoleServices, couchbasev2.Service(serviceName))
+				spec.Networking.AdminConsoleServices = append(spec.Networking.AdminConsoleServices, couchbasev2.Service(serviceName))
 			}
 
 		// Sets ServerGroups in ClusterSpec
@@ -519,10 +537,10 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 						spec.AntiAffinity = false
 					}
 				case "logRetentionTime":
-					spec.LogRetentionTime = config[key][setting]
+					spec.Logging.LogRetentionTime = config[key][setting]
 				case "logRetentionCount":
 					if logRetentionCount, err := strconv.Atoi(config[key][setting]); err == nil {
-						spec.LogRetentionCount = logRetentionCount
+						spec.Logging.LogRetentionCount = logRetentionCount
 					}
 				}
 			}
@@ -534,8 +552,8 @@ func CreateClusterSpec(genName, secretName string, config map[string]map[string]
 func CreateClusterCRD(genName string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
 	crd := NewClusterCRD(genName, spec)
 	if adminConsoleExposed {
-		crd.Spec.ExposeAdminConsole = true
-		crd.Spec.AdminConsoleServices = couchbasev2.ServiceList{
+		crd.Spec.Networking.ExposeAdminConsole = true
+		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
 			couchbasev2.DataService,
 		}
 	}
@@ -553,7 +571,7 @@ func NewStatefulCluster(genName, secretName string, size int, exposed bool) *cou
 
 	crd := NewBasicCluster(genName, secretName, size, exposed)
 	couchbase := "couchbase"
-	crd.Spec.ServerSettings[0].Pod = &couchbasev2.PodPolicy{
+	crd.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: couchbase},
 	}
 

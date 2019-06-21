@@ -21,8 +21,10 @@ var (
 				Namespace: "default",
 			},
 			Spec: couchbasev2.ClusterSpec{
-				LogRetentionTime:  "1m",
-				LogRetentionCount: 3,
+				Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+					LogRetentionTime:  "1m",
+					LogRetentionCount: 3,
+				},
 			},
 		},
 	}

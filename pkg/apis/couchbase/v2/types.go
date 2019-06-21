@@ -145,31 +145,8 @@ type ClusterSpec struct {
 	// the couchbase members in the same cluster onto the same node.
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
-	// couchbase cluster TLS configuration
-	TLS *TLSPolicy `json:"tls,omitempty"`
-
 	// Cluster specific settings
 	ClusterSettings ClusterConfig `json:"cluster"`
-
-	// Bucket specific settings
-	Buckets Buckets `json:"buckets,omitempty"`
-
-	// A specificaion for the way nodes should be configured in the cluster
-	ServerSettings []ServerConfig `json:"servers,omitempty"`
-
-	// AuthSecret is the name of a kube secret to use for authentication
-	AuthSecret string `json:"authSecret"`
-
-	// Option to expose admin console
-	ExposeAdminConsole bool `json:"exposeAdminConsole"`
-
-	// Specific services to use when exposing ui
-	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`
-
-	// ExposedFeatures is a list of features to expose on the K8S node
-	// network.  They represent a subset of ports e.g. admin=8091,
-	// xdcr=8091,8092,11210, and thus may overlap.
-	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
 
 	// Enables software update notifications in the UI
 	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications"`
@@ -188,11 +165,45 @@ type ClusterSpec struct {
 	// Security Context for all pods
 	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
 
-	// LogRetentionTime gives the time to keep persistent log PVCs alive for.
-	LogRetentionTime string `json:"logRetentionTime,omitempty"`
+	// Platform gives a hint as to what platform we are running on and how
+	// to configure services etc.
+	Platform PlatformType `json:"platform,omitempty"`
 
-	// LogRetentionCount gives the number of persistent log PVCs to keep.
-	LogRetentionCount int `json:"logRetentionCount,omitempty"`
+	// Security groups together related security options.
+	Security CouchbaseClusterSecuritySpec `json:"security"`
+
+	// Networking groups together related networking options.
+	Networking CouchbaseClusterNetworkingSpec `json:"networking"`
+
+	// Logging groups together logging related options.
+	Logging CouchbaseClusterLoggingSpec `json:"logging"`
+
+	// Servers specifies
+	Servers []ServerConfig `json:"servers,omitempty"`
+
+	// Bucket specific settings
+	Buckets Buckets `json:"buckets,omitempty"`
+}
+
+type CouchbaseClusterSecuritySpec struct {
+	// AdminSecret is the name of a kubernetes secret to use for administrator authentication.
+	AdminSecret string `json:"adminSecret"`
+}
+
+type CouchbaseClusterNetworkingSpec struct {
+	// ExposeAdminConsole creates a service referencing the admin console.
+	ExposeAdminConsole bool `json:"exposeAdminConsole"`
+
+	// AdminConsoleServices is a selector to choose specific services to expose via the admin console.
+	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`
+
+	// ExposedFeatures is a list of features to expose on the K8S node
+	// network.  They represent a subset of ports e.g. admin=8091,
+	// xdcr=8091,8092,11210, and thus may overlap.
+	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
+
+	// TLS contains the TLS configuration for the cluster.
+	TLS *TLSPolicy `json:"tls,omitempty"`
 
 	// ExposedFeatureServiceType defines whether to create a NodePort or LoadBalancer service.
 	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
@@ -202,10 +213,14 @@ type ClusterSpec struct {
 
 	// DNS points to information for Dynamic DNS support.
 	DNS *DNS `json:"dns,omitempty"`
+}
 
-	// Platform gives a hint as to what platform we are running on and how
-	// to configure services etc.
-	Platform PlatformType `json:"platform,omitempty"`
+type CouchbaseClusterLoggingSpec struct {
+	// LogRetentionTime gives the time to keep persistent log PVCs alive for.
+	LogRetentionTime string `json:"logRetentionTime,omitempty"`
+
+	// LogRetentionCount gives the number of persistent log PVCs to keep.
+	LogRetentionCount int `json:"logRetentionCount,omitempty"`
 }
 
 // DNS contains information for Dynamic DNS support.

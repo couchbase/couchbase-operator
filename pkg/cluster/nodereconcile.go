@@ -136,7 +136,7 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 
 	// If we have any server specs that are not properly sized then we need to
 	// reconcile the nodes.
-	serverSpecs := c.cluster.Spec.ServerSettings
+	serverSpecs := c.cluster.Spec.Servers
 	for _, serverSpec := range serverSpecs {
 		nodes := r.couchbase.ActiveNodes.GroupByServerConfig(serverSpec.Name)
 		if nodes.Size() != serverSpec.Size {
@@ -459,7 +459,7 @@ func handleUnknownServerConfigs(r *ReconcileMachine, c *Cluster) error {
 	// up all of the nodes from that server config here.
 	for _, m := range r.runningPods {
 		found := false
-		for _, serverSpec := range c.cluster.Spec.ServerSettings {
+		for _, serverSpec := range c.cluster.Spec.Servers {
 			if m.ServerConfig == serverSpec.Name {
 				found = true
 				break
@@ -483,7 +483,7 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 	currentSize := 0
 	desiredSize := 0
 
-	serverSpecs := c.cluster.Spec.ServerSettings
+	serverSpecs := c.cluster.Spec.Servers
 	for _, serverSpec := range serverSpecs {
 		// Check to see if we need to remove anything
 		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
@@ -535,7 +535,7 @@ func handleUnmanagedNodes(r *ReconcileMachine, c *Cluster) error {
 }
 
 func handleAddNode(r *ReconcileMachine, c *Cluster) error {
-	serverSpecs := c.cluster.Spec.ServerSettings
+	serverSpecs := c.cluster.Spec.Servers
 	for _, serverSpec := range serverSpecs {
 		addCount := 0
 		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)

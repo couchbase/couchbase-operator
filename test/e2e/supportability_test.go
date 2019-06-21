@@ -1883,8 +1883,8 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	// Create the cluster
 	e2eutil.MustNewBucket(t, kubernetes, f.Namespace, e2espec.DefaultBucket)
 	cluster := e2espec.NewSupportableCluster(mdsGroupSize)
-	cluster.Spec.LogRetentionTime = "15m"
-	cluster.Spec.LogRetentionCount = maxLogCount
+	cluster.Spec.Logging.LogRetentionTime = "15m"
+	cluster.Spec.Logging.LogRetentionCount = maxLogCount
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, f.Namespace, cluster)
 
 	// Track pods we create and their expected number of persistent volumes.
@@ -2280,7 +2280,7 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 
 	// Ensure cluster 1 is healthy and update the retention period to be 1m.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, 2*time.Minute)
-	_ = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/LogRetentionTime", "1m"), time.Minute)
+	_ = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/Logging/LogRetentionTime", "1m"), time.Minute)
 
 	// Ensure cluster2 is healthy then kill the first stateless pod in cluster 2.  Wait for the recovery to
 	// start and complete.

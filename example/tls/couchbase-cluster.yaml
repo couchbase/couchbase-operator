@@ -18,12 +18,19 @@ metadata:
   name: cb-example
 spec:
   image: couchbase/server:enterprise-6.0.1
-  authSecret: cb-example-auth
-  exposeAdminConsole: true
-  adminConsoleServices:
-    - data
-  exposedFeatures:
-    - xdcr
+  security:
+    adminSecret: cb-example-auth
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServices:
+      - data
+    exposedFeatures:
+      - xdcr
+    tls:
+      static:
+        member:
+          serverSecret: couchbase-server-tls
+        operatorSecret: couchbase-operator-tls
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256
@@ -48,8 +55,3 @@ spec:
         - search
       dataPath: /opt/couchbase/var/lib/couchbase/data
       indexPath: /opt/couchbase/var/lib/couchbase/data
-  tls:
-    static:
-      member:
-        serverSecret: couchbase-server-tls
-      operatorSecret: couchbase-operator-tls

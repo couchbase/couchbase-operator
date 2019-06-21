@@ -158,7 +158,7 @@ func (c *ClusterSpec) Cleanup() {
 
 func (c *ClusterSpec) TotalSize() int {
 	size := 0
-	for _, server := range c.ServerSettings {
+	for _, server := range c.Servers {
 		size += server.Size
 	}
 	return size
@@ -186,7 +186,7 @@ func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 // ServerGroupsEnabled returns true if any server config contains server group
 // settings or it is defined globally
 func (cs *ClusterSpec) ServerGroupsEnabled() bool {
-	for _, setting := range cs.ServerSettings {
+	for _, setting := range cs.Servers {
 		if len(setting.ServerGroups) > 0 {
 			return true
 		}
@@ -213,7 +213,7 @@ func HasItem(itm string, arr []string) (int, bool) {
 
 // Get the server specification or nil if it doesn't exist
 func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
-	for _, spec := range cs.ServerSettings {
+	for _, spec := range cs.Servers {
 		if spec.Name == name {
 			return &spec
 		}
@@ -237,19 +237,19 @@ func MissingItems(a1, a2 []string) []string {
 // HasExposedFeatures returns whether we need to expose ports and update the
 // alternate addresses in server.
 func (cs *ClusterSpec) HasExposedFeatures() bool {
-	return len(cs.ExposedFeatures) != 0
+	return len(cs.Networking.ExposedFeatures) != 0
 }
 
 // IsExposedFeatureServiceTypePublic returns whether exposed ports will be public and
 // therefore need to be TLS protected and may have DDNS entries created.
 func (cs *ClusterSpec) IsExposedFeatureServiceTypePublic() bool {
-	return cs.ExposedFeatureServiceType == v1.ServiceTypeLoadBalancer
+	return cs.Networking.ExposedFeatureServiceType == v1.ServiceTypeLoadBalancer
 }
 
 // IsAdminConsoleServiceTypePublic returns whether exposed ports will be public and
 // therefore need to be TLS protected and may have DDNS entries created.
 func (cs *ClusterSpec) IsAdminConsoleServiceTypePublic() bool {
-	return cs.AdminConsoleServiceType == v1.ServiceTypeLoadBalancer
+	return cs.Networking.AdminConsoleServiceType == v1.ServiceTypeLoadBalancer
 }
 
 func (tp *TLSPolicy) Validate() error {

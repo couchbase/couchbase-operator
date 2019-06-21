@@ -51,7 +51,7 @@ var (
 				serverGroup1,
 				serverGroup2,
 			},
-			ServerSettings: []couchbasev2.ServerConfig{
+			Servers: []couchbasev2.ServerConfig{
 				couchbasev2.ServerConfig{
 					Name: serverClass1,
 				},
@@ -74,7 +74,7 @@ var (
 			Namespace: namespace,
 		},
 		Spec: couchbasev2.ClusterSpec{
-			ServerSettings: []couchbasev2.ServerConfig{
+			Servers: []couchbasev2.ServerConfig{
 				couchbasev2.ServerConfig{
 					Name: serverClass1,
 				},

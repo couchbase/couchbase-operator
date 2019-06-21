@@ -89,11 +89,11 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []by
 // getTLSData gets the TLS data from kubernetes and performs some error checking.
 func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) {
 	// Load the TLS data from kubernetes.
-	operatorSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
+	operatorSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.Networking.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
 	if err != nil {
 		return
 	}
-	serverSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.TLS.Static.Member.ServerSecret, c.cluster.Namespace, nil)
+	serverSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret, c.cluster.Namespace, nil)
 	if err != nil {
 		return
 	}
@@ -121,7 +121,7 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 // reconcileTLS performs any certificate rotations that are necessary.
 func (c *Cluster) reconcileTLS() error {
 	// Insecure cluster, ignore.
-	if !c.cluster.Spec.TLS.IsSecureClient() {
+	if !c.cluster.Spec.Networking.TLS.IsSecureClient() {
 		return nil
 	}
 
@@ -136,8 +136,8 @@ func (c *Cluster) reconcileTLS() error {
 	zones := []string{
 		c.cluster.Name + "." + c.cluster.Namespace + ".svc",
 	}
-	if c.cluster.Spec.DNS != nil {
-		zone := c.cluster.Name + "." + c.cluster.Spec.DNS.Domain
+	if c.cluster.Spec.Networking.DNS != nil {
+		zone := c.cluster.Name + "." + c.cluster.Spec.Networking.DNS.Domain
 		zones = append(zones, zone)
 	}
 

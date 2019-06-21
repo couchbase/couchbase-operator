@@ -572,14 +572,14 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 
 // Initialize a member with TLS certificates
 func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs couchbasev2.ClusterSpec) error {
-	if cs.TLS != nil {
+	if cs.Networking.TLS != nil {
 		// Static configuration:
 		// * Upload the cluster CA certifcate
 		// * Reload the server certifcate/key.  These were injected into
 		//   the pod's file system from a secret during creation
-		if cs.TLS.Static != nil {
+		if cs.Networking.TLS.Static != nil {
 			// Grab the operator secret
-			secretName := cs.TLS.Static.OperatorSecret
+			secretName := cs.Networking.TLS.Static.OperatorSecret
 			secret, err := k8sutil.GetSecret(c.config.KubeCli, secretName, c.cluster.Namespace, nil)
 			if err != nil {
 				return err
@@ -635,7 +635,7 @@ func (c *Cluster) getServerGroups() []string {
 	for _, serverGroup := range c.cluster.Spec.ServerGroups {
 		serverGroups[serverGroup] = nil
 	}
-	for _, serverClass := range c.cluster.Spec.ServerSettings {
+	for _, serverClass := range c.cluster.Spec.Servers {
 		for _, serverGroup := range serverClass.ServerGroups {
 			serverGroups[serverGroup] = nil
 		}
@@ -843,7 +843,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 // node address and node ports in the 30000 range.
 func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
 	var hostname string
-	if c.cluster.Spec.DNS != nil {
+	if c.cluster.Spec.Networking.DNS != nil {
 		// Use the user provided DNS name.
 		hostname = k8sutil.GetDNSName(c.cluster, member.Name)
 	} else {

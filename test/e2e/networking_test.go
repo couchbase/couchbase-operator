@@ -34,7 +34,7 @@ func TestExposedFeatureIP(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -69,14 +69,14 @@ func TestExposedFeatureDNS(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
 	}
-	testCouchbase.Spec.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev2.DNS{
+	testCouchbase.Spec.Networking.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
+	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -116,14 +116,14 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
 	}
-	testCouchbase.Spec.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev2.DNS{
+	testCouchbase.Spec.Networking.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
+	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -142,7 +142,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 		fmt.Sprintf("*.%s.%s", clusterName, newDomain),
 	}
 	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/DNS/Domain", newDomain), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/DNS/Domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, newDomain, 5*time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, targetKube, testCouchbase, newDomain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
@@ -172,14 +172,14 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.ExposedFeatures = couchbasev2.ExposedFeatureList{
+	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
 	}
-	testCouchbase.Spec.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev2.DNS{
+	testCouchbase.Spec.Networking.ExposedFeatureServiceType = corev1.ServiceTypeLoadBalancer
+	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -191,9 +191,9 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 
 	// Verify that changing the node port type is reflected in the services.
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatureServiceType", corev1.ServiceTypeNodePort), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/ExposedFeatureServiceType", corev1.ServiceTypeNodePort), time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatureServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/ExposedFeatureServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 }
 
@@ -222,11 +222,11 @@ func TestConsoleServiceDNS(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev2.DNS{
+	testCouchbase.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
+	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -265,11 +265,11 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev2.DNS{
+	testCouchbase.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
+	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -287,7 +287,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 		fmt.Sprintf("*.%s.%s", clusterName, newDomain),
 	}
 	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/DNS/Domain", newDomain), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/DNS/Domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAdminAnnotation(t, targetKube, testCouchbase, newDomain, 5*time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 }
@@ -317,11 +317,11 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
 	testCouchbase.Name = clusterName
-	testCouchbase.Spec.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
-	testCouchbase.Spec.DNS = &couchbasev2.DNS{
+	testCouchbase.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
+	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
 	}
-	testCouchbase.Spec.TLS = &couchbasev2.TLSPolicy{
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			Member: &couchbasev2.MemberSecret{
 				ServerSecret: ctx.ClusterSecretName,
@@ -333,9 +333,9 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 
 	// Verify that changing the node port type is reflected in the services.
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServiceType", corev1.ServiceTypeNodePort), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/AdminConsoleServiceType", corev1.ServiceTypeNodePort), time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 	e2eutil.MustCheckConsoleServiceStatus(t, targetKube, testCouchbase, 5*time.Minute)
 }

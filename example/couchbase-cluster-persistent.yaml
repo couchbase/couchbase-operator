@@ -18,10 +18,12 @@ metadata:
   name: cb-example
 spec:
   image: couchbase/server:enterprise-6.0.1
-  authSecret: cb-example-auth
-  exposeAdminConsole: true
-  adminConsoleServices:
-    - data
+  security:
+    adminSecret: cb-example-auth
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServices:
+      - data
   cluster:
     dataServiceMemoryQuota: 256
     indexServiceMemoryQuota: 256

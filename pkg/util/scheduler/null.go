@@ -27,7 +27,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 	sched := &nullSchedulerImpl{
 		serverClasses: map[string]*serverList{},
 	}
-	for _, class := range cluster.Spec.ServerSettings {
+	for _, class := range cluster.Spec.Servers {
 		sched.serverClasses[class.Name] = &serverList{}
 	}
 

@@ -669,16 +669,16 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 
 // Adds any necessary pod prerequisites before enabling TLS
 func applyPodTlsConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
-	if cs.TLS != nil {
+	if cs.Networking.TLS != nil {
 		// Static configuration:
 		// * Defines a volume which contains the secrets necessary
 		//   to explicitly define TLS certificates and keys
 		// * Mounts the volume in in the correct location so that API
 		//   calls to /node/controller/reloadCertificate succeed
-		if cs.TLS.Static != nil {
+		if cs.Networking.TLS.Static != nil {
 			// Ensure the schema is correct
 			// TODO: does this make sense not to be a pointer?
-			if cs.TLS.Static.Member == nil {
+			if cs.Networking.TLS.Static.Member == nil {
 				return fmt.Errorf("static tls member secret required")
 			}
 
@@ -687,7 +687,7 @@ func applyPodTlsConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 				Name: couchbaseTlsVolumeName,
 			}
 			volume.VolumeSource.Secret = &v1.SecretVolumeSource{
-				SecretName: cs.TLS.Static.Member.ServerSecret,
+				SecretName: cs.Networking.TLS.Static.Member.ServerSecret,
 			}
 			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
 

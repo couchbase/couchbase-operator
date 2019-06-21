@@ -18,12 +18,14 @@ metadata:
   name: cb-example
 spec:
   image: couchbase/server:enterprise-6.0.1
-  authSecret: cb-example-auth
-  exposeAdminConsole: true
-  adminConsoleServices:
-    - data
-  exposedFeatures:
-    - xdcr
+  security:
+    adminSecret: cb-example-auth
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServices:
+      - data
+    exposedFeatures:
+      - xdcr
   serverGroups:
     - us-east-1a
     - us-east-1b
