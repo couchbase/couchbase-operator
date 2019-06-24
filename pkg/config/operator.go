@@ -210,7 +210,7 @@ func GetOperatorRoleBinding(namespace string) *rbacv1.RoleBinding {
 }
 
 // GetOperatorDeployment returns the canonical way to run the operator.
-func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deployment {
+func GetOperatorDeployment(image string, imagePullSecret string, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -242,9 +242,9 @@ func GetOperatorDeployment(image string, imagePullSecret string) *appsv1.Deploym
 							Command: []string{
 								OperatorResourceName,
 							},
-							Args: []string{
+							Args: append([]string{
 								"--pod-create-timeout=10m",
-							},
+							}, extraArgs...),
 							Env: []corev1.EnvVar{
 								{
 									Name: "WATCH_NAMESPACE",

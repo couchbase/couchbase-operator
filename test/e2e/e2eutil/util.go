@@ -57,28 +57,6 @@ var (
 		"indexStorageSetting":      "memory_optimized",
 		"autoFailoverTimeout":      "30",
 		"autoFailoverMaxCount":     "1"}
-
-	BasicOneReplicaBucket = map[string]string{
-		"bucketName":         "default",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false"}
-
-	BasicTwoReplicaBucket = map[string]string{
-		"bucketName":         "default",
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "2",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false"}
 )
 
 // randomSuffix generates a 5 character random suffix to be appended to
@@ -217,12 +195,6 @@ func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace
 		}
 	}
 	return newClusterFromSpec(t, k8s, namespace, crd)
-}
-
-// Creates Couchbase cluster object and returns it
-func CreateClusterFromSpecNoWait(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec) (*couchbasev2.CouchbaseCluster, error) {
-	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
-	return CreateCluster(t, k8s.CRClient, namespace, crd)
 }
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
@@ -685,20 +657,17 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebuckets: ", err)
-	}
-	if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebuckets: ", err)
 	}
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
-	}
-	if err := WaitForEphemeralBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForEphemeralBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
 	}
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
-	}
-	if err := WaitForMemcachedBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForMemcachedBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
 	}
 }

@@ -155,22 +155,10 @@ func TestInvalidBaseImage(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	couchbaseBaseImage := "basecouch/123"
-	couchbaseVerString := "enterprise-5.5.0"
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
-	otherConfig1 := map[string]string{
-		"baseImageName": couchbaseBaseImage,
-		"versionNum":    couchbaseVerString,
-	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"other1":   otherConfig1,
-	}
-
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
+	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1, constants.AdminHidden)
+	testCouchbase.Spec.Image = "basecouch/123:enterprise-5.5.0"
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
@@ -191,22 +179,10 @@ func TestInvalidVersion(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	couchbaseBaseImage := "couchbase/server"
-	couchbaseVerString := "enterprise-9.9.9"
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(1, "test_config_1", []string{"data", "query", "index"})
-	otherConfig1 := map[string]string{
-		"versionNum":    couchbaseVerString,
-		"baseImageName": couchbaseBaseImage,
-	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"other1":   otherConfig1,
-	}
-
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterMultiNoWait(t, targetKube, f.Namespace, configMap)
+	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1, constants.AdminHidden)
+	testCouchbase.Spec.Image = "couchbase/server:enterprise-9.9.9"
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.

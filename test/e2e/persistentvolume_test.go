@@ -714,12 +714,10 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	serviceConfig1["defaultVolMnt"] = pvcName
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -729,6 +727,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	// Create a expected RZA results map for verification
@@ -805,12 +804,10 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	serviceConfig1["defaultVolMnt"] = pvcName
 	serviceConfig1["dataVolMnt"] = pvcName
 	serviceConfig1["indexVolMnt"] = pvcName
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -820,6 +817,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 	createPodSecurityContext(1000, &clusterSpec)
 
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
 
 	// Create a expected RZA results map for verification

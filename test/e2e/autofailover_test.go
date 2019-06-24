@@ -132,17 +132,16 @@ func TestServerGroupWithSingleServiceNodeInFailoverGroup(t *testing.T) {
 	clusterConfig["autoFailoverServerGroup"] = "true"
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize-1, "test_config_1", []string{"data", "query", "index"})
 	serviceConfig2 := e2eutil.GetClassSpecificServiceConfigMap(1, "test_config_2", []string{"search"}, []string{availableServerGroupList[2]})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
 		"service2":     serviceConfig2,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	sort.Strings(availableServerGroupList)

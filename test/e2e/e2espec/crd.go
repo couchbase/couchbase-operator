@@ -295,6 +295,11 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 				Size: size,
 				Services: couchbasev2.ServiceList{
 					couchbasev2.QueryService,
+					// Eventing is not technically necessary here, however some tests rely on
+					// synchronization events before proceeding.  Eventing causes a rebalance
+					// when the Couchbase server process goes down so we can tell when it's
+					// back in the cluster.
+					couchbasev2.EventingService,
 				},
 				Pod: &couchbasev2.PodPolicy{
 					VolumeMounts: &couchbasev2.VolumeMounts{

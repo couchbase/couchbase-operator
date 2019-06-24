@@ -134,7 +134,7 @@ func startTimeoutTimer() {
 }
 
 func CreateDeploymentObject(operatorImage string, operatorPort int) (deployment *appsv1.Deployment, err error) {
-	deployment = config.GetOperatorDeployment(operatorImage, dockerPullSecretName)
+	deployment = config.GetOperatorDeployment(operatorImage, dockerPullSecretName, "--zap-level", "debug")
 
 	// Manually set the HTTP port.
 	if operatorPort != 0 {

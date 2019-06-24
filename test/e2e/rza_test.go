@@ -17,6 +17,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -220,6 +221,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	}
 
 	t.Logf("AntiAffinity=%s ... \n attempting to create %d pod cluster with %d nodes", antiAffinity, clusterSize, clusterSize)
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -285,12 +287,10 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -298,6 +298,7 @@ func RzaK8SNodeLabelEdit(t *testing.T, editType string) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -393,16 +394,15 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
 	// Create a expected RZA results map for verification
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
@@ -489,16 +489,15 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	serviceConfig1 := e2eutil.GetClassSpecificServiceConfigMap(class1Size, "class1", []string{"data", "index"}, class1ServerGroups)
 	serviceConfig2 := e2eutil.GetClassSpecificServiceConfigMap(class2Size, "class2", []string{"query"}, class2ServerGroups)
 	serviceConfig3 := e2eutil.GetClassSpecificServiceConfigMap(class3Size, "class3", []string{"search"}, class3ServerGroups)
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	configMap := map[string]map[string]string{
 		"cluster":  clusterConfig,
 		"service1": serviceConfig1,
 		"service2": serviceConfig2,
 		"service3": serviceConfig3,
-		"bucket1":  bucketConfig1,
 	}
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	// Creating expected RZA server groups pod maps
@@ -543,12 +542,10 @@ func TestRzaResizeCluster(t *testing.T) {
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -556,6 +553,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -655,12 +653,10 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -668,6 +664,7 @@ func TestRzaServerGroupRemoval(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -722,12 +719,10 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	availableServerGroups := strings.Join(serverGroupsUsed, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -735,6 +730,7 @@ func TestRzaServerGroupAddition(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, serverGroupsUsed)
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -802,16 +798,15 @@ func TestRzaNegScaleupCluster(t *testing.T) {
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	expectedEvents := e2eutil.EventValidator{}
@@ -876,12 +871,10 @@ func TestRzaServerGroupDown(t *testing.T) {
 	availableServerGroups := strings.Join(availableServerGroupList, ",")
 	clusterConfig := e2eutil.BasicClusterConfig
 	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index"})
-	bucketConfig1 := e2eutil.BasicOneReplicaBucket
 	serverGroups := map[string]string{"groupNames": availableServerGroups}
 	configMap := map[string]map[string]string{
 		"cluster":      clusterConfig,
 		"service1":     serviceConfig1,
-		"bucket1":      bucketConfig1,
 		"serverGroups": serverGroups,
 	}
 
@@ -889,6 +882,7 @@ func TestRzaServerGroupDown(t *testing.T) {
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)
 
 	// Deploy couchbase cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
 
 	// Create a map for server-groups based on deployed cb-server nodes
