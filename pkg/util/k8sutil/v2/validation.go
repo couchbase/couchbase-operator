@@ -2,8 +2,7 @@ package v2
 
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/gocbmgr"
-	corev1 "k8s.io/api/core/v1"
+
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -81,25 +80,16 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 									Maximum: &maximumBucketReplicas,
 								},
 								"ioPriority": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"high"`)},
-										{Raw: []byte(`"low"`)},
-									},
+									Type:    "string",
+									Pattern: "^high|low$",
 								},
 								"evictionPolicy": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"valueOnly"`)},
-										{Raw: []byte(`"fullEviction"`)},
-									},
+									Type:    "string",
+									Pattern: "^valueOnly|fullEviction$",
 								},
 								"conflictResolution": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"seqno"`)},
-										{Raw: []byte(`"lww"`)},
-									},
+									Type:    "string",
+									Pattern: "^seqno|lww$",
 								},
 								"enableFlush": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
@@ -108,12 +98,8 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 									Type: "boolean",
 								},
 								"compressionMode": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"` + cbmgr.CompressionModeOff + `"`)},
-										{Raw: []byte(`"` + cbmgr.CompressionModePassive + `"`)},
-										{Raw: []byte(`"` + cbmgr.CompressionModeActive + `"`)},
-									},
+									Type:    "string",
+									Pattern: "^off|passive|active$",
 								},
 							},
 						},
@@ -175,36 +161,23 @@ func GetCouchbaseEphemeralBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 									Maximum: &maximumBucketReplicas,
 								},
 								"ioPriority": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"high"`)},
-										{Raw: []byte(`"low"`)},
-									},
+									Type:    "string",
+									Pattern: "^high|low$",
 								},
 								"evictionPolicy": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"noEviction"`)},
-										{Raw: []byte(`"nruEviction"`)},
-									},
+									Type:    "string",
+									Pattern: "^noEviction|nruEviction$",
 								},
 								"conflictResolution": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"seqno"`)},
-										{Raw: []byte(`"lww"`)},
-									},
+									Type:    "string",
+									Pattern: "^seqno|lww$",
 								},
 								"enableFlush": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
 								},
 								"compressionMode": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"` + cbmgr.CompressionModeOff + `"`)},
-										{Raw: []byte(`"` + cbmgr.CompressionModePassive + `"`)},
-										{Raw: []byte(`"` + cbmgr.CompressionModeActive + `"`)},
-									},
+									Type:    "string",
+									Pattern: "^off|passive|active$",
 								},
 							},
 						},
@@ -332,15 +305,8 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 							Type: "array",
 							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 								Schema: &apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"` + string(couchbasev2.DataService) + `"`)},
-										{Raw: []byte(`"` + string(couchbasev2.IndexService) + `"`)},
-										{Raw: []byte(`"` + string(couchbasev2.QueryService) + `"`)},
-										{Raw: []byte(`"` + string(couchbasev2.SearchService) + `"`)},
-										{Raw: []byte(`"` + string(couchbasev2.EventingService) + `"`)},
-										{Raw: []byte(`"` + string(couchbasev2.AnalyticsService) + `"`)},
-									},
+									Type:    "string",
+									Pattern: "^data|index|query|search|eventing|analytics$",
 								},
 							},
 						},
@@ -348,12 +314,8 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 							Type: "array",
 							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 								Schema: &apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"admin"`)},
-										{Raw: []byte(`"xdcr"`)},
-										{Raw: []byte(`"client"`)},
-									},
+									Type:    "string",
+									Pattern: "^admin|xdcr|client$",
 								},
 							},
 						},
@@ -380,18 +342,12 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 							Minimum: &minimumLogRetentionCount,
 						},
 						"exposedFeatureServiceType": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "string",
-							Enum: []apiextensionsv1beta1.JSON{
-								{Raw: []byte(`"` + corev1.ServiceTypeNodePort + `"`)},
-								{Raw: []byte(`"` + corev1.ServiceTypeLoadBalancer + `"`)},
-							},
+							Type:    "string",
+							Pattern: "^NodePort|LoadBalancer$",
 						},
 						"adminConsoleServiceType": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "string",
-							Enum: []apiextensionsv1beta1.JSON{
-								{Raw: []byte(`"` + corev1.ServiceTypeNodePort + `"`)},
-								{Raw: []byte(`"` + corev1.ServiceTypeLoadBalancer + `"`)},
-							},
+							Type:    "string",
+							Pattern: "^NodePort|LoadBalancer$",
 						},
 						"dns": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
@@ -405,12 +361,8 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 							},
 						},
 						"platform": apiextensionsv1beta1.JSONSchemaProps{
-							Type: "string",
-							Enum: []apiextensionsv1beta1.JSON{
-								{Raw: []byte(`"` + couchbasev2.PlatformTypeAWS + `"`)},
-								{Raw: []byte(`"` + couchbasev2.PlatformTypeGCE + `"`)},
-								{Raw: []byte(`"` + couchbasev2.PlatformTypeAzure + `"`)},
-							},
+							Type:    "string",
+							Pattern: "^aws|gce|azure$",
 						},
 						"cluster": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
@@ -449,11 +401,8 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 									Minimum: &minimumAnalyticsServiceMemoryQuota,
 								},
 								"indexStorageSetting": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
-									Enum: []apiextensionsv1beta1.JSON{
-										{Raw: []byte(`"plasma"`)},
-										{Raw: []byte(`"memory_optimized"`)},
-									},
+									Type:    "string",
+									Pattern: "^plasma|memory_optimized$",
 								},
 								"autoFailoverTimeout": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "integer",
@@ -503,15 +452,8 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 											Type: "array",
 											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 												Schema: &apiextensionsv1beta1.JSONSchemaProps{
-													Type: "string",
-													Enum: []apiextensionsv1beta1.JSON{
-														{Raw: []byte(`"` + string(couchbasev2.DataService) + `"`)},
-														{Raw: []byte(`"` + string(couchbasev2.IndexService) + `"`)},
-														{Raw: []byte(`"` + string(couchbasev2.QueryService) + `"`)},
-														{Raw: []byte(`"` + string(couchbasev2.SearchService) + `"`)},
-														{Raw: []byte(`"` + string(couchbasev2.EventingService) + `"`)},
-														{Raw: []byte(`"` + string(couchbasev2.AnalyticsService) + `"`)},
-													},
+													Type:    "string",
+													Pattern: "^data|index|query|search|eventing|analytics$",
 												},
 											},
 											MinLength: &minimumServicesLength,

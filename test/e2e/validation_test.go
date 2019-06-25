@@ -416,7 +416,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateExposedFeaturesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatures", couchbasev2.ExposedFeatureList{couchbasev2.FeatureAdmin, "cleint", couchbasev2.FeatureXDCR})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.exposedFeatures in body should be one of [admin xdcr client]"},
+			expectedErrors: []string{"spec.exposedFeatures in body should match '^admin|xdcr|client$'"},
 		},
 		{
 			name:           "TestValidateExposedFeaturesUnique",
@@ -435,61 +435,61 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateBucketConflictResolutionRequiredForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/Spec/ConflictResolution")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body should be one of [seqno lww]"},
+			expectedErrors: []string{"spec.conflictResolution in body should match '^seqno|lww$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyRequiredForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/Spec/EvictionPolicy")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketIOPriorityRequiredForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/Spec/IoPriority")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body should be one of [high low]"},
+			expectedErrors: []string{"spec.ioPriority in body should match '^high|low$'"},
 		},
 		{
 			name:           "TestValidateBucketConflictResolutionRequiredForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/Spec/ConflictResolution")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body should be one of [seqno lww]"},
+			expectedErrors: []string{"spec.conflictResolution in body should match '^seqno|lww$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyRequiredForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/Spec/EvictionPolicy")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketIOPriorityRequiredForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/Spec/IoPriority")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body should be one of [high low]"},
+			expectedErrors: []string{"spec.ioPriority in body should match '^high|low$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_1",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "valueOnly")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_2",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "fullEviction")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidInvalidForCouchbase_1",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "noEviction")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidInvalidForCouchbase_2",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "nruEviction")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
 		// Hard problem.
 		//		{
@@ -507,13 +507,13 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionMode("invalid"))},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.compressionMode in body should be one of [off passive active]"},
+			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionMode("invalid"))},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.compressionMode in body should be one of [off passive active]"},
+			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
 		},
 
 		// Server settings validation
@@ -521,7 +521,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateServerServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ServerSettings/0/Services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.Service("indxe"), couchbasev2.QueryService, couchbasev2.SearchService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers.services in body should be one of [data index query search eventing analytics]"},
+			expectedErrors: []string{"spec.servers.services in body should match '^data|index|query|search|eventing|analytics$'"},
 		},
 		{
 			name:           "TestValidateServerNameUnique",
@@ -573,7 +573,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateAdminConsoleServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.Service("indxe"), couchbasev2.QueryService, couchbasev2.SearchService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
+			expectedErrors: []string{"spec.adminConsoleServices in body should match '^data|index|query|search|eventing|analytics$'"},
 		},
 
 		// Persistent volume claim cases
@@ -858,31 +858,31 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			name:           "TestValidateAdminConsoleServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.Service("xxxxx")})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
+			expectedErrors: []string{"spec.adminConsoleServices in body should match '^data|index|query|search|eventing|analytics$'"},
 		},
 		{
 			name:           "TestValidateBucketIOPriorityEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/IoPriority", "lighow")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body should be one of [high low]"},
+			expectedErrors: []string{"spec.ioPriority in body should match '^high|low$'"},
 		},
 		{
 			name:           "TestValidateBucketConflictResolutionEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/ConflictResolution", "selwwno")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body should be one of [seqno lww]"},
+			expectedErrors: []string{"spec.conflictResolution in body should match '^seqno|lww$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "valueOnly")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "nruEviction")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1053,26 +1053,26 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			name:           "TestValidateApplyAdminConsoleServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServices", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.Service("xxxxx")})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.adminConsoleServices in body should be one of [data index query search eventing analytics]"},
+			expectedErrors: []string{"spec.adminConsoleServices in body should match '^data|index|query|search|eventing|analytics$'"},
 		},
 		{
 			name:           "TestValidateApplyBucketIOPriorityEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/IoPriority", "lighow")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body should be one of [high low]"},
+			expectedErrors: []string{"spec.ioPriority in body should match '^high|low$'"},
 		},
 		{
 			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "valueOnly")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 
 		{
 			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/EvictionPolicy", "nruEviction")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
+			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1092,7 +1092,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name:           "TestValidateApplyBucketConflictResolutionEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/Spec/ConflictResolution", "selwwno")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body should be one of [seqno lww]"},
+			expectedErrors: []string{"spec.conflictResolution in body should match '^seqno|lww$'"},
 		},
 		{
 			name:           "TestValidateApplyBucketConflictResolutionImmutableForCouchbase",

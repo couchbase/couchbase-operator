@@ -20,11 +20,11 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
 
@@ -37,8 +37,7 @@ var (
 
 // addToScheme registers types we need to be able to decode from the raw JSON
 func addToScheme(scheme *runtime.Scheme) error {
-	// TODO: admissionv1beta1 surely?
-	if err := admissionregistrationv1beta1.AddToScheme(scheme); err != nil {
+	if err := clientscheme.AddToScheme(scheme); err != nil {
 		return err
 	}
 	if err := couchbasev1.AddToScheme(scheme); err != nil {
@@ -185,6 +184,12 @@ func deepCopy(resource runtime.Object) (runtime.Object, error) {
 func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
 	if glog.V(1) {
 		glog.Info("validating couchbasecluster")
+	}
+
+	// Temporary hack: explicitly validate the schema.
+	if err := validator.SchemaValidate(scheme, ar.Request.Object); err != nil {
+		glog.Error(err)
+		return errorResponse(err)
 	}
 
 	// Decode the CouchbaseCluster object
