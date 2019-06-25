@@ -32,14 +32,11 @@ skip-tear-down: true
 # Test suite to run. Same named yaml file should exists in resources/suites path
 suite: TestNone
 
-# Couchbase server docker image to use
-cbServerBaseImage: couchbase/server
+# Couchbase server image to use
+couchbase-server-image: couchbase/server:enterprise-5.5.0
 
-# Couchbase server image docker version to use
-cbServerImageVersion: enterprise-5.5.0
-
-# Couchbase server version to upgrade to
-cbServerImageVersionUpgrade: enterprise-6.0.0
+# Couchbase server image to upgrade to
+couchbase-server-image-upgrade: couchbase/server:enterprise-6.0.0
 
 # Cluster type kubernetes | openshift
 kube-type: kubernetes
