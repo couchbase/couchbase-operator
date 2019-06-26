@@ -14,7 +14,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -49,9 +48,6 @@ func CouchbaseVersion(image string) (string, error) {
 	parts := strings.Split(image, ":")
 	if len(parts) != 2 {
 		return "", fmt.Errorf("invalid image string: %s", image)
-	}
-	if err := couchbaseutil.VerifyVersion(parts[1]); err != nil {
-		return "", err
 	}
 	return parts[1], nil
 }
