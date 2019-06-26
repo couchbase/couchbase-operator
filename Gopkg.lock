@@ -57,14 +57,14 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
-  digest = "1:6201acd86f57ba3e25faf1e556d7ba701af6d779c02588aebbcf3f5af9780f68"
+  digest = "1:cda7cfb27c339e679bafc1a85950d678a122739a4c02d16f32c8bd2b3d03608e"
   name = "github.com/couchbase/gocbmgr"
   packages = [
     ".",
     "urlencoding",
   ]
   pruneopts = "UT"
-  revision = "5e66b72f1afbe9db51917aef85d69effd2a7f58d"
+  revision = "c9ff7dba65382dc045b8714d03e8b4798050da00"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -865,7 +865,6 @@
     "k8s.io/api/extensions/v1beta1",
     "k8s.io/api/policy/v1beta1",
     "k8s.io/api/rbac/v1",
-    "k8s.io/api/rbac/v1beta1",
     "k8s.io/api/storage/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
@@ -895,6 +894,7 @@
     "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
+    "k8s.io/client-go/tools/clientcmd/api/v1",
     "k8s.io/client-go/tools/leaderelection",
     "k8s.io/client-go/tools/leaderelection/resourcelock",
     "k8s.io/client-go/tools/portforward",
