@@ -88,14 +88,14 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:b669be5097589c2d8c4bf57db12830bb7e724f8ab81cc514158530b07933bf16"
+  digest = "1:e010520051be088e289f63a2e0bb534a218b872c769fccb84f2bfffd749872a1"
   name = "github.com/couchbase/gocbmgr"
   packages = [
     ".",
     "urlencoding",
   ]
   pruneopts = "UT"
-  revision = "6e24a38aef66ec281a0c295833faf88894933ffb"
+  revision = "6d733d36eb8ccf1f9461c83f7d47e21538b736ad"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -1186,6 +1186,7 @@
     "github.com/ghodss/yaml",
     "github.com/go-openapi/errors",
     "github.com/golang/glog",
+    "github.com/golang/groupcache/lru",
     "github.com/google/go-cmp/cmp",
     "github.com/google/uuid",
     "github.com/operator-framework/operator-sdk/pkg/k8sutil",
@@ -1228,7 +1229,6 @@
     "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
-    "k8s.io/client-go/kubernetes/typed/core/v1",
     "k8s.io/client-go/plugin/pkg/client/auth/azure",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/plugin/pkg/client/auth/oidc",
@@ -1239,7 +1239,6 @@
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/client-go/tools/clientcmd/api/v1",
     "k8s.io/client-go/tools/portforward",
-    "k8s.io/client-go/tools/record",
     "k8s.io/client-go/tools/remotecommand",
     "k8s.io/client-go/transport/spdy",
     "k8s.io/client-go/util/flowcontrol",
