@@ -157,7 +157,7 @@ spec:
   securityContext:
     runAsUser: 1000
     runAsNonRoot: false
-    fsGroup: 1000
+    fsGroup: 123456
   volumeClaimTemplates:
     - metadata:
         name: couchbase

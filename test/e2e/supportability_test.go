@@ -1567,7 +1567,6 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Cb cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
@@ -1721,7 +1720,6 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-	createPodSecurityContext(1000, &clusterSpec)
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
@@ -1956,7 +1954,6 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-	createPodSecurityContext(1000, &clusterSpec)
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
@@ -2211,7 +2208,6 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
 	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-	createPodSecurityContext(1000, &clusterSpec)
 
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)

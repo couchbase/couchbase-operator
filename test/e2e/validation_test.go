@@ -25,7 +25,8 @@ import (
 )
 
 var (
-	unavailableStorageClass = "unavailableStorageClass"
+	unavailableStorageClass       = "unavailableStorageClass"
+	defaultFSGroup          int64 = 1000
 )
 
 // Resources are stored in a list in order to maintain ordering.  Do not try to use a map
@@ -825,6 +826,11 @@ func TestValidationDefaultCreate(t *testing.T) {
 			name:        "TestValidateBucketCompressionModeDefaultForEphemeral",
 			mutations:   patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/Spec/CompressionMode")},
 			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().Test("/Spec/CompressionMode", cbmgr.CompressionModePassive)},
+		},
+		{
+			name:        "TestValidateFSGroupDefault",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/Spec/SecurityContext/FSGroup")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/Spec/SecurityContext/FSGroup", &defaultFSGroup)},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

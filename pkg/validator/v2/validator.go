@@ -18,50 +18,53 @@ import (
 )
 
 const (
-	DefaultBaseImage                              = "couchbase/server"
-	DefaultIndexStorageSetting                    = "memory_optimized"
-	DefaultAutoFailoverTimeout                    = 120
-	DefaultAutoFailoverMaxCount                   = 3
-	DefaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
-	DefaultServiceMemQuota                        = 256
-	DefaultAnalyticsServiceMemQuota               = 1024
+	defaultIndexStorageSetting                    = "memory_optimized"
+	defaultAutoFailoverTimeout                    = 120
+	defaultAutoFailoverMaxCount                   = 3
+	defaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
+	defaultServiceMemQuota                        = 256
+	defaultAnalyticsServiceMemQuota               = 1024
+)
+
+var (
+	defaultFSGroup int64 = 1000
 )
 
 func ApplyDefaults(customResource *couchbasev2.CouchbaseCluster) {
 	if customResource.Spec.ClusterSettings.DataServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.DataServiceMemQuota = DefaultServiceMemQuota
+		customResource.Spec.ClusterSettings.DataServiceMemQuota = defaultServiceMemQuota
 	}
 
 	if customResource.Spec.ClusterSettings.IndexServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.IndexServiceMemQuota = DefaultServiceMemQuota
+		customResource.Spec.ClusterSettings.IndexServiceMemQuota = defaultServiceMemQuota
 	}
 
 	if customResource.Spec.ClusterSettings.SearchServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.SearchServiceMemQuota = DefaultServiceMemQuota
+		customResource.Spec.ClusterSettings.SearchServiceMemQuota = defaultServiceMemQuota
 	}
 
 	if customResource.Spec.ClusterSettings.EventingServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.EventingServiceMemQuota = DefaultServiceMemQuota
+		customResource.Spec.ClusterSettings.EventingServiceMemQuota = defaultServiceMemQuota
 	}
 
 	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota = DefaultAnalyticsServiceMemQuota
+		customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota = defaultAnalyticsServiceMemQuota
 	}
 
 	if customResource.Spec.ClusterSettings.IndexStorageSetting == "" {
-		customResource.Spec.ClusterSettings.IndexStorageSetting = DefaultIndexStorageSetting
+		customResource.Spec.ClusterSettings.IndexStorageSetting = defaultIndexStorageSetting
 	}
 
 	if customResource.Spec.ClusterSettings.AutoFailoverTimeout == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverTimeout = DefaultAutoFailoverTimeout
+		customResource.Spec.ClusterSettings.AutoFailoverTimeout = defaultAutoFailoverTimeout
 	}
 
 	if customResource.Spec.ClusterSettings.AutoFailoverMaxCount == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverMaxCount = DefaultAutoFailoverMaxCount
+		customResource.Spec.ClusterSettings.AutoFailoverMaxCount = defaultAutoFailoverMaxCount
 	}
 
 	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = DefaultAutoFailoverOnDataDiskIssuesTimePeriod
+		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = defaultAutoFailoverOnDataDiskIssuesTimePeriod
 	}
 
 	if customResource.Spec.Networking.AdminConsoleServiceType == "" {
@@ -70,6 +73,14 @@ func ApplyDefaults(customResource *couchbasev2.CouchbaseCluster) {
 
 	if customResource.Spec.Networking.ExposedFeatureServiceType == "" {
 		customResource.Spec.Networking.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
+	}
+
+	if customResource.Spec.SecurityContext == nil {
+		customResource.Spec.SecurityContext = &corev1.PodSecurityContext{}
+	}
+
+	if customResource.Spec.SecurityContext.FSGroup == nil {
+		customResource.Spec.SecurityContext.FSGroup = &defaultFSGroup
 	}
 }
 
