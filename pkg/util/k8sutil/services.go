@@ -543,7 +543,7 @@ func updateExposedPorts(portStatusMap couchbasev2.PortStatusMap, nodeName string
 
 // GetExposedServiceName returns the service name generated for each service port group
 func GetExposedServiceName(nodeName string) string {
-	return nodeName + "-exposed-ports"
+	return nodeName
 }
 
 // exposedfeatureSets is a mapping from feature name to a list of host ports to expose

@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -1207,7 +1208,7 @@ func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 		Die(t, err)
 	}
 	for _, service := range services.Items {
-		if strings.HasSuffix(service.Name, "-exposed-ports") {
+		if _, ok := service.Spec.Selector[operator_constants.LabelNode]; ok {
 			if err := DeleteService(k8s.KubeClient, service.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
 				Die(t, err)
 			}
