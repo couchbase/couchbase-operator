@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -983,6 +984,9 @@ func (c *Cluster) reconcileClusterSettings() error {
 	if err := c.reconcileIndexStorageSettings(); err != nil {
 		return err
 	}
+	if err := c.reconcileAutoCompactionSettings(); err != nil {
+		return err
+	}
 
 	c.status.ClearCondition(couchbasev2.ClusterConditionManageConfig)
 	return nil
@@ -1122,6 +1126,80 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 		}
 		log.Info("Index storage settings updated", "cluster", c.cluster.Name)
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
+	}
+
+	return nil
+}
+
+// reconcileAutoCompactionSettings sets up disk defragmentation
+func (c *Cluster) reconcileAutoCompactionSettings() error {
+	current, err := c.client.GetAutoCompactionSettings(c.readyMembers())
+	if err != nil {
+		return err
+	}
+
+	databaseFragmentationThresholdPercentage := 0
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent != nil {
+		databaseFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent
+	}
+	databaseFragmentationThresholdSize, _ := c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Size.AsInt64()
+
+	viewFragmentationThresholdPercentage := 0
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent != nil {
+		viewFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent
+	}
+	viewFragmentationThresholdSize, _ := c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size.AsInt64()
+
+	fromHour := 0
+	fromMinute := 0
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start != "" {
+		// validated by DAC
+		parts := strings.Split(c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start, ":")
+		fromHour, _ = strconv.Atoi(parts[0])
+		fromMinute, _ = strconv.Atoi(parts[1])
+	}
+
+	toHour := 0
+	toMinute := 0
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End != "" {
+		// validated by DAC
+		parts := strings.Split(c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End, ":")
+		toHour, _ = strconv.Atoi(parts[0])
+		toMinute, _ = strconv.Atoi(parts[1])
+	}
+
+	requested := &cbmgr.AutoCompactionSettings{
+		AutoCompactionSettings: cbmgr.AutoCompactionAutoCompactionSettings{
+			DatabaseFragmentationThreshold: cbmgr.AutoCompactionDatabaseFragmentationThreshold{
+				Percentage: databaseFragmentationThresholdPercentage,
+				Size:       databaseFragmentationThresholdSize,
+			},
+			ViewFragmentationThreshold: cbmgr.AutoCompactionViewFragmentationThreshold{
+				Percentage: viewFragmentationThresholdPercentage,
+				Size:       viewFragmentationThresholdSize,
+			},
+			ParallelDBAndViewCompaction: c.cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
+			IndexCompactionMode:         "circular",
+			IndexCircularCompaction: cbmgr.AutoCompactionIndexCircularCompaction{
+				DaysOfWeek: "Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday",
+				Interval: cbmgr.AutoCompactionInterval{
+					FromHour:     fromHour,
+					FromMinute:   fromMinute,
+					ToHour:       toHour,
+					ToMinute:     toMinute,
+					AbortOutside: c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.AbortCompactionOutsideWindow,
+				},
+			},
+		},
+		PurgeInterval: c.cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Hours() / 24.0,
+	}
+
+	if !reflect.DeepEqual(current, requested) {
+		log.Info("Updating auto compaction settings")
+		if err := c.client.SetAutoCompactionSettings(c.readyMembers(), requested); err != nil {
+			return err
+		}
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("auto compaction", c.cluster))
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package v2
 
 import (
 	"fmt"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -65,6 +66,21 @@ func ApplyDefaults(customResource *couchbasev2.CouchbaseCluster) {
 
 	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
 		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = defaultAutoFailoverOnDataDiskIssuesTimePeriod
+	}
+
+	if customResource.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent == nil {
+		thirty := 30
+		customResource.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent = &thirty
+	}
+
+	if customResource.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent == nil {
+		thirty := 30
+		customResource.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent = &thirty
+	}
+
+	if customResource.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration == 0 {
+		duration, _ := time.ParseDuration("72h")
+		customResource.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration = duration
 	}
 
 	if customResource.Spec.Networking.AdminConsoleServiceType == "" {
@@ -325,6 +341,14 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 	if err := validateMemoryConstraints(v, customResource); err != nil {
 		errs = append(errs, err)
+	}
+
+	purgeInterval := customResource.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
+	if purgeInterval < 1.0 {
+		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h"))
+	}
+	if purgeInterval > 60.0*24.0 {
+		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d"))
 	}
 
 	if len(errs) > 0 {

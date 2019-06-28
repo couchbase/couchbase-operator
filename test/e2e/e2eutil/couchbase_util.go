@@ -629,6 +629,33 @@ func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couc
 	}
 }
 
+func PatchAutoCompactionSettings(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+		info, err := client.GetAutoCompactionSettings()
+		if err != nil {
+			return false, err
+		}
+		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+}
+
+func MustPatchAutoCompactionSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchAutoCompactionSettings(k8s, couchbase, patches, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

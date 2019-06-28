@@ -851,3 +851,13 @@ func (c *CouchbaseClient) UpdateServerGroups(ms MemberSet, revision string, grou
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.UpdateServerGroups(revision, groups)
 }
+
+func (c *CouchbaseClient) GetAutoCompactionSettings(ms MemberSet) (*cbmgr.AutoCompactionSettings, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetAutoCompactionSettings()
+}
+
+func (c *CouchbaseClient) SetAutoCompactionSettings(ms MemberSet, r *cbmgr.AutoCompactionSettings) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.SetAutoCompactionSettings(r)
+}

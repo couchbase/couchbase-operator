@@ -97,6 +97,19 @@ spec:
     autoFailoverOnDataDiskIssuesTimePeriod: 10
     autoFailoverMaxCount: 1
     autoFailoverTimeout: 10
+    autoCompaction:
+      databaseFragmentationThreshold:
+        percent: 50
+        size: 100Mi
+      viewFragmentationThreshold:
+        percent: 50
+        size: 100Mi
+      parallelCompaction: true
+      timeWindow:
+        start: 03:00
+        end: 07:30
+        abortCompactionOutsideWindow: true
+      tombstonePurgeInterval: 24h
   buckets:
     managed: true
   servers:

@@ -22,10 +22,13 @@ var (
 	minimumAutofailoverMaxCount        float64 = 1
 	maximumAutofailoverMaxCount        float64 = 3
 	minimumLogRetentionCount           float64 = 0
+	minimumAutoCompactionPercent       float64 = 2
+	maximumAutoCompactionPercent       float64 = 100
 )
 
 const (
-	ImagePattern = `^[\w_\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
+	ImagePattern  = `^[\w_\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
+	wallClockTime = `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
 )
 
 func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
@@ -439,6 +442,59 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 								},
 								"autoFailoverServerGroup": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
+								},
+								"autoCompaction": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"databaseFragmentationThreshold": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"percent": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "integer",
+													Minimum: &minimumAutoCompactionPercent,
+													Maximum: &maximumAutoCompactionPercent,
+												},
+												"size": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+										},
+										"viewFragmentationThreshold": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"percent": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "integer",
+													Minimum: &minimumAutoCompactionPercent,
+													Maximum: &maximumAutoCompactionPercent,
+												},
+												"size": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+										},
+										"parallelCompaction": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "boolean",
+										},
+										"timeWindow": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"start": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "string",
+													Pattern: wallClockTime,
+												},
+												"end": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "string",
+													Pattern: wallClockTime,
+												},
+												"abortCompactionOutsideWindow": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "boolean",
+												},
+											},
+										},
+										"tombstonePurgeInterval": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
 								},
 							},
 						},

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -411,6 +412,19 @@ func TestValidationCreate(t *testing.T) {
 }
 
 func TestNegValidationCreate(t *testing.T) {
+	oneMinute, _ := time.ParseDuration("1m")
+	tombstonePurgeIntervalUnderflow := metav1.Duration{
+		Duration: oneMinute,
+	}
+
+	oneHundredDays, _ := time.ParseDuration("2400h")
+	tombstonePurgeIntervalOverflow := metav1.Duration{
+		Duration: oneHundredDays,
+	}
+
+	one := 1
+	oneHundredAndOne := 101
+
 	testDefs := []testDef{
 		// Spec.ExposedFeatures list validation
 		{
@@ -690,6 +704,37 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`certificate is valid for *.cluster.default.svc, *.cluster.example.com, not verify.cluster.acme.com`},
 		},
+		// Auto compaction
+		{
+			name:           "TestValidateAutoCompactionMinimum",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/DatabaseFragmentationThreshold/Percent", &one)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.databaseFragmentationThreshold.percent in body should be greater than or equal to 2`},
+		},
+		{
+			name:           "TestValidateAutoCompactionMaximum",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/DatabaseFragmentationThreshold/Percent", &oneHundredAndOne)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.databaseFragmentationThreshold.percent in body should be less than or equal to 100`},
+		},
+		{
+			name:           "TestValidateStartTimeIllegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/TimeWindow/Start", "26:00")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.timeWindow.start in body should match '^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$'`},
+		},
+		{
+			name:           "TestValidateTombstonePurgeIntervalMinimum",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/TombstonePurgeInterval", tombstonePurgeIntervalUnderflow)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h`},
+		},
+		{
+			name:           "TestValidateTombstonePurgeIntervalMaximum",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/TombstonePurgeInterval", tombstonePurgeIntervalOverflow)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]
@@ -766,6 +811,13 @@ func TestNegValidationCreate(t *testing.T) {
 }
 
 func TestValidationDefaultCreate(t *testing.T) {
+	defaultAutoCompationThresholdPercent := 30
+
+	threeDays, _ := time.ParseDuration("72h")
+	defaultTombstonePurgeInterval := metav1.Duration{
+		Duration: threeDays,
+	}
+
 	testDefs := []testDef{
 		{
 			name:        "TestValidateIndexServiceMemoryQuotaDefault",
@@ -831,6 +883,21 @@ func TestValidationDefaultCreate(t *testing.T) {
 			name:        "TestValidateFSGroupDefault",
 			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/Spec/SecurityContext/FSGroup")},
 			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/Spec/SecurityContext/FSGroup", &defaultFSGroup)},
+		},
+		{
+			name:        "TestAutoCompactionDatabaseThresholdPercentDefault",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoCompaction/DatabaseFragmentationThreshold/Percent")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoCompaction/DatabaseFragmentationThreshold/Percent", &defaultAutoCompationThresholdPercent)},
+		},
+		{
+			name:        "TestAutoCompactionViewThresholdPercentDefault",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoCompaction/ViewFragmentationThreshold/Percent")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoCompaction/ViewFragmentationThreshold/Percent", &defaultAutoCompationThresholdPercent)},
+		},
+		{
+			name:        "TestAutoCompactionTombstonePurgeIntervalDefault",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/Spec/ClusterSettings/AutoCompaction/TombstonePurgeInterval")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/Spec/ClusterSettings/AutoCompaction/TombstonePurgeInterval", defaultTombstonePurgeInterval)},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

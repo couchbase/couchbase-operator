@@ -9,6 +9,7 @@ tcGroups:
       - name: TestResizeClusterWithBucket
       - name: TestBasicMDSScaling
       - name: TestDenyCommunityEdition
+      - name: TestAutoCompactionUpdate
 
   - name: BucketTests
     clusters:

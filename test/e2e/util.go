@@ -85,6 +85,7 @@ var (
 		"TestTaintK8SNodeAndRemoveTaint":                      TestTaintK8SNodeAndRemoveTaint,
 		"TestDenyCommunityEdition":                            TestDenyCommunityEdition,
 		"TestRemoveServerClassWithNodeService":                TestRemoveServerClassWithNodeService,
+		"TestAutoCompactionUpdate":                            TestAutoCompactionUpdate,
 
 		// System testing cases
 		"TestFeaturesAll": TestFeaturesAll,

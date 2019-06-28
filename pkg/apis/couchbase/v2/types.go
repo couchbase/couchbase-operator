@@ -4,6 +4,7 @@ import (
 	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -265,6 +266,59 @@ type ClusterConfig struct {
 
 	// Whether to enable failing over a server group
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup"`
+
+	// Auto-compaction settings
+	AutoCompaction AutoCompaction `json:"autoCompaction,omitempty"`
+}
+
+// DatabaseFragmentationThreshold lists triggers for when database compaction should start.
+type DatabaseFragmentationThreshold struct {
+	// Percent is the percentage of disk fragmentation (2-100).
+	Percent *int `json:"percent,omitempty"`
+
+	// Size is the size of disk framentation.
+	Size resource.Quantity `json:"size,omitempty"`
+}
+
+// ViewFragmentationThreshold lists triggers for when view compaction should start.
+type ViewFragmentationThreshold struct {
+	// Percent is the percentage of disk fragmentation (2-100).
+	Percent *int `json:"percent,omitempty"`
+
+	// Size is the size of disk framentation.
+	Size resource.Quantity `json:"size,omitempty"`
+}
+
+// TimeWindow allows the user to restrict when compaction can occur.
+type TimeWindow struct {
+	// Start is a string in the form HH:MM.
+	Start string `json:"start,omitempty"`
+
+	// End is a string in the form HH:MM.
+	End string `json:"end,omitempty"`
+
+	// AbortCompactionOutsideWindow stops compaction processes when the
+	// process moves outside the window.
+	AbortCompactionOutsideWindow bool `json:"abortCompactionOutsideWindow,omitempty"`
+}
+
+// AutoCompaction define auto compaction settings.
+type AutoCompaction struct {
+	// DatabaseFragmentationThreshold lists triggers for when database compaction should start.
+	DatabaseFragmentationThreshold DatabaseFragmentationThreshold `json:"databaseFragmentationThreshold,omitempty"`
+
+	// ViewFragmentationThreshold lists triggers for when view compaction should start.
+	ViewFragmentationThreshold ViewFragmentationThreshold `json:"viewFragmentationThreshold,omitempty"`
+
+	// ParallelCompaction controls whether database and view compactions can happen
+	// in parallel.
+	ParallelCompaction bool `json:"parallelCompaction,omitempty"`
+
+	// TimeWindow allows the user to restrict when compaction can occur.
+	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
+
+	// TombstonePurgeInterval controls how long to wait before purging tombstones.
+	TombstonePurgeInterval metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
 }
 
 type Buckets struct {
