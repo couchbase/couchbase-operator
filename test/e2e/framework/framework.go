@@ -382,6 +382,9 @@ func RecreateCRDs(k8s *types.Cluster) error {
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseMemcachedBucketCRD()); err != nil {
 		return err
 	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseReplicationCRD()); err != nil {
+		return err
+	}
 	return nil
 }
 

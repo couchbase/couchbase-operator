@@ -42,6 +42,10 @@ const (
 	EventReasonTLSUpdated            = "TLSUpdated"
 	EventReasonTLSInvalid            = "TLSInvalid"
 	EventReasonTLSUpdateFailed       = "TLSUpdateFailed"
+	EventReasonRemoteClusterAdded    = "RemoteClusterAdded"
+	EventReasonRemoteClusterRemoved  = "RemoteClusterRemoved"
+	EventReasonReplicationAdded      = "ReplicationAdded"
+	EventReasonReplicationRemoved    = "ReplicationRemoved"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
@@ -259,6 +263,38 @@ func TLSUpdateFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonTLSUpdateFailed
 	event.Message = "TLS configuration was unable to be updated"
+	return event
+}
+
+func RemoteClusterAddedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonRemoteClusterAdded
+	event.Message = fmt.Sprintf("XDCR remote cluster %s added", name)
+	return event
+}
+
+func RemoteClusterRemovedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonRemoteClusterRemoved
+	event.Message = fmt.Sprintf("XDCR remote cluster %s removed", name)
+	return event
+}
+
+func ReplicationAddedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonReplicationAdded
+	event.Message = fmt.Sprintf("XDCR replication %s added", name)
+	return event
+}
+
+func ReplicationRemovedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonReplicationRemoved
+	event.Message = fmt.Sprintf("XDCR replication %s removed", name)
 	return event
 }
 

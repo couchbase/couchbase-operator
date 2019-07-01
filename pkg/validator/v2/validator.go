@@ -115,6 +115,12 @@ func ApplyEphemeralBucketDefaults(bucket *couchbasev2.CouchbaseEphemeralBucket) 
 func ApplyMemcachedBucketDefaults(bucket *couchbasev2.CouchbaseMemcachedBucket) {
 }
 
+func ApplyReplicationDefaults(replication *couchbasev2.CouchbaseReplication) {
+	if replication.Spec.CompressionType == "" {
+		replication.Spec.CompressionType = couchbasev2.CompressionTypeAuto
+	}
+}
+
 func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseCluster) error {
 	errs := []error{}
 
@@ -147,7 +153,27 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret); err != nil {
 		errs = append(errs, err)
 	} else if secret == nil {
-		errs = append(errs, fmt.Errorf("secret %s must exist", customResource.Spec.Security.AdminSecret))
+		errs = append(errs, fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", customResource.Spec.Security.AdminSecret))
+	}
+	if customResource.Spec.XDCR.Managed {
+		for i, remoteCluster := range customResource.Spec.XDCR.RemoteClusters {
+			if secret, err := v.Abstraction.GetSecret(customResource.Namespace, remoteCluster.AuthenticationSecret); err != nil {
+				errs = append(errs, err)
+			} else if secret == nil {
+				errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", remoteCluster.AuthenticationSecret, i))
+			}
+
+			replications, err := v.Abstraction.GetCouchbaseReplications(customResource.Namespace, remoteCluster.Replications.Selector)
+			if err != nil {
+				errs = append(errs, err)
+			}
+
+			for _, replication := range replications.Items {
+				if err := validateBucketExists(v, customResource, replication.Spec.Bucket); err != nil {
+					errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist", replication.Spec.Bucket, replication.Name))
+				}
+			}
+		}
 	}
 
 	// Check to make sure:
@@ -400,6 +426,10 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return nil
 }
 
+func CheckConstraintsReplication(v *types.Validator, replication *couchbasev2.CouchbaseReplication) error {
+	return nil
+}
+
 // validateTLS checks TLS configuration exists and is valid
 // * correct secrets exist
 // * correct keys exist in the secrets
@@ -424,7 +454,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		if err != nil {
 			errs = append(errs, err)
 		} else if operatorSecret == nil {
-			errs = append(errs, fmt.Errorf("tls operator secret %s must exist", operatorSecretName))
+			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.operatorSecret must exist", operatorSecretName))
 		} else {
 			if ca, ok = operatorSecret.Data["ca.crt"]; !ok {
 				errs = append(errs, fmt.Errorf("tls operator secret %s must contain ca.crt", operatorSecretName))
@@ -436,7 +466,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		if err != nil {
 			errs = append(errs, err)
 		} else if serverSecret == nil {
-			errs = append(errs, fmt.Errorf("tls server secret %s must exist", serverSecretName))
+			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.member.serverSecret must exist", serverSecretName))
 		} else {
 			if chain, ok = serverSecret.Data["chain.pem"]; !ok {
 				errs = append(errs, fmt.Errorf("tls server secret %s must contain chain.pem", serverSecretName))
@@ -530,6 +560,22 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 	}
 
 	return nil
+}
+
+// validateBucketExists ensures the specified Couchbase bucket exists.
+func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, name string) error {
+	buckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	for _, bucket := range buckets.Items {
+		if bucket.Name == name {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("bucket %s not found", name)
 }
 
 func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error {
@@ -732,5 +778,10 @@ func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEpheme
 	return nil
 }
 func CheckImmutableFieldsMemcachedBucket(prev, curr *couchbasev2.CouchbaseMemcachedBucket) error {
+	return nil
+}
+func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplication) error {
+	// Todo validate all clusters referencing the replication also reference the
+	// source bucket.
 	return nil
 }

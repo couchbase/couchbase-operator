@@ -11,8 +11,7 @@ import (
 
 	"github.com/golang/glog"
 
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/apis"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -22,6 +21,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -40,7 +40,7 @@ func addToScheme(scheme *runtime.Scheme) error {
 	if err := clientscheme.AddToScheme(scheme); err != nil {
 		return err
 	}
-	if err := couchbasev1.AddToScheme(scheme); err != nil {
+	if err := apis.AddToScheme(scheme); err != nil {
 		return err
 	}
 	return nil
@@ -114,27 +114,17 @@ func errorResponse(err error) *admissionv1beta1.AdmissionResponse {
 // decodeObject decodes a cluster from an admission review and returns a versioned
 // structure.
 func decodeObject(ar admissionv1beta1.AdmissionReview, raw runtime.RawExtension) (runtime.Object, error) {
-	var object runtime.Object
-	switch ar.Request.Kind.Kind {
-	case couchbasev2.ClusterCRDResourceKind:
-		switch ar.Request.Resource.Version {
-		case "v1":
-			object = &couchbasev1.CouchbaseCluster{}
-		case "v2":
-			object = &couchbasev2.CouchbaseCluster{}
-		default:
-			return nil, fmt.Errorf("unhandled resource version %s", ar.Request.Resource.Version)
-		}
-	case couchbasev2.BucketCRDResourceKind:
-		object = &couchbasev2.CouchbaseBucket{}
-	case couchbasev2.EphemeralBucketCRDResourceKind:
-		object = &couchbasev2.CouchbaseEphemeralBucket{}
-	case couchbasev2.MemcachedBucketCRDResourceKind:
-		object = &couchbasev2.CouchbaseMemcachedBucket{}
+	gvk := schema.GroupVersionKind{
+		Group:   ar.Request.Kind.Group,
+		Version: ar.Request.Kind.Version,
+		Kind:    ar.Request.Kind.Kind,
+	}
+	object, err := scheme.New(gvk)
+	if err != nil {
+		return nil, err
 	}
 
 	deserializer := codecs.UniversalDeserializer()
-	var err error
 	object, _, err = deserializer.Decode(raw.Raw, nil, object)
 	if err != nil {
 		return nil, err
@@ -145,38 +135,35 @@ func decodeObject(ar admissionv1beta1.AdmissionReview, raw runtime.RawExtension)
 
 // getSpec returns the cluster specification from an abstract cluster type.
 func getSpec(resource runtime.Object) (interface{}, error) {
-	switch t := resource.(type) {
-	case *couchbasev1.CouchbaseCluster:
-		return t.Spec, nil
-	case *couchbasev2.CouchbaseCluster:
-		return t.Spec, nil
-	case *couchbasev2.CouchbaseBucket:
-		return t.Spec, nil
-	case *couchbasev2.CouchbaseEphemeralBucket:
-		return t.Spec, nil
-	case *couchbasev2.CouchbaseMemcachedBucket:
-		return t.Spec, nil
-	default:
-		return nil, fmt.Errorf("unhandled type %v", t)
+	v := reflect.ValueOf(resource)
+	if v.Kind() != reflect.Ptr && v.Kind() != reflect.Interface {
+		return nil, fmt.Errorf("getSpec: object not an interface or pointer")
 	}
+	v = v.Elem().FieldByName("Spec")
+	if v.Kind() == reflect.Invalid {
+		return nil, fmt.Errorf("getSpec: object does not contain a Spec field")
+	}
+	return v.Interface(), nil
 }
 
 // deepCopy returns a clone of an abstract cluster type.
 func deepCopy(resource runtime.Object) (runtime.Object, error) {
-	switch t := resource.(type) {
-	case *couchbasev1.CouchbaseCluster:
-		return t.DeepCopy(), nil
-	case *couchbasev2.CouchbaseCluster:
-		return t.DeepCopy(), nil
-	case *couchbasev2.CouchbaseBucket:
-		return t.DeepCopy(), nil
-	case *couchbasev2.CouchbaseEphemeralBucket:
-		return t.DeepCopy(), nil
-	case *couchbasev2.CouchbaseMemcachedBucket:
-		return t.DeepCopy(), nil
-	default:
-		return nil, fmt.Errorf("unhandled type %v", t)
+	v := reflect.ValueOf(resource)
+	if v.Kind() != reflect.Ptr && v.Kind() != reflect.Interface {
+		return nil, fmt.Errorf("deepCopy: object not an interface or pointer %v", v.Kind())
 	}
+	v = v.MethodByName("DeepCopy")
+	if v.Kind() == reflect.Invalid {
+		return nil, fmt.Errorf("deepCopy: object does not have a DeepCopy method")
+	}
+	res := v.Call([]reflect.Value{})
+	if len(res) != 1 {
+		return nil, fmt.Errorf("deepCopy: unexpected result length %d", len(res))
+	}
+	if newResource, ok := res[0].Interface().(runtime.Object); ok {
+		return newResource, nil
+	}
+	return nil, fmt.Errorf("deepCopy: unexpected result type")
 }
 
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the

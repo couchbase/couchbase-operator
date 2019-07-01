@@ -28,6 +28,8 @@ type KubeAbstraction interface {
 	GetCouchbaseEphemeralBuckets(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error)
 	// GetCouchbaseMemcachedBuckets returns all memcached buckets for a specified selector.
 	GetCouchbaseMemcachedBuckets(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error)
+	// GetCouchbaseReplications returns all replications for a specified selector.
+	GetCouchbaseReplications(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseReplicationList, error)
 }
 
 // kubeAbstractionImpl Implements KubeAbstraction, operating on a real kubernetes cluster.
@@ -92,6 +94,15 @@ func (ab *kubeAbstractionImpl) GetCouchbaseMemcachedBuckets(namespace string, se
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(listOpts)
+}
+
+// GetCouchbaseReplications returns all replications for a specified selector.
+func (ab *kubeAbstractionImpl) GetCouchbaseReplications(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseReplicationList, error) {
+	listOpts := metav1.ListOptions{}
+	if selector != nil {
+		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	}
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseReplications(namespace).List(listOpts)
 }
 
 // Validator is an abstraction layer for communicating with kubernetes

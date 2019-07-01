@@ -2,7 +2,6 @@ package e2eutil
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,24 +14,15 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
-
-type cbClusterInfo struct {
-	Uuid string `json:"uuid"`
-}
-
-type xdcrRemoteClusterReference struct {
-	Name     string `json:"name"`
-	Uri      string `json:"uri"`
-	Hostname string `json:"hostname"`
-	Username string `json:"username"`
-}
 
 func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string, reqParams io.Reader) ([]byte, error) {
 	var request *http.Request
@@ -61,12 +51,6 @@ func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string
 		return nil, errors.New("Remote call failed with response: " + response.Status + ", " + string(responseData))
 	}
 	return responseData, nil
-}
-
-func FlushBucket(hostUrl, bucketName, hostUsername, hostPassword string) ([]byte, error) {
-	//curl -X POST -u [admin]:[password] [localhost]:8091/pools/default/buckets/[bucket-name]/controller/doFlush
-	hostUrl = "http://" + hostUrl + "/pools/default/buckets/" + bucketName + "/controller/doFlush"
-	return GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
 }
 
 // PopulateBucket selects a random pod from the cluster and then uses the API
@@ -143,134 +127,106 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 	}
 }
 
-func GetRemoteUuid(hostUrl, cbUsername, cbPassword string) (uuid string, err error) {
-	// curl -u [admin]:[password] http://[localhost]:8091/pools
-	hostUrl = "http://" + hostUrl + "/pools"
-	responseData, err := GenerateHttpRequest("GET", hostUrl, cbUsername, cbPassword, nil)
+func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
+	// List the pods on the remote cluster and pick one
+	selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster.Name)).String()
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return "", "", err
+	}
+	if len(pods.Items) == 0 {
+		return "", "", fmt.Errorf("no pods listed")
+	}
+	pod := pods.Items[0]
+
+	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+
+	ports, ok := cluster.Status.ExposedPorts[pod.Name]
+	if !ok {
+		return "", "", fmt.Errorf("admin service port not exposed")
+	}
+
+	return cluster.Status.ClusterID, pod.Status.HostIP + ":" + strconv.Itoa(int(ports.AdminServicePort)), nil
+}
+
+// EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
+// bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
+func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) (cleanup func(), err error) {
+	// Create the remote cluster secret.
+	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: xdcrSecret,
+		},
+		Data: dstK8s.DefaultSecret.Data,
+	}
+	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
+		return
+	}
+
+	// Define the cleanup to remove the secret and automatically perform cleanup on error so the client doesn't need to worry.
+	cleanup = func() {
+		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
+	}
+	defer func() {
+		if err != nil {
+			cleanup()
+		}
+	}()
+
+	// Create the replication.
+	replication := &couchbasev2.CouchbaseReplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-replication",
+		},
+		Spec: couchbasev2.CouchbaseReplicationSpec{
+			Bucket:       srcBucket,
+			RemoteBucket: dstBucket,
+		},
+	}
+	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
+		return
+	}
+
+	// Create the XDCR remote cluster.
+	clusterName := "remote"
+
+	uuid, host, err := getRemoteUUIDAndHost(dstK8s, target)
 	if err != nil {
 		return
 	}
-	var cbClusterInfo cbClusterInfo
-	if err = json.Unmarshal(responseData, &cbClusterInfo); err != nil {
+
+	xdcr := couchbasev2.XDCR{
+		Managed: true,
+		RemoteClusters: []couchbasev2.RemoteCluster{
+			{
+				Name:                 clusterName,
+				UUID:                 uuid,
+				Hostname:             host,
+				AuthenticationSecret: xdcrSecret,
+			},
+		},
+	}
+	if _, err = PatchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/Spec/XDCR", xdcr), time.Minute); err != nil {
 		return
 	}
-	uuid = cbClusterInfo.Uuid
+
+	// Wait for the operator to successfully connect before continuing.
+	name := fmt.Sprintf("%s/%s/%s", clusterName, srcBucket, dstBucket)
+	if err = WaitForClusterEvent(srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name), 5*time.Minute); err != nil {
+		return
+	}
+
 	return
 }
 
-// CreateDestClusterReference polls the destination cluster to discover the node port of a pod and uses that to
-// initialize connection on the source cluster.
-func CreateDestClusterReference(k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	callback := func() (bool, error) {
-		// List the pods on the remote cluster and pick one
-		selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(dst.Name)).String()
-		pods, err := k8sDst.KubeClient.CoreV1().Pods(dst.Namespace).List(metav1.ListOptions{LabelSelector: selector})
-		if err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-		if len(pods.Items) == 0 {
-			return false, retryutil.RetryOkError(fmt.Errorf("no pods listed"))
-		}
-		pod := pods.Items[0]
-
-		host, cleanup, err := GetAdminConsoleHostURL(k8sSrc, src)
-		if err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-		defer cleanup()
-
-		cluster, err := k8sDst.CRClient.CouchbaseV2().CouchbaseClusters(dst.Namespace).Get(dst.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-
-		ports, ok := cluster.Status.ExposedPorts[pod.Name]
-		if !ok {
-			return false, retryutil.RetryOkError(fmt.Errorf("admin service port not exposed"))
-		}
-
-		// Make the request
-		values := url.Values{}
-		values.Add("uuid", cluster.Status.ClusterID)
-		values.Add("name", cluster.Name)
-		values.Add("hostname", pod.Status.HostIP+":"+strconv.Itoa(int(ports.AdminServicePort)))
-		values.Add("username", username)
-		values.Add("password", password)
-
-		if _, err := GenerateHttpRequest("POST", "http://"+host+"/pools/default/remoteClusters", username, password, strings.NewReader(values.Encode())); err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-		return true, nil
-	}
-
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, callback)
-}
-
-func MustCreateDestClusterReference(t *testing.T, k8sSrc, k8sDst *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password string) {
-	if err := CreateDestClusterReference(k8sSrc, k8sDst, src, dst, username, password); err != nil {
-		Die(t, err)
-	}
-}
-
-func GetXdcrClusterReferences(hostUrl, hostUsername, hostPassword string) (xdcrClusterRefList []xdcrRemoteClusterReference, err error) {
-	// Get all XDCR cluster reference
-	hostUrl = "http://" + hostUrl + "/pools/default/remoteClusters"
-	var responseData []byte
-	responseData, err = GenerateHttpRequest("POST", hostUrl, hostUsername, hostPassword, nil)
+func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) func() {
+	cleanup, err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, srcBucket, dstBucket)
 	if err != nil {
-		return
-	}
-	if err = json.Unmarshal(responseData, &xdcrClusterRefList); err != nil {
-		return
-	}
-	return
-}
-
-func DeleteXdcrClusterReferences(hostUsername, hostPassword string, xdcrClusterRef xdcrRemoteClusterReference) error {
-	// Stop replication of default bucket
-	hostUrl := "http://" + xdcrClusterRef.Hostname + "/controller/cancelXDCR/" + xdcrClusterRef.Uri + "%2Fdeafult%2Fdefault"
-	if _, err := GenerateHttpRequest("DELETE", hostUrl, hostUsername, hostPassword, nil); err != nil {
-		return err
-	}
-
-	// Delete XDCR reference
-	hostUrl = "http://" + xdcrClusterRef.Hostname + xdcrClusterRef.Uri
-	_, err := GenerateHttpRequest("DELETE", hostUrl, hostUsername, hostPassword, nil)
-	return err
-}
-
-func CreateXdcrBucketReplication(k8s *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password, srcbucket, dstBucket string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	values := url.Values{}
-	values.Add("fromBucket", srcbucket)
-	values.Add("toCluster", dst.Name)
-	values.Add("toBucket", dstBucket)
-	values.Add("versionType", "xmem")
-	values.Add("replicationType", "continuous")
-
-	callback := func() (bool, error) {
-		host, cleanup, err := GetAdminConsoleHostURL(k8s, src)
-		if err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-		defer cleanup()
-
-		if _, err := GenerateHttpRequest("POST", "http://"+host+"/controller/createReplication", username, password, strings.NewReader(values.Encode())); err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-		return true, nil
-	}
-
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, callback)
-}
-
-func MustCreateXdcrBucketReplication(t *testing.T, k8s *types.Cluster, src, dst *couchbasev2.CouchbaseCluster, username, password, srcbucket, dstBucket string) {
-	if err := CreateXdcrBucketReplication(k8s, src, dst, username, password, srcbucket, dstBucket); err != nil {
 		Die(t, err)
 	}
+	return cleanup
 }

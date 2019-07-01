@@ -96,35 +96,16 @@ func loadResources(path string) (resourceList, error) {
 			return nil, err
 		}
 
-		decoder := scheme.Codecs.UniversalDeserializer()
-		switch k := u.GetObjectKind().GroupVersionKind().Kind; k {
-		case couchbasev2.ClusterCRDResourceKind:
-			obj, _, err := decoder.Decode([]byte(part), nil, &couchbasev2.CouchbaseCluster{})
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, obj)
-		case couchbasev2.BucketCRDResourceKind:
-			obj, _, err := decoder.Decode([]byte(part), nil, &couchbasev2.CouchbaseBucket{})
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, obj)
-		case couchbasev2.EphemeralBucketCRDResourceKind:
-			obj, _, err := decoder.Decode([]byte(part), nil, &couchbasev2.CouchbaseEphemeralBucket{})
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, obj)
-		case couchbasev2.MemcachedBucketCRDResourceKind:
-			obj, _, err := decoder.Decode([]byte(part), nil, &couchbasev2.CouchbaseMemcachedBucket{})
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, obj)
-		default:
-			return nil, fmt.Errorf("unsupported kind: %v", k)
+		object, err := scheme.Scheme.New(u.GetObjectKind().GroupVersionKind())
+		if err != nil {
+			return nil, err
 		}
+
+		decoder := scheme.Codecs.UniversalDeserializer()
+		if object, _, err = decoder.Decode([]byte(part), nil, object); err != nil {
+			return nil, err
+		}
+		res = append(res, object)
 	}
 
 	return res, nil
@@ -162,6 +143,13 @@ func createResources(k8s *types.Cluster, namespace string, resources resourceLis
 				return err
 			}
 			resources[i] = bucket
+		case couchbasev2.ReplicationCRDResourceKind:
+			replication := resource.(*couchbasev2.CouchbaseReplication)
+			replication, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).Create(replication)
+			if err != nil {
+				return err
+			}
+			resources[i] = replication
 		default:
 			return fmt.Errorf("create: unsupported kind: %v", k)
 		}
@@ -197,6 +185,12 @@ func updateResources(k8s *types.Cluster, resources resourceList) error {
 				return err
 			}
 			resources[i] = bucket
+		case *couchbasev2.CouchbaseReplication:
+			replication, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(t.Namespace).Update(t)
+			if err != nil {
+				return err
+			}
+			resources[i] = replication
 		default:
 			return fmt.Errorf("update: unsupported kind: %v", t)
 		}
@@ -225,6 +219,10 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 			if err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(t.Namespace).Delete(t.Name, options); err != nil {
 				return err
 			}
+		case *couchbasev2.CouchbaseReplication:
+			if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(t.Namespace).Delete(t.Name, options); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("delete: unsupported kind: %v", t)
 		}
@@ -237,35 +235,43 @@ func patchResources(resources resourceList, patches patchMap) error {
 	for _, resource := range resources {
 		switch t := resource.(type) {
 		case *couchbasev2.CouchbaseCluster:
-			patcheset, ok := patches[t.Name]
+			patchset, ok := patches[t.Name]
 			if !ok {
 				break
 			}
-			if err := jsonpatch.Apply(t, patcheset.Patches()); err != nil {
+			if err := jsonpatch.Apply(t, patchset.Patches()); err != nil {
 				return err
 			}
 		case *couchbasev2.CouchbaseBucket:
-			patcheset, ok := patches[t.Name]
+			patchset, ok := patches[t.Name]
 			if !ok {
 				break
 			}
-			if err := jsonpatch.Apply(t, patcheset.Patches()); err != nil {
+			if err := jsonpatch.Apply(t, patchset.Patches()); err != nil {
 				return err
 			}
 		case *couchbasev2.CouchbaseEphemeralBucket:
-			patcheset, ok := patches[t.Name]
+			patchset, ok := patches[t.Name]
 			if !ok {
 				break
 			}
-			if err := jsonpatch.Apply(t, patcheset.Patches()); err != nil {
+			if err := jsonpatch.Apply(t, patchset.Patches()); err != nil {
 				return err
 			}
 		case *couchbasev2.CouchbaseMemcachedBucket:
-			patcheset, ok := patches[t.Name]
+			patchset, ok := patches[t.Name]
 			if !ok {
 				break
 			}
-			if err := jsonpatch.Apply(t, patcheset.Patches()); err != nil {
+			if err := jsonpatch.Apply(t, patchset.Patches()); err != nil {
+				return err
+			}
+		case *couchbasev2.CouchbaseReplication:
+			patchset, ok := patches[t.Name]
+			if !ok {
+				break
+			}
+			if err := jsonpatch.Apply(t, patchset.Patches()); err != nil {
 				return err
 			}
 		default:
@@ -311,6 +317,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				defer teardown()
 
 				cluster.Spec.Security.AdminSecret = targetKube.DefaultSecret.Name
+				for i := range cluster.Spec.XDCR.RemoteClusters {
+					cluster.Spec.XDCR.RemoteClusters[i].AuthenticationSecret = targetKube.DefaultSecret.Name
+				}
 				cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 					Static: &couchbasev2.StaticTLS{
 						Member: &couchbasev2.MemberSecret{
@@ -651,19 +660,19 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateAuthSecretMissing",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/Security/AdminSecret", "does-not-exist")},
 			shouldFail:     true,
-			expectedErrors: []string{"secret does-not-exist must exist"},
+			expectedErrors: []string{"secret does-not-exist referenced by spec.security.adminSecret must exist"},
 		},
 		{
 			name:           "TestValidateTLSServerSecretMissing",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/Networking/TLS/Static/Member/ServerSecret", "does-not-exist")},
 			shouldFail:     true,
-			expectedErrors: []string{"secret does-not-exist must exist"},
+			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.member.serverSecret must exist"},
 		},
 		{
 			name:           "TestValidateTLSOperatorSecretMissing",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/Networking/TLS/Static/OperatorSecret", "does-not-exist")},
 			shouldFail:     true,
-			expectedErrors: []string{"secret does-not-exist must exist"},
+			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.operatorSecret must exist"},
 		},
 		// Missing Network configuration
 		{
@@ -734,6 +743,43 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/TombstonePurgeInterval", tombstonePurgeIntervalOverflow)},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d`},
+		},
+		// XDCR
+		{
+			name:           "TestValidateXDCRUUIDInvalid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/XDCR/RemoteClusters/0/UUID", "cat")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters.uuid in body should match '^[0-9a-f]{32}$'`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameInvalidName",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/XDCR/RemoteClusters/0/Hostname", "illegal_dns")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters.hostname in body should match '^[0-9a-zA-Z\-\.]+(:\d+)?$'`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameInvalidPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/XDCR/RemoteClusters/0/Hostname", "starsky-and-hutch.tv:huggy-bear")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters.hostname in body should match '^[0-9a-zA-Z\-\.]+(:\d+)?$'`},
+		},
+		{
+			name:           "TestValidateXDCRAuthenticationSecretExists",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/Spec/XDCR/RemoteClusters/0/AuthenticationSecret", "huggy-bear")},
+			shouldFail:     true,
+			expectedErrors: []string{`secret huggy-bear referenced by spec.xdcr.remoteClusters[0].authenticationSecret must exist`},
+		},
+		{
+			name:           "TestValidateXDCRReplicationBucketExists",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/Spec/Bucket", "huggy-bear")},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must exist`},
+		},
+		{
+			name:           "TestValidateXDCRReplicationCompressionTypeInvalid",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/Spec/CompressionType", couchbasev2.CompressionType("huggy-bear"))},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.compressionType in body should match '^none|auto|snappy$'`},
 		},
 	}
 

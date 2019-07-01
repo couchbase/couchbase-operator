@@ -83,13 +83,9 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestXdcrCreateTlsCluster
-      - name: TestXdcrCreateK8SVMCluster
-      - name: TestXdcrNodeDownDuringSetupDuringConfigure
-      - name: TestXdcrNodeDownDuringSetupAfterConfigure
-      - name: TestXdcrNodeAddDuringSetupDuringConfigure
-      - name: TestXdcrNodeAddDuringSetupAfterConfigure
-      - name: TestXdcrNodeServiceKilledDuringConfigure
-      - name: TestXdcrNodeServiceKilledAfterConfigure
+      - name: TestXdcrSourceNodeDown
+      - name: TestXdcrSourceNodeAdd
+      - name: TestXdcrTargetNodeServiceDelete
 
   - name: RzaTests
     clusters:

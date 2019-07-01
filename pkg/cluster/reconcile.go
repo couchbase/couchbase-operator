@@ -90,6 +90,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	if err := c.reconcileXDCR(); err != nil {
+		return err
+	}
+
 	if err := c.verifyClusterVolumes(); err != nil {
 		return err
 	}
@@ -1195,7 +1199,7 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	}
 
 	if !reflect.DeepEqual(current, requested) {
-		log.Info("Updating auto compaction settings")
+		log.Info("Updating auto compaction settings", "cluster", c.cluster.Name)
 		if err := c.client.SetAutoCompactionSettings(c.readyMembers(), requested); err != nil {
 			return err
 		}
@@ -1380,4 +1384,127 @@ func (c *Cluster) reconcileReadiness() error {
 		}
 	}
 	return k8sutil.ReconcilePDB(c.config.KubeCli, c.cluster)
+}
+
+// replicationKey returns a unique identifier per replication.
+func replicationKey(r cbmgr.Replication) string {
+	return fmt.Sprintf("%s/%s/%s", r.ToCluster, r.FromBucket, r.ToBucket)
+}
+
+// reconcileXDCR creates and deletes XDCR connections dynamically.
+func (c *Cluster) reconcileXDCR() error {
+	if !c.cluster.Spec.XDCR.Managed {
+		return nil
+	}
+
+	requestedClusters := []cbmgr.RemoteCluster{}
+	requestedReplications := []cbmgr.Replication{}
+
+	for _, cluster := range c.cluster.Spec.XDCR.RemoteClusters {
+		secret, err := k8sutil.GetSecret(c.config.KubeCli, cluster.AuthenticationSecret, c.cluster.Namespace, nil)
+		if err != nil {
+			return err
+		}
+
+		requestedClusters = append(requestedClusters, cbmgr.RemoteCluster{
+			Name:     cluster.Name,
+			UUID:     cluster.UUID,
+			Hostname: cluster.Hostname,
+			Username: string(secret.Data["username"]),
+			Password: string(secret.Data["password"]),
+		})
+
+		listOpts := metav1.ListOptions{}
+		if cluster.Replications.Selector != nil {
+			listOpts.LabelSelector = metav1.FormatLabelSelector(c.cluster.Spec.Buckets.Selector)
+		}
+		replications, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseReplications(c.cluster.Namespace).List(listOpts)
+		if err != nil {
+			return err
+		}
+
+		for _, replication := range replications.Items {
+			requestedReplications = append(requestedReplications, cbmgr.Replication{
+				FromBucket:       replication.Spec.Bucket,
+				ToCluster:        cluster.Name,
+				ToBucket:         replication.Spec.RemoteBucket,
+				Type:             "xmem",
+				ReplicationType:  "continuous",
+				CompressionType:  string(replication.Spec.CompressionType),
+				FilterExpression: replication.Spec.FilterExpression,
+			})
+		}
+	}
+
+	currentClusters, err := c.client.ListRemoteClusters(c.readyMembers())
+	if err != nil {
+		return err
+	}
+
+	currentReplications, err := c.client.ListReplications(c.readyMembers())
+	if err != nil {
+		return err
+	}
+
+	// Create any new clusters...
+CreateNextCluster:
+	for _, requested := range requestedClusters {
+		for _, current := range currentClusters {
+			if current.Name == requested.Name {
+				continue CreateNextCluster
+			}
+		}
+		log.Info("Creating XDCR remote cluster", "cluster", c.cluster.Name, "remote", requested.Name)
+		if err := c.client.CreateRemoteCluster(c.readyMembers(), &requested); err != nil {
+			return err
+		}
+		c.raiseEvent(k8sutil.RemoteClusterAddedEvent(c.cluster, requested.Name))
+	}
+
+	// Create any new replications...
+CreateNextReplication:
+	for _, requested := range requestedReplications {
+		for _, current := range currentReplications {
+			if replicationKey(current) == replicationKey(requested) {
+				continue CreateNextReplication
+			}
+		}
+		log.Info("Creating XDCR replication", "cluster", c.cluster.Name, "replication", replicationKey(requested))
+		if err := c.client.CreateReplication(c.readyMembers(), &requested); err != nil {
+			return err
+		}
+		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, replicationKey(requested)))
+	}
+
+	// Delete any orphaned replications...
+DeleteNextReplication:
+	for _, current := range currentReplications {
+		for _, requested := range requestedReplications {
+			if replicationKey(current) == replicationKey(requested) {
+				continue DeleteNextReplication
+			}
+		}
+		log.Info("Deleting XDCR replication", "cluster", c.cluster.Name, "replication", replicationKey(current))
+		if err := c.client.DeleteReplication(c.readyMembers(), &current); err != nil {
+			return err
+		}
+		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, replicationKey(current)))
+	}
+
+	// Delete any orphaned clusters...
+DeleteNextCluster:
+	for _, current := range currentClusters {
+		for _, requested := range requestedClusters {
+			if current.Name == requested.Name {
+				continue DeleteNextCluster
+			}
+		}
+		log.Info("Deleting XDCR remote cluster", "cluster", c.cluster.Name, "remote", current.Name)
+		if err := c.client.DeleteRemoteCluster(c.readyMembers(), &current); err != nil {
+			return err
+		}
+		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, current.Name))
+	}
+
+	return nil
 }

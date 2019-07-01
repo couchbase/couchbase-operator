@@ -14,11 +14,14 @@ const (
 	EphemeralBucketCRDResourcePlural = "couchbaseephemeralbuckets"
 	MemcachedBucketCRDResourceKind   = "CouchbaseMemcachedBucket"
 	MemcachedBucketCRDResourcePlural = "couchbasememcachedbuckets"
+	ReplicationCRDResourceKind       = "CouchbaseReplication"
+	ReplicationCRDResourcePlural     = "couchbasereplications"
 	GroupName                        = "couchbase.com"
 	ClusterCRDName                   = ClusterCRDResourcePlural + "." + GroupName
 	BucketCRDName                    = BucketCRDResourcePlural + "." + GroupName
 	EphemeralBucketCRDName           = EphemeralBucketCRDResourcePlural + "." + GroupName
 	MemcachedBucketCRDName           = MemcachedBucketCRDResourcePlural + "." + GroupName
+	ReplicationCRDName               = ReplicationCRDResourcePlural + "." + GroupName
 )
 
 var (
@@ -34,6 +37,7 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseBucket{}, &CouchbaseBucketList{})
 	SchemeBuilder.Register(&CouchbaseEphemeralBucket{}, &CouchbaseEphemeralBucketList{})
 	SchemeBuilder.Register(&CouchbaseMemcachedBucket{}, &CouchbaseMemcachedBucketList{})
+	SchemeBuilder.Register(&CouchbaseReplication{}, &CouchbaseReplicationList{})
 }
 
 func Resource(resource string) schema.GroupResource {
@@ -46,6 +50,8 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: EphemeralBucketCRDResourceKind}
 	case "couchbasememcachedbucket":
 		return schema.GroupResource{Group: GroupName, Resource: MemcachedBucketCRDResourceKind}
+	case "couchbasereplication":
+		return schema.GroupResource{Group: GroupName, Resource: ReplicationCRDResourceKind}
 	default:
 		return schema.GroupResource{}
 	}

@@ -400,7 +400,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 	// Ensure the operator doesn't start replacing the ejected node until we've registered it as having
 	// been fully ejected, the two rebalance events may merge in to one otherwise.
-	if _, err := PatchCluster(t, k8s, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute); err != nil {
+	if _, err := PatchCluster(k8s, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute); err != nil {
 		return err
 	}
 
@@ -426,7 +426,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	}
 
 	// Restore the operator back to the previous condition.
-	if _, err := PatchCluster(t, k8s, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute); err != nil {
+	if _, err := PatchCluster(k8s, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute); err != nil {
 		return err
 	}
 

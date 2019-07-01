@@ -74,6 +74,8 @@ func ApplyDefaults(resource runtime.Object) {
 		validationv2.ApplyEphemeralBucketDefaults(t)
 	case *couchbasev2.CouchbaseMemcachedBucket:
 		validationv2.ApplyMemcachedBucketDefaults(t)
+	case *couchbasev2.CouchbaseReplication:
+		validationv2.ApplyReplicationDefaults(t)
 	}
 }
 
@@ -89,6 +91,8 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) error {
 		return validationv2.CheckConstraintsEphemeralBucket(v, t)
 	case *couchbasev2.CouchbaseMemcachedBucket:
 		return validationv2.CheckConstraintsMemcachedBucket(v, t)
+	case *couchbasev2.CouchbaseReplication:
+		return validationv2.CheckConstraintsReplication(v, t)
 	}
 	return nil
 }
@@ -119,6 +123,11 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 		switch t2 := updated.(type) {
 		case *couchbasev2.CouchbaseMemcachedBucket:
 			return validationv2.CheckImmutableFieldsMemcachedBucket(t, t2)
+		}
+	case *couchbasev2.CouchbaseReplication:
+		switch t2 := updated.(type) {
+		case *couchbasev2.CouchbaseReplication:
+			return validationv2.CheckImmutableFieldsReplication(t, t2)
 		}
 	}
 	return nil

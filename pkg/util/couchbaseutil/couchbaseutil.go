@@ -861,3 +861,32 @@ func (c *CouchbaseClient) SetAutoCompactionSettings(ms MemberSet, r *cbmgr.AutoC
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.SetAutoCompactionSettings(r)
 }
+
+func (c *CouchbaseClient) ListRemoteClusters(ms MemberSet) (cbmgr.RemoteClusters, error) {
+	return c.client.ListRemoteClusters()
+}
+
+func (c *CouchbaseClient) CreateRemoteCluster(ms MemberSet, r *cbmgr.RemoteCluster) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.CreateRemoteCluster(r)
+}
+
+func (c *CouchbaseClient) DeleteRemoteCluster(ms MemberSet, r *cbmgr.RemoteCluster) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.DeleteRemoteCluster(r)
+}
+
+func (c *CouchbaseClient) ListReplications(ms MemberSet) ([]cbmgr.Replication, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.ListReplications()
+}
+
+func (c *CouchbaseClient) CreateReplication(ms MemberSet, r *cbmgr.Replication) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.CreateReplication(r)
+}
+
+func (c *CouchbaseClient) DeleteReplication(ms MemberSet, r *cbmgr.Replication) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.DeleteReplication(r)
+}

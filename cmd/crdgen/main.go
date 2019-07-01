@@ -43,6 +43,7 @@ func main() {
 	buffer(v2.GetCouchbaseBucketCRD())
 	buffer(v2.GetCouchbaseEphemeralBucketCRD())
 	buffer(v2.GetCouchbaseMemcachedBucketCRD())
+	buffer(v2.GetCouchbaseReplicationCRD())
 	buffer(k8sutil.GetCRD())
 	if err := dump(); err != nil {
 		fmt.Println(err)

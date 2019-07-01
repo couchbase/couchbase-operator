@@ -61,6 +61,14 @@ spec:
   compressionMode: passive
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replication0
+spec:
+  bucket: bucket0
+  remoteBucket: bucket0
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cluster
@@ -112,6 +120,13 @@ spec:
       tombstonePurgeInterval: 24h
   buckets:
     managed: true
+  xdcr:
+    managed: true
+    remoteClusters:
+      - name: starsky
+        uuid: 246bb8fb53a75e37819cb50b98ac3b65
+        hostname: starsky-and-hutch.tv:8091
+        authenticationSecret: POPULATED_BY_TEST
   servers:
     - size: 1
       name: all_services

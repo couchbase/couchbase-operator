@@ -72,6 +72,7 @@ func GetOperatorRole() *rbacv1.Role {
 					couchbasev2.BucketCRDResourcePlural,
 					couchbasev2.EphemeralBucketCRDResourcePlural,
 					couchbasev2.MemcachedBucketCRDResourcePlural,
+					couchbasev2.ReplicationCRDResourcePlural,
 				},
 				Verbs: []string{
 					"list", // used by the operator to configure buckets.

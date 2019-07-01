@@ -439,7 +439,7 @@ func MustDeleteBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket
 
 func AddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	settings := append(cl.Spec.Servers, newService)
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", settings), timeout)
+	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", settings), timeout)
 }
 
 func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -457,7 +457,7 @@ func RemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseC
 			newServiceConfig = append(newServiceConfig, service)
 		}
 	}
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
+	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
 }
 
 func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -478,7 +478,7 @@ func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 		}
 		newServiceConfig = append(newServiceConfig, service)
 	}
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
+	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
 }
 
 func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -490,7 +490,7 @@ func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchba
 }
 
 // PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster
-func PatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
+func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -526,7 +526,7 @@ func PatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couchba
 
 // MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error
 func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseCluster {
-	cluster, err := PatchCluster(t, k8s, cluster, patches, timeout)
+	cluster, err := PatchCluster(k8s, cluster, patches, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -535,7 +535,7 @@ func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
 func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet) {
-	if _, err := PatchCluster(t, k8s, cluster, patches, 30*time.Second); err == nil {
+	if _, err := PatchCluster(k8s, cluster, patches, 30*time.Second); err == nil {
 		Die(t, fmt.Errorf("cluster patch applied unexpectedly"))
 	}
 }
@@ -671,6 +671,11 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 	} else if err := WaitForMemcachedBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
 	}
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
+	} else if err := WaitForReplicationDeletion(k8s, namespace, time.Minute); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
+	}
 }
 
 func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName string, names ...string) error {
@@ -746,7 +751,7 @@ func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
 
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-	return PatchCluster(t, k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/Servers/%d/Size", service), clusterSize), 30*time.Second)
+	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/Servers/%d/Size", service), clusterSize), 30*time.Second)
 }
 
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {

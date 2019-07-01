@@ -432,7 +432,7 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 		log.Info("Pods failed over", "cluster", c.cluster.Name)
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
-				log.Error(err, "Pod unrecoverable", "cluster", c.cluster.Name, "name", m.Name)
+				log.Info("Pod unrecoverable", "cluster", c.cluster.Name, "name", m.Name, "reason", err)
 				r.transitionState(ReconcileNotifyFinished)
 				return nil
 			} else {

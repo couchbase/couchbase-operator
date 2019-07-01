@@ -484,7 +484,7 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 	if config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig); config != nil {
 		err := k8sutil.IsPodRecoverable(c.config.KubeCli, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
 		if err != nil {
-			log.Error(err, "Pod unrecoverable", "cluster", c.cluster.Name, "name", m.Name)
+			log.Info("Pod unrecoverable", "cluster", c.cluster.Name, "name", m.Name, "reason", err)
 		} else {
 			recoverable = true
 		}

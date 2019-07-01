@@ -79,6 +79,50 @@ type CouchbaseMemcachedBucketList struct {
 	Items           []CouchbaseMemcachedBucket `json:"items"`
 }
 
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseReplication struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseReplicationSpec `json:"spec"`
+}
+
+// CompressionType represents all allowable XDCR compression modes.
+type CompressionType string
+
+const (
+	// CompressionTypeNone applies no compression
+	CompressionTypeNone CompressionType = "none"
+
+	// CompressionTypeAuto automatically applies compression based on internal heuristics.
+	CompressionTypeAuto CompressionType = "auto"
+
+	// CompressionTypeSnappy applies snappy compression to all documents.
+	CompressionTypeSnappy CompressionType = "snappy"
+)
+
+type CouchbaseReplicationSpec struct {
+	// Bucket is the source bucket to replicate from.  This must be defined and
+	// selected by the cluster.
+	Bucket string `json:"bucket"`
+
+	// RemoteBucket is the remote bucket name to synchronize to.
+	RemoteBucket string `json:"remoteBucket"`
+
+	// CompressionType is the type of compression to apply to the replication.
+	CompressionType CompressionType `json:"compressionType"`
+
+	// FilterExpression allows certain documents to be filtered out of the replication.
+	FilterExpression string `json:"filterExpression"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseReplicationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseReplication `json:"items"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // CouchbaseClusterList is a list of Couchbase clusters.
 type CouchbaseClusterList struct {
@@ -184,6 +228,9 @@ type ClusterSpec struct {
 
 	// Bucket specific settings
 	Buckets Buckets `json:"buckets,omitempty"`
+
+	// XDCR specific settings.
+	XDCR XDCR `json:"xdcr"`
 }
 
 type CouchbaseClusterSecuritySpec struct {
@@ -319,6 +366,41 @@ type AutoCompaction struct {
 
 	// TombstonePurgeInterval controls how long to wait before purging tombstones.
 	TombstonePurgeInterval metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
+}
+
+// Replications defines XDCR replications.
+type Replications struct {
+	// Selector allows CouchbaseReplication resources to be filtered
+	// based on labels.
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
+// RemoteCluster is a reference to a remote cluster for XDCR.
+type RemoteCluster struct {
+	// Name of the remote cluster.  Referenced by Replications.
+	Name string `json:"name,onitempty"`
+
+	// UUID of the remote cluster.
+	UUID string `json:"uuid,omitempty"`
+
+	// Hostname is the connection string to use to connect the remote cluster.
+	Hostname string `json:"hostname,omitempty"`
+
+	// AuthenticationSecret is a secret used to authenticate when establishing a
+	// remote connection.
+	AuthenticationSecret string `json:"authenticationSecret,omitempty"`
+
+	// Replications are replication streams from this cluster to the remote one.
+	Replications Replications `json:"replications"`
+}
+
+// XDCR allows management of XDCR settings.
+type XDCR struct {
+	// Managed defines whether XDCR is managed by the operator or not.
+	Managed bool `json:"managed,omitempty"`
+
+	// RemoteClusters is a set of named remote clusters to establish replications to.
+	RemoteClusters []RemoteCluster `json:"remoteClusters,omitempty"`
 }
 
 type Buckets struct {
