@@ -557,6 +557,7 @@ var exposedfeatureSets = map[string][]couchbasev2.Service{
 		couchbasev2.DataService,
 	},
 	couchbasev2.FeatureClient: []couchbasev2.Service{
+		couchbasev2.AdminService,
 		couchbasev2.IndexService,
 		couchbasev2.QueryService,
 		couchbasev2.SearchService,
