@@ -50,7 +50,7 @@ func (r *podUpgradableResource) name(item int) string {
 
 func (r *podUpgradableResource) fetch() error {
 	var err error
-	r.pods, err = r.cluster.config.KubeCli.CoreV1().Pods(r.cluster.cluster.Namespace).List(k8sutil.ClusterListOpt(r.cluster.cluster.Name))
+	r.pods, err = r.cluster.kubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).List(k8sutil.ClusterListOpt(r.cluster.cluster.Name))
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (r *podUpgradableResource) perform(item, action int) error {
 
 func (r *podUpgradableResource) commit(item int) error {
 	pod := &r.pods.Items[item]
-	if _, err := r.cluster.config.KubeCli.CoreV1().Pods(r.cluster.cluster.Namespace).Update(pod); err != nil {
+	if _, err := r.cluster.kubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(pod); err != nil {
 		return err
 	}
 	return nil

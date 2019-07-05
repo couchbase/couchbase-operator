@@ -47,7 +47,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 	selector = selector.Add(*appRequirement, *clusterRequirement)
 
 	// Fetch the list of PVCs.
-	pvcs, err := j.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pvcs, err := j.cluster.kubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 
 // LogPVCUpdate updates the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVolumeClaim) error {
-	if _, err := j.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(pvc); err != nil {
+	if _, err := j.cluster.kubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(pvc); err != nil {
 		return err
 	}
 	return nil
@@ -80,7 +80,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVol
 
 // LogPVCDelete deleted the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
-	if err := j.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
+	if err := j.cluster.kubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	return nil
@@ -88,7 +88,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
 
 // PodExists returns whether a pod exists or not.
 func (j *janitorAbstractionInterfaceImpl) PodExists(name string) (bool, error) {
-	pod, err := k8sutil.GetPod(j.cluster.config.KubeCli, j.cluster.cluster.Namespace, name)
+	pod, err := k8sutil.GetPod(j.cluster.kubeClient, j.cluster.cluster.Namespace, name)
 	if err != nil {
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return false, nil

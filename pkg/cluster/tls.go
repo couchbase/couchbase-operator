@@ -89,11 +89,11 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []by
 // getTLSData gets the TLS data from kubernetes and performs some error checking.
 func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) {
 	// Load the TLS data from kubernetes.
-	operatorSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.Networking.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
+	operatorSecret, err := k8sutil.GetSecret(c.kubeClient, c.cluster.Spec.Networking.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
 	if err != nil {
 		return
 	}
-	serverSecret, err := k8sutil.GetSecret(c.config.KubeCli, c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret, c.cluster.Namespace, nil)
+	serverSecret, err := k8sutil.GetSecret(c.kubeClient, c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret, c.cluster.Namespace, nil)
 	if err != nil {
 		return
 	}

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -60,13 +59,6 @@ func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (recon
 			return reconcile.Result{}, nil
 		}
 		log.Error(err, "Failed to get CouchbaseCluster", "cluster", request.NamespacedName)
-		return reconcile.Result{}, err
-	}
-
-	// Ignore failed clusters.
-	if couchbase.Status.IsFailed() {
-		err := fmt.Errorf("cluster %s failed", request.NamespacedName)
-		log.Error(err, "Ignoring failed cluster", "cluster", request.NamespacedName)
 		return reconcile.Result{}, err
 	}
 

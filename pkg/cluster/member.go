@@ -72,7 +72,7 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (*couchbaseuti
 
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
-	pvcMembers, err := k8sutil.PVCToMemberset(c.config.KubeCli,
+	pvcMembers, err := k8sutil.PVCToMemberset(c.kubeClient,
 		c.cluster.Namespace,
 		c.cluster.Name,
 		c.isSecureClient())

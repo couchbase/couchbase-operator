@@ -13,9 +13,11 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -309,13 +311,10 @@ func labelsForNodeService(clusterName, nodeName string) map[string]string {
 	return labels
 }
 
-// creates a service of Type ClusterIP which is only resolvable internally.
-// furthermore the ClusterIP is "None" allowing the service to run "headless"
-// (sans load balancing middleware) which allows the operator to resolve
-// addresses of individual pods instead of a proxy
-func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
-	labels := LabelsForCluster(clusterName)
-
+// getPeerServicePorts returns the set of all possible ports.  When running in a
+// service mesh it will deny access unless they are referenced by at least one
+// service.
+func getPeerServicePorts() ([]v1.ServicePort, error) {
 	// Create a service which defines A records for all pods, we use this internally
 	// to address nodes via stable names (IPs are not fixed)
 	ports := []v1.ServicePort{}
@@ -334,26 +333,126 @@ func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, own
 				})
 			}
 		default:
-			return fmt.Errorf("illegal port rule: %v", rule)
+			return nil, fmt.Errorf("illegal port rule: %v", rule)
 		}
 	}
 
-	svc := createServiceManifest(clusterName, v1.ServiceTypeClusterIP, ports, labels, labels)
-	svc.Spec.ClusterIP = v1.ClusterIPNone
-	if _, err := createService(kubecli, ns, svc, owner); err != nil {
+	return ports, nil
+}
+
+func updatePeerService(current, requested *v1.Service) bool {
+	updated := false
+	if !reflect.DeepEqual(current.Labels, requested.Labels) {
+		current.Labels = requested.Labels
+		updated = true
+	}
+	if !reflect.DeepEqual(current.Annotations, requested.Annotations) {
+		current.Annotations = requested.Annotations
+		updated = true
+	}
+	// Filled in by the API, so reset to what we generate
+	for i := range current.Spec.Ports {
+		current.Spec.Ports[i].TargetPort = intstr.IntOrString{}
+	}
+	// Unlike NodePort services we don't need to preserve TargetPorts so
+	// can just copy over the whole Spec.
+	if !reflect.DeepEqual(current.Spec, requested.Spec) {
+		current.Spec = requested.Spec
+		updated = true
+	}
+	return updated
+}
+
+// reconcilePeerService either creates the peer service if it doesn't exist
+// or updates an existing version if it has been edited or has been upgraded.
+func reconcilePeerService(kubecli kubernetes.Interface, namespace, name string, owner metav1.OwnerReference) error {
+	serviceName := name
+
+	ports, err := getPeerServicePorts()
+	if err != nil {
 		return err
 	}
+
+	labels := LabelsForCluster(name)
+	requested := createServiceManifest(serviceName, v1.ServiceTypeClusterIP, ports, labels, labels)
+	requested.Spec.ClusterIP = v1.ClusterIPNone
+
+	current, err := GetService(kubecli, namespace, serviceName, nil)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		current = nil
+	}
+
+	// Create if it doesn't exist.
+	if current == nil {
+		_, err := createService(kubecli, namespace, requested, owner)
+		return err
+	}
+
+	// Update an existing service if it does exist.
+	if !updatePeerService(current, requested) {
+		return nil
+	}
+
+	if _, err := UpdateService(kubecli, namespace, current); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reconcileDiscoveryService either creates the discovery service if it doesn't exist
+// or updates an existing version if it has been edited or has been upgraded.
+func reconcileDiscoveryService(kubecli kubernetes.Interface, namespace, name string, owner metav1.OwnerReference) error {
+	serviceName := name + "-srv"
+
+	labels := LabelsForCluster(name)
 
 	// Create a service which defines only data nodes.  This is the expected way clients
 	// using SRV records will connect, meaning they will only ever bootstrap via memcached
-	selectors := LabelsForCluster(clusterName)
+	selectors := LabelsForCluster(name)
 	selectors["couchbase_service_data"] = "enabled"
-	svc = createServiceManifest(clusterName+"-srv", v1.ServiceTypeClusterIP, srvServicePorts, labels, selectors)
-	svc.Spec.ClusterIP = v1.ClusterIPNone
-	if _, err := createService(kubecli, ns, svc, owner); err != nil {
+
+	requested := createServiceManifest(serviceName, v1.ServiceTypeClusterIP, srvServicePorts, labels, selectors)
+	requested.Spec.ClusterIP = v1.ClusterIPNone
+
+	current, err := GetService(kubecli, namespace, serviceName, nil)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		current = nil
+	}
+
+	// Create if it doesn't exist.
+	if current == nil {
+		_, err := createService(kubecli, namespace, requested, owner)
 		return err
 	}
 
+	// Update an existing service if it does exist.
+	if !updatePeerService(current, requested) {
+		return nil
+	}
+
+	if _, err := UpdateService(kubecli, namespace, current); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReconcilePeerServices creates/updates all cluster-wide services required for
+// communication to and discovery of the cluster.
+func ReconcilePeerServices(kubecli kubernetes.Interface, namespace, name string, owner metav1.OwnerReference) error {
+	if err := reconcilePeerService(kubecli, namespace, name, owner); err != nil {
+		return err
+	}
+	if err := reconcileDiscoveryService(kubecli, namespace, name, owner); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -453,7 +552,7 @@ func updateConsoleService(service, requested *v1.Service) bool {
 func UpdateAdminConsole(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, status *couchbasev2.ClusterStatus) (ReconcileStatus, error) {
 	// Lookup the console service.
 	name := cluster.Name + "-ui"
-	service, err := GetService(kubecli, name, cluster.Namespace, nil)
+	service, err := GetService(kubecli, cluster.Namespace, name, nil)
 
 	// If it didn't exist but wants to, create it.
 	if err != nil {

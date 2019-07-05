@@ -28,6 +28,11 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.cluster.Name)
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.cluster.Name)
 
+	// Establish DNS for cluster communication.
+	if err := k8sutil.ReconcilePeerServices(c.kubeClient, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
+		return err
+	}
+
 	// First thing we must do is fix up TLS or we may not be able to talk to the
 	// cluster for anything else.
 	if err := c.reconcileTLS(); err != nil {
@@ -38,7 +43,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	// internal state in all the cases when a pod fails to be created, deleted,
 	// or disappears
 	var err error
-	if c.scheduler, err = scheduler.New(c.config.KubeCli, c.cluster); err != nil {
+	if c.scheduler, err = scheduler.New(c.kubeClient, c.cluster); err != nil {
 		return err
 	}
 
@@ -143,7 +148,7 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
 
 // logFailedMember outputs any debug information we can about a failed member creation.
 func (c *Cluster) logFailedMember(name string) {
-	for _, line := range k8sutil.LogPod(c.config.KubeCli, c.cluster.Namespace, name) {
+	for _, line := range k8sutil.LogPod(c.kubeClient, c.cluster.Namespace, name) {
 		log.Info(line, "cluster", c.cluster.Name)
 	}
 }
@@ -161,8 +166,13 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	// Allocate an index to be used in the name.  Get the current index then increment
 	// and commit back to etcd.  That way we are guaranteed to never have conflicting
 	// names
-	index := c.getPodIndex()
-	c.incPodIndex()
+	index, err := c.getPodIndex()
+	if err != nil {
+		return nil, err
+	}
+	if err := c.incPodIndex(); err != nil {
+		return nil, err
+	}
 
 	// Create a new member
 	newMember, err := c.newMember(index, serverSpec.Name, c.cluster.Spec.Image)
@@ -174,7 +184,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	// occur during creation or configuration
 	defer func() {
 		if err != nil {
-			c.decPodIndex()
+			_ = c.decPodIndex()
 			// Deleting volumes, even log volumes
 			// if node doesn't get to start
 			_ = c.removePod(newMember.Name, true)
@@ -353,15 +363,15 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 	if c.cluster.Spec.Buckets.Selector != nil {
 		listOpts.LabelSelector = metav1.FormatLabelSelector(c.cluster.Spec.Buckets.Selector)
 	}
-	couchbaseBuckets, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseBuckets(c.cluster.Namespace).List(listOpts)
+	couchbaseBuckets, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseBuckets(c.cluster.Namespace).List(listOpts)
 	if err != nil {
 		return nil, err
 	}
-	couchbaseEphemeralBuckets, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseEphemeralBuckets(c.cluster.Namespace).List(listOpts)
+	couchbaseEphemeralBuckets, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseEphemeralBuckets(c.cluster.Namespace).List(listOpts)
 	if err != nil {
 		return nil, err
 	}
-	couchbaseMemcachedBuckets, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseMemcachedBuckets(c.cluster.Namespace).List(listOpts)
+	couchbaseMemcachedBuckets, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseMemcachedBuckets(c.cluster.Namespace).List(listOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +514,7 @@ func (c *Cluster) reconcileBuckets() error {
 // reconcile changes to selected pod labels for
 // the nodePort service exposing admin console
 func (c *Cluster) reconcileAdminService() {
-	status, err := k8sutil.UpdateAdminConsole(c.config.KubeCli, c.cluster, &c.status)
+	status, err := k8sutil.UpdateAdminConsole(c.kubeClient, c.cluster, &c.status)
 	if err != nil {
 		log.Error(err, "UI service update failed", "cluster", c.cluster.Name)
 		return
@@ -527,7 +537,7 @@ func (c *Cluster) reconcileAdminService() {
 // specification and add/removes services as requested, raising events as
 // appropriate.
 func (c *Cluster) reconcileExposedFeatures() error {
-	status, err := k8sutil.UpdateExposedFeatures(c.config.KubeCli, c.members, c.cluster, &c.status)
+	status, err := k8sutil.UpdateExposedFeatures(c.kubeClient, c.members, c.cluster, &c.status)
 	if err != nil {
 		return err
 	}
@@ -585,7 +595,7 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 		if cs.Networking.TLS.Static != nil {
 			// Grab the operator secret
 			secretName := cs.Networking.TLS.Static.OperatorSecret
-			secret, err := k8sutil.GetSecret(c.config.KubeCli, secretName, c.cluster.Namespace, nil)
+			secret, err := k8sutil.GetSecret(c.kubeClient, secretName, c.cluster.Namespace, nil)
 			if err != nil {
 				return err
 			}
@@ -741,7 +751,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
 			podName := strings.Split(existingMember.HostName, ".")[0]
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, podName)
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.kubeClient, c.cluster.Namespace, podName)
 
 			// A status error from the API probably means a 404, just reuse the old
 			// server group location
@@ -814,7 +824,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
 			podName := strings.Split(existingMember.HostName, ".")[0]
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.config.KubeCli, c.cluster.Namespace, podName)
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.kubeClient, c.cluster.Namespace, podName)
 
 			// A status error from the API probably means a 404, just reuse the old
 			// server group location
@@ -854,7 +864,7 @@ func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member)
 	} else {
 		// Lookup the node IP the pod is running on.
 		var err error
-		hostname, err = k8sutil.GetHostIP(c.config.KubeCli, c.cluster.Namespace, member.Name)
+		hostname, err = k8sutil.GetHostIP(c.kubeClient, c.cluster.Namespace, member.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -1233,7 +1243,7 @@ func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 		return nil
 	}
 
-	err := k8sutil.IsPodRecoverable(c.config.KubeCli, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
+	err := k8sutil.IsPodRecoverable(c.kubeClient, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
 	if err != nil {
 		if _, ok := err.(cberrors.ErrNoVolumeMounts); ok {
 			// Pod is not configured for volumes
@@ -1379,11 +1389,11 @@ func (c *Cluster) reportUpgradeComplete() error {
 // number of evictions during a drain i.e. k8s upgrade.
 func (c *Cluster) reconcileReadiness() error {
 	for name := range c.members {
-		if err := k8sutil.FlagPodReady(c.config.KubeCli, c.cluster.Namespace, name); err != nil {
+		if err := k8sutil.FlagPodReady(c.kubeClient, c.cluster.Namespace, name); err != nil {
 			return err
 		}
 	}
-	return k8sutil.ReconcilePDB(c.config.KubeCli, c.cluster)
+	return k8sutil.ReconcilePDB(c.kubeClient, c.cluster)
 }
 
 // replicationKey returns a unique identifier per replication.
@@ -1401,7 +1411,7 @@ func (c *Cluster) reconcileXDCR() error {
 	requestedReplications := []cbmgr.Replication{}
 
 	for _, cluster := range c.cluster.Spec.XDCR.RemoteClusters {
-		secret, err := k8sutil.GetSecret(c.config.KubeCli, cluster.AuthenticationSecret, c.cluster.Namespace, nil)
+		secret, err := k8sutil.GetSecret(c.kubeClient, cluster.AuthenticationSecret, c.cluster.Namespace, nil)
 		if err != nil {
 			return err
 		}
@@ -1418,7 +1428,7 @@ func (c *Cluster) reconcileXDCR() error {
 		if cluster.Replications.Selector != nil {
 			listOpts.LabelSelector = metav1.FormatLabelSelector(c.cluster.Spec.Buckets.Selector)
 		}
-		replications, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseReplications(c.cluster.Namespace).List(listOpts)
+		replications, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseReplications(c.cluster.Namespace).List(listOpts)
 		if err != nil {
 			return err
 		}

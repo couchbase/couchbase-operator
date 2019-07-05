@@ -88,6 +88,7 @@ func GetOperatorRole() *rbacv1.Role {
 				Verbs: []string{
 					"get",    // used by the controller-runtime for leadership.
 					"create", // used by the controller-runtime for leadership.
+					"update", // used my the operator for persistent state.
 				},
 			},
 			{

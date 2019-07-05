@@ -50,7 +50,7 @@ func (r *pvcUpgradableResource) name(item int) string {
 
 func (r *pvcUpgradableResource) fetch() error {
 	var err error
-	r.pvcs, err = r.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).List(k8sutil.ClusterListOpt(r.cluster.cluster.Name))
+	r.pvcs, err = r.cluster.kubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).List(k8sutil.ClusterListOpt(r.cluster.cluster.Name))
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (r *pvcUpgradableResource) perform(item, action int) error {
 
 func (r *pvcUpgradableResource) commit(item int) error {
 	pvc := &r.pvcs.Items[item]
-	if _, err := r.cluster.config.KubeCli.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(pvc); err != nil {
+	if _, err := r.cluster.kubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(pvc); err != nil {
 		return err
 	}
 	return nil

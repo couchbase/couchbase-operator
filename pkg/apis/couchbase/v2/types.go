@@ -651,8 +651,6 @@ type MembersStatus struct {
 	Ready MemberStatusList `json:"ready,omitempty"`
 	// Unready are the couchbase members not ready to serve requests
 	Unready MemberStatusList `json:"unready,omitempty"`
-	// Current Index of the members
-	Index int `json:"index"`
 }
 
 // Used to marshal and unmarshal information from the Upgrading condition.

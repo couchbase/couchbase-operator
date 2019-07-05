@@ -104,7 +104,7 @@ func createService(kubecli kubernetes.Interface, ns string, svc *v1.Service, own
 	return kubecli.CoreV1().Services(ns).Create(svc)
 }
 
-func GetService(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Service, error) {
+func GetService(kubecli kubernetes.Interface, ns, name string, opts *metav1.GetOptions) (*v1.Service, error) {
 	if opts == nil {
 		opts = &metav1.GetOptions{}
 	}

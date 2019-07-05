@@ -71,7 +71,7 @@ func (c *Cluster) operatorUpgrade() error {
 	validator.ApplyDefaults(c.cluster)
 	if !reflect.DeepEqual(c.cluster, cluster) {
 		log.Info("Upgrading resource", "cluster", c.cluster.Name, "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
-		cluster, err := c.config.CouchbaseCRCli.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
+		cluster, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
 		if err != nil {
 			return err
 		}
