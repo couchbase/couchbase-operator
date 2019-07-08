@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -19,82 +21,73 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Create cluster with Analytics service enabled
-// Deploy analytics bucket and verify for bucket creation and data replication
-func TestAnalyticsCreateDataSet(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+// skipAnalytics doesn't run analytics tests on Couchbase 5.x.x as the feature is
+// beta and all the syntax changed between then and GA.
+func skipAnalytics(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	clusterSize := 3
-	numOfDocs := 50
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
-	configMap := map[string]map[string]string{
-		"cluster":         clusterConfig,
-		"service1":        serviceConfig1,
-		"exposedFeatures": {"featureNames": "client"},
-	}
-
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
-
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.AnalyticsService, couchbasev2.DataService, couchbasev2.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.SearchService)
-	// Can get stuck on rebalancing.
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, "default", 0, numOfDocs)
-	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-
-	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
-	defer cleanup()
-
-	analyticsDataset := "testDataset1"
-
-	queries := []string{
-		"CREATE DATASET " + analyticsDataset + " ON `default`",
-		"CONNECT LINK Local",
-	}
 
 	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	// TODO: Kill me ASAP as it's DP code.
 	version, err := couchbaseutil.NewVersion(versionStr)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	if version.Major() < 6 {
-		analyticsBucketName := "testAnalyticsBucket"
-		queries = []string{
-			`create bucket ` + analyticsBucketName + ` with {"name": "default"}`,
-			`create dataset ` + analyticsDataset + ` on ` + analyticsBucketName,
-			`connect bucket ` + analyticsBucketName,
-		}
+		t.Skip("beta feature unsupported")
+	}
+}
+
+// Create cluster with Analytics service enabled
+// Deploy analytics bucket and verify for bucket creation and data replication
+func TestAnalyticsCreateDataSet(t *testing.T) {
+	skipAnalytics(t)
+
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+	numOfDocs := 50
+	analyticsDataset := "testDataset1"
+	queries := []string{
+		"CREATE DATASET " + analyticsDataset + " ON `default`",
+		"CONNECT LINK Local",
 	}
 
+	// Create the cluster.
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+
+	// Runtime configuration.
+	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+
+	// When ready, insert documents into our bucket.  Create a dataset and link to our bucket.
+	// Verify the number of documents in the dataset match those in the bucket.
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	defer cleanup()
 	for _, query := range queries {
-		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
-			t.Fatal(err.Error() + "-" + string(response))
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query, time.Minute); err != nil {
+			e2eutil.Die(t, fmt.Errorf("query error: %v, %v", err, response))
 		}
 	}
-
-	// Verify data set doc count
 	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -138,46 +131,18 @@ func insertAnalyticsDocument(k8s *types.Cluster, cluster *couchbasev2.CouchbaseC
 // Create analytics bucket with data sets and connect with couchbase bucket
 // Resize cluster with analytics nodes and check for data and functional consistency
 func TestAnalyticsResizeCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	skipAnalytics(t)
+
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
 	clusterSize := 1
 	numOfDocs := 10
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
-	configMap := map[string]map[string]string{
-		"cluster":         clusterConfig,
-		"service1":        serviceConfig1,
-		"exposedFeatures": map[string]string{"featureNames": "client"},
-	}
-
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
-
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterEvent(testCouchbase, "AdminConsoleServiceCreate")
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.AnalyticsService, couchbasev2.DataService, couchbasev2.EventingService)
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.SearchService)
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, "default", 0, numOfDocs)
-
-	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-
-	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
-	defer cleanup()
-
 	analyticsDataset1 := "testDataset1"
 	analyticsDataset2 := "testDataset2"
 	analyticsDataset3 := "testDataset3"
-
 	queries := []string{
 		"CREATE DATASET " + analyticsDataset1 + " ON `default`",
 		"CREATE DATASET " + analyticsDataset2 + " ON `default` WHERE `valueType` = \"type1\"",
@@ -185,41 +150,33 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		"CONNECT LINK Local",
 	}
 
-	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
+	// Create the cluster.
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
-	// TODO: Kill me ASAP as it's DP code.
-	version, err := couchbaseutil.NewVersion(versionStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-	if version.Major() < 6 {
-		analyticsBucketName := "testAnalyticsBucket"
-		queries = []string{
-			`create bucket ` + analyticsBucketName + ` with {"name": "default"}`,
-			`create dataset ` + analyticsDataset1 + ` on ` + analyticsBucketName,
-			`create dataset ` + analyticsDataset2 + ` on ` + analyticsBucketName + ` where valueType="type1"`,
-			`create dataset ` + analyticsDataset3 + ` on ` + analyticsBucketName + ` where valueType="type2"`,
-			`connect bucket ` + analyticsBucketName,
-		}
-	}
+	// Runtime configuration.
+	analyticsNodeName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	// Load default data set into couchbase bucket
+	// When ready, create three datasets on our bucket and add some initial documents ...
+	analyticsHostUrl, analyticsNodePortStr, cleanup := e2eutil.MustGetAnalyticsIpAndPort(t, targetKube, f.Namespace, analyticsNodeName)
+	defer cleanup()
 	for _, query := range queries {
-		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
-			t.Fatal(err.Error() + "-" + string(response))
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query, time.Minute); err != nil {
+			e2eutil.Die(t, fmt.Errorf("query error: %v, %v", err, response))
 		}
 	}
+	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
 
-	// Function to insert data with two types of valueType variables
+	// ... until we say otherwise insert documents into the bucket, alternating between
+	// 'type1' and 'type2', keeping a record of how many of each type we have successfully
+	// managed to create ...
 	dataInsertionErrChan := make(chan error)
 	stopDataInsertionChan := make(chan interface{})
 	numOfType1Docs := 0
 	numOfType2Docs := 0
-
 	// Clone the cluster here to avoid read/write races
 	// Don't not use any Must* calls as it will cause a hang
 	go func(cluster *couchbasev2.CouchbaseCluster) {
@@ -235,7 +192,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 				if numOfDocs%2 != 0 {
 					docType = "type2"
 				}
-				if err = insertAnalyticsDocument(targetKube, cluster, "default", docID, docType); err != nil {
+				if err = insertAnalyticsDocument(targetKube, cluster, e2espec.DefaultBucket.Name, docID, docType); err != nil {
 					break
 				}
 				if numOfDocs%2 == 0 {
@@ -249,7 +206,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		dataInsertionErrChan <- err
 	}(testCouchbase.DeepCopy())
 
-	// Ensure the routine is shut down properly in the event of a fatality.
+	// ... ensure the routine is shut down properly in the event of a fatality ...
 	stopped := false
 	defer func() {
 		if !stopped {
@@ -258,33 +215,15 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		}
 	}()
 
-	// Resize cluster
-	clusterSizes := []int{2, 3, 2, 1}
-	prevClusterSize := clusterSize
-	for _, clusterSize = range clusterSizes {
-		service := 0
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 20*time.Minute)
-
-		switch {
-		case clusterSize-prevClusterSize > 0:
-			expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", clusterSize-1)
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-
-		case clusterSize-prevClusterSize < 0:
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-			expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", clusterSize)
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-		}
-		prevClusterSize = clusterSize
+	// ... finally resize cluster. Note: do not scale down to 1, it's broken.
+	for _, clusterSize = range []int{2, 3, 2} {
+		testCouchbase = e2eutil.MustResizeCluster(t, 0, clusterSize, targetKube, testCouchbase, 5*time.Minute)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
-
-	// To stop background data insertion and wait for function to complete.
+	// ... stop background data insertion and wait for function to complete.
 	// Wait for a short while so that the load generator has a chance to successfully
 	// commit documents to only pods that exist now.  Note that the port forward has
-	// a timeout of 1 minute, so wait for two to be certain.
+	// a timeout of 1 minute, so wait for two to be certain ...
 	time.Sleep(2 * time.Minute)
 	close(stopDataInsertionChan)
 	stopped = true
@@ -292,12 +231,24 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	// Verify total docs in data sets
-	datasetNames := []string{analyticsDataset1, analyticsDataset2, analyticsDataset3}
-	dataSetDocCount := []int{numOfDocs, numOfType1Docs, numOfType2Docs}
-	for index, datasetName := range datasetNames {
-		e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, datasetName, constants.CbClusterUsername, constants.CbClusterPassword, dataSetDocCount[index], 5*time.Minute)
+	// ...finally verify total docs in data sets.
+	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset1, constants.CbClusterUsername, constants.CbClusterPassword, numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset2, constants.CbClusterUsername, constants.CbClusterPassword, numOfType1Docs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInAnalyticsDataset(t, analyticsHostUrl, analyticsNodePortStr, analyticsDataset3, constants.CbClusterUsername, constants.CbClusterPassword, numOfType2Docs, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Cluster scales from 1 -> 2
+	// * Cluster scales from 2 -> 3
+	// * Cluster scales from 3 -> 2
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleDownSequence(1),
 	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -374,7 +325,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	// Load default data set into couchbase bucket
 	for _, query := range queries {
 		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query, time.Minute); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
 		}
 	}
@@ -564,7 +515,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	// Load default data set into couchbase bucket
 	for _, query := range queries {
 		t.Log(query)
-		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query); err != nil {
+		if response, err := e2eutil.ExecuteAnalyticsQuery(analyticsHostUrl, analyticsNodePortStr, query, time.Minute); err != nil {
 			t.Fatal(err.Error() + "-" + string(response))
 		}
 	}

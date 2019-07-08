@@ -253,7 +253,6 @@ func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 
 // Get Bucket from couchbase cluster
 func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error) {
-	t.Logf("get bucket: %s", bucketName)
 	buckets, err := client.GetBuckets()
 	if err == nil {
 		for _, b := range buckets {
@@ -749,9 +748,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 			t.Log(err)
 			return false, retryutil.RetryOkError(err)
 		}
-		if err == nil {
-			defer cleanup()
-		}
+		defer cleanup()
 
 		hostUrl := "http://" + eventingUrl + "/api/v1/functions?name=" + eventingFuncName
 
@@ -784,35 +781,39 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 	return responseData, nil
 }
 
-func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string) (responseData []byte, err error) {
+func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string, timeout time.Duration) (responseData []byte, err error) {
 	hostUrl := "http://" + hostIp + ":" + hostPort + "/analytics/service"
 	username := string(e2espec.BasicSecretData["username"])
 	password := string(e2espec.BasicSecretData["password"])
-	data := []byte(queryStr)
 
-	request, err := http.NewRequest("POST", hostUrl, bytes.NewReader(data))
-	if err != nil {
-		err = errors.New("Failed to create http request: " + err.Error())
-		return
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-	request.SetBasicAuth(username, password)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	err = retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", func() error {
+		request, err := http.NewRequest("POST", hostUrl, bytes.NewReader([]byte(queryStr)))
+		if err != nil {
+			return errors.New("Failed to create http request: " + err.Error())
+		}
 
-	client := http.Client{Timeout: time.Minute}
-	response, err := client.Do(request)
-	if err != nil {
-		err = errors.New("Http POST failed: " + err.Error())
-		return
-	}
-	defer response.Body.Close()
+		request.SetBasicAuth(username, password)
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	responseBody := response.Body
-	responseData, _ = ioutil.ReadAll(responseBody)
+		client := http.Client{Timeout: time.Minute}
+		response, err := client.Do(request)
+		if err != nil {
+			return errors.New("Http POST failed: " + err.Error())
+		}
+		defer response.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
-		err = errors.New("Remote call failed with response: " + response.Status)
-	}
+		responseBody := response.Body
+		responseData, _ = ioutil.ReadAll(responseBody)
+
+		if response.StatusCode != http.StatusOK {
+			return errors.New("Remote call failed with response: " + response.Status)
+		}
+
+		return nil
+	})
 	return
 }
 
@@ -828,7 +829,7 @@ func VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName,
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", func() error {
-		response, err := ExecuteAnalyticsQuery(hostName, hostPort, query)
+		response, err := ExecuteAnalyticsQuery(hostName, hostPort, query, timeout) // Timeout wrong.
 		if err != nil {
 			return fmt.Errorf("%v: %v", err, string(response))
 		}

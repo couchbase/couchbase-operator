@@ -127,7 +127,6 @@ tcGroups:
       - name: TestLogCollectUsingClusterNameAndNamespace
       - name: TestExtendedDebugWithNonDefaultValues
       - name: TestCollectLogFromEphemeralPodsUsingLogPVKillProcess
-      - name: TestCollectLogFromPvPodRecovered
       - name: TestLogRedactionWithPvVerify
       - name: TestLogCollectListJson
 

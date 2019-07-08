@@ -802,6 +802,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create a expected RZA results map for verification
 	sort.Strings(availableServerGroupList)

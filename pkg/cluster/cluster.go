@@ -220,7 +220,12 @@ func (c *Cluster) setup() error {
 func (c *Cluster) create() error {
 	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.cluster.Name)
 	c.status.SetPhase(couchbasev2.ClusterPhaseCreating)
-	c.status.SetVersion(c.cluster.Spec.Image)
+
+	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+	c.status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
 		return fmt.Errorf("cluster create: failed to update cluster phase (%v): %v",
@@ -660,9 +665,12 @@ func (c *Cluster) clusterRemoveMember(name string) error {
 	return c.updateMemberStatus()
 }
 
-// Raises an event.  Unfortunately the event stream only appears to have a
-// 1s granularity, so insert a delay if necessary
-func (c *Cluster) raiseEvent(event *v1.Event) {
+// Raises an event.  While time.Time has nanosecond accuracy, this is lost when
+// marshalled into JSON on the wire, so events within the same second look like
+// they happened at exactly the same time, and thus ordering is arbitrary.  We
+// rate limit new events so they always appear to occur at a visibly different
+// time.
+func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 	// Work out how long since we last raised an event
 	duration := event.FirstTimestamp.Time.Sub(c.lastEvent)
 
@@ -677,12 +685,15 @@ func (c *Cluster) raiseEvent(event *v1.Event) {
 	}
 
 	// Post the event to kubernetes
-	if _, err := c.config.KubeCli.CoreV1().Events(c.cluster.Namespace).Create(event); err != nil {
+	event, err := c.config.KubeCli.CoreV1().Events(c.cluster.Namespace).Create(event)
+	if err != nil {
 		log.Error(err, "Event creation failed", "cluster", c.cluster.Name, "event", event.Reason)
+		return nil
 	}
 
 	// Update the last event timestamp
 	c.lastEvent = event.FirstTimestamp.Time
+	return event
 }
 
 // raiseEventCached raises an event but first checks an LRU cache and optionally
@@ -703,11 +714,10 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 			return
 		}
 	}
-	e, err := c.config.KubeCli.CoreV1().Events(c.cluster.Namespace).Create(event)
-	if err != nil {
-		log.Error(err, "Event creation failed", "cluster", c.cluster.Name, "event", event.Reason)
+
+	if event = c.raiseEvent(event); event != nil {
+		c.eventCache.Add(key, event)
 	}
-	c.eventCache.Add(key, e)
 }
 
 // clients should use ready members that are available to service requests

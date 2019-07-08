@@ -221,7 +221,6 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	}
 
 	t.Logf("AntiAffinity=%s ... \n attempting to create %d pod cluster with %d nodes", antiAffinity, clusterSize, clusterSize)
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
 
 	expectedEvents := e2eutil.EventValidator{}

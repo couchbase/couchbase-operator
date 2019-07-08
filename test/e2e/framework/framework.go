@@ -200,6 +200,7 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
 	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
+	logrus.Info(" →  couchbase server upgrade: " + runtimeParams.CouchbaseServerImageUpgrade)
 	logrus.Info("Kubernetes")
 	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
 	logrus.Info("Logs")

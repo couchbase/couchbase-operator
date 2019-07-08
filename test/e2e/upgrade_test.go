@@ -93,17 +93,17 @@ func upgradeDownRecoverableSequence(victimName string) eventschema.Validatable {
 }
 
 // MemberAddAndDownUnecoverableSequence is a common sequence for generating events for a new
-// member being added, the pod being killed during a rebalance and the recovery steps.
+// member being added, the pod being killed during a rebalance and the recovery steps.  Warning,
+// the behaviour of this changes based on what kind of stateful service is enabled - eventing
+// being the prime cause of inconsistency.
 func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -575,6 +575,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		upgradeDownUnrecoverableSequence(victimName),
+		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
