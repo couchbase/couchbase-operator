@@ -84,6 +84,9 @@ func TestNodeManualFailover(t *testing.T) {
 	// create 2 node cluster with admin console
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
 
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
+
 	// When ready failover a node, expect it to be added back in.
 	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, 0, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
@@ -116,6 +119,9 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -166,6 +172,9 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
 
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
+
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
 
@@ -214,6 +223,9 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
 
 	// Runtime configuration.
 	victim1Name := couchbaseutil.CreateMemberName(testCouchbase.Name, victim1Index)
@@ -282,6 +294,9 @@ func TestRemoveForeignNode(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.WithBucket, constants.AdminHidden)
+
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
 
 	// Runtime configuration.
 	foreignNodeName := testCouchbase.Name + "-hrisovalantis" // (this is Greek ;p)
@@ -415,6 +430,9 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
+
 	// Kill a single pod and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
@@ -456,6 +474,9 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
 
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
@@ -545,6 +566,9 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	testCouchbase.Spec.BucketSettings[0].BucketReplicas = 2
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
+
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
@@ -584,6 +608,9 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithBucket, constants.AdminHidden)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
 
 	// Runtime configuration
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -633,6 +660,9 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
 
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
+
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT; iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
 
@@ -680,6 +710,9 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	}
 
 	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, "couchbase/server:"+f.CouchbaseServerVersion, "default")()
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
