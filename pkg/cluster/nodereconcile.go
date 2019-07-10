@@ -191,7 +191,7 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 	// TEMPORARY HACK END
 
 	if !needsReconcile {
-		c.status.SetBalancedCondition()
+		c.cluster.Status.SetBalancedCondition()
 		r.transitionState(ReconcileFinished)
 		return nil
 	}
@@ -200,7 +200,7 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 	// which is outside of our control, or existing rebalance conditions
 	// after a restart
 	if r.couchbase.NeedsRebalance || r.couchbase.IsRebalancing {
-		c.status.SetUnbalancedCondition()
+		c.cluster.Status.SetUnbalancedCondition()
 		if err := c.updateCRStatus(); err != nil {
 			// TODO: we should handle errors properly
 			r.transitionState(ReconcileFinished)
@@ -267,7 +267,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 
 	if r.couchbase.DownNodes.Size() > 0 {
 		// Ensure the cluster is visibly unhealthy before triggering any events
-		c.status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
+		c.cluster.Status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
 
 		if err := c.updateCRStatus(); err != nil {
 			return err
@@ -286,9 +286,9 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 					continue
 				}
 			}
-			if c.status.Members.Unready.Contains(m.Name) {
+			if c.cluster.Status.Members.Unready.Contains(m.Name) {
 				if c.isPodRecoverable(m) {
-					ts := c.status.Members.Unready.GetMember(m.Name).Ts()
+					ts := c.cluster.Status.Members.Unready.GetMember(m.Name).Ts()
 
 					// Recover node if it has been down longer than auto-failover time
 					elapsed, remainingTs := c.elapsedRecoveryDuration(ts)
@@ -315,7 +315,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		return fmt.Errorf("unable to reconcile cluster because some nodes are down")
 	}
 
-	c.status.SetReadyCondition()
+	c.cluster.Status.SetReadyCondition()
 	r.transitionState(ReconcileUnclusteredNodes)
 	return nil
 }
@@ -517,7 +517,7 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 	// If we are performing any scaling update the status and request a rebalance
 	// to eject the scheduled servers
 	if currentSize != desiredSize {
-		c.status.SetScalingDownCondition(currentSize, desiredSize)
+		c.cluster.Status.SetScalingDownCondition(currentSize, desiredSize)
 		r.couchbase.NeedsRebalance = true
 	}
 
@@ -542,7 +542,7 @@ func handleAddNode(r *ReconcileMachine, c *Cluster) error {
 		for nodes.Size()+addCount < serverSpec.Size {
 			originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
 
-			c.status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
+			c.cluster.Status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
 			if err := c.updateCRStatus(); err != nil {
 				log.Error(err, "Cluster status update failed", "cluster", c.cluster.Name)
 			}

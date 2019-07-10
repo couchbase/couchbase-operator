@@ -437,6 +437,27 @@ func MustDeleteBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket
 	}
 }
 
+func GetBucketName(bucket runtime.Object) (string, error) {
+	switch t := bucket.(type) {
+	case *couchbasev2.CouchbaseBucket:
+		return t.Name, nil
+	case *couchbasev2.CouchbaseEphemeralBucket:
+		return t.Name, nil
+	case *couchbasev2.CouchbaseMemcachedBucket:
+		return t.Name, nil
+	default:
+		return "", fmt.Errorf("unsupported bucket type")
+	}
+}
+
+func MustGetBucketName(t *testing.T, bucket runtime.Object) string {
+	name, err := GetBucketName(bucket)
+	if err != nil {
+		Die(t, err)
+	}
+	return name
+}
+
 func AddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	settings := append(cl.Spec.Servers, newService)
 	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", settings), timeout)

@@ -551,12 +551,11 @@ type ClusterCondition struct {
 type ClusterConditionType string
 
 const (
-	ClusterConditionAvailable     ClusterConditionType = "Available"
-	ClusterConditionBalanced      ClusterConditionType = "Balanced"
-	ClusterConditionManageBuckets ClusterConditionType = "ManageBuckets"
-	ClusterConditionManageConfig  ClusterConditionType = "ManageConfig"
-	ClusterConditionScaling       ClusterConditionType = "Scaling"
-	ClusterConditionUpgrading     ClusterConditionType = "Upgrading"
+	ClusterConditionAvailable    ClusterConditionType = "Available"
+	ClusterConditionBalanced     ClusterConditionType = "Balanced"
+	ClusterConditionManageConfig ClusterConditionType = "ManageConfig"
+	ClusterConditionScaling      ClusterConditionType = "Scaling"
+	ClusterConditionUpgrading    ClusterConditionType = "Upgrading"
 )
 
 type ClusterStatusMap map[ClusterConditionType]*ClusterCondition
@@ -615,27 +614,6 @@ type ClusterStatus struct {
 
 	// ports exposing couchbase cluster on the K8S node network
 	ExposedPorts PortStatusMap `json:"nodePorts,omitempty"`
-}
-
-func (cs *ClusterStatus) CreateBucket(bucket cbmgr.Bucket) {
-	cs.Buckets = append(cs.Buckets, bucket)
-}
-
-func (cs *ClusterStatus) UpdateBucket(bucket cbmgr.Bucket) {
-	for i, b := range cs.Buckets {
-		if b.BucketName == bucket.BucketName {
-			cs.Buckets[i] = bucket
-			break
-		}
-	}
-}
-
-func (cs *ClusterStatus) DeleteBucket(bucket cbmgr.Bucket) {
-	for i, b := range cs.Buckets {
-		if b.BucketName == bucket.BucketName {
-			cs.Buckets = append(cs.Buckets[:i], cs.Buckets[i+1:]...)
-		}
-	}
 }
 
 type MemberTimestamp struct {

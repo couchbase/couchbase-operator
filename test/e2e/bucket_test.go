@@ -150,11 +150,12 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucket := range buckets {
+		name := e2eutil.MustGetBucketName(t, bucket)
 		e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
-		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{name}, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 		e2eutil.MustDeleteBucket(t, targetKube, f.Namespace, bucket)
-		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, "default", 2*time.Minute)
+		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, name, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	}
 

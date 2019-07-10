@@ -366,11 +366,6 @@ func (cs *ClusterStatus) SetReason(r string) {
 	cs.Reason = r
 }
 
-func (cs *ClusterStatus) SetBucketManagementFailedCondition(reason, message string) {
-	c := newClusterCondition(v1.ConditionFalse, reason, message)
-	cs.setClusterCondition(ClusterConditionManageBuckets, c)
-}
-
 func (cs *ClusterStatus) SetScalingUpCondition(from, to int) {
 	c := newClusterCondition(v1.ConditionTrue, "Scaling up", scalingMsg(from, to))
 	cs.setClusterCondition(ClusterConditionScaling, c)

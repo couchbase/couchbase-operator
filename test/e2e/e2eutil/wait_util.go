@@ -66,10 +66,11 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
+	// First ensure the buckets are created according to the operator.
+	callback := func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		for _, b := range buckets {
@@ -81,11 +82,39 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 				}
 			}
 			if !found {
-				return false, nil
+				return fmt.Errorf("bucket %s not present", b)
 			}
 		}
-		return true, nil
-	})
+		return nil
+	}
+	if err := retryutil.RetryOnErr(ctx, retryInterval, IntMax, "", "", callback); err != nil {
+		return err
+	}
+
+	// Next wait until all nodes are warmed up before allowing tests to do I/O
+	client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	callback = func() error {
+		info, err := client.ClusterInfo()
+		if err != nil {
+			return err
+		}
+		for _, node := range info.Nodes {
+			if node.Status != "healthy" || node.Membership != "active" {
+				return fmt.Errorf("node %s unhealthy, state %s:%s", node.HostName, node.Status, node.Membership)
+			}
+		}
+		return nil
+	}
+	if err := retryutil.RetryOnErr(ctx, retryInterval, IntMax, "", "", callback); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func MustWaitUntilBucketsExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) {

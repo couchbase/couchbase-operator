@@ -222,6 +222,9 @@ var (
 		"TestConsoleServiceDNS":               TestConsoleServiceDNS,
 		"TestConsoleServiceDNSModify":         TestConsoleServiceDNSModify,
 		"TestConsoleServiceTypeModify":        TestConsoleServiceTypeModify,
+
+		// Status tests
+		"TestStatusRecovery": TestStatusRecovery,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{

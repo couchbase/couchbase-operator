@@ -10,6 +10,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -24,7 +25,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -80,7 +80,6 @@ type Cluster struct {
 	kubeClient          kubernetes.Interface
 	couchbaseKubeClient versioned.Interface
 	cluster             *couchbasev2.CouchbaseCluster
-	status              couchbasev2.ClusterStatus
 	members             couchbaseutil.MemberSet
 	username            string
 	password            string
@@ -91,7 +90,7 @@ type Cluster struct {
 	scheduler           scheduler.Scheduler            // Pod placement scheduler
 	forceUpdate         bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
 	eventCache          *lru.Cache                     // Used to store events for aggregation
-	persistentState     *v1.ConfigMap                  // Used to store persistent cluster state
+	state               persistence.PersistentStorage  // Used to store persistent cluster state
 }
 
 // New is called when we first observe a CouchbaseCluster resource.  This may be due to
@@ -99,7 +98,6 @@ type Cluster struct {
 func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
 		config:     config,
-		status:     *(cl.Status.DeepCopy()),
 		cluster:    cl,
 		eventCache: lru.New(1024),
 	}
@@ -119,6 +117,18 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 		return nil, err
 	}
 
+	// Create a new persistence layer to store and retrieve state.  Add in
+	// defaults if they don't exist.
+	if c.state, err = persistence.New(c.kubeClient, cl); err != nil {
+		return nil, err
+	}
+	if err := c.state.Insert(persistence.Phase, string(couchbasev2.ClusterPhaseNone)); err != nil && !persistence.IsKeyError(err) {
+		return nil, err
+	}
+	if err := c.state.Insert(persistence.PodIndex, "0"); err != nil && !persistence.IsKeyError(err) {
+		return nil, err
+	}
+
 	// Cancel is used to abort the go routine when the operator is deleted
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 
@@ -135,7 +145,7 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 
 	if err := c.setup(); err != nil {
 		log.Error(err, "Cluster setup failed", "cluster", c.cluster.Name)
-		c.status.SetReason(err.Error())
+		c.cluster.Status.SetReason(err.Error())
 		if err := c.updatePhase(couchbasev2.ClusterPhaseFailed); err != nil {
 			return nil, err
 		}
@@ -158,38 +168,11 @@ func (c *Cluster) Delete() {
 }
 
 func (c *Cluster) setup() error {
-	var err error
-	c.persistentState, err = c.kubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	phase, err := c.state.Get(persistence.Phase)
 	if err != nil {
-		// Something went wrong with the API, stop
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-
-		// Create a new persistent state object
-		c.persistentState = &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: c.cluster.Name,
-				OwnerReferences: []metav1.OwnerReference{
-					c.cluster.AsOwner(),
-				},
-			},
-			Data: map[string]string{
-				"phase":    string(couchbasev2.ClusterPhaseNone),
-				"podIndex": "0",
-			},
-		}
-		if c.persistentState, err = c.kubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Create(c.persistentState); err != nil {
-			return err
-		}
+		return err
 	}
-
-	// Get the persistent phase from storage and update the status.
-	phase, ok := c.persistentState.Data["phase"]
-	if !ok {
-		return fmt.Errorf("phase field not present in cluster configmap")
-	}
-	c.status.SetPhase(couchbasev2.ClusterPhase(phase))
+	c.cluster.Status.SetPhase(couchbasev2.ClusterPhase(phase))
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("warning failed to update cluster status", "cluster", c.cluster.Name)
 	}
@@ -219,12 +202,22 @@ func (c *Cluster) setup() error {
 		return err
 	}
 
+	// Setup the UI so we can monitor cluster creation
+	if err := c.reconcileAdminService(); err != nil {
+		return err
+	}
+
 	if shouldCreateCluster {
 		if err := c.create(); err != nil {
 			return err
 		}
 	} else {
 		log.Info("Cluster already exists, the operator will now manage it", "cluster", c.cluster.Name)
+
+		// Reload dynamic persistent storage.
+		if err := c.reconcilePersistentStatus(); err != nil {
+			return err
+		}
 
 		// TLS may have updated across the restart, so the client CA is valid
 		// but the rest of the cluster is uncontactable.  For this we need a
@@ -240,6 +233,8 @@ func (c *Cluster) setup() error {
 		if err := c.reconcileTLS(); err != nil {
 			return err
 		}
+
+		// Let the normal security machanisms kick in.
 		c.members = nil
 
 		// Perform any necessary upgrades to the cluster and kubernetes resources.
@@ -251,28 +246,17 @@ func (c *Cluster) setup() error {
 	// Once the cluster is guaranteed to exist, extract the UUID and inject
 	// it into the client.  Connections from now on will be aborted if the
 	// UUID reported on the persistent connection differs
-	c.client.SetUUID(c.status.ClusterID)
+	c.client.SetUUID(c.cluster.Status.ClusterID)
 
-	return nil
-}
-
-// updatePersistentState saves the cluster persistent state to a ConfigMap in etcd.
-func (c *Cluster) updatePersistentState() error {
-	persistentState, err := c.kubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Update(c.persistentState)
-	if err != nil {
-		return err
-	}
-	c.persistentState = persistentState
 	return nil
 }
 
 // updatePhase updates the cluster phase in both persistent state and the status.
 func (c *Cluster) updatePhase(phase couchbasev2.ClusterPhase) error {
-	c.persistentState.Data["phase"] = string(phase)
-	if err := c.updatePersistentState(); err != nil {
+	if err := c.state.Update(persistence.Phase, string(phase)); err != nil {
 		return err
 	}
-	c.status.SetPhase(phase)
+	c.cluster.Status.SetPhase(phase)
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("warning failed to update cluster status", "cluster", c.cluster.Name)
 	}
@@ -286,7 +270,11 @@ func (c *Cluster) create() error {
 	if err != nil {
 		return err
 	}
-	c.status.CurrentVersion = version
+
+	if err := c.state.Insert(persistence.Version, version); err != nil {
+		return err
+	}
+	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updatePhase(couchbasev2.ClusterPhaseCreating); err != nil {
 		return err
@@ -319,8 +307,12 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	c.status.SetClusterID(uuid)
-	c.status.SetBalancedCondition()
+	if err := c.state.Insert(persistence.UUID, uuid); err != nil {
+		return err
+	}
+
+	c.cluster.Status.SetClusterID(uuid)
+	c.cluster.Status.SetBalancedCondition()
 	return c.updateCRStatus()
 }
 
@@ -346,14 +338,14 @@ func (c *Cluster) runReconcile() {
 
 	// If the user has requested that we pause operations.
 	if c.cluster.Spec.Paused {
-		c.status.PauseControl()
+		c.cluster.Status.PauseControl()
 		log.Info("Operator paused, skipping", "cluster", c.cluster.Name)
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "paused").Inc()
 		return
 	}
 
 	// Otherwise indicate that we are in control.
-	c.status.Control()
+	c.cluster.Status.Control()
 
 	running, pending, err := c.pollPods()
 	if err != nil {
@@ -400,25 +392,25 @@ func (c *Cluster) runReconcile() {
 // then update the specification and unconditionally reconcile.
 func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {
-		c.logSpecUpdate(c.cluster.Spec, cluster.Spec)
-		c.cluster = cluster
+		c.logUpdate(c.cluster.Spec, cluster.Spec)
 	}
 
+	c.cluster = cluster
 	c.runReconcile()
 }
 
-func (c *Cluster) logSpecUpdate(oldSpec, newSpec couchbasev2.ClusterSpec) {
-	oldSpecBytes, err := yaml.Marshal(oldSpec)
+func (c *Cluster) logUpdate(old, new interface{}) {
+	oldBytes, err := yaml.Marshal(old)
 	if err != nil {
 		log.Error(err, "YAML marshal failed", "cluster", c.cluster.Name)
 	}
-	newSpecBytes, err := yaml.Marshal(newSpec)
+	newBytes, err := yaml.Marshal(new)
 	if err != nil {
 		log.Error(err, "YAML marshal failed", "cluster", c.cluster.Name)
 	}
 
 	log.Info("Specification updated", "cluster", c.cluster.Name)
-	diff := cmp.Diff(string(oldSpecBytes), string(newSpecBytes))
+	diff := cmp.Diff(string(oldBytes), string(newBytes))
 	for _, m := range strings.Split(diff, "\n") {
 		log.Info(m, "cluster", c.cluster.Name)
 	}
@@ -435,12 +427,12 @@ func (c *Cluster) updateCRStatus() error {
 	}
 
 	// Ignore the case where nothing needs to be updated
-	if reflect.DeepEqual(c.cluster.Status, c.status) {
+	if reflect.DeepEqual(c.cluster.Status, cluster.Status) {
 		return nil
 	}
 
 	// Copy the updated status to our cluster object and try update it
-	cluster.Status = c.status
+	cluster.Status = c.cluster.Status
 	if _, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 		return err
 	}
@@ -612,8 +604,8 @@ func (c *Cluster) updateMemberStatus() error {
 // use cluster info to set ready members from active nodes
 // and all remaining nodes as unready
 func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) error {
-	c.status.Members.SetReady(cs.ActiveNodes.Names())
-	c.status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
+	c.cluster.Status.Members.SetReady(cs.ActiveNodes.Names())
+	c.cluster.Status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
 	return c.updateCRStatus()
 }
 
@@ -696,14 +688,14 @@ func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 // Adds a new member to our cluster object and updates the cluster status
 func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) error {
 	c.members.Add(member)
-	c.status.Size = c.members.Size()
+	c.cluster.Status.Size = c.members.Size()
 	return c.updateMemberStatus()
 }
 
 // Removes a member from our cluster object and updates the cluster status
 func (c *Cluster) clusterRemoveMember(name string) error {
 	c.members.Remove(name)
-	c.status.Size = c.members.Size()
+	c.cluster.Status.Size = c.members.Size()
 	return c.updateMemberStatus()
 }
 
@@ -766,7 +758,7 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 // according to status readiness.  Otherwise, fallback to cluster members
 func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
-	readyNodes := c.status.Members.Ready.Names()
+	readyNodes := c.cluster.Status.Members.Ready.Names()
 
 	// Get running pods to ensure ready nodes exists
 	running, _, err := c.pollPods()
@@ -807,9 +799,9 @@ func (c *Cluster) memberHasLogVolumes(name string) bool {
 
 // getPodIndex returns the current pod naming index
 func (c *Cluster) getPodIndex() (int, error) {
-	podIndexStr, ok := c.persistentState.Data["podIndex"]
-	if !ok {
-		return -1, fmt.Errorf("pod index not found in configmap")
+	podIndexStr, err := c.state.Get(persistence.PodIndex)
+	if err != nil {
+		return -1, err
 	}
 	podIndex, err := strconv.Atoi(podIndexStr)
 	if err != nil {
@@ -820,8 +812,7 @@ func (c *Cluster) getPodIndex() (int, error) {
 
 // setPodIndex updates the current pod naming index and commits to etcd
 func (c *Cluster) setPodIndex(index int) error {
-	c.persistentState.Data["podIndex"] = strconv.Itoa(index)
-	return c.updatePersistentState()
+	return c.state.Update(persistence.PodIndex, strconv.Itoa(index))
 }
 
 // incPodIndex gets the current pod naming index and increments it

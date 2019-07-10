@@ -163,3 +163,9 @@ tcGroups:
       - name: TestUpgradeKillPodOnCreate
       - name: TestUpgradeInvalidRollback
       - name: TestUpgradeSupportable
+
+  - name: StatusTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestStatusRecovery

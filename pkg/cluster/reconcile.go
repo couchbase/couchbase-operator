@@ -10,6 +10,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -27,6 +28,11 @@ import (
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.cluster.Name)
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.cluster.Name)
+
+	// Persistent data may need to be reflected in the status.
+	if err := c.reconcilePersistentStatus(); err != nil {
+		return err
+	}
 
 	// Establish DNS for cluster communication.
 	if err := k8sutil.ReconcilePeerServices(c.kubeClient, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
@@ -107,14 +113,17 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	c.reconcileAdminService()
+	if err := c.reconcileAdminService(); err != nil {
+		return err
+	}
 
 	if err := c.reportUpgradeComplete(); err != nil {
 		return err
 	}
 
-	c.status.ClearCondition(couchbasev2.ClusterConditionScaling)
-	c.status.SetReadyCondition()
+	c.cluster.Status.Size = c.members.Size()
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
+	c.cluster.Status.SetReadyCondition()
 
 	return nil
 }
@@ -211,7 +220,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	// when checking the UUID, temporarily disable these checks while installing
 	// TLS configuration
 	c.client.SetUUID("")
-	defer c.client.SetUUID(c.status.ClusterID)
+	defer c.client.SetUUID(c.cluster.Status.ClusterID)
 
 	// Check the pod is EE
 	isEnterprise, err := c.client.IsEnterprise(newMember)
@@ -306,7 +315,7 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
 	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
-	c.status.SetUnbalancedCondition()
+	c.cluster.Status.SetUnbalancedCondition()
 	if err := c.updateCRStatus(); err != nil {
 		return err
 	}
@@ -349,7 +358,7 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 
 	// Report the cluster is balanced
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
-	c.status.SetBalancedCondition()
+	c.cluster.Status.SetBalancedCondition()
 	if err := c.updateCRStatus(); err != nil {
 		return err
 	}
@@ -417,16 +426,16 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 }
 
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
-// of buckets to create, update or remove.
-func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Bucket, error) {
+// of buckets to create, update or remove and the requested set for status updates.
+func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Bucket, error) {
 	requested, err := c.gatherBuckets()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	actual, err := c.client.ListBuckets(c.readyMembers())
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	create := []cbmgr.Bucket{}
@@ -466,7 +475,7 @@ func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Buck
 		}
 	}
 
-	return create, update, remove, nil
+	return create, update, remove, requested, nil
 }
 
 // reconcile buckets by adding or removing
@@ -477,7 +486,7 @@ func (c *Cluster) reconcileBuckets() error {
 		return nil
 	}
 
-	create, update, remove, err := c.inspectBuckets()
+	create, update, remove, requested, err := c.inspectBuckets()
 	if err != nil {
 		return err
 	}
@@ -488,7 +497,6 @@ func (c *Cluster) reconcileBuckets() error {
 		}
 		log.Info("Bucket created", "cluster", c.cluster.Name, "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketCreateEvent(bucket.BucketName, c.cluster))
-		c.status.CreateBucket(bucket)
 	}
 	for _, bucket := range update {
 		if err := c.client.UpdateBucket(c.readyMembers(), bucket); err != nil {
@@ -496,7 +504,6 @@ func (c *Cluster) reconcileBuckets() error {
 		}
 		log.Info("Bucket updated", "cluster", c.cluster.Name, "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
-		c.status.UpdateBucket(bucket)
 	}
 	for _, bucket := range remove {
 		if err := c.client.DeleteBucket(c.readyMembers(), bucket); err != nil {
@@ -504,20 +511,19 @@ func (c *Cluster) reconcileBuckets() error {
 		}
 		log.Info("Bucket deleted", "cluster", c.cluster.Name, "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketDeleteEvent(bucket.BucketName, c.cluster))
-		c.status.DeleteBucket(bucket)
 	}
 
-	c.status.ClearCondition(couchbasev2.ClusterConditionManageBuckets)
+	c.cluster.Status.Buckets = requested
 	return nil
 }
 
 // reconcile changes to selected pod labels for
 // the nodePort service exposing admin console
-func (c *Cluster) reconcileAdminService() {
-	status, err := k8sutil.UpdateAdminConsole(c.kubeClient, c.cluster, &c.status)
+func (c *Cluster) reconcileAdminService() error {
+	status, err := k8sutil.UpdateAdminConsole(c.kubeClient, c.cluster, &c.cluster.Status)
 	if err != nil {
 		log.Error(err, "UI service update failed", "cluster", c.cluster.Name)
-		return
+		return err
 	}
 
 	serviceName := k8sutil.ConsoleServiceName(c.cluster.Name)
@@ -531,13 +537,15 @@ func (c *Cluster) reconcileAdminService() {
 	case k8sutil.ReconcileStatusUpdated:
 		log.Info("UI service updated", "cluster", c.cluster.Name, "name", serviceName)
 	}
+
+	return nil
 }
 
 // reconcileExposedFeatures looks at the requested exported feature set in the
 // specification and add/removes services as requested, raising events as
 // appropriate.
 func (c *Cluster) reconcileExposedFeatures() error {
-	status, err := k8sutil.UpdateExposedFeatures(c.kubeClient, c.members, c.cluster, &c.status)
+	status, err := k8sutil.UpdateExposedFeatures(c.kubeClient, c.members, c.cluster, &c.cluster.Status)
 	if err != nil {
 		return err
 	}
@@ -875,7 +883,7 @@ func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member)
 	}
 
 	// If any exposed ports are defined then add them to the external addresses.
-	if ports, ok := c.status.ExposedPorts[member.Name]; ok {
+	if ports, ok := c.cluster.Status.ExposedPorts[member.Name]; ok {
 		addresses.Ports = &cbmgr.AlternateAddressesExternalPorts{
 			AdminServicePort:    ports.AdminServicePort,
 			AdminServicePortTLS: ports.AdminServicePortTLS,
@@ -1002,7 +1010,7 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
-	c.status.ClearCondition(couchbasev2.ClusterConditionManageConfig)
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManageConfig)
 	return nil
 }
 
@@ -1049,7 +1057,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 		if err != nil {
 			log.Error(err, "Auto-failover settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)
-			c.status.SetConfigRejectedCondition(message)
+			c.cluster.Status.SetConfigRejectedCondition(message)
 			return err
 		}
 		log.Info("Auto-failover settings updated", "cluster", c.cluster.Name)
@@ -1088,7 +1096,7 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 		if err := c.client.SetPoolsDefault(c.readyMembers(), requested); err != nil {
 			log.Error(err, "Cluster settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
-			c.status.SetConfigRejectedCondition(message)
+			c.cluster.Status.SetConfigRejectedCondition(message)
 			return err
 		}
 		log.Info("Cluster settings updated", "cluster", c.cluster.Name)
@@ -1112,7 +1120,7 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 		if err := c.client.SetUpdatesEnabled(c.readyMembers(), requested); err != nil {
 			log.Error(err, "Software notification settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
-			c.status.SetConfigRejectedCondition(message)
+			c.cluster.Status.SetConfigRejectedCondition(message)
 			return err
 		}
 		log.Info("Software notification settings updated", "cluster", c.cluster.Name)
@@ -1135,7 +1143,7 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, specStorageMode, settings); err != nil {
 			log.Error(err, "Index storage settings update failed", "cluster", c.cluster.Name)
 			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
-			c.status.SetConfigRejectedCondition(message)
+			c.cluster.Status.SetConfigRejectedCondition(message)
 			return err
 		}
 		log.Info("Index storage settings updated", "cluster", c.cluster.Name)
@@ -1307,7 +1315,7 @@ func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int, e
 // condition, makes condition updates and raises events.
 func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 	// Look for an existing condition
-	condition := c.status.GetCondition(couchbasev2.ClusterConditionUpgrading)
+	condition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
 
 	if condition == nil {
 		// No existing condition, we are guaranteed to be upgrading.
@@ -1335,7 +1343,7 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 		}
 	}
 
-	c.status.SetUpgradingCondition(status)
+	c.cluster.Status.SetUpgradingCondition(status)
 
 	if err := c.updateCRStatus(); err != nil {
 		return err
@@ -1356,7 +1364,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 	}
 
 	// There is no condition, we weren't upgrading, do nothing
-	condition := c.status.GetCondition(couchbasev2.ClusterConditionUpgrading)
+	condition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
 	if condition == nil {
 		return nil
 	}
@@ -1369,13 +1377,13 @@ func (c *Cluster) reportUpgradeComplete() error {
 		c.raiseEvent(k8sutil.RollbackFinishedEvent(status.Source, status.Target, c.cluster))
 	}
 
-	c.status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
 
 	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
 	if err != nil {
 		return err
 	}
-	c.status.CurrentVersion = version
+	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
 		return err
@@ -1516,5 +1524,31 @@ DeleteNextCluster:
 		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, current.Name))
 	}
 
+	return nil
+}
+
+// reconcilePersistentStatus examines persistent state and synchronizes and
+// dependant cluster status, in case someone or something thought it wise to
+// delete it!
+func (c *Cluster) reconcilePersistentStatus() error {
+	phase, err := c.state.Get(persistence.Phase)
+	if err != nil {
+		return err
+	}
+	uuid, err := c.state.Get(persistence.UUID)
+	if err != nil {
+		return err
+	}
+	version, err := c.state.Get(persistence.Version)
+	if err != nil {
+		return err
+	}
+
+	c.cluster.Status.Phase = couchbasev2.ClusterPhase(phase)
+	c.cluster.Status.ClusterID = uuid
+	c.cluster.Status.CurrentVersion = version
+	if err := c.updateCRStatus(); err != nil {
+		log.Info("failed to update cluster status", "cluster", c.cluster.Name)
+	}
 	return nil
 }
