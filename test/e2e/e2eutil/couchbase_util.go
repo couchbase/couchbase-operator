@@ -722,9 +722,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *ap
 			t.Log(err)
 			return false, retryutil.RetryOkError(err)
 		}
-		if err == nil {
-			defer cleanup()
-		}
+		defer cleanup()
 
 		hostUrl := "http://" + eventingUrl + "/api/v1/functions?name=" + eventingFuncName
 

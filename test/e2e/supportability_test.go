@@ -270,7 +270,7 @@ func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, config *rest.Co
 	if err != nil {
 		return errors.New("Failed to create clientset object: " + err.Error())
 	}
-	crds, _ := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
 	if err != nil {
 		return errors.New("Failed to list crds: " + err.Error())
 	}
@@ -486,34 +486,35 @@ func untarGzFile(tarGzFilePath string) error {
 	tarReader := tar.NewReader(gr)
 	for {
 		hdr, err := tarReader.Next()
-		switch {
-		case err == io.EOF:
-			return nil
-		case err != nil:
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			return err
-		case err == nil:
-			filePath := hdr.Name
-			filePathAsList := strings.Split(filePath, "/")
-			filePathAsList = filePathAsList[0 : len(filePathAsList)-1]
-			filePathToCreate := strings.Join(filePathAsList, "/")
-			if err := os.MkdirAll(filePathToCreate, 0766); err != nil {
-				return err
-			}
+		}
+		filePath := hdr.Name
+		filePathAsList := strings.Split(filePath, "/")
+		filePathAsList = filePathAsList[0 : len(filePathAsList)-1]
+		filePathToCreate := strings.Join(filePathAsList, "/")
+		if err := os.MkdirAll(filePathToCreate, 0766); err != nil {
+			return err
+		}
 
-			filePtr, err := os.OpenFile(filePath, os.O_RDWR|os.O_TRUNC, 0777)
-			defer filePtr.Close()
+		filePtr, err := os.OpenFile(filePath, os.O_RDWR|os.O_TRUNC, 0777)
+		if err != nil {
+			filePtr, err = os.Create(filePath)
 			if err != nil {
-				filePtr, err = os.Create(filePath)
-				if err != nil {
-					return err
-				}
-			}
-
-			if _, err := io.Copy(filePtr, tarReader); err != nil {
 				return err
 			}
 		}
+		defer filePtr.Close()
+
+		if _, err := io.Copy(filePtr, tarReader); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // Generic function to run cbopinfo command

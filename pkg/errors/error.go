@@ -12,7 +12,7 @@ import (
 
 var (
 	ErrClusterCreating              = E.New("existing cluster failed during prior initialization, state unknown")
-	ErrUnkownCreatePod              = E.New("unkown error occurred creating pod")
+	ErrUnknownCreatePod             = E.New("unknown error occurred creating pod")
 	ErrUnboundPersistedVolumeClaims = "unbound immediate PersistentVolumeClaims"
 )
 
@@ -212,7 +212,7 @@ func (e ErrVolumeClaimPending) Error() string {
 }
 
 func (e ErrVolumeClaimUnknownPhase) Error() string {
-	return fmt.Sprintf("PersistentVolumeClaim for path %s is in an unkown phase `%s`", e.Path, e.Phase)
+	return fmt.Sprintf("PersistentVolumeClaim for path %s is in an unknown phase `%s`", e.Path, e.Phase)
 }
 
 func (e ErrVolumeClaimMissing) Error() string {

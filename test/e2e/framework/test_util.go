@@ -804,7 +804,7 @@ func DeleteEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeCo
 	logrus.Info("Running delete-etcd-automation.sh")
 	wipePortworxCmd := exec.Command("bash", "./resources/thirdparty/etcd/delete-etcd-automation.sh", "--namespace", namespace, "--kubeConfig", kubeConfigPath)
 	if err := runExecCommand(wipePortworxCmd); err != nil {
-		logrus.Infof("Error deleteing etcd operator crd: %v", err)
+		logrus.Infof("Error deleting etcd operator crd: %v", err)
 	}
 
 	logrus.Info("Deleting etcd-operator pods")

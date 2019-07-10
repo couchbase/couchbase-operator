@@ -166,9 +166,6 @@ func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clus
 	buckets := cluster.Spec.BucketNames()
 	if len(buckets) > 0 {
 		MustWaitUntilBucketsExists(t, k8s, cluster, buckets, 5*time.Minute)
-		if err != nil {
-			return cluster, err
-		}
 	}
 
 	// Update the cluster status, this is important for the test, especially if the cluster
