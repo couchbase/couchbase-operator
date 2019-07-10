@@ -1215,3 +1215,58 @@ func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 		}
 	}
 }
+
+// GenerateWorkload creates workload on a cluster with the cbc-pillowfight utility.  It
+// inserts JSON documents continuously until deleted by the returned cleanup function.
+func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, image, bucket string) (func(), error) {
+	podName := couchbase.Name + "-workloadgen"
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "couchbase-server",
+					Image: image,
+					Command: []string{
+						"/opt/couchbase/bin/cbc-pillowfight",
+					},
+					Args: []string{
+						"-U",
+						fmt.Sprintf("couchbase://%s-srv.%s.svc/%s", couchbase.Name, couchbase.Namespace, bucket),
+						"-u",
+						string(k8s.DefaultSecret.Data["username"]),
+						"-P",
+						string(k8s.DefaultSecret.Data["password"]),
+						// No pre-population, dive straight in.
+						"-n",
+						// JSON documents.
+						"-J",
+						// A large (ish) number of items so we generate lots of writes and flushes,
+						// even a little compaction, but not too much or rebalances will take forever.
+						"-I", "100000",
+						// Run continuously.
+						"-c", "-1",
+					},
+				},
+			},
+		},
+	}
+	if _, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Create(pod); err != nil {
+		return nil, err
+	}
+
+	cleanup := func() {
+		_ = k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Delete(podName, metav1.NewDeleteOptions(0))
+	}
+	return cleanup, nil
+}
+
+func MustGenerateWorkload(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, image, bucket string) func() {
+	cleanup, err := GenerateWorkload(k8s, couchbase, image, bucket)
+	if err != nil {
+		Die(t, err)
+	}
+	return cleanup
+}
