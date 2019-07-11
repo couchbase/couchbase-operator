@@ -16,12 +16,21 @@ const (
 	MemcachedBucketCRDResourcePlural = "couchbasememcachedbuckets"
 	ReplicationCRDResourceKind       = "CouchbaseReplication"
 	ReplicationCRDResourcePlural     = "couchbasereplications"
+	UserCRDResourceKind              = "CouchbaseUser"
+	UserCRDResourcePlural            = "couchbaseusers"
+	RoleCRDResourceKind              = "CouchbaseRole"
+	RoleCRDResourcePlural            = "couchbaseroles"
+	RoleBindingCRDResourceKind       = "CouchbaseRoleBinding"
+	RoleBindingCRDResourcePlural     = "couchbaserolebindings"
 	GroupName                        = "couchbase.com"
 	ClusterCRDName                   = ClusterCRDResourcePlural + "." + GroupName
 	BucketCRDName                    = BucketCRDResourcePlural + "." + GroupName
 	EphemeralBucketCRDName           = EphemeralBucketCRDResourcePlural + "." + GroupName
 	MemcachedBucketCRDName           = MemcachedBucketCRDResourcePlural + "." + GroupName
 	ReplicationCRDName               = ReplicationCRDResourcePlural + "." + GroupName
+	UserCRDName                      = UserCRDResourcePlural + "." + GroupName
+	RoleCRDName                      = RoleCRDResourcePlural + "." + GroupName
+	RoleBindingCRDName               = RoleBindingCRDResourcePlural + "." + GroupName
 )
 
 var (
@@ -38,6 +47,9 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseEphemeralBucket{}, &CouchbaseEphemeralBucketList{})
 	SchemeBuilder.Register(&CouchbaseMemcachedBucket{}, &CouchbaseMemcachedBucketList{})
 	SchemeBuilder.Register(&CouchbaseReplication{}, &CouchbaseReplicationList{})
+	SchemeBuilder.Register(&CouchbaseUser{}, &CouchbaseUserList{})
+	SchemeBuilder.Register(&CouchbaseRole{}, &CouchbaseRoleList{})
+	SchemeBuilder.Register(&CouchbaseRoleBinding{}, &CouchbaseRoleBindingList{})
 }
 
 func Resource(resource string) schema.GroupResource {
@@ -52,6 +64,12 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: MemcachedBucketCRDResourceKind}
 	case "couchbasereplication":
 		return schema.GroupResource{Group: GroupName, Resource: ReplicationCRDResourceKind}
+	case "couchbaseuser":
+		return schema.GroupResource{Group: GroupName, Resource: UserCRDResourceKind}
+	case "couchbaserole":
+		return schema.GroupResource{Group: GroupName, Resource: RoleCRDResourceKind}
+	case "couchbaserolebinding":
+		return schema.GroupResource{Group: GroupName, Resource: RoleBindingCRDResourceKind}
 	default:
 		return schema.GroupResource{}
 	}

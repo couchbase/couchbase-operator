@@ -64,6 +64,7 @@ func SchemaValidate(scheme *runtime.Scheme, raw runtime.RawExtension) error {
 }
 
 func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+
 	switch object.GetAPIVersion() {
 	case couchbasev2.GroupName + "/v1":
 		switch object.GetKind() {
@@ -82,6 +83,8 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 			return validationv2.ApplyMemcachedBucketDefaults(object)
 		case couchbasev2.ReplicationCRDResourceKind:
 			return validationv2.ApplyReplicationDefaults(object)
+		case couchbasev2.RoleCRDResourceKind:
+			return validationv2.ApplyRoleDefaults(object)
 		}
 	}
 	return nil
@@ -101,6 +104,10 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) error {
 		return validationv2.CheckConstraintsMemcachedBucket(v, t)
 	case *couchbasev2.CouchbaseReplication:
 		return validationv2.CheckConstraintsReplication(v, t)
+	case *couchbasev2.CouchbaseUser:
+		return validationv2.CheckConstraintsCouchbaseUser(v, t)
+	case *couchbasev2.CouchbaseRole:
+		return validationv2.CheckConstraintsCouchbaseRole(v, t)
 	}
 	return nil
 }

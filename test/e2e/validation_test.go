@@ -1278,6 +1278,59 @@ func TestNegValidationImmutableApply(t *testing.T) {
 }
 
 /*******************************************************************
+************ Test cases for RBAC testing *************
+********************************************************************/
+func TestRBACValidationCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:        "TestValidateLDAPDomain",
+			mutations:   patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "ldap")},
+			validations: patchMap{"user1": jsonpatch.NewPatchSet().Test("/spec/authDomain", "ldap")},
+			shouldFail:  false,
+		}, {
+			name:        "TestValidateClusterRole",
+			mutations:   patchMap{"role": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "cluster_admin")},
+			validations: patchMap{"role": jsonpatch.NewPatchSet().Test("/spec/roles/0/name", "cluster_admin")},
+			shouldFail:  false,
+		},
+		{
+			name:           "TestRejectBucketForClusterRole",
+			mutations:      patchMap{"role": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "default")},
+			validations:    patchMap{"role": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "default")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.roles[0].bucket for cluster role.admin is a forbidden property"},
+		},
+		/* Unknown role is caught by CRD validation which returns expectError that isn't being matched
+		{
+			name:           "TestUnknownRole",
+			mutations:      patchMap{"role": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "jabroni")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.roles[0].name in body should match '" + couchbasev2.ValidRolePattern() + "'"},
+		}*/
+		{
+			name:           "TestValidateUnkownDomain",
+			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "unknown")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.authDomain in body should match '^local|ldap$'"},
+		},
+		{
+			name:           "TestValidateSecretRequired",
+			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Remove("/spec/authSecret")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.authSecret for `local` domain in user1 is required"},
+		},
+		{
+			name:        "TestValidateDefaultBucketRole",
+			validations: patchMap{"bucket-role": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "*")},
+			shouldFail:  false,
+		},
+	}
+
+	kubeName := framework.Global.TestClusters[0]
+	runValidationTest(t, testDefs, kubeName, "create")
+}
+
+/*******************************************************************
 ************ Test cases for RZA / Server group testing *************
 ********************************************************************/
 

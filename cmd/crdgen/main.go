@@ -44,6 +44,9 @@ func main() {
 	buffer(v2.GetCouchbaseEphemeralBucketCRD())
 	buffer(v2.GetCouchbaseMemcachedBucketCRD())
 	buffer(v2.GetCouchbaseReplicationCRD())
+	buffer(v2.GetUserCRD())
+	buffer(v2.GetRoleCRD())
+	buffer(v2.GetRoleBindingCRD())
 	buffer(k8sutil.GetCRD())
 	if err := dump(); err != nil {
 		fmt.Println(err)

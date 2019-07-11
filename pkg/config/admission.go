@@ -96,6 +96,9 @@ func GetAdmissionClusterRole() *rbacv1.ClusterRole {
 					couchbasev2.EphemeralBucketCRDResourcePlural,
 					couchbasev2.MemcachedBucketCRDResourcePlural,
 					couchbasev2.ReplicationCRDResourcePlural,
+					couchbasev2.UserCRDResourcePlural,
+					couchbasev2.RoleCRDResourcePlural,
+					couchbasev2.RoleBindingCRDResourcePlural,
 				},
 				Verbs: []string{
 					"list",
@@ -311,6 +314,9 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistra
 								couchbasev2.EphemeralBucketCRDResourcePlural,
 								couchbasev2.MemcachedBucketCRDResourcePlural,
 								couchbasev2.ReplicationCRDResourcePlural,
+								couchbasev2.UserCRDResourcePlural,
+								couchbasev2.RoleCRDResourcePlural,
+								couchbasev2.RoleBindingCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",
@@ -362,6 +368,9 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregist
 								couchbasev2.EphemeralBucketCRDResourcePlural,
 								couchbasev2.MemcachedBucketCRDResourcePlural,
 								couchbasev2.ReplicationCRDResourcePlural,
+								couchbasev2.UserCRDResourcePlural,
+								couchbasev2.RoleCRDResourcePlural,
+								couchbasev2.RoleBindingCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",

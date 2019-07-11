@@ -90,6 +90,96 @@ type CouchbaseReplication struct {
 // CompressionType represents all allowable XDCR compression modes.
 type CompressionType string
 
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseUser struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseUserSpec `json:"spec"`
+}
+
+type CouchbaseUserSpec struct {
+	// (Optional) Full Name of Couchbase user
+	FullName string `json:"fullName"`
+	// The domain which provides user auth
+	AuthDomain string `json:"authDomain"`
+	// Name of kubernetes secret with password for couchbase domain
+	AuthSecret string `json:"authSecret"`
+}
+
+// CouchbaseUserList is a list of Couchbase users.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseUserList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseUser `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseRole struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseRoleSpec `json:"spec"`
+}
+
+type CouchbaseRoleSpec struct {
+	// role identifier
+	Roles []Role `json:"roles"`
+}
+
+type Role struct {
+	// name of role
+	Name string `json:"name"`
+	// optional bucket name for bucket admin roles
+	Bucket string `json:"bucket"`
+}
+
+// CouchbaseRoleList is a list of Couchbase users.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseRoleList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseRole `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseRoleBinding struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseRoleBindingSpec `json:"spec"`
+}
+
+type CouchbaseRoleBindingSpec struct {
+	//  List of users to bind a role to
+	Subjects []CouchbaseRoleBindingSubject `json:"subjects"`
+	// CouchbaseRole being bound to subjects
+	RoleRef CouchbaseRoleBindingRef `json:"roleRef"`
+}
+
+type CouchbaseRoleBindingSubject struct {
+	// Couchbase user kind
+	Kind string `json:"kind"`
+	// Name of Couchbase user resource
+	Name string `json:"name"`
+}
+
+type CouchbaseRoleBindingRef struct {
+	// Kind of role to use for binding
+	Kind string `json:"kind"`
+	// Name of role resource to use for binding
+	Name string `json:"name"`
+}
+
+// CouchbaseRoleBindingList is a list of Couchbase users.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseRoleBindingList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseRoleBinding `json:"items"`
+}
+
 const (
 	// CompressionTypeNone applies no compression
 	CompressionTypeNone CompressionType = "none"
@@ -236,6 +326,8 @@ type ClusterSpec struct {
 type CouchbaseClusterSecuritySpec struct {
 	// AdminSecret is the name of a kubernetes secret to use for administrator authentication.
 	AdminSecret string `json:"adminSecret"`
+	// Couchbase RBAC Users
+	RBAC RBAC `json:"rbac,omitempty"`
 }
 
 type CouchbaseClusterNetworkingSpec struct {
@@ -437,6 +529,14 @@ type Buckets struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+type RBAC struct {
+	// Managed defines whether RBAC is managed by us or the clients.
+	Managed bool `json:"managed,omitempty"`
+	// Selector is a label selector used to list RBAC users in the namespace
+	// that are managed by the Operator.
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
 type ServerConfig struct {
 	// Size is the expected size of the couchbase cluster. The
 	// couchbase-operator will eventually make the size of the running
@@ -629,6 +729,9 @@ type ClusterStatus struct {
 
 	// Name of buckets active within cluster
 	Buckets []cbmgr.Bucket `json:"buckets,omitempty"`
+
+	// Name of users active within cluster
+	Users []string `json:"users,omitempty"`
 
 	// port exposing couchbase cluster
 	AdminConsolePort    string `json:"adminConsolePort,omitempty"`

@@ -14,6 +14,7 @@ var (
 	minimumBucketQuota                 float64 = 100
 	minimumAutofailoverTimeout         float64 = 5
 	minimumServersSize                 float64 = 1
+	minimumItemLength                  int64   = 1
 	minimumServicesLength              int64   = 1
 	minimumServersLength               int64   = 1
 	minimumStringLength                int64   = 1
@@ -838,6 +839,213 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 													},
 												},
 											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func GetUserCRD() *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiextensionsv1beta1.SchemeGroupVersion.String(),
+			Kind:       "CustomResourceDefinition",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   couchbasev2.UserCRDName,
+			Labels: map[string]string{"group": "couchbase.com"},
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group: couchbasev2.SchemeGroupVersion.Group,
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: couchbasev2.UserCRDResourcePlural,
+				Kind:   couchbasev2.UserCRDResourceKind,
+			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1",
+				},
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: true,
+				},
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"spec": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Required: []string{
+								"authDomain",
+							},
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"fullName": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"authDomain": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: "^local|ldap$",
+								},
+								"authSecret": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func GetRoleCRD() *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiextensionsv1beta1.SchemeGroupVersion.String(),
+			Kind:       "CustomResourceDefinition",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   couchbasev2.RoleCRDName,
+			Labels: map[string]string{"group": "couchbase.com"},
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group: couchbasev2.SchemeGroupVersion.Group,
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: couchbasev2.RoleCRDResourcePlural,
+				Kind:   couchbasev2.RoleCRDResourceKind,
+			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1",
+				},
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: true,
+				},
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"spec": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Required: []string{
+								"roles",
+							},
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"roles": apiextensionsv1beta1.JSONSchemaProps{
+									Type:      "array",
+									MinLength: &minimumItemLength,
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Required: []string{
+												"name",
+											},
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"name": apiextensionsv1beta1.JSONSchemaProps{
+													Type:      "string",
+													MinLength: &minimumStringLength,
+													Pattern:   couchbasev2.ValidRolePattern(),
+												},
+												"bucket": apiextensionsv1beta1.JSONSchemaProps{
+													Type:      "string",
+													MinLength: &minimumStringLength,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func GetRoleBindingCRD() *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiextensionsv1beta1.SchemeGroupVersion.String(),
+			Kind:       "CustomResourceDefinition",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   couchbasev2.RoleBindingCRDName,
+			Labels: map[string]string{"group": "couchbase.com"},
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group: couchbasev2.SchemeGroupVersion.Group,
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: couchbasev2.RoleBindingCRDResourcePlural,
+				Kind:   couchbasev2.RoleBindingCRDResourceKind,
+			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1",
+				},
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: true,
+				},
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"spec": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Required: []string{
+								"subjects",
+								"roleRef",
+							},
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"subjects": apiextensionsv1beta1.JSONSchemaProps{
+									Type:      "array",
+									MinLength: &minimumItemLength,
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Required: []string{
+												"name",
+												"kind",
+											},
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"name": apiextensionsv1beta1.JSONSchemaProps{
+													Type:      "string",
+													MinLength: &minimumStringLength,
+												},
+												"kind": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "string",
+													Pattern: "^CouchbaseUser|CouchbaseGroup$",
+												},
+											},
+										},
+									},
+								},
+								"roleRef": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Required: []string{
+										"name",
+									},
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"name": apiextensionsv1beta1.JSONSchemaProps{
+											Type:      "string",
+											MinLength: &minimumStringLength,
+										},
+										"kind": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
 										},
 									},
 								},

@@ -1,0 +1,31 @@
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: admin-user
+spec:
+  fullName: Administrator
+  authDomain: local
+  authSecret: cb-example-auth
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRole
+metadata:
+  name: admin-role
+spec:
+  roles:
+  - name: cluster_admin
+  - name: bucket_admin
+    bucket: default
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: admin-role-binding
+spec:
+  roleRef:
+    kind: CouchbaseRole
+    name: admin-role
+  subjects:
+  - kind: CouchbaseUser
+    name: admin-user

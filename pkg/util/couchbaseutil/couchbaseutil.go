@@ -682,6 +682,30 @@ func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket cbmgr.Bucket) error 
 	return c.client.DeleteBucket(bucket.BucketName)
 }
 
+func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]cbmgr.User, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	users, err := c.client.GetUsers()
+	if err != nil {
+		return nil, err
+	}
+
+	res := []cbmgr.User{}
+	for _, user := range users {
+		res = append(res, *user)
+	}
+	return res, nil
+}
+
+func (c *CouchbaseClient) CreateUser(ms MemberSet, user cbmgr.User) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.CreateUser(&user)
+}
+
+func (c *CouchbaseClient) DeleteUser(ms MemberSet, user cbmgr.User) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.DeleteUser(&user)
+}
+
 func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.AutoFailoverSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)

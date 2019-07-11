@@ -20,6 +20,8 @@ spec:
   image: couchbase/server:enterprise-6.0.1
   security:
     adminSecret: cb-example-auth
+    rbac:
+      managed: true
   networking:
     exposeAdminConsole: true
     adminConsoleServices:

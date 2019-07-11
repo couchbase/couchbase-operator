@@ -117,6 +117,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	if err := c.reconcileUsers(); err != nil {
+		return err
+	}
+
 	if err := c.reportUpgradeComplete(); err != nil {
 		return err
 	}
@@ -1567,5 +1571,226 @@ func (c *Cluster) reconcilePersistentStatus() error {
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("failed to update cluster status", "cluster", c.namespacedName())
 	}
+	return nil
+}
+
+// gatherUsers loads up user configurations from Kubernetes and marshalls them into canonical form.
+func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
+	listOpts := metav1.ListOptions{}
+
+	// only users with role bindings can be created
+	couchbaseRoleBindings, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseRoleBindings(c.cluster.Namespace).List(listOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	// requested users
+	users := make(map[string]*cbmgr.User)
+
+	// map of uid+roleref combinations
+	boundUserRoles := make(map[string]bool)
+
+	// step through role binding gathering requested users
+	for _, roleBinding := range couchbaseRoleBindings.Items {
+
+		// gather roles
+		roles := []cbmgr.UserRole{}
+		roleRef := roleBinding.Spec.RoleRef
+		roleName := roleRef.Name
+		couchbaseRole, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseRoles(c.cluster.Namespace).Get(roleName, metav1.GetOptions{})
+
+		// attempt to get referenced role, and warn if missing because
+		// users may be deleted if there are no roles to bind
+		if k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return nil, fmt.Errorf("rolebinding `%s` refers a missing role resource `%s`", roleBinding.Name, roleName)
+		} else if err != nil {
+			return nil, err
+		}
+
+		for _, role := range couchbaseRole.Spec.Roles {
+			roles = append(roles, cbmgr.UserRole{
+				Role:       role.Name,
+				BucketName: role.Bucket,
+			})
+		}
+
+		// when all roles are missing, then the users bound to the role
+		// will also be deleted unless found in a different rolebinding
+		if len(roles) == 0 {
+			continue
+		}
+
+		// gather users bound to roles
+		for _, subject := range roleBinding.Spec.Subjects {
+			subjectName := subject.Name
+			couchbaseUser, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseUsers(c.cluster.Namespace).Get(subjectName, metav1.GetOptions{})
+
+			// missing users will be deleted
+			if k8sutil.IsKubernetesResourceNotFoundError(err) {
+				return nil, fmt.Errorf("rolebinding `%s` refers to a missing user resource `%s`", roleBinding.Name, subjectName)
+			} else if err != nil {
+				return nil, err
+			}
+
+			// get secret info when using local auth
+			user := &cbmgr.User{
+				Name:  couchbaseUser.Spec.FullName,
+				ID:    couchbaseUser.Name,
+				Roles: roles,
+			}
+
+			// extend current roles if user is previously bound
+			if boundUser, ok := users[user.ID]; ok {
+				// ...ignoring duplicates
+				for _, r := range roles {
+					userRoleId := user.ID + "-" + r.Role
+					if _, ok := boundUserRoles[userRoleId]; !ok {
+						// associate additional roles from ref with user
+						boundUser.Roles = append(boundUser.Roles, r)
+					}
+				}
+			} else {
+				// New user to set
+				if couchbaseUser.Spec.AuthDomain == string(cbmgr.InternalAuthDomain) {
+					user.Domain = cbmgr.InternalAuthDomain
+					password, err := c.getRBACAuthPassword(couchbaseUser.Spec.AuthSecret)
+					if err != nil {
+						return nil, err
+					}
+					user.Password = password
+				}
+				users[user.ID] = user
+
+				// keep track of specific roles so we can
+				// detect if a role has already been added
+				for _, r := range roles {
+					userRoleId := user.ID + "-" + r.Role
+					boundUserRoles[userRoleId] = true
+				}
+			}
+		}
+	}
+
+	// represent as slice
+	requestedUsers := []cbmgr.User{}
+	for _, user := range users {
+		requestedUsers = append(requestedUsers, *user)
+	}
+	return requestedUsers, nil
+}
+
+// Get auth password to be set for user
+func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
+	var password string
+	opts := metav1.GetOptions{}
+	secret, err := c.kubeClient.CoreV1().Secrets(c.cluster.Namespace).Get(authSecret, opts)
+	if err != nil {
+		return password, err
+	}
+
+	data := secret.Data
+	if dataPassword, ok := data[constants.AuthSecretPasswordKey]; ok {
+		password = string(dataPassword)
+	} else {
+		return password, cberrors.ErrSecretMissingPassword{Reason: authSecret}
+	}
+
+	return password, nil
+}
+
+// inspectUsers looks up users to create and roles to apply or update.
+// Users in the cluster without rolebinding are deleted.
+func (c *Cluster) inspectUsers() ([]cbmgr.User, []cbmgr.User, []cbmgr.User, error) {
+
+	requested, err := c.gatherUsers()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	actual, err := c.client.ListUsers(c.readyMembers())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	create := []cbmgr.User{}
+	update := []cbmgr.User{}
+	remove := []cbmgr.User{}
+
+	// Detect which users do not exist and need to be created
+	// or which exist and need to be updated
+	for _, r := range requested {
+		found := false
+		for _, a := range actual {
+			if r.ID == a.ID {
+				// compare roles which are the only mutable user attributes
+				if !reflect.DeepEqual(r.RolesToStr(), a.RolesToStr()) {
+					update = append(update, r)
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			create = append(create, r)
+		}
+	}
+
+	// Do an exhaustive search of actual users in the requested list, deleting
+	// as necessary.
+	for _, a := range actual {
+		found := false
+		for _, r := range requested {
+			if a.ID == r.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remove = append(remove, a)
+		}
+	}
+	return create, update, remove, nil
+}
+
+// reconcileUsers synchronizes couchbase users with requested users
+// and raising events as appropriate
+func (c *Cluster) reconcileUsers() error {
+
+	if !c.cluster.Spec.Security.RBAC.Managed {
+		return nil
+	}
+
+	create, update, remove, err := c.inspectUsers()
+	if err != nil {
+		return err
+	}
+
+	existingUsers := []string{}
+	for _, user := range create {
+		if err := c.client.CreateUser(c.readyMembers(), user); err != nil {
+			return err
+		}
+		log.Info("User created", "cluster", c.namespacedName(), "name", user.ID)
+		c.raiseEvent(k8sutil.UserCreateEvent(user.ID, c.cluster))
+		existingUsers = append(existingUsers, user.ID)
+	}
+	for _, user := range update {
+		// User update is treated the same as create
+		if err := c.client.CreateUser(c.readyMembers(), user); err != nil {
+			return err
+		}
+		log.Info("User updated", "cluster", c.namespacedName(), "name", user.ID)
+		c.raiseEvent(k8sutil.UserEditEvent(user.ID, c.cluster))
+		existingUsers = append(existingUsers, user.ID)
+	}
+	for _, user := range remove {
+		if err := c.client.DeleteUser(c.readyMembers(), user); err != nil {
+			return err
+		}
+		log.Info("User deleted", "cluster", c.namespacedName(), "name", user.ID)
+		c.raiseEvent(k8sutil.UserDeleteEvent(user.ID, c.cluster))
+	}
+
+	c.cluster.Status.Users = existingUsers
 	return nil
 }

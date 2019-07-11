@@ -76,6 +76,55 @@ spec:
   remoteBucket: bucket0
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: user1
+spec:
+  fullName: Administrator
+  authDomain: local
+  authSecret: cb-example-auth
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRole
+metadata:
+  name: role
+spec:
+  roles:
+   - name: admin
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRole
+metadata:
+  name: bucket-role
+spec:
+  roles:
+   - name: data_writer
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: role-binding
+spec:
+  roleRef:
+    kind: CouchbaseRole
+    name: role
+  subjects:
+  - kind: CouchbaseUser
+    name: user1
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: bucket-role-binding
+spec:
+  roleRef:
+    kind: CouchbaseRole
+    name: bucket-role
+  subjects:
+  - kind: CouchbaseUser
+    name: user1
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cluster

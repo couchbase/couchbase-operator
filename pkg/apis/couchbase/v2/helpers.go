@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -466,4 +468,26 @@ func NewUpgradeStatus(message string) *UpgradeStatus {
 	status := &UpgradeStatus{}
 	fmt.Sscanf(message, UpgradingMessageFormat, &status.State, &status.Source, &status.Target, &status.TargetCount, &status.TotalCount)
 	return status
+}
+
+func ValidRolePattern() string {
+	return fmt.Sprintf("^%s$|^%s$", strings.Join(constants.ClusterRoles, "$|^"), strings.Join(constants.BucketRoles, "$|^"))
+}
+
+func IsBucketRole(role string) bool {
+	for _, r := range constants.BucketRoles {
+		if r == role {
+			return true
+		}
+	}
+	return false
+}
+
+func IsClusterRole(role string) bool {
+	for _, r := range constants.ClusterRoles {
+		if r == role {
+			return true
+		}
+	}
+	return false
 }

@@ -29,6 +29,9 @@ const (
 	EventReasonBucketCreated         = "BucketCreated"
 	EventReasonBucketDeleted         = "BucketDeleted"
 	EventReasonBucketEdited          = "BucketEdited"
+	EventReasonUserCreated           = "UserCreated"
+	EventReasonUserDeleted           = "UserDeleted"
+	EventReasonUserEdited            = "UserEdited"
 	EventReasonServiceCreated        = "ServiceCreated"
 	EventReasonServiceDeleted        = "ServiceDeleted"
 	EventReasonNodeServiceCreated    = "NodeServiceCreated"
@@ -159,6 +162,30 @@ func BucketEditEvent(bucketName string, cl *couchbasev2.CouchbaseCluster) *v1.Ev
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBucketEdited
 	event.Message = fmt.Sprintf("Bucket `%s` was edited", bucketName)
+	return event
+}
+
+func UserCreateEvent(userName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonUserCreated
+	event.Message = fmt.Sprintf("A new user `%s` was created", userName)
+	return event
+}
+
+func UserDeleteEvent(userName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonUserDeleted
+	event.Message = fmt.Sprintf("User `%s` was deleted", userName)
+	return event
+}
+
+func UserEditEvent(userName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonUserEdited
+	event.Message = fmt.Sprintf("User `%s` was edited", userName)
 	return event
 }
 

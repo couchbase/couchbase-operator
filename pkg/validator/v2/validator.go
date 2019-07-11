@@ -136,6 +136,24 @@ func ApplyReplicationDefaults(object *unstructured.Unstructured) jsonpatch.Patch
 	return patch
 }
 
+func ApplyRoleDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
+	roles, _, _ := unstructured.NestedSlice(object.Object, "spec", "roles")
+	for i, role := range roles {
+		if r, ok := role.(map[string]interface{}); ok {
+			// Apply bucket role to all buckets by default
+			if _, ok := r["bucket"]; !ok {
+				if couchbasev2.IsBucketRole(r["name"].(string)) {
+					path := fmt.Sprintf("/spec/roles/%d/bucket", i)
+					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "*"})
+				}
+			}
+
+		}
+	}
+	return patch
+}
+
 func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseCluster) error {
 	errs := []error{}
 
@@ -452,6 +470,60 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 }
 
 func CheckConstraintsReplication(v *types.Validator, replication *couchbasev2.CouchbaseReplication) error {
+	return nil
+}
+
+func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.CouchbaseUser) error {
+	errs := []error{}
+
+	// only 'local' and 'ldap' auth domains accepted
+	domain := cbmgr.AuthDomain(user.Spec.AuthDomain)
+	if domain == cbmgr.InternalAuthDomain {
+		// password is required for internal auth domain
+		authSecretName := user.Spec.AuthSecret
+		if authSecretName == "" {
+			emsg := fmt.Sprintf("spec.authSecret for `%s` domain", domain)
+			errs = append(errs, errors.Required(emsg, user.Name))
+		} else {
+			// Check the ldap auth secret exists and has the correct keys
+			authSecret, err := v.Abstraction.GetSecret(user.Namespace, authSecretName)
+			if err != nil {
+				// Silently ignore permissions errors, some users may not want us seeing these resources.
+				if apierrors.IsForbidden(err) {
+					return nil
+				}
+				errs = append(errs, err)
+			} else {
+				if _, ok := authSecret.Data["password"]; !ok {
+					errs = append(errs, fmt.Errorf("ldap auth secret %s must contain password", authSecretName))
+				}
+			}
+		}
+	} else if domain != cbmgr.LDAPAuthDomain {
+		return fmt.Errorf("unsupported auth domain: %s", user.Spec.AuthDomain)
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+	return nil
+}
+
+func CheckConstraintsCouchbaseRole(v *types.Validator, role *couchbasev2.CouchbaseRole) error {
+	errs := []error{}
+
+	for index, role := range role.Spec.Roles {
+		// role itself must be valid
+		isCluterRole := couchbasev2.IsClusterRole(role.Name)
+		// Bucket cannot be used with cluster role
+		if role.Bucket != "" && isCluterRole {
+			errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.roles[%d].bucket for cluster role", index), "", role.Name))
+		}
+
+	}
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
 	return nil
 }
 

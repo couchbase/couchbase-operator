@@ -80,6 +80,30 @@ func GetOperatorRole() *rbacv1.Role {
 			},
 			{
 				APIGroups: []string{
+					couchbasev2.GroupName,
+				},
+				Resources: []string{
+					couchbasev2.UserCRDResourcePlural,
+					couchbasev2.RoleCRDResourcePlural,
+				},
+				Verbs: []string{
+					"list", // used by the operator to discover users and roles.
+					"get",  // used by the operator to validate users and roles.
+				},
+			},
+			{
+				APIGroups: []string{
+					couchbasev2.GroupName,
+				},
+				Resources: []string{
+					couchbasev2.RoleBindingCRDResourcePlural,
+				},
+				Verbs: []string{
+					"list", // used by the operator to discover user role bindings.
+				},
+			},
+			{
+				APIGroups: []string{
 					"",
 				},
 				Resources: []string{

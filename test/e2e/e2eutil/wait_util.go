@@ -754,7 +754,6 @@ func WaitForMemcachedBucketDeletion(k8s *types.Cluster, namespace string, timeou
 func WaitForReplicationDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
 	callback := func() error {
 		replications, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).List(metav1.ListOptions{})
 		if err != nil {
@@ -762,6 +761,60 @@ func WaitForReplicationDeletion(k8s *types.Cluster, namespace string, timeout ti
 		}
 		if len(replications.Items) != 0 {
 			return fmt.Errorf("waiting for %v replications to delete", len(replications.Items))
+		}
+		return nil
+	}
+
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
+}
+
+func WaitForUserDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		users, err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(users.Items) != 0 {
+			return fmt.Errorf("waiting for %v couchbase users to delete", len(users.Items))
+		}
+		return nil
+	}
+
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
+}
+
+func WaitForRoleDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		roles, err := k8s.CRClient.CouchbaseV2().CouchbaseRoles(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(roles.Items) != 0 {
+			return fmt.Errorf("waiting for %v couchbase user roles to delete", len(roles.Items))
+		}
+		return nil
+	}
+
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
+}
+
+func WaitForRoleBindingDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		bindings, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(bindings.Items) != 0 {
+			return fmt.Errorf("waiting for %v couchbase user role bindings to delete", len(bindings.Items))
 		}
 		return nil
 	}

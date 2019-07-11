@@ -121,6 +121,9 @@ var (
 		"TestXdcrResizedOutSourceClusterNodes":   TestXdcrResizedOutSourceClusterNodes,
 		"TestXdcrResizedOutTargetClusterNodes":   TestXdcrResizedOutTargetClusterNodes,
 
+		// RBAC cases
+		"TestRBACValidationCreate": TestRBACValidationCreate,
+
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,
 		"TestRzaCreateClusterWithClassBasedConfig": TestRzaCreateClusterWithClassBasedConfig,
