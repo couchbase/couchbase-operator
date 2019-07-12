@@ -5,9 +5,9 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"os"
 	"testing"
 	"time"
 
@@ -70,55 +70,48 @@ var (
 	}
 )
 
-// Creates config map of 2 service groups and required bucket data
-func createEventingConfigMap(nonEventingNodes, eventingNodes int) map[string]map[string]string {
-	clusterConfig := e2eutil.BasicClusterConfig2
-	serviceConfig1 := e2eutil.GetServiceConfigMap(nonEventingNodes, "test_config_1", []string{"data", "query", "index"})
-	serviceConfig2 := e2eutil.GetServiceConfigMap(eventingNodes, "test_config_2", []string{"eventing"})
-	return map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2,
-	}
-}
+const (
+	// dataServiceMemoryQuota is enough memory to support the bucket requirements
+	dataServiceMemoryQuota = 300
+
+	// function is a basic test eventing function that populates a destination
+	// bucket with a test value when a document appears in a source bucket.  It
+	// deletes it when the corresponding source document is deleted.
+	function = `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
+)
 
 // Create eventing enabled cluster
 // Create 3 buckets for eventing to work
 // Deploy eventing function to verify the results in destination bucket
 func TestEventingCreateEventingCluster(t *testing.T) {
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
 	clusterSize := 3
 	numOfDocs := 10
-	clusterConfig := e2eutil.BasicClusterConfig2
-	clusterConfig["autoFailoverMaxCount"] = "3"
-	clusterConfig["autoFailoverTimeout"] = "10"
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "eventing"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-	}
 
-	// Creating cluster with eventing
+	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
+	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
+	// When ready, deploy an eventing function to create documents in a destination
+	// bucket based on source bucket documents. Populate the source and ensure the
+	// documents appear in the destination.
+	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
 	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, sourceBucket.Name, 1, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, numOfDocs, 2*time.Minute)
 
-	eventingFuncName := "eventingFunc"
-	eventingSrcBucketName := sourceBucket.Name
-	eventingMetaBucketName := metadataBucket.Name
-	eventingDstBucketName := destinationBucket.Name
-	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
-
-	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
-
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
-
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Buckets created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
@@ -130,93 +123,48 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 // Create eventing enabled couchbase cluster with eventing buckets
 // Resize the cluster when the eventing deployment is active and verify the results
 func TestEventingResizeCluster(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	nonEventingNodes := 2
-	eventingNodes := 3
-	clusterSize := nonEventingNodes + eventingNodes
-	numOfDocs := 10
-	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
+	// Static configuration.
+	clusterSize := 1
 
-	// Creating cluster with eventing
+	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
+	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, sourceBucket.Name, 0, numOfDocs)
-
-	eventingFuncName := "eventingFunc"
-	eventingSrcBucketName := sourceBucket.Name
-	eventingMetaBucketName := metadataBucket.Name
-	eventingDstBucketName := destinationBucket.Name
-	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
-
-	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
-
-	// Cross check number of docs inserted reflected in eventing
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
-
-	// Code to insert data in parallel with cluster resize
-	stopDataInsertion := make(chan interface{})
-	dataInsertionError := make(chan error)
-
-	// Clone the cluster here to avoid read/write races
-	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *couchbasev2.CouchbaseCluster) {
-		var err error
-	OuterLoop:
-		for {
-			select {
-			case <-stopDataInsertion:
-				break OuterLoop
-			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, sourceBucket.Name, numOfDocs, 1); err == nil {
-					numOfDocs++
-				}
-			}
-		}
-		dataInsertionError <- err
-	}(testCouchbase.DeepCopy())
-
-	// Ensure the routine is shut down properly in the event of a fatality.
-	stopped := false
-	defer func() {
-		if !stopped {
-			close(stopDataInsertion)
-			<-dataInsertionError
-		}
-	}()
-
-	// Don't scale this too high or it will pwn your laptop and the cluster will go unresponsive
-	for _, eventingNodes = range []int{2, 4, 3} {
-		testCouchbase = e2eutil.MustResizeCluster(t, 1, eventingNodes, targetKube, testCouchbase, 20*time.Minute)
+	// When ready deploy the eventing function and generate workload.  Scale the cluster
+	// up and down then stop the workload.  Expect the number of documents in the destination
+	// bucket to equal those in the source.
+	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, sourceBucket.Name)
+	defer stop()
+	for _, newClusterSize := range []int{2, 3, 2} {
+		testCouchbase = e2eutil.MustResizeCluster(t, 0, newClusterSize, targetKube, testCouchbase, 5*time.Minute)
 	}
+	stop()
+	time.Sleep(time.Minute) // Wait for eventing to catch up
+	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, sourceBucket.Name, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), 2*time.Minute)
 
-	// To stop background data insertion and wait for function to complete.
-	// Wait for a short while so that the load generator has a chance to successfully
-	// commit documents to only pods that exist now.  Note that the port forward has
-	// a timeout of 1 minute, so wait for two to be certain.
-	time.Sleep(2 * time.Minute)
-	close(stopDataInsertion)
-	stopped = true
-	if err := <-dataInsertionError; err != nil {
-		t.Fatal(err)
-	}
-
-	// Cross check number of docs inserted reflected in eventing
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
-
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Buckets created
+	// * Cluster scales from 1 -> 2
+	// * Cluster scales from 2 -> 3
+	// * Cluster scales from 3 -> 2
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
-		e2eutil.ClusterScaleDownSequence(1),
-		e2eutil.ClusterScaleUpSequence(2),
+		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleUpSequence(1),
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
@@ -226,92 +174,42 @@ func TestEventingResizeCluster(t *testing.T) {
 // Create couchbase cluster with eventing service and required buckets
 // Kill all the eventing nodes one by one and check for eventing stability
 func TestEventingKillEventingPods(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	nonEventingNodes := 2
-	eventingNodes := 3
-	clusterSize := nonEventingNodes + eventingNodes
-	numOfDocs := 10
-	configMap := createEventingConfigMap(nonEventingNodes, eventingNodes)
+	// Static configuration.
+	clusterSize := 3
 
-	// Creating cluster with eventing
+	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
+	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
-	e2eutil.MustInsertJsonDocsIntoBucket(t, targetKube, testCouchbase, sourceBucket.Name, 0, numOfDocs)
-
-	eventingFuncName := "eventingFunc"
-	eventingSrcBucketName := sourceBucket.Name
-	eventingMetaBucketName := metadataBucket.Name
-	eventingDstBucketName := destinationBucket.Name
-	eventingJsFunc := `function OnUpdate(doc, meta) {\n    var doc_id = meta.id;\n    dst_bucket[doc_id] = \"test value\";\n}\nfunction OnDelete(meta) {\n  delete dst_bucket[meta.id];\n}`
-
-	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, eventingSrcBucketName, eventingMetaBucketName, eventingDstBucketName, eventingJsFunc)
-
-	// Cross check number of docs inserted reflected in eventing
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
-
-	// Code to insert data in parallel with cluster resize
-	stopDataInsertion := make(chan interface{})
-	dataInsertionErr := make(chan error)
-
-	// Clone the cluster here to avoid read/write races
-	// Don't not use any Must* calls as it will cause a hang
-	go func(cluster *couchbasev2.CouchbaseCluster) {
-		var err error
-	OuterLoop:
-		for {
-			select {
-			case <-stopDataInsertion:
-				break OuterLoop
-			default:
-				if err = e2eutil.InsertJsonDocsIntoBucket(targetKube, cluster, sourceBucket.Name, numOfDocs, 1); err == nil {
-					numOfDocs++
-				}
-			}
-		}
-		dataInsertionErr <- err
-	}(testCouchbase.DeepCopy())
-
-	// Ensure the routine is shut down properly in the event of a fatality.
-	stopped := false
-	defer func() {
-		if !stopped {
-			close(stopDataInsertion)
-			<-dataInsertionErr
-		}
-	}()
-
-	newMemberToBeAdded := clusterSize
-	for _, memberId := range []int{2, 3, 4} {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, memberId, true)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, memberId), 30*time.Second)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, newMemberToBeAdded), 3*time.Minute)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-		newMemberToBeAdded++
+	// When ready deploy the eventing function and generate workload.  Kill pods in sequence
+	// then stop the workload.  Expect the number of documents in the destination bucket to
+	// equal those in the source.
+	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, sourceBucket.Name)
+	defer stop()
+	for _, victim := range []int{0, 1, 2} {
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 	}
+	stop()
+	time.Sleep(time.Minute) // Wait for eventing to catch up
+	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, sourceBucket.Name, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), 2*time.Minute)
 
-	// To stop background data insertion and wait for function to complete.
-	// Wait for a short while so that the load generator has a chance to successfully
-	// commit documents to only pods that exist now.  Note that the port forward has
-	// a timeout of 1 minute, so wait for two to be certain.
-	time.Sleep(2 * time.Minute)
-	close(stopDataInsertion)
-	stopped = true
-	if err := <-dataInsertionErr; err != nil {
-		t.Fatal(err)
-	}
-
-	// Cross check number of docs inserted reflected in eventing
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, eventingDstBucketName, numOfDocs, 2*time.Minute)
-
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Cluster goes down, fails over and recovers N times
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},

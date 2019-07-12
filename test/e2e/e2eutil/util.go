@@ -1269,6 +1269,9 @@ func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 						"-n",
 						// JSON documents.
 						"-J",
+						// A small batch size does rudimentary rate limiting as minikube is likely
+						// to get pwned.
+						"-B", "1",
 						// A large (ish) number of items so we generate lots of writes and flushes,
 						// even a little compaction, but not too much or rebalances will take forever.
 						"-I", "100000",

@@ -24,7 +24,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	"github.com/couchbase/gocbmgr"
 
@@ -714,15 +713,15 @@ func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[s
 	}
 }
 
-func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) {
-	if responseData, err := DeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc); err != nil {
+func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) {
+	if responseData, err := DeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc, timeout); err != nil {
 		t.Log(string(responseData))
 		Die(t, err)
 	}
 }
 
-func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	requestType := "POST"
@@ -781,18 +780,26 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 	return responseData, nil
 }
 
-func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string, timeout time.Duration) (responseData []byte, err error) {
-	hostUrl := "http://" + hostIp + ":" + hostPort + "/analytics/service"
-	username := string(e2espec.BasicSecretData["username"])
-	password := string(e2espec.BasicSecretData["password"])
+func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) ([]byte, error) {
+	username := string(k8s.DefaultSecret.Data["username"])
+	password := string(k8s.DefaultSecret.Data["password"])
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	err = retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", func() error {
-		request, err := http.NewRequest("POST", hostUrl, bytes.NewReader([]byte(queryStr)))
+	var data []byte
+	callback := func() error {
+		url, cleanup, err := GetHostURL(k8s, cluster, couchbasev2.AnalyticsService)
 		if err != nil {
-			return errors.New("Failed to create http request: " + err.Error())
+			return err
+		}
+		defer cleanup()
+
+		hostUrl := "http://" + url + "/analytics/service"
+
+		request, err := http.NewRequest("POST", hostUrl, bytes.NewReader([]byte(query)))
+		if err != nil {
+			return err
 		}
 
 		request.SetBasicAuth(username, password)
@@ -801,54 +808,93 @@ func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string, timeout time.Durat
 		client := http.Client{Timeout: time.Minute}
 		response, err := client.Do(request)
 		if err != nil {
-			return errors.New("Http POST failed: " + err.Error())
+			return err
 		}
 		defer response.Body.Close()
 
-		responseBody := response.Body
-		responseData, _ = ioutil.ReadAll(responseBody)
+		data, err = ioutil.ReadAll(response.Body)
+		if err != nil {
+			return err
+		}
 
 		if response.StatusCode != http.StatusOK {
-			return errors.New("Remote call failed with response: " + response.Status)
+			return fmt.Errorf("bad status: %v", response.Status)
 		}
 
 		return nil
-	})
-	return
-}
-
-func VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName, password string, reqNumOfDocs int, timeout time.Duration) error {
-	currDocCount := 0
-	query := "select count(*) as count from " + datasetName
-
-	type queryResult struct {
-		Results []map[string]int
+	}
+	if err := retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", callback); err != nil {
+		return nil, err
 	}
 
+	return data, nil
+}
+
+func MustExecuteAnalyticsQuery(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) []byte {
+	data, err := ExecuteAnalyticsQuery(k8s, cluster, query, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return data
+}
+
+func GetDatasetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, dataset string, timeout time.Duration) (int64, error) {
+	data, err := ExecuteAnalyticsQuery(k8s, cluster, "SELECT COUNT(*) AS count FROM "+dataset, timeout)
+	if err != nil {
+		return 0, err
+	}
+
+	result := struct {
+		Results []map[string]int64 `json:"results"`
+	}{}
+
+	if err := json.Unmarshal(data, &result); err != nil {
+		return 0, err
+	}
+
+	return result.Results[0]["count"], nil
+}
+
+func MustGetDatasetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, dataset string, timeout time.Duration) int64 {
+	count, err := GetDatasetItemCount(k8s, cluster, dataset, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return count
+}
+
+func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", func() error {
-		response, err := ExecuteAnalyticsQuery(hostName, hostPort, query, timeout) // Timeout wrong.
+	var count int64
+	callback := func() error {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
-			return fmt.Errorf("%v: %v", err, string(response))
-		}
-		queryRes := queryResult{}
-		if err := json.Unmarshal(response, &queryRes); err != nil {
 			return err
 		}
-		currDocCount = queryRes.Results[0]["count"]
+		defer cleanup()
 
-		if currDocCount != reqNumOfDocs {
-			return fmt.Errorf("expected %d, actual %d", reqNumOfDocs, currDocCount)
+		info, err := client.GetBucketStatus(bucket)
+		if err != nil {
+			return err
 		}
 
+		count = int64(info.BasicStats.ItemCount)
 		return nil
-	})
+	}
+
+	if err := retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", callback); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
-func MustVerifyDocCountInAnalyticsDataset(t *testing.T, hostName, hostPort, datasetName, userName, password string, reqNumOfDocs int, timeout time.Duration) {
-	if err := VerifyDocCountInAnalyticsDataset(hostName, hostPort, datasetName, userName, password, reqNumOfDocs, timeout); err != nil {
+func MustGetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) int64 {
+	count, err := GetItemCount(k8s, cluster, bucket, timeout)
+	if err != nil {
 		Die(t, err)
 	}
+	return count
 }
