@@ -141,7 +141,13 @@ var (
 		"TestXdcrResizedOutTargetClusterNodes":     TestXdcrResizedOutTargetClusterNodes,
 
 		// RBAC cases
-		"TestRBACValidationCreate": TestRBACValidationCreate,
+		"TestRBACValidationCreate":      TestRBACValidationCreate,
+		"TestRBACCreateAdminUser":       TestRBACCreateAdminUser,
+		"TestRBACUpdateRole":            TestRBACUpdateRole,
+		"TestRBACDeleteUser":            TestRBACDeleteUser,
+		"TestRBACDeleteRole":            TestRBACDeleteRole,
+		"TestRBACRemoveUserFromBinding": TestRBACRemoveUserFromBinding,
+		"TestRBACDeleteBinding":         TestRBACDeleteBinding,
 
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,

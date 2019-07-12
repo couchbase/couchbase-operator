@@ -1,0 +1,14 @@
+---
+suite: TestRBAC
+timeout: 4h
+tcGroups:
+  - name: RBACTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRBACValidationCreate
+      - name: TestRBACDeleteUser
+      - name: TestRBACUpdateRole
+      - name: TestRBACDeleteRole
+      - name: TestRBACRemoveUserFromBinding
+      - name: TestRBACDeleteBinding

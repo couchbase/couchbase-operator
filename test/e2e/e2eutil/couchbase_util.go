@@ -230,7 +230,6 @@ func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 		if err := jsonpatch.Apply(&after, patches.Patches()); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
-
 		if reflect.DeepEqual(before, after) {
 			return true, nil
 		}
@@ -950,6 +949,42 @@ func CreateBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 
 func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
 	if err := CreateBucket(k8s, cluster, bucket, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// PatchUserInfo tries patching the user returned directly from Couchbase server.
+func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain string, patches jsonpatch.PatchSet, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		actual, err := client.GetUser(userName, cbmgr.AuthDomain(userAuthDomain))
+		if err != nil {
+			return false, err
+		}
+
+		expected, err := client.GetUser(userName, cbmgr.AuthDomain(userAuthDomain))
+		if err != nil {
+			return false, err
+		}
+		if err := jsonpatch.Apply(expected, patches.Patches()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		// loop until resources equal
+		return reflect.DeepEqual(actual, expected), nil
+	})
+}
+
+func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain string, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchUserInfo(t, k8s, couchbase, userName, userAuthDomain, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }

@@ -638,7 +638,7 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 	}
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
-	} else if err := WaitForUserDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForAllUserDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
 	}
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseRoles(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {

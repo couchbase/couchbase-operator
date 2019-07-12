@@ -19,7 +19,7 @@ import (
 var (
 	DefaultBucket = &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "default",
+			Name: e2e_constants.DefaultBucket,
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        e2e_constants.Mem256Mb,
@@ -35,7 +35,7 @@ var (
 
 	DefaultBucketTwoReplicas = &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "default",
+			Name: e2e_constants.DefaultBucket,
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        e2e_constants.Mem256Mb,
@@ -51,7 +51,7 @@ var (
 
 	DefaultBucketThreeReplicas = &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "default",
+			Name: e2e_constants.DefaultBucket,
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        e2e_constants.Mem256Mb,
@@ -107,7 +107,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 									for _, enableIndexReplica := range enableIndexReplicas {
 										buckets = append(buckets, &couchbasev2.CouchbaseBucket{
 											ObjectMeta: metav1.ObjectMeta{
-												Name: "default",
+												Name: e2e_constants.DefaultBucket,
 											},
 											Spec: couchbasev2.CouchbaseBucketSpec{
 												MemoryQuota:        bucketMemoryQuota,
@@ -134,7 +134,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 				for _, enableFlush := range enableFlushes {
 					buckets = append(buckets, &couchbasev2.CouchbaseMemcachedBucket{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "default",
+							Name: e2e_constants.DefaultBucket,
 						},
 						Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
 							MemoryQuota: bucketMemoryQuota,
@@ -158,7 +158,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 								for _, enableFlush := range enableFlushes {
 									buckets = append(buckets, &couchbasev2.CouchbaseEphemeralBucket{
 										ObjectMeta: metav1.ObjectMeta{
-											Name: "default",
+											Name: e2e_constants.DefaultBucket,
 										},
 										Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
 											MemoryQuota:        bucketMemoryQuota,
@@ -214,6 +214,9 @@ func NewBasicCluster(genName, secretName string, size int) *couchbasev2.Couchbas
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
 			AdminSecret: e2e_constants.KubeTestSecretName,
+			RBAC: couchbasev2.RBAC{
+				Managed: true,
+			},
 		},
 		Buckets: couchbasev2.Buckets{
 			Managed: true,

@@ -759,7 +759,111 @@ func WaitForReplicationDeletion(k8s *types.Cluster, namespace string, timeout ti
 	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
-func WaitForUserDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
+func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		// find user in cluster status
+		_, found := couchbasev2.HasItem(user.Name, currCluster.Status.Users)
+		if !found {
+			return false, fmt.Errorf("waiting for user `%s` to be created", user.Name)
+		}
+		// user must also be in couchbase
+		client, cleanup, err := CreateAdminConsoleClient(k8s, currCluster)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+		_, err = client.GetUser(user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain))
+		return err == nil, err
+
+	})
+}
+
+func MustWaitUntilUserExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) {
+	if err := WaitUntilUserExists(k8s, couchbase, user, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitForClusterUserDeletion waits user to be deleted
+// from couchbase cluster
+func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, timeout time.Duration) error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() (bool, error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		// we should get an error attempting to get user
+		users, err := client.GetUsers()
+		if err != nil {
+			return true, err
+		}
+
+		found := false
+		for _, user := range users {
+			if user.ID == userName {
+				found = true
+				break
+			}
+		}
+		if found {
+			return true, fmt.Errorf("waiting for couchbase user `%s` to be deleted", userName)
+		}
+		return true, nil
+	}
+
+	return retryutil.Retry(ctx, retryInterval, callback)
+}
+
+func MustWaitForClusterUserDeletion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, timeout time.Duration) error {
+	err := WaitForClusterUserDeletion(k8s, couchbase, userName, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return nil
+}
+
+func WaitForUserDeletion(k8s *types.Cluster, namespace string, userName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		users, err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+
+		found := false
+		for _, u := range users.Items {
+			if u.Name == userName {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			return fmt.Errorf("waiting for couchbase user `%s` to be deleted", userName)
+		}
+		return nil
+	}
+
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
+}
+
+func WaitForAllUserDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -771,10 +875,26 @@ func WaitForUserDeletion(k8s *types.Cluster, namespace string, timeout time.Dura
 		if len(users.Items) != 0 {
 			return fmt.Errorf("waiting for %v couchbase users to delete", len(users.Items))
 		}
+
+		// and none of the users are remaining in status
+		for _, user := range users.Items {
+			err := WaitForUserDeletion(k8s, namespace, user.Name, timeout)
+			if err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}
 
 	return retryutil.RetryOnErr(ctx, time.Second, callback)
+}
+
+func MustWaitForUserDeletion(t *testing.T, k8s *types.Cluster, namespace string, userName string, timeout time.Duration) {
+	err := WaitForUserDeletion(k8s, namespace, userName, timeout)
+	if err != nil {
+		Die(t, err)
+	}
 }
 
 func WaitForRoleDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {

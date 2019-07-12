@@ -89,10 +89,29 @@ const (
 	BucketFlushDisabled  = false
 	IndexReplicaEnabled  = true
 	IndexReplicaDisabled = false
+
+	DefaultBucket = "default"
 )
 
 const (
 	Mem256Mb = 256
 	Mem512Mb = 512
 	Mem1Gb   = 1024
+)
+
+const (
+	// CRD Object naming
+	CouchbaseUserName = "admin"
+	ClusterRoleName   = "admin-role"
+	BucketRoleName    = "bucket-role"
+	RoleBindingName   = "role-binding"
+
+	// Couchbase specific roles
+	ClusterAdminRole = "cluster_admin"
+	BucketAdminRole  = "bucket_admin"
+
+	// Binding
+	CouchbaseRoleRefKind      = "CouchbaseRole"
+	CouchbaseSubjectUserKind  = "CouchbaseUser"
+	CouchbaseSubjectGroupKind = "CouchbaseGroup"
 )

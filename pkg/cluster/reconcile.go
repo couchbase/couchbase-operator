@@ -1591,7 +1591,9 @@ func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
 		// attempt to get referenced role, and warn if missing because
 		// users may be deleted if there are no roles to bind
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return nil, fmt.Errorf("rolebinding `%s` refers a missing role resource `%s`", roleBinding.Name, roleName)
+			err = fmt.Errorf("rolebinding `%s` refers to a missing role resource `%s`", roleBinding.Name, roleName)
+			log.Error(err, "User may be deleted if no longer bound to roles", "cluster", c.namespacedName())
+			continue
 		} else if err != nil {
 			return nil, err
 		}
@@ -1616,7 +1618,9 @@ func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
 
 			// missing users will be deleted
 			if k8sutil.IsKubernetesResourceNotFoundError(err) {
-				return nil, fmt.Errorf("rolebinding `%s` refers to a missing user resource `%s`", roleBinding.Name, subjectName)
+				err = fmt.Errorf("rolebinding `%s` refers to a missing user resource `%s`", roleBinding.Name, subjectName)
+				log.Error(err, "User may be deleted if no referenced by a role binding", "cluster", c.namespacedName())
+				continue
 			} else if err != nil {
 				return nil, err
 			}
@@ -1752,6 +1756,11 @@ func (c *Cluster) reconcileUsers() error {
 	create, update, remove, err := c.inspectUsers()
 	if err != nil {
 		return err
+	}
+
+	if len(create) == 0 && len(update) == 0 && len(remove) == 0 {
+		// nothing to reconcile
+		return nil
 	}
 
 	existingUsers := []string{}

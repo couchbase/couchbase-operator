@@ -135,6 +135,8 @@ spec:
   paused: false
   security:
     adminSecret: basic-test-secret
+    rbac:
+      managed: true
   networking:
     exposeAdminConsole: false
     adminConsoleServices:

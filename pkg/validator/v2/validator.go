@@ -143,7 +143,8 @@ func ApplyRoleDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	for i, role := range roles {
 		if r, ok := role.(map[string]interface{}); ok {
 			// Apply bucket role to all buckets by default
-			if _, ok := r["bucket"]; !ok {
+			bucket, ok := r["bucket"]
+			if !ok || (bucket == "") {
 				if couchbasev2.IsBucketRole(r["name"].(string)) {
 					path := fmt.Sprintf("/spec/roles/%d/bucket", i)
 					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "*"})

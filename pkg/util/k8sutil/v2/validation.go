@@ -988,8 +988,7 @@ func GetRoleCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 													Pattern:   couchbasev2.ValidRolePattern(),
 												},
 												"bucket": apiextensionsv1beta1.JSONSchemaProps{
-													Type:      "string",
-													MinLength: &minimumStringLength,
+													Type: "string",
 												},
 											},
 										},
