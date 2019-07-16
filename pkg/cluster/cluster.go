@@ -409,7 +409,7 @@ func (c *Cluster) logUpdate(old, new interface{}) {
 		log.Error(err, "YAML marshal failed", "cluster", c.cluster.Name)
 	}
 
-	log.Info("Specification updated", "cluster", c.cluster.Name)
+	log.Info("Resource updated", "cluster", c.cluster.Name)
 	diff := cmp.Diff(string(oldBytes), string(newBytes))
 	for _, m := range strings.Split(diff, "\n") {
 		log.Info(m, "cluster", c.cluster.Name)

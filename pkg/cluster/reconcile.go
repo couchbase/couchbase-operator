@@ -450,6 +450,7 @@ func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Buck
 			if r.BucketName == a.BucketName {
 				if !reflect.DeepEqual(r, a) {
 					update = append(update, r)
+					c.logUpdate(a, r)
 				}
 				found = true
 				break

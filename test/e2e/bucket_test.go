@@ -191,10 +191,10 @@ func TestEditBucket(t *testing.T) {
 	// Create the cluster.
 	bucket := e2eutil.MustNewBucket(t, kubernetes, f.Namespace, e2espec.DefaultBucket)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, constants.Size1, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create a direct connection to a couchbase node.
 	// When healthy change the memory quota, replicas, whether flushes are allowed and the compression mode.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", 128), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", 128), time.Minute)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", 256), time.Minute)
@@ -255,6 +255,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
 	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
