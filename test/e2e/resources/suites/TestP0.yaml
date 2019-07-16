@@ -105,7 +105,6 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestServerGroupAutoFailover
-      - name: TestServerGroupWithSingleServiceNodeInFailoverGroup
       - name: TestMultiNodeAutoFailover
       - name: TestDiskFailureAutoFailover
 

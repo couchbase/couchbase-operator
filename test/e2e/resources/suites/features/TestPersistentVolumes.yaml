@@ -13,7 +13,6 @@ tcGroups:
       - name: TestPersistentVolumeKillAllPodsAndOperator
       - name: TestPersistentVolumeRzaNodesKilled
       - name: TestPersistentVolumeRzaFailover
-      - name: TestPersistentVolumeWithSingleNodeService
       - name: TestPersistentVolumeResizeCluster
       - name: TestAnalyticsKillPodsWithPVC
       - name: TestLogCollectClusterWithPVC

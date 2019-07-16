@@ -38,28 +38,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var (
-	BasicClusterConfig = map[string]string{
-		"dataServiceMemQuota":      strconv.Itoa(constants.Mem256Mb),
-		"indexServiceMemQuota":     strconv.Itoa(constants.Mem256Mb),
-		"searchServiceMemQuota":    strconv.Itoa(constants.Mem256Mb),
-		"eventingServiceMemQuota":  strconv.Itoa(constants.Mem256Mb),
-		"analyticsServiceMemQuota": strconv.Itoa(constants.Mem1Gb),
-		"indexStorageSetting":      "memory_optimized",
-		"autoFailoverTimeout":      "30",
-		"autoFailoverMaxCount":     "1"}
-
-	BasicClusterConfig2 = map[string]string{
-		"dataServiceMemQuota":      strconv.Itoa(constants.Mem1Gb),
-		"indexServiceMemQuota":     strconv.Itoa(constants.Mem256Mb),
-		"searchServiceMemQuota":    strconv.Itoa(constants.Mem256Mb),
-		"eventingServiceMemQuota":  strconv.Itoa(constants.Mem256Mb),
-		"analyticsServiceMemQuota": strconv.Itoa(constants.Mem1Gb),
-		"indexStorageSetting":      "memory_optimized",
-		"autoFailoverTimeout":      "30",
-		"autoFailoverMaxCount":     "1"}
-)
-
 // randomSuffix generates a 5 character random suffix to be appended to
 // k8s resources to avoid namespace collisions (especially events)
 func RandomSuffix() string {
@@ -82,39 +60,6 @@ func RandomSuffix() string {
 		suffix += string(rune(ordinal))
 	}
 	return suffix
-}
-
-func GetClusterConfigMap(dataMem, indexMem, searchMem, eventingMem, cbasMem, autoFailoverTimeout, autoFailoverMaxCount int, autoFailoverServerGroup bool) map[string]string {
-	return map[string]string{
-		"dataServiceMemQuota":      strconv.Itoa(dataMem),
-		"indexServiceMemQuota":     strconv.Itoa(indexMem),
-		"searchServiceMemQuota":    strconv.Itoa(searchMem),
-		"eventingServiceMemQuota":  strconv.Itoa(eventingMem),
-		"analyticsServiceMemQuota": strconv.Itoa(cbasMem),
-		"indexStorageSetting":      "memory_optimized",
-		"autoFailoverTimeout":      strconv.Itoa(autoFailoverTimeout),
-		"autoFailoverMaxCount":     strconv.Itoa(autoFailoverMaxCount),
-		"autoFailoverServerGroup":  strconv.FormatBool(autoFailoverServerGroup),
-		//"autoFailoverOnDiskIssues":        strconv.FormatBool(diskFailover),
-		//"autoFailoverOnDiskIssuesTimeout": strconv.Itoa(diskFailoverTimeout),
-	}
-}
-
-func GetServiceConfigMap(size int, configName string, serviceList []string) map[string]string {
-	return map[string]string{
-		"name":     configName,
-		"size":     strconv.Itoa(size),
-		"services": strings.Join(serviceList, ","),
-	}
-}
-
-func GetClassSpecificServiceConfigMap(size int, configName string, serviceList, serverGroupList []string) map[string]string {
-	return map[string]string{
-		"name":         configName,
-		"services":     strings.Join(serviceList, ","),
-		"size":         strconv.Itoa(size),
-		"serverGroups": strings.Join(serverGroupList, ","),
-	}
 }
 
 // newClusterFromSpec creates a cluster and waits for various ready conditions.
@@ -156,25 +101,6 @@ func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string,
 
 func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
 	cluster, err := NewClusterFromSpecAsync(t, k8s, namespace, clusterSpec)
-	if err != nil {
-		Die(t, err)
-	}
-	return cluster
-}
-
-// Creates Cluster Spec object and returns it
-func CreateClusterSpec(secretName string, config map[string]map[string]string) couchbasev2.ClusterSpec {
-	return e2espec.CreateClusterSpec(constants.ClusterNamePrefix, secretName, config)
-}
-
-// Creates Couchbase cluster object and returns it
-func CreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec) (*couchbasev2.CouchbaseCluster, error) {
-	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
-	return newClusterFromSpec(t, k8s, namespace, crd)
-}
-
-func MustCreateClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
-	cluster, err := CreateClusterFromSpec(t, k8s, namespace, adminConsoleExposed, spec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -360,36 +286,6 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 // but dies on error.
 func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
 	cluster, err := NewSupportableTLSCluster(t, k8s, namespace, size, ctx)
-	if err != nil {
-		Die(t, err)
-	}
-	return cluster
-}
-
-// NewClusterMulti creates a multi cluster, retrying if an error is encountered and
-// performing garbage collection
-func NewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, exposed)
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
-}
-
-func MustNewClusterMulti(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string, exposed bool) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewClusterMulti(t, k8s, namespace, config, exposed)
-	if err != nil {
-		Die(t, err)
-	}
-	return cluster
-}
-
-// NewClusterMultiNoWait creates a multi cluster, but doesn't wait for any events.
-// Used in cases where the cluster is expected to fail
-func NewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewMultiCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, config, false)
-	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
-}
-
-func MustNewClusterMultiNoWait(t *testing.T, k8s *types.Cluster, namespace string, config map[string]map[string]string) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewClusterMultiNoWait(t, k8s, namespace, config)
 	if err != nil {
 		Die(t, err)
 	}
@@ -753,10 +649,6 @@ func WriteLogs(kubeClient kubernetes.Interface, namespace, logDir, testName stri
 		}
 	}
 	return nil
-}
-
-func LogfWithTimestamp(t *testing.T, format string, args ...interface{}) {
-	t.Log(time.Now(), fmt.Sprintf(format, args...))
 }
 
 func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {

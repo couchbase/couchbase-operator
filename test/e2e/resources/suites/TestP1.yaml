@@ -97,15 +97,9 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-      # K8S-393, Unsupported in 1.0
-      #- name: TestRzaServerGroupRemoval
-      - name: TestRzaServerGroupAddition
       - name: TestRzaKillServerPods
-      - name: TestRzaNegScaleupCluster
-      - name: TestRzaServerGroupDown
       - name: TestRzaAntiAffinityOn
       - name: TestRzaAntiAffinityOff
-      - name: TestRzaUpdateK8SNodeLabelAndCrd
 
   - name: PersistentVolumeTests
     clusters:
@@ -117,7 +111,6 @@ tcGroups:
       - name: TestPersistentVolumeKillAllPodsAndOperator
       - name: TestPersistentVolumeRzaNodesKilled
       - name: TestPersistentVolumeRzaFailover
-      - name: TestPersistentVolumeWithSingleNodeService
       - name: TestPersistentVolumeResizeCluster
       - name: TestLogCollectClusterWithPVC
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +11,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -212,147 +210,146 @@ func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *b
 	return job
 }
 
-func NewBucket(name string) map[string]string {
-	return map[string]string{
-		"bucketName":         name,
-		"bucketType":         "couchbase",
-		"bucketMemoryQuota":  "100",
-		"bucketReplicas":     "1",
-		"ioPriority":         "high",
-		"evictionPolicy":     "fullEviction",
-		"conflictResolution": "seqno",
-		"enableFlush":        "true",
-		"enableIndexReplica": "false",
-	}
-}
-
 // runs a system test based on a sysTestDef
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
 	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
 	clusterSize := 4
-
-	// cluster configuration, 10 buckets, 4 nodes, all services
-	withPvc := true
-	withTls := true
+	pvcName := "couchbase"
 	leaveJobsRunning := false
 
-	clusterConfig := map[string]string{
-		"dataServiceMemQuota":   "2000",
-		"indexServiceMemQuota":  "2000",
-		"searchServiceMemQuota": "2000",
-		"indexStorageSetting":   "plasma",
-		"autoFailoverTimeout":   "120",
+	// cluster configuration, 4 nodes, all services
+	clusterTemplate := &couchbasev2.CouchbaseCluster{
+		Spec: couchbasev2.ClusterSpec{
+			Image:        f.CouchbaseServerImage,
+			AntiAffinity: true,
+			ClusterSettings: couchbasev2.ClusterConfig{
+				DataServiceMemQuota:   2000,
+				IndexServiceMemQuota:  2000,
+				SearchServiceMemQuota: 2000,
+				IndexStorageSetting:   "plasma",
+				AutoFailoverTimeout:   120,
+			},
+			Security: couchbasev2.CouchbaseClusterSecuritySpec{
+				AdminSecret: targetKube.DefaultSecret.Name,
+			},
+			Servers: []couchbasev2.ServerConfig{
+				{
+					Name: "test",
+					Size: clusterSize,
+					Services: couchbasev2.ServiceList{
+						couchbasev2.DataService,
+						couchbasev2.IndexService,
+						couchbasev2.QueryService,
+						couchbasev2.SearchService,
+						couchbasev2.EventingService,
+						couchbasev2.AnalyticsService,
+					},
+					Pod: &couchbasev2.PodPolicy{
+						VolumeMounts: &couchbasev2.VolumeMounts{
+							DefaultClaim: pvcName,
+							DataClaim:    pvcName + "-data",
+							IndexClaim:   pvcName + "-index",
+							AnalyticsClaims: []string{
+								pvcName,
+								pvcName,
+							},
+						},
+					},
+				},
+			},
+			Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
+				AdminConsoleServices: couchbasev2.ServiceList{
+					couchbasev2.DataService,
+				},
+				ExposedFeatures: couchbasev2.ExposedFeatureList{
+					couchbasev2.FeatureXDCR,
+				},
+			},
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+				createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 1),
+				createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-data", 4),
+				createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-index", 4),
+			},
+		},
 	}
 
-	serviceConfig1 := map[string]string{
-		"size":     strconv.Itoa(clusterSize),
-		"name":     "test_config_1",
-		"services": "data,query,index,search,eventing,analytics",
-	}
-	pvcName := "couchbase"
-	if withPvc {
-		serviceConfig1["defaultVolMnt"] = pvcName
-		serviceConfig1["dataVolMnt"] = pvcName + "-data"
-		serviceConfig1["indexVolMnt"] = pvcName + "-index"
-		serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
-	}
-
-	otherConfig1 := map[string]string{
-		"antiAffinity": "on",
-	}
-	exposedFeaturesConfig := map[string]string{
-		"featureNames": "xdcr",
-	}
-	adminConsoleServices := map[string]string{
-		"services": "data",
+	bucketTemplate := &couchbasev2.CouchbaseBucket{
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        100,
+			Replicas:           1,
+			IoPriority:         "high",
+			EvictionPolicy:     "fullEviction",
+			ConflictResolution: "seqno",
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    "passive",
+		},
 	}
 
-	bucketConfig1 := NewBucket("default")
-	bucketConfig2 := NewBucket("CUSTOMER")
-	bucketConfig3 := NewBucket("DISTRICT")
-	bucketConfig4 := NewBucket("HISTORY")
-	bucketConfig5 := NewBucket("WAREHOUSE")
-	bucketConfig6 := NewBucket("ITEM")
-	bucketConfig7 := NewBucket("NEW_ORDER")
-	bucketConfig8 := NewBucket("ORDERS")
-	bucketConfig9 := NewBucket("ORDER_LINE")
-	bucketConfig10 := NewBucket("STOCK")
-	configMap := map[string]map[string]string{
-		"cluster":              clusterConfig,
-		"service1":             serviceConfig1,
-		"bucket1":              bucketConfig1,
-		"bucket2":              bucketConfig2,
-		"bucket3":              bucketConfig3,
-		"bucket4":              bucketConfig4,
-		"bucket5":              bucketConfig5,
-		"bucket6":              bucketConfig6,
-		"bucket7":              bucketConfig7,
-		"bucket8":              bucketConfig8,
-		"bucket9":              bucketConfig9,
-		"bucket10":             bucketConfig10,
-		"other1":               otherConfig1,
-		"exposedFeatures":      exposedFeaturesConfig,
-		"adminConsoleServices": adminConsoleServices,
+	// Create the buckets.  These will be shared by both clusters.
+	bucketNames := []string{
+		"default",
+		"CUSTOMER",
+		"DISTRICT",
+		"HISTORY",
+		"WAREHOUSE",
+		"ITEM",
+		"NEW_ORDER",
+		"ORDERS",
+		"ORDER_LINE",
+		"STOCK",
 	}
-	clusterSpec1 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	clusterSpec2 := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	if withPvc {
-		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 1))
-		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-data", 4))
-		clusterSpec1.VolumeClaimTemplates = append(clusterSpec1.VolumeClaimTemplates, createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-index", 4))
-		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 1))
-		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-data", 4))
-		clusterSpec2.VolumeClaimTemplates = append(clusterSpec2.VolumeClaimTemplates, createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-index", 4))
+	for _, name := range bucketNames {
+		bucket := bucketTemplate.DeepCopy()
+		bucket.Name = name
+		e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
 	}
 
+	// Create the first cluster.
 	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer teardown1()
 
+	testCouchbase1 := clusterTemplate.DeepCopy()
+	testCouchbase1.Name = ctx1.ClusterName
+	testCouchbase1.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
+				ServerSecret: ctx1.ClusterSecretName,
+			},
+			OperatorSecret: ctx1.OperatorSecretName,
+		},
+	}
+	testCouchbase1 = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase1)
+
+	// Create the second cluster.
 	ctx2, teardown2, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer teardown2()
 
-	if !withTls {
-		// This ensures we don't install the certifcates into the cluster
-		ctx1 = nil
-		ctx2 = nil
+	testCouchbase2 := clusterTemplate.DeepCopy()
+	testCouchbase2.Name = ctx2.ClusterName
+	testCouchbase2.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
+				ServerSecret: ctx2.ClusterSecretName,
+			},
+			OperatorSecret: ctx2.OperatorSecretName,
+		},
 	}
+	testCouchbase2 = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase2)
 
-	var testCouchbase1 *couchbasev2.CouchbaseCluster
-	errChan := make(chan error)
-	// Create Cluster1 in async manner
-	go func() {
-		var err error
-		testCouchbase1, err = e2eutil.CreateClusterFromSpecSystemTest(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec1, ctx1)
-		errChan <- err
-	}()
-
-	// Create Cluster2 and wait for cluster creation to succeed
-	testCouchbase2, err := e2eutil.CreateClusterFromSpecSystemTest(t, targetKube, f.Namespace, constants.AdminExposed, clusterSpec2, ctx2)
-	if err != nil {
-		t.Fatal(err)
+	if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx1); err != nil {
+		t.Fatal("TLS check for cluster failed: ", err)
 	}
-
-	// Wait for Cluster1 creation to complete
-	if err := <-errChan; err != nil {
-		t.Fatal(err)
-	}
-
-	// check tls
-	if withTls {
-		if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx1); err != nil {
-			t.Fatal("TLS check for cluster failed: ", err)
-		}
-		if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx2); err != nil {
-			t.Fatal("TLS check for cluster failed: ", err)
-		}
+	if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx2); err != nil {
+		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
 	// create connection to couchbase nodes

@@ -159,7 +159,7 @@ func runSuite(t *testing.T) {
 			}
 
 			// Add required K8S node labels
-			if err := K8SNodesAddLabel(clusterSpec, kubeCluster, constants.FailureDomainZoneLabel, time.Minute); err != nil {
+			if err := k8sNodesAddLabel(clusterSpec, kubeCluster, constants.FailureDomainZoneLabel, time.Minute); err != nil {
 				t.Errorf("Failed to label the nodes: %v", err)
 				skipCurrTestGroup = true
 				delete(f.ClusterSpec, kubeName)

@@ -273,10 +273,15 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			return err
 		}
 
+		// Alaways flag nodes down, the observed behaviour can change based on whether
+		// a recover timer has expired or not.
+		for _, m := range r.couchbase.DownNodes {
+			c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
+		}
+
 		// Get the duration that the node has been down from the status
 		// and check if it has persistent volumes to be recovered
 		for _, m := range r.couchbase.DownNodes {
-			c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
 			if _, ok := r.runningPods[m.Name]; ok {
 				// If the pod was created in the last minute then it may be a down node
 				// that was restarted and is still coming back online. If this is the

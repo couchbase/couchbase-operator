@@ -177,16 +177,12 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 	err := retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
 		cl, err := GetCouchbaseCluster(k8s.CRClient, cluster.Name, cluster.Namespace)
 		if err != nil {
-			LogfWithTimestamp(t, "could not get cluster: (%v)", err)
 			return false, err
 		}
 
 		if cl.Status.Size != cluster.Spec.TotalSize() {
-			LogfWithTimestamp(t, "Cluster nodes (%d) does not match expected nodes (%d) \n", cl.Status.Size, cluster.Spec.TotalSize())
 			return false, nil
 		}
-
-		LogfWithTimestamp(t, "Cluster Status Conditions: (%v)", cl.Status.Conditions)
 
 		healthyConditions := map[couchbasev2.ClusterConditionType]struct {
 			healthyCondition v1.ConditionStatus
@@ -217,11 +213,9 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 			}
 
 			if cond.Status != healthyCondition.healthyCondition {
-				LogfWithTimestamp(t, "%s", healthyCondition.message)
 				return false, nil
 			}
 		}
-		LogfWithTimestamp(t, "Cluster healthy")
 		return true, nil
 	})
 
@@ -242,7 +236,6 @@ func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *cou
 	if err != nil {
 		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
 			p := undeletedPods[0]
-			LogfWithTimestamp(t, "waiting pod (%s) to be deleted.", p.Name)
 
 			buf := bytes.NewBuffer(nil)
 			buf.WriteString("init container status:\n")
@@ -260,7 +253,6 @@ func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *cou
 			return false, err
 		}
 		if len(list.Items) > 0 {
-			LogfWithTimestamp(t, "waiting service (%s) to be deleted", list.Items[0].Name)
 			return false, nil
 		}
 		return true, nil
@@ -276,7 +268,6 @@ func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName strin
 	if err != nil {
 		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
 			p := undeletedPods[0]
-			LogfWithTimestamp(t, "waiting pod (%s) to be deleted.", p.Name)
 
 			buf := bytes.NewBuffer(nil)
 			buf.WriteString("init container status:\n")

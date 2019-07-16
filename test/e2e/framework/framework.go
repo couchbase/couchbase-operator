@@ -3,7 +3,6 @@ package framework
 import (
 	"bytes"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -36,6 +35,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -225,11 +225,11 @@ func DeleteAllJobs(kubeClient kubernetes.Interface) error {
 	logrus.Info("Deleting jobs")
 	jobs, err := kubeClient.BatchV1().Jobs(Global.Namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return errors.New("Failed to list jobs: " + err.Error())
+		return fmt.Errorf("failed to list jobs: %v", err)
 	}
 	for _, job := range jobs.Items {
 		if err := kubeClient.BatchV1().Jobs(Global.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0)); err != nil {
-			return errors.New("Failed to delete job: " + err.Error())
+			return fmt.Errorf("failed to delete job: %v", err)
 		}
 		logrus.Infof("Job deleted: %s", job.Name)
 	}
@@ -240,7 +240,7 @@ func DeleteCouchbaseServices(kubeClient kubernetes.Interface) error {
 	logrus.Info("Deleting Couchbase services")
 	services, err := kubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
-		return errors.New("Failed to list services: " + err.Error())
+		return fmt.Errorf("failed to list services: %v", err)
 	}
 	for _, service := range services.Items {
 		if err := kubeClient.CoreV1().Services(Global.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
@@ -264,7 +264,7 @@ func DeleteCouchbaseClusters(kubeClient kubernetes.Interface, crClient versioned
 		logrus.Infof("Deleted Couchbase cluster: %s", cluster.Name)
 		pods, err := kubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
 		if err != nil {
-			return errors.New("Failed to list pods for cluster: " + err.Error())
+			return fmt.Errorf("failed to list pods for cluster: %v", err)
 		}
 		killPods := []string{}
 		for _, pod := range pods.Items {
@@ -300,7 +300,7 @@ func cleanUpNamespace() (err error) {
 		if targetKube.DefaultSecret != nil {
 			if err := e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, targetKube.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
 				if !k8sutil.IsKubernetesResourceNotFoundError(err) {
-					return errors.New("Unable to delete the default secret: " + err.Error())
+					return fmt.Errorf("unable to delete the default secret: %v", err)
 				}
 			}
 		}
@@ -322,7 +322,7 @@ func cleanUpNamespace() (err error) {
 
 func Teardown() error {
 	if Global == nil {
-		return errors.New("framework is uninitialized")
+		return fmt.Errorf("framework is uninitialized")
 	}
 
 	if Global.SkipTeardown {
@@ -355,7 +355,7 @@ func CreateKubeClusterObject(kubeConfPath, context string) (*types.Cluster, erro
 func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 	secret, err := e2eutil.CreateSecret(f.ClusterSpec[kubeName].KubeClient, f.Namespace, e2espec.NewDefaultSecret(f.Namespace))
 	if err != nil {
-		err = errors.New("failed to create default couchbase secret: " + err.Error())
+		err = fmt.Errorf("failed to create default couchbase secret: %v", err)
 		return err
 	}
 	f.ClusterSpec[kubeName].DefaultSecret = secret
@@ -365,10 +365,10 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 func RecreateCRDs(k8s *types.Cluster) error {
 	clientSet, err := clientset.NewForConfig(k8s.Config)
 	if err != nil {
-		return errors.New("failed to create clientset object: " + err.Error())
+		return fmt.Errorf("failed to create clientset object: %v", err)
 	}
 	if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
-		return errors.New("failed to delete CRDs: " + err.Error())
+		return fmt.Errorf("failed to delete CRDs: %v", err)
 	}
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(k8sutil.GetCRD()); err != nil {
 		return err
@@ -438,8 +438,10 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 	for _, pod := range pods.Items {
-		err = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
-		if err != nil {
+		if err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return err
 		}
 		logrus.Infof("Pod deleted: %v", pod.Name)
@@ -494,7 +496,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 
 	logrus.Info("Setting up operator")
 	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
-		return errors.New("failed to setup couchbase operator: " + err.Error())
+		return fmt.Errorf("failed to setup couchbase operator: %v", err)
 	}
 	logrus.Info("Couchbase operator created successfully")
 	logrus.Info("E2E setup successfully")
@@ -593,7 +595,7 @@ func runExecCommand(command *exec.Cmd) error {
 	command.Stderr = &stderr
 
 	if err := command.Run(); err != nil {
-		return errors.New("error during execution: " + err.Error() + "\n\n stdout: " + stdout.String() + "\n\n stderr: " + stderr.String())
+		return fmt.Errorf("error during execution: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
 	}
 	return nil
 }

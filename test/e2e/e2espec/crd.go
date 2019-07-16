@@ -1,7 +1,6 @@
 package e2espec
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -78,19 +77,6 @@ var (
 			EnableFlush:        constants.BucketFlushEnabled,
 			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
 			CompressionMode:    cbmgr.CompressionModePassive,
-		},
-	}
-)
-
-// server settings
-var (
-	defaultServers = couchbasev2.ServerConfig{
-		Size: e2e_constants.Size1,
-		Name: "test_config_1",
-		Services: couchbasev2.ServiceList{
-			couchbasev2.DataService,
-			couchbasev2.QueryService,
-			couchbasev2.IndexService,
 		},
 	}
 )
@@ -387,168 +373,6 @@ func NewBasicXdcrCluster(genName, secretName string, size int, exposed bool) *co
 	return crd
 }
 
-// new custom cluster
-func CreateClusterSpec(genName, secretName string, config map[string]map[string]string) couchbasev2.ClusterSpec {
-	keys := []string{}
-	for key := range config {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	// Spec object to return
-	spec := couchbasev2.ClusterSpec{
-		Image: e2e_constants.CouchbaseServerImage,
-		Security: couchbasev2.CouchbaseClusterSecuritySpec{
-			AdminSecret: secretName,
-		},
-		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
-			ExposedFeatures:      []string{},
-			AdminConsoleServices: couchbasev2.ServiceList{},
-		},
-		ClusterSettings: defaultClusterSettings,
-		Buckets: couchbasev2.Buckets{
-			Managed: true,
-		},
-		Servers:      []couchbasev2.ServerConfig{},
-		ServerGroups: []string{},
-	}
-
-	for _, key := range keys {
-		switch {
-		// Updates Cluster settings in ClusterSpec
-		case strings.Contains(key, "cluster"):
-			for setting := range config[key] {
-				switch setting {
-				case "dataServiceMemQuota":
-					dataServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.DataServiceMemQuota = dataServiceMemQuota
-				case "indexServiceMemQuota":
-					indexServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.IndexServiceMemQuota = indexServiceMemQuota
-				case "searchServiceMemQuota":
-					searchServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.SearchServiceMemQuota = searchServiceMemQuota
-				case "indexStorageSetting":
-					spec.ClusterSettings.IndexStorageSetting = config[key][setting]
-				case "eventingServiceMemQuota":
-					eventingServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.EventingServiceMemQuota = eventingServiceMemQuota
-				case "analyticsServiceMemQuota":
-					analyticsServiceMemQuota, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.AnalyticsServiceMemQuota = analyticsServiceMemQuota
-				case "autoFailoverTimeout":
-					autoFailoverTimeout, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.AutoFailoverTimeout = autoFailoverTimeout
-				case "autoFailoverMaxCount":
-					autoFailoverMaxCount, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.AutoFailoverMaxCount = autoFailoverMaxCount
-				case "autoFailoverServerGroup":
-					autoFailoverServerGroup, _ := strconv.ParseBool(config[key][setting])
-					spec.ClusterSettings.AutoFailoverServerGroup = autoFailoverServerGroup
-				case "autoFailoverOnDiskIssues":
-					autoFailoverOnDiskIssues, _ := strconv.ParseBool(config[key][setting])
-					spec.ClusterSettings.AutoFailoverOnDataDiskIssues = autoFailoverOnDiskIssues
-				case "autoFailoverOnDiskIssuesTimeout":
-					autoFailoverOnDiskIssuesTimeout, _ := strconv.ParseUint(config[key][setting], 10, 64)
-					spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = autoFailoverOnDiskIssuesTimeout
-				}
-			}
-
-		// Modify Service in ClusterSpec
-		case strings.Contains(key, "service"):
-			serverSettings := defaultServers
-			volumeMnt := &couchbasev2.VolumeMounts{}
-			podPolicy := &couchbasev2.PodPolicy{VolumeMounts: nil}
-			podPolicy.Resources = v1.ResourceRequirements{
-				Limits:   make(v1.ResourceList),
-				Requests: make(v1.ResourceList),
-			}
-			serverSettings.Pod = podPolicy
-			for setting := range config[key] {
-				switch setting {
-				case "name":
-					serverSettings.Name = config[key][setting]
-				case "size":
-					size, _ := strconv.Atoi(config[key][setting])
-					serverSettings.Size = size
-				case "services":
-					serverSettings.Services = couchbasev2.NewServiceList(strings.Split(config[key][setting], ","))
-				case "serverGroups":
-					serverSettings.ServerGroups = strings.Split(config[key][setting], ",")
-				case "resourceMemLimit":
-					if _, err := strconv.Atoi(config[key][setting]); err == nil {
-						serverSettings.Pod.Resources.Limits[v1.ResourceMemory] = resource.MustParse(config[key][setting] + "Mi")
-					}
-				case "resourceMemRequest":
-					if _, err := strconv.Atoi(config[key][setting]); err == nil {
-						serverSettings.Pod.Resources.Requests[v1.ResourceMemory] = resource.MustParse(config[key][setting] + "Mi")
-					}
-				case "defaultVolMnt":
-					if serverSettings.Pod.VolumeMounts == nil {
-						serverSettings.Pod.VolumeMounts = volumeMnt
-					}
-					serverSettings.Pod.VolumeMounts.DefaultClaim = config[key][setting]
-				case "indexVolMnt":
-					if serverSettings.Pod.VolumeMounts == nil {
-						serverSettings.Pod.VolumeMounts = volumeMnt
-					}
-					serverSettings.Pod.VolumeMounts.IndexClaim = config[key][setting]
-				case "dataVolMnt":
-					if serverSettings.Pod.VolumeMounts == nil {
-						serverSettings.Pod.VolumeMounts = volumeMnt
-					}
-					serverSettings.Pod.VolumeMounts.DataClaim = config[key][setting]
-				case "analyticsVolMnt":
-					if serverSettings.Pod.VolumeMounts == nil {
-						serverSettings.Pod.VolumeMounts = volumeMnt
-					}
-					serverSettings.Pod.VolumeMounts.AnalyticsClaims = strings.Split(config[key][setting], ",")
-				case "logVolMnt":
-					if serverSettings.Pod.VolumeMounts == nil {
-						serverSettings.Pod.VolumeMounts = volumeMnt
-					}
-					serverSettings.Pod.VolumeMounts.LogsClaim = config[key][setting]
-				}
-			}
-			spec.Servers = append(spec.Servers, serverSettings)
-
-		// Sets ExposedFeatures in ClusterSpec
-		case key == "exposedFeatures":
-			spec.Networking.ExposedFeatures = strings.Split(config[key]["featureNames"], ",")
-
-		// Updates AdminConsoleServices in ClusterSpec
-		case key == "adminConsoleServices":
-			for _, serviceName := range strings.Split(config[key]["services"], ",") {
-				spec.Networking.AdminConsoleServices = append(spec.Networking.AdminConsoleServices, couchbasev2.Service(serviceName))
-			}
-
-		// Sets ServerGroups in ClusterSpec
-		case key == "serverGroups":
-			spec.ServerGroups = strings.Split(config[key]["groupNames"], ",")
-
-		// Updates ClusterSpec settings like BaseImage, version, antiaffinity...
-		case strings.Contains(key, "other"):
-			for setting := range config[key] {
-				switch setting {
-				case "antiAffinity":
-					if config[key][setting] == "on" {
-						spec.AntiAffinity = true
-					} else if config[key][setting] == "off" {
-						spec.AntiAffinity = false
-					}
-				case "logRetentionTime":
-					spec.Logging.LogRetentionTime = config[key][setting]
-				case "logRetentionCount":
-					if logRetentionCount, err := strconv.Atoi(config[key][setting]); err == nil {
-						spec.Logging.LogRetentionCount = logRetentionCount
-					}
-				}
-			}
-		}
-	}
-	return spec
-}
-
 func CreateClusterCRD(genName string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
 	crd := NewClusterCRD(genName, spec)
 	if adminConsoleExposed {
@@ -558,11 +382,6 @@ func CreateClusterCRD(genName string, adminConsoleExposed bool, spec couchbasev2
 		}
 	}
 	return crd
-}
-
-func NewMultiCluster(genName, secretName string, config map[string]map[string]string, exposed bool) *couchbasev2.CouchbaseCluster {
-	spec := CreateClusterSpec(genName, secretName, config)
-	return CreateClusterCRD(genName, exposed, spec)
 }
 
 // Stateful 3 node cluster with a single volume.

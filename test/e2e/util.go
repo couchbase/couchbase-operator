@@ -128,14 +128,8 @@ var (
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,
 		"TestRzaCreateClusterWithClassBasedConfig": TestRzaCreateClusterWithClassBasedConfig,
 		"TestRzaResizeCluster":                     TestRzaResizeCluster,
-		"TestRzaServerGroupRemoval":                TestRzaServerGroupRemoval,
-		"TestRzaServerGroupAddition":               TestRzaServerGroupAddition,
-		"TestRzaNegScaleupCluster":                 TestRzaNegScaleupCluster,
-		"TestRzaServerGroupDown":                   TestRzaServerGroupDown,
 		"TestRzaAntiAffinityOn":                    TestRzaAntiAffinityOn,
 		"TestRzaAntiAffinityOff":                   TestRzaAntiAffinityOff,
-		"TestRzaUpdateK8SNodeLabelAndCrd":          TestRzaUpdateK8SNodeLabelAndCrd,
-		"TestRzaRemoveK8SNodeLabel":                TestRzaRemoveK8SNodeLabel,
 
 		// 5.5 feature - Eventing cases
 		"TestEventingCreateEventingCluster": TestEventingCreateEventingCluster,
@@ -149,10 +143,9 @@ var (
 		"TestAnalyticsKillPodsWithPVC": TestAnalyticsKillPodsWithPVC,
 
 		// 5.5 feature - Node Failover cases
-		"TestServerGroupAutoFailover":                         TestServerGroupAutoFailover,
-		"TestServerGroupWithSingleServiceNodeInFailoverGroup": TestServerGroupWithSingleServiceNodeInFailoverGroup,
-		"TestDiskFailureAutoFailover":                         TestDiskFailureAutoFailover,
-		"TestMultiNodeAutoFailover":                           TestMultiNodeAutoFailover,
+		"TestServerGroupAutoFailover": TestServerGroupAutoFailover,
+		"TestDiskFailureAutoFailover": TestDiskFailureAutoFailover,
+		"TestMultiNodeAutoFailover":   TestMultiNodeAutoFailover,
 
 		// Persistent Volume cases
 		"TestPersistentVolumeCreateCluster":          TestPersistentVolumeCreateCluster,
@@ -160,12 +153,10 @@ var (
 		"TestPersistentVolumeNodeFailover":           TestPersistentVolumeNodeFailover,
 		"TestPersistentVolumeKillAllPodsDeletePod":   TestPersistentVolumeKillAllPodsDeletePod,
 		"TestPersistentVolumeKillAllPodsKillService": TestPersistentVolumeKillAllPodsKillService,
-		"TestPersistentVolumeRemoveVolume":           TestPersistentVolumeRemoveVolume,
 		"TestPersistentVolumeKillPodAndOperator":     TestPersistentVolumeKillPodAndOperator,
 		"TestPersistentVolumeKillAllPodsAndOperator": TestPersistentVolumeKillAllPodsAndOperator,
 		"TestPersistentVolumeRzaNodesKilled":         TestPersistentVolumeRzaNodesKilled,
 		"TestPersistentVolumeRzaFailover":            TestPersistentVolumeRzaFailover,
-		"TestPersistentVolumeWithSingleNodeService":  TestPersistentVolumeWithSingleNodeService,
 		"TestPersistentVolumeResizeCluster":          TestPersistentVolumeResizeCluster,
 
 		// Supportability cases

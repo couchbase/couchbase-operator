@@ -15,6 +15,9 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/gocbmgr"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Test scaling a cluster with no buckets up and down
@@ -32,7 +35,7 @@ func TestResizeCluster(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
 	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
@@ -115,14 +118,11 @@ func TestEditClusterSettings(t *testing.T) {
 	newIndexStorageSetting := "plasma"
 
 	// Create the cluster.
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
+	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
+		couchbasev2.DataService, // No index service or we cannot update the index settings
 	}
-
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
@@ -214,23 +214,19 @@ func TestNodeUnschedulable(t *testing.T) {
 	allocatableMemory := e2eutil.MustGetMinNodeMem(t, targetKube)
 
 	// Create the cluster.
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := map[string]string{
-		"size":               "1",
-		"name":               "test_config_1",
-		"services":           "data",
-		"resourceMemRequest": strconv.Itoa(int(allocatableMemory * 0.7)),
+	testCouchbase := e2espec.NewBasicClusterSpec(1, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse(strconv.Itoa(int(allocatableMemory*0.7)) + "Mi"),
+			},
+		},
 	}
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-	}
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, false)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
-	// Scal up the cluster enhauting memory, We expect the last node to not schedule. When the
+	// Scales up the cluster exhausting memory, We expect the last node to not schedule. When the
 	// policy is removed the last node will be created successfully and the cluster rebalanced
 	// into a healthy state.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 5*time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Servers/0/Pod"), time.Minute)
@@ -414,12 +410,12 @@ func TestBasicMDSScaling(t *testing.T) {
 	// Static configuration.
 	clusterSize := 1
 
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1}
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
+		couchbasev2.DataService,
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// adding query service
 	t.Log("adding query service")
@@ -548,15 +544,12 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	// Static configuration.
 	clusterSize := 1
 
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data"})
-
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
+		couchbasev2.DataService,
 	}
-
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// adding query service
 	t.Log("adding query service")
@@ -708,15 +701,27 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	mdsGroup2Size := 1
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(mdsGroup1Size, "test_config_1", []string{"query", "index", "search"})
-	serviceConfig2 := e2eutil.GetServiceConfigMap(mdsGroup2Size, "test_config_2", []string{"data"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2}
-
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(mdsGroup1Size, constants.AdminHidden)
+	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
+		{
+			Name: "service1",
+			Size: mdsGroup1Size,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.QueryService,
+				couchbasev2.IndexService,
+				couchbasev2.SearchService,
+			},
+		},
+		{
+			Name: "service2",
+			Size: mdsGroup2Size,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+			},
+		},
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -745,19 +750,30 @@ func TestRemoveLastDataService(t *testing.T) {
 	mdsGroup2Size := 1
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(mdsGroup1Size, "test_config_1", []string{"data", "query", "index"})
-	serviceConfig2 := e2eutil.GetServiceConfigMap(mdsGroup2Size, "test_config_2", []string{"data"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2}
-
-	testCouchbase := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminHidden)
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(mdsGroup1Size, constants.AdminHidden)
+	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
+		{
+			Name: "service1",
+			Size: mdsGroup1Size,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+			},
+		},
+		{
+			Name: "service2",
+			Size: mdsGroup2Size,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+			},
+		},
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// create connection to couchbase nodes
-	removeServiceName := "test_config_2"
-	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
+	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, "service2", 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	serviceMap := map[string]int{

@@ -62,7 +62,7 @@ func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
 func supportsMultipleVolumeClaims(t *testing.T, cluster *types.Cluster) bool {
 	return cluster.SupportsMultipleVolumeClaims ||
 		e2eutil.MustNumNodes(t, cluster) == 1 ||
-		MustNumAvailabilityZones(t, cluster) == 1 ||
+		mustNumAvailabilityZones(t, cluster) == 1 ||
 		lazyBoundStorageClass(t, cluster)
 }
 
@@ -1497,7 +1497,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 
 	// Kill PV log enabled pods and verify the logs are persisted after pod deletion
 	for i, victim := range victims {
@@ -1518,7 +1518,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 
 	var validator eventschema.Validatable
 	switch podDownMethod {
@@ -1542,101 +1542,55 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 // Generic function to kill Cb server pod and update the server class in parallel
 // and check how operator handles the log retention as expected
 func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperatorKilledWithServerPod bool) {
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	operatorKilledErrChan := make(chan error)
-	clusterSize := 6
-	serverIndexToResize := 1
-	podMemberToKill := 3
-	pvcName := "couchbase-log-pv"
-	clusterConfig := e2eutil.BasicClusterConfig
-	clusterConfig["autoFailoverOnDiskIssues"] = "true"
-	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
-	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_1", []string{"data"})
-	serviceConfig1["defaultVolMnt"] = pvcName
+	// Static configuration.
+	mdsGroupSize := 3
+	clusterSize := mdsGroupSize * 2
+	resizedService := 1
+	victim := 3
 
-	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size3, "test_config_2", []string{"search", "query"})
-	serviceConfig2["logVolMnt"] = pvcName
-
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2,
-	}
-
-	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-
-	// Create Cb cluster
+	// Create the cluster (3 stateful nodes, 3 stateless nodes)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, f.Namespace, mdsGroupSize)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
-
-	// Add expected kube events for verification
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", "default")
-
-	// To cross check number of persistent vol claims matches the defined spec
-	expectedPvcMap := map[string]int{
+	// When ready, ensure the persistent volumes are allocated as expected.
+	mustVerifyPvcMappingForPods(t, targetKube, f.Namespace, map[string]int{
 		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 3): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 4): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 5): 1,
-	}
+	})
 
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-
-	// Trigger async Cluster's service config resize
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serverIndexToResize, constants.Size1, targetKube, cbCluster)
-
-	// Kill operator if flag is enabled
+	e2eutil.MustKillPodForMember(t, targetKube, cbCluster, victim, false)
 	if isOperatorKilledWithServerPod {
-		go func() {
-			operatorKilledErrChan <- e2eutil.KillOperatorAndWaitForRecovery(targetKube, f.Namespace)
-		}()
+		e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
+	}
+	cbCluster = e2eutil.MustResizeCluster(t, resizedService, 1, targetKube, cbCluster, 5*time.Minute)
+
+	mustVerifyPvcMappingForPods(t, targetKube, f.Namespace, map[string]int{
+		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 3): 1,
+	})
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Pod goes down and fails
+	// * Scales from 3 -> 1
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+		e2eutil.ClusterScaleDownSequence(2),
 	}
 
-	// Kill pod in parallel to resize
-	podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, podMemberToKill)
-	if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, metav1.NewDeleteOptions(0)); err != nil {
-		t.Fatal(err)
-	}
-	expectedEvents.AddClusterPodEvent(cbCluster, "MemberDown", podMemberToKill)
-
-	// If operator was killed, will waits for operator recovery to happen
-	if isOperatorKilledWithServerPod {
-		if err := <-operatorKilledErrChan; err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Wait for failover of killed server pod
-	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.NewMemberFailedOverEvent(cbCluster, podMemberToKill), 2*time.Minute)
-	expectedEvents.AddClusterPodEvent(cbCluster, "FailedOver", podMemberToKill)
-
-	// Wait for rebalance complete event
-	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", podMemberToKill)
-	expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", clusterSize-1)
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-
-	// Updating expectedPvcMap for resizing pods
-	expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, clusterSize-1)] = 0
-
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
 }
 
@@ -1691,117 +1645,56 @@ func TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess(t *testing.T) 
 // Deploys Couchbase server with log PV defined for server pods
 // Scale down the couchbase cluster and check log PVs cleanup has happened
 func TestEphemeralLogCollectResizeCluster(t *testing.T) {
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	clusterSize := 7
-	pvcName := "couchbase-log-pv"
-	serviceIndexToResize := 1
-	clusterConfig := e2eutil.BasicClusterConfig
-	clusterConfig["autoFailoverOnDiskIssues"] = "true"
-	clusterConfig["autoFailoverOnDiskIssuesTimeout"] = "30"
-	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_1", []string{"data"})
-	serviceConfig1["defaultVolMnt"] = pvcName
+	// Static configuration.
+	mdsGroupSize := 3
+	clusterSize := mdsGroupSize * 2
+	scaledService := 1
 
-	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size5, "test_config_2", []string{"search", "query", "eventing"})
-	serviceConfig2["logVolMnt"] = pvcName
-
-	otherConfig1 := map[string]string{
-		"logRetentionTime":  "2h",
-		"logRetentionCount": "3",
-	}
-
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2,
-		"other1":   otherConfig1,
-	}
-
-	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-
+	// Create the cluster (3 stateful and 3 stateless)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
+	cbCluster := e2espec.NewSupportableCluster(mdsGroupSize)
+	cbCluster.Spec.Logging.LogRetentionCount = 3
+	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, cbCluster)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 5*time.Minute)
-
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(cbCluster, "Create", "default")
-
-	// To cross check number of persistent vol claims matches the defined spec
-	expectedPvcMap := map[string]int{
+	// When ready, ensure the currect volumes are in place, then scale up and down.
+	// Expect only volumes to exist for live pods on completion.
+	mustVerifyPvcMappingForPods(t, targetKube, f.Namespace, map[string]int{
 		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 3): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 4): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 5): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 6): 1,
+	})
+
+	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 2, targetKube, cbCluster, 5*time.Minute)
+	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 4, targetKube, cbCluster, 5*time.Minute)
+	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 1, targetKube, cbCluster, 5*time.Minute)
+
+	mustVerifyPvcMappingForPods(t, targetKube, f.Namespace, map[string]int{
+		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
+		couchbaseutil.CreateMemberName(cbCluster.Name, 3): 1,
+	})
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Scales from 3 -> 2
+	// * Scales from 2 -> 4
+	// * Scales from 4 -> 1
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.ClusterScaleDownSequence(1),
+		e2eutil.ClusterScaleUpSequence(2),
+		e2eutil.ClusterScaleDownSequence(3),
 	}
 
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-
-	// Start resizing service config to 2 node service
-	serviceSize := constants.Size2
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube, cbCluster)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
-
-	// Add expected events
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-	for memberIndex := 4; memberIndex <= 6; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIndex)
-		memberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberIndex)
-		// Update expectedPvcMap for removed nodes
-		expectedPvcMap[memberName] = 0
-	}
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-
-	// Start resizing service config to 4 node service
-	serviceSize = constants.Size4
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube, cbCluster)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
-
-	// Add expected events
-	for memberIndex := 7; memberIndex <= 8; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(cbCluster, "AddNewMember", memberIndex)
-		memberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberIndex)
-		// Update expectedPvcMap for removed nodes
-		expectedPvcMap[memberName] = 1
-	}
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
-
-	// Start resizing service config to 4 node service
-	serviceSize = constants.Size1
-	cbCluster = e2eutil.MustResizeClusterNoWait(t, serviceIndexToResize, serviceSize, targetKube, cbCluster)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
-
-	// Add expected events
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceStarted")
-	for _, memberIndex := range []int{3, 7, 8} {
-		expectedEvents.AddClusterPodEvent(cbCluster, "MemberRemoved", memberIndex)
-		memberName := couchbaseutil.CreateMemberName(cbCluster.Name, memberIndex)
-		// Update expectedPvcMap for removed nodes
-		expectedPvcMap[memberName] = 0
-	}
-	expectedEvents.AddClusterEvent(cbCluster, "RebalanceCompleted")
-
-	// Verifying the persistence of log PVs are preserved by operator
-	MustVerifyPvcMappingForPods(t, targetKube, f.Namespace, expectedPvcMap)
 	ValidateEvents(t, targetKube, cbCluster, expectedEvents)
 }
 
@@ -1840,7 +1733,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	for i := 0; i < clusterSize; i++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
-	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 
 	// Kill stateless pods repeatedly waiting for recovery each time.
 	for victim := mdsGroupSize; victim < mdsGroupSize+victims; victim++ {
@@ -1852,7 +1745,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	for i := clusterSize; i < clusterSize+victims; i++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
-	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1912,7 +1805,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	for victim := 0; victim < victims-maxLogCount; victim++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, mdsGroupSize+victim)] = 0
 	}
-	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1940,25 +1833,25 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	clusterSize := constants.Size2
 	operatorKilledErrChan := make(chan error)
 	pvcName := "couchbase"
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
-	serviceConfig1["defaultVolMnt"] = pvcName
-	serviceConfig1["dataVolMnt"] = pvcName
-	serviceConfig1["indexVolMnt"] = pvcName
-	serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
-
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-	}
-
-	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
+	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
+	cbCluster := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
+	cbCluster.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
+		VolumeMounts: &couchbasev2.VolumeMounts{
+			DefaultClaim: pvcName,
+			DataClaim:    pvcName,
+			IndexClaim:   pvcName,
+			AnalyticsClaims: []string{
+				pvcName,
+			},
+		},
+	}
+	cbCluster.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+		pvcTemplate,
+	}
+	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, cbCluster)
 
 	// Kills operator pod in async way
 	if isOperatorKilledWithServerPod {
@@ -2126,18 +2019,9 @@ func TestLogRedactionVerify(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size1, "test_config_1", []string{"data"})
-	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_2", []string{"query", "index", "analytics"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2,
-	}
-
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
 
 	// Collect logs
 	args := argumentList{}
@@ -2194,26 +2078,26 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	clusterSize := constants.Size3
 	pvcName := "couchbase"
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(clusterSize, "test_config_1", []string{"data", "query", "index", "analytics"})
-	serviceConfig1["defaultVolMnt"] = pvcName
-	serviceConfig1["dataVolMnt"] = pvcName
-	serviceConfig1["indexVolMnt"] = pvcName
-	serviceConfig1["analyticsVolMnt"] = pvcName + "," + pvcName
 
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-	}
-
-	pvcTemplate1 := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	clusterSpec := e2eutil.CreateClusterSpec(targetKube.DefaultSecret.Name, configMap)
-	clusterSpec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{pvcTemplate1}
-
-	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustCreateClusterFromSpec(t, targetKube, f.Namespace, constants.AdminHidden, clusterSpec)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
+	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
+	cbCluster := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
+	cbCluster.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
+		VolumeMounts: &couchbasev2.VolumeMounts{
+			DefaultClaim: pvcName,
+			DataClaim:    pvcName,
+			IndexClaim:   pvcName,
+			AnalyticsClaims: []string{
+				pvcName,
+				pvcName,
+			},
+		},
+	}
+	cbCluster.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+		pvcTemplate,
+	}
+	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, cbCluster)
 
 	// Collect logs
 	args := argumentList{}
@@ -2293,26 +2177,16 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 	for i := 0; i < clusterSize+1; i++ {
 		pvcMapping[couchbaseutil.CreateMemberName(cluster2.Name, i)] = 1
 	}
-	MustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, pvcMapping)
+	mustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, pvcMapping)
 }
 
 func TestLogCollectListJson(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	clusterConfig := e2eutil.BasicClusterConfig
-	serviceConfig1 := e2eutil.GetServiceConfigMap(constants.Size1, "test_config_1", []string{"data"})
-	serviceConfig2 := e2eutil.GetServiceConfigMap(constants.Size2, "test_config_2", []string{"query", "index", "analytics"})
-	configMap := map[string]map[string]string{
-		"cluster":  clusterConfig,
-		"service1": serviceConfig1,
-		"service2": serviceConfig2,
-	}
-
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewClusterMulti(t, targetKube, f.Namespace, configMap, constants.AdminExposed)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, cbCluster, 2*time.Minute)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
 
 	// Collect logs
 	args := argumentList{}
