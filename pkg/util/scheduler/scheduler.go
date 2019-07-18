@@ -1,12 +1,14 @@
 package scheduler
 
 import (
-	"io"
-
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("scheduler")
 
 // Scheduler is an abstraction for something that is able to inspect the cluster
 // and make intelligent decisions about which server groups to add pods to or
@@ -24,7 +26,7 @@ type Scheduler interface {
 	Upgrade(class, name string) error
 
 	// LogStatus writes out the status to a writer.
-	LogStatus(io.Writer) error
+	LogStatus(cluster string)
 }
 
 // New is a factory method to return the correct scheduler type for

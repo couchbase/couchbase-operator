@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -409,11 +408,8 @@ func (c *Cluster) logUpdate(old, new interface{}) {
 		log.Error(err, "YAML marshal failed", "cluster", c.cluster.Name)
 	}
 
-	log.Info("Resource updated", "cluster", c.cluster.Name)
 	diff := cmp.Diff(string(oldBytes), string(newBytes))
-	for _, m := range strings.Split(diff, "\n") {
-		log.Info(m, "cluster", c.cluster.Name)
-	}
+	log.Info("Resource updated", "cluster", c.cluster.Name, "diff", diff)
 }
 
 func (c *Cluster) updateCRStatus() error {
@@ -834,15 +830,6 @@ func (c *Cluster) decPodIndex() error {
 }
 
 func (c *Cluster) logStatus(status *couchbaseutil.ClusterStatus) {
-	// We are performing an action log the cluster status
-	b := &bytes.Buffer{}
-	if err := status.LogStatus(b); err != nil {
-		log.Error(err, "Cluster status dump failed", "cluster", c.cluster.Name)
-	}
-	if err := c.scheduler.LogStatus(b); err != nil {
-		log.Error(err, "Scheduler status dump failed", "cluster", c.cluster.Name)
-	}
-	for _, line := range strings.Split(b.String(), "\n") {
-		log.Info(line, "cluster", c.cluster.Name)
-	}
+	status.LogStatus(c.cluster.Name)
+	c.scheduler.LogStatus(c.cluster.Name)
 }

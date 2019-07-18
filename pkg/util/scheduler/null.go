@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"fmt"
-	"io"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -88,6 +87,5 @@ func (sched *nullSchedulerImpl) Upgrade(class, name string) error {
 }
 
 // LogStatus returns nothing
-func (sched *nullSchedulerImpl) LogStatus(w io.Writer) error {
-	return nil
+func (sched *nullSchedulerImpl) LogStatus(cluster string) {
 }

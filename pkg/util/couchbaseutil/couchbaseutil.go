@@ -4,14 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
-	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/gocbmgr"
@@ -180,6 +178,7 @@ type nodeStatus struct {
 	name    string
 	version string
 	class   string
+	managed bool
 	state   string
 }
 
@@ -269,31 +268,18 @@ func (cs *ClusterStatus) addMemberToStateSet(state NodeState, member *Member) er
 }
 
 // logClusterStatus logs the overal cluster status e.g. balanced condition
-func (cs *ClusterStatus) logClusterStatus(w io.Writer) error {
-	states := []string{}
-
+func (cs *ClusterStatus) logClusterStatus(cluster string) {
 	// A cluster is either balanced or not
+	balance := "balanced"
 	if cs.NeedsRebalance {
-		states = append(states, "unbalanced")
-	} else {
-		states = append(states, "balanced")
+		balance = "unbalanced"
 	}
 
-	// A cluster may be rebalancing
-	if cs.IsRebalancing {
-		states = append(states, "rebalancing")
-	}
-
-	_, err := w.Write([]byte(fmt.Sprintf("Cluster status: %s\n", strings.Join(states, "+"))))
-	return err
+	log.Info("Cluster status", "cluster", cluster, "balance", balance, "rebalancing", cs.IsRebalancing)
 }
 
 // logClusterNodeStatus logs the individual node statuses
-func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
-	if _, err := w.Write([]byte("Node status:\n")); err != nil {
-		return err
-	}
-
+func (cs *ClusterStatus) logClusterNodeStatus(cluster string) {
 	// Sort the names so it's easier to grok
 	names := []string{}
 	for name := range cs.managedNodes {
@@ -309,11 +295,8 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 
 	for _, name := range names {
 		// All members are managed
-		states := []string{"managed"}
-
 		// And they will exist in one state
 		state := cs.NodeStateMap[name]
-		states = append(states, state.String())
 
 		// Buffer up the status entry
 		class := cs.managedNodes[name].ServerConfig
@@ -323,7 +306,8 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 			name:    name,
 			version: version,
 			class:   class,
-			state:   strings.Join(states, "+"),
+			managed: true,
+			state:   state.String(),
 		}
 		statuses = append(statuses, status)
 
@@ -340,20 +324,20 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 	sort.Strings(cs.UnmanagedNodes)
 
 	for _, name := range cs.UnmanagedNodes {
-		states := []string{"unmanaged"}
-
 		// Ignore the error, if we've added the unmanaged node it has to exist in the node info.
 		node, _ := cs.getNode(name)
 
 		// Report the current state the unmanaged node is in, again ignore the error here as
 		// it will return invalid if an error occurs.
 		state, _ := getNodeState(node)
-		states = append(states, state.String())
 
 		// Buffer up the status entry
 		status := nodeStatus{
-			name:  name,
-			state: strings.Join(states, "+"),
+			name:    name,
+			version: "unknown",
+			class:   "unknown",
+			managed: false,
+			state:   state.String(),
 		}
 
 		statuses = append(statuses, status)
@@ -364,25 +348,15 @@ func (cs *ClusterStatus) logClusterNodeStatus(w io.Writer) error {
 		}
 	}
 
-	// Format our table
-	table := prettytable.Table{
-		Header: prettytable.Row{"Server", "Version", "Class", "Status"},
-	}
 	for _, status := range statuses {
-		table.Rows = append(table.Rows, prettytable.Row{status.name, status.version, status.class, status.state})
+		log.Info("Node status", "cluster", cluster, "name", status.name, "version", status.version, "class", status.class, "managed", status.managed, "status", status.state)
 	}
-	return table.Write(w)
 }
 
 // Logs the cluster status
-func (cs *ClusterStatus) LogStatus(w io.Writer) error {
-	if err := cs.logClusterStatus(w); err != nil {
-		return err
-	}
-	if err := cs.logClusterNodeStatus(w); err != nil {
-		return err
-	}
-	return nil
+func (cs *ClusterStatus) LogStatus(cluster string) {
+	cs.logClusterStatus(cluster)
+	cs.logClusterNodeStatus(cluster)
 }
 
 // Are all managed nodes healthy? e.g. in the active state
@@ -625,7 +599,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 		})
 }
 
-func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait bool) error {
+func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait bool, cluster string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "rebalance", c.clusterName,
 		func() error {
@@ -643,9 +617,9 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait b
 					}
 					switch status.Status {
 					case cbmgr.RebalanceStatusUnknown:
-						log.Info("Rebalancing", "progress", "unknown")
+						log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
 					case cbmgr.RebalanceStatusRunning:
-						log.Info("Rebalancing", "progress", status.Progress)
+						log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
 					}
 				}
 			}

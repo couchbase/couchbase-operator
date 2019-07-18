@@ -2,12 +2,10 @@ package scheduler
 
 import (
 	"fmt"
-	"io"
 	"sort"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"k8s.io/api/core/v1"
 )
 
@@ -145,11 +143,7 @@ func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
 }
 
 // LogStatus writes formatted state for debugging
-func (sched *stripeSchedulerImpl) LogStatus(w io.Writer) error {
-	if _, err := w.Write([]byte("Scheduler status:\n")); err != nil {
-		return err
-	}
-
+func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 	// Remember the classes/groups so we can do an ordered/sorted traversal
 	mapClass := map[string]interface{}{}
 	mapGroup := map[string]interface{}{}
@@ -173,12 +167,6 @@ func (sched *stripeSchedulerImpl) LogStatus(w io.Writer) error {
 	sort.Strings(listClass)
 	sort.Strings(listGroup)
 
-	// Make a new table
-	table := prettytable.Table{
-		Header: prettytable.Row{"Class", "Zone", "Server"},
-	}
-
-	// Populate the rows
 	for _, class := range listClass {
 		for _, group := range listGroup {
 			// The class may not contain a particular group, and that may contain no
@@ -189,11 +177,8 @@ func (sched *stripeSchedulerImpl) LogStatus(w io.Writer) error {
 			}
 			servers.sort()
 			for _, server := range servers.servers {
-				table.Rows = append(table.Rows, prettytable.Row{class, group, server})
+				log.Info("Scheduler status", "cluster", cluster, "name", server, "class", class, "group", group)
 			}
 		}
 	}
-
-	// And write out the table
-	return table.Write(w)
 }

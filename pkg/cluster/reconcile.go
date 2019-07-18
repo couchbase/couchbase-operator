@@ -322,7 +322,7 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 
 	// Perform the operation
 	nodesToRemove := append(managed.HostURLsPlaintext(), unmanaged...)
-	if err := c.client.Rebalance(c.members, nodesToRemove, true); err != nil {
+	if err := c.client.Rebalance(c.members, nodesToRemove, true, c.cluster.Name); err != nil {
 		return err
 	}
 
