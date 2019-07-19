@@ -33,7 +33,7 @@ func TestExposedFeatureIP(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
 	}
@@ -67,7 +67,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
@@ -114,7 +114,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
@@ -170,7 +170,7 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
@@ -220,8 +220,12 @@ func TestConsoleServiceDNS(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Name = clusterName
+	testCouchbase.Spec.Networking.ExposeAdminConsole = true
+	testCouchbase.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
+		couchbasev2.DataService,
+	}
 	testCouchbase.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
 	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
@@ -263,8 +267,12 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Name = clusterName
+	testCouchbase.Spec.Networking.ExposeAdminConsole = true
+	testCouchbase.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
+		couchbasev2.DataService,
+	}
 	testCouchbase.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
 	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,
@@ -315,8 +323,12 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOptions)
 	defer teardown()
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminExposed)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Name = clusterName
+	testCouchbase.Spec.Networking.ExposeAdminConsole = true
+	testCouchbase.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
+		couchbasev2.DataService,
+	}
 	testCouchbase.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeLoadBalancer
 	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
 		Domain: domain,

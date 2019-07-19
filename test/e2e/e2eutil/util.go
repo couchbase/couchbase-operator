@@ -107,32 +107,15 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace str
 	return cluster
 }
 
-// Creates Couchbase cluster object and returns it
-func CreateClusterFromSpecSystemTest(t *testing.T, k8s *types.Cluster, namespace string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
-	crd := e2espec.CreateClusterCRD(constants.ClusterNamePrefix, adminConsoleExposed, spec)
-	if ctx != nil {
-		crd.Name = ctx.ClusterName
-		crd.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-			Static: &couchbasev2.StaticTLS{
-				Member: &couchbasev2.MemberSecret{
-					ServerSecret: ctx.ClusterSecretName,
-				},
-				OperatorSecret: ctx.OperatorSecretName,
-			},
-		}
-	}
-	return newClusterFromSpec(t, k8s, namespace, crd)
-}
-
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
+func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewClusterBasic(t, k8s, namespace, size, exposed)
+func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewClusterBasic(t, k8s, namespace, size)
 	if err != nil {
 		Die(t, err)
 	}
@@ -140,8 +123,8 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 }
 
 // NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
-func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
+func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
@@ -154,8 +137,8 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewTLSClusterBasic(t, k8s, namespace, size, exposed, ctx)
+func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewTLSClusterBasic(t, k8s, namespace, size, ctx)
 	if err != nil {
 		Die(t, err)
 	}
@@ -163,8 +146,8 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 }
 
 // NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
-func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
+func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
@@ -178,15 +161,15 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 }
 
 // MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification
-func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) {
-	if _, err := NewTLSClusterBasicNoWait(t, k8s, namespace, size, exposed, ctx); err == nil {
+func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) {
+	if _, err := NewTLSClusterBasicNoWait(t, k8s, namespace, size, ctx); err == nil {
 		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
 }
 
 // NewTlsXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
-func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
+func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
@@ -199,8 +182,8 @@ func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewTlsXdcrClusterBasic(t, k8s, namespace, size, exposed, ctx)
+func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewTlsXdcrClusterBasic(t, k8s, namespace, size, ctx)
 	if err != nil {
 		Die(t, err)
 	}
@@ -209,8 +192,8 @@ func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace stri
 
 // NewXdcrClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
-func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
+func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		Die(t, err)
@@ -219,28 +202,28 @@ func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 	return cluster, err
 }
 
-func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewXdcrClusterBasic(t, k8s, namespace, size, exposed)
+func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewXdcrClusterBasic(t, k8s, namespace, size)
 	if err != nil {
 		Die(t, err)
 	}
 	return cluster
 }
 
-func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
+func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an
 // error is encountered and performing garbage collection
-func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewStatefulCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size, exposed)
+func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewStatefulCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewStatefulCluster(t, k8s, namespace, size, exposed)
+func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewStatefulCluster(t, k8s, namespace, size)
 	if err != nil {
 		Die(t, err)
 	}
@@ -762,7 +745,7 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *co
 	return nil, NewErrServerConfigNotFound(m.ServerConfig)
 }
 
-func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) error {
+func deleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) error {
 	name, err := GetOperatorName(kubeCli, namespace)
 	if err != nil {
 		return err
@@ -771,13 +754,13 @@ func DeleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) err
 }
 
 func MustDeleteCouchbaseOperator(t *testing.T, k8s *types.Cluster, namespace string) {
-	if err := DeleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
+	if err := deleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
 		Die(t, err)
 	}
 }
 
 func KillOperatorAndWaitForRecovery(k8s *types.Cluster, namespace string) error {
-	if err := DeleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
+	if err := deleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
 		return fmt.Errorf("failed to kill couchbase operator: %v", err)
 	}
 
@@ -1003,7 +986,7 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, n
 		return err
 	}
 	for _, pod := range pods.Items {
-		err := DeletePod(t, kubeClient, pod.Name, namespace)
+		err := deletePod(t, kubeClient, pod.Name, namespace)
 		if err != nil {
 			return err
 		}
@@ -1015,7 +998,7 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, n
 	return nil
 }
 
-func DeletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace string) error {
+func deletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace string) error {
 	t.Logf("deleting pod: %v", podName)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -1104,7 +1087,7 @@ func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, membe
 		return
 	}
 
-	if err := DeletePod(t, k8s.KubeClient, member, namespace); err != nil {
+	if err := deletePod(t, k8s.KubeClient, member, namespace); err != nil {
 		Die(t, err)
 	}
 }

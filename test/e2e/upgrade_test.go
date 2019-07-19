@@ -155,7 +155,7 @@ func TestUpgrade(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
@@ -192,7 +192,7 @@ func TestUpgradeRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point revert.  The cluster will
@@ -238,7 +238,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -283,7 +283,7 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// When the cluster is ready, start the upgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -303,7 +303,7 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// When the cluster is ready, start the downgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -323,7 +323,7 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point try rollabck to an illegal version.

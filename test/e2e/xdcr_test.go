@@ -107,8 +107,8 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminHidden)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminHidden)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -183,8 +183,8 @@ func TestXdcrCreateCluster(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminHidden)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminHidden)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -227,8 +227,8 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, xdcrCluster1Size, constants.AdminHidden)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, xdcrCluster2Size, constants.AdminHidden)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, xdcrCluster1Size)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, xdcrCluster2Size)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -277,8 +277,8 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminHidden)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminHidden)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -325,8 +325,8 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminHidden)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminHidden)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -377,8 +377,8 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, constants.AdminHidden, tls1)
-	xdcrCluster2 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, constants.AdminHidden, tls2)
+	xdcrCluster1 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, tls1)
+	xdcrCluster2 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, tls2)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 

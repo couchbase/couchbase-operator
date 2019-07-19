@@ -89,7 +89,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		},
 	}
 
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = 1024
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
@@ -118,7 +118,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 
 	currentBuckets, err := client.GetBuckets()
 	if err != nil && len(currentBuckets) != 0 {
-		t.Fatalf("failed to see no buckets from client")
+		e2eutil.Die(t, fmt.Errorf("failed to see no buckets from client"))
 	}
 
 	// Check the events match what we expect:
@@ -141,7 +141,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
@@ -186,7 +186,7 @@ func TestEditBucket(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustNewBucket(t, kubernetes, f.Namespace, e2espec.DefaultBucket)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, constants.Size1, constants.AdminExposed)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, constants.Size1)
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create a direct connection to a couchbase node.
@@ -221,7 +221,6 @@ func TestEditBucket(t *testing.T) {
 	// * Cluster created
 	// * Bucket edited N times
 	expectedEvents := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: 9, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
@@ -250,7 +249,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
@@ -292,7 +291,7 @@ func TestBucketUnmanaged(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 
 	// Create a cluster with buckets unmanaged.
-	couchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	couchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	couchbase.Spec.Buckets.Managed = false
 	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, couchbase)
 
@@ -332,7 +331,7 @@ func TestBucketSelection(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
 
 	// Create a cluster that selects only labelled buckets.
-	couchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	couchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	couchbase.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}

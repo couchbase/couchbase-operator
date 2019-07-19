@@ -602,7 +602,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	// Validate args which won't produce output file
 	for _, arg := range []string{"--help", "--version"} {
 		if _, err := runCbopinfoCmd([]string{arg}); err != nil {
-			t.Fatalf("Failed while providing arg %s: %v", arg, err)
+			e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %v", arg, err))
 		}
 	}
 
@@ -645,7 +645,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 
 	// Deploy cb server for cbopinfo validation
-	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
+	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1)
 
 	for _, arg := range validArgumentList {
 		t.Run(arg.Name, func(t *testing.T) {
@@ -657,7 +657,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			execOutStr := strings.TrimSpace(string(execOut))
 			t.Logf("Returned: %s\n", execOutStr)
 			if err != nil {
-				t.Fatalf("Failed while providing arg %s: %v", arg.Arg, err)
+				e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %v", arg.Arg, err))
 			}
 			logFileName := getLogFileNameFromExecOutput(execOutStr)
 			defer os.Remove(logFileName)
@@ -665,7 +665,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			logFileDir := strings.Split(logFileName, ".")[0]
 			defer os.RemoveAll(logFileDir)
 			if err := untarGzFile(logFileName); err != nil {
-				t.Fatalf("Failed to untar file %s: %v", logFileName, err)
+				e2eutil.Die(t, fmt.Errorf("Failed to untar file %s: %v", logFileName, err))
 			}
 
 			// Check command fails with missing argument value
@@ -676,17 +676,17 @@ func TestLogCollectValidateArguments(t *testing.T) {
 				execOutStr := strings.TrimSpace(string(execOut))
 				t.Logf("Returned: %s\n", execOutStr)
 				if err == nil {
-					t.Fatalf("Command executed successfully without providing value for %s: %v", arg.Arg, err)
+					e2eutil.Die(t, fmt.Errorf("Command executed successfully without providing value for %s: %v", arg.Arg, err))
 				}
 
 				// Verify valid error message
 				if !strings.Contains(execOutStr, arg.ExpectedErr) {
-					t.Fatalf("Invalid error for missing arg value %s\nExpected: %v\nReceived: %v", arg.Arg, arg.ExpectedErr, execOutStr)
+					e2eutil.Die(t, fmt.Errorf("Invalid error for missing arg value %s\nExpected: %v\nReceived: %v", arg.Arg, arg.ExpectedErr, execOutStr))
 				}
 
 				// Check no output file is generated
 				if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
-					t.Fatalf("File created with missing argument for %s", arg.Arg)
+					e2eutil.Die(t, fmt.Errorf("File created with missing argument for %s", arg.Arg))
 				}
 			}
 		})
@@ -810,19 +810,19 @@ func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
 
 	go func() {
 		var err error
-		cluster1, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster1Size, constants.AdminHidden)
+		cluster1, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster1Size)
 		cluster1Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster2, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster2Size, constants.AdminHidden)
+		cluster2, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster2Size)
 		cluster2Err <- err
 	}()
 
 	go func() {
 		var err error
-		cluster3, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster3Size, constants.AdminHidden)
+		cluster3, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster3Size)
 		cluster3Err <- err
 	}()
 
@@ -1109,7 +1109,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1)
 
 	// Create a service account with no permissions.
 	if err := framework.RecreateServiceAccount(targetKube.KubeClient, f.Namespace, cluster.Name); err != nil {
@@ -1235,7 +1235,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	}
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 	defer e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
@@ -1324,7 +1324,7 @@ func TestExtendedDebugWithInvalidValues(t *testing.T) {
 	cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
 	// Collect logs with invalid operator-image-name
 	t.Log("Collecting logs using invalid -operator-image arg value")
@@ -1413,7 +1413,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
 	t.Log("Collecting logs using invalid operator-image value")
 	args := argumentList{}
@@ -1424,9 +1424,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
 
-	if err := e2eutil.DeleteCouchbaseOperator(targetKube.KubeClient, f.Namespace); err != nil {
-		e2eutil.Die(t, err)
-	}
+	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
 
 	// Collect logs when operator pod goes down in parallel
 	t.Log("Starting log collection")
@@ -1836,7 +1834,7 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	cbCluster := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	cbCluster := e2espec.NewBasicClusterSpec(clusterSize)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	cbCluster.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -1862,13 +1860,11 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 
 	// Delete pod with default persistent volumes defined for it
 	for podMemberToKill, podDownMethod := range serverMemberIdToKill {
-		podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, podMemberToKill)
 		switch podDownMethod {
 		case "deletePod":
-			if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podNameToKill, metav1.NewDeleteOptions(0)); err != nil {
-				t.Fatal(err)
-			}
+			e2eutil.MustKillPodForMember(t, targetKube, cbCluster, podMemberToKill, false)
 		case "killServerProcess":
+			podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, podMemberToKill)
 			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podNameToKill, "pkill beam.smp")
 		}
 	}
@@ -2021,7 +2017,7 @@ func TestLogRedactionVerify(t *testing.T) {
 
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3)
 
 	// Collect logs
 	args := argumentList{}
@@ -2081,7 +2077,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	cbCluster := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	cbCluster := e2espec.NewBasicClusterSpec(clusterSize)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	cbCluster.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -2186,7 +2182,7 @@ func TestLogCollectListJson(t *testing.T) {
 
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3)
 
 	// Collect logs
 	args := argumentList{}

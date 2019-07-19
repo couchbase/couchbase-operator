@@ -85,11 +85,6 @@ const (
 )
 
 const (
-	WithBucket    = true
-	WithoutBucket = false
-	AdminExposed  = true
-	AdminHidden   = false
-
 	BucketFlushEnabled   = true
 	BucketFlushDisabled  = false
 	IndexReplicaEnabled  = true

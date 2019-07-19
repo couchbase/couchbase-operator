@@ -23,7 +23,7 @@ func TestStatusRecovery(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// Runtime configuration.
 	uuid := cluster.Status.ClusterID

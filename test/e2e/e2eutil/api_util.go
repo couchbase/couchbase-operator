@@ -2,6 +2,7 @@ package e2eutil
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -31,9 +32,10 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (E
 		if item.Reason == "FailedToUpdateEndpoint" {
 			continue
 		}
-		events.AddEvent(item)
+		events = append(events, item)
 	}
 
+	sort.Sort(events)
 	return events, nil
 }
 

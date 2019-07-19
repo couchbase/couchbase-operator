@@ -25,7 +25,7 @@ func TestPauseOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
 	// Pause the operator, kill a pod, ensure nothing comes back from the dead, then reenable the operator.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
@@ -64,7 +64,7 @@ func TestKillOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
 	// Kill the operator, wait for recovery and make sure nothing bad happened to the cluster.
 	e2eutil.MustKillOperatorAndWaitForRecovery(t, targetKube, f.Namespace)
@@ -90,7 +90,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminExposed)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// When the cluster is ready, pause the operator, and await aknowledgement.  Manually update the bucket, then kill
@@ -107,7 +107,6 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	// * Cluster created
 	// * Bucket edited (reverted)
 	expectedEvents := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},

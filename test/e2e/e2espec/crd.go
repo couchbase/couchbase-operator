@@ -218,7 +218,7 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster) {
 }
 
 // basic 3 node cluster
-func NewBasicCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
+func NewBasicCluster(genName, secretName string, size int) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
@@ -243,17 +243,10 @@ func NewBasicCluster(genName, secretName string, size int, exposed bool) *couchb
 			},
 		}},
 	}
-	crd := NewClusterCRD(genName, spec)
-	if exposed {
-		crd.Spec.Networking.ExposeAdminConsole = true
-		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
-			couchbasev2.DataService,
-		}
-	}
-	return crd
+	return NewClusterCRD(genName, spec)
 }
 
-func NewBasicClusterSpec(size int, console bool) *couchbasev2.CouchbaseCluster {
+func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
@@ -276,14 +269,7 @@ func NewBasicClusterSpec(size int, console bool) *couchbasev2.CouchbaseCluster {
 			},
 		}},
 	}
-	crd := NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
-	if console {
-		crd.Spec.Networking.ExposeAdminConsole = true
-		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
-			couchbasev2.DataService,
-		}
-	}
-	return crd
+	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
 // NewSupportableClusterSpec returns a basic supportable cluster spec with a stateful and stateless
@@ -364,7 +350,7 @@ func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
 }
 
 // basic 3 node cluster with Xdcr cluster
-func NewBasicXdcrCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
+func NewBasicXdcrCluster(genName, secretName string, size int) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
@@ -389,32 +375,18 @@ func NewBasicXdcrCluster(genName, secretName string, size int, exposed bool) *co
 	}
 	spec.ClusterSettings.AutoFailoverTimeout = 30
 	spec.ClusterSettings.AutoFailoverMaxCount = 3
-	crd := NewClusterCRD(genName, spec)
-	if exposed {
-		crd.Spec.Networking.ExposeAdminConsole = true
-		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
-			couchbasev2.DataService,
-		}
-	}
-	return crd
+	return NewClusterCRD(genName, spec)
 }
 
-func CreateClusterCRD(genName string, adminConsoleExposed bool, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
-	crd := NewClusterCRD(genName, spec)
-	if adminConsoleExposed {
-		crd.Spec.Networking.ExposeAdminConsole = true
-		crd.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
-			couchbasev2.DataService,
-		}
-	}
-	return crd
+func CreateClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
+	return NewClusterCRD(genName, spec)
 }
 
 // Stateful 3 node cluster with a single volume.
 // Spec will request 1Gb of storage (minikube default is 5gb).
-func NewStatefulCluster(genName, secretName string, size int, exposed bool) *couchbasev2.CouchbaseCluster {
+func NewStatefulCluster(genName, secretName string, size int) *couchbasev2.CouchbaseCluster {
 
-	crd := NewBasicCluster(genName, secretName, size, exposed)
+	crd := NewBasicCluster(genName, secretName, size)
 	couchbase := "couchbase"
 	crd.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: couchbase},

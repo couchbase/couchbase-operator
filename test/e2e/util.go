@@ -222,7 +222,7 @@ var (
 	}
 )
 
-func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, events e2eutil.EventValidator) {
+func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, events []eventschema.Validatable) {
 	clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, couchbase.Name, couchbase.Namespace)
 	if err != nil {
 		t.Error(err)

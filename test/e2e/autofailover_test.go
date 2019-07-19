@@ -1,14 +1,12 @@
 package e2e
 
 import (
-	"reflect"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -31,7 +29,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 10
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
@@ -41,18 +39,8 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
-	expectedRzaResultMap := getExpectedRzaResultMap(clusterSize, availableServerGroupList)
-
-	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err := getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-
-	// Cross check it matches the expected values
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	victimGroup := 0
 	victims := []int{}
@@ -69,17 +57,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
-
-	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err = getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-
-	// Cross check it matches the expected values
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -109,7 +87,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	victimCount := len(victims)
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketThreeReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true

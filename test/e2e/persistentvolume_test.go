@@ -2,9 +2,7 @@ package e2e
 
 import (
 	"context"
-	"errors"
-	"reflect"
-	"sort"
+	"fmt"
 	"testing"
 	"time"
 
@@ -66,7 +64,7 @@ func verifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string,
 				return err
 			} else if len(pvcList.Items) != pvcCount {
 				t.Logf("Persistent volume claims not created as expected for %s. Has %d volume, expected %d", memberName, len(pvcList.Items), pvcCount)
-				return errors.New("PVC mapping verification failed")
+				return fmt.Errorf("pvc mapping verification failed")
 			}
 		}
 		return nil
@@ -75,10 +73,7 @@ func verifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string,
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
-		// Sleep before next poll
-		return pvcMappingVerify()
-	})
+	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", pvcMappingVerify)
 }
 
 func mustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int) {
@@ -99,7 +94,7 @@ func persistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	pvcName := "couchbase"
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 10
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
@@ -113,36 +108,13 @@ func persistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	// For event validation scheme
-	memberDownEvents := e2eutil.EventValidator{}
-	memberRecoveredEvents := e2eutil.EventValidator{}
-
 	// Kill couchbase server pods in cluster and test auto failover
 	for _, podMemberId := range podMembersToKill {
-		podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-		if err := e2eutil.DeletePod(t, targetKube.KubeClient, podMemberName, f.Namespace); err != nil {
-			t.Fatal(err)
-		}
-		memberDownEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
-		memberRecoveredEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberId, false)
 	}
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-
-	// For event schema validation
-	expectedEvents.AddParallelEvents(memberDownEvents)
-	expectedEvents.AddParallelEvents(memberRecoveredEvents)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 
 	// Execute this test code only in case of kubernetes cluster,
 	// since openshift container does not have permissions to execute in privileged mode
@@ -152,13 +124,9 @@ func persistentVolumeNodeFailoverGeneric(t *testing.T, clusterSize int, podMembe
 			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
 			e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "pkill beam.smp")
 		}
-		expectedEvents.AddParallelEvents(memberDownEvents)
-		expectedEvents.AddParallelEvents(memberRecoveredEvents)
 
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -179,7 +147,7 @@ func persistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	pvcName := "couchbase"
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
@@ -194,67 +162,18 @@ func persistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int,
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	memberDownEvents := e2eutil.EventValidator{}
-	memberRecoveredEvents := e2eutil.EventValidator{}
-
 	// Kill couchbase server pods in cluster and test auto failover
-	killPodsErrChan := make(chan error)
-	go func() {
-		for _, podMemberId := range podMembersToKill {
-			podMemberName := couchbaseutil.CreateMemberName(testCouchbase.Name, podMemberId)
-			if err := k8sutil.DeletePod(targetKube.KubeClient, f.Namespace, podMemberName, &metav1.DeleteOptions{}); err != nil {
-				killPodsErrChan <- err
-			}
-			memberDownEvents.AddClusterPodEvent(testCouchbase, "MemberDown", podMemberId)
-			memberRecoveredEvents.AddClusterPodEvent(testCouchbase, "MemberRecovered", podMemberId)
-		}
-		killPodsErrChan <- nil
-	}()
-
-	// kill couchbase operator
-	operatorPodList, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseOperatorLabel})
-	if err != nil {
-		t.Fatal(err)
+	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
+	for _, victim := range podMembersToKill {
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
 	}
-	for _, operatorPod := range operatorPodList.Items {
-		if err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(operatorPod.Name, &metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("Failed to kill operator pod %s: %v", operatorPod.Name, err)
-		}
-	}
-
-	// Wait to cb-server pods kill to complete
-	if err := <-killPodsErrChan; err != nil {
-		t.Fatalf("Unable to kill requested pods: %v", err)
-	}
-
-	podMembersToKillLen := len(podMembersToKill)
-	if podMembersToKillLen == clusterSize {
-		// All cluster pods are killed, should get one less than all events since first pod
-		// event will not have the respective event, but recovered event will be registered
-		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
-		for index := 1; index < podMembersToKillLen; index++ {
-			expectedEvents.AddAnyOfEvents(memberDownEvents)
-		}
-		for index := 1; index < podMembersToKillLen; index++ {
-			expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
-		}
-	} else {
-		// If some pods are killed, should get all member down and recovered events
-		expectedEvents.AddAnyOfEvents(memberDownEvents)
-		expectedEvents.AddAnyOfEvents(memberRecoveredEvents)
-	}
-
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, len(podMembersToKill)),
+	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -330,7 +249,7 @@ func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
 	pvcName := "couchbase"
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
@@ -377,7 +296,7 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 	pvcName := "couchbase"
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
@@ -441,7 +360,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ServerGroups = availableServerGroups
@@ -458,17 +377,8 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Create a expected RZA results map for verification
-	sort.Strings(availableServerGroups)
-	expectedRzaResultMap := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-
-	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err := getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// kill the first N pods where N is the no of server groups
 	victims := []int{}
@@ -485,13 +395,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
-	deployedRzaGroupsMap, err = getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Logf("Failed to get deployed Rza map: %v", err)
-	}
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -523,7 +427,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
@@ -542,18 +446,8 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create a expected RZA results map for verification
-	sort.Strings(availableServerGroups)
-	expectedRzaResultMap := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-
-	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err := getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-	// Cross check rza deployment matches the expected values
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// Kill nodes in 1st server group
 	victimGroup := 0
@@ -573,13 +467,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
-	deployedRzaGroupsMap, err = getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -613,7 +501,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	pvcName := "couchbase"
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
@@ -642,7 +530,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 		podList, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + testCouchbase.Name})
 		if err != nil {
-			t.Fatalf("Failed to fetch pod list: %v", err)
+			e2eutil.Die(t, fmt.Errorf("Failed to fetch pod list: %v", err))
 		}
 		for _, pod := range podList.Items {
 			expectedPvcMap[pod.Name] = 3

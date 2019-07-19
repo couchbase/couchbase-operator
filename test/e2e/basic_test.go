@@ -2,9 +2,9 @@ package e2e
 
 import (
 	"testing"
-	"time"
 
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -15,17 +15,21 @@ import (
 // 2. Check the events to make sure the operator took the correct actions
 // 3. Verifies that the cluster is balanced and all data is available
 func TestCreateCluster(t *testing.T) {
+	// Plaform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
+	// Static configuration.
+	clusterSize := 3
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", 0, 1, 2)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -34,18 +38,22 @@ func TestCreateCluster(t *testing.T) {
 // 2. Check the events to make sure the operator took the correct actions
 // 3. Verifies that the cluster is balanced and all data is available
 func TestCreateBucketCluster(t *testing.T) {
+	// Plaform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3, constants.AdminHidden)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
-	expectedEvents := e2eutil.EventValidator{}
-	expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", 0, 1, 2)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

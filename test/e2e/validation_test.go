@@ -380,12 +380,12 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			// If there were any errors to expect look for them.
 			if err != nil {
 				if !test.shouldFail {
-					t.Fatalf("test unexpectedly failed: %v", err)
+					e2eutil.Die(t, fmt.Errorf("test unexpectedly failed: %v", err))
 				}
 				if len(test.expectedErrors) > 0 {
 					for _, message := range test.expectedErrors {
 						if !strings.Contains(err.Error(), message) || message == "" {
-							t.Fatalf("expected message: %+v \n returned message: %v \n", message, err)
+							e2eutil.Die(t, fmt.Errorf("expected message: %+v \n returned message: %v \n", message, err))
 						}
 					}
 				}

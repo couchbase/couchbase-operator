@@ -2,10 +2,9 @@ package e2e
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"reflect"
 	"sort"
-	"strconv"
 	"testing"
 	"time"
 
@@ -22,7 +21,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Labels k8s nodes based on the values provided from the ClusterInfo struct
@@ -33,7 +31,7 @@ func k8sNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabel
 	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
 		k8sNodeList, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
-			return errors.New("Failed to get k8s nodes " + err.Error())
+			return fmt.Errorf("failed to get k8s nodes: %v", err)
 		}
 		for _, k8sNode := range k8sNodeList.Items {
 			labelChanged := false
@@ -54,7 +52,7 @@ func k8sNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabel
 				}
 			}
 			if !labelChanged {
-				return errors.New("Unable to find node " + nodeIpAddress)
+				return fmt.Errorf("unable to find node %v", nodeIpAddress)
 			}
 			k8sNode.SetLabels(nodeLabels)
 
@@ -63,48 +61,54 @@ func k8sNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabel
 			k8sNode.Spec.Taints = []v1.Taint{}
 
 			if _, err := k8s.KubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-				return errors.New("Failed to update label for node " + nodeIpAddress + ": " + err.Error())
+				return fmt.Errorf("failed to update label for node %v: %v", nodeIpAddress, err)
 			}
 		}
 		return nil
 	})
 }
 
+// rzaMap maps an availability zone to the number of pods scheduled in it.
+type rzaMap map[string]int
+
 // Note: Should be used only when using static server-group configuration
 // Returns for map of expected ServerGroup names with the pod count in the group
 // assuming the CRD is having static server-group configuration in it
-func getExpectedRzaResultMap(clusterSize int, availableServerGroups []string) map[string]int {
-	expectedRzaResultMap := map[string]int{}
-	availableServerGroupsLen := len(availableServerGroups)
-	for index := 0; index < clusterSize; index++ {
-		currRzaGroup := availableServerGroups[index%availableServerGroupsLen]
-		if _, keyPresent := expectedRzaResultMap[currRzaGroup]; keyPresent {
-			expectedRzaResultMap[currRzaGroup]++
-		} else {
-			expectedRzaResultMap[currRzaGroup] = 1
-		}
-	}
-	return expectedRzaResultMap
+func mustGetExpectedRzaResultMap(t *testing.T, cluster *types.Cluster, groupSize int) rzaMap {
+	// Get the sorted list of AZs and the number of them.
+	serverGroups := getAvailabilityZones(t, cluster)
+
+	expected := rzaMap{}
+	expected.accumulateRzaServerClass(groupSize, serverGroups)
+	return expected
 }
 
-// Returns for map of ServerGroup names with the pod count in the group
-func getDeployedRzaMap(kubeClient kubernetes.Interface, namespace string) (map[string]int, error) {
-	// Get all couchbase pods
-	couchbasePodList, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+// accumulateRzaServerClass adds in class based scheduling to an rzaMap
+func (expected rzaMap) accumulateRzaServerClass(groupSize int, serverGroups []string) {
+	numServerGroups := len(serverGroups)
+
+	// For each cluster member expect them to be striped, in order across
+	// the available AZs
+	for index := 0; index < groupSize; index++ {
+		expected[serverGroups[index%numServerGroups]]++
+	}
+}
+
+// mustValidateRzaMap accepts an expected scheduling and compares against reality
+func (expected rzaMap) mustValidateRzaMap(t *testing.T, cluster *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+	pods, err := cluster.KubeClient.CoreV1().Pods(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
-		return nil, err
+		e2eutil.Die(t, err)
 	}
 
-	deployedRzaGroupsMap := map[string]int{}
-	for _, cbPod := range couchbasePodList.Items {
-		currRzaGroup := cbPod.Spec.NodeSelector[constants.FailureDomainZoneLabel]
-		if _, keyPresent := deployedRzaGroupsMap[currRzaGroup]; keyPresent {
-			deployedRzaGroupsMap[currRzaGroup]++
-		} else {
-			deployedRzaGroupsMap[currRzaGroup] = 1
-		}
+	rzaMap := rzaMap{}
+	for _, pod := range pods.Items {
+		rzaMap[pod.Spec.NodeSelector[constants.FailureDomainZoneLabel]]++
 	}
-	return deployedRzaGroupsMap, err
+
+	if !reflect.DeepEqual(expected, rzaMap) {
+		e2eutil.Die(t, fmt.Errorf("RZA scheduling mismatch: requested %v actual %v", expected, rzaMap))
+	}
 }
 
 // getAvailabilityZones returns a sorted list of configured availability zones from the cluster.
@@ -121,146 +125,6 @@ func getAvailabilityZones(t *testing.T, cluster *types.Cluster) clustercapabilit
 // mustNumAvailabilityZones returns the number of availability zones defined in the target cluster.
 func mustNumAvailabilityZones(t *testing.T, cluster *types.Cluster) int {
 	return len(getAvailabilityZones(t, cluster))
-}
-
-// Generic function to test AntiAffinity test case with values on / off
-func rzaAntiAffinity(t *testing.T, antiAffinity bool) {
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	availableServerGroups := getAvailabilityZones(t, targetKube)
-
-	getClusterSizeForAntiAffinity := func() int {
-		maxNodesPossibleforAaOn := 0
-		sort.Strings(availableServerGroups)
-		k8sNodes, err := targetKube.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		serverGroupNodeCountMap := map[string]int{}
-
-		// Populate the server-group node count map
-		for _, node := range k8sNodes.Items {
-			nodeLabels := node.GetLabels()
-			if serverGroup, zoneLabelOk := nodeLabels[constants.FailureDomainZoneLabel]; zoneLabelOk {
-				serverGroupNodeCountMap[serverGroup] += 1
-			}
-		}
-
-		// Simulate the nodes scheduling across server groups which is done in lexical order of group names
-		// When the next server group to be allocated from is empty then terminate
-		// and return the number of allocations that succeeded
-		for {
-			for _, serverGroup := range availableServerGroups {
-				if serverGroupNodeCountMap[serverGroup] == 0 {
-					return maxNodesPossibleforAaOn
-				}
-				maxNodesPossibleforAaOn++
-				serverGroupNodeCountMap[serverGroup]--
-			}
-		}
-	}
-
-	// TODO: so while we do force removal taints at the moment, we cannot rely on
-	// this forever, perhaps the clustercapabilities can point out how many nodes
-	// are schedulable...
-	clusterSize := getClusterSizeForAntiAffinity()
-	newPodsToAdd := constants.Size3
-
-	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.AntiAffinity = antiAffinity
-	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
-
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	if clusterSize > 1 {
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	serviceIndex := 0
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube, testCouchbase)
-
-	if antiAffinity {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*time.Minute)
-		expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
-		// Revert back to original cluster size
-		testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize, targetKube, testCouchbase)
-	} else {
-		// Updated new clusterSize
-		clusterSize += newPodsToAdd
-		for memberIndex := clusterSize - newPodsToAdd; memberIndex < clusterSize; memberIndex++ {
-			e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberIndex), 2*time.Minute)
-			expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-		}
-
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	// Create a expected RZA results map for verification
-	expectedRzaResultMap := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-
-	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err := getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-
-	// Cross check it matches the expected values
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-}
-
-// Define Static ServersGroups in the CRD
-// Deploy the cluster through operator and verify the server groups are balanced
-func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	// Create cluster spec for RZA feature
-	clusterSize := 3
-	availableServerGroups := getAvailabilityZones(t, targetKube)
-
-	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
-
-	// Create a expected RZA results map for verification
-	expectedRzaResultMap := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err := getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-
-	// Cross check it matches the expected values
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // chooseServerGroups deterministically chooses a set of server groups to use based
@@ -289,13 +153,31 @@ func chooseServerGroups(groups []string, seed string, max int) []string {
 	return output
 }
 
-// accumulateExpectedPods populates a map of server group to pod count based on
-// the number of servers in a class and the allowed server groups.
-func accumulateExpectedPods(expected map[string]int, count int, serverGroups []string) {
-	sort.Strings(serverGroups)
-	for i := 0; i < count; i++ {
-		expected[serverGroups[i%len(serverGroups)]]++
+// Define Static ServersGroups in the CRD
+// Deploy the cluster through operator and verify the server groups are balanced
+func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Create cluster spec for RZA feature
+	clusterSize := 3
+	availableServerGroups := getAvailabilityZones(t, targetKube)
+
+	// Create the cluster.
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase.Spec.ServerGroups = availableServerGroups
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// Create a expected RZA results map for verification
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Define Class based ServersGroups config in the CRD
@@ -319,7 +201,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(class1Size, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(class1Size)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
@@ -350,21 +232,11 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Creating expected RZA server groups pod maps
-	expectedRzaResultMap := map[string]int{}
-	accumulateExpectedPods(expectedRzaResultMap, class1Size, class1ServerGroups)
-	accumulateExpectedPods(expectedRzaResultMap, class2Size, class2ServerGroups)
-	accumulateExpectedPods(expectedRzaResultMap, class3Size, class3ServerGroups)
-
-	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err := getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-
-	// Cross check it matches the expected values
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Errorf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected := rzaMap{}
+	expected.accumulateRzaServerClass(class1Size, class1ServerGroups)
+	expected.accumulateRzaServerClass(class2Size, class2ServerGroups)
+	expected.accumulateRzaServerClass(class3Size, class3ServerGroups)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -385,89 +257,36 @@ func TestRzaResizeCluster(t *testing.T) {
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroups := getAvailabilityZones(t, targetKube)
-	expectedRzaResultMap := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
 	// Create a map for server-groups based on deployed cb-server nodes
-	deployedRzaGroupsMap, err := getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-	if err != nil {
-		t.Fatalf("Failed to get deployed Rza map: %v", err)
-	}
-
-	// Cross check it matches the expected values
-	if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-		t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-	}
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// Starting resize cluster test
 	service := 0
 	clusterSizes := []int{2, 7, 4}
-	prevClusterSize := clusterSize
-	memberToBeAdded := clusterSize
-
 	for _, clusterSize := range clusterSizes {
-		membersAdded := []int{}
-		membersRemoved := []int{}
-		sizeDiff := clusterSize - prevClusterSize
-		if sizeDiff > 0 {
-			for memberId := prevClusterSize; memberId < clusterSize; memberId++ {
-				membersAdded = append(membersAdded, memberToBeAdded)
-				memberToBeAdded++
-			}
-		} else {
-			for memberId := memberToBeAdded + sizeDiff; memberId < memberToBeAdded; memberId++ {
-				membersRemoved = append(membersRemoved, memberId)
-			}
-		}
-
-		// Update the expected RZA results map for verification
-		expectedRzaResultMap = getExpectedRzaResultMap(clusterSize, availableServerGroups)
-
 		// Resize cluster and wait for healthy cluster
 		testCouchbase = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, targetKube, testCouchbase)
-		t.Logf("Waiting For Cluster Size To Be: %v...\n", strconv.Itoa(clusterSize))
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 		// Update deployed server-groups based on new cluster size
-		deployedRzaGroupsMap, err = getDeployedRzaMap(targetKube.KubeClient, f.Namespace)
-		if err != nil {
-			t.Fatalf("Failed to get deployed Rza map: %v", err)
-		}
+		expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+		expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	}
 
-		// Cross check it matches the expected values
-		if reflect.DeepEqual(expectedRzaResultMap, deployedRzaGroupsMap) == false {
-			t.Fatalf("RZA deployment failed to deploy as expected.\n Expected: %v\n Deployed: %v", expectedRzaResultMap, deployedRzaGroupsMap)
-		}
-
-		switch {
-		case clusterSize-prevClusterSize > 0:
-			for _, memberId := range membersAdded {
-				expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberId)
-			}
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-
-		case clusterSize-prevClusterSize < 0:
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-			for _, memberId := range membersRemoved {
-				expectedEvents.AddClusterPodEvent(testCouchbase, "MemberRemoved", memberId)
-			}
-			expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-		}
-		prevClusterSize = clusterSize
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.ClusterScaleDownSequence(1),
+		e2eutil.ClusterScaleUpSequence(5),
+		e2eutil.ClusterScaleDownSequence(3),
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -476,12 +295,73 @@ func TestRzaResizeCluster(t *testing.T) {
 // Add nodes beyond the number of available cluster nodes
 // Expects pod creation beyond k8s cluster size should fail
 func TestRzaAntiAffinityOn(t *testing.T) {
-	rzaAntiAffinity(t, true)
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	availableServerGroups := getAvailabilityZones(t, targetKube)
+	// WARNING: this assumes all AZs have the same number of nodes
+	clusterSize := e2eutil.MustNumNodes(t, targetKube)
+	class := 0
+
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase.Spec.AntiAffinity = true
+	testCouchbase.Spec.ServerGroups = availableServerGroups
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// When ready scale up, with AA on it should fail.
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, class, clusterSize+1, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*time.Minute)
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, class, clusterSize, targetKube, testCouchbase)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Create a map for server-groups based on deployed cb-server nodes
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 // Create cluster with AA-OFF and deploy the çb cluster
 // Add nodes beyond the number of available cluster nodes
 // Expects pod creation beyond k8s cluster size should succeed
 func TestRzaAntiAffinityOff(t *testing.T) {
-	rzaAntiAffinity(t, false)
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	availableServerGroups := getAvailabilityZones(t, targetKube)
+	// WARNING: this assumes all AZs have the same number of nodes
+	clusterSize := e2eutil.MustNumNodes(t, targetKube)
+	class := 0
+
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase.Spec.ServerGroups = availableServerGroups
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// When ready scale up, with AA on it should fail.
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, class, clusterSize+1, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Create a map for server-groups based on deployed cb-server nodes
+	expected = mustGetExpectedRzaResultMap(t, targetKube, testCouchbase.Spec.TotalSize())
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		e2eutil.ClusterScaleUpSequence(1),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

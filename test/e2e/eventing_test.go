@@ -4,7 +4,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -96,7 +95,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -134,7 +133,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -185,7 +184,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota

@@ -385,46 +385,6 @@ func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev2.C
 	}
 }
 
-// waits until the provided condition type occurs with associated status
-func WaitForListOfClusterEvents(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, eventList EventList, maxExpectedEvents int, timeout time.Duration) (EventList, error) {
-	opts := metav1.ListOptions{
-		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
-	}
-	occuredEvents := EventList{}
-	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(opts)
-	if err != nil {
-		return occuredEvents, err
-	}
-	defer watch.Stop()
-
-	now := metav1.Now()
-
-	resultChan := watch.ResultChan()
-	timeoutChan := time.After(timeout)
-	for {
-		select {
-		case <-timeoutChan:
-			return occuredEvents, fmt.Errorf("time out waiting for %d cluster events from,\n%v \nEvents got:\n%v", maxExpectedEvents, eventList, occuredEvents)
-
-		case watchEvent := <-resultChan:
-			crdEvent := watchEvent.Object.(*v1.Event)
-			// Watch() returns every event since the dawn of time, so ensure we
-			// only return things after we started the wait.  This avoids matching
-			// events that may have already occurred
-			if crdEvent.FirstTimestamp.Before(&now) {
-				continue
-			}
-			if EventExistsInEventList(crdEvent, eventList) {
-				occuredEvents = append(occuredEvents, *crdEvent)
-			}
-		}
-		if len(occuredEvents) == maxExpectedEvents {
-			break
-		}
-	}
-	return occuredEvents, nil
-}
-
 // waits until the provided condition type with associated status after specified timestamp
 func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	after := time.Now()

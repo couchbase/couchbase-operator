@@ -7,7 +7,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -38,7 +37,7 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	purgeIntervalInternal := purgeIntervalBase.Hours() / 24.0
 
 	// Create the cluster.
-	couchbase := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize, constants.AdminHidden)
+	couchbase := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// Twiddle the knobs, and ensure the server settings are changed.
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/DatabaseFragmentationThreshold/Percent", &thresholdPercent), time.Minute)
