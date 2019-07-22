@@ -144,7 +144,6 @@ var (
 
 		// 5.5 feature - Node Failover cases
 		"TestServerGroupAutoFailover": TestServerGroupAutoFailover,
-		"TestDiskFailureAutoFailover": TestDiskFailureAutoFailover,
 		"TestMultiNodeAutoFailover":   TestMultiNodeAutoFailover,
 
 		// Persistent Volume cases

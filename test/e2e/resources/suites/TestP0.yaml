@@ -106,7 +106,6 @@ tcGroups:
     testcases:
       - name: TestServerGroupAutoFailover
       - name: TestMultiNodeAutoFailover
-      - name: TestDiskFailureAutoFailover
 
   - name: AnalyticsTests
     clusters:

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -143,68 +142,4 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 
-}
-
-// Create multinode couchbase cluster and bucket with replicas
-// Load data into the bucket
-// Remove bucket dir from the pod to simulate the disk write errors
-func TestDiskFailureAutoFailover(t *testing.T) {
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	clusterSize := 6
-
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.AdminHidden)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
-
-	expectedEvents := e2eutil.EventValidator{}
-	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
-		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
-	}
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", "default")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	// Get pod object for reading container name
-	podName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-
-	// Asynchronously insert data into the cluster so that Couchbase server
-	// notices it cannot read/write to the bucket directory.
-	go func() {
-		cmd := []string{
-			"/opt/couchbase/bin/cbworkloadgen",
-			"-n", "127.0.0.1:8091",
-			"-u", "Administrator",
-			"-p", "password",
-			"-b", "default",
-			"-j",
-			"-s", "100000",
-			"-i", "10000",
-		}
-		// Note: we expect an error here as the directory gets deleted later.
-		stdout, stderr, err := e2eutil.ExecCommandInPod(targetKube, f.Namespace, podName, cmd...)
-		if err != nil {
-			t.Logf("Error: %v", err)
-			t.Logf("Command: %s", cmd)
-			t.Logf("stdout: %s", stdout)
-			t.Logf("stderr: %s", stderr)
-		}
-	}()
-
-	t.Log("Entering sleep to load data")
-	time.Sleep(time.Second * 20)
-	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, podName, "rm -vf /opt/couchbase/var/lib/couchbase/data/default/*")
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
-	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

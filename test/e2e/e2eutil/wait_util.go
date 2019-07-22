@@ -172,38 +172,23 @@ func MustWaitClusterPhaseFailed(t *testing.T, k8s *types.Cluster, cluster *couch
 
 func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
 	defer cancel()
-	err := retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
+
+	callback := func() error {
 		cl, err := GetCouchbaseCluster(k8s.CRClient, cluster.Name, cluster.Namespace)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		if cl.Status.Size != cluster.Spec.TotalSize() {
-			return false, nil
+			return fmt.Errorf("requested size %d, reported size %d", cluster.Spec.TotalSize(), cl.Status.Size)
 		}
 
-		healthyConditions := map[couchbasev2.ClusterConditionType]struct {
-			healthyCondition v1.ConditionStatus
-			message          string
-		}{
-			couchbasev2.ClusterConditionAvailable: {
-				v1.ConditionTrue,
-				"Cluster not available ...",
-			},
-			couchbasev2.ClusterConditionBalanced: {
-				v1.ConditionTrue,
-				"Cluster unbalanced ...",
-			},
-			couchbasev2.ClusterConditionScaling: {
-				v1.ConditionFalse,
-				"Cluster scaling ...",
-			},
-			couchbasev2.ClusterConditionUpgrading: {
-				v1.ConditionFalse,
-				"Cluster upgrading ...",
-			},
+		healthyConditions := map[couchbasev2.ClusterConditionType]v1.ConditionStatus{
+			couchbasev2.ClusterConditionAvailable: v1.ConditionTrue,
+			couchbasev2.ClusterConditionBalanced:  v1.ConditionTrue,
+			couchbasev2.ClusterConditionScaling:   v1.ConditionFalse,
+			couchbasev2.ClusterConditionUpgrading: v1.ConditionFalse,
 		}
 
 		for kind, cond := range cl.Status.Conditions {
@@ -212,14 +197,14 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 				continue
 			}
 
-			if cond.Status != healthyCondition.healthyCondition {
-				return false, nil
+			if cond.Status != healthyCondition {
+				return fmt.Errorf("healthy condition %v is %v", kind, cond.Status)
 			}
 		}
-		return true, nil
-	})
+		return nil
+	}
 
-	if err != nil {
+	if err := retryutil.RetryOnErr(ctx, retryInterval, IntMax, "", "", callback); err != nil {
 		return fmt.Errorf("fail to wait for cluster status to be healthy: %v", err)
 	}
 	return nil

@@ -906,25 +906,17 @@ func getNodeAllocatableMemory(t *testing.T, k8s *types.Cluster) map[string]float
 		// Begin with the allocatable amount of memory on the node.  This is fixed and
 		// doesn't take in to account the running pods.
 		allocatable := memoryRequirementToFloat(node.Status.Allocatable[v1.ResourceMemory])
+		result[node.Name] = allocatable
+	}
 
-		// Next deduct any limits and requests, the former taking precedence.
-		for _, pod := range pods.Items {
-			if pod.Spec.NodeName != node.Name {
+	// Next deduct any requests.
+	for _, pod := range pods.Items {
+		for _, container := range pod.Spec.Containers {
+			if quantity, ok := container.Resources.Requests[v1.ResourceMemory]; ok {
+				result[pod.Spec.NodeName] -= memoryRequirementToFloat(quantity)
 				continue
 			}
-			for _, container := range pod.Spec.Containers {
-				if quantity, ok := container.Resources.Limits[v1.ResourceMemory]; ok {
-					allocatable -= memoryRequirementToFloat(quantity)
-					continue
-				}
-				if quantity, ok := container.Resources.Requests[v1.ResourceMemory]; ok {
-					allocatable -= memoryRequirementToFloat(quantity)
-					continue
-				}
-			}
 		}
-
-		result[node.Name] = allocatable
 	}
 
 	return result

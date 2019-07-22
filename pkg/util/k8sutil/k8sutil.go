@@ -1,7 +1,6 @@
 package k8sutil
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -15,7 +14,6 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
@@ -448,39 +446,17 @@ func GetPodUptime(kubecli kubernetes.Interface, ns, name string) int {
 
 // LogPod returns ephemeral debug information about a failed pod, e.g. it's about to be
 // deleted and we want to know why.
-func LogPod(kubeCli kubernetes.Interface, namespace, name string) []string {
-	result := []string{}
-
+func LogPod(kubeCli kubernetes.Interface, namespace, name string) string {
 	pod, err := GetPod(kubeCli, namespace, name)
-	if err == nil {
-		if data, err := yaml.Marshal(pod); err == nil {
-			result = append(result, "resource:")
-			result = append(result, strings.Split(string(data), "\n")...)
-		}
+	if err != nil {
+		return ""
 	}
 
-	events, err := GetEventsForResource(kubeCli, namespace, "Pod", name)
-	if err == nil {
-		result = append(result, "events:")
-		table := prettytable.Table{
-			Header: prettytable.Row{"FirstTimestamp", "LastTimestamp", "Count", "Type", "Reason", "Message"},
-		}
-		for _, event := range events {
-			row := prettytable.Row{
-				event.FirstTimestamp.String(),
-				event.LastTimestamp.String(),
-				strconv.Itoa(int(event.Count)),
-				event.Type,
-				event.Reason,
-				event.Message,
-			}
-			table.Rows = append(table.Rows, row)
-		}
-		data := &bytes.Buffer{}
-		if err := table.Write(data); err == nil {
-			result = append(result, strings.Split(data.String(), "\n")...)
-		}
+	// Format as YAML
+	data, err := yaml.Marshal(pod)
+	if err != nil {
+		return ""
 	}
 
-	return result
+	return string(data)
 }

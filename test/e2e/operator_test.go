@@ -87,19 +87,20 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size1
-	flush := false
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize, constants.AdminExposed)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
-	// When the cluster is ready, kill the operator, manually update the bucket.  Verify the
-	// bucket was updated and wait for it to revert as the operator regains mastership.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	// When the cluster is ready, pause the operator, and await aknowledgement.  Manually update the bucket, then kill
+	// and unpause the operator.  Verify the bucket was updated and wait for it to revert as the operator regains mastership.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/ControlPaused", true), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
 	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Replace("/EnableFlush", flush), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, "default", jsonpatch.NewPatchSet().Test("/EnableFlush", flush), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent("default", testCouchbase), 3*time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent(e2espec.DefaultBucket.Name, testCouchbase), time.Minute)
 
 	// Check the events match what we expect:
 	// * Admin console service created

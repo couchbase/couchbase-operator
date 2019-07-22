@@ -569,7 +569,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
@@ -633,7 +633,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
 
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 5*time.Minute)
+		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 10*time.Minute)
 
 		// Populate the expectedPvcMap for maximum available nodes everytime
 		for memberId := 0; memberId < 9; memberId++ {
