@@ -46,7 +46,7 @@ func (r *clusterRoleResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), clusterRole.Name, clusterRole.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), clusterRole.Name, clusterRole.Name+".yaml"), string(data))
 	}
 	return nil
 }

@@ -159,14 +159,14 @@ var (
 		"TestPersistentVolumeResizeCluster":          TestPersistentVolumeResizeCluster,
 
 		// Supportability cases
-		"TestLogCollectValidateArguments":            TestLogCollectValidateArguments,
-		"TestNegLogCollectValidateArgs":              TestNegLogCollectValidateArgs,
-		"TestLogCollectUsingClusterNameAndNamespace": TestLogCollectUsingClusterNameAndNamespace,
-		"TestLogCollectRbacPermission":               TestLogCollectRbacPermission,
+		"TestLogCollectValidateArguments": TestLogCollectValidateArguments,
+		"TestNegLogCollectValidateArgs":   TestNegLogCollectValidateArgs,
+		"TestLogCollect":                  TestLogCollect,
+		"TestLogCollectRbacPermission":    TestLogCollectRbacPermission,
 		// Extended log collection cases
 		"TestExtendedDebugWithDefaultValues":               TestExtendedDebugWithDefaultValues,
 		"TestExtendedDebugWithNonDefaultValues":            TestExtendedDebugWithNonDefaultValues,
-		"TestExtendedDebugWithInvalidValues":               TestExtendedDebugWithInvalidValues,
+		"TestLogCollectInvalid":                            TestLogCollectInvalid,
 		"TestExtendedDebugKillOperatorDuringLogCollection": TestExtendedDebugKillOperatorDuringLogCollection,
 		"TestLogCollectListJson":                           TestLogCollectListJson,
 

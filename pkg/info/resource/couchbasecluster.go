@@ -33,7 +33,7 @@ func (r *couchbaseClusterResource) Kind() string {
 func (r *couchbaseClusterResource) Fetch() error {
 	// We have to manually filter here as couchbaseCluster are not labelled and field
 	// selectors aren't up to matching based on name (multiple couchbaseClusters that is)
-	couchbaseClusters, err := r.context.CouchbaseClusterClient.CouchbaseV2().CouchbaseClusters(r.context.Namespace()).List(metav1.ListOptions{})
+	couchbaseClusters, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseClusters(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

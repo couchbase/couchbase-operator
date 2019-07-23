@@ -134,7 +134,7 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestLogCollectRbacPermission
-      - name: TestExtendedDebugWithInvalidValues
+      - name: TestLogCollectInvalid
       - name: TestExtendedDebugKillOperatorDuringLogCollection
       - name: TestCollectLogFromEphemeralPodsWithOperatorKilled
       - name: TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess

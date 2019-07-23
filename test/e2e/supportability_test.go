@@ -4,10 +4,8 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
-	"context"
 	"errors"
 	"fmt"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"io"
 	"io/ioutil"
 	"os"
@@ -20,7 +18,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -31,13 +29,13 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 
 	"github.com/ghodss/yaml"
@@ -66,21 +64,104 @@ func supportsMultipleVolumeClaims(t *testing.T, cluster *types.Cluster) bool {
 		lazyBoundStorageClass(t, cluster)
 }
 
-// Function to cross check log dir contents against populated file list
-func checkLogDirContents(reqFileList []string, errMsgList *failureList) {
-	for _, fileName := range reqFileList {
-		if _, err := os.Stat(fileName); err != nil {
-			errMsgList.AppendFailure("File "+fileName, errors.New("File not found!"))
-		}
+// compoundError is a group of errors
+type compoundError struct {
+	errs []error
+}
+
+func NewCompoundError(errs []error) error {
+	return &compoundError{errs: errs}
+}
+
+func (e *compoundError) Error() string {
+	errs := []string{}
+	for _, err := range e.errs {
+		errs = append(errs, err.Error())
+	}
+	return strings.Join(errs, "\n")
+}
+
+// removeServerLogs is invoked when we run with server log collection to clean the
+// working directory
+func removeServerLogs() {
+	files, err := filepath.Glob("*.zip")
+	if err != nil {
+		return
+	}
+
+	for _, file := range files {
+		_ = os.Remove(file)
 	}
 }
 
-// Function to cross check log dir contents are not present against the populated file list
-func checkLogDirContentsForExcludedFiles(excludedFileList []string, errMsgList *failureList) {
-	for _, fileName := range excludedFileList {
-		if _, err := os.Stat(fileName); err == nil {
-			errMsgList.AppendFailure("File "+fileName, errors.New("File Exists!"))
+// mustVerifyArchiveContents examines a TGZ archive and errors if expected files
+// are not present, or unexpected files are present.
+func mustVerifyArchiveContents(t *testing.T, archive string, expected []string) {
+	// Open the archive file.
+	file, err := os.OpenFile(archive, os.O_RDONLY, 0444)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	defer func() { _ = file.Close() }()
+
+	// Read each entry in the archive and store the file names.
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	defer func() { _ = gzipReader.Close() }()
+
+	tarReader := tar.NewReader(gzipReader)
+
+	actual := []string{}
+	for {
+		hdr, err := tarReader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			e2eutil.Die(t, err)
 		}
+		actual = append(actual, hdr.Name)
+	}
+
+	// Do an exhaustive search of both lists - O(N^2), I'm lazy - and accumulate
+	// any errors
+	errs := []error{}
+	for _, e := range expected {
+		found := false
+		for _, a := range actual {
+			if a == e {
+				found = true
+				break
+			}
+		}
+		if !found {
+			errs = append(errs, fmt.Errorf("expected file %s not found in archive", e))
+		}
+	}
+	for _, a := range actual {
+		// Hack: Check for and add if there are events/logs associated with the involved resource.
+		if strings.HasSuffix(a, "events.yaml") {
+			continue
+		}
+		if strings.HasSuffix(a, ".log") {
+			continue
+		}
+		found := false
+		for _, e := range expected {
+			if e == a {
+				found = true
+				break
+			}
+		}
+		if !found {
+			errs = append(errs, fmt.Errorf("unexpected file %s found in archive", a))
+		}
+	}
+
+	if len(errs) != 0 {
+		e2eutil.Die(t, NewCompoundError(errs))
 	}
 }
 
@@ -103,97 +184,93 @@ func archiveName(namespace, name, timestamp string, redacted bool) string {
 	return archive
 }
 
-// checkCollectInfoLogs checks all expected Couchbase server logs are present.
-func checkCollectInfoLogs(kubeClient kubernetes.Interface, namespace, cbClusterName, cbopinfoLogDir string, redacted bool, errMsgList *failureList) error {
-	fileInfos, err := ioutil.ReadDir(".")
-	if err != nil {
-		errMsgList.AppendFailure("For directory "+" . ", fmt.Errorf("Failed to read directory: %v", err))
-	}
-
-	timestamp, err := extractTimestamp(cbopinfoLogDir)
-	if err != nil {
-		errMsgList.AppendFailure("For log directory "+cbopinfoLogDir, fmt.Errorf("Failed to extract timestamp: %v", err))
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	var pods *corev1.PodList
-	err = retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
-		pods, err = kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+// getLabelSelector returns an appropriate label selector for resources that
+// are scoped to a specific couchbase cluster.
+func getLabelSelector(all bool, clusters []string) (string, error) {
+	selector := labels.Everything()
+	if !all {
+		requirements := []labels.Requirement{}
+		req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return "", err
 		}
-		return true, nil
-	})
+		requirements = append(requirements, *req)
+		if len(clusters) != 0 {
+			req, err := labels.NewRequirement(operator_constants.LabelCluster, selection.In, clusters)
+			if err != nil {
+				return "", err
+			}
+			requirements = append(requirements, *req)
+		}
+		selector = labels.NewSelector()
+		selector = selector.Add(requirements...)
+	}
+	return selector.String(), nil
+}
+
+// mustVerifyServerLogs looks for pods that exist and should have associated server logs.
+func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, namespace, archive string, redacted bool, clusters ...string) {
+	// Grab the required pods.
+	selector, err := getLabelSelector(false, clusters)
 	if err != nil {
-		return err
+		e2eutil.Die(t, err)
 	}
 
-PodForLoop:
+	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// List all files.
+	files, err := ioutil.ReadDir(".")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Grab the timestamp from the archive, all files share this across a cbopinfo run.
+	timestamp, err := extractTimestamp(archive)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// For each pod, ensure the associated server log exists.
+	errs := []error{}
+NextPod:
 	for _, pod := range pods.Items {
-		archive := archiveName(namespace, pod.Name, timestamp, redacted) + ".zip"
-		for _, fileInfo := range fileInfos {
-			if fileInfo.Name() == archive {
-				continue PodForLoop
+		expected := archiveName(namespace, pod.Name, timestamp, redacted) + ".zip"
+		for _, file := range files {
+			if file.Name() == expected {
+				if redacted {
+					if err := verifyLogRedaction(expected); err != nil {
+						errs = append(errs, err)
+					}
+				}
+				continue NextPod
 			}
 		}
-		errMsgList.AppendFailure("For pod "+pod.Name, fmt.Errorf("server log file %s missing", archive))
+		errs = append(errs, fmt.Errorf("expected file %s not found", expected))
 	}
-	return nil
+
+	if len(errs) != 0 {
+		e2eutil.Die(t, NewCompoundError(errs))
+	}
 }
 
 // verifyLogRedaction verifies logs collected for pods are redacted.
-func verifyLogRedaction(kubeClient kubernetes.Interface, namespace, cbClusterName, cbopinfoLogDir string, errMsgList *failureList) error {
-	timestamp, err := extractTimestamp(cbopinfoLogDir)
-	if err != nil {
-		fmt.Printf("Failed to extract timestamp: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	var pods *corev1.PodList
-	err = retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
-		pods, err = kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
-		if err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-		return true, nil
-	})
+func verifyLogRedaction(archive string) error {
+	zipReader, err := zip.OpenReader(archive)
 	if err != nil {
 		return err
 	}
+	defer zipReader.Close()
 
-	for _, pod := range pods.Items {
-		// Derive unzipped log directory and archive names.
-		directory := archiveName(namespace, pod.Name, timestamp, true)
-		archive := directory + ".zip"
-
-		// Clean up after ourselves
-		defer os.RemoveAll(directory)
-		defer os.Remove(archive)
-
-		// Extract the archive
-		if err := unzipFile(archive); err != nil {
-			return err
-		}
-
-		// Extract the directory contents
-		fileInfos, err := ioutil.ReadDir(directory)
-		if err != nil {
-			return err
-		}
-
-		// Redacted logs should not contain users.dets
-		for _, fileInfo := range fileInfos {
-			if fileInfo.Name() == "users.dets" {
-				errMsgList.AppendFailure("Non-redacted file: users.dets", fmt.Errorf("Users file found in redacted file list"))
-				break
-			}
+	for _, file := range zipReader.File {
+		if strings.HasSuffix(file.Name, "/users.dets") {
+			return nil
 		}
 	}
-	return nil
+
+	return fmt.Errorf("file %s not redacted", archive)
 }
 
 func verifyLogCollectListJson(kubeClient kubernetes.Interface, namespace, cbClusterName, collectInfoListJson string, errMsgList *failureList) error {
@@ -202,334 +279,256 @@ func verifyLogCollectListJson(kubeClient kubernetes.Interface, namespace, cbClus
 		return errors.New("Failed to list pods: " + err.Error())
 	}
 
-	podPresent := true
-
 	for _, pod := range pods.Items {
-		if strings.Contains(collectInfoListJson, pod.Name) != podPresent {
+		if !strings.Contains(collectInfoListJson, pod.Name) {
 			errMsgList.AppendFailure("Pod missing from JSON output: "+pod.Name, errors.New("Pod missing in JSON output!"))
 		}
 	}
 	return nil
 }
 
-// Function to populate deployment file list
-func getDeployementFileList(kubeClient kubernetes.Interface, namespace, deploymentDir string, fileList *[]string, allFlag bool) error {
-	var err error
-	var deployments *appsv1.DeploymentList
-	if allFlag {
-		deployments, err = kubeClient.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
-	} else {
-		deployments, err = kubeClient.AppsV1().Deployments(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	}
+// mustGetFileList lists all resources that should be collected by cbopinfo.
+func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string, all, pprof, metrics bool, clusters ...string) []string {
+	// The base file path will have a top level directory named the same as the archive.
+	base := strings.TrimSuffix(archive, ".tar.gz")
+
+	// Initialize any required clients.
+	apiExtensionsClient, err := clientset.NewForConfig(k8s.Config)
 	if err != nil {
-		return errors.New("Failed to list deployments: " + err.Error())
+		e2eutil.Die(t, err)
 	}
-	for _, deployment := range deployments.Items {
-		*fileList = append(*fileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".yaml")
-		if namespace != "kube-system" {
-			*fileList = append(*fileList, deploymentDir+"/"+deployment.Name+"/"+deployment.Name+".log")
-		}
+
+	// These are files that will always exist
+	files := []string{
+		fmt.Sprintf("%s/cmdline", base),
 	}
-	return nil
-}
 
-// Function to get kube-system specific log file names
-func getNonCouchbaseLogFileList(kubeClient kubernetes.Interface, config *rest.Config, namespace, cbopinfoLogDir string, allFlag bool, reqFileList *[]string) error {
-	namespaceDir := cbopinfoLogDir + "/" + namespace
-
-	clusterroleDir := namespaceDir + "/clusterrole"
-	clusterroleBindingDir := namespaceDir + "/clusterrolebinding"
-	crdDir := namespaceDir + "/customresourcedefinition"
-	deploymentDir := namespaceDir + "/deployment"
-	endpointsDir := namespaceDir + "/endpoints"
-	podDir := namespaceDir + "/pod"
-	secretDir := namespaceDir + "/secret"
-	serviceDir := namespaceDir + "/service"
-	pvDir := cbopinfoLogDir + "/persistentvolume"
-	pvcDir := namespaceDir + "/persistentvolumeclaim"
-
-	// clusterrole dir contents
-	clusterRoles, err := kubeClient.RbacV1beta1().ClusterRoles().List(metav1.ListOptions{})
+	// Gather cluster scoped resources.
+	clusterRoles, err := k8s.KubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
 	if err != nil {
-		return errors.New("Failed to list cluster roles: " + err.Error())
+		e2eutil.Die(t, err)
 	}
+	clusterRoleBindings, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	crds, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	persistentVolumes, err := k8s.KubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	for _, clusterRole := range clusterRoles.Items {
-		*reqFileList = append(*reqFileList, clusterroleDir+"/"+clusterRole.Name+"/"+clusterRole.Name+".yaml")
-	}
-
-	// clusterrolebinding dir contents
-	clusterRoleBindings, err := kubeClient.RbacV1beta1().ClusterRoleBindings().List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list cluster role bindings: " + err.Error())
+		files = append(files, fmt.Sprintf("%s/clusterrole/%s/%s.yaml", base, clusterRole.Name, clusterRole.Name))
 	}
 	for _, clusterRoleBinding := range clusterRoleBindings.Items {
-		*reqFileList = append(*reqFileList, clusterroleBindingDir+"/"+clusterRoleBinding.Name+"/"+clusterRoleBinding.Name+".yaml")
-	}
-
-	// customresourcedefinition dir contents
-	clientset, err := clientset.NewForConfig(config)
-	if err != nil {
-		return errors.New("Failed to create clientset object: " + err.Error())
-	}
-	crds, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list crds: " + err.Error())
+		files = append(files, fmt.Sprintf("%s/clusterrolebinding/%s/%s.yaml", base, clusterRoleBinding.Name, clusterRoleBinding.Name))
 	}
 	for _, crd := range crds.Items {
-		if strings.Contains(crd.Name, "couchbase.com") {
-			*reqFileList = append(*reqFileList, crdDir+"/"+crd.Name+"/"+crd.Name+".yaml")
-		}
+		files = append(files, fmt.Sprintf("%s/customresourcedefinition/%s/%s.yaml", base, crd.Name, crd.Name))
+	}
+	for _, node := range nodes.Items {
+		files = append(files, fmt.Sprintf("%s/node/%s/%s.yaml", base, node.Name, node.Name))
+	}
+	for _, persistentVolume := range persistentVolumes.Items {
+		files = append(files, fmt.Sprintf("%s/persistentvolume/%s/%s.yaml", base, persistentVolume.Name, persistentVolume.Name))
 	}
 
-	// deployment dir contents
-	if err := getDeployementFileList(kubeClient, namespace, deploymentDir, reqFileList, allFlag); err != nil {
-		return err
-	}
-
-	if allFlag {
-		// endpoints dir content
-		endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
-		if err != nil {
-			return errors.New("Failed to list endpoints: " + err.Error())
-		}
-		for _, endpoint := range endpoints.Items {
-			*reqFileList = append(*reqFileList, endpointsDir+"/"+endpoint.Name+"/"+endpoint.Name+".yaml")
-		}
-
-		// service dir contents
-		services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
-		if err != nil {
-			return errors.New("Failed to list services: " + err.Error())
-		}
-		for _, service := range services.Items {
-			*reqFileList = append(*reqFileList, serviceDir+"/"+service.Name+"/"+service.Name+".yaml")
-		}
-
-		// pod dir contents
-		pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
-		if err != nil {
-			return errors.New("Failed to list pods: " + err.Error())
-		}
-		for _, pod := range pods.Items {
-			if strings.Contains(pod.Name, "couchbase-operator-") {
-				continue
-			}
-			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
-		}
-
-		// persistentvolumeclaims dir contents
-		persistentVolClaims, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "app!=couchbase"})
-		if err != nil {
-			return errors.New("Failed to list persistent volume claims: " + err.Error())
-		}
-		for _, pvc := range persistentVolClaims.Items {
-			*reqFileList = append(*reqFileList, pvcDir+"/"+pvc.Name+"/"+pvc.Name+".yaml")
-		}
-	}
-
-	// secret dir contents
-	secrets, err := kubeClient.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
+	// Gather namespace scoped resources.
+	buckets, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return errors.New("Failed to list secrets: " + err.Error())
+		e2eutil.Die(t, err)
+	}
+	ephemeralBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	memcachedBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	replications, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	roles, err := k8s.KubeClient.RbacV1().Roles(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	rolebindings, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	secrets, err := k8s.KubeClient.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	configMaps, err := k8s.KubeClient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for _, bucket := range buckets.Items {
+		files = append(files, fmt.Sprintf("%s/%s/couchbasebucket/%s/%s.yaml", base, namespace, bucket.Name, bucket.Name))
+	}
+	for _, ephemeralBucket := range ephemeralBuckets.Items {
+		files = append(files, fmt.Sprintf("%s/%s/couchbaseephemeralbucket/%s/%s.yaml", base, namespace, ephemeralBucket.Name, ephemeralBucket.Name))
+	}
+	for _, memcachedBucket := range memcachedBuckets.Items {
+		files = append(files, fmt.Sprintf("%s/%s/couchbasememcachedbucket/%s/%s.yaml", base, namespace, memcachedBucket.Name, memcachedBucket.Name))
+	}
+	for _, replication := range replications.Items {
+		files = append(files, fmt.Sprintf("%s/%s/couchbasereplication/%s/%s.yaml", base, namespace, replication.Name, replication.Name))
+	}
+	for _, role := range roles.Items {
+		files = append(files, fmt.Sprintf("%s/%s/role/%s/%s.yaml", base, namespace, role.Name, role.Name))
+	}
+	for _, rolebinding := range rolebindings.Items {
+		files = append(files, fmt.Sprintf("%s/%s/rolebinding/%s/%s.yaml", base, namespace, rolebinding.Name, rolebinding.Name))
 	}
 	for _, secret := range secrets.Items {
-		*reqFileList = append(*reqFileList, secretDir+"/"+secret.Name+"/"+secret.Name+".yaml")
+		files = append(files, fmt.Sprintf("%s/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
+	}
+	for _, configMap := range configMaps.Items {
+		files = append(files, fmt.Sprintf("%s/%s/configmap/%s/%s.yaml", base, namespace, configMap.Name, configMap.Name))
 	}
 
-	// persistentvolumes dir contents
-	persistentVols, err := kubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	// Deployments are special, we only collect them if the image matches the operator image.
+	// It also has a collector that will pull out pprof and metrics if they are reachable.
+	deployments, err := k8s.KubeClient.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return errors.New("Failed to list persistent volumes: " + err.Error())
-	}
-	for _, pv := range persistentVols.Items {
-		*reqFileList = append(*reqFileList, pvDir+"/"+pv.Name+"/"+pv.Name+".yaml")
-	}
-	return nil
-}
-
-// Function to get autonomous-operator extended debug file list
-func getOperatorExtendedDebugFileList(namespace, deploymentName, cbopinfoLogDir string, pprof, metrics bool) []string {
-	namespaceDir := cbopinfoLogDir + "/" + namespace
-	deploymentDir := namespaceDir + "/deployment/" + deploymentName
-
-	files := []string{}
-	if pprof {
-		files = append(files, "pprof.block", "pprof.goroutine", "pprof.heap", "pprof.mutex", "pprof.threadcreate")
-	}
-	if metrics {
-		files = append(files, "stats.cluster")
+		e2eutil.Die(t, err)
 	}
 
-	for index, file := range files {
-		files[index] = deploymentDir + "/" + file
-	}
-	return files
-}
-
-// Function to get couchbase cluster specific log file names
-func getCouchbaseFileList(kubeClient kubernetes.Interface, crClient versioned.Interface, namespace, cbopinfoLogDir, cbClusterName string, reqFileList *[]string) error {
-	namespaceDir := cbopinfoLogDir + "/" + namespace
-
-	cbClusterDir := namespaceDir + "/couchbasecluster"
-	podDir := namespaceDir + "/pod"
-	endpointsDir := namespaceDir + "/endpoints"
-	serviceDir := namespaceDir + "/service"
-	pvcDir := namespaceDir + "/persistentvolumeclaim"
-
-	// Cluster dependent file - couchbasecluster, endpoints, pods, secrets
-	clusters, err := crClient.CouchbaseV2().CouchbaseClusters(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.New("Failed to list clusters: " + err.Error())
-	}
-	for _, cbCluster := range clusters.Items {
-		if cbCluster.Name != cbClusterName {
+	for _, deployment := range deployments.Items {
+		operator := deployment.Spec.Template.Spec.Containers[0].Image == framework.Global.Deployment.Spec.Template.Spec.Containers[0].Image
+		if !operator && !all {
 			continue
 		}
-		// couchbasecluster dir contents
-		*reqFileList = append(*reqFileList, cbClusterDir+"/"+cbCluster.Name+"/"+cbCluster.Name+".yaml")
 
-		// pod dir contents
-		pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
-		if err != nil {
-			return errors.New("Failed to list pods: " + err.Error())
-		}
-		for _, pod := range pods.Items {
-			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/couchbase-server.log")
-			*reqFileList = append(*reqFileList, podDir+"/"+pod.Name+"/"+pod.Name+".yaml")
-		}
+		files = append(files, fmt.Sprintf("%s/%s/deployment/%s/%s.yaml", base, namespace, deployment.Name, deployment.Name))
 
-		endpoints, err := kubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
-		if err != nil {
-			return errors.New("Failed to list endpoints: " + err.Error())
-		}
-		for _, endpoint := range endpoints.Items {
-			*reqFileList = append(*reqFileList, endpointsDir+"/"+endpoint.Name+"/"+endpoint.Name+".yaml")
-		}
-
-		// service dir contents
-		services, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
-		if err != nil {
-			return errors.New("Failed to list services: " + err.Error())
-		}
-		for _, service := range services.Items {
-			*reqFileList = append(*reqFileList, serviceDir+"/"+service.Name+"/"+service.Name+".yaml")
-		}
-
-		// persistentvolumeclaims dir contents
-		persistentVolClaims, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
-		if err != nil {
-			return errors.New("Failed to list persistent volume claims: " + err.Error())
-		}
-		for _, pvc := range persistentVolClaims.Items {
-			*reqFileList = append(*reqFileList, pvcDir+"/"+pvc.Name+"/"+pvc.Name+".yaml")
+		if operator {
+			if pprof {
+				pprofFiles := []string{
+					"pprof.block",
+					"pprof.goroutine",
+					"pprof.heap",
+					"pprof.mutex",
+					"pprof.threadcreate",
+				}
+				for _, pprofFile := range pprofFiles {
+					files = append(files, fmt.Sprintf("%s/%s/deployment/%s/%s", base, namespace, deployment.Name, pprofFile))
+				}
+			}
+			if metrics {
+				metricsFiles := []string{
+					"stats.cluster",
+				}
+				for _, metricsFile := range metricsFiles {
+					files = append(files, fmt.Sprintf("%s/%s/deployment/%s/%s", base, namespace, deployment.Name, metricsFile))
+				}
+			}
 		}
 	}
-	return nil
-}
 
-// Function to unzip the zip file
-func unzipFile(zipFileName string) error {
-	destFileName := strings.Replace(zipFileName, ".zip", "", -1)
-	zipReader, err := zip.OpenReader(zipFileName)
+	// CouchbaseClusters are filtered based on selection.
+	couchbaseClusters, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return err
-	}
-	defer zipReader.Close()
-
-	if err := os.MkdirAll(destFileName, 0777); err != nil {
-		return err
+		e2eutil.Die(t, err)
 	}
 
-	// Closure to address file descriptors issue with all the deferred .Close() methods
-	extractAndWriteFile := func(file *zip.File) error {
-		rc, err := file.Open()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = rc.Close() }()
-
-		filePath := filepath.Join(destFileName, file.Name)
-
-		if file.FileInfo().IsDir() {
-			if err := os.MkdirAll(filePath, 0777); err != nil {
-				return err
+	for _, cluster := range couchbaseClusters.Items {
+		if len(clusters) != 0 {
+			found := false
+			for _, c := range clusters {
+				if c == cluster.Name {
+					found = true
+					break
+				}
 			}
-		} else {
-			if err := os.MkdirAll(filepath.Dir(filePath), 0777); err != nil {
-				return err
-			}
-			fPtr, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
-			if err != nil {
-				return err
-			}
-			defer fPtr.Close()
-
-			if _, err := io.Copy(fPtr, rc); err != nil {
-				return err
+			if !found {
+				continue
 			}
 		}
-		return nil
+
+		files = append(files, fmt.Sprintf("%s/%s/couchbasecluster/%s/%s.yaml", base, namespace, cluster.Name, cluster.Name))
 	}
 
-	for _, file := range zipReader.File {
-		if err := extractAndWriteFile(file); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Function to untar the log file
-func untarGzFile(tarGzFilePath string) error {
-	file, err := os.OpenFile(tarGzFilePath, os.O_RDONLY, 0444)
-	defer func() { _ = file.Close() }()
+	// Gather namespace and cluster scoped resources.
+	selector, err := getLabelSelector(all, clusters)
 	if err != nil {
-		return err
+		e2eutil.Die(t, err)
 	}
 
-	gr, err := gzip.NewReader(file)
-	defer func() { _ = gr.Close() }()
+	endpoints, err := k8s.KubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
-		return err
+		e2eutil.Die(t, err)
+	}
+	pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
 	}
 
-	tarReader := tar.NewReader(gr)
-	for {
-		hdr, err := tarReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		filePath := hdr.Name
-		filePathAsList := strings.Split(filePath, "/")
-		filePathAsList = filePathAsList[0 : len(filePathAsList)-1]
-		filePathToCreate := strings.Join(filePathAsList, "/")
-		if err := os.MkdirAll(filePathToCreate, 0766); err != nil {
-			return err
-		}
-
-		filePtr, err := os.OpenFile(filePath, os.O_RDWR|os.O_TRUNC, 0777)
-		if err != nil {
-			filePtr, err = os.Create(filePath)
-			if err != nil {
-				return err
-			}
-		}
-		defer filePtr.Close()
-
-		if _, err := io.Copy(filePtr, tarReader); err != nil {
-			return err
-		}
+	for _, endpoint := range endpoints.Items {
+		files = append(files, fmt.Sprintf("%s/%s/endpoints/%s/%s.yaml", base, namespace, endpoint.Name, endpoint.Name))
+	}
+	for _, pvc := range pvcs.Items {
+		files = append(files, fmt.Sprintf("%s/%s/persistentvolumeclaim/%s/%s.yaml", base, namespace, pvc.Name, pvc.Name))
+	}
+	for _, pod := range pods.Items {
+		files = append(files, fmt.Sprintf("%s/%s/pod/%s/%s.yaml", base, namespace, pod.Name, pod.Name))
+	}
+	for _, pdb := range pdbs.Items {
+		files = append(files, fmt.Sprintf("%s/%s/poddisruptionbudget/%s/%s.yaml", base, namespace, pdb.Name, pdb.Name))
+	}
+	for _, service := range services.Items {
+		files = append(files, fmt.Sprintf("%s/%s/service/%s/%s.yaml", base, namespace, service.Name, service.Name))
 	}
 
-	return nil
+	return files
 }
 
 // Generic function to run cbopinfo command
 func runCbopinfoCmd(cmdArgs []string) ([]byte, error) {
 	return exec.Command(framework.Global.CbopinfoPath, cmdArgs...).CombinedOutput()
+}
+
+// cbopinfo runs the command with the specified arguments returning the archive name
+// created.
+func cbopinfo(t *testing.T, args argumentList) string {
+	stdout, err := runCbopinfoCmd(args.slice())
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %v: %v", err, stdout))
+	}
+	re, err := regexp.Compile(`Wrote cluster information to (\S+)`)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	matches := re.FindStringSubmatch(string(stdout))
+	if len(matches) != 2 {
+		e2eutil.Die(t, fmt.Errorf("failed to extract archive"))
+	}
+	return matches[1]
 }
 
 func getLogFileNameFromExecOutput(outputStr string) string {
@@ -586,6 +585,15 @@ func (a argumentList) addClusterDefaults(k8s *types.Cluster) {
 // that should be used for a successful run.
 func (a argumentList) addEnvironmentDefaults() {
 	a.add("--operator-image", framework.Global.OpImage)
+}
+
+// clone duplicates an argument list.
+func (a argumentList) clone() argumentList {
+	n := argumentList{}
+	for k, v := range a {
+		n[k] = v
+	}
+	return n
 }
 
 // Run cbopinfo command with all valid arguments
@@ -664,9 +672,6 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 			logFileDir := strings.Split(logFileName, ".")[0]
 			defer os.RemoveAll(logFileDir)
-			if err := untarGzFile(logFileName); err != nil {
-				e2eutil.Die(t, fmt.Errorf("Failed to untar file %s: %v", logFileName, err))
-			}
 
 			// Check command fails with missing argument value
 			if arg.ArgValue != "" {
@@ -792,312 +797,118 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 // Create a couchbase cluster
 // Get the logs from the desired clustername and namespace and verify
 // Get logs from multiple / all clusters and verify the files
-func TestLogCollectUsingClusterNameAndNamespace(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
+func TestLogCollect(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	failureExists := false
-	cluster1Size := constants.Size3
-	cluster2Size := constants.Size3
+	cluster1Size := constants.Size1
+	cluster2Size := constants.Size1
 	cluster3Size := constants.Size1
-	var cluster1, cluster2, cluster3 *couchbasev2.CouchbaseCluster
-	cluster1Err := make(chan error)
-	cluster2Err := make(chan error)
-	cluster3Err := make(chan error)
 
-	go func() {
-		var err error
-		cluster1, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster1Size)
-		cluster1Err <- err
-	}()
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	cluster1 := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, cluster1Size)
+	cluster2 := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, cluster2Size)
+	cluster3 := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, cluster3Size)
 
-	go func() {
-		var err error
-		cluster2, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster2Size)
-		cluster2Err <- err
-	}()
+	commonArgs := argumentList{}
+	commonArgs.addClusterDefaults(targetKube)
+	commonArgs.addEnvironmentDefaults()
 
-	go func() {
-		var err error
-		cluster3, err = e2eutil.NewClusterBasic(t, targetKube, f.Namespace, cluster3Size)
-		cluster3Err <- err
-	}()
+	t.Run("TestLogCollectSingle", func(t *testing.T) {
+		args := commonArgs.clone()
+		args.add(cluster1.Name, "")
 
-	for _, errChan := range []chan error{cluster1Err, cluster2Err, cluster3Err} {
-		if err := <-errChan; err != nil {
-			t.Fatal(err)
-		}
-	}
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	isAllFlagSet := false
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true, cluster1.Name)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 
-	/////////////////////////////////////////////////////
-	// Log collection using '-namespace' & cluster arg //
-	/////////////////////////////////////////////////////
-	t.Log("Collecting logs from single cluster")
-	reqFileList := []string{}
-	errMsgList := failureList{}
-	args := argumentList{}
-	args.addClusterDefaults(targetKube)
-	args.addEnvironmentDefaults()
-	commonArgs := args.slice()
-	cmdArgs := append(commonArgs, cluster1.Name)
-	execOut, err := runCbopinfoCmd(cmdArgs)
-	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+	t.Run("TestLogCollectMultiple", func(t *testing.T) {
+		args := commonArgs.clone()
+		args.add(cluster1.Name, "")
+		args.add(cluster3.Name, "")
 
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true, cluster1.Name, cluster3.Name)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 
-	// collect logs from multi clusters by specifying cluster names in command line
-	t.Log("Collecting logs from cluster1 and cluster3")
-	reqFileList = []string{}
-	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, cluster1.Name, cluster3.Name)
-	execOut, err = runCbopinfoCmd(cmdArgs)
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+	t.Run("TestLogCollect", func(t *testing.T) {
+		archive := cbopinfo(t, commonArgs)
+		defer os.Remove(archive)
 
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster3.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("TestLogCollectSingleSystem", func(t *testing.T) {
+		args := commonArgs.clone()
+		args.add("--system", "")
+		args.add(cluster2.Name, "")
 
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	// collect logs from all clusters in the given namespace
-	t.Log("Collecting logs from all available cluster")
-	reqFileList = []string{}
-	errMsgList = failureList{}
-	execOut, err = runCbopinfoCmd(commonArgs)
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true, cluster2.Name)
+		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, true, true, true)...)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("TestLogCollectMultipleSystem", func(t *testing.T) {
+		args := commonArgs.clone()
+		args.add("--system", "")
+		args.add(cluster1.Name, "")
+		args.add(cluster3.Name, "")
 
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster2.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	///////////////////////////////////////////////
-	/////// Log collection using '-system' ////////
-	///////////////////////////////////////////////
-	t.Log("Log Verification for kube-system and single cb cluster")
-	reqFileList = []string{}
-	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "--system", cluster2.Name)
-	execOut, err = runCbopinfoCmd(cmdArgs)
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true, cluster1.Name, cluster3.Name)
+		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, true, true, true)...)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("TestLogCollectSystem", func(t *testing.T) {
+		args := commonArgs.clone()
+		args.add("--system", "")
 
-	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster2.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	// Verify kube-system logs with multiple couchbase cluster logs
-	t.Log("Collecting logs from specific cb clusters")
-	reqFileList = []string{}
-	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "--system", cluster1.Name, cluster3.Name)
-	execOut, err = runCbopinfoCmd(cmdArgs)
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true)
+		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, true, true, true)...)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("TestLogCollectSingleCollectInfo", func(t *testing.T) {
+		args := commonArgs.clone()
+		args.add("--collectinfo", "")
+		args.add("--collectinfo-collect", "all")
+		args.add(cluster1.Name, "")
 
-	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, clusterName := range []string{cluster1.Name, cluster3.Name} {
-		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, clusterName, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
+		defer removeServerLogs()
 
-	// Verify kube-system logs with all other cb cluster logs
-	t.Log("Collecting logs from all available cb clusters")
-	reqFileList = []string{}
-	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "--system")
-	execOut, err = runCbopinfoCmd(cmdArgs)
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true, cluster1.Name)
+		mustVerifyArchiveContents(t, archive, files)
+		mustVerifyServerLogs(t, targetKube, f.Namespace, archive, false, cluster1.Name)
+	})
 
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("TestLogCollectAll", func(t *testing.T) {
+		args := commonArgs.clone()
+		args.add("--all", "")
 
-	for _, namespace := range []string{f.Namespace, "kube-system"} {
-		if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, clusterName := range []string{cluster1.Name, cluster2.Name, cluster3.Name} {
-		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, clusterName, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	///////////////////////////////////////////////////
-	/////// Log collection using '-collectinfo' ///////
-	///////////////////////////////////////////////////
-	t.Log("Collecting logs with -collectinfo flag on single cb cluster")
-	reqFileList = []string{}
-	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "--collectinfo", "--collectinfo-collect", "all", cluster1.Name)
-	execOut, err = runCbopinfoCmd(cmdArgs)
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
-
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cluster1.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
-
-	///////////////////////////////////////////////////
-	/////////// Log collection using '-all' ///////////
-	///////////////////////////////////////////////////
-	t.Log("Collecting logs with -all flag on all cb clusters")
-	reqFileList = []string{}
-	errMsgList = failureList{}
-	cmdArgs = append(commonArgs, "--all")
-	execOut, err = runCbopinfoCmd(cmdArgs)
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
-
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
-
-	isAllFlagSet = true
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	for _, clusterName := range []string{cluster1.Name, cluster2.Name, cluster3.Name} {
-		if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, clusterName, &reqFileList); err != nil {
-			t.Fatal(err)
-		}
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists = errMsgList.PrintFailures(t) || failureExists
-
-	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cluster1.Name, logFileDir, false, &errMsgList); err != nil {
-		t.Fatal(err)
-	}
-
-	if failureExists {
-		t.Fatal("Test failed")
-	}
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, true, true, true)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 }
 
 // Create couchbase cluster
@@ -1224,7 +1035,7 @@ func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName s
 
 // Generic function to re-deploy the operator with given image name and rest-port
 // Collect logs with appropriate cbopinfo arguments and verify the collected info
-func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorImage string, operatorPort int, cmdArgs []string) {
+func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorImage string, operatorPort int, args argumentList) {
 	f := framework.Global
 	targetKube := k8s
 	clusterSize := 3
@@ -1239,43 +1050,15 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	defer e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
-	execOut, err := runCbopinfoCmd(append(cmdArgs, cbCluster.Name))
-	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+	args.add(cbCluster.Name, "")
 
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	archive := cbopinfo(t, args)
+	defer os.Remove(archive)
+	defer removeServerLogs()
 
-	// Verify file list
-	errMsgList := failureList{}
-	reqFileList := getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, true)
-
-	isAllFlagSet := true
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists := errMsgList.PrintFailures(t)
-
-	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, false, &errMsgList); err != nil {
-		t.Fatal(err)
-	}
-
-	if failureExists {
-		t.Fatal("Test failed")
-	}
+	files := mustGetFileList(t, targetKube, f.Namespace, archive, true, true, true)
+	mustVerifyArchiveContents(t, archive, files)
+	mustVerifyServerLogs(t, targetKube, f.Namespace, archive, false)
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
@@ -1294,7 +1077,7 @@ func TestExtendedDebugWithDefaultValues(t *testing.T) {
 	args.add("--collectinfo", "")
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
-	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, constants.OperatorRestPort, args.slice())
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, constants.OperatorRestPort, args)
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
@@ -1310,99 +1093,55 @@ func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	args.add("--collectinfo", "")
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
-	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, args.slice())
+	CollectExtendedDebugLogGeneric(t, targetKube, f.OpImage, testPort, args)
 }
 
 // Collect cbopinfo with '--operator-image' & '-operator-rest-port'
 // with invalid values and validate the log collection
-func TestExtendedDebugWithInvalidValues(t *testing.T) {
+func TestLogCollectInvalid(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	invalidImgName := "couchbase/couchbase-operator:invalidversion"
 	invalidPortVal := "32080"
 	clusterSize := constants.Size1
-	cbopinfoAllFlag := false
+	//cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
 	// Collect logs with invalid operator-image-name
-	t.Log("Collecting logs using invalid -operator-image arg value")
-	args := argumentList{}
-	args.addClusterDefaults(targetKube)
-	args.add("--operator-image", invalidImgName)
-	args.add("--operator-rest-port", strconv.Itoa(constants.OperatorRestPort))
+	t.Run("TestLogCollectInvalidOperatorImage", func(t *testing.T) {
+		args := argumentList{}
+		args.addClusterDefaults(targetKube)
+		args.add("--operator-image", invalidImgName)
+		args.add("--operator-rest-port", strconv.Itoa(constants.OperatorRestPort))
 
-	execOut, err := runCbopinfoCmd(append(args.slice(), cbCluster.Name))
-	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	// Untar log file
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Error(err)
-	} else {
-		// Verify file list if untar is successful
-		errMsgList := failureList{}
-		excludedFileList := []string{}
-		deploymentDir := logFileDir + "/" + f.Namespace + "/deployment"
-
-		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &excludedFileList, cbopinfoAllFlag); err != nil {
-			t.Error(err)
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, true, true)
+		filtered := []string{}
+		for _, file := range files {
+			if !strings.Contains(file, "/deployment/") {
+				filtered = append(filtered, file)
+			}
 		}
-		excludedFileList = append(excludedFileList, getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, true)...)
-
-		checkLogDirContentsForExcludedFiles(excludedFileList, &errMsgList)
-		if failureExists := errMsgList.PrintFailures(t); failureExists {
-			t.Error("Log file verification failed")
-		}
-	}
+		mustVerifyArchiveContents(t, archive, filtered)
+	})
 
 	// Collect logs with invalid operator-rest-port
-	t.Log("Collecting logs using invalid -operator-rest-port arg value")
-	args = argumentList{}
-	args.addClusterDefaults(targetKube)
-	args.addEnvironmentDefaults()
-	args.add("--operator-rest-port", invalidPortVal)
+	t.Run("TestLogCollectInvalidRestPort", func(t *testing.T) {
+		args := argumentList{}
+		args.addClusterDefaults(targetKube)
+		args.addEnvironmentDefaults()
+		args.add("--operator-rest-port", invalidPortVal)
 
-	execOut, err = runCbopinfoCmd(append(args.slice(), cbCluster.Name))
-	execOutStr = strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName = getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
+		archive := cbopinfo(t, args)
+		defer os.Remove(archive)
 
-	// Untar log file
-	logFileDir = strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Error(err)
-	} else {
-		// Verify file list if untar is successful
-		errMsgList := failureList{}
-		reqFileList := []string{}
-		deploymentDir := logFileDir + "/" + f.Namespace + "/deployment"
-
-		// In invalid rest-port case, deployment yaml, logs will exists. Only rest-port files will be missing
-		if err := getDeployementFileList(targetKube.KubeClient, f.Namespace, deploymentDir, &reqFileList, cbopinfoAllFlag); err != nil {
-			t.Error(err)
-		}
-		excludedFileList := getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, false)
-
-		checkLogDirContents(reqFileList, &errMsgList)
-		checkLogDirContentsForExcludedFiles(excludedFileList, &errMsgList)
-		if failureExists := errMsgList.PrintFailures(t); failureExists {
-			t.Error("Log file verification failed")
-		}
-	}
+		files := mustGetFileList(t, targetKube, f.Namespace, archive, false, false, true)
+		mustVerifyArchiveContents(t, archive, files)
+	})
 }
 
 // Collect cbopinfo with '-operator-image' & '-operator-rest-port'
@@ -1413,9 +1152,8 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
 
-	t.Log("Collecting logs using invalid operator-image value")
 	args := argumentList{}
 	args.addClusterDefaults(targetKube)
 	args.addEnvironmentDefaults()
@@ -1427,48 +1165,14 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
 
 	// Collect logs when operator pod goes down in parallel
-	t.Log("Starting log collection")
-	var err error
-	execOut, err := runCbopinfoCmd(append(args.slice(), cbCluster.Name))
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
-
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	archive := cbopinfo(t, args)
+	defer os.Remove(archive)
+	defer removeServerLogs()
 
 	// Verify file list
-	errMsgList := failureList{}
-	reqFileList := getOperatorExtendedDebugFileList(f.Namespace, f.Deployment.Name, logFileDir, true, true)
-
-	isAllFlagSet := true
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, isAllFlagSet, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-
-	checkLogDirContents(reqFileList, &errMsgList)
-	failureExists := errMsgList.PrintFailures(t)
-
-	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, false, &errMsgList); err != nil {
-		t.Fatal(err)
-	}
-
-	if failureExists {
-		t.Fatal("Test failed")
-	}
+	files := mustGetFileList(t, targetKube, f.Namespace, archive, true, true, true)
+	mustVerifyArchiveContents(t, archive, files)
+	mustVerifyServerLogs(t, targetKube, f.Namespace, archive, false)
 }
 
 /**************************************
@@ -1889,43 +1593,20 @@ func LogCollectionWithDefaultPvcMount(t *testing.T, k8s *types.Cluster, serverMe
 	args.add("--collectinfo", "")
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
-	execOut, err := runCbopinfoCmd(args.slice())
-	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
 
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	archive := cbopinfo(t, args)
+	defer os.Remove(archive)
+	defer removeServerLogs()
 
 	// Verify file list
-	errMsgList := failureList{}
-	reqFileList := []string{}
-	if err := getNonCouchbaseLogFileList(targetKube.KubeClient, targetKube.Config, f.Namespace, logFileDir, true, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	if err := getCouchbaseFileList(targetKube.KubeClient, targetKube.CRClient, f.Namespace, logFileDir, cbCluster.Name, &reqFileList); err != nil {
-		t.Fatal(err)
-	}
-	checkLogDirContents(reqFileList, &errMsgList)
-	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, false, &errMsgList); err != nil {
-		t.Error(err)
-	}
-	errMsgList.CheckFailures(t)
+	files := mustGetFileList(t, targetKube, f.Namespace, archive, true, true, true)
+	mustVerifyArchiveContents(t, archive, files)
+	mustVerifyServerLogs(t, targetKube, f.Namespace, archive, false)
 }
 
 // Create couchbase cluster with persistent volume claim
 // Collect log and check for persistent volume definition files
 func TestLogCollectClusterWithPVC(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -1980,9 +1661,6 @@ func TestCollectLogFromPvPodRecoveredKillService(t *testing.T) {
 // Bring down a pod with operator and wait for recovery
 // Collect log and check for persistent volume definition files
 func TestCollectLogFromPvPodAndOperatorRecovered(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -2017,7 +1695,7 @@ func TestLogRedactionVerify(t *testing.T) {
 
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3)
+	e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size3)
 
 	// Collect logs
 	args := argumentList{}
@@ -2027,41 +1705,12 @@ func TestLogRedactionVerify(t *testing.T) {
 	args.add("--collectinfo-collect", "all")
 	args.add("--collectinfo-redact", "")
 	args.add("--all", "")
-	execOut, err := runCbopinfoCmd(args.slice())
-	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
 
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	archive := cbopinfo(t, args)
+	defer os.Remove(archive)
+	defer removeServerLogs()
 
-	// Variable to denote failure of test
-	testHasErrors := false
-
-	// Verify required log files are generated
-	errMsgList := failureList{}
-	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, true, &errMsgList); err != nil {
-		t.Error(err)
-	}
-	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
-
-	// Verify log redaction part in collected files
-	errMsgList = failureList{}
-	if err := verifyLogRedaction(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, &errMsgList); err != nil {
-		t.Error(err)
-	}
-	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
-
-	if testHasErrors {
-		t.Fail()
-	}
+	mustVerifyServerLogs(t, targetKube, f.Namespace, archive, true)
 }
 
 func TestLogRedactionWithPvVerify(t *testing.T) {
@@ -2093,7 +1742,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	cbCluster.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		pvcTemplate,
 	}
-	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, cbCluster)
+	e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, cbCluster)
 
 	// Collect logs
 	args := argumentList{}
@@ -2103,41 +1752,12 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	args.add("--collectinfo-collect", "all")
 	args.add("--collectinfo-redact", "")
 	args.add("--all", "")
-	execOut, err := runCbopinfoCmd(args.slice())
-	execOutStr := strings.TrimSpace(string(execOut))
-	t.Logf("Returned: %s\n", execOutStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	logFileName := getLogFileNameFromExecOutput(execOutStr)
-	defer os.Remove(logFileName)
 
-	logFileDir := strings.Split(logFileName, ".")[0]
-	defer os.RemoveAll(logFileDir)
-	if err := untarGzFile(logFileName); err != nil {
-		t.Fatal(err)
-	}
+	archive := cbopinfo(t, args)
+	defer os.Remove(archive)
+	defer removeServerLogs()
 
-	// Variable to denote failure of test
-	testHasErrors := false
-
-	// Verify required log files are generated
-	errMsgList := failureList{}
-	if err := checkCollectInfoLogs(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, true, &errMsgList); err != nil {
-		t.Error(err)
-	}
-	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
-
-	// Verify log redaction part in collected files
-	errMsgList = failureList{}
-	if err := verifyLogRedaction(targetKube.KubeClient, f.Namespace, cbCluster.Name, logFileDir, &errMsgList); err != nil {
-		t.Error(err)
-	}
-	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
-
-	if testHasErrors {
-		t.Fail()
-	}
+	mustVerifyServerLogs(t, targetKube, f.Namespace, archive, true)
 }
 
 // TestLogRetentionMultiCluster ensures that one cluster's retention settings do not affect anothers
@@ -2196,6 +1816,8 @@ func TestLogCollectListJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer removeServerLogs()
 
 	errMsgList := failureList{}
 	testHasErrors := false

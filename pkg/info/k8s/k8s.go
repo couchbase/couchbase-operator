@@ -43,7 +43,7 @@ func InitContext(context *context.Context) error {
 	}
 
 	// Create a Couchbase client
-	context.CouchbaseClusterClient, err = versioned.NewForConfig(context.KubeConfig)
+	context.CouchbaseClient, err = versioned.NewForConfig(context.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func GetOperatorDeployment(context *context.Context) (*appsv1.Deployment, error)
 
 // GetCouchbaseClusters returns all Couchbase Clusters in the namespace.
 func GetCouchbaseClusters(context *context.Context) (*couchbasev2.CouchbaseClusterList, error) {
-	clusters, err := context.CouchbaseClusterClient.CouchbaseV2().CouchbaseClusters(context.Namespace()).List(metav1.ListOptions{})
+	clusters, err := context.CouchbaseClient.CouchbaseV2().CouchbaseClusters(context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to poll CouchbaseCluster resources: %v", err)
 	}

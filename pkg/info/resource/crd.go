@@ -57,7 +57,7 @@ func (r *crdResource) Write(b backend.Backend) error {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), crd.Name, crd.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), crd.Name, crd.Name+".yaml"), string(data))
 	}
 	return nil
 }

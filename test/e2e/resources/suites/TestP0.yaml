@@ -118,7 +118,7 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestNegLogCollectValidateArgs
-      - name: TestLogCollectUsingClusterNameAndNamespace
+      - name: TestLogCollect
       - name: TestExtendedDebugWithNonDefaultValues
       - name: TestCollectLogFromEphemeralPodsUsingLogPVKillProcess
       - name: TestLogRedactionWithPvVerify

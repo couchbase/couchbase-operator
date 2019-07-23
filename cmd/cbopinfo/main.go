@@ -24,10 +24,12 @@ import (
 var (
 	// Define all of the resource types we can collect information for
 	resourceInitializers = []resource.ResourceInitializer{
-		resource.NewClusterRoleResource,
-		resource.NewClusterRoleBindingResource,
+		resource.NewConfigMapResource,
 		resource.NewCouchbaseClusterResource,
-		resource.NewCustomResourceDefinitionResource,
+		resource.NewCouchbaseBucketResource,
+		resource.NewCouchbaseEphemeralBucketResource,
+		resource.NewCouchbaseMemcachedBucketResource,
+		resource.NewCouchbaseReplicationResource,
 		resource.NewDeploymentResource,
 		resource.NewEndpointResource,
 		resource.NewPersistentVolumeClaimResource,
@@ -48,6 +50,9 @@ var (
 
 	// Define all cluster scoped resource types
 	clusterResourceInitializers = []resource.ResourceInitializer{
+		resource.NewClusterRoleResource,
+		resource.NewClusterRoleBindingResource,
+		resource.NewCustomResourceDefinitionResource,
 		resource.NewNodeResource,
 		resource.NewPersistentVolumeResource,
 	}

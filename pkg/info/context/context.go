@@ -22,8 +22,8 @@ type Context struct {
 	KubeClient *kubernetes.Clientset
 	// KubeExtClient is an initialized Kubernetes extensions client for CRDs
 	KubeExtClient clientset.Interface
-	// CouchbaseClusterClient is an initialized Kubernetes client for CouchbaseCluster CRDs
-	CouchbaseClusterClient versioned.Interface
+	// CouchbaseClient is an initialized Kubernetes client for Couchbase CRDs
+	CouchbaseClient versioned.Interface
 	// NamespaceOverride allows you to ignore what kuebconfig or the CLI says
 	NamespaceOverride string
 }
