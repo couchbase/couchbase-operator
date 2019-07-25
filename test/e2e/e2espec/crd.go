@@ -169,6 +169,32 @@ func GenerateValidBucketSettings(bucketTypes []string) []api.BucketConfig {
 	return generatedSettings
 }
 
+// imagePullSecret to use to apply to pods.  Ignored if empty.
+var imagePullSecret string
+
+// SetImagePullSecret sets the privaye image pull secret for this module.
+// TODO: globals are banned!!
+func SetImagePullSecret(s string) {
+	imagePullSecret = s
+}
+
+// ApplyImagePullSecret adds an image pull secret to all the Couchbase server pods so that
+// they can use private repositories.
+func ApplyImagePullSecret(cluster *api.CouchbaseCluster) {
+	if imagePullSecret != "" {
+		for i := range cluster.Spec.ServerSettings {
+			if cluster.Spec.ServerSettings[i].Pod == nil {
+				cluster.Spec.ServerSettings[i].Pod = &api.PodPolicy{}
+			}
+			cluster.Spec.ServerSettings[i].Pod.ImagePullSecrets = []v1.LocalObjectReference{
+				{
+					Name: imagePullSecret,
+				},
+			}
+		}
+	}
+}
+
 // basic 3 node cluster
 func NewBasicCluster(genName, secretName string, size int, withBucket bool, exposed bool) *api.CouchbaseCluster {
 	bucketConfig := []api.BucketConfig{}

@@ -6,12 +6,18 @@ import (
 	api "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string, cl *api.CouchbaseCluster) (*api.CouchbaseCluster, error) {
+	// This is the only place where all cluster creations converge due to code sprawl.
+	// So regardless of whether the CRD was hand crafted, or a cookie cutter we are
+	// guaranteed to apply the correct pod policy mutations here before every creation.
+	e2espec.ApplyImagePullSecret(cl)
+
 	cl.Namespace = namespace
 	res, err := k8sutil.CreateCouchbaseCluster(crClient, cl)
 	if err != nil {
