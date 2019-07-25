@@ -46,7 +46,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AdminService, api.AnalyticsService, api.DataService, api.EventingService)
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
 	// Can get stuck on rebalancing.
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
@@ -158,7 +158,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AdminService, api.AnalyticsService, api.DataService, api.EventingService)
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
 	expectedEvents.AddClusterBucketEvent(testCouchbase, "Create", bucketName)
 
@@ -331,7 +331,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AdminService, api.AnalyticsService, api.DataService, api.EventingService)
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
@@ -502,7 +502,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	for memberIndex := 0; memberIndex < clusterSize; memberIndex++ {
 		expectedEvents.AddClusterPodEvent(testCouchbase, "AddNewMember", memberIndex)
 	}
-	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AnalyticsService, api.DataService, api.EventingService)
+	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.AdminService, api.AnalyticsService, api.DataService, api.EventingService)
 	expectedEvents.AddClusterNodeServiceEvent(testCouchbase, "Create", api.IndexService, api.QueryService, api.SearchService)
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceStarted")
 	expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
