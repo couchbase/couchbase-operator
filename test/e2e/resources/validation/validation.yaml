@@ -158,7 +158,7 @@ spec:
         - path: subject.cn
           prefix: prefix
           delimiter: .
-    loadBalanacerSourceRanges:
+    loadBalancerSourceRanges:
     - 10.0.0.0/8
     - 172.16.0.0/12
   logging:
@@ -280,3 +280,6 @@ spec:
             storage: 1Gi
           limits:
             storage: 2Gi
+  monitoring:
+    prometheus:
+      enabled: true

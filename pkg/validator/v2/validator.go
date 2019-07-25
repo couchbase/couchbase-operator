@@ -3,7 +3,6 @@ package v2
 import (
 	"crypto/x509"
 	"fmt"
-
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -29,6 +28,7 @@ const (
 	defaultServiceMemQuota                        = 256
 	defaultAnalyticsServiceMemQuota               = 1024
 	defaultFSGroup                                = 1000
+	defaultMetricsImage                           = "couchbase/prometheus-exporter:1.0.0"
 )
 
 func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
@@ -98,6 +98,11 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: defaultFSGroup})
+	}
+	if enableMonitoring, found, _ := unstructured.NestedBool(object.Object, "spec", "monitoring", "prometheus", "enabled"); found && enableMonitoring {
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "monitoring", "prometheus", "image"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/monitoring/prometheus/image", Value: defaultMetricsImage})
+		}
 	}
 
 	return patch

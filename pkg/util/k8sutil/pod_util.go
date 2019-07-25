@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sort"
 	"strings"
 
@@ -31,6 +32,7 @@ const (
 	defaultSubPathName              = "default"
 	etcSubPathName                  = "etc"
 	readinessFile                   = "/tmp/ready"
+	prometheusPort                  = 9091
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -362,6 +364,14 @@ func CreateCouchbasePodSpec(kubeCli kubernetes.Interface, m *couchbaseutil.Membe
 			SecurityContext: cluster.Spec.SecurityContext,
 		},
 	}
+
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
+		if cluster.Spec.Monitoring.Prometheus.Enabled {
+			metricsContainer := createMetricsContainer(cluster.Spec)
+			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
+		}
+	}
+
 	applyBaseAnnotations(pod.GetObjectMeta())
 
 	if cluster.Spec.AntiAffinity {
@@ -620,6 +630,41 @@ func couchbaseInitContainer(image, claimName string) v1.Container {
 			MountPath: "/mnt"},
 	}
 	return initContainer
+}
+
+func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
+	var resources v1.ResourceRequirements
+	if cs.Monitoring.Prometheus.Resources != nil {
+		resources = *cs.Monitoring.Prometheus.Resources
+	}
+
+	return v1.Container{
+		Name:    "metrics",
+		Image:   cs.Monitoring.Prometheus.Image,
+		Command: []string{"couchbase_exporter"},
+		Ports: []v1.ContainerPort{
+			{
+				Name:          "prometheus",
+				ContainerPort: int32(prometheusPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+		ReadinessProbe: &v1.Probe{
+			Handler: v1.Handler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: prometheusPort,
+					},
+				},
+			},
+			InitialDelaySeconds: 10,
+			TimeoutSeconds:      5,
+			PeriodSeconds:       10,
+			FailureThreshold:    3,
+		},
+		Resources: resources,
+	}
 }
 
 func PodWithAntiAffinity(pod *v1.Pod, clusterName string) *v1.Pod {

@@ -814,9 +814,15 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateLoadBalancerSourceRanges",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/networking/loadBalanacerSourceRanges/-", "192.168.0.1")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/networking/loadBalancerSourceRanges/-", "192.168.0.1")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.loadBalanacerSourceRanges in body should match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$'`},
+			expectedErrors: []string{`spec.networking.loadBalancerSourceRanges in body should match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$'`},
+		},
+		{
+			name:           "TestValidateMonitoringInvalidImage",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/monitoring/prometheus/image", "mr-tickle")},
+			shouldFail:     true,
+			expectedErrors: []string{`CouchbaseCluster.couchbase.com "cluster" is invalid: spec.monitoring.prometheus.image: Invalid value: "": spec.monitoring.prometheus.image in body should match '^[\w_\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$'`},
 		},
 	}
 

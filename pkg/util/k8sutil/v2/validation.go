@@ -626,7 +626,7 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 										"serviceAnnotations": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "object",
 										},
-										"loadBalanacerSourceRanges": apiextensionsv1beta1.JSONSchemaProps{
+										"loadBalancerSourceRanges": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "array",
 											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 												Schema: &apiextensionsv1beta1.JSONSchemaProps{
@@ -1073,6 +1073,50 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 																			Type: "string",
 																		},
 																	},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								"monitoring": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"prometheus": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"enabled": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "boolean",
+												},
+												"image": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "string",
+													Pattern: ImagePattern,
+												},
+												"resources": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"limits": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																"cpu": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+																"memory": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+															},
+														},
+														"requests": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																"cpu": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+																"memory": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
 																},
 															},
 														},

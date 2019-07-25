@@ -321,6 +321,9 @@ type ClusterSpec struct {
 
 	// XDCR specific settings.
 	XDCR XDCR `json:"xdcr"`
+
+	// Prometheus Monitoring settings.
+	Monitoring *CouchbaseClusterMonitoringSpec `json:"monitoring,omitempty"`
 }
 
 type CouchbaseClusterSecuritySpec struct {
@@ -365,7 +368,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// LoadBalancerSourceRanges applies only when an exposed service is of type
 	// LoadBalancer and limits the source IP ranges that are allowed to use the
 	// service.
-	LoadBalancerSourceRanges []string `json:"loadBalanacerSourceRanges,omitempty"`
+	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
@@ -808,3 +811,18 @@ const (
 	// a rollback in process.
 	UpgradingMessageStateRollback = "rolling-back"
 )
+
+type CouchbaseClusterMonitoringSpec struct {
+	Prometheus *CouchbaseClusterMonitoringPrometheusSpec `json:"prometheus,omitempty"`
+}
+
+type CouchbaseClusterMonitoringPrometheusSpec struct {
+	// Enabled is a boolean that enables/disables the metrics sidecar container.
+	Enabled bool `json:"enabled,omitempty"`
+	// Image is the metrics image to be used to collect metrics.
+	Image string `json:"image,omitempty"`
+	// Resources is the resource requirements for the metrics container.
+	// This field cannot be updated once the cluster is created.
+	// Will be populated by defaults if not specified.
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+}
