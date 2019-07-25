@@ -17,6 +17,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	"gopkg.in/ini.v1"
@@ -282,6 +283,9 @@ func RecreateDockerAuthSecret(client kubernetes.Interface) error {
 		if _, err := client.CoreV1().Secrets(runtimeParams.Namespace).Create(secret); err != nil {
 			return err
 		}
+
+		// Register with the cluster creation module that we have a pull secret.
+		e2espec.SetImagePullSecret(dockerPullSecretName)
 	}
 
 	return nil
