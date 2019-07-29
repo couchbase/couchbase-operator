@@ -183,7 +183,7 @@ func GetAdmissionSecret(key, cert []byte) *corev1.Secret {
 }
 
 // GetAdmissionDeployment returns the canonical deployment for the admission controller.
-func GetAdmissionDeployment(image, imagePullSecret string) *appsv1.Deployment {
+func GetAdmissionDeployment(image, imagePullSecret string, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -215,12 +215,12 @@ func GetAdmissionDeployment(image, imagePullSecret string) *appsv1.Deployment {
 							Command: []string{
 								"couchbase-operator-admission",
 							},
-							Args: []string{
+							Args: append([]string{
 								"--logtostderr",
 								"--stderrthreshold", "0",
 								"--tls-cert-file", "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-cert-file",
 								"--tls-private-key-file", "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-private-key-file",
-							},
+							}, extraArgs...),
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "https",

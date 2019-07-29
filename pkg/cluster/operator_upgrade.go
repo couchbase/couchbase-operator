@@ -1,11 +1,14 @@
 package cluster
 
 import (
-	"reflect"
+	"encoding/json"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 	"github.com/couchbase/couchbase-operator/pkg/version"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // upgradeRange specifies the range of versions to apply an upgrade action to.
@@ -67,10 +70,20 @@ type upgradableResource interface {
 // complete it will commit upgraded items back to Kubernetes to persist the upgrades.
 func (c *Cluster) operatorUpgrade() error {
 	// Check first whether any new defaults need applying to the existing cluster.
-	cluster := c.cluster.DeepCopy()
-	validator.ApplyDefaults(c.cluster)
-	if !reflect.DeepEqual(c.cluster, cluster) {
+	data, err := json.Marshal(c.cluster)
+	if err != nil {
+		return err
+	}
+	unstructuredCluster := &unstructured.Unstructured{}
+	if err := json.Unmarshal(data, unstructuredCluster); err != nil {
+		return err
+	}
+	if patches := validator.ApplyDefaults(unstructuredCluster); patches != nil {
+		cluster := c.cluster.DeepCopy()
 		log.Info("Upgrading resource", "cluster", c.cluster.Name, "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
+		if err := jsonpatch.Apply(cluster, patches); err != nil {
+			return err
+		}
 		cluster, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
 		if err != nil {
 			return err

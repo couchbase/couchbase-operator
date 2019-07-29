@@ -56,7 +56,7 @@ func createAdmissionController(client kubernetes.Interface) error {
 	if _, err := client.CoreV1().Secrets(Global.Namespace).Create(secret); err != nil {
 		return err
 	}
-	deployment := config.GetAdmissionDeployment(runtimeParams.AdmissionControllerImage, dockerPullSecretName)
+	deployment := config.GetAdmissionDeployment(runtimeParams.AdmissionControllerImage, dockerPullSecretName, "-v", "1")
 	if _, err := client.AppsV1().Deployments(Global.Namespace).Create(deployment); err != nil {
 		return err
 	}

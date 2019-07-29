@@ -6,6 +6,7 @@ import (
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	schemav1 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v1"
 	schemav2 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v2"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
@@ -62,21 +63,29 @@ func SchemaValidate(scheme *runtime.Scheme, raw runtime.RawExtension) error {
 	return nil
 }
 
-func ApplyDefaults(resource runtime.Object) {
-	switch t := resource.(type) {
-	case *couchbasev1.CouchbaseCluster:
-		validationv1.ApplyDefaults(t)
-	case *couchbasev2.CouchbaseCluster:
-		validationv2.ApplyDefaults(t)
-	case *couchbasev2.CouchbaseBucket:
-		validationv2.ApplyBucketDefaults(t)
-	case *couchbasev2.CouchbaseEphemeralBucket:
-		validationv2.ApplyEphemeralBucketDefaults(t)
-	case *couchbasev2.CouchbaseMemcachedBucket:
-		validationv2.ApplyMemcachedBucketDefaults(t)
-	case *couchbasev2.CouchbaseReplication:
-		validationv2.ApplyReplicationDefaults(t)
+func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	fmt.Println(object.GetAPIVersion(), couchbasev2.GroupName, object.GetKind())
+	switch object.GetAPIVersion() {
+	case couchbasev2.GroupName + "/v1":
+		switch object.GetKind() {
+		case couchbasev2.ClusterCRDResourceKind:
+			return validationv1.ApplyDefaults(object)
+		}
+	case couchbasev2.GroupName + "/v2":
+		switch object.GetKind() {
+		case couchbasev2.ClusterCRDResourceKind:
+			return validationv2.ApplyDefaults(object)
+		case couchbasev2.BucketCRDResourceKind:
+			return validationv2.ApplyBucketDefaults(object)
+		case couchbasev2.EphemeralBucketCRDResourceKind:
+			return validationv2.ApplyEphemeralBucketDefaults(object)
+		case couchbasev2.MemcachedBucketCRDResourceKind:
+			return validationv2.ApplyMemcachedBucketDefaults(object)
+		case couchbasev2.ReplicationCRDResourceKind:
+			return validationv2.ApplyReplicationDefaults(object)
+		}
 	}
+	return nil
 }
 
 func CheckConstraints(v *types.Validator, resource runtime.Object) error {

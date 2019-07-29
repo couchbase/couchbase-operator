@@ -17,14 +17,14 @@ type CouchbaseBucket struct {
 }
 
 type CouchbaseBucketSpec struct {
-	MemoryQuota        int                   `json:"memoryQuota"`
-	Replicas           int                   `json:"replicas"`
-	IoPriority         string                `json:"ioPriority"`
-	EvictionPolicy     string                `json:"evictionPolicy"`
-	ConflictResolution string                `json:"conflictResolution"`
-	EnableFlush        bool                  `json:"enableFlush"`
-	EnableIndexReplica bool                  `json:"enableIndexReplica"`
-	CompressionMode    cbmgr.CompressionMode `json:"compressionMode"`
+	MemoryQuota        int                   `json:"memoryQuota,omitempty"`
+	Replicas           int                   `json:"replicas,omitempty"`
+	IoPriority         string                `json:"ioPriority,omitempty"`
+	EvictionPolicy     string                `json:"evictionPolicy,omitempty"`
+	ConflictResolution string                `json:"conflictResolution,omitempty"`
+	EnableFlush        bool                  `json:"enableFlush,omitempty"`
+	EnableIndexReplica bool                  `json:"enableIndexReplica,omitempty"`
+	CompressionMode    cbmgr.CompressionMode `json:"compressionMode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -43,13 +43,13 @@ type CouchbaseEphemeralBucket struct {
 }
 
 type CouchbaseEphemeralBucketSpec struct {
-	MemoryQuota        int                   `json:"memoryQuota"`
-	Replicas           int                   `json:"replicas"`
-	IoPriority         string                `json:"ioPriority"`
-	EvictionPolicy     string                `json:"evictionPolicy"`
-	ConflictResolution string                `json:"conflictResolution"`
-	EnableFlush        bool                  `json:"enableFlush"`
-	CompressionMode    cbmgr.CompressionMode `json:"compressionMode"`
+	MemoryQuota        int                   `json:"memoryQuota,omitempty"`
+	Replicas           int                   `json:"replicas,omitempty"`
+	IoPriority         string                `json:"ioPriority,omitempty"`
+	EvictionPolicy     string                `json:"evictionPolicy,omitempty"`
+	ConflictResolution string                `json:"conflictResolution,omitempty"`
+	EnableFlush        bool                  `json:"enableFlush,omitempty"`
+	CompressionMode    cbmgr.CompressionMode `json:"compressionMode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -68,8 +68,8 @@ type CouchbaseMemcachedBucket struct {
 }
 
 type CouchbaseMemcachedBucketSpec struct {
-	MemoryQuota int  `json:"memoryQuota"`
-	EnableFlush bool `json:"enableFlush"`
+	MemoryQuota int  `json:"memoryQuota,omitempty"`
+	EnableFlush bool `json:"enableFlush,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -104,16 +104,16 @@ const (
 type CouchbaseReplicationSpec struct {
 	// Bucket is the source bucket to replicate from.  This must be defined and
 	// selected by the cluster.
-	Bucket string `json:"bucket"`
+	Bucket string `json:"bucket,omitempty"`
 
 	// RemoteBucket is the remote bucket name to synchronize to.
-	RemoteBucket string `json:"remoteBucket"`
+	RemoteBucket string `json:"remoteBucket,omitempty"`
 
 	// CompressionType is the type of compression to apply to the replication.
-	CompressionType CompressionType `json:"compressionType"`
+	CompressionType CompressionType `json:"compressionType,omitempty"`
 
 	// FilterExpression allows certain documents to be filtered out of the replication.
-	FilterExpression string `json:"filterExpression"`
+	FilterExpression string `json:"filterExpression,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -279,43 +279,43 @@ type DNS struct {
 
 type ClusterConfig struct {
 	// The name of the cluster
-	ClusterName string `json:"clusterName"`
+	ClusterName string `json:"clusterName,omitempty"`
 
 	// The amount of memory that should be allocated to the data service
-	DataServiceMemQuota uint64 `json:"dataServiceMemoryQuota"`
+	DataServiceMemQuota uint64 `json:"dataServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the index service
-	IndexServiceMemQuota uint64 `json:"indexServiceMemoryQuota"`
+	IndexServiceMemQuota uint64 `json:"indexServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the search service
-	SearchServiceMemQuota uint64 `json:"searchServiceMemoryQuota"`
+	SearchServiceMemQuota uint64 `json:"searchServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the eventing service
-	EventingServiceMemQuota uint64 `json:"eventingServiceMemoryQuota"`
+	EventingServiceMemQuota uint64 `json:"eventingServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the analytics service
-	AnalyticsServiceMemQuota uint64 `json:"analyticsServiceMemoryQuota"`
+	AnalyticsServiceMemQuota uint64 `json:"analyticsServiceMemoryQuota,omitempty"`
 
 	// The index storage mode to use for secondary indexing
-	IndexStorageSetting string `json:"indexStorageSetting"`
+	IndexStorageSetting string `json:"indexStorageSetting,omitempty"`
 
 	// Timeout that expires to trigger the auto failover.
-	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout"`
+	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout,omitempty"`
 
 	// The number of failover events we can tolerate
-	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount"`
+	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount,omitempty"`
 
 	// Whether to auto failover if disk issues are detected
-	AutoFailoverOnDataDiskIssues bool `json:"autoFailoverOnDataDiskIssues"`
+	AutoFailoverOnDataDiskIssues bool `json:"autoFailoverOnDataDiskIssues,omitempty"`
 
 	// How long to wait for transient errors before failing over a faulty disk
-	AutoFailoverOnDataDiskIssuesTimePeriod uint64 `json:"autoFailoverOnDataDiskIssuesTimePeriod"`
+	AutoFailoverOnDataDiskIssuesTimePeriod uint64 `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
 
 	// Whether to enable failing over a server group
-	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup"`
+	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
 	// Auto-compaction settings
-	AutoCompaction AutoCompaction `json:"autoCompaction,omitempty"`
+	AutoCompaction AutoCompaction `json:"autoCompaction,omitempty,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

@@ -64,12 +64,9 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 							Type: "object",
 							Required: []string{
 								"memoryQuota",
-								"replicas",
 								"ioPriority",
 								"evictionPolicy",
 								"conflictResolution",
-								"enableFlush",
-								"enableIndexReplica",
 								"compressionMode",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
@@ -146,11 +143,9 @@ func GetCouchbaseEphemeralBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 							Type: "object",
 							Required: []string{
 								"memoryQuota",
-								"replicas",
 								"ioPriority",
 								"evictionPolicy",
 								"conflictResolution",
-								"enableFlush",
 								"compressionMode",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
@@ -224,7 +219,6 @@ func GetCouchbaseMemcachedBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 							Type: "object",
 							Required: []string{
 								"memoryQuota",
-								"enableFlush",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{

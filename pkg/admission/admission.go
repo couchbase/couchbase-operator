@@ -4,22 +4,20 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 
 	"github.com/golang/glog"
 
 	"github.com/couchbase/couchbase-operator/pkg/apis"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
-	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -133,45 +131,15 @@ func decodeObject(ar admissionv1beta1.AdmissionReview, raw runtime.RawExtension)
 	return object, nil
 }
 
-// getSpec returns the cluster specification from an abstract cluster type.
-func getSpec(resource runtime.Object) (interface{}, error) {
-	v := reflect.ValueOf(resource)
-	if v.Kind() != reflect.Ptr && v.Kind() != reflect.Interface {
-		return nil, fmt.Errorf("getSpec: object not an interface or pointer")
-	}
-	v = v.Elem().FieldByName("Spec")
-	if v.Kind() == reflect.Invalid {
-		return nil, fmt.Errorf("getSpec: object does not contain a Spec field")
-	}
-	return v.Interface(), nil
-}
-
-// deepCopy returns a clone of an abstract cluster type.
-func deepCopy(resource runtime.Object) (runtime.Object, error) {
-	v := reflect.ValueOf(resource)
-	if v.Kind() != reflect.Ptr && v.Kind() != reflect.Interface {
-		return nil, fmt.Errorf("deepCopy: object not an interface or pointer %v", v.Kind())
-	}
-	v = v.MethodByName("DeepCopy")
-	if v.Kind() == reflect.Invalid {
-		return nil, fmt.Errorf("deepCopy: object does not have a DeepCopy method")
-	}
-	res := v.Call([]reflect.Value{})
-	if len(res) != 1 {
-		return nil, fmt.Errorf("deepCopy: unexpected result length %d", len(res))
-	}
-	if newResource, ok := res[0].Interface().(runtime.Object); ok {
-		return newResource, nil
-	}
-	return nil, fmt.Errorf("deepCopy: unexpected result type")
-}
-
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the
 // operator.  This is for things which cannot be achieved with JSON schema v3 only.
 func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
-	if glog.V(1) {
-		glog.Info("validating couchbasecluster")
-	}
+	glog.Infof("Validating resource: %v %v %v/%v",
+		ar.Request.Operation,
+		ar.Request.Kind,
+		ar.Request.Namespace,
+		ar.Request.Name)
+	glog.V(1).Infof("Validating resource: %s", string(ar.Request.Object.Raw))
 
 	// Temporary hack: explicitly validate the schema.
 	if err := validator.SchemaValidate(scheme, ar.Request.Object); err != nil {
@@ -200,14 +168,14 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 		}
 		// Note: the we cannot raise warnings as the Result field is only consulted if Allowed is false
 		if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
-			glog.Error(err)
+			glog.Errorf("Rejecting resource: %v", err)
 			return errorResponse(err)
 		}
 	}
 
 	// Check that the CouchbaseCluster is correctly configured
 	if err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient()), couchbaseCluster); err != nil {
-		glog.Error(err)
+		glog.Errorf("Rejecting resource: %v", err)
 		return errorResponse(err)
 	}
 
@@ -217,13 +185,17 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 // couchbaseClustersMutate mutates a CouchbaseCluster object before validation.  This allows
 // us to set sensible default values for various properties.
 func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
-	if glog.V(1) {
-		glog.Info("mutating couchbasecluster")
-	}
+	glog.Infof("Mutating resource: %v %v %v/%v",
+		ar.Request.Operation,
+		ar.Request.Kind,
+		ar.Request.Namespace,
+		ar.Request.Name)
+	glog.V(1).Infof("Mutating resource: %s", string(ar.Request.Object.Raw))
 
-	// Decode the CouchbaseCluster object
-	couchbaseCluster, err := decodeObject(ar, ar.Request.Object)
-	if err != nil {
+	// Decode the object as an unstructured data type.  Defaulting happens before
+	// schema validation, so we mustn't try decode until this occurs.
+	object := &unstructured.Unstructured{}
+	if err := json.Unmarshal(ar.Request.Object.Raw, object); err != nil {
 		glog.Error(err)
 		return errorResponse(err)
 	}
@@ -235,33 +207,9 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 		PatchType: &pt,
 	}
 
-	// Duplicate the cluster and apply default values.  If the cluster has been
-	// mutated send a patch pack to the server to be applied.
-	mutatedCouchbaseCluster, err := deepCopy(couchbaseCluster)
-	if err != nil {
-		glog.Error(err)
-		return errorResponse(err)
-	}
-	validator.ApplyDefaults(mutatedCouchbaseCluster)
-	oldSpec, err := getSpec(couchbaseCluster)
-	if err != nil {
-		glog.Error(err)
-		return errorResponse(err)
-	}
-	newSpec, err := getSpec(mutatedCouchbaseCluster)
-	if err != nil {
-		glog.Error(err)
-		return errorResponse(err)
-	}
-
-	if !reflect.DeepEqual(oldSpec, newSpec) {
-		patch := jsonpatch.PatchList{
-			jsonpatch.Patch{
-				Op:    jsonpatch.Replace,
-				Path:  "/spec",
-				Value: newSpec,
-			},
-		}
+	patch := validator.ApplyDefaults(object)
+	if patch != nil {
+		glog.V(1).Infof("Applying patch: %v", patch)
 		data, err := json.Marshal(patch)
 		if err != nil {
 			glog.Error(err)

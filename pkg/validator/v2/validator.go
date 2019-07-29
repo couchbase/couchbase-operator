@@ -6,6 +6,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-openapi/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -25,100 +27,98 @@ const (
 	defaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
 	defaultServiceMemQuota                        = 256
 	defaultAnalyticsServiceMemQuota               = 1024
+	defaultFSGroup                                = 1000
 )
 
-var (
-	defaultFSGroup int64 = 1000
-)
+func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
 
-func ApplyDefaults(customResource *couchbasev2.CouchbaseCluster) {
-	if customResource.Spec.ClusterSettings.DataServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.DataServiceMemQuota = defaultServiceMemQuota
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "dataServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/dataServiceMemoryQuota", Value: defaultServiceMemQuota})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexServiceMemoryQuota", Value: defaultServiceMemQuota})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "searchServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/searchServiceMemoryQuota", Value: defaultServiceMemQuota})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "eventingServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/eventingServiceMemoryQuota", Value: defaultServiceMemQuota})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "analyticsServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/analyticsServiceMemoryQuota", Value: defaultAnalyticsServiceMemQuota})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexStorageSetting"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexStorageSetting", Value: defaultIndexStorageSetting})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverTimeout"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverTimeout", Value: defaultAutoFailoverTimeout})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverMaxCount"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverMaxCount", Value: defaultAutoFailoverMaxCount})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverOnDataDiskIssuesTimePeriod"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", Value: defaultAutoFailoverOnDataDiskIssuesTimePeriod})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold", "percent"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", Value: 30})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "viewFragmentationThreshold", "percent"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/viewFragmentationThreshold/percent", Value: 30})
+	}
+	value, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "tombstonePurgeInterval")
+	interval, _ := time.ParseDuration(value.(string))
+	if !found || (interval == 0) {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/tombstonePurgeInterval", Value: "72h"})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "adminConsoleServiceType"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/adminConsoleServiceType", Value: corev1.ServiceTypeNodePort})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "exposedFeatureServiceType"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/exposedFeatureServiceType", Value: corev1.ServiceTypeNodePort})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: defaultFSGroup})
 	}
 
-	if customResource.Spec.ClusterSettings.IndexServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.IndexServiceMemQuota = defaultServiceMemQuota
-	}
-
-	if customResource.Spec.ClusterSettings.SearchServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.SearchServiceMemQuota = defaultServiceMemQuota
-	}
-
-	if customResource.Spec.ClusterSettings.EventingServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.EventingServiceMemQuota = defaultServiceMemQuota
-	}
-
-	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota = defaultAnalyticsServiceMemQuota
-	}
-
-	if customResource.Spec.ClusterSettings.IndexStorageSetting == "" {
-		customResource.Spec.ClusterSettings.IndexStorageSetting = defaultIndexStorageSetting
-	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverTimeout == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverTimeout = defaultAutoFailoverTimeout
-	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverMaxCount == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverMaxCount = defaultAutoFailoverMaxCount
-	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = defaultAutoFailoverOnDataDiskIssuesTimePeriod
-	}
-
-	if customResource.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent == nil {
-		thirty := 30
-		customResource.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent = &thirty
-	}
-
-	if customResource.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent == nil {
-		thirty := 30
-		customResource.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent = &thirty
-	}
-
-	if customResource.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration == 0 {
-		duration, _ := time.ParseDuration("72h")
-		customResource.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration = duration
-	}
-
-	if customResource.Spec.Networking.AdminConsoleServiceType == "" {
-		customResource.Spec.Networking.AdminConsoleServiceType = corev1.ServiceTypeNodePort
-	}
-
-	if customResource.Spec.Networking.ExposedFeatureServiceType == "" {
-		customResource.Spec.Networking.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
-	}
-
-	if customResource.Spec.SecurityContext == nil {
-		customResource.Spec.SecurityContext = &corev1.PodSecurityContext{}
-	}
-
-	if customResource.Spec.SecurityContext.FSGroup == nil {
-		customResource.Spec.SecurityContext.FSGroup = &defaultFSGroup
-	}
+	return patch
 }
 
-func ApplyBucketDefaults(bucket *couchbasev2.CouchbaseBucket) {
-	if bucket.Spec.CompressionMode == "" {
-		bucket.Spec.CompressionMode = cbmgr.CompressionModePassive
+func ApplyBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
+
+	a, b, c := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode")
+	fmt.Println(a, b, c)
+
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
 	}
+
+	return patch
 }
 
-func ApplyEphemeralBucketDefaults(bucket *couchbasev2.CouchbaseEphemeralBucket) {
-	if bucket.Spec.CompressionMode == "" {
-		bucket.Spec.CompressionMode = cbmgr.CompressionModePassive
+func ApplyEphemeralBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
+
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
 	}
+
+	return patch
 }
 
-func ApplyMemcachedBucketDefaults(bucket *couchbasev2.CouchbaseMemcachedBucket) {
+func ApplyMemcachedBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	return nil
 }
 
-func ApplyReplicationDefaults(replication *couchbasev2.CouchbaseReplication) {
-	if replication.Spec.CompressionType == "" {
-		replication.Spec.CompressionType = couchbasev2.CompressionTypeAuto
+func ApplyReplicationDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
+
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionType"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionType", Value: couchbasev2.CompressionTypeAuto})
 	}
+
+	return patch
 }
 
 func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseCluster) error {

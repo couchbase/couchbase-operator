@@ -6,6 +6,7 @@ import (
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	validationv1 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v1"
 	"github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
@@ -13,86 +14,76 @@ import (
 	"github.com/couchbase/gocbmgr"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/go-openapi/errors"
 )
 
 const (
-	DefaultBaseImage                              = "couchbase/server"
-	DefaultIndexStorageSetting                    = "memory_optimized"
-	DefaultAutoFailoverTimeout                    = 120
-	DefaultAutoFailoverMaxCount                   = 3
-	DefaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
-	DefaultServiceMemQuota                        = 256
-	DefaultAnalyticsServiceMemQuota               = 1024
+	defaultBaseImage                              = "couchbase/server"
+	defaultIndexStorageSetting                    = "memory_optimized"
+	defaultAutoFailoverTimeout                    = 120
+	defaultAutoFailoverMaxCount                   = 3
+	defaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
+	defaultServiceMemQuota                        = 256
+	defaultAnalyticsServiceMemQuota               = 1024
 )
 
-func ApplyDefaults(customResource *couchbasev1.CouchbaseCluster) {
-	if customResource.Spec.ClusterSettings.ClusterName == "" {
-		customResource.Spec.ClusterSettings.ClusterName = customResource.Name
-	}
+func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
 
-	if customResource.Spec.BaseImage == "" {
-		customResource.Spec.BaseImage = DefaultBaseImage
+	if _, found, _ := unstructured.NestedString(object.Object, "spec", "clusterSettings", "clusterName"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/clusterSettings/clusterName", Value: object.GetName()})
 	}
-
-	if customResource.Spec.ExposedFeatureServiceType == "" {
-		customResource.Spec.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
+	if _, found, _ := unstructured.NestedString(object.Object, "spec", "bsaeImage"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/baseImage", Value: defaultBaseImage})
 	}
-
-	if customResource.Spec.AdminConsoleServiceType == "" {
-		customResource.Spec.AdminConsoleServiceType = corev1.ServiceTypeNodePort
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "dataServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/dataServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
-
-	if customResource.Spec.ClusterSettings.DataServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.DataServiceMemQuota = DefaultServiceMemQuota
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
-
-	if customResource.Spec.ClusterSettings.IndexServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.IndexServiceMemQuota = DefaultServiceMemQuota
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "searchServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/searchServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
-
-	if customResource.Spec.ClusterSettings.SearchServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.SearchServiceMemQuota = DefaultServiceMemQuota
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "eventingServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/eventingServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
-
-	if customResource.Spec.ClusterSettings.EventingServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.EventingServiceMemQuota = DefaultServiceMemQuota
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "analyticsServiceMemoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/analyticsServiceMemoryQuota", Value: defaultAnalyticsServiceMemQuota})
 	}
-
-	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota == 0 {
-		customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota = DefaultAnalyticsServiceMemQuota
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexStorageSetting"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexStorageSetting", Value: defaultIndexStorageSetting})
 	}
-
-	if customResource.Spec.ClusterSettings.IndexStorageSetting == "" {
-		customResource.Spec.ClusterSettings.IndexStorageSetting = DefaultIndexStorageSetting
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverTimeout"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverTimeout", Value: defaultAutoFailoverTimeout})
 	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverTimeout == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverTimeout = DefaultAutoFailoverTimeout
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverMaxCount"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverMaxCount", Value: defaultAutoFailoverMaxCount})
 	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverMaxCount == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverMaxCount = DefaultAutoFailoverMaxCount
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverOnDataDiskIssuesTimePeriod"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", Value: defaultAutoFailoverOnDataDiskIssuesTimePeriod})
 	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
-		customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod = DefaultAutoFailoverOnDataDiskIssuesTimePeriod
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "adminConsoleServiceType"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/adminConsoleServiceType", Value: corev1.ServiceTypeNodePort})
 	}
-
-	if customResource.Spec.AdminConsoleServiceType == "" {
-		customResource.Spec.AdminConsoleServiceType = corev1.ServiceTypeNodePort
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "exposedFeatureServiceType"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/exposedFeatureServiceType", Value: corev1.ServiceTypeNodePort})
 	}
-
-	if customResource.Spec.ExposedFeatureServiceType == "" {
-		customResource.Spec.ExposedFeatureServiceType = corev1.ServiceTypeNodePort
-	}
-
-	for index, bucket := range customResource.Spec.BucketSettings {
-		if bucket.BucketType != constants.BucketTypeMemcached && customResource.Spec.BucketSettings[index].CompressionMode == "" {
-			customResource.Spec.BucketSettings[index].CompressionMode = cbmgr.CompressionModePassive
+	if buckets, found, _ := unstructured.NestedSlice(object.Object, "spec", "buckets"); !found {
+		for i, bucket := range buckets {
+			b, ok := bucket.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if _, found, _ := unstructured.NestedFieldNoCopy(b, "compressionMode"); !found {
+				patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: fmt.Sprintf("/spec/buckets/%d/compressionMode", i), Value: cbmgr.CompressionModePassive})
+			}
 		}
 	}
+
+	return patch
 }
 
 func CheckConstraints(v *types.Validator, customResource *couchbasev1.CouchbaseCluster) error {
