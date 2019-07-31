@@ -332,7 +332,9 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 		files = append(files, fmt.Sprintf("%s/clusterrolebinding/%s/%s.yaml", base, clusterRoleBinding.Name, clusterRoleBinding.Name))
 	}
 	for _, crd := range crds.Items {
-		files = append(files, fmt.Sprintf("%s/customresourcedefinition/%s/%s.yaml", base, crd.Name, crd.Name))
+		if strings.HasSuffix(crd.Name, ".couchbase.com") {
+			files = append(files, fmt.Sprintf("%s/customresourcedefinition/%s/%s.yaml", base, crd.Name, crd.Name))
+		}
 	}
 	for _, node := range nodes.Items {
 		files = append(files, fmt.Sprintf("%s/node/%s/%s.yaml", base, node.Name, node.Name))
