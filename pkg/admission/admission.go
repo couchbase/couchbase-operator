@@ -209,12 +209,12 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 
 	patch := validator.ApplyDefaults(object)
 	if patch != nil {
-		glog.V(1).Infof("Applying patch: %v", patch)
 		data, err := json.Marshal(patch)
 		if err != nil {
 			glog.Error(err)
 			return errorResponse(err)
 		}
+		glog.V(1).Infof("Applying patch: %v", string(data))
 		reviewResponse.Patch = data
 	}
 

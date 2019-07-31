@@ -31,8 +31,13 @@ const (
 )
 
 func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	emptyObject := struct{}{}
+
 	var patch jsonpatch.PatchList
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster", Value: emptyObject})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "dataServiceMemoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/dataServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
@@ -60,6 +65,9 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverOnDataDiskIssuesTimePeriod"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", Value: defaultAutoFailoverOnDataDiskIssuesTimePeriod})
 	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction", Value: emptyObject})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold", "percent"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", Value: 30})
 	}
@@ -71,11 +79,17 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	if !found || (interval == 0) {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/tombstonePurgeInterval", Value: "72h"})
 	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking", Value: emptyObject})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "adminConsoleServiceType"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/adminConsoleServiceType", Value: corev1.ServiceTypeNodePort})
 	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "exposedFeatureServiceType"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/exposedFeatureServiceType", Value: corev1.ServiceTypeNodePort})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
 	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: defaultFSGroup})

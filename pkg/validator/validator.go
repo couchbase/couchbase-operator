@@ -64,7 +64,6 @@ func SchemaValidate(scheme *runtime.Scheme, raw runtime.RawExtension) error {
 }
 
 func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
-	fmt.Println(object.GetAPIVersion(), couchbasev2.GroupName, object.GetKind())
 	switch object.GetAPIVersion() {
 	case couchbasev2.GroupName + "/v1":
 		switch object.GetKind() {
