@@ -240,7 +240,7 @@ type CouchbaseClusterSecuritySpec struct {
 
 type CouchbaseClusterNetworkingSpec struct {
 	// ExposeAdminConsole creates a service referencing the admin console.
-	ExposeAdminConsole bool `json:"exposeAdminConsole"`
+	ExposeAdminConsole bool `json:"exposeAdminConsole,omitempty"`
 
 	// AdminConsoleServices is a selector to choose specific services to expose via the admin console.
 	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`

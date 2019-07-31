@@ -15,21 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// cluster settings
-var (
-	defaultClusterSettings = couchbasev2.ClusterConfig{
-		DataServiceMemQuota:                    e2e_constants.Mem256Mb,
-		IndexServiceMemQuota:                   e2e_constants.Mem256Mb,
-		SearchServiceMemQuota:                  e2e_constants.Mem256Mb,
-		EventingServiceMemQuota:                e2e_constants.Mem256Mb,
-		AnalyticsServiceMemQuota:               e2e_constants.Mem1Gb,
-		IndexStorageSetting:                    constants.IndexStorageModeMemoryOptimized,
-		AutoFailoverTimeout:                    30,
-		AutoFailoverMaxCount:                   1,
-		AutoFailoverOnDataDiskIssuesTimePeriod: 120,
-	}
-)
-
 // bucket settings
 var (
 	DefaultBucket = &couchbasev2.CouchbaseBucket{
@@ -224,12 +209,6 @@ func NewBasicCluster(genName, secretName string, size int) *couchbasev2.Couchbas
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
 			AdminSecret: e2e_constants.KubeTestSecretName,
 		},
-		ClusterSettings: defaultClusterSettings,
-		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
-			AdminConsoleServiceType:   "NodePort",
-			ExposedFeatureServiceType: "NodePort",
-			ExposedFeatures:           []string{},
-		},
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
@@ -252,10 +231,6 @@ func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
 			AdminSecret: e2e_constants.KubeTestSecretName,
 		},
-		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
-			ExposedFeatures: []string{},
-		},
-		ClusterSettings: defaultClusterSettings,
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
@@ -280,7 +255,6 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
 			AdminSecret: e2e_constants.KubeTestSecretName,
 		},
-		ClusterSettings: defaultClusterSettings,
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
@@ -359,7 +333,6 @@ func NewBasicXdcrCluster(genName, secretName string, size int) *couchbasev2.Couc
 		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
 			ExposedFeatures: []string{"xdcr"},
 		},
-		ClusterSettings: defaultClusterSettings,
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
