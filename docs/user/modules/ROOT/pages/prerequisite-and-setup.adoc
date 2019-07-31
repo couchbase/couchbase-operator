@@ -21,8 +21,11 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| Certified 5.5, 5.5.x, 6.0, 6.0.x
+a| Certified 5.5, 6.0
+
+_Unless otherwise stated, maintenance releases (x.x.x) are supported._
 |===
+
 
 .Kubernetes Platform Compatibility List
 [#table-operator-compatibility,cols="1,1",options="header"]
@@ -32,7 +35,7 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Open Source Kubernetes
 | Certified 1.11, 1.12, 1.13
 
-| Red Hat OpenShift
+| Red Hat OpenShift Container Platform
 | Certified 3.11
 
 Supported 3.10

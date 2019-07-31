@@ -4,6 +4,57 @@ Couchbase Autonomous Operator 1.2 is a substantial update that introduces severa
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
+[#release-v121]
+== Release 1.2.1
+
+Couchbase Autonomous Operator 1.2.1, released in August 2019, is the first maintenance release in the 1.2.x series for Couchbase Autonomous Operator. This release further fortifies the previously released 1.2.x series with bug fixes to improve product stability.
+
+[#behavior-changes-v121]
+=== Behavior Changes
+
+[#table_behavior_changes_v121,cols="25,66"]
+|===
+| Issue | Description
+
+| https://issues.couchbase.com/browse/K8S-965[K8S-965]
+| The Operator now uses the default Storage Class of the Kubernetes cluster if none is specified in the CouchbaseCluster configuration.
+In previous releases, you were required to specify xref:couchbase-cluster-config.adoc#storageclassname[`spec.volumeClaimTemplates.storageClassName`] even if a default Storage Class was defined in your Kubernetes cluster.
+
+| https://issues.couchbase.com/browse/K8S-1017[K8S-1017]
+| Specifying `client` for the xref:couchbase-cluster-config.adoc#exposedfeatures[`exposedFeatures`] property in the CouchbaseCluster configuration now exposes the Couchbase admin ports, including 8091.
+In previous releases, you would need to specify both `client` and `admin` to ensure proper communication with the Couchbase SDK, or for performing administration tasks like creating buckets or users via an application.
+|===
+
+[#fixed-issues-v121]
+=== Fixed Issues
+
+[#table_fixed_issues_v121,cols="25,66"]
+|===
+| Issue | Description
+
+| https://issues.couchbase.com/browse/K8S-992[K8S-992]
+| *Summary*: The `LoadBalancer` ports are set incorrectly after a topology change (for example after a failover) for clusters using the `LoadBalancer` `exposedFeatureServiceType`.
+This causes any applications or XDCR replications attempting to connect via the `LoadBalancer` to fail.
+Clusters that do not use `exposedFeatures` or have the `exposedFeatureServiceType` set to `NodePort` (this is the default) are not affected by this issue.
+
+| https://issues.couchbase.com/browse/K8S-1011[K8S-1011]
+| *Summary*: Under any load, an issue can occur that prevents certain Couchbase operations from executing, the results of which include logs full of entries about being unable to decode JSON.
+|===
+
+[#known-issues-v121]
+=== Known Issues and Limitations
+
+[#table_known_issues_v121,cols="25,66"]
+|===
+| Issue | Description
+
+| https://issues.couchbase.com/browse/K8S-964[K8S-964]
+| *Summary*: Due to a known issue in Helm 2.14.0, attempting to install the Couchbase cluster can result in validation errors, even for correctly-configured charts.
+
+*Workaround*: Use a version of Helm other than 2.14.0.
+|===
+
+[#release-v120]
 == Release 1.2.0
 
 Couchbase Autonomous Operator 1.2.0 was released in May 2019.
@@ -60,7 +111,7 @@ Refer to xref:network-requirements.adoc#table-public-connectivity[Supported Clie
 === Fixed Issues
 
 .Issues Fixed in Version 1.2.0
-[#table_fixednissues_v120,cols="25,66"]
+[#table_fixedissues_v120,cols="25,66"]
 |===
 | Issue | Description
 
@@ -115,6 +166,11 @@ This includes things like adding a node or creating a server group.
 The one exception is when `disableBucketManagement` is set to `true` in the CouchbaseCluster configuration (the default is `false`).
 If this is the case, the creation and deletion of Couchbase buckets must be done manually.
 Refer to the CouchbaseCluster xref:couchbase-cluster-config.adoc[documentation] for more information.
+
+| https://issues.couchbase.com/browse/K8S-992[K8S-992]
+| *Summary*: The `LoadBalancer` ports are set incorrectly after a topology change (for example after a failover) for clusters using the `LoadBalancer` `exposedFeatureServiceType`.
+This causes any applications or XDCR replications attempting to connect via the `LoadBalancer` to fail.
+Clusters that do not use `exposedFeatures` or have the `exposedFeatureServiceType` set to `NodePort` (this is the default) are not affected by this issue.
 
 | https://issues.couchbase.com/browse/K8S-928[K8S-928]
 | *Summary*: When a bucket replica is disabled in a cluster with persistent volumes, a down pod may not automatically join the cluster after recovery.
