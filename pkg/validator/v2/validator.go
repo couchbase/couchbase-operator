@@ -2,7 +2,6 @@ package v2
 
 import (
 	"fmt"
-	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -68,15 +67,19 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction", Value: emptyObject})
 	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold", Value: emptyObject})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold", "percent"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", Value: 30})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "viewFragmentationThreshold"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/viewFragmentationThreshold", Value: emptyObject})
 	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "viewFragmentationThreshold", "percent"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/viewFragmentationThreshold/percent", Value: 30})
 	}
-	value, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "tombstonePurgeInterval")
-	interval, _ := time.ParseDuration(value.(string))
-	if !found || (interval == 0) {
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "tombstonePurgeInterval"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/tombstonePurgeInterval", Value: "72h"})
 	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking"); !found {

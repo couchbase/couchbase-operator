@@ -86,6 +86,8 @@ spec:
       - index
       - query
       - search
+    adminConsoleServiceType: NodePort
+    exposedFeatureServiceType: NodePort
     dns:
       domain: "example.com"
   logging:
