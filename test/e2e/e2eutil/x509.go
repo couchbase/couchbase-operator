@@ -355,7 +355,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 	return pem, nil
 }
 
-func CreateOperatorCertReq(commonName string) *x509.CertificateRequest {
+func CreateCertReq(commonName string) *x509.CertificateRequest {
 	return &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: commonName,
@@ -363,13 +363,10 @@ func CreateOperatorCertReq(commonName string) *x509.CertificateRequest {
 	}
 }
 
-func CreateClusterCertReq(commonName string, dnsNames []string) *x509.CertificateRequest {
-	return &x509.CertificateRequest{
-		Subject: pkix.Name{
-			CommonName: commonName,
-		},
-		DNSNames: dnsNames,
-	}
+func CreateCertReqDNS(commonName string, dnsNames []string) *x509.CertificateRequest {
+	req := CreateCertReq(commonName)
+	req.DNSNames = dnsNames
+	return req
 }
 
 func CreateIntermedateCACertReq(commonName string) *x509.CertificateRequest {
@@ -451,6 +448,8 @@ type TLSContext struct {
 	OperatorSecretName string
 	// ClusterSecretName is the name of the secret created for cluster certificates.
 	ClusterSecretName string
+	// LDAPSecretName is the name of the secret created for ldap certificates.
+	LDAPSecretName string
 }
 
 type TLSOpts struct {
@@ -470,6 +469,9 @@ type TLSOpts struct {
 	OperatorCertType *CertType
 	// clusterCertType sets the cluster certificate type.  Defaults to CertTypeServer.
 	ClusterCertType *CertType
+	// ldapAltName is DNS name of ldap server to optionally add to AltNames
+	// ldapCertType sets the ldap certificate type.  Defaults to CertTypeServer.
+	LDAPCertType *CertType
 }
 
 // clusterSANs generates a valid set of SANs for a cluster.
@@ -540,7 +542,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 	}
 
 	// Create the operator secret
-	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(keyType, operatorCertType, operatorReq)
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -556,7 +558,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 	}
 
 	// Create the cluster secret
-	clusterReq := CreateClusterCertReq(clusterCN, altNames)
+	clusterReq := CreateCertReqDNS(clusterCN, altNames)
 	clusterReqKeyPair := CreateKeyPairReqData(keyType, clusterCertType, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -600,7 +602,7 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames 
 	if len(subjectAltNames) == 0 {
 		subjectAltNames = ctx.clusterSANs()
 	}
-	clusterReq := CreateClusterCertReq(clusterCN, subjectAltNames)
+	clusterReq := CreateCertReqDNS(clusterCN, subjectAltNames)
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -628,7 +630,7 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 	validTo := validFrom.AddDate(10, 0, 0)
 
 	// Generate a new client certificate
-	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -659,7 +661,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Generate a new server certificate
-	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
@@ -696,7 +698,7 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Generate a new client certificate
-	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
@@ -733,7 +735,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Generate a new server certificate
-	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -776,7 +778,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	}
 
 	// Generate a new server certificate
-	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -787,7 +789,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	}
 
 	// Generate a new client certificate
-	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -831,7 +833,7 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Generate a new server certificate
-	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
@@ -865,7 +867,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Generate a new client certificate
-	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
@@ -978,4 +980,80 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 	}
 
 	return nil
+}
+
+// InitLDAPTLS accepts a key type (only RSA works for now) and returns a context
+// containing all the certificates, and a tear down function to be deferred.
+func InitLDAPTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
+
+	// Create the context
+	ctx = &TLSContext{
+		Client:    client,
+		Namespace: namespace,
+	}
+
+	// Generate alt names.
+	altNames := ctx.clusterSANs()
+	if len(opts.AltNames) > 0 {
+		altNames = opts.AltNames
+	}
+
+	// Set the certificate parameters
+	keyType := KeyTypeRSA
+	if opts.KeyType != nil {
+		keyType = *opts.KeyType
+	}
+
+	validFrom := time.Now().In(time.UTC)
+	if opts.ValidFrom != nil {
+		validFrom = *opts.ValidFrom
+	}
+
+	validTo := validFrom.AddDate(10, 0, 0)
+	if opts.ValidTo != nil {
+		validTo = *opts.ValidTo
+	}
+
+	caCertType := CertTypeCA
+	if opts.CaCertType != nil {
+		caCertType = *opts.CaCertType
+	}
+
+	ldapCertType := CertTypeServer
+	if opts.LDAPCertType != nil {
+		ldapCertType = *opts.LDAPCertType
+	}
+	// Generate the CA
+	if ctx.CA, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
+		return
+	}
+
+	// Create the req
+	ldapReq := CreateCertReqDNS(operatorCN, altNames)
+	ldapReqKeyPair := CreateKeyPairReqData(keyType, ldapCertType, ldapReq)
+	ldapKey, ldapCert, err := ldapReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		return
+	}
+
+	ctx.LDAPSecretName = "ldap-secret-tls-" + RandomSuffix()
+	ldapSecretData := CreateOperatorSecretData(namespace, ctx.LDAPSecretName, ctx.CA.Certificate, ldapCert, ldapKey)
+	if _, err = CreateSecret(client, namespace, ldapSecretData); err != nil {
+		return
+	}
+
+	teardown = func() {
+		_ = DeleteSecret(client, namespace, ctx.LDAPSecretName, &metav1.DeleteOptions{})
+	}
+
+	return
+}
+
+// MustInitLDAPTLS does the same as InitLDAPTLS, dying on failure
+func MustInitLDAPTLS(t *testing.T, k8s *types.Cluster, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
+	ctx, teardown, err := InitLDAPTLS(k8s.KubeClient, namespace, opts)
+	if err != nil {
+		Die(t, err)
+	}
+	return ctx, teardown
 }

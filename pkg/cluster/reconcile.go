@@ -115,6 +115,10 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	if err := c.reconcileLDAPSettings(); err != nil {
+		return err
+	}
+
 	if err := c.reconcileUsers(); err != nil {
 		return err
 	}
@@ -1821,6 +1825,102 @@ func (c *Cluster) inspectUsers() ([]cbmgr.User, []cbmgr.User, []cbmgr.User, erro
 		}
 	}
 	return create, update, remove, nil
+}
+
+// reconcileLDAPSettings synchronizes couchbase ldap settings with requested settings
+func (c *Cluster) reconcileLDAPSettings() error {
+
+	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
+	if err != nil {
+		return err
+	}
+	required, _ := couchbaseutil.NewVersion(constants.LDAPVersionMin)
+	if version.Less(required) {
+		if c.cluster.Spec.Security.LDAP != nil {
+			message := fmt.Sprintf("LDAP Security settings not allowed for version: %s, requires: %s", version, required)
+			log.Info(message, "cluster", c.namespacedName())
+		}
+		return nil
+	}
+
+	// Get current ldap cluster spec
+	apiLDAPSettings, err := c.client.GetLDAPSettings(c.readyMembers())
+	if err != nil {
+		return err
+	}
+	if ldap := c.cluster.Spec.Security.LDAP; ldap == nil {
+		if len(apiLDAPSettings.Hosts) > 0 {
+			// Reset settings to default
+			settings := cbmgr.LDAPSettings{Encryption: cbmgr.LDAPEncryptionNone}
+			return c.client.SetLDAPSettings(c.readyMembers(), &settings)
+		}
+		// nothing to reconcile
+		return nil
+	} else {
+
+		// Convert requested ldap spec
+		updatedUserDNMapping := []cbmgr.LDAPUserDNMapping{}
+		if specDNMapping := ldap.UserDNMapping; specDNMapping != nil {
+			for _, dn := range *specDNMapping {
+				updatedUserDNMapping = append(updatedUserDNMapping, cbmgr.LDAPUserDNMapping(dn))
+			}
+		}
+		specLDAPSettings := cbmgr.LDAPSettings{
+			AuthenticationEnabled: ldap.AuthenticationEnabled,
+			AuthorizationEnabled:  ldap.AuthorizationEnabled,
+			Hosts:                 ldap.Hosts,
+			Port:                  ldap.Port,
+			Encryption:            cbmgr.LDAPEncryption(ldap.Encryption),
+			EnableCertValidation:  ldap.EnableCertValidation,
+			GroupsQuery:           ldap.GroupsQuery,
+			QueryDN:               ldap.QueryDN,
+			UserDNMapping:         &updatedUserDNMapping,
+			NestedGroupsEnabled:   ldap.NestedGroupsEnabled,
+			NestedGroupsMaxDepth:  ldap.NestedGroupsMaxDepth,
+			CacheValueLifetime:    ldap.CacheValueLifetime,
+		}
+
+		// It's not possible to reconcile on password
+		// change because api just returns asterisks
+		specLDAPSettings.QueryPass = apiLDAPSettings.QueryPass
+
+		// set cacert if provided and validation cert is enabled
+		if specLDAPSettings.EnableCertValidation {
+			tlsSecretName := ldap.TLSSecret
+			if tlsSecretName != "" {
+				tlsSecret, found := c.k8s.Secrets.Get(tlsSecretName)
+				if !found {
+					return fmt.Errorf("unable to get ldap tls secret `%s`", tlsSecretName)
+				}
+				ca, ok := tlsSecret.Data[constants.LDAPSecretCACert]
+				if !ok {
+					return fmt.Errorf("unable to find %s in tls ldap secret", constants.LDAPSecretCACert)
+				}
+				specLDAPSettings.CACert = string(ca)
+			}
+		}
+
+		if !reflect.DeepEqual(*apiLDAPSettings, specLDAPSettings) {
+
+			// reconcile and set bind password if provided
+			bindSecretName := c.cluster.Spec.Security.LDAP.BindSecret
+			if bindSecretName != "" {
+				bindSecret, found := c.k8s.Secrets.Get(bindSecretName)
+				if !found {
+					return fmt.Errorf("unable to get ldap bind secret `%s`", bindSecretName)
+				}
+				password, ok := bindSecret.Data[constants.LDAPSecretPassword]
+				if !ok {
+					return fmt.Errorf("unable to find %s in ldap bind secret", constants.LDAPSecretPassword)
+				}
+				specLDAPSettings.QueryPass = string(password)
+			}
+
+			// Update ldap settings according requested spec
+			return c.client.SetLDAPSettings(c.readyMembers(), &specLDAPSettings)
+		}
+	}
+	return nil
 }
 
 // reconcileUsers synchronizes couchbase users with requested users

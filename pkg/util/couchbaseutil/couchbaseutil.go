@@ -939,3 +939,13 @@ func (c *CouchbaseClient) DeleteReplication(ms MemberSet, r *cbmgr.Replication) 
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteReplication(r)
 }
+
+func (c *CouchbaseClient) SetLDAPSettings(ms MemberSet, settings *cbmgr.LDAPSettings) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.SetLDAPSettings(settings)
+}
+
+func (c *CouchbaseClient) GetLDAPSettings(ms MemberSet) (*cbmgr.LDAPSettings, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetLDAPSettings()
+}

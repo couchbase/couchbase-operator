@@ -1,0 +1,45 @@
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:enterprise-6.5.0-beta
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+    ldap:
+      bindSecret: bind-secret
+      hosts:
+      - example.ldap.default.svc
+      port: 389
+      encryption: "false"
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServices:
+      - data
+    exposedFeatures:
+      - xdcr
+    exposedFeatureServiceType: NodePort
+    adminConsoleServiceType: NodePort
+  cluster:
+    dataServiceMemoryQuota: 256
+    indexServiceMemoryQuota: 256
+    searchServiceMemoryQuota: 256
+    eventingServiceMemoryQuota: 256
+    analyticsServiceMemoryQuota: 1024
+    indexStorageSetting: memory_optimized
+    autoFailoverTimeout: 120
+    autoFailoverMaxCount: 3
+    autoFailoverOnDataDiskIssues: true
+    autoFailoverOnDataDiskIssuesTimePeriod: 120
+    autoFailoverServerGroup: false
+  buckets:
+    managed: true
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index

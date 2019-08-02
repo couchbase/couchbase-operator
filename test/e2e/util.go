@@ -143,12 +143,14 @@ var (
 
 		// RBAC cases
 		"TestRBACValidationCreate":      TestRBACValidationCreate,
+		"TestRBACValidationLDAP":        TestRBACValidationLDAP,
 		"TestRBACCreateAdminUser":       TestRBACCreateAdminUser,
 		"TestRBACUpdateRole":            TestRBACUpdateRole,
 		"TestRBACDeleteUser":            TestRBACDeleteUser,
 		"TestRBACDeleteRole":            TestRBACDeleteRole,
 		"TestRBACRemoveUserFromBinding": TestRBACRemoveUserFromBinding,
 		"TestRBACDeleteBinding":         TestRBACDeleteBinding,
+		"TestRBACWithLDAPAuth":          TestRBACWithLDAPAuth,
 
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,

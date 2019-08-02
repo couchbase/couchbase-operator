@@ -80,6 +80,11 @@ func (v *Version) Semver() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch())
 }
 
+// String representation of version
+func (v *Version) String() string {
+	return v.Semver()
+}
+
 // Compare semantic versions
 // Returns -1 if v < o, 0 if v == o and 1 if v > o
 func (v *Version) Compare(o *Version) int {

@@ -104,3 +104,8 @@ const (
 	CouchbaseSubjectUserKind  = "CouchbaseUser"
 	CouchbaseSubjectGroupKind = "CouchbaseGroup"
 )
+
+const (
+	LDAPDomain        = "openldap"
+	LDAPLabelSelector = "openldap.couchbase.com"
+)

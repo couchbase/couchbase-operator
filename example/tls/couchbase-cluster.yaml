@@ -17,7 +17,7 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  image: couchbase/server:enterprise-6.0.1
+  image: couchbase/server:enterprise-6.5.0-beta
   security:
     adminSecret: cb-example-auth
   networking:
@@ -45,12 +45,8 @@ spec:
   buckets:
     managed: true
   servers:
-    - size: 3
+    - size: 1
       name: all_services
       services:
         - data
         - index
-        - query
-        - search
-      dataPath: /opt/couchbase/var/lib/couchbase/data
-      indexPath: /opt/couchbase/var/lib/couchbase/data

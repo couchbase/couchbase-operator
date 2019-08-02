@@ -231,3 +231,40 @@ func TestRBACDeleteBinding(t *testing.T) {
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
+
+// Verify RBAC auth can be applied to LDAP users
+func TestRBACWithLDAPAuth(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Start LDAP service
+	service := e2espec.NewLDAPService()
+	_ = e2eutil.MustNewLDAPService(t, targetKube.KubeClient, f.Namespace, service)
+
+	// Start the LDAP server
+	tlsOpts := &e2eutil.TLSOpts{
+		AltNames: e2espec.LDAPAltNames(f.Namespace),
+	}
+	ctx, teardown := e2eutil.MustInitLDAPTLS(t, targetKube, f.Namespace, tlsOpts)
+	defer teardown()
+	pod := e2espec.NewLDAPServerTLS(f.Namespace, ctx.LDAPSecretName)
+	_ = e2eutil.MustNewLDAPServer(t, targetKube.KubeClient, f.Namespace, pod)
+
+	// Create a cluster with LDAP Auth
+	testCouchbase := e2espec.NewLDAPClusterBasic(targetKube.DefaultSecret.Name, f.Namespace, clusterSize, ctx.LDAPSecretName, targetKube.DefaultSecret.Name)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Verify Connectivity
+	e2eutil.MustCheckLDAPStatus(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Validation
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}

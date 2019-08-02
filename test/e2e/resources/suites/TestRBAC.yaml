@@ -7,8 +7,10 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestRBACValidationCreate
+      - name: TestRBACValidationLDAP
       - name: TestRBACDeleteUser
       - name: TestRBACUpdateRole
       - name: TestRBACDeleteRole
       - name: TestRBACRemoveUserFromBinding
       - name: TestRBACDeleteBinding
+      - name: TestRBACWithLDAPAuth

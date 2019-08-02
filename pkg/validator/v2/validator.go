@@ -132,7 +132,18 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/monitoring/prometheus/image", Value: defaultMetricsImage})
 		}
 	}
-
+	if dn, found, _ := unstructured.NestedSlice(object.Object, "spec", "security", "ldap", "user_dn_mapping"); found {
+		for i, mapping := range dn {
+			if dnMap, ok := mapping.(map[string]interface{}); ok {
+				regex, ok := dnMap["regex"]
+				if !ok || regex == "" {
+					// default is to match everything
+					path := fmt.Sprintf("/spec/security/ldap/user_dn_mapping/%d/re", i)
+					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "(.+)"})
+				}
+			}
+		}
+	}
 	return patch
 }
 
@@ -541,6 +552,56 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d"))
 	}
 
+	// Check LDAP Settings
+	if ldap := customResource.Spec.Security.LDAP; ldap != nil {
+		if len(ldap.Hosts) == 0 {
+			errs = append(errs, errors.TooFewItems("spec.security.ldap.hosts", "", 1))
+		}
+
+		// If authentication enabled then require username mapping
+		if ldap.AuthenticationEnabled {
+			if ldap.UserDNMapping == nil {
+				errs = append(errs, errors.Required("spec.security.ldap.user_dn_mapping", "body"))
+			} else {
+				for i, mapping := range *ldap.UserDNMapping {
+					if mapping.Template == "" {
+						errs = append(errs, errors.Required(fmt.Sprintf("ldap.user_dn_mapping.template[%d]", i), "body"))
+					}
+				}
+			}
+		}
+		// ca is required when tls is enabled
+		if ldap.EnableCertValidation {
+			tlsSecretName := customResource.Spec.Security.LDAP.TLSSecret
+			if tlsSecretName == "" {
+				errs = append(errs, errors.Required("spec.security.ldap.tlsSecret", "body"))
+			}
+
+			// secret containing ldap ca must exist
+			tlsSecret, err := v.Abstraction.GetSecret(customResource.Namespace, tlsSecretName)
+			if err != nil {
+				// Silently ignore permissions errors, some users may not want us seeing these resources.
+				if apierrors.IsForbidden(err) {
+					return nil
+				}
+				errs = append(errs, err)
+			} else if tlsSecret == nil {
+				errs = append(errs, fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName))
+			} else {
+				if _, ok := tlsSecret.Data["ca.crt"]; !ok {
+					errs = append(errs, fmt.Errorf("ldap tls secret %s must contain key 'ca.crt'", tlsSecretName))
+				}
+			}
+		}
+
+		// require groups query when group auth enabled
+		if ldap.AuthorizationEnabled {
+			if ldap.GroupsQuery == "" {
+				errs = append(errs, errors.Required("security.ldap.groups_query", "body"))
+			}
+		}
+	}
+
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
@@ -632,6 +693,8 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 					return nil
 				}
 				errs = append(errs, err)
+			} else if authSecret == nil {
+				errs = append(errs, fmt.Errorf("secret %s referenced by user.spec.authSecret for `%s` must exist", authSecretName, user.Name))
 			} else {
 				if _, ok := authSecret.Data["password"]; !ok {
 					errs = append(errs, fmt.Errorf("ldap auth secret %s must contain password", authSecretName))

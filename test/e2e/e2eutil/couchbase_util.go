@@ -988,3 +988,38 @@ func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.
 		Die(t, err)
 	}
 }
+
+// CheckLDAPStatus checks for successful connectivity
+// between couchbase and an LDAP server
+func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		defer cleanup()
+
+		status, err := client.GetLDAPConnectivityStatus()
+		if err != nil {
+			return false, err
+		}
+		if status.Result == cbmgr.LDAPStatusResultSuccess {
+			return true, nil
+		} else if status.Reason != "" {
+			err = fmt.Errorf("failed to connect to LDAP server: %s", status.Reason)
+			return false, retryutil.RetryOkError(err)
+
+		}
+		return false, nil
+	})
+}
+
+// MustCheckLDAPStatus checks ldap status success or dies
+func MustCheckLDAPStatus(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := CheckLDAPStatus(k8s, cluster, timeout); err != nil {
+		Die(t, err)
+	}
+}

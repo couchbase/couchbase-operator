@@ -88,6 +88,7 @@ func (v KubernetesVersion) String() string {
 
 const (
 	CouchbaseVersionMin = "enterprise-5.5.0"
+	LDAPVersionMin      = "enterprise-6.5.0"
 )
 
 const (
@@ -99,3 +100,10 @@ const (
 // Cluster and Bucket RBAC Roles (as of 6.0)
 var ClusterRoles = []string{"admin", "cluster_admin", "security_admin", "ro_admin", "replication_admin", "query_external_access", "query_system_catalog", "analytics_reader"}
 var BucketRoles = []string{"bucket_admin", "views_admin", "fts_admin", "data_reader", "data_writer", "data_dcp_reader", "data_backup", "data_monitoring", "replication_target", "analytics_manager", "views_reader", "fts_searcher", "query_select", "query_update", "query_insert", "query_delete", "query_manage_index"}
+
+const (
+	// LDAPSecretCACert is the field within a k8s secret containing the cacert PEM
+	LDAPSecretCACert = "ca.crt"
+	// LDAPSecretPassword is the field within a k8s secret containing the password PEM
+	LDAPSecretPassword = "password"
+)

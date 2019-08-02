@@ -36,7 +36,7 @@ spec:
 apiVersion: couchbase.com/v2
 kind: CouchbaseMemcachedBucket
 metadata:
-  name: bucket2 
+  name: bucket2
 spec:
   memoryQuota: 100Mi
   enableFlush: true
@@ -75,6 +75,13 @@ spec:
   bucket: bucket0
   remoteBucket: bucket0
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-example-auth
+data:
+  password: YmxhaCBibGFoIGJsYWgK
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseUser
 metadata:
@@ -82,7 +89,7 @@ metadata:
 spec:
   fullName: Administrator
   authDomain: local
-  authSecret: cb-example-auth
+  authSecret: test-example-auth
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseRole
@@ -124,6 +131,20 @@ spec:
   - kind: CouchbaseUser
     name: user1
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ldap-ca
+data:
+  ca.crt: YmxhaCBibGFoIGJsYWgK
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ldap-auth
+data:
+  password: YmxhaCBibGFoIGJsYWgK
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
@@ -137,6 +158,24 @@ spec:
     adminSecret: basic-test-secret
     rbac:
       managed: true
+    ldap:
+      bindSecret: ldap-auth
+      tlsSecret: ldap-ca
+      hosts:
+      - ldap-0000.cb-ldap.default.svc
+      port: 389
+      encryption: StartTLSExtension
+      query_dn: "cn=admin,dc=cb-ldap,dc=default,dc=svc"
+      authentication_enabled: true
+      user_dn_mapping:
+      - template: "uid={0},ou=People,dc=example,dc=com"
+        re: "(.+)"
+      authorization_enabled: true
+      groups_query: "cn=mygroup,ou=Groups,dc=example,dc=com??base?"
+      server_cert_validation: true
+      nested_groups_enabled: false
+      nested_groups_max_depth: 10
+      cache_value_lifetime: 300000
   networking:
     exposeAdminConsole: false
     adminConsoleServices:

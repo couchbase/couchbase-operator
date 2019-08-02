@@ -1337,6 +1337,40 @@ func TestRBACValidationCreate(t *testing.T) {
 }
 
 /*******************************************************************
+************ Test cases for LDAP Validation *************
+********************************************************************/
+func TestRBACValidationLDAP(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestValidateHostnameRequired",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/hosts/0")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.security.ldap.hosts should have at least 1 items"},
+		},
+		{
+			name:           "TestValidateCaCertRequired",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/tlsSecret")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.security.ldap.tlsSecret in body is required"},
+		},
+		{
+			name:        "TestValidateDefaultRegex",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/user_dn_mapping/0/re")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/user_dn_mapping/0/re", "(.+)")},
+			shouldFail:  false,
+		}, {
+			name:           "TestValidateGroupRequired",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/groups_query")},
+			shouldFail:     true,
+			expectedErrors: []string{"security.ldap.groups_query in body is required"},
+		},
+	}
+
+	kubeName := framework.Global.TestClusters[0]
+	runValidationTest(t, testDefs, kubeName, "create")
+}
+
+/*******************************************************************
 ************ Test cases for RZA / Server group testing *************
 ********************************************************************/
 

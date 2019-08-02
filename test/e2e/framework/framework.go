@@ -317,6 +317,11 @@ func cleanUpNamespace() (err error) {
 
 		// Blow away any couchbase cluster resources (and friends)
 		e2eutil.CleanK8Cluster(targetKube, Global.Namespace)
+
+		// Clean up any LDAP Pods & Services
+		if err := e2eutil.CleanLDAPResources(targetKube.KubeClient, Global.Namespace); err != nil {
+			return err
+		}
 	}
 
 	// TODO: check all deleted and wait

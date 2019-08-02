@@ -509,6 +509,78 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 												},
 											},
 										},
+										"ldap": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Required: []string{
+												"hosts",
+											},
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"bindSecret": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"tlsSecret": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"authentication_enabled": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "boolean",
+												},
+												"authorization_enabled": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "boolean",
+												},
+												"hosts": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "array",
+													Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+														Schema: &apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+												},
+												"port": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "integer",
+												},
+												"encryption": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "string",
+													Pattern: "^false|StartTLSExtension|TLS$",
+												},
+												"server_cert_validation": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "boolean",
+												},
+												"groups_query": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"query_dn": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"user_dn_mapping": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "array",
+													Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+														Schema: &apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+															Required: []string{
+																"template",
+															},
+															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																"template": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+																"re": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+															},
+														},
+													},
+												},
+												"nested_groups_enabled": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "boolean",
+												},
+												"nested_groups_max_depth": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "integer",
+												},
+												"cache_value_lifetime": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "integer",
+												},
+											},
+										},
 									},
 								},
 								"securityContext": apiextensionsv1beta1.JSONSchemaProps{
