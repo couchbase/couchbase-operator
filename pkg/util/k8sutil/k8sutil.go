@@ -29,9 +29,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// TODO: This is deprecated in 1.11+, remove me next release and use PublishNotReadyAddresses
-const TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
-
 // applyBaseAnnotations adds common annotations to resources.
 // All resources created should have this set of annotations for upgrade reasons.
 func applyBaseAnnotations(object metav1.Object) {

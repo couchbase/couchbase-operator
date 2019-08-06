@@ -278,14 +278,12 @@ func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   svcName,
 			Labels: labels,
-			Annotations: map[string]string{
-				TolerateUnreadyEndpointsAnnotation: "true",
-			},
 		},
 		Spec: v1.ServiceSpec{
-			Type:     serviceType,
-			Ports:    ports,
-			Selector: selector,
+			Type:                     serviceType,
+			Ports:                    ports,
+			Selector:                 selector,
+			PublishNotReadyAddresses: true,
 		},
 	}
 
@@ -349,6 +347,10 @@ func updatePeerService(current, requested *v1.Service) bool {
 	}
 	if !reflect.DeepEqual(current.Annotations, requested.Annotations) {
 		current.Annotations = requested.Annotations
+		updated = true
+	}
+	if current.Spec.PublishNotReadyAddresses != requested.Spec.PublishNotReadyAddresses {
+		current.Spec.PublishNotReadyAddresses = requested.Spec.PublishNotReadyAddresses
 		updated = true
 	}
 	// Filled in by the API, so reset to what we generate
@@ -524,6 +526,10 @@ func updateConsoleService(service, requested *v1.Service) bool {
 	// This handles spec.ddns.domain updates.
 	if !reflect.DeepEqual(service.Annotations, requested.Annotations) {
 		service.Annotations = requested.Annotations
+		updated = true
+	}
+	if service.Spec.PublishNotReadyAddresses != requested.Spec.PublishNotReadyAddresses {
+		service.Spec.PublishNotReadyAddresses = requested.Spec.PublishNotReadyAddresses
 		updated = true
 	}
 	// This handles spec.adminConsoleServices updates.
