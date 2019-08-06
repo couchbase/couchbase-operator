@@ -150,6 +150,9 @@ func chooseServerGroups(groups []string, seed string, max int) []string {
 		output = append(output, groups[(i+index)%len(groups)])
 	}
 
+	// Sure the list is lexically ordered so that the scheduling emulation
+	// works as desired.
+	sort.Strings(output)
 	return output
 }
 

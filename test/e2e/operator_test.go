@@ -46,11 +46,7 @@ func TestPauseOperator(t *testing.T) {
 	// * Member replaced
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
-		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
