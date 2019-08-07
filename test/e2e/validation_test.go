@@ -19,6 +19,7 @@ import (
 	"github.com/ghodss/yaml"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/discovery"
@@ -110,23 +111,31 @@ func getResourceMeta(resource []byte) (string, string, error) {
 	return object.GetNamespace(), object.GetName(), nil
 }
 
+var (
+	// restMapper is cached because the calls to create it are very expensive.
+	restMapper meta.RESTMapper
+)
+
 // getResource takes raw JSON and returns the resource type (used by the raw API),
 // the API version and the Kind (POST and PUT methods actually strip this from
 // the status response so we have to replopulate it).
 func getResource(k8s *types.Cluster, resource []byte) (string, string, string, error) {
+	if restMapper == nil {
+		discoveryClient, err := discovery.NewDiscoveryClientForConfig(k8s.Config)
+		if err != nil {
+			return "", "", "", err
+		}
+		groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
+		if err != nil {
+			return "", "", "", err
+		}
+		restMapper = restmapper.NewDiscoveryRESTMapper(groupresources)
+	}
+
 	object := &unstructured.Unstructured{}
 	if err := json.Unmarshal(resource, object); err != nil {
 		return "", "", "", err
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(k8s.Config)
-	if err != nil {
-		return "", "", "", err
-	}
-	groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		return "", "", "", err
-	}
-	restMapper := restmapper.NewDiscoveryRESTMapper(groupresources)
 	gvk := object.GroupVersionKind()
 	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {

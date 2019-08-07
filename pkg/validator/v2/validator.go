@@ -104,9 +104,6 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 func ApplyBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
-	a, b, c := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode")
-	fmt.Println(a, b, c)
-
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
 	}
