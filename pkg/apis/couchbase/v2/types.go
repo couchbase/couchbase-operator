@@ -315,7 +315,7 @@ type ClusterConfig struct {
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
 	// Auto-compaction settings
-	AutoCompaction AutoCompaction `json:"autoCompaction,omitempty,omitempty"`
+	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

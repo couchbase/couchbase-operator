@@ -113,7 +113,6 @@ func AnalyzeResults(t *testing.T) {
 
 	if xmlstring, err := xml.MarshalIndent(testsuite, "", "    "); err == nil {
 		xmlstring = []byte(xml.Header + string(xmlstring))
-		fmt.Printf("%s\n", xmlstring)
 		err := ioutil.WriteFile("results.xml", xmlstring, 0644)
 		if err != nil {
 			t.Fatalf("Failed to write test XML: %v", err)
