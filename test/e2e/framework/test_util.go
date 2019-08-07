@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"encoding/base64"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -44,9 +45,30 @@ var Results = []TestResult{}
 func AnalyzeResults(t *testing.T) {
 	t.Logf("Suite Test Results: \n")
 
+	//structs for xml
+	type TestCase struct {
+		XMLName xml.Name `xml:"testcase"`
+		Name    string   `xml:"name,attr"`
+		Time    string   `xml:"time,attr"`
+	}
+
+	type TestSuite struct {
+		XMLName   xml.Name   `xml:"testsuite"`
+		Name      string     `xml:"name,attr"`
+		Tests     string     `xml:"tests,attr"`
+		Errors    string     `xml:"errors,attr"`
+		Failures  string     `xml:"failures,attr"`
+		Skip      string     `xml:"skip,attr"`
+		Time      string     `xml:"time,attr"`
+		Testcases []TestCase `xml:"testcase"`
+	}
+
 	failures := []string{}
 	instabilities := []string{}
+	testcases := []TestCase{}
+
 	for i, result := range Results {
+		testcases = append(testcases, TestCase{Name: result.Name, Time: "0"})
 		if result.Result {
 			t.Logf("%d: %s...PASS", i+1, result.Name)
 		} else {
@@ -56,6 +78,16 @@ func AnalyzeResults(t *testing.T) {
 		if result.Unstable {
 			instabilities = append(instabilities, result.Name)
 		}
+	}
+
+	testsuite := TestSuite{
+		Name:      suiteData.SuiteName,
+		Tests:     strconv.Itoa(len(Results)),
+		Errors:    strconv.Itoa(len(instabilities)),
+		Failures:  strconv.Itoa(len(failures)),
+		Skip:      "0",
+		Time:      "0",
+		Testcases: testcases,
 	}
 
 	pass := float64(len(Results) - len(failures))
@@ -78,6 +110,16 @@ func AnalyzeResults(t *testing.T) {
 	}
 
 	t.Logf("\n Pass: %f \n Fail: %f \n Pass Rate: %f", pass, fail, passRate)
+
+	if xmlstring, err := xml.MarshalIndent(testsuite, "", "    "); err == nil {
+		xmlstring = []byte(xml.Header + string(xmlstring))
+		fmt.Printf("%s\n", xmlstring)
+		err := ioutil.WriteFile("results.xml", xmlstring, 0644)
+		if err != nil {
+			t.Fatalf("Failed to write test XML: %v", err)
+		}
+	}
+
 	if fail > 0 {
 		t.Fatalf("suite contains failures")
 	}
