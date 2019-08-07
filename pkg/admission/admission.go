@@ -155,15 +155,18 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 
 	// Check that the CouchbaseCluster is correctly configured with respect to an existing resource
 	if ar.Request.Operation == admissionv1beta1.Update {
+		// Ignore errors here as we could be upgrading from v1 to v2.  In this scenario
+		// all CRDs served by the API will appear as v2 regardless of what's actually
+		// on disk.
+		glog.V(1).Infof("Previous resource: %s", string(ar.Request.OldObject.Raw))
 		existingCouchbaseCluser, err := decodeObject(ar, ar.Request.OldObject)
 		if err != nil {
 			glog.Error(err)
-			return errorResponse(err)
-		}
-		// Note: the we cannot raise warnings as the Result field is only consulted if Allowed is false
-		if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
-			glog.Errorf("Rejecting resource: %v", err)
-			return errorResponse(err)
+		} else {
+			if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
+				glog.Errorf("Rejecting resource: %v", err)
+				return errorResponse(err)
+			}
 		}
 	}
 

@@ -21,8 +21,6 @@ import (
 )
 
 const (
-	couchbaseContainerName          = "couchbase-server"
-	couchbaseTLSVolumeName          = "couchbase-server-tls"
 	couchbaseTLSVolumeMountDir      = "/opt/couchbase/var/lib/couchbase/inbox"
 	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
 	CouchbaseVolumeMountLogsDir     = "/opt/couchbase/var/lib/couchbase/logs"
@@ -409,7 +407,7 @@ func CouchbaseContainer(image string) v1.Container {
 
 func couchbaseContainer(image string) v1.Container {
 	c := v1.Container{
-		Name:  couchbaseContainerName,
+		Name:  constants.CouchbaseContainerName,
 		Image: image,
 		Ports: []v1.ContainerPort{
 			{
@@ -604,7 +602,7 @@ func couchbaseContainer(image string) v1.Container {
 // shared with with the Pod's main container
 func couchbaseInitContainer(image, claimName string) v1.Container {
 	initContainer := couchbaseContainer(image)
-	initContainer.Name = fmt.Sprintf("%s-init", couchbaseContainerName)
+	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	initContainer.Args = []string{"cp", "-a", "/opt/couchbase/etc", "/mnt/"}
 	initContainer.VolumeMounts = []v1.VolumeMount{
 		{Name: claimName,
@@ -659,7 +657,7 @@ func applyPodPolicy(pod *v1.Pod, policy *couchbasev2.PodPolicy) {
 	mergeLabels(pod.Annotations, policy.Annotations)
 
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == couchbaseContainerName {
+		if pod.Spec.Containers[i].Name == constants.CouchbaseContainerName {
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, policy.Env...)
 			pod.Spec.Containers[i].EnvFrom = append(pod.Spec.Containers[i].EnvFrom, policy.EnvFrom...)
 		}
@@ -669,7 +667,7 @@ func applyPodPolicy(pod *v1.Pod, policy *couchbasev2.PodPolicy) {
 // Given a pod, return a pointer to the couchbase container
 func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 	for index := range pod.Spec.Containers {
-		if pod.Spec.Containers[index].Name == couchbaseContainerName {
+		if pod.Spec.Containers[index].Name == constants.CouchbaseContainerName {
 			return &pod.Spec.Containers[index], nil
 		}
 	}
@@ -693,7 +691,7 @@ func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 
 			// Add the TLS secret volume to the pod
 			volume := v1.Volume{
-				Name: couchbaseTLSVolumeName,
+				Name: constants.CouchbaseTLSVolumeName,
 			}
 			volume.VolumeSource.Secret = &v1.SecretVolumeSource{
 				SecretName: cs.Networking.TLS.Static.Member.ServerSecret,
@@ -702,7 +700,7 @@ func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 
 			// Mount the secret volume in Couchbase's inbox
 			volumeMount := v1.VolumeMount{
-				Name:      couchbaseTLSVolumeName,
+				Name:      constants.CouchbaseTLSVolumeName,
 				ReadOnly:  true,
 				MountPath: couchbaseTLSVolumeMountDir,
 			}
@@ -876,7 +874,7 @@ func exec(client kubernetes.Interface, pod *v1.Pod, command []string) error {
 		Name(pod.Name).
 		SubResource("exec")
 	req.VersionedParams(&v1.PodExecOptions{
-		Container: couchbaseContainerName,
+		Container: constants.CouchbaseContainerName,
 		Command:   command,
 		Stdout:    true,
 	}, scheme.ParameterCodec)

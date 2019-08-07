@@ -13,7 +13,7 @@ import (
 
 // upgradeRange specifies the range of versions to apply an upgrade action to.
 type upgradeRange struct {
-	// From allows an upgrade action to occur if a reosurce is greater than or equal to this version.
+	// From allows an upgrade action to occur if a resource is greater than or equal to this version.
 	from string
 	// To allows an upgrade action to occur if a resource less than this version.
 	to string

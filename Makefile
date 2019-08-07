@@ -34,6 +34,7 @@ $(BINARY): $(SOURCE)
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/crdgen ./cmd/crdgen/
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopinfo ./cmd/cbopinfo
 	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopcfg ./cmd/cbopcfg
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopconv ./cmd/cbopconv
 	build/bin/crdgen > example/crd.yaml
 
 # NOTE: This target is only for local development. While we use this Dockerfile
@@ -62,6 +63,9 @@ tools: build
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopcfg ./cmd/cbopcfg/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopcfg ./cmd/cbopcfg/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopcfg.exe ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopconv ./cmd/cbopconv
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopconv ./cmd/cbopconv
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopconv.exe ./cmd/cbopconv
 
 artifacts: tools
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(version) --bld_num $(bldNum)

@@ -36,6 +36,7 @@ func newPodUpgradableResource(c *Cluster) upgradableResource {
 		cluster: c,
 		actions: podUpgradeActionList{
 			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePodFrom000000To010200},
+			{upgradeRange: upgradeRange{"1.2.0", "2.0.0"}, action: upgradePodFrom010200To020000},
 		},
 	}
 }
@@ -103,6 +104,31 @@ func upgradePodFrom000000To010200(cluster *Cluster, pod *corev1.Pod) error {
 	// Add the server version annotation from the cluster's current version.
 	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = cluster.cluster.Status.CurrentVersion
 	delete(pod.Annotations, "couchbase.version")
+
+	return nil
+}
+
+// upgradePodFrom010200To020000 performs pod upgrades to 2.0.0 from 1.2.0.
+// * The "pod.couchbase.com/tls" annotation was added.
+// * The "pod.couchbase.com/spec" annotation was added (very hard, just let upgrade happen).
+func upgradePodFrom010200To020000(cluster *Cluster, pod *corev1.Pod) error {
+	// Update the version annotation
+	pod.Annotations[constants.ResourceVersionAnnotation] = "2.0.0"
+
+	// Previously we allowed TLS to be on or off during the life cycle of a cluster.
+	// Now we can allow upgrade and downgrade we must explicitly monitor which pods
+	// have TLS secrets mounted.
+	for _, container := range pod.Spec.Containers {
+		if container.Name == constants.CouchbaseContainerName {
+			for _, mount := range container.VolumeMounts {
+				if mount.Name == constants.CouchbaseTLSVolumeName {
+					pod.Annotations[constants.PodTLSAnnotation] = "enabled"
+					break
+				}
+			}
+			break
+		}
+	}
 
 	return nil
 }

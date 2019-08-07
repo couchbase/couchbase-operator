@@ -125,18 +125,6 @@ func GetOperatorRole() *rbacv1.Role {
 					"",
 				},
 				Resources: []string{
-					"configmaps",
-				},
-				Verbs: []string{
-					"get",    // used by the controller-runtime for leadership.
-					"create", // used by the controller-runtime for leadership.
-				},
-			},
-			{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
 					"pods",
 					"services",
 					"persistentvolumeclaims",

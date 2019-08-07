@@ -52,7 +52,6 @@ var (
 	AutoFailoverOnDataDiskIssuesTimePeriodMin uint64 = 5
 	AutoFailoverOnDataDiskIssuesTimePeriodMax uint64 = 3600
 
-	PodIndexAnnotation            = "pod.couchbase.com/index"
 	PodSpecAnnotation             = "pod.couchbase.com/spec"
 	PodTLSAnnotation              = "pod.couchbase.com/tls"
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
@@ -77,6 +76,9 @@ const (
 
 	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
 	DNSAnnotation = "external-dns.alpha.kubernetes.io/hostname"
+
+	CouchbaseContainerName = "couchbase-server"
+	CouchbaseTLSVolumeName = "couchbase-server-tls"
 )
 
 // Represents the Kubernetes version by its major and minor parts. The first

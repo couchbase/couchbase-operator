@@ -470,7 +470,7 @@ type AutoCompaction struct {
 	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
 
 	// TombstonePurgeInterval controls how long to wait before purging tombstones.
-	TombstonePurgeInterval metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
+	TombstonePurgeInterval *metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
 }
 
 // Replications defines XDCR replications.
