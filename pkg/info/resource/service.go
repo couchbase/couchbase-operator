@@ -55,5 +55,9 @@ func (r *serviceResource) Write(b backend.Backend) error {
 }
 
 func (r *serviceResource) References() []ResourceReference {
-	return []ResourceReference{}
+	references := []ResourceReference{}
+	for _, service := range r.services.Items {
+		references = append(references, newResourceReference(r.Kind(), service.Name))
+	}
+	return references
 }

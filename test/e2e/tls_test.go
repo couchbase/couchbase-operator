@@ -161,7 +161,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
 	e2eutil.MustRecreateSecret(t, targetKube, f.Namespace, secret)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events match what we expect:
@@ -249,7 +249,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
 	e2eutil.MustRecreateSecret(t, targetKube, f.Namespace, secret)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events match what we expect:

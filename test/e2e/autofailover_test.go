@@ -35,6 +35,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
 	testCouchbase.Spec.ServerGroups = availableServerGroupList
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	sort.Strings(availableServerGroupList)
 
