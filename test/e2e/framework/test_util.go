@@ -46,10 +46,12 @@ func AnalyzeResults(t *testing.T) {
 	t.Logf("Suite Test Results: \n")
 
 	//structs for xml
+
 	type TestCase struct {
 		XMLName xml.Name `xml:"testcase"`
 		Name    string   `xml:"name,attr"`
 		Time    string   `xml:"time,attr"`
+		Error   string   `xml:"error,omitempty"`
 	}
 
 	type TestSuite struct {
@@ -68,14 +70,17 @@ func AnalyzeResults(t *testing.T) {
 	testcases := []TestCase{}
 
 	for i, result := range Results {
-		testcases = append(testcases, TestCase{Name: result.Name, Time: "0"})
+
 		if result.Result {
 			t.Logf("%d: %s...PASS", i+1, result.Name)
+			testcases = append(testcases, TestCase{Name: result.Name, Time: "0"})
 		} else {
 			t.Logf("%d: %s...FAIL", i+1, result.Name)
+			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "fail"})
 			failures = append(failures, result.Name)
 		}
 		if result.Unstable {
+			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "unstable"})
 			instabilities = append(instabilities, result.Name)
 		}
 	}
