@@ -84,6 +84,7 @@ func TestNodeManualFailover(t *testing.T) {
 	// create 2 node cluster with admin console
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Generate workload during the operation.
 	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
@@ -121,6 +122,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Generate workload during the operation.
 	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
@@ -174,6 +176,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Generate workload during the operation.
 	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
@@ -227,6 +230,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Generate workload during the operation.
 	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
@@ -295,6 +299,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Generate workload during the operation.
 	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
@@ -607,6 +612,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Generate workload during the operation.
 	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
@@ -650,6 +656,7 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Generate workload during the operation.
 	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
@@ -734,6 +741,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	// Deploy couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Set taint properties
 	podTaint := []v1.Taint{

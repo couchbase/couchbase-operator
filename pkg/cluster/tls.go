@@ -67,23 +67,31 @@ func (c *Cluster) reloadChain(member *couchbaseutil.Member, cacert []byte) error
 func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []byte, cert *x509.Certificate) error {
 	log.Info("Reloading certificate chain", "cluster", c.cluster.Name, "name", member.Name)
 
-	// Refresh the server certificate chain.
-	if err := c.reloadChain(member, cacert); err != nil {
-		return err
-	}
-
 	// Wait for the certificate data to be updated. NS server has a few quirks (as per usual... sigh).
 	// Reloading the chain will sometimes not work and need to be repeatedly prodded until it decides
 	// to obey our command.
-	return retryutil.Retry(c.ctx, 5*time.Second, couchbaseutil.ExtendedRetryCount, func() (bool, error) {
-		if tlsValid(member, cacert, cert) {
-			return true, nil
-		}
+	callback := func() error {
 		if err := c.reloadChain(member, cacert); err != nil {
-			return false, nil
+			return err
 		}
-		return false, nil
-	})
+		return nil
+	}
+	if err := retryutil.RetryOnErr(c.ctx, 5*time.Second, couchbaseutil.ExtendedRetryCount, "", "", callback); err != nil {
+		return err
+	}
+
+	// Wait until TLS is visibly being served before continuing.
+	callback = func() error {
+		if tlsValid(member, cacert, cert) {
+			return nil
+		}
+		return fmt.Errorf("certificate chain not served")
+	}
+	if err := retryutil.RetryOnErr(c.ctx, 5*time.Second, couchbaseutil.ExtendedRetryCount, "", "", callback); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // getTLSData gets the TLS data from kubernetes and performs some error checking.

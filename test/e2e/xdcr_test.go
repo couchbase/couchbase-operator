@@ -28,7 +28,7 @@ func mustCreateXDCRBuckets(t *testing.T, k8s1, k8s2 *types.Cluster) {
 // ejectAllXDCRNodes removes each node from the cluster sequentially.
 func ejectAllXDCRNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) eventschema.Validatable {
 	for i := 0; i < couchbase.Spec.TotalSize(); i++ {
-		e2eutil.MustEjectMember(t, k8s, couchbase, i, time.Minute)
+		e2eutil.MustEjectMember(t, k8s, couchbase, i, 5*time.Minute)
 		e2eutil.MustWaitForClusterEvent(t, k8s, couchbase, e2eutil.RebalanceCompletedEvent(couchbase), 5*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, k8s, couchbase, 2*time.Minute)
 	}
