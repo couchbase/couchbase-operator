@@ -84,7 +84,7 @@ func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couch
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 
-		if err := retryutil.Retry(ctx, 5*time.Second, IntMax, callback); err != nil {
+		if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 			return err
 		}
 	}
@@ -104,7 +104,7 @@ func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbase
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 10*time.Second, IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
 		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
 		defer cleanup()
 

@@ -120,5 +120,7 @@ func waitAdmissionController(client kubernetes.Interface) error {
 		}
 		return true, nil
 	}
-	return retryutil.Retry(context.Background(), time.Second, 30, callback)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	return retryutil.Retry(ctx, time.Second, callback)
 }

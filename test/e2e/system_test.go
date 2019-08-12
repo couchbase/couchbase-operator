@@ -3,7 +3,6 @@ package e2e
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -509,9 +508,6 @@ outerLoop:
 }
 
 func TestFeaturesAll(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	testDef := sysTestDef{
 		name:     "simple",

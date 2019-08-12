@@ -127,6 +127,23 @@ func IsErrUnknownMember(err error) bool {
 	return ok
 }
 
+// RebalanceIncompleteError is used when a rebalance operation did not
+// complete successfully and the cluster is unbalanced
+type rebalanceIncompleteError struct{}
+
+func (e rebalanceIncompleteError) Error() string {
+	return "rebalance did not complete, cluster is unbalanced"
+}
+
+func NewRebalanceIncompleteError() error {
+	return &rebalanceIncompleteError{}
+}
+
+func IsRebalanceIncompleteError(err error) bool {
+	_, ok := err.(*rebalanceIncompleteError)
+	return ok
+}
+
 // ErrUnknownServerClass is used when mapping a class name to a server
 // configuration and the configuration does not exist
 type ErrUnknownServerClass struct {

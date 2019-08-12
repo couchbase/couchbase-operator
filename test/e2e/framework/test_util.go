@@ -1082,7 +1082,7 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 
-		err := retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
+		err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 			if err := CreateEtcd(t, kubeClient, namespace, kubeConfigPath); err != nil {
 				logrus.Infof("Error creating etcd: %v", err)
 				_ = DeleteEtcd(t, kubeClient, namespace, kubeConfigPath)
@@ -1095,7 +1095,7 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 		}
 
 		logrus.Info("Creating Portworx cluster")
-		return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
+		return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 			if err := CreatePortworx(t, kubeClient, namespace, kubeConfigPath); err != nil {
 				logrus.Infof("Error creating portworx cluster: %v", err)
 				_ = DeletePortworx(t, kubeClient, kubeConfigPath)

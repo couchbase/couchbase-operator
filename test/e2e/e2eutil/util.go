@@ -1,7 +1,6 @@
 package e2eutil
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -394,7 +393,7 @@ func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, pat
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return cluster, retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+	return cluster, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		// Get the current cluster resource
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
@@ -444,7 +443,7 @@ func PatchBucket(k8s *types.Cluster, bucket runtime.Object, patches jsonpatch.Pa
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return bucket, retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+	return bucket, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		// Get the current bucket resource
 		switch t := bucket.(type) {
 		case *couchbasev2.CouchbaseBucket:
@@ -489,7 +488,7 @@ func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object, pa
 }
 
 func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *couchbasev2.CouchbaseCluster) {
-	if err := DeleteCluster(t, crClient, kubeClient, cluster, 10); err != nil {
+	if err := DeleteCluster(t, crClient, kubeClient, cluster); err != nil {
 		Die(t, err)
 	}
 }
@@ -634,17 +633,6 @@ func WriteLogs(kubeClient kubernetes.Interface, namespace, logDir, testName stri
 	return nil
 }
 
-func printContainerStatus(buf *bytes.Buffer, ss []v1.ContainerStatus) {
-	for _, s := range ss {
-		if s.State.Waiting != nil {
-			buf.WriteString(fmt.Sprintf("%s: Waiting: message (%s) reason (%s)\n", s.Name, s.State.Waiting.Message, s.State.Waiting.Reason))
-		}
-		if s.State.Terminated != nil {
-			buf.WriteString(fmt.Sprintf("%s: Terminated: message (%s) reason (%s)\n", s.Name, s.State.Terminated.Message, s.State.Terminated.Reason))
-		}
-	}
-}
-
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
 	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/Servers/%d/Size", service), clusterSize), 30*time.Second)
@@ -782,7 +770,7 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 
 	var pods *v1.PodList
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("app", "couchbase-operator")))
-	outerErr := retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+	outerErr := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		var err error
 		pods, err = kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
@@ -991,7 +979,7 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, n
 			return err
 		}
 	}
-	_, err = WaitPodsDeleted(kubeClient, namespace, 30, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitPodsDeleted(kubeClient, namespace, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
@@ -1002,7 +990,7 @@ func deletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace
 	t.Logf("deleting pod: %v", podName)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err := retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		if err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -1023,7 +1011,7 @@ func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, la
 			return err
 		}
 	}
-	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, 30, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}

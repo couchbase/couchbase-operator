@@ -369,7 +369,9 @@ func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interf
 		return false, fmt.Errorf("claim is not bound to a persistent volume")
 	}
 
-	if err := retryutil.Retry(ctx, time.Second, 10, retryFunc); err != nil {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := retryutil.Retry(ctx, time.Second, retryFunc); err != nil {
 		if phase == v1.ClaimPending {
 			// claim is not yet bound to volume but there was no error when
 			// creating so allow any consumer of this claim to deal with

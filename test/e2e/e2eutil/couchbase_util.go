@@ -82,7 +82,7 @@ func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	err = retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+	err = retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		if err := pf.ForwardPorts(); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -215,7 +215,7 @@ func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -339,7 +339,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		return true, nil
 	}
-	if err := retryutil.Retry(ctx, 5*time.Second, IntMax, callback); err != nil {
+	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 
@@ -356,7 +356,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		return true, nil
 	}
-	if err := retryutil.Retry(ctx, 5*time.Second, IntMax, callback); err != nil {
+	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 
@@ -374,7 +374,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		return info.RebalanceStatus == "none", nil
 	}
-	return retryutil.Retry(ctx, time.Second, IntMax, callback)
+	return retryutil.Retry(ctx, time.Second, callback)
 }
 
 func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member *couchbaseutil.Member) {
@@ -420,7 +420,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 		return info.RebalanceStatus == "none", nil
 	}
-	if err := retryutil.Retry(ctx, time.Second, IntMax, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		return err
 	}
 
@@ -451,7 +451,7 @@ func FailoverNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, i
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -481,7 +481,7 @@ func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *couchbasev2.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "failover nodes", "test-cluster", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -515,7 +515,7 @@ func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "wait for unhealthy nodes", "test-cluster", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -550,7 +550,7 @@ func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -577,7 +577,7 @@ func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -604,7 +604,7 @@ func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -631,7 +631,7 @@ func PatchAutoCompactionSettings(k8s *types.Cluster, couchbase *couchbasev2.Couc
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (done bool, err error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -658,7 +658,7 @@ func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -739,7 +739,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		`"appcode": "` + jsFunc + `"` +
 		`}]`
 
-	err := retryutil.Retry(ctx, 5*time.Second, IntMax, func() (bool, error) {
+	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		var eventingUrl string
 		var cleanup func()
 		var err error
@@ -823,7 +823,7 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, 10*time.Second, callback); err != nil {
 		return nil, err
 	}
 
@@ -884,7 +884,7 @@ func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, 10*time.Second, IntMax, "", "", callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, 10*time.Second, callback); err != nil {
 		return 0, err
 	}
 
@@ -897,4 +897,38 @@ func MustGetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 		Die(t, err)
 	}
 	return count
+}
+
+func CreateBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+
+		b := &cbmgr.Bucket{
+			BucketName:         bucket,
+			BucketType:         "couchbase",
+			BucketMemoryQuota:  100,
+			IoPriority:         cbmgr.IoPriorityTypeHigh,
+			EvictionPolicy:     "fullEviction",
+			ConflictResolution: "seqno",
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    cbmgr.CompressionModePassive,
+		}
+		return client.CreateBucket(b)
+	}
+
+	return retryutil.RetryOnErr(ctx, 10*time.Second, callback)
+}
+
+func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
+	if err := CreateBucket(k8s, cluster, bucket, timeout); err != nil {
+		Die(t, err)
+	}
 }

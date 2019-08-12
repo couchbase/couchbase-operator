@@ -125,7 +125,7 @@ func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.Cou
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		nodeServices, err := getNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -157,7 +157,7 @@ func CheckForDNSAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.Co
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		nodeServices, err := getNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -189,7 +189,7 @@ func CheckForDNSServiceAnnotations(k8s *types.Cluster, couchbase *couchbasev2.Co
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		services, err := getKubernetesNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -225,7 +225,7 @@ func CheckForNodeServiceType(k8s *types.Cluster, couchbase *couchbasev2.Couchbas
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		services, err := getKubernetesNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -256,7 +256,7 @@ func CheckForDNSAdminAnnotation(k8s *types.Cluster, couchbase *couchbasev2.Couch
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -286,7 +286,7 @@ func CheckForConsoleServiceType(k8s *types.Cluster, couchbase *couchbasev2.Couch
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -311,7 +311,7 @@ func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err

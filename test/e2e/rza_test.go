@@ -28,7 +28,7 @@ func k8sNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabel
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		k8sNodeList, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get k8s nodes: %v", err)

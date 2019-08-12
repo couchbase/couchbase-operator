@@ -19,15 +19,14 @@ type GroupSetupFunction map[string]func(*testing.T, []framework.ClusterInfo) err
 
 // Variable to store random suffix for couchbase-server name & tls certificates
 var (
-	envParallelTest     = "PARALLEL_TEST"
-	envParallelTestTrue = "true"
-	TestFuncMap         = framework.FuncMap{
+	TestFuncMap = framework.FuncMap{
 		"TestCreateCluster":                                   TestCreateCluster,
 		"TestCreateBucketCluster":                             TestCreateBucketCluster,
 		"TestBucketAddRemoveBasic":                            TestBucketAddRemoveBasic,
 		"TestEditBucket":                                      TestEditBucket,
 		"TestBucketUnmanaged":                                 TestBucketUnmanaged,
 		"TestBucketSelection":                                 TestBucketSelection,
+		"TestDeltaRecoveryImpossible":                         TestDeltaRecoveryImpossible,
 		"TestResizeCluster":                                   TestResizeCluster,
 		"TestEditClusterSettings":                             TestEditClusterSettings,
 		"TestRecoveryAfterOnePodFailureNoBucket":              TestRecoveryAfterOnePodFailureNoBucket,

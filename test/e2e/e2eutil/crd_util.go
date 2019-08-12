@@ -28,13 +28,13 @@ func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string,
 	return res, nil
 }
 
-func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, retries int) error {
+func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
 	t.Logf("deleting couchbase cluster: %v", cl.Name)
 	err := k8sutil.DeleteCouchbaseCluster(crClient, cl)
 	if err != nil {
 		return err
 	}
-	return waitResourcesDeleted(t, kubeClient, cl, retries)
+	return waitResourcesDeleted(t, kubeClient, cl)
 }
 
 func getClusterCRD(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {

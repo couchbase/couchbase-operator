@@ -33,6 +33,14 @@ const (
 	NodeStateAddBack
 	NodeStateUnclustered
 	NodeStateInvalid
+
+	// DefaultRetryPeriod is the default amount of time to wait for an API
+	// operation to report success.
+	DefaultRetryPeriod = 30 * time.Second
+
+	// ExtendedRetryPeriod is an extended amount of time to wait for slow
+	// API operations to report success.
+	ExtendedRetryPeriod = 3 * time.Minute
 )
 
 // String converts a node state into a string representation
@@ -109,11 +117,6 @@ func (c *ClusterStatus) Reset() {
 	c.IsRebalancing = false
 	c.NeedsRebalance = false
 }
-
-const (
-	RetryCount         = 5
-	ExtendedRetryCount = 36
-)
 
 // CouchbaseClient encapsulates Couchbase API operations.
 type CouchbaseClient struct {
@@ -445,26 +448,29 @@ func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchb
 		return err
 	}
 
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "add node", c.clusterName,
-		func() error {
-			return c.client.AddNode(hostname, c.username, c.password, svcs)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.AddNode(hostname, c.username, c.password, svcs)
+	})
 }
 
 func (c *CouchbaseClient) CancelAddNode(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "cancel add node", c.clusterName,
-		func() error {
-			return c.client.CancelAddNode(hostname)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.CancelAddNode(hostname)
+	})
 }
 
 func (c *CouchbaseClient) CancelAddBackNode(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "cancel add back node", c.clusterName,
-		func() error {
-			return c.client.CancelAddBackNode(hostname)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.CancelAddBackNode(hostname)
+	})
 }
 
 func (c *CouchbaseClient) ClusterUUID(m *Member) (string, error) {
@@ -473,11 +479,12 @@ func (c *CouchbaseClient) ClusterUUID(m *Member) (string, error) {
 
 	var err error
 	var uuid string
-	err = retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster uuid", c.clusterName,
-		func() error {
-			uuid, err = c.client.ClusterUUID()
-			return err
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		uuid, err = c.client.ClusterUUID()
+		return err
+	})
 
 	return uuid, err
 }
@@ -489,7 +496,9 @@ func (c *CouchbaseClient) IsEnterprise(m *Member) (bool, error) {
 
 	var err error
 	var isEnterprise bool
-	err = retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "is enterprise", c.clusterName, func() error {
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		isEnterprise, err = c.client.IsEnterprise()
 		return err
 	})
@@ -510,7 +519,9 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 
 	status.Reset()
 
-	err := retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster status", c.clusterName, func() error {
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		// Get the cluster information from Couchbase server
 		var err error
 		status.info, err = c.client.ClusterInfo()
@@ -571,10 +582,11 @@ func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "node init", clusterName,
-		func() error {
-			return c.client.NodeInitialize(m.Addr(), dataPath, indexPath, analyticsPaths)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.NodeInitialize(m.Addr(), dataPath, indexPath, analyticsPaths)
+	})
 }
 
 func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
@@ -592,40 +604,41 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 		return err
 	}
 
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "cluster init", defaults.ClusterName,
-		func() error {
-			return c.client.ClusterInitialize(username, password, defaults,
-				8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.ClusterInitialize(username, password, defaults, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
+	})
 }
 
 func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait bool, cluster string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "rebalance", c.clusterName,
-		func() error {
-			err := c.client.Rebalance(nodesToRemove)
-			if err != nil {
-				return err
-			}
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		err := c.client.Rebalance(nodesToRemove)
+		if err != nil {
+			return err
+		}
 
-			if wait {
-				progress := c.client.NewRebalanceProgress()
-				for {
-					status, ok := <-progress.Status()
-					if !ok {
-						return progress.Error()
-					}
-					switch status.Status {
-					case cbmgr.RebalanceStatusUnknown:
-						log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
-					case cbmgr.RebalanceStatusRunning:
-						log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
-					}
+		if wait {
+			progress := c.client.NewRebalanceProgress()
+			for {
+				status, ok := <-progress.Status()
+				if !ok {
+					return progress.Error()
+				}
+				switch status.Status {
+				case cbmgr.RebalanceStatusUnknown:
+					log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
+				case cbmgr.RebalanceStatusRunning:
+					log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
 				}
 			}
+		}
 
-			return nil
-		})
+		return nil
+	})
 }
 
 func (c *CouchbaseClient) StopRebalance(ms MemberSet) error {
@@ -671,21 +684,23 @@ func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket cbmgr.Bucket) error 
 
 func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.AutoFailoverSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "set autofailover timeout", c.clusterName,
-		func() error {
-			return c.client.SetAutoFailoverSettings(settings)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.SetAutoFailoverSettings(settings)
+	})
 }
 
 func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*cbmgr.AutoFailoverSettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	var settings *cbmgr.AutoFailoverSettings
 
-	return settings, retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "get autofailover settings", c.clusterName,
-		func() (e error) {
-			settings, e = c.client.GetAutoFailoverSettings()
-			return e
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return settings, retryutil.RetryOnErr(ctx, 5*time.Second, func() (e error) {
+		settings, e = c.client.GetAutoFailoverSettings()
+		return e
+	})
 }
 
 func (c *CouchbaseClient) GetClusterInfo(ms MemberSet) (*cbmgr.ClusterInfo, error) {
@@ -701,10 +716,11 @@ func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, defaults *cbmgr.PoolsDef
 func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "upload CA cert", c.clusterName,
-		func() error {
-			return c.client.UploadClusterCACert(pem)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.UploadClusterCACert(pem)
+	})
 }
 
 func (c *CouchbaseClient) GetClusterCACert(m *Member) ([]byte, error) {
@@ -717,10 +733,11 @@ func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 	// This may take ages if the CA was previously updated.
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, ExtendedRetryCount, "reload server cert", c.clusterName,
-		func() error {
-			return c.client.ReloadNodeCert()
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.ReloadNodeCert()
+	})
 }
 
 func (c *CouchbaseClient) SetClientCertAuth(m *Member, settings *cbmgr.ClientCertAuth) error {
@@ -770,18 +787,20 @@ func (c *CouchbaseClient) DeleteAlternateAddressesExternal(m *Member) error {
 
 func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "set delta recovery", c.clusterName,
-		func() error {
-			return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
+	})
 }
 
 func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return retryutil.RetryOnErr(c.ctx, 5*time.Second, RetryCount, "set full recovery", c.clusterName,
-		func() error {
-			return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeFull)
-		})
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeFull)
+	})
 }
 
 // Get RecoveryType of node if it has been set.

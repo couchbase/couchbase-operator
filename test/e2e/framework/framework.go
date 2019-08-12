@@ -394,7 +394,7 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 5*time.Second, e2eutil.IntMax, "", "", func() error {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		nodeTaintList := []v1.Taint{}
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
@@ -519,7 +519,7 @@ func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, nam
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var operatorPod *v1.Pod
-	err = retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
+	err = retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		operatorPod, err = kubeClient.CoreV1().Pods(namespace).Get(operatorPodName, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -542,7 +542,7 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
-	return retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		_, err := kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return false, err

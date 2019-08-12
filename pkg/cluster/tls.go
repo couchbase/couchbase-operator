@@ -76,7 +76,9 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []by
 		}
 		return nil
 	}
-	if err := retryutil.RetryOnErr(c.ctx, 5*time.Second, couchbaseutil.ExtendedRetryCount, "", "", callback); err != nil {
+	ctx, cancel1 := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
+	defer cancel1()
+	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 
@@ -87,7 +89,9 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []by
 		}
 		return fmt.Errorf("certificate chain not served")
 	}
-	if err := retryutil.RetryOnErr(c.ctx, 5*time.Second, couchbaseutil.ExtendedRetryCount, "", "", callback); err != nil {
+	ctx, cancel2 := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
+	defer cancel2()
+	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 

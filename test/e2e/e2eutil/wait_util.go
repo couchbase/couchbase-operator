@@ -1,7 +1,6 @@
 package e2eutil
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -26,10 +25,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const (
-	IntMax = int(^uint(0) >> 1)
-)
-
 var retryInterval = 10 * time.Second
 
 type filterFunc func(*v1.Pod) bool
@@ -39,7 +34,7 @@ func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev2.Couchbas
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
+	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
 		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(k8sutil.ClusterListOpt(couchbase.Name))
 		if err != nil {
 			return false, err
@@ -87,7 +82,7 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 		}
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, retryInterval, IntMax, "", "", callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
 		return err
 	}
 
@@ -110,7 +105,7 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 		}
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, retryInterval, IntMax, "", "", callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
 		return err
 	}
 
@@ -127,7 +122,7 @@ func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *couchbasev2.Couchba
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, retryInterval, IntMax, func() (done bool, err error) {
+	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -154,7 +149,7 @@ func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *couc
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	err := retryutil.Retry(ctx, retryInterval, IntMax, func() (bool, error) {
+	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
 		cluster, err := GetCouchbaseCluster(crClient, cl.Name, cl.Namespace)
 		if err != nil {
 			return false, err
@@ -204,7 +199,7 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, retryInterval, IntMax, "", "", callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
 		return fmt.Errorf("fail to wait for cluster status to be healthy: %v", err)
 	}
 	return nil
@@ -216,23 +211,10 @@ func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
-func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, retries int) error {
-	undeletedPods, err := WaitPodsDeleted(kubeClient, cl.Namespace, retries, k8sutil.ClusterListOpt(cl.Name))
-	if err != nil {
-		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
-			p := undeletedPods[0]
-
-			buf := bytes.NewBuffer(nil)
-			buf.WriteString("init container status:\n")
-			printContainerStatus(buf, p.Status.InitContainerStatuses)
-			buf.WriteString("container status:\n")
-			printContainerStatus(buf, p.Status.ContainerStatuses)
-			t.Logf("pod (%s) status.phase is (%s): %v", p.Name, p.Status.Phase, buf.String())
-		}
-		return fmt.Errorf("fail to wait pods deleted: %v", err)
-	}
-
-	err = retryutil.Retry(context.Background(), retryInterval, 3, func() (done bool, err error) {
+func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	err := retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
 		list, err := kubeClient.CoreV1().Services(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 		if err != nil {
 			return false, err
@@ -249,49 +231,32 @@ func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *cou
 }
 
 func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName string, cl *couchbasev2.CouchbaseCluster) error {
-	undeletedPods, err := WaitPodsDeleted(kubeClient, cl.Namespace, 3, k8sutil.NodeListOpt(cl.Name, podName))
+	_, err := WaitPodsDeleted(kubeClient, cl.Namespace, k8sutil.NodeListOpt(cl.Name, podName))
 	if err != nil {
-		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
-			p := undeletedPods[0]
-
-			buf := bytes.NewBuffer(nil)
-			buf.WriteString("init container status:\n")
-			printContainerStatus(buf, p.Status.InitContainerStatuses)
-			buf.WriteString("container status:\n")
-			printContainerStatus(buf, p.Status.ContainerStatuses)
-			t.Logf("pod (%s) status.phase is (%s): %v", p.Name, p.Status.Phase, buf.String())
-		}
-
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
 	return nil
 }
 
 func WaitUntilPodDeleted(kubeClient kubernetes.Interface, namespace string) error {
-	undeletedPods, err := WaitPodsDeleted(kubeClient, namespace, 3, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	_, err := WaitPodsDeleted(kubeClient, namespace, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
-		if retryutil.IsRetryFailure(err) && len(undeletedPods) > 0 {
-			p := undeletedPods[0]
-			buf := bytes.NewBuffer(nil)
-			buf.WriteString("init container status:\n")
-			printContainerStatus(buf, p.Status.InitContainerStatuses)
-			buf.WriteString("container status:\n")
-			printContainerStatus(buf, p.Status.ContainerStatuses)
-		}
-
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
 	return nil
 }
 
-func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions) ([]*v1.Pod, error) {
+func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions) ([]*v1.Pod, error) {
 	f := func(p *v1.Pod) bool { return p.DeletionTimestamp != nil }
-	return waitPodsDeleted(kubecli, namespace, retries, lo, f)
+	return waitPodsDeleted(kubecli, namespace, lo, f)
 }
 
-func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions, filters ...filterFunc) ([]*v1.Pod, error) {
+func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions, filters ...filterFunc) ([]*v1.Pod, error) {
 	var pods []*v1.Pod
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (bool, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
@@ -316,7 +281,9 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, retries int
 
 // WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
 func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label string) error {
-	err := retryutil.Retry(context.Background(), time.Second, 180, func() (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	err := retryutil.Retry(ctx, time.Second, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 		if err != nil {
 			return false, err
@@ -494,14 +461,16 @@ func WaitForPodsReadyWithLabel(t *testing.T, kubeClient kubernetes.Interface, wa
 	}
 }
 
-func WaitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions) ([]*v1beta1.DaemonSet, error) {
+func WaitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions) ([]*v1beta1.DaemonSet, error) {
 	f := func(ds *v1beta1.DaemonSet) bool { return ds.DeletionTimestamp != nil }
-	return waitDaemonSetsDeleted(kubecli, namespace, retries, lo, f)
+	return waitDaemonSetsDeleted(kubecli, namespace, lo, f)
 }
 
-func waitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, retries int, lo metav1.ListOptions, filters ...filterFuncDaemonSet) ([]*v1beta1.DaemonSet, error) {
+func waitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions, filters ...filterFuncDaemonSet) ([]*v1beta1.DaemonSet, error) {
 	var dss []*v1beta1.DaemonSet
-	err := retryutil.Retry(context.Background(), retryInterval, retries, func() (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
 		dsList, err := kubecli.ExtensionsV1beta1().DaemonSets(namespace).List(lo)
 		if err != nil {
 			return false, err
@@ -561,7 +530,7 @@ func WaitForPVCDeletion(k8s *types.Cluster, namespace string, ctx context.Contex
 	selector := labels.NewSelector()
 	selector = selector.Add(requirements...)
 
-	return retryutil.Retry(ctx, 10*time.Second, IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
 		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -592,7 +561,7 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 	selector = selector.Add(requirements...)
 
 	// Retry deletion until success or the timeout context fires.
-	return retryutil.Retry(ctx, time.Second, IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, time.Second, func() (bool, error) {
 		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -645,7 +614,7 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 1*time.Second, IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, 1*time.Second, func() (bool, error) {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -688,7 +657,7 @@ func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *couchbasev2.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, retryInterval, IntMax, func() (bool, error) {
+	return retryutil.Retry(ctx, retryInterval, func() (bool, error) {
 		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 		if err != nil {
 			return false, err
@@ -743,7 +712,7 @@ func WaitForBucketDeletion(k8s *types.Cluster, namespace string, timeout time.Du
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, IntMax, "", "", callback)
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
 func WaitForEphemeralBucketDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
@@ -761,7 +730,7 @@ func WaitForEphemeralBucketDeletion(k8s *types.Cluster, namespace string, timeou
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, IntMax, "", "", callback)
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
 func WaitForMemcachedBucketDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
@@ -779,7 +748,7 @@ func WaitForMemcachedBucketDeletion(k8s *types.Cluster, namespace string, timeou
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, IntMax, "", "", callback)
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
 func WaitForReplicationDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
@@ -797,5 +766,5 @@ func WaitForReplicationDeletion(k8s *types.Cluster, namespace string, timeout ti
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, IntMax, "", "", callback)
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }

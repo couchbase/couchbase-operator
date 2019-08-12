@@ -71,7 +71,7 @@ func goroutineLeakCheck(expected int) {
 		return runtime.NumGoroutine() == expected, nil
 	}
 
-	if err := retryutil.Retry(ctx, 5*time.Second, e2eutil.IntMax, callback); err != nil {
+	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 		fmt.Println("WARN: goroutine leak detected:", expected, "vs", runtime.NumGoroutine())
 		trace := &bytes.Buffer{}
 		profile := pprof.Lookup("goroutine")

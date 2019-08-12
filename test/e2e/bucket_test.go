@@ -352,3 +352,55 @@ func TestBucketSelection(t *testing.T) {
 
 	ValidateEvents(t, targetKube, couchbase, expectedEvents)
 }
+
+// TestDeltaRecoveryImpossible ensures that the operator handles the situation where
+// it can attempt a delta node recovery, however Couchbase server prevents it.  This
+// is an esoteric case that shouldn't happen in reality, but it can, because users.
+func TestDeltaRecoveryImpossible(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+	victim := 1
+	foreignBucketName := "foreign"
+
+	// Create the cluster
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = 1024
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 10)
+
+	// Pause the operator, failover the victim, then create a new bucket and populate it.
+	// The operator - when restarted - should flag the node for delta recovery, but Server
+	// will not allow this due to not all buckets being delta recoverable ("default" contains
+	// partial data whereas "foreign" contains none).
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
+	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victim, 5*time.Minute)
+	e2eutil.MustCreateBucket(t, targetKube, testCouchbase, foreignBucketName, time.Minute)
+	// Wait for the active nodes to warm up. Operator behaves differently if this hasn't happened
+	time.Sleep(10 * time.Second)
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, foreignBucketName, 10)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Failed node added back, fails delta rebalance
+	// * Failed node added back, succeeds full rebalance
+	// * Foreign bucket is deleted
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}

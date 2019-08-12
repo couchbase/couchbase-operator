@@ -320,28 +320,30 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 	// Perform the operation
 	nodesToRemove := append(managed.HostURLsPlaintext(), unmanaged...)
 	if err := c.client.Rebalance(c.members, nodesToRemove, true, c.cluster.Name); err != nil {
+		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 		return err
 	}
 
 	// Error checking... perfom this a few times as there is a race between when
 	// we check and when Server reports rebalance is complete.
 	var status *couchbaseutil.ClusterStatus
-	retryFunc := func() (bool, error) {
+	retryFunc := func() error {
 		var err error
 		status, err = c.client.GetClusterStatus(c.members)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return !status.NeedsRebalance, nil
-	}
-	if err := retryutil.Retry(c.ctx, time.Second, 10, retryFunc); err != nil && !retryutil.IsRetryFailure(err) {
-		return err
+		if status.NeedsRebalance {
+			return cberrors.NewRebalanceIncompleteError()
+		}
+		return nil
 	}
 
-	// Check that Couchbase server is happy with the state
-	if status.NeedsRebalance {
+	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
+	defer cancel()
+	if err := retryutil.RetryOnErr(ctx, time.Second, retryFunc); err != nil {
 		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-		return fmt.Errorf("cluster reports rebalance incomplete")
+		return err
 	}
 
 	// Notify if we've removed some nodes (deterministically sorted)
@@ -676,6 +678,9 @@ func (c *Cluster) getServerGroups() []string {
 func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr.ServerGroups, error) {
 	serverGroups := c.getServerGroups()
 
+	ctx, cancel := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
+	defer cancel()
+
 	// Create any that do not exist
 	for _, serverGroup := range serverGroups {
 		if existingGroups.GetServerGroup(serverGroup) != nil {
@@ -688,7 +693,7 @@ func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr
 
 		// 409s have been seen due to this not being updated quick enough, ensure the
 		// new server group exists before continuing
-		err := retryutil.Retry(c.ctx, 5*time.Second, couchbaseutil.RetryCount, func() (bool, error) {
+		err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 			var err error
 			existingGroups, err = c.client.GetServerGroups(c.members)
 			if err != nil {
@@ -1258,12 +1263,6 @@ func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 		return err
 	}
 	return nil
-}
-
-// Check error the response from rebalance request (RetryError) and detect
-// detect whether cause was due to inability to perform delta recovery
-func (c *Cluster) didDeltaRecoveryFail(err error) bool {
-	return retryutil.DidServerErrorOccurOnRetry(err, cbmgr.DeltaRecoveryNotPossible)
 }
 
 // Gets paths to use when initializing data, index, and analytics service.

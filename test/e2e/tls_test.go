@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -312,9 +311,6 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 // Deploy cluster using invalid DNS name value in the certificate
 // Cluster creation should fail due to the invalid DNS value
 func TestTlsNegRSACertificateDnsName(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -372,9 +368,6 @@ func TestTlsCertificateExpiry(t *testing.T) {
 // Deploy a couchbase cluster using a expired TLS certificate
 // Cluster creation should fail
 func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -395,9 +388,6 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 // Deploy the cluster using the certificate which is not yet valid
 // Cluster creation should not happen until the validity time crosses the current time
 func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -414,9 +404,6 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 // Create a couchbase cluster using the wrong CA certificate type
 // Cluster deployment should fail
 func TestTlsGenerateWrongCACertType(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -434,9 +421,6 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 // Create a couchbase cluster using the wrong certificate type
 // Cluster deployment should fail
 func TestTlsGenerateWrongCertType(t *testing.T) {
-	if os.Getenv(envParallelTest) == envParallelTestTrue {
-		t.Parallel()
-	}
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 

@@ -1,15 +1,12 @@
 package k8sutil
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	validationv1 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v1"
 	validationv2 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v2"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -66,32 +63,6 @@ func createCRD(version constants.KubernetesVersion) *apiextensionsv1beta1.Custom
 			},
 		},
 	}
-}
-
-func WaitCRDReady(clientset apiextensionsclient.Interface) error {
-	err := retryutil.Retry(context.Background(), 5*time.Second, 20, func() (bool, error) {
-		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(couchbasev2.ClusterCRDName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, cond := range crd.Status.Conditions {
-			switch cond.Type {
-			case apiextensionsv1beta1.Established:
-				if cond.Status == apiextensionsv1beta1.ConditionTrue {
-					return true, nil
-				}
-			case apiextensionsv1beta1.NamesAccepted:
-				if cond.Status == apiextensionsv1beta1.ConditionFalse {
-					return false, fmt.Errorf("name conflict: %v", cond.Reason)
-				}
-			}
-		}
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("wait CRD created failed: %v", err)
-	}
-	return nil
 }
 
 func MustNewKubeExtClient() apiextensionsclient.Interface {
