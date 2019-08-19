@@ -127,7 +127,7 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 
 // Cleans all log entries from a pod to save ephemeral space.
 func CleanLogs(context *context.Context, pod *v1.Pod) error {
-	command := []string{"rm", "-f", "/tmp/cbinfo-*"}
+	command := []string{"find", "/tmp", "-name", "cbinfo-*", "-exec", "rm", "{}", ";"}
 	req := context.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(pod.Namespace).
