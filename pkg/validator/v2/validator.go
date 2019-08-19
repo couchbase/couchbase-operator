@@ -15,6 +15,7 @@ import (
 	"github.com/go-openapi/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -165,14 +166,20 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 	// Referenced object validation
 	if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret); err != nil {
-		errs = append(errs, err)
+		// Silently ignore permissions errors, some users may not want us seeing these resources.
+		if !apierrors.IsForbidden(err) {
+			errs = append(errs, err)
+		}
 	} else if secret == nil {
 		errs = append(errs, fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", customResource.Spec.Security.AdminSecret))
 	}
 	if customResource.Spec.XDCR.Managed {
 		for i, remoteCluster := range customResource.Spec.XDCR.RemoteClusters {
 			if secret, err := v.Abstraction.GetSecret(customResource.Namespace, remoteCluster.AuthenticationSecret); err != nil {
-				errs = append(errs, err)
+				// Silently ignore permissions errors, some users may not want us seeing these resources.
+				if !apierrors.IsForbidden(err) {
+					errs = append(errs, err)
+				}
 			} else if secret == nil {
 				errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", remoteCluster.AuthenticationSecret, i))
 			}
@@ -344,7 +351,10 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		if pvc.Spec.StorageClassName != nil {
 			storageClass, err := v.Abstraction.GetStorageClass(*pvc.Spec.StorageClassName)
 			if err != nil {
-				errs = append(errs, err)
+				// Silently ignore permissions errors, some users may not want us seeing these resources.
+				if !apierrors.IsForbidden(err) {
+					errs = append(errs, err)
+				}
 			} else if storageClass == nil {
 				errs = append(errs, fmt.Errorf("storage class %s must exist", *pvc.Spec.StorageClassName))
 			}
@@ -466,6 +476,10 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		// Check the operator secret exists and has the correct keys
 		operatorSecret, err := v.Abstraction.GetSecret(cluster.Namespace, operatorSecretName)
 		if err != nil {
+			// Silently ignore permissions errors, some users may not want us seeing these resources.
+			if apierrors.IsForbidden(err) {
+				return
+			}
 			errs = append(errs, err)
 		} else if operatorSecret == nil {
 			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.operatorSecret must exist", operatorSecretName))
@@ -478,6 +492,10 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		// Check the server secret exists and has the correct keys
 		serverSecret, err := v.Abstraction.GetSecret(cluster.Namespace, serverSecretName)
 		if err != nil {
+			// Silently ignore permissions errors, some users may not want us seeing these resources.
+			if apierrors.IsForbidden(err) {
+				return
+			}
 			errs = append(errs, err)
 		} else if serverSecret == nil {
 			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.member.serverSecret must exist", serverSecretName))
