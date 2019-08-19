@@ -18,6 +18,8 @@ const (
 	ReplicationCRDResourcePlural     = "couchbasereplications"
 	UserCRDResourceKind              = "CouchbaseUser"
 	UserCRDResourcePlural            = "couchbaseusers"
+	GroupCRDResourceKind             = "CouchbaseGroup"
+	GroupCRDResourcePlural           = "couchbasegroups"
 	RoleCRDResourceKind              = "CouchbaseRole"
 	RoleCRDResourcePlural            = "couchbaseroles"
 	RoleBindingCRDResourceKind       = "CouchbaseRoleBinding"
@@ -29,6 +31,7 @@ const (
 	MemcachedBucketCRDName           = MemcachedBucketCRDResourcePlural + "." + GroupName
 	ReplicationCRDName               = ReplicationCRDResourcePlural + "." + GroupName
 	UserCRDName                      = UserCRDResourcePlural + "." + GroupName
+	GroupCRDName                     = GroupCRDResourcePlural + "." + GroupName
 	RoleCRDName                      = RoleCRDResourcePlural + "." + GroupName
 	RoleBindingCRDName               = RoleBindingCRDResourcePlural + "." + GroupName
 )
@@ -48,6 +51,7 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseMemcachedBucket{}, &CouchbaseMemcachedBucketList{})
 	SchemeBuilder.Register(&CouchbaseReplication{}, &CouchbaseReplicationList{})
 	SchemeBuilder.Register(&CouchbaseUser{}, &CouchbaseUserList{})
+	SchemeBuilder.Register(&CouchbaseGroup{}, &CouchbaseGroupList{})
 	SchemeBuilder.Register(&CouchbaseRole{}, &CouchbaseRoleList{})
 	SchemeBuilder.Register(&CouchbaseRoleBinding{}, &CouchbaseRoleBindingList{})
 }
@@ -66,6 +70,8 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: ReplicationCRDResourceKind}
 	case "couchbaseuser":
 		return schema.GroupResource{Group: GroupName, Resource: UserCRDResourceKind}
+	case "couchbasegroup":
+		return schema.GroupResource{Group: GroupName, Resource: GroupCRDResourceKind}
 	case "couchbaserole":
 		return schema.GroupResource{Group: GroupName, Resource: RoleCRDResourceKind}
 	case "couchbaserolebinding":

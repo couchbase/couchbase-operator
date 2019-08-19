@@ -79,6 +79,7 @@ func GetOperatorRole() *rbacv1.Role {
 					couchbasev2.MemcachedBucketCRDResourcePlural,
 					couchbasev2.ReplicationCRDResourcePlural,
 					couchbasev2.UserCRDResourcePlural,
+					couchbasev2.GroupCRDResourcePlural,
 					couchbasev2.RoleCRDResourcePlural,
 					couchbasev2.RoleBindingCRDResourcePlural,
 				},

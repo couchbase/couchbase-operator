@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/gocbmgr"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -54,11 +55,15 @@ func TestRBACCreateAdminUser(t *testing.T) {
 func TestRBACDeleteUser(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	timeout := 4 * time.Minute
+	timeout := 2 * time.Minute
 
 	// Create Cluster
 	clusterSize := 1
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+
+	// Expect user delete event eventually to occur
+	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
 	user, _, _ := mustCreateBoundUser(t, targetKube, f.Namespace)
@@ -66,10 +71,10 @@ func TestRBACDeleteUser(t *testing.T) {
 
 	// Delete user deletion
 	e2eutil.MustDeleteUser(t, targetKube, f.Namespace, user)
-	e2eutil.MustWaitForUserDeletion(t, targetKube, f.Namespace, user.Name, timeout)
+	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
-	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, timeout)
+	// Ensure user delete event emitted
+	e2eutil.MustReceiveErrorValue(t, echan)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
@@ -85,11 +90,15 @@ func TestRBACDeleteRole(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	timeout := 4 * time.Minute
+	timeout := 2 * time.Minute
 
 	// Create Cluster
 	clusterSize := 1
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+
+	// Expect user delete event to occur
+	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
 	user, role, _ := mustCreateBoundUser(t, targetKube, f.Namespace)
@@ -99,9 +108,8 @@ func TestRBACDeleteRole(t *testing.T) {
 	e2eutil.MustDeleteRole(t, targetKube, f.Namespace, role)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
-	// Waiting for deletion event
-	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, timeout)
+	// Ensure user delete event emitted
+	e2eutil.MustReceiveErrorValue(t, echan)
 
 	// Validation
 	expectedEvents := []eventschema.Validatable{
@@ -117,7 +125,7 @@ func TestRBACDeleteRole(t *testing.T) {
 func TestRBACUpdateRole(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	timeout := 4 * time.Minute
+	timeout := 2 * time.Minute
 
 	// Cluster
 	clusterSize := 1
@@ -129,7 +137,7 @@ func TestRBACUpdateRole(t *testing.T) {
 
 	// Change to bucket role user
 	e2eutil.MustPatchRole(t, targetKube, role, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", "bucket_admin"), time.Minute)
-	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, user.Spec.AuthDomain, jsonpatch.NewPatchSet().Replace("/Roles/0/Role", "bucket_admin"), time.Minute)
+	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", "bucket_admin"), time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -152,7 +160,7 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	timeout := 4 * time.Minute
+	timeout := 2 * time.Minute
 
 	// Cluster
 	clusterSize := 1
@@ -166,6 +174,10 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 	customUser := e2espec.NewDefaultUser()
 	customUser.Name = "alt-user"
 	customUser = e2eutil.MustNewUser(t, targetKube, f.Namespace, customUser)
+
+	// Expect user delete event eventually occur
+	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Add new user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
@@ -181,9 +193,8 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Remove("/Spec/Subjects/0"), time.Minute)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
-	// Waiting for deletion event
-	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, timeout)
+	// Ensure user delete event emitted
+	e2eutil.MustReceiveErrorValue(t, echan)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -205,11 +216,15 @@ func TestRBACDeleteBinding(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	timeout := 4 * time.Minute
+	timeout := 2 * time.Minute
 
 	// Create Cluster
 	clusterSize := 1
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+
+	// Expect user delete event to eventually occur
+	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
 	user, _, binding := mustCreateBoundUser(t, targetKube, f.Namespace)
@@ -219,9 +234,8 @@ func TestRBACDeleteBinding(t *testing.T) {
 	e2eutil.MustDeleteRoleBinding(t, targetKube, f.Namespace, binding)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
-	// Waiting for deletion event
-	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, event, timeout)
+	// Ensure user delete event emitted
+	e2eutil.MustReceiveErrorValue(t, echan)
 
 	// Validation
 	expectedEvents := []eventschema.Validatable{

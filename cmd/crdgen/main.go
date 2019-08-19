@@ -44,6 +44,7 @@ func main() {
 	buffer(v2.GetCouchbaseMemcachedBucketCRD())
 	buffer(v2.GetCouchbaseReplicationCRD())
 	buffer(v2.GetUserCRD())
+	buffer(v2.GetGroupCRD())
 	buffer(v2.GetRoleCRD())
 	buffer(v2.GetRoleBindingCRD())
 	buffer(v2.GetCouchbaseClusterCRD())

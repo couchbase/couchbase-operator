@@ -3,7 +3,6 @@ package e2espec
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/gocbmgr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -15,7 +14,7 @@ func NewDefaultUser() *couchbasev2.CouchbaseUser {
 			Name: e2e_constants.CouchbaseUserName,
 		},
 		Spec: couchbasev2.CouchbaseUserSpec{
-			AuthDomain: string(cbmgr.InternalAuthDomain),
+			AuthDomain: couchbasev2.InternalAuthDomain,
 			AuthSecret: e2e_constants.KubeTestSecretName,
 		},
 	}

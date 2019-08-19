@@ -194,11 +194,18 @@ type CouchbaseUser struct {
 	Spec              CouchbaseUserSpec `json:"spec"`
 }
 
+type AuthDomain string
+
+const (
+	InternalAuthDomain AuthDomain = "local"
+	LDAPAuthDomain     AuthDomain = "ldap"
+)
+
 type CouchbaseUserSpec struct {
 	// (Optional) Full Name of Couchbase user
 	FullName string `json:"fullName"`
 	// The domain which provides user auth
-	AuthDomain string `json:"authDomain"`
+	AuthDomain AuthDomain `json:"authDomain"`
 	// Name of kubernetes secret with password for couchbase domain
 	AuthSecret string `json:"authSecret"`
 }
@@ -209,6 +216,28 @@ type CouchbaseUserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CouchbaseUser `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseGroup struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseGroupSpec `json:"spec"`
+}
+
+type CouchbaseGroupSpec struct {
+	// LDAPGroupRef is optional reference to LDAP
+	// group that this couchbase group refers to
+	LDAPGroupRef string `json:"ldapGroupRef"`
+}
+
+// CouchbaseGroupList is a list of Couchbase groups .
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseGroupList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseGroup `json:"items"`
 }
 
 // +genclient
@@ -254,9 +283,19 @@ type CouchbaseRoleBindingSpec struct {
 	RoleRef CouchbaseRoleBindingRef `json:"roleRef"`
 }
 
+type RoleBindingType string
+
+const (
+	// RoleBindingTypeUser applies role to Couchbase User
+	RoleBindingTypeUser RoleBindingType = "CouchbaseUser"
+
+	// RoleBindingTypeUser applies role to Couchbase Group
+	RoleBindingTypeGroup RoleBindingType = "CouchbaseGroup"
+)
+
 type CouchbaseRoleBindingSubject struct {
-	// Couchbase user kind
-	Kind string `json:"kind"`
+	// Couchbase user/group kind
+	Kind RoleBindingType `json:"kind"`
 	// Name of Couchbase user resource
 	Name string `json:"name"`
 }
@@ -688,7 +727,7 @@ type Buckets struct {
 type RBAC struct {
 	// Managed defines whether RBAC is managed by us or the clients.
 	Managed bool `json:"managed,omitempty"`
-	// Selector is a label selector used to list RBAC users in the namespace
+	// Selector is a label selector used to list RBAC resources in the namespace
 	// that are managed by the Operator.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
@@ -905,6 +944,9 @@ type ClusterStatus struct {
 
 	// Name of users active within cluster
 	Users []string `json:"users,omitempty"`
+
+	// Name of groups active within cluster
+	Groups []string `json:"groups,omitempty"`
 
 	// port exposing couchbase cluster
 	AdminConsolePort    string `json:"adminConsolePort,omitempty"`

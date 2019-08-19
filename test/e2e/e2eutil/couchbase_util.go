@@ -954,7 +954,7 @@ func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 }
 
 // PatchUserInfo tries patching the user returned directly from Couchbase server.
-func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain string, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain cbmgr.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -965,12 +965,12 @@ func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couc
 		}
 		defer cleanup()
 
-		actual, err := client.GetUser(userName, cbmgr.AuthDomain(userAuthDomain))
+		actual, err := client.GetUser(userName, userAuthDomain)
 		if err != nil {
 			return false, err
 		}
 
-		expected, err := client.GetUser(userName, cbmgr.AuthDomain(userAuthDomain))
+		expected, err := client.GetUser(userName, userAuthDomain)
 		if err != nil {
 			return false, err
 		}
@@ -983,7 +983,7 @@ func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couc
 	})
 }
 
-func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain string, patches jsonpatch.PatchSet, timeout time.Duration) {
+func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain cbmgr.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchUserInfo(t, k8s, couchbase, userName, userAuthDomain, patches, timeout); err != nil {
 		Die(t, err)
 	}

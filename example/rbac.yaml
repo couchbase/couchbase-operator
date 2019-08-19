@@ -9,6 +9,13 @@ spec:
   authSecret: cb-example-auth
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: ldap-group
+spec:
+  ldapGroupRef: cn=mygroup,ou=Groups,dc=example,dc=com
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseRole
 metadata:
   name: admin-role
@@ -29,3 +36,5 @@ spec:
   subjects:
   - kind: CouchbaseUser
     name: admin-user
+  - kind: CouchbaseGroup
+    name: ldap-group

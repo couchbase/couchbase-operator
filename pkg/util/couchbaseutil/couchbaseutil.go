@@ -747,18 +747,18 @@ func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket cbmgr.Bucket) error 
 	return c.client.DeleteBucket(bucket.BucketName)
 }
 
-func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]cbmgr.User, error) {
+func (c *CouchbaseClient) GetUser(ms MemberSet, id string, domain couchbasev2.AuthDomain) (*cbmgr.User, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetUser(id, cbmgr.AuthDomain(domain))
+}
+
+func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]*cbmgr.User, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	users, err := c.client.GetUsers()
 	if err != nil {
 		return nil, err
 	}
-
-	res := []cbmgr.User{}
-	for _, user := range users {
-		res = append(res, *user)
-	}
-	return res, nil
+	return users, nil
 }
 
 func (c *CouchbaseClient) CreateUser(ms MemberSet, user cbmgr.User) error {
@@ -769,6 +769,25 @@ func (c *CouchbaseClient) CreateUser(ms MemberSet, user cbmgr.User) error {
 func (c *CouchbaseClient) DeleteUser(ms MemberSet, user cbmgr.User) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteUser(&user)
+}
+
+func (c *CouchbaseClient) ListGroups(ms MemberSet) ([]*cbmgr.Group, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	groups, err := c.client.GetGroups()
+	if err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
+func (c *CouchbaseClient) CreateGroup(ms MemberSet, group cbmgr.Group) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.CreateGroup(&group)
+}
+
+func (c *CouchbaseClient) DeleteGroup(ms MemberSet, group cbmgr.Group) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.DeleteGroup(&group)
 }
 
 func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.AutoFailoverSettings) error {

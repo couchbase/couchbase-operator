@@ -32,6 +32,7 @@ type Client struct {
 
 	// Pods is a read only cache of pods (Couchbase cluster scoped)
 	Pods *PodCache
+
 	// PersistentVolumeClaims is a read only cache of persistent volume claims (Couchbase cluster scoped)
 	PersistentVolumeClaims *PersistentVolumeClaimCache
 
@@ -58,6 +59,9 @@ type Client struct {
 
 	// CouchbaseUsers is a read only cache of couchbase users (namespace scoped)
 	CouchbaseUsers *CouchbaseUserCache
+
+	// CouchbaseGroups is a read only cache of couchbase groups (namespace scoped)
+	CouchbaseGroups *CouchbaseGroupCache
 
 	// CouchbaseRoles is a read only cache of couchbase roles (namespace scoped)
 	CouchbaseRoles *CouchbaseRoleCache
@@ -136,6 +140,11 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
+	c.CouchbaseGroups, err = newCouchbaseGroupCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	c.CouchbaseRoles, err = newCouchbaseRoleCache(ctx, c.CouchbaseClient, namespace)
 	if err != nil {
 		return nil, err
@@ -161,6 +170,7 @@ func (c *Client) Shutdown() {
 	c.CouchbaseMemcachedBuckets.stop()
 	c.CouchbaseReplications.stop()
 	c.CouchbaseUsers.stop()
+	c.CouchbaseGroups.stop()
 	c.CouchbaseRoles.stop()
 	c.CouchbaseRoleBindings.stop()
 }

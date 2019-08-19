@@ -32,6 +32,9 @@ const (
 	EventReasonUserCreated           = "UserCreated"
 	EventReasonUserDeleted           = "UserDeleted"
 	EventReasonUserEdited            = "UserEdited"
+	EventReasonGroupCreated          = "GroupCreated"
+	EventReasonGroupDeleted          = "GroupDeleted"
+	EventReasonGroupEdited           = "GroupEdited"
 	EventReasonServiceCreated        = "ServiceCreated"
 	EventReasonServiceDeleted        = "ServiceDeleted"
 	EventReasonNodeServiceCreated    = "NodeServiceCreated"
@@ -187,6 +190,30 @@ func UserEditEvent(userName string, cl *couchbasev2.CouchbaseCluster) *v1.Event 
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonUserEdited
 	event.Message = fmt.Sprintf("User `%s` was edited", userName)
+	return event
+}
+
+func GroupCreateEvent(groupName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonGroupCreated
+	event.Message = fmt.Sprintf("A new group `%s` was created", groupName)
+	return event
+}
+
+func GroupDeleteEvent(groupName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonGroupDeleted
+	event.Message = fmt.Sprintf("Group `%s` was deleted", groupName)
+	return event
+}
+
+func GroupEditEvent(groupName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonGroupEdited
+	event.Message = fmt.Sprintf("Group `%s` was edited", groupName)
 	return event
 }
 

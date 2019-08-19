@@ -774,6 +774,7 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 		if !found {
 			return false, fmt.Errorf("waiting for user `%s` to be created", user.Name)
 		}
+
 		// user must also be in couchbase
 		client, cleanup, err := CreateAdminConsoleClient(k8s, currCluster)
 		if err != nil {
@@ -782,7 +783,6 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 		defer cleanup()
 		_, err = client.GetUser(user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain))
 		return err == nil, err
-
 	})
 }
 
@@ -820,7 +820,8 @@ func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.Couch
 			}
 		}
 		if found {
-			return true, fmt.Errorf("waiting for couchbase user `%s` to be deleted", userName)
+			err := fmt.Errorf("waiting for couchbase user `%s` to be deleted", userName)
+			return false, retryutil.RetryOkError(err)
 		}
 		return true, nil
 	}
@@ -950,4 +951,21 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 		// crd still exists, retry
 		return false, nil
 	})
+}
+
+// WaitForPendingClusterEvent returns a channel to be
+// populated with result of a pending cluster event
+func WaitForPendingClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) chan error {
+	echan := make(chan error)
+	go func() {
+		echan <- WaitForClusterEvent(kubeClient, cl, event, timeout)
+	}()
+	return echan
+}
+
+// MustReceiveErrorValue requires error from channel is nil
+func MustReceiveErrorValue(t *testing.T, echan chan error) {
+	if err := <-echan; err != nil {
+		Die(t, err)
+	}
 }

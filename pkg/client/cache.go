@@ -519,6 +519,51 @@ func (c *CouchbaseUserCache) stop() {
 	c.resourceCache.stop()
 }
 
+// CouchbaseGroupCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseGroup resources.
+type CouchbaseGroupCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseiGroupCache creates a new synchronized cache for CouchbaseGroup resources.
+func newCouchbaseGroupCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseGroupCache, error) {
+	selector := labels.Everything()
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseGroup{}, selector, couchbasev2.GroupCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return &CouchbaseGroupCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested couchbaseuser based on name.
+func (c *CouchbaseGroupCache) Get(name string) (*couchbasev2.CouchbaseGroup, bool) {
+	key := c.namespace + "/" + name
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+	return obj.(*couchbasev2.CouchbaseGroup), true
+}
+
+// list returns all couchbaseusers.
+func (c *CouchbaseGroupCache) List() (resources []*couchbasev2.CouchbaseGroup) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseGroup))
+	}
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseGroupCache) stop() {
+	c.resourceCache.stop()
+}
+
 // CouchbaseRoleCache is a wrapper around a resourceCache that provides concrete typing for
 // CouchbaseRole resources.
 type CouchbaseRoleCache struct {

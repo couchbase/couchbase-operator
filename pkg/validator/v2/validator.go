@@ -673,8 +673,8 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	errs := []error{}
 
 	// only 'local' and 'ldap' auth domains accepted
-	domain := cbmgr.AuthDomain(user.Spec.AuthDomain)
-	if domain == cbmgr.InternalAuthDomain {
+	domain := user.Spec.AuthDomain
+	if domain == couchbasev2.InternalAuthDomain {
 		// password is required for internal auth domain
 		authSecretName := user.Spec.AuthSecret
 		if authSecretName == "" {

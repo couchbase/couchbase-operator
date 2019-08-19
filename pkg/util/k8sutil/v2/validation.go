@@ -1324,6 +1324,50 @@ func GetUserCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 	}
 }
 
+func GetGroupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiextensionsv1beta1.SchemeGroupVersion.String(),
+			Kind:       "CustomResourceDefinition",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: couchbasev2.GroupCRDName,
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group: couchbasev2.SchemeGroupVersion.Group,
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: couchbasev2.GroupCRDResourcePlural,
+				Kind:   couchbasev2.GroupCRDResourceKind,
+			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1",
+				},
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: true,
+				},
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"spec": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"ldapGroupRef": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func GetRoleCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{

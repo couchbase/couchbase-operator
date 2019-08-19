@@ -413,6 +413,9 @@ func RecreateCRDs(k8s *types.Cluster) error {
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetUserCRD()); err != nil {
 		return err
 	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetGroupCRD()); err != nil {
+		return err
+	}
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetRoleCRD()); err != nil {
 		return err
 	}
