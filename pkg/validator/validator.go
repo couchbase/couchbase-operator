@@ -12,6 +12,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/go-openapi/errors"
@@ -216,7 +217,10 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 
 	// Ensure secret exists
 	if secret, err := v.abstraction.getSecret(customResource.Namespace, customResource.Spec.AuthSecret); err != nil {
-		errs = append(errs, err)
+		// Silently ignore permissions errors, some users may not want us seeing these resources.
+		if !apierrors.IsForbidden(err) {
+			errs = append(errs, err)
+		}
 	} else if secret == nil {
 		errs = append(errs, fmt.Errorf("secret %s must exist", customResource.Spec.AuthSecret))
 	}
@@ -517,7 +521,10 @@ func (v *Validator) CheckConstraints(customResource *api.CouchbaseCluster) error
 		if pvc.Spec.StorageClassName != nil {
 			storageClass, err := v.abstraction.getStorageClass(*pvc.Spec.StorageClassName)
 			if err != nil {
-				errs = append(errs, err)
+				// Silently ignore permissions errors, some users may not want us seeing these resources.
+				if !apierrors.IsForbidden(err) {
+					errs = append(errs, err)
+				}
 			} else if storageClass == nil {
 				errs = append(errs, fmt.Errorf("storage class %s must exist", *pvc.Spec.StorageClassName))
 			}
@@ -581,6 +588,10 @@ func (v *Validator) validateTLS(cluster *api.CouchbaseCluster, zones []string) (
 		// Check the operator secret exists and has the correct keys
 		operatorSecret, err := v.abstraction.getSecret(cluster.Namespace, operatorSecretName)
 		if err != nil {
+			// Silently ignore permissions errors, some users may not want us seeing these resources.
+			if apierrors.IsForbidden(err) {
+				return
+			}
 			errs = append(errs, err)
 		} else if operatorSecret == nil {
 			errs = append(errs, fmt.Errorf("tls operator secret %s must exist", operatorSecretName))
@@ -593,6 +604,10 @@ func (v *Validator) validateTLS(cluster *api.CouchbaseCluster, zones []string) (
 		// Check the server secret exists and has the correct keys
 		serverSecret, err := v.abstraction.getSecret(cluster.Namespace, serverSecretName)
 		if err != nil {
+			// Silently ignore permissions errors, some users may not want us seeing these resources.
+			if apierrors.IsForbidden(err) {
+				return
+			}
 			errs = append(errs, err)
 		} else if serverSecret == nil {
 			errs = append(errs, fmt.Errorf("tls server secret %s must exist", serverSecretName))
