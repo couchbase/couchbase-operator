@@ -35,9 +35,9 @@ const (
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig, ctx context.Context) (*v1.Pod, error) {
+func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *cbapi.CouchbaseCluster, m *couchbaseutil.Member, version string, config cbapi.ServerConfig, ctx context.Context, enableReadiness bool) (*v1.Pod, error) {
 
-	pod, err := createCouchbasePodSpec(m, cluster.Name, cluster.Spec, version, config, cluster.AsOwner())
+	pod, err := createCouchbasePodSpec(m, cluster.Name, cluster.Spec, version, config, cluster.AsOwner(), enableReadiness)
 	if err != nil {
 		return nil, err
 	}
@@ -316,12 +316,14 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName cbapi.
 }
 
 // Couchbase pod spec with default configuration
-func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, version string, ns cbapi.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
+func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs cbapi.ClusterSpec, version string, ns cbapi.ServerConfig, owner metav1.OwnerReference, enableReadiness bool) (*v1.Pod, error) {
 
 	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
-	container := containerWithReadinessProbe(couchbaseContainer(cs.BaseImage, version),
-		couchbaseReadinessProbe())
+	container := couchbaseContainer(cs.BaseImage, version)
+	if enableReadiness {
+		container = containerWithReadinessProbe(container, couchbaseReadinessProbe())
+	}
 
 	if ns.Pod != nil {
 		container = containerWithRequirements(container, ns.Pod.Resources)

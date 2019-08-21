@@ -77,9 +77,10 @@ You can specify a list of command-line flags to pass on to the Operator to modif
       containers:
       ...
         args:
-        - -create-crd
-        - -log-level
-        - -pod-create-timeout
+        - -create-crd=false
+        - -log-level=fatal
+        - -pod-create-timeout=10m
+        - -enable-readiness=true
 ----
 
 --create-crd <bool>::
@@ -117,4 +118,18 @@ This flag defaults to `5m`.
 [source,yaml]
 ----
 - "-pod-create-timeout=10m"
+----
+
+--enable-readiness <bool>::
+By default the Operator constrains Kubernetes rolling upgrades with `PodDisruptionBudget` resources and exec based readiness checks.
+This ensures that data is always available (provided buckets have at least one replica).
+To facilitate this the Operator places a file on the `Pod` file systems to indicate it is clustered and all data is replicated.
+This requires the `pods/exec` RBAC permission.
+If your security policy does not allow `pods/exec` and you acknowledge that Kubernetes rolling upgrades may lead to data loss this functionality may be disabled by setting this flag to `false`.
+This flag defaults to `true`
++
+.Example:
+[source,yaml]
+----
+- "-enable-readiness=true"
 ----

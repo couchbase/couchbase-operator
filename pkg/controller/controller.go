@@ -57,6 +57,7 @@ type Config struct {
 	CouchbaseCRCli   versioned.Interface
 	VerifyVersion    bool
 	PodCreateTimeout string
+	EnableReadiness  bool
 }
 
 func New(cfg Config) *Controller {
@@ -202,6 +203,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 		LogLevel:         logutil.LogLevel(),
 		EnableUpgrades:   c.Config.EnableUpgrades,
 		PodCreateTimeout: c.Config.PodCreateTimeout,
+		EnableReadiness:  c.Config.EnableReadiness,
 	}
 }
 

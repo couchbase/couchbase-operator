@@ -42,6 +42,7 @@ var (
 	enableUpgrades   bool
 	podCreateTimeout string
 	chaosLevel       int
+	enableReadiness  bool
 
 	mainLogger *logrus.Entry
 )
@@ -55,6 +56,7 @@ func main() {
 	flag.BoolVar(&verifyVersion, "verify-version", true, "Skip verification of required couchbase min version")
 	flag.StringVar(&logLevel, "log-level", "info", "Sets the logging level (panic, fatal, error, warn, info, debug)")
 	flag.StringVar(&podCreateTimeout, "pod-create-timeout", "5m", "Sets the amount of time to wait for Pod creation to complete")
+	flag.BoolVar(&enableReadiness, "enable-readiness", true, "Enables readiness checks of Couchbase Server pods")
 	flag.Parse()
 	logrus.SetOutput(os.Stdout)
 	mainLogger = logrus.WithFields(logrus.Fields{"module": "main"})
@@ -151,6 +153,7 @@ func newControllerConfig() controller.Config {
 		VerifyVersion:    verifyVersion,
 		EnableUpgrades:   enableUpgrades,
 		PodCreateTimeout: podCreateTimeout,
+		EnableReadiness:  enableReadiness,
 	}
 
 	return cfg

@@ -59,6 +59,7 @@ type Config struct {
 	LogLevel         logrus.Level
 	EnableUpgrades   bool
 	PodCreateTimeout string
+	EnableReadiness  bool
 }
 
 type ClusterStats struct {
@@ -463,7 +464,7 @@ func (c *Cluster) isSecureClient() bool {
 func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec api.ServerConfig) error {
 	version := c.cluster.Spec.Version
 	c.logger.Infof("Creating a pod (%s) running Couchbase %s", m.Name, version)
-	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, ctx)
+	_, err := k8sutil.CreateCouchbasePod(c.config.KubeCli, c.scheduler, c.cluster, m, version, serverSpec, ctx, c.config.EnableReadiness)
 	return err
 }
 

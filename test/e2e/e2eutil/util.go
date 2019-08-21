@@ -773,7 +773,7 @@ func CreateMemberPod(k8s *types.Cluster, cl *api.CouchbaseCluster, m *couchbaseu
 		if config.Name == m.ServerConfig {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
-			pod, err := k8sutil.CreateCouchbasePod(k8s.KubeClient, scheduler, cl, m, cl.Status.CurrentVersion, config, ctx)
+			pod, err := k8sutil.CreateCouchbasePod(k8s.KubeClient, scheduler, cl, m, cl.Status.CurrentVersion, config, ctx, true)
 			if err != nil {
 				return nil, err
 			}

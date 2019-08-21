@@ -1245,6 +1245,12 @@ func (c *Cluster) reportUpgradeComplete() error {
 // balanced.  It also reconciles a pod disruption budget so we only tolerate a certain
 // number of evictions during a drain i.e. k8s upgrade.
 func (c *Cluster) reconcileReadiness() error {
+	// Some customers deem pods/exec a huge security incident, so we need to
+	// disable readiness checks.  The upshot is no rolling upgrades.
+	if !c.config.EnableReadiness {
+		return nil
+	}
+
 	for name := range c.members {
 		if err := k8sutil.FlagPodReady(c.config.KubeCli, c.cluster.Namespace, name); err != nil {
 			return err
