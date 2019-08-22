@@ -124,7 +124,7 @@ To create configuration to run on RedHat Openshift:
 [source,console]
 ----
 cbopcfg --namespace myproject \
-  --operator-image registry.connect.redhat.com/couchbase/operator:1.2.0-1 \
-  --dynamic-admission-controller-image registry.connect.redhat.com/couchbase/admission-controller:1.2.0-1 \
+  --operator-image registry.connect.redhat.com/couchbase/operator:1.2.1-1 \
+  --dynamic-admission-controller-image registry.connect.redhat.com/couchbase/admission-controller:1.2.1-1 \
   --image-pull-secret my-redhat-docker-credentials > operator.yaml
 ----

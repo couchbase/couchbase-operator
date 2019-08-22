@@ -28,7 +28,7 @@ couchbaseOperator:
   name: "couchbase-operator"
   image:
     repository: couchbase/operator
-    tag: 1.2.0
+    tag: 1.2.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   commandArgs:
@@ -48,7 +48,7 @@ admissionController:
   name: "couchbase-admission-controller"
   image:
     repository: couchbase/admission-controller
-    tag: 1.2.0
+    tag: 1.2.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   verboseLogging: true
@@ -226,7 +226,7 @@ couchbaseOperator:
   name: "couchbase-operator"
   image:
     repository: couchbase/operator
-    tag: 1.2.0
+    tag: 1.2.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   commandArgs:
@@ -262,7 +262,7 @@ a| The `name` field defaults to `couchbase-operator`.
 ----
   image:
     repository: couchbase/operator
-    tag: 1.2.0
+    tag: 1.2.1
 ----
 
 The repository and tag to use for pulling the Operator image.
@@ -361,7 +361,7 @@ admissionController:
   name: "couchbase-admission-controller"
   image:
     repository: couchbase/admission-controller
-    tag: 1.2.0
+    tag: 1.2.1
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   verboseLogging: true
@@ -386,7 +386,7 @@ a| The `name` field defaults to `couchbase-admission-controller`.
 ----
   image:
     repository: couchbase/admission-controller
-    tag: 1.2.0
+    tag: 1.2.1
 ----
 
 The repository and tag to use for pulling the admission controller image.

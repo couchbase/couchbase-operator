@@ -138,13 +138,13 @@ oc create secret docker-registry rh-catalog \
 couchbaseOperator:
   image:
     repository: registry.connect.redhat.com/couchbase/operator
-    tag: 1.2.0
+    tag: 1.2.1
   imagePullSecrets:
   - rh-catalog
 admissionController:
   image:
     repository: registry.connect.redhat.com/couchbase/admission-controller
-    tag: 1.2.0
+    tag: 1.2.1
   imagePullSecrets:
   - rh-catalog
 ----

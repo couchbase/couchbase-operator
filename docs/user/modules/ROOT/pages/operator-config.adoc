@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: couchbase/operator:1.2.0
+        image: couchbase/operator:1.2.1
         command:
         - couchbase-operator
         args:
