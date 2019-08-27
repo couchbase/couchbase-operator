@@ -759,16 +759,23 @@ func ExecuteAnalyticsQuery(hostIp, hostPort, queryStr string) (responseData []by
 	hostUrl := "http://" + hostIp + ":" + hostPort + "/analytics/service"
 	username := string(e2espec.BasicSecretData["username"])
 	password := string(e2espec.BasicSecretData["password"])
-	data := []byte(queryStr)
 
-	request, err := http.NewRequest("POST", hostUrl, bytes.NewReader(data))
+	requestBody, err := json.Marshal(map[string]string{
+		"statement":         queryStr,
+		"pretty":            "true",
+		"client_context_id": "",
+		"timeout":           "120s",
+		"mode":              "",
+	})
+
+	request, err := http.NewRequest("POST", hostUrl, bytes.NewBuffer(requestBody))
 	if err != nil {
 		err = errors.New("Failed to create http request: " + err.Error())
 		return
 	}
 
 	request.SetBasicAuth(username, password)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Content-Type", "application/json")
 
 	client := http.Client{Timeout: time.Minute}
 	response, err := client.Do(request)
