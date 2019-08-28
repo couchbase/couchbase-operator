@@ -28,7 +28,7 @@ Kubernetes integrates with native storage provisioners available on major cloud 
 .Prerequisites:
 * An overall understanding of https://kubernetes.io/docs/concepts/storage/persistent-volumes/[Kubernetes persistent volumes^]
 * Your Kubernetes environment is set up to support clusters with persistent volumes.
-Refer to the persistent volume xref:persistent-volume-setup.adoc[setup guide] for more information.
+Refer to the persistent volume xref:persistent-volumes-setup.adoc[setup guide] for more information.
 * You are using a supported xref:prerequisite-and-setup.adoc#compatibility-pv[storage provisioner].
 
 To create a Couchbase cluster that uses persistent volumes, you need to add `volumeMounts` under `pod` within a group of `spec.servers` in the xref:couchbase-cluster-config.adoc[CouchbaseCluster configuration].
