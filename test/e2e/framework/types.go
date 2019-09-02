@@ -3,6 +3,7 @@ package framework
 import (
 	"testing"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -98,6 +99,11 @@ type TestRunParam struct {
 
 	// TestRetries allows you to retry a test N times before giving up.
 	TestRetries *int `yaml:"testRetries"`
+
+	// Platform allows you to explicitly specify the platform type.  DO NOT USE THIS
+	// 99% of the time, your tests should not rely on platform behaviour and be generic,
+	// unless absolutely necessary.
+	Platform couchbasev2.PlatformType `yanl:"platform"`
 }
 
 /************************************************

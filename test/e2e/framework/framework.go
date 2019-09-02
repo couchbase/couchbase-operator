@@ -191,6 +191,7 @@ func Setup(t *testing.T) (err error) {
 	// Setting required spec values from test_config yaml
 	e2espec.SetStorageClassName(runtimeParams.StorageClassName)
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
+	e2espec.SetPlatform(runtimeParams.Platform)
 
 	logrus.Info("Docker Registry")
 	logrus.Info(" →  server: " + runtimeParams.DockerServer)

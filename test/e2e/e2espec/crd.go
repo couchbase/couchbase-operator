@@ -80,6 +80,12 @@ func SetStorageClassName(storageClassNameIn string) {
 	}
 }
 
+var platform couchbasev2.PlatformType
+
+func SetPlatform(p couchbasev2.PlatformType) {
+	platform = p
+}
+
 func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 	buckets := []runtime.Object{}
 	for _, bucketType := range bucketTypes {
@@ -222,6 +228,9 @@ func NewBasicCluster(genName, secretName string, size int) *couchbasev2.Couchbas
 			},
 		}},
 	}
+	if platform != "" {
+		spec.Platform = platform
+	}
 	return NewClusterCRD(genName, spec)
 }
 
@@ -243,6 +252,9 @@ func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 				couchbasev2.IndexService,
 			},
 		}},
+	}
+	if platform != "" {
+		spec.Platform = platform
 	}
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
@@ -313,6 +325,10 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 	// observe a failover leading to non-determinism.
 	spec.ClusterSettings.AutoFailoverTimeout = 120
 
+	if platform != "" {
+		spec.Platform = platform
+	}
+
 	return spec
 }
 
@@ -348,6 +364,9 @@ func NewBasicXdcrCluster(genName, secretName string, size int) *couchbasev2.Couc
 	}
 	spec.ClusterSettings.AutoFailoverTimeout = 30
 	spec.ClusterSettings.AutoFailoverMaxCount = 3
+	if platform != "" {
+		spec.Platform = platform
+	}
 	return NewClusterCRD(genName, spec)
 }
 

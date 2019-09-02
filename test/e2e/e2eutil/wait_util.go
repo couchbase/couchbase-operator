@@ -614,10 +614,10 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 1*time.Second, func() (bool, error) {
+	return retryutil.RetryOnErr(ctx, 1*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 		defer cleanup()
 
@@ -627,17 +627,17 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 		for {
 			select {
 			case <-ctx.Done():
-				return false, ctx.Err()
+				return ctx.Err()
 			case status, ok := <-progress.Status():
 				if !ok {
-					return false, fmt.Errorf("rebalance status terminated: %v", progress.Error())
+					return fmt.Errorf("rebalance status terminated: %v", progress.Error())
 				}
 				switch status.Status {
 				case cbmgr.RebalanceStatusUnknown:
-					return false, retryutil.RetryOkError(fmt.Errorf("rebalance status unknown"))
+					return fmt.Errorf("rebalance status unknown")
 				case cbmgr.RebalanceStatusRunning:
 					if status.Progress >= threshold {
-						return true, nil
+						return nil
 					}
 				}
 			}
