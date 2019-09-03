@@ -5,6 +5,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -367,6 +368,24 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	k8s1 := f.GetCluster(0)
 	k8s2 := f.GetCluster(1)
 
+	// This uses a fully encrypted TLS handshake, and as such needs server
+	// 5.5.3+ or 6.0.1+ in their respective major versions.
+	rawVersion, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	version, err := couchbaseutil.NewVersion(rawVersion)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	minVersion, err := couchbaseutil.NewVersion("6.0.1")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	if version.Less(minVersion) {
+		t.Skip("Test requires Couchbase 6.0.1 or greater")
+	}
+
 	// Static configuration.
 	clusterSize := constants.Size1
 
@@ -383,7 +402,7 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the XDCR connection.  Ensure TLS is enabled.
-	cleanup := e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+	cleanup := e2eutil.MustEstablishXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name, tls2.CA.Certificate)
 	defer cleanup()
 	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls1)
 	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls2)
@@ -392,13 +411,13 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	// * Both clusters created
 	// * Source cluster establishes XDCR
 	expectedEvents1 := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)

@@ -76,13 +76,13 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestXdcrCreateCluster
+      - name: TestXdcrCreateTlsCluster # Must be on the same cluster for DNS resolution.
 
   - name: XdcrCases
     clusters:
       - BasicCluster
       - NewCluster1
     testcases:
-      - name: TestXdcrCreateTlsCluster
       - name: TestXdcrSourceNodeDown
       - name: TestXdcrSourceNodeAdd
       - name: TestXdcrTargetNodeServiceDelete

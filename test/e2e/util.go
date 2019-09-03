@@ -79,8 +79,6 @@ var (
 		"TestValidationDefaultApply":                          TestValidationDefaultApply,
 		"TestNegValidationConstraintsApply":                   TestNegValidationConstraintsApply,
 		"TestNegValidationImmutableApply":                     TestNegValidationImmutableApply,
-		"TestValidationDelete":                                TestValidationDelete,
-		"TestNegValidationDelete":                             TestNegValidationDelete,
 		"TestTaintK8SNodeAndRemoveTaint":                      TestTaintK8SNodeAndRemoveTaint,
 		"TestDenyCommunityEdition":                            TestDenyCommunityEdition,
 		"TestRemoveServerClassWithNodeService":                TestRemoveServerClassWithNodeService,

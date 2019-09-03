@@ -1421,13 +1421,33 @@ func (c *Cluster) reconcileXDCR() error {
 			return err
 		}
 
-		requestedClusters = append(requestedClusters, cbmgr.RemoteCluster{
+		requested := cbmgr.RemoteCluster{
 			Name:     cluster.Name,
 			UUID:     cluster.UUID,
 			Hostname: cluster.Hostname,
 			Username: string(secret.Data["username"]),
 			Password: string(secret.Data["password"]),
-		})
+		}
+
+		if cluster.TLS != nil {
+			if cluster.TLS.Secret != nil {
+				secret, err := k8sutil.GetSecret(c.kubeClient, *cluster.TLS.Secret, c.cluster.Namespace, nil)
+				if err != nil {
+					return err
+				}
+				if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
+					return fmt.Errorf("CA certificate is required for TLS encryption")
+				}
+				// No, we will never support any other type!
+				requested.SecureType = "full"
+
+				// While we should pass through the raw []byte, it makes life simpler for the client
+				// library if we pass it as a string.
+				requested.CA = string(secret.Data[couchbasev2.RemoteClusterTLSCA])
+			}
+		}
+
+		requestedClusters = append(requestedClusters, requested)
 
 		listOpts := metav1.ListOptions{}
 		if cluster.Replications.Selector != nil {

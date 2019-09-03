@@ -88,14 +88,14 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:3d3f0bb223d76ffe5a94d72b240336c9fbf6f50d619bb423cb849124fc667175"
+  digest = "1:1fb422c25f219e1bdb821bade3e7fedc23f6a2cd603187cb00f3212cf1c37a4c"
   name = "github.com/couchbase/gocbmgr"
   packages = [
     ".",
     "urlencoding",
   ]
   pruneopts = "UT"
-  revision = "bd670473a67688fc9a2b1a50eb9aafdac3f83813"
+  revision = "d544ea1dffd4bac8dd0644aba79398039b4f2bef"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -1183,6 +1183,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/couchbase/gocbmgr",
+    "github.com/evanphx/json-patch",
     "github.com/ghodss/yaml",
     "github.com/go-openapi/errors",
     "github.com/golang/glog",
@@ -1212,6 +1213,7 @@
     "k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
     "k8s.io/apimachinery/pkg/api/errors",
+    "k8s.io/apimachinery/pkg/api/meta",
     "k8s.io/apimachinery/pkg/api/resource",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
@@ -1234,6 +1236,7 @@
     "k8s.io/client-go/plugin/pkg/client/auth/oidc",
     "k8s.io/client-go/plugin/pkg/client/auth/openstack",
     "k8s.io/client-go/rest",
+    "k8s.io/client-go/restmapper",
     "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",

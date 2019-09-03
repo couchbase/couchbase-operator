@@ -378,6 +378,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 	// Check TLS
 	errs = append(errs, validateTLS(v, customResource, zones)...)
+	errs = append(errs, validateTLSXDCR(v, customResource)...)
 
 	// Require that publically visible service ports have DNS information available.
 	if customResource.Spec.IsExposedFeatureServiceTypePublic() || customResource.Spec.IsAdminConsoleServiceTypePublic() {
@@ -516,6 +517,37 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		// Validate the TLS configuration is going to work
 		errs = x509.Verify(ca, chain, key, zones)
 		return
+	}
+	return
+}
+
+// validateTLSXDCR checks that TLS configuration for a remote cluster is valid.
+// * if set the secret must exist
+// * if set the secret must contain a CA
+func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) (errs []error) {
+	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+		if remoteCluster.TLS == nil {
+			continue
+		}
+		if remoteCluster.TLS.Secret != nil {
+			secret, err := v.Abstraction.GetSecret(cluster.Namespace, *remoteCluster.TLS.Secret)
+			if err != nil {
+				// Silently ignore permissions errors, some users may not want us seeing these resources.
+				if apierrors.IsForbidden(err) {
+					return
+				}
+				errs = append(errs, err)
+				continue
+			}
+			if secret == nil {
+				errs = append(errs, fmt.Errorf("xdcr tls secret %s for remote cluster %s must exist", *remoteCluster.TLS.Secret, remoteCluster.Name))
+				continue
+			}
+			if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
+				errs = append(errs, fmt.Errorf("xdcr tls secret %s for remote cluster %s must contain key 'ca'", *remoteCluster.TLS.Secret, remoteCluster.Name))
+				continue
+			}
+		}
 	}
 	return
 }

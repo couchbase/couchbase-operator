@@ -471,6 +471,14 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 														},
 													},
 												},
+												"tls": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"secret": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+												},
 											},
 										},
 									},

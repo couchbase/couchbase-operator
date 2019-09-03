@@ -21,8 +21,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/restmapper"
 )
 
@@ -119,54 +122,52 @@ var (
 // getResource takes raw JSON and returns the resource type (used by the raw API),
 // the API version and the Kind (POST and PUT methods actually strip this from
 // the status response so we have to replopulate it).
-func getResource(k8s *types.Cluster, resource []byte) (string, string, string, error) {
+func getResource(k8s *types.Cluster, object *unstructured.Unstructured) (*schema.GroupVersionResource, error) {
 	if restMapper == nil {
 		discoveryClient, err := discovery.NewDiscoveryClientForConfig(k8s.Config)
 		if err != nil {
-			return "", "", "", err
+			return nil, err
 		}
 		groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
 		if err != nil {
-			return "", "", "", err
+			return nil, err
 		}
 		restMapper = restmapper.NewDiscoveryRESTMapper(groupresources)
 	}
 
-	object := &unstructured.Unstructured{}
-	if err := json.Unmarshal(resource, object); err != nil {
-		return "", "", "", err
-	}
 	gvk := object.GroupVersionKind()
 	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return "", "", "", err
+		return nil, err
 	}
-	return mapping.Resource.Resource, object.GetAPIVersion(), object.GetKind(), nil
+	return &mapping.Resource, nil
 }
 
 // createResources iterates over every resource and creates them in the requested namespace.
 func createResources(k8s *types.Cluster, namespace string, resources resourceList) error {
 	for i, resource := range resources {
-		resourceType, apiVersion, kind, err := getResource(k8s, resource)
+		object := &unstructured.Unstructured{}
+		if err := json.Unmarshal(resource, object); err != nil {
+			return err
+		}
+
+		groupVersion, err := getResource(k8s, object)
 		if err != nil {
 			return err
 		}
 
-		res := &unstructured.Unstructured{}
-		err = k8s.CRClient.CouchbaseV2().RESTClient().
-			Post().
-			Resource(resourceType).
-			Namespace(namespace).
-			Body(resource).
-			Do().
-			Into(res)
+		client, err := dynamic.NewForConfig(k8s.Config)
+		if err != nil {
+			return err
+		}
+		res, err := client.Resource(*groupVersion).Namespace(framework.Global.Namespace).Create(object, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 
 		// Stupid API
-		res.SetAPIVersion(apiVersion)
-		res.SetKind(kind)
+		res.SetAPIVersion(object.GetAPIVersion())
+		res.SetKind(object.GetKind())
 
 		raw, err := json.Marshal(res)
 		if err != nil {
@@ -181,32 +182,28 @@ func createResources(k8s *types.Cluster, namespace string, resources resourceLis
 // updateResources updates all defined resources.
 func updateResources(k8s *types.Cluster, resources resourceList) error {
 	for i, resource := range resources {
-		namespace, name, err := getResourceMeta(resource)
+		object := &unstructured.Unstructured{}
+		if err := json.Unmarshal(resource, object); err != nil {
+			return err
+		}
+
+		groupVersion, err := getResource(k8s, object)
 		if err != nil {
 			return err
 		}
 
-		resourceType, apiVersion, kind, err := getResource(k8s, resource)
+		client, err := dynamic.NewForConfig(k8s.Config)
 		if err != nil {
 			return err
 		}
-
-		res := &unstructured.Unstructured{}
-		err = k8s.CRClient.CouchbaseV2().RESTClient().
-			Put().
-			Resource(resourceType).
-			Namespace(namespace).
-			Name(name).
-			Body(resource).
-			Do().
-			Into(res)
+		res, err := client.Resource(*groupVersion).Namespace(object.GetNamespace()).Update(object, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
 
 		// Stupid API
-		res.SetAPIVersion(apiVersion)
-		res.SetKind(kind)
+		res.SetAPIVersion(object.GetAPIVersion())
+		res.SetKind(object.GetKind())
 
 		raw, err := json.Marshal(res)
 		if err != nil {
@@ -220,24 +217,21 @@ func updateResources(k8s *types.Cluster, resources resourceList) error {
 // deleteResources deletes all defined resources.
 func deleteResources(k8s *types.Cluster, resources resourceList) error {
 	for _, resource := range resources {
-		namespace, name, err := getResourceMeta(resource)
+		object := &unstructured.Unstructured{}
+		if err := json.Unmarshal(resource, object); err != nil {
+			return err
+		}
+
+		groupVersion, err := getResource(k8s, object)
 		if err != nil {
 			return err
 		}
 
-		resourceType, _, _, err := getResource(k8s, resource)
+		client, err := dynamic.NewForConfig(k8s.Config)
 		if err != nil {
 			return err
 		}
-
-		err = k8s.CRClient.CouchbaseV2().RESTClient().
-			Delete().
-			Resource(resourceType).
-			Namespace(namespace).
-			Name(name).
-			Do().
-			Error()
-		if err != nil {
+		if err := client.Resource(*groupVersion).Namespace(object.GetNamespace()).Delete(object.GetName(), metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
@@ -293,6 +287,11 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			if err != nil {
 				e2eutil.Die(t, err)
 			}
+
+			// Delete anything we created.
+			defer func() {
+				_ = deleteResources(targetKube, objects)
+			}()
 
 			for i, resource := range objects {
 				object := &unstructured.Unstructured{}
@@ -377,11 +376,8 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				objects[i] = raw
 			}
 
-			// Removing previous deployment if any
-			e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, kubeName, t.Name())
-
 			// If we are applying a change or deleting a cluster we first need to create it...
-			if command == "apply" || command == "delete" {
+			if command == "apply" {
 				if err := createResources(targetKube, f.Namespace, objects); err != nil {
 					e2eutil.Die(t, err)
 				}
@@ -400,8 +396,6 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				err = createResources(targetKube, f.Namespace, objects)
 			case "apply":
 				err = updateResources(targetKube, objects)
-			case "delete":
-				err = deleteResources(targetKube, objects)
 			}
 
 			// Handle successes when it shoud have failed.
@@ -474,11 +468,6 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/exposedFeatures", couchbasev2.ExposedFeatureList{couchbasev2.FeatureAdmin, couchbasev2.FeatureClient, couchbasev2.FeatureXDCR, couchbasev2.FeatureAdmin})},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.networking.exposedFeatures in body shouldn't contain duplicates"},
-		},
-		{
-			name:       "TestValidateBucketNameInvalid",
-			mutations:  patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/metadata/name", "invalid!bucket!name")},
-			shouldFail: true,
 		},
 		{
 			name:           "TestValidateBucketConflictResolutionRequiredForCouchbase",
@@ -791,6 +780,18 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.compressionType in body should match '^none|auto|snappy$'`},
 		},
+		{
+			name:           "TestValidateXDCRTLSSecretMissing",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/tls/secret", "huggy-bear")},
+			shouldFail:     true,
+			expectedErrors: []string{`xdcr tls secret huggy-bear for remote cluster starsky must exist`},
+		},
+		{
+			name:           "TestValidateXDCRTLSCAMissing",
+			mutations:      patchMap{"xdcr-tls-secret": jsonpatch.NewPatchSet().Remove("/data/ca")},
+			shouldFail:     true,
+			expectedErrors: []string{`xdcr tls secret xdcr-tls-secret for remote cluster starsky must contain key 'ca'`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]
@@ -986,12 +987,6 @@ func TestValidationApply(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name: "TestValidateDefault",
-		},
-		{
-			name:        "TestValidateApplyBucketName",
-			mutations:   patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/metadata/name", "newNameForBucket")},
-			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().Test("/metadata/name", "newNameForBucket")},
-			shouldFail:  true,
 		},
 	}
 
@@ -1280,30 +1275,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 	}
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
-}
-
-// CRD delete tests
-func TestValidationDelete(t *testing.T) {
-	testDefs := []testDef{
-		{
-			name: "TestValidateDelete",
-		},
-	}
-	kubeName := framework.Global.TestClusters[0]
-	runValidationTest(t, testDefs, kubeName, "delete")
-}
-
-func TestNegValidationDelete(t *testing.T) {
-	testDefs := []testDef{
-		{
-			name:           "TestValidateDeleteRenamedCluster",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/name", "cb-example1")},
-			shouldFail:     true,
-			expectedErrors: []string{`couchbaseclusters.couchbase.com "cb-example1" not found`},
-		},
-	}
-	kubeName := framework.Global.TestClusters[0]
-	runValidationTest(t, testDefs, kubeName, "delete")
 }
 
 /*******************************************************************

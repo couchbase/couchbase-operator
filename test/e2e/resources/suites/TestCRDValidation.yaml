@@ -16,5 +16,3 @@ tcGroups:
       - name: TestValidationDefaultApply
       - name: TestNegValidationConstraintsApply
       - name: TestNegValidationImmutableApply
-      - name: TestValidationDelete
-      - name: TestNegValidationDelete

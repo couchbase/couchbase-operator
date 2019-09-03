@@ -1,3 +1,10 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: xdcr-tls-secret
+data:
+  ca: YmxhaCBibGFoIGJsYWgK
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
@@ -129,6 +136,8 @@ spec:
         uuid: 246bb8fb53a75e37819cb50b98ac3b65
         hostname: starsky-and-hutch.tv:8091
         authenticationSecret: POPULATED_BY_TEST
+        tls:
+          secret: xdcr-tls-secret
   servers:
     - size: 1
       name: all_services

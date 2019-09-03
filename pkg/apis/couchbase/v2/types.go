@@ -375,6 +375,28 @@ type Replications struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+const (
+	// RemoteClusterTLSCA is the key in the secret mapping to the remote cluster's
+	// expected trust anchor.
+	RemoteClusterTLSCA = "ca"
+
+	// RemoteClusterTLSCertificate is the key in the secret mapping to a client
+	// certificate signed by the remote cluster.
+	RemoteClusterTLSCertificate = "certificate"
+
+	// RemoteClusterTLSKey is the key in the secret mapping to a client key to
+	// digitally sign data for validation by remote cluster.
+	RemoteClusterTLSKey = "key"
+)
+
+// RemoteClusterTLS is a structure that can source TLS certificates from
+// different sources.
+type RemoteClusterTLS struct {
+	// Secret references a secret containing the CA certificate, and optionally a
+	// client certificate and key.
+	Secret *string `json:"secret"`
+}
+
 // RemoteCluster is a reference to a remote cluster for XDCR.
 type RemoteCluster struct {
 	// Name of the remote cluster.  Referenced by Replications.
@@ -392,6 +414,10 @@ type RemoteCluster struct {
 
 	// Replications are replication streams from this cluster to the remote one.
 	Replications Replications `json:"replications"`
+
+	// TLS if specified references a resource containing the necessary certificate
+	// data.
+	TLS *RemoteClusterTLS `json:"tls,omitempty"`
 }
 
 // XDCR allows management of XDCR settings.

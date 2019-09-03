@@ -127,6 +127,8 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 	}
 }
 
+// getRemoteUUIDAndHost returns the remote hostname, based on IP and node port, and the cluster UUID.
+// Used for generic XDCR testing.
 func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
 	// List the pods on the remote cluster and pick one
 	selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster.Name)).String()
@@ -150,6 +152,28 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 	}
 
 	return cluster.Status.ClusterID, pod.Status.HostIP + ":" + strconv.Itoa(int(ports.AdminServicePort)), nil
+}
+
+// getRemoteUUIDAndHostTLS returns the remote hostname, based on DNS, and the cluster UUID.
+// Used for generic XDCR testing.
+func getRemoteUUIDAndHostTLS(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
+	// List the pods on the remote cluster and pick one
+	selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster.Name)).String()
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return "", "", err
+	}
+	if len(pods.Items) == 0 {
+		return "", "", fmt.Errorf("no pods listed")
+	}
+	pod := pods.Items[0]
+
+	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+
+	return cluster.Status.ClusterID, fmt.Sprintf("%s.%s.%s.svc:18091", pod.Name, cluster.Name, cluster.Namespace), nil
 }
 
 // EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
@@ -223,8 +247,109 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	return
 }
 
+// EstablishXDCRReplicationTLS creates a remote cluster in the source, and a replication from the source bucket to the destination
+// bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
+func EstablishXDCRReplicationTLS(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ca []byte) (cleanup func(), err error) {
+	// Create the remote cluster secret.
+	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: xdcrSecret,
+		},
+		Data: dstK8s.DefaultSecret.Data,
+	}
+	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
+		return
+	}
+
+	// Define the cleanup to remove the secret and automatically perform cleanup on error so the client doesn't need to worry.
+	cleanup = func() {
+		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
+	}
+	defer func() {
+		if err != nil {
+			cleanup()
+		}
+	}()
+
+	// Define the TLS secret.
+	tlsSecret := fmt.Sprintf("%s-xdcr-tls", target.Name)
+	secret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tlsSecret,
+		},
+		Data: map[string][]byte{
+			couchbasev2.RemoteClusterTLSCA: ca,
+		},
+	}
+	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
+		return
+	}
+
+	cleanup = func() {
+		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
+		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(tlsSecret, metav1.NewDeleteOptions(0))
+	}
+
+	// Create the replication.
+	replication := &couchbasev2.CouchbaseReplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-replication",
+		},
+		Spec: couchbasev2.CouchbaseReplicationSpec{
+			Bucket:       srcBucket,
+			RemoteBucket: dstBucket,
+		},
+	}
+	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
+		return
+	}
+
+	// Create the XDCR remote cluster.
+	clusterName := "remote"
+
+	uuid, host, err := getRemoteUUIDAndHostTLS(dstK8s, target)
+	if err != nil {
+		return
+	}
+
+	xdcr := couchbasev2.XDCR{
+		Managed: true,
+		RemoteClusters: []couchbasev2.RemoteCluster{
+			{
+				Name:                 clusterName,
+				UUID:                 uuid,
+				Hostname:             host,
+				AuthenticationSecret: xdcrSecret,
+				TLS: &couchbasev2.RemoteClusterTLS{
+					Secret: &tlsSecret,
+				},
+			},
+		},
+	}
+	if _, err = PatchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/Spec/XDCR", xdcr), time.Minute); err != nil {
+		return
+	}
+
+	// Wait for the operator to successfully connect before continuing.
+	name := fmt.Sprintf("%s/%s/%s", clusterName, srcBucket, dstBucket)
+	if err = WaitForClusterEvent(srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name), 5*time.Minute); err != nil {
+		return
+	}
+
+	return
+}
+
 func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) func() {
 	cleanup, err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, srcBucket, dstBucket)
+	if err != nil {
+		Die(t, err)
+	}
+	return cleanup
+}
+
+func MustEstablishXDCRReplicationTLS(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ca []byte) func() {
+	cleanup, err := EstablishXDCRReplicationTLS(srcK8s, dstK8s, source, target, srcBucket, dstBucket, ca)
 	if err != nil {
 		Die(t, err)
 	}
