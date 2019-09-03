@@ -122,7 +122,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
 	defer stop()
 	for _, newClusterSize := range []int{2, 3, 2} {
-		testCouchbase = e2eutil.MustResizeCluster(t, 0, newClusterSize, targetKube, testCouchbase, 10*time.Minute)
+		testCouchbase = e2eutil.MustResizeCluster(t, 0, newClusterSize, targetKube, testCouchbase, 20*time.Minute)
 	}
 	stop()
 	time.Sleep(time.Minute) // let analytics catch up

@@ -1154,3 +1154,38 @@ func MustGenerateWorkload(t *testing.T, k8s *types.Cluster, couchbase *couchbase
 	}
 	return cleanup
 }
+
+// GetUUID returns the UUID of the cluster
+func GetUUID(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) (string, error) {
+	uuid := ""
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	callback := func() error {
+		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if c.Status.ClusterID == "" {
+			return fmt.Errorf("cluster ID is not set")
+		}
+
+		uuid = c.Status.ClusterID
+		return nil
+	}
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		return "", err
+	}
+
+	return uuid, nil
+}
+
+func MustGetUUID(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) string {
+	uuid, err := GetUUID(k8s, couchbase, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return uuid
+}

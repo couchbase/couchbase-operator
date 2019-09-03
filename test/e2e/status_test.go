@@ -26,7 +26,7 @@ func TestStatusRecovery(t *testing.T) {
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
 
 	// Runtime configuration.
-	uuid := cluster.Status.ClusterID
+	uuid := e2eutil.MustGetUUID(t, kubernetes, cluster, time.Minute)
 
 	// When ready pause the cluster and wait until reported as such, it is possible that a
 	// reconciliation is in flight and will just reset the status to what it was.  Next delete
