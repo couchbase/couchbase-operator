@@ -368,7 +368,9 @@ func RecreateCRDs(k8s *types.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset object: %v", err)
 	}
-	if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+
+	opts := metav1.ListOptions{LabelSelector: "group=couchbase.com"}
+	if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(&metav1.DeleteOptions{}, opts); err != nil {
 		return fmt.Errorf("failed to delete CRDs: %v", err)
 	}
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(k8sutil.GetCRD()); err != nil {

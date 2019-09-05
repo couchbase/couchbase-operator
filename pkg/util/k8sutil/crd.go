@@ -38,7 +38,8 @@ func createCRD(version constants.KubernetesVersion) *apiextensionsv1beta1.Custom
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: couchbasev2.ClusterCRDName,
+			Name:   couchbasev2.ClusterCRDName,
+			Labels: map[string]string{"group": "couchbase.com"},
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
