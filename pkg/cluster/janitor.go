@@ -161,7 +161,7 @@ func (j *janitor) updateDetachedAnnotation(pvc *corev1.PersistentVolumeClaim) er
 		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; !ok {
 			return nil
 		}
-		log.Info("PVC marked as attached", "cluster", j.cluster.cluster.Name, "name", pvc.Name)
+		log.Info("PVC marked as attached", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
 		delete(pvc.Annotations, constants.VolumeDetachedAnnotation)
 	} else {
 		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; ok {
@@ -170,7 +170,7 @@ func (j *janitor) updateDetachedAnnotation(pvc *corev1.PersistentVolumeClaim) er
 		if pvc.Annotations == nil {
 			pvc.Annotations = map[string]string{}
 		}
-		log.Info("PVC marked as detached", "cluster", j.cluster.cluster.Name, "name", pvc.Name)
+		log.Info("PVC marked as detached", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
 		pvc.Annotations[constants.VolumeDetachedAnnotation] = time.Now().Format(time.RFC3339)
 	}
 
@@ -222,7 +222,7 @@ func (j *janitor) deleteTimedOutVolumes() error {
 			return err
 		}
 		if detachedTime.Add(logRetentionTime).Before(time.Now()) {
-			log.Info("PVC retention time threshold exceeded, deleting", "cluster", j.cluster.cluster.Name, "name", pvc.Name)
+			log.Info("PVC retention time threshold exceeded, deleting", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
 			if err := j.abstraction.LogPVCDelete(pvc.Name); err != nil {
 				return err
 			}
@@ -261,7 +261,7 @@ func (j *janitor) deleteOverCapacityVolumes() error {
 
 	// Finally kill off the overflow
 	for _, pvc := range pvcs[0 : logCount-logRetentionCount] {
-		log.Info("PVC count thershold exceeded, deleting", "cluster", j.cluster.cluster.Name, "name", pvc.Name)
+		log.Info("PVC count thershold exceeded, deleting", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
 		if err := j.abstraction.LogPVCDelete(pvc.Name); err != nil {
 			return err
 		}
@@ -289,7 +289,7 @@ func (j *janitor) cleanPeriodic() error {
 
 // run monitors the namespace for resources related to the named cluster.
 func (j *janitor) run() {
-	log.Info("Janitor starting", "cluster", j.cluster.cluster.Name)
+	log.Info("Janitor starting", "cluster", j.cluster.namespacedName())
 
 	// Sit in a loop forever performing periodic clean up operations every
 	// minute.
@@ -299,7 +299,7 @@ func (j *janitor) run() {
 			return
 		case <-time.After(time.Minute):
 			if err := j.cleanPeriodic(); err != nil {
-				log.Error(err, "Janitor error", "cluster", j.cluster.cluster.Name)
+				log.Error(err, "Janitor error", "cluster", j.cluster.namespacedName())
 			}
 		}
 	}

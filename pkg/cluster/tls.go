@@ -39,7 +39,7 @@ func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
 		return err
 	}
 	if !reflect.DeepEqual(cacert, oldcacert) {
-		log.Info("Reloading CA certificate", "cluster", c.cluster.Name, "name", member.Name)
+		log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name)
 		if err := c.client.UploadClusterCACert(member, cacert); err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func (c *Cluster) reloadChain(member *couchbaseutil.Member, cacert []byte) error
 // reloadChainAndVerify reloads the certificate chain for a member when necessary,
 // waiting until the certificate is presented by the server.
 func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []byte, cert *x509.Certificate) error {
-	log.Info("Reloading certificate chain", "cluster", c.cluster.Name, "name", member.Name)
+	log.Info("Reloading certificate chain", "cluster", c.namespacedName(), "name", member.Name)
 
 	// Wait for the certificate data to be updated. NS server has a few quirks (as per usual... sigh).
 	// Reloading the chain will sometimes not work and need to be repeatedly prodded until it decides

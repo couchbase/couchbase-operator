@@ -80,7 +80,7 @@ func (c *Cluster) operatorUpgrade() error {
 	}
 	if patches := validator.ApplyDefaults(unstructuredCluster); patches != nil {
 		cluster := c.cluster.DeepCopy()
-		log.Info("Upgrading resource", "cluster", c.cluster.Name, "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
+		log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
 		if err := jsonpatch.Apply(cluster, patches); err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (c *Cluster) operatorUpgrade() error {
 				if !isActionable {
 					continue
 				}
-				log.Info("Upgrading resource", "cluster", c.cluster.Name, "kind", resource.kind(), "name", resource.name(item), "version", versionRange.to)
+				log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", resource.kind(), "name", resource.name(item), "version", versionRange.to)
 				if err := resource.perform(item, action); err != nil {
 					return err
 				}
