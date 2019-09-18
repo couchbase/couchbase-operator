@@ -636,14 +636,53 @@ type TLSPolicy struct {
 	// StaticTLS enables user to generate static x509 certificates and keys,
 	// put them into Kubernetes secrets, and specify them into here.
 	Static *StaticTLS `json:"static,omitempty"`
+
+	// ClientCertificatePolicy optionally defines the policy to use.
+	// If set then the OperatorSecret must contain a valid
+	// certificate/key pair for the Administrator account.
+	ClientCertificatePolicy *ClientCertificatePolicy `json:"clientCertificatePolicy,omitempty"`
+
+	// ClientCertificatePaths optionally defines where to look in client
+	// certificates to extract the user name.
+	ClientCertificatePaths []ClientCertificatePath `json:"clientCertificatePaths,omitempty"`
 }
 
 type StaticTLS struct {
 	// Member contains secrets containing TLS certs used by each couchbase member pod.
 	Member *MemberSecret `json:"member,omitempty"`
+
 	// OperatorSecret is the secret containing TLS certs used by operator to
 	// talk securely to this cluster.
 	OperatorSecret string `json:"operatorSecret,omitempty"`
+}
+
+// ClientCertificatePolicy defines the type of TLS policy to apply.  The default
+// "disable" is implicit when the policy is not set.
+type ClientCertificatePolicy string
+
+const (
+	// ClientCertificatePolicyEnable enables optional TLS client ceritifcates
+	// falling back to password based authentication on failure.  This mode
+	// is required when using secure XDCR... aledgedly, even though that can
+	// have a client cert specified.
+	ClientCertificatePolicyEnable ClientCertificatePolicy = "enable"
+
+	// ClientCertificatePolicyMandatory enables mandatory TLS client certification.
+	ClientCertificatePolicyMandatory ClientCertificatePolicy = "mandatory"
+)
+
+// ClientCertificatePath defines how to extract a username from a client ceritficate.
+type ClientCertificatePath struct {
+	// Path defines where in the X.509 specification to extract the username from.
+	// Valid values are subject.cn, san.uri, san.dnsname, san.email.
+	Path string `json:"path,omitempty"`
+
+	// Prefix if specified allows a prefix to be stripped from the username.
+	Prefix string `json:"prefix,omitempty"`
+
+	// Delimiter if specified allows a suffix to be stripped from the username.
+	// Typically this will be
+	Delimiter string `json:"delimiter,omitempty"`
 }
 
 type MemberSecret struct {

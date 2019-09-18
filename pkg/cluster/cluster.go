@@ -652,23 +652,23 @@ func (c *Cluster) initCouchbaseClient() error {
 			return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCACert)
 		}
 
+		// Add the TLS context
+		tls := &cbmgr.TLSAuth{
+			CACert: secret.Data[tlsOperatorSecretCACert],
+		}
+
 		// Optionally enable client authentication
-		var clientAuth *cbmgr.TLSClientAuth
-		if _, ok := secret.Data[tlsOperatorSecretCert]; ok {
-			if _, ok := secret.Data[tlsOperatorSecretKey]; !ok {
-				return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretKey)
+		if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
+			_, clientCert, clientKey, err := c.getTLSClientData()
+			if err != nil {
+				return err
 			}
-			clientAuth = &cbmgr.TLSClientAuth{
-				Cert: secret.Data[tlsOperatorSecretCert],
-				Key:  secret.Data[tlsOperatorSecretKey],
+			tls.ClientAuth = &cbmgr.TLSClientAuth{
+				Cert: clientCert,
+				Key:  clientKey,
 			}
 		}
 
-		// Add the TLS context
-		tls := &cbmgr.TLSAuth{
-			CACert:     secret.Data[tlsOperatorSecretCACert],
-			ClientAuth: clientAuth,
-		}
 		c.client.SetTLS(tls)
 	}
 

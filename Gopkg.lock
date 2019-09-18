@@ -88,14 +88,14 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:1fb422c25f219e1bdb821bade3e7fedc23f6a2cd603187cb00f3212cf1c37a4c"
+  digest = "1:acd15f5c685113f415e29b9c4204b3e4c5b6fefd27939e60fbb29a60eb37f10e"
   name = "github.com/couchbase/gocbmgr"
   packages = [
     ".",
     "urlencoding",
   ]
   pruneopts = "UT"
-  revision = "d544ea1dffd4bac8dd0644aba79398039b4f2bef"
+  revision = "04238bfa32e1df915fa660a76ffdf3609810939d"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -1229,6 +1229,7 @@
     "k8s.io/cli-runtime/pkg/genericclioptions",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/discovery/fake",
+    "k8s.io/client-go/dynamic",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/azure",

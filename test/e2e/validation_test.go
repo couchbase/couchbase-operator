@@ -322,15 +322,10 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOpts)
 				defer teardown()
 
-				tlsPolicy := map[string]interface{}{
-					"static": map[string]interface{}{
-						"member": map[string]interface{}{
-							"serverSecret": ctx.ClusterSecretName,
-						},
-						"operatorSecret": ctx.OperatorSecretName,
-					},
+				if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "member", "serverSecret"); err != nil {
+					e2eutil.Die(t, err)
 				}
-				if err := unstructured.SetNestedField(object.Object, tlsPolicy, "spec", "networking", "tls"); err != nil {
+				if err := unstructured.SetNestedField(object.Object, ctx.OperatorSecretName, "spec", "networking", "tls", "static", "operatorSecret"); err != nil {
 					e2eutil.Die(t, err)
 				}
 
@@ -675,6 +670,30 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/static/operatorSecret", "does-not-exist")},
 			shouldFail:     true,
 			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.operatorSecret must exist"},
+		},
+		{
+			name:           "TestValidateTLSClientCertificatePolicyInvalid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/clientCertificatePolicy", "invalid")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePolicy in body should match '^enable|mandatory$'`},
+		},
+		{
+			name:           "TestValidateTLSClientCertificatePathInvalid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/clientCertificatePaths/0/path", "invalid")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path in body should match '^subject\.cn|san\.uri|san\.dnsname|san\.email$'`},
+		},
+		{
+			name:           "TestValidateTLSClientCertificatePathRequired",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/networking/tls/clientCertificatePaths/0/path")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path in body is required`},
+		},
+		{
+			name:           "TestValidateTLSClientCertificateNoPaths",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/networking/tls/clientCertificatePaths")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths should have at least 1 items`},
 		},
 		{
 			name: "TestValidateDNSReqiredWithPublicAdminConsoleService",

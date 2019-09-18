@@ -146,6 +146,15 @@ spec:
     exposedFeatureServiceType: NodePort
     dns:
       domain: "example.com"
+    tls:
+      # Empty objects to be filled in by the dynamic runtime
+      static:
+        member: {}
+      clientCertificatePolicy: "enable"
+      clientCertificatePaths:
+        - path: subject.cn
+          prefix: prefix
+          delimiter: .
   logging:
     logRetentionTime: "24h"
     logRetentionCount: 10

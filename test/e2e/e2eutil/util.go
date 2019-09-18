@@ -144,6 +144,35 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	return cluster
 }
 
+// NewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
+func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext, policy couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
+	clusterSpec.Name = ctx.ClusterName
+	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
+				ServerSecret: ctx.ClusterSecretName,
+			},
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+		ClientCertificatePolicy: &policy,
+		ClientCertificatePaths: []couchbasev2.ClientCertificatePath{
+			{
+				Path: "subject.cn",
+			},
+		},
+	}
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
+}
+
+func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewMutualTLSClusterBasic(t, k8s, namespace, size, ctx, policy)
+	if err != nil {
+		Die(t, err)
+	}
+	return cluster
+}
+
 // NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
 func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)

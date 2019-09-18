@@ -412,6 +412,14 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		errs = append(errs, err)
 	}
 
+	// Check mutual verification
+	if customResource.Spec.Networking.TLS.ClientCertificatePolicy != nil {
+		if len(customResource.Spec.Networking.TLS.ClientCertificatePaths) == 0 {
+			errs = append(errs, errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1))
+		}
+	}
+
+	// Check auto compaction
 	purgeInterval := customResource.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
 	if purgeInterval < 1.0 {
 		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h"))

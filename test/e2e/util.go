@@ -108,6 +108,23 @@ var (
 		"TestTLSRotateCAKillPodAndKillOperator":            TestTLSRotateCAKillPodAndKillOperator,
 		"TestTLSRotateInvalid":                             TestTLSRotateInvalid,
 
+		// mTLS test cases
+		"TestMutualTLSCreateCluster":     TestMutualTLSCreateCluster,
+		"TestMutualTLSEnable":            TestMutualTLSEnable,
+		"TestMutualTLSDisable":           TestMutualTLSDisable,
+		"TestMutualTLSRotateClient":      TestMutualTLSRotateClient,
+		"TestMutualTLSRotateClientChain": TestMutualTLSRotateClientChain,
+		"TestMutualTLSRotateCA":          TestMutualTLSRotateCA,
+		"TestMutualTLSRotateInvalid":     TestMutualTLSRotateInvalid,
+
+		"TestMandatoryMutualTLSCreateCluster":     TestMandatoryMutualTLSCreateCluster,
+		"TestMandatoryMutualTLSEnable":            TestMandatoryMutualTLSEnable,
+		"TestMandatoryMutualTLSDisable":           TestMandatoryMutualTLSDisable,
+		"TestMandatoryMutualTLSRotateClient":      TestMandatoryMutualTLSRotateClient,
+		"TestMandatoryMutualTLSRotateClientChain": TestMandatoryMutualTLSRotateClientChain,
+		"TestMandatoryMutualTLSRotateCA":          TestMandatoryMutualTLSRotateCA,
+		"TestMandatoryMutualTLSRotateInvalid":     TestMandatoryMutualTLSRotateInvalid,
+
 		// XDCR cases
 		"TestXdcrCreateCluster":                  TestXdcrCreateCluster,
 		"TestXdcrCreateTlsCluster":               TestXdcrCreateTlsCluster,

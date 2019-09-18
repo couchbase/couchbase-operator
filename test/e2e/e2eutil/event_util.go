@@ -161,6 +161,32 @@ func ClusterCreateSequenceWithExposedFeatures(size int, features ...string) even
 	return schema
 }
 
+// ClusterCreateSequenceWithMutualTLS is a common function for generating cluster
+// creation events, when mTLS is enabled.
+func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
+	if size == 1 {
+		return eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+			},
+		}
+	}
+
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+			eventschema.Repeat{
+				Times:     size - 1,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
+
 // ClusterScaleUpSequence is a common function for generating cluster scaling up events.
 func ClusterScaleUpSequence(size int) eventschema.Validatable {
 	return eventschema.Sequence{

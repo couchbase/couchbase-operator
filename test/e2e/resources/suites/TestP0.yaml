@@ -69,6 +69,20 @@ tcGroups:
       - name: TestTLSRotateChain
       - name: TestTLSRotateCA
       - name: TestTLSRotateInvalid
+      - name: TestMutualTLSCreateCluster
+      - name: TestMutualTLSEnable
+      - name: TestMutualTLSDisable
+      - name: TestMutualTLSRotateClient
+      - name: TestMutualTLSRotateClientChain
+      - name: TestMutualTLSRotateCA
+      - name: TestMutualTLSRotateInvalid
+      - name: TestMandatoryMutualTLSCreateCluster
+      - name: TestMandatoryMutualTLSEnable
+      - name: TestMandatoryMutualTLSDisable
+      - name: TestMandatoryMutualTLSRotateClient
+      - name: TestMandatoryMutualTLSRotateClientChain
+      - name: TestMandatoryMutualTLSRotateCA
+      - name: TestMandatoryMutualTLSRotateInvalid
 
   - name: XdcrCasesIntraCluster
     clusters:

@@ -56,6 +56,10 @@ func (m *Member) HostURLPlaintext() string {
 	return fmt.Sprintf("%s:%d", m.Addr(), adminPort)
 }
 
+func (m *Member) HostURLTLS() string {
+	return fmt.Sprintf("%s:%d", m.Addr(), adminPortTLS)
+}
+
 func (m *Member) clientScheme() string {
 	if m.SecureClient {
 		return "https"
@@ -151,6 +155,14 @@ func (ms MemberSet) ClientURLs() []string {
 	endpoints := make([]string, 0, len(ms))
 	for _, m := range ms {
 		endpoints = append(endpoints, m.ClientURL())
+	}
+	return endpoints
+}
+
+func (ms MemberSet) ClientURLsPlaintext() []string {
+	endpoints := make([]string, 0, len(ms))
+	for _, m := range ms {
+		endpoints = append(endpoints, m.ClientURLPlaintext())
 	}
 	return endpoints
 }

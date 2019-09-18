@@ -17,8 +17,8 @@ import (
 )
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
-func tlsValid(member *couchbaseutil.Member, ca []byte, cert *x509.Certificate) bool {
-	serverChain, err := netutil.GetTLSState(member.HostURL(), ca)
+func tlsValid(member *couchbaseutil.Member, ca, clientCert, clientKey []byte, cert *x509.Certificate) bool {
+	serverChain, err := netutil.GetTLSState(member.HostURLTLS(), ca, clientCert, clientKey)
 	if err == nil && serverChain[0].Equal(cert) {
 		return true
 	}
@@ -27,13 +27,6 @@ func tlsValid(member *couchbaseutil.Member, ca []byte, cert *x509.Certificate) b
 
 // reloadCA insecurely reloads the cluster CA certificate.
 func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
-	// Perform this insecurely but over TLS so as not to leak credentials.
-	// This handles where the client is using an updated CA but the cluster
-	// is still using certificates signed by an old one.
-	tls := c.client.GetTLS()
-	c.client.SetTLS(&cbmgr.TLSAuth{CACert: cacert, Insecure: true})
-	defer c.client.SetTLS(tls)
-
 	oldcacert, err := c.client.GetClusterCACert(member)
 	if err != nil {
 		return err
@@ -49,13 +42,6 @@ func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
 
 // reloadChain does an insecure reload of the TLS certificates and keys.
 func (c *Cluster) reloadChain(member *couchbaseutil.Member, cacert []byte) error {
-	// Perform this insecurely but over TLS so as not to leak credentials.
-	// This handles where the client is using an updated CA but the cluster
-	// is still using certificates signed by an old one.
-	tls := c.client.GetTLS()
-	c.client.SetTLS(&cbmgr.TLSAuth{CACert: cacert, Insecure: true})
-	defer c.client.SetTLS(tls)
-
 	if err := c.client.ReloadNodeCert(member); err != nil {
 		return err
 	}
@@ -64,33 +50,23 @@ func (c *Cluster) reloadChain(member *couchbaseutil.Member, cacert []byte) error
 
 // reloadChainAndVerify reloads the certificate chain for a member when necessary,
 // waiting until the certificate is presented by the server.
-func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert []byte, cert *x509.Certificate) error {
+func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert, clientCert, clientKey []byte, cert *x509.Certificate) error {
 	log.Info("Reloading certificate chain", "cluster", c.namespacedName(), "name", member.Name)
 
 	// Wait for the certificate data to be updated. NS server has a few quirks (as per usual... sigh).
 	// Reloading the chain will sometimes not work and need to be repeatedly prodded until it decides
-	// to obey our command.
+	// to obey our command.  It will also take a few tries to verify.
 	callback := func() error {
 		if err := c.reloadChain(member, cacert); err != nil {
 			return err
 		}
+		if !tlsValid(member, cacert, clientCert, clientKey, cert) {
+			return fmt.Errorf("certificate chain not served")
+		}
 		return nil
 	}
-	ctx, cancel1 := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
-	defer cancel1()
-	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
-		return err
-	}
-
-	// Wait until TLS is visibly being served before continuing.
-	callback = func() error {
-		if tlsValid(member, cacert, cert) {
-			return nil
-		}
-		return fmt.Errorf("certificate chain not served")
-	}
-	ctx, cancel2 := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
-	defer cancel2()
+	ctx, cancel := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
+	defer cancel()
 	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
@@ -112,7 +88,7 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 
 	// Ensure that the secrets are correctly formatted.
 	var ok bool
-	ca, ok = operatorSecret.Data["ca.crt"]
+	ca, ok = operatorSecret.Data[tlsOperatorSecretCACert]
 	if !ok {
 		err = fmt.Errorf("operator secret missing ca.crt")
 		return
@@ -130,21 +106,151 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 	return
 }
 
+// getTLSClientData returns the PEM files required for client authentication.
+func (c *Cluster) getTLSClientData() (ca []byte, chain []byte, key []byte, err error) {
+	// Load the TLS data from kubernetes.
+	operatorSecret, err := k8sutil.GetSecret(c.kubeClient, c.cluster.Spec.Networking.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
+	if err != nil {
+		return
+	}
+
+	var ok bool
+	ca, ok = operatorSecret.Data[tlsOperatorSecretCACert]
+	if !ok {
+		err = fmt.Errorf("operator secret missing ca.crt")
+		return
+	}
+	chain, ok = operatorSecret.Data[tlsOperatorSecretCert]
+	if !ok {
+		err = fmt.Errorf("operator secret missing " + tlsOperatorSecretCert)
+		return
+	}
+	key, ok = operatorSecret.Data[tlsOperatorSecretKey]
+	if !ok {
+		err = fmt.Errorf("operator secret missing " + tlsOperatorSecretKey)
+		return
+	}
+	return
+}
+
+// reconcileMemberTLS reconciles both the CA and certificate chain on Couchbase server.
+// This is done in plain text due to races involving required mTLS.
+func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key []byte, leaf *x509.Certificate) (bool, error) {
+	member.SecureClient = false
+	defer func() {
+		member.SecureClient = true
+	}()
+
+	// Try connect to the target node, if it doesn't respond we assume it's
+	// deleted or the admin service has gone down and needs a reconcile to fix it.
+	ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+	defer cancel()
+
+	if err := netutil.WaitForHostPort(ctx, member.HostURL()); err != nil {
+		return false, nil
+	}
+
+	// By default we use the most up to date certificates, as the whole CA may
+	// have been rotated so we need those client certs to perform the TLS handshake,
+	// when mandatory mTLS is enables. If however we are disabling mTLS entirely but
+	// not rotating, then we need to use the existing client cert or the check will
+	// fail.
+	if tls := c.client.GetTLS(); cert == nil && tls.ClientAuth != nil {
+		cert = tls.ClientAuth.Cert
+		key = tls.ClientAuth.Key
+	}
+
+	if tlsValid(member, ca, cert, key, leaf) {
+		return false, nil
+	}
+
+	// Reload the CA certificate if necessary.
+	if err := c.reloadCA(member, ca); err != nil {
+		return false, err
+	}
+
+	// Reload the server certificate chain.
+	if err := c.reloadChainAndVerify(member, ca, cert, key, leaf); err != nil {
+		return false, err
+	}
+
+	// Indicate something happened for raising events.
+	return true, nil
+}
+
+// reconcileClientAuthentication reconciles client ceritifcate policy.  Note this must be
+// done over plaintext or the logic would become next to impossible to comprehend.
+func (c *Cluster) reconcileClientAuthentication() error {
+	// Reconcile client ceritifcate policy. Defaults to disable (implied by nil policy).
+	settings := &cbmgr.ClientCertAuth{
+		State:    "disable",
+		Prefixes: []cbmgr.ClientCertAuthPrefix{}, // *sigh* it must be specified and not null
+	}
+
+	if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
+		settings.State = string(*c.cluster.Spec.Networking.TLS.ClientCertificatePolicy)
+		for _, path := range c.cluster.Spec.Networking.TLS.ClientCertificatePaths {
+			settings.Prefixes = append(settings.Prefixes, cbmgr.ClientCertAuthPrefix{
+				Path:      path.Path,
+				Prefix:    path.Prefix,
+				Delimiter: path.Delimiter,
+			})
+		}
+	}
+
+	existingSettings, err := c.client.GetClientCertAuth(c.members)
+	if err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(existingSettings, settings) {
+		if err := c.client.SetClientCertAuth(c.members, settings); err != nil {
+			return err
+		}
+
+		// These settings are ACCEPTED and take some time to apply, so wait until they are
+		// live, lest we get non-determinism.
+		callback := func() error {
+			currentSettings, err := c.client.GetClientCertAuth(c.members)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(currentSettings, settings) {
+				return fmt.Errorf("client TLS not reconciled")
+			}
+			return nil
+		}
+
+		ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
+		defer cancel()
+
+		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("client authentication", c.cluster))
+	}
+
+	return nil
+}
+
 // reconcileTLS performs any certificate rotations that are necessary.
+// We perform all of the rotations in plain text as this would become a
+// nightmare with required mTLS.  We always ensure TLS client settings
+// are enforced on exit from this function as we don't ever want to
+// leak sensitive information.
 func (c *Cluster) reconcileTLS() error {
 	// Insecure cluster, ignore.
 	if !c.cluster.Spec.Networking.TLS.IsSecureClient() {
 		return nil
 	}
 
-	// Load the TLS data from kubernetes.
+	// Load server TLS data from kubernetes and verify.
 	cacert, chain, key, err := c.getTLSData()
 	if err != nil {
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 		return err
 	}
-
-	// Work out what zones should be in the certificate for verification purposes.
 	zones := []string{
 		c.cluster.Name + "." + c.cluster.Namespace + ".svc",
 	}
@@ -152,8 +258,6 @@ func (c *Cluster) reconcileTLS() error {
 		zone := c.cluster.Name + "." + c.cluster.Spec.Networking.DNS.Domain
 		zones = append(zones, zone)
 	}
-
-	// Verify that the configuration is valid.
 	if errs := util_x509.Verify(cacert, chain, key, zones); len(errs) != 0 {
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 
@@ -165,6 +269,39 @@ func (c *Cluster) reconcileTLS() error {
 		return fmt.Errorf(errString)
 	}
 
+	// Create a new client TLS configuration.
+	tls := &cbmgr.TLSAuth{
+		CACert: cacert,
+	}
+
+	// If client authentication is specified load and verify those certificates.
+	var clientCert []byte
+	var clientKey []byte
+	if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
+		// Load client TLS data from kubernetes and verify.
+		_, clientCert, clientKey, err = c.getTLSClientData()
+		if err != nil {
+			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
+			return err
+		}
+		if errs := util_x509.Verify(cacert, clientCert, clientKey, nil); len(errs) != 0 {
+			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
+
+			errStrings := []string{}
+			for _, err := range errs {
+				errStrings = append(errStrings, err.Error())
+			}
+			errString := strings.Join(errStrings, ", ")
+			return fmt.Errorf(errString)
+		}
+
+		// Update the TLS client configuration.
+		tls.ClientAuth = &cbmgr.TLSClientAuth{
+			Cert: clientCert,
+			Key:  clientKey,
+		}
+	}
+
 	// Parse the certificate chain.
 	chainPem := util_x509.DecodePEM(chain)
 	cert, err := x509.ParseCertificate(chainPem[0].Bytes)
@@ -172,44 +309,33 @@ func (c *Cluster) reconcileTLS() error {
 		return err
 	}
 
-	// Update the client to use the new CA certificate for verification.
-	tls := c.client.GetTLS()
-	if !reflect.DeepEqual(tls.CACert, cacert) {
-		c.client.SetTLS(&cbmgr.TLSAuth{CACert: cacert})
-	}
-
+	// Update the CA and any server certificate chains that require it.
 	changed := false
 	for _, member := range c.members {
-		// Try connect to the target node, if it doesn't respond we assume it's
-		// deleted or the admin service has gone down and needs a reconcile to fix it.
-		ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
-		defer cancel()
-		if err := netutil.WaitForHostPort(ctx, member.HostURL()); err != nil {
-			continue
-		}
-
-		// If the server is correctly configured, ignore it.
-		if tlsValid(member, cacert, cert) {
-			continue
-		}
-
-		// Reload the CA certificate if necessary.
-		if err := c.reloadCA(member, cacert); err != nil {
+		change, err := c.reconcileMemberTLS(member, cacert, clientCert, clientKey, cert)
+		if err != nil {
 			return err
 		}
-
-		// Reload the server certificate chain.
-		if err := c.reloadChainAndVerify(member, cacert, cert); err != nil {
-			return err
-		}
-
-		// Indicate something happened for raising events.
-		changed = true
+		changed = changed || change
 	}
 
 	// Finally if we did anything raise an event.
 	if changed {
 		c.raiseEvent(k8sutil.TLSUpdatedEvent(c.cluster))
+	}
+
+	// Update the client if necessary.  This must be done after member reconciliation as
+	// we need a reference to the old TLS client certs using this process.  They are not
+	// interrogated when no longer required as per the client code above.
+	if !reflect.DeepEqual(tls, c.client.GetTLS()) {
+		c.client.SetTLS(tls)
+		log.Info("Reloading TLS client configuration")
+		c.raiseEvent(k8sutil.ClientTLSUpdatedEvent(c.cluster))
+	}
+
+	// Reconcile client ceritifcate policy.
+	if err := c.reconcileClientAuthentication(); err != nil {
+		return err
 	}
 
 	return nil

@@ -389,9 +389,11 @@ func CreateKeyPairReqData(keyType KeyType, certType CertType, certReq *x509.Cert
 }
 
 const (
-	operatorTLSSecretCA   = "ca.crt"
-	clusterTLSSecretKey   = "pkey.key"
-	clusterTLSSecretChain = "chain.pem"
+	operatorTLSSecretCA    = "ca.crt"
+	operatorTLSSecretChain = "couchbase-operator.crt"
+	operatorTLSSecretKey   = "couchbase-operator.key"
+	clusterTLSSecretKey    = "pkey.key"
+	clusterTLSSecretChain  = "chain.pem"
 )
 
 func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, certPEM, keyPEM []byte) *corev1.Secret {
@@ -401,9 +403,9 @@ func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, 
 			Name:      secretName,
 		},
 		Data: map[string][]byte{
-			operatorTLSSecretCA:      caCertData,
-			"couchbase-operator.crt": certPEM,
-			"couchbase-operator.key": keyPEM,
+			operatorTLSSecretCA:    caCertData,
+			operatorTLSSecretChain: certPEM,
+			operatorTLSSecretKey:   keyPEM,
 		},
 	}
 }
@@ -424,7 +426,7 @@ func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byt
 const (
 	caCN             = "Couchbase CA"
 	intermediateCACN = "Couchbase Intermediate CA"
-	operatorCN       = "Couchbase Operator"
+	operatorCN       = "Administrator"
 	clusterCN        = "Couchbase Cluster"
 )
 
@@ -441,9 +443,13 @@ type TlsContext struct {
 	CA *CertificateAuthority
 	// ServerCert is the server certifcate at the leaf of the chain
 	ServerCert *x509.Certificate
-	// operatorSecretName is the name of the secret created for operator certificates.
+	// ClientCert is the client certificate chain used for verification
+	ClientCert []byte
+	// CLientKey is the client key used for verification
+	ClientKey []byte
+	// OperatorSecretName is the name of the secret created for operator certificates.
 	OperatorSecretName string
-	// clusterSecretName is the name of the secret created for cluster certificates.
+	// ClusterSecretName is the name of the secret created for cluster certificates.
 	ClusterSecretName string
 }
 
@@ -540,6 +546,8 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 	if err != nil {
 		return
 	}
+	ctx.ClientKey = operatorKey
+	ctx.ClientCert = operatorCert
 
 	ctx.OperatorSecretName = "operator-secret-tls-" + RandomSuffix()
 	operatorSecretData := CreateOperatorSecretData(namespace, ctx.OperatorSecretName, ctx.CA.Certificate, operatorCert, operatorKey)
@@ -614,6 +622,31 @@ func MustRotateServerCertificate(t *testing.T, ctx *TlsContext, subjectAltNames 
 	}
 }
 
+// MustRotateClientCertificate generates a new client certificate and updates the existing secret.
+func MustRotateClientCertificate(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Generate a new client certificate
+	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		Die(t, err)
+	}
+
+	// Update the existing client secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
+	if err != nil {
+		Die(t, err)
+	}
+	secret.Data[operatorTLSSecretKey] = operatorKey
+	secret.Data[operatorTLSSecretChain] = operatorCert
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustRotateServerCertificateChain generates a new intermediate CA and server certificate and updates the existing secret.
 func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
 	validFrom := time.Now().In(time.UTC)
@@ -651,6 +684,43 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
 	}
 }
 
+// MustRotateClientCertificateChain generates a new intermediate CA and client certificate and updates the existing secret.
+func MustRotateClientCertificateChain(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Create an intermediate CA
+	intermediate, err := ctx.CA.NewIntermediateCertificateAuthority(KeyTypeRSA, intermediateCACN, validFrom, validTo)
+	if err != nil {
+		Die(t, err)
+	}
+
+	// Generate a new client certificate
+	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(intermediate, validFrom, validTo)
+	if err != nil {
+		Die(t, err)
+	}
+	ctx.ClientKey = operatorKey
+	ctx.ClientCert = operatorCert
+	ctx.ClientCert = append(ctx.ClientCert, []byte("\n")...)
+	ctx.ClientCert = append(ctx.ClientCert, intermediate.Certificate...)
+
+	chain := append(operatorCert, intermediate.Certificate...)
+
+	// Update the existing client secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
+	if err != nil {
+		Die(t, err)
+	}
+	secret.Data[operatorTLSSecretKey] = operatorKey
+	secret.Data[operatorTLSSecretChain] = chain
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustRotateServerCertificateAndCA generates a new CA and server certificate and updates the existing secret.
 func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
 	validFrom := time.Now().In(time.UTC)
@@ -679,6 +749,61 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
 		Die(t, err)
 	}
 	secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		Die(t, err)
+	}
+
+	// Update the existing server secret
+	if secret, err = GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName); err != nil {
+		Die(t, err)
+	}
+	secret.Data[clusterTLSSecretKey] = clusterKey
+	secret.Data[clusterTLSSecretChain] = clusterCert
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustRotateServerCertificateClientCertificateAndCA generates a new CA and client and server certificates and updates the existing secrets.
+func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Create a new CA
+	var err error
+	if ctx.CA, err = NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA); err != nil {
+		Die(t, err)
+	}
+
+	// Generate a new server certificate
+	clusterReq := CreateClusterCertReq(clusterCN, ctx.clusterSANs())
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		Die(t, err)
+	}
+	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+		Die(t, err)
+	}
+
+	// Generate a new client certificate
+	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		Die(t, err)
+	}
+	ctx.ClientKey = operatorKey
+	ctx.ClientCert = operatorCert
+
+	// Update the existing operator secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
+	if err != nil {
+		Die(t, err)
+	}
+	secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
+	secret.Data[operatorTLSSecretKey] = operatorKey
+	secret.Data[operatorTLSSecretChain] = operatorCert
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -728,6 +853,39 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 	}
 }
 
+// MustRotateClientCertificateWrongCA generates a new CA and client certificate, but only updates the client cert.
+func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TlsContext) {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	// Create a new CA, don't add to the context
+	ca, err := NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA)
+	if err != nil {
+		Die(t, err)
+	}
+
+	// Generate a new client certificate
+	operatorReq := CreateOperatorCertReq(operatorCN)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ca, validFrom, validTo)
+	if err != nil {
+		Die(t, err)
+	}
+	ctx.ClientKey = operatorKey
+	ctx.ClientCert = operatorCert
+
+	// Update the existing client secret
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
+	if err != nil {
+		Die(t, err)
+	}
+	secret.Data[operatorTLSSecretKey] = operatorKey
+	secret.Data[operatorTLSSecretChain] = operatorCert
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		Die(t, err)
+	}
+}
+
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
 func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TlsContext) error {
@@ -744,9 +902,17 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 	}
 	defer pf.Close()
 
+	clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
+	if err != nil {
+		return err
+	}
+
 	// Validate that the server certificate is valid for the context's CA.
 	tlsConfig := &tls.Config{
 		RootCAs: x509.NewCertPool(),
+		Certificates: []tls.Certificate{
+			clientCert,
+		},
 	}
 	tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
 

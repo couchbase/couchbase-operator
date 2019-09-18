@@ -52,7 +52,7 @@ func Verify(caData, chainData, keyData []byte, zones []string) (errors []error) 
 		}
 		chain = append(chain, cert)
 	}
-	serverCert := chain[0]
+	cert := chain[0]
 	intermediates := chain[1:]
 	verifyOptions := x509.VerifyOptions{
 		Intermediates: x509.NewCertPool(),
@@ -62,11 +62,28 @@ func Verify(caData, chainData, keyData []byte, zones []string) (errors []error) 
 	for _, cert := range intermediates {
 		verifyOptions.Intermediates.AddCert(cert)
 	}
-	for _, zone := range zones {
-		verifyOptions.DNSName = "verify." + zone
-		if _, err := serverCert.Verify(verifyOptions); err != nil {
+
+	if len(cert.ExtKeyUsage) != 1 {
+		errors = append(errors, fmt.Errorf("certificate extended key usage not populated: %v", err))
+		return
+	}
+
+	switch cert.ExtKeyUsage[0] {
+	case x509.ExtKeyUsageClientAuth:
+		verifyOptions.KeyUsages = append(verifyOptions.KeyUsages, x509.ExtKeyUsageClientAuth)
+		if _, err := cert.Verify(verifyOptions); err != nil {
 			errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
 		}
+	case x509.ExtKeyUsageServerAuth:
+		verifyOptions.KeyUsages = append(verifyOptions.KeyUsages, x509.ExtKeyUsageServerAuth)
+		for _, zone := range zones {
+			verifyOptions.DNSName = "verify." + zone
+			if _, err := cert.Verify(verifyOptions); err != nil {
+				errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
+			}
+		}
+	default:
+		errors = append(errors, fmt.Errorf("certificate extended key usage not recognized: %v", cert.ExtKeyUsage))
 	}
 
 	// Decode key
@@ -79,9 +96,12 @@ func Verify(caData, chainData, keyData []byte, zones []string) (errors []error) 
 		errors = append(errors, fmt.Errorf("private key contains %d PEM blocks, expected 1", len(keyPem)))
 		return
 	}
-	if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
-		// This is an annoying bug with NS server not supporting PKCS8 *sigh*
-		errors = append(errors, fmt.Errorf("private key not formatted as PKCS1"))
+
+	if cert.ExtKeyUsage[0] == x509.ExtKeyUsageServerAuth {
+		if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
+			// This is an annoying bug with NS server not supporting PKCS8 *sigh*
+			errors = append(errors, fmt.Errorf("private key not formatted as PKCS1"))
+		}
 	}
 
 	return

@@ -106,15 +106,6 @@ func TestVerifyInvalidCertificateExpired(t *testing.T) {
 	mustNotVerify(t, ca.Certificate, cert, key, validZone)
 }
 
-// TestVerifyInvalidCertificateType checks that a client certificate is rejected.
-func TestVerifyInvalidCertificateType(t *testing.T) {
-	ca, _ := NewCertificateAuthority(KeyTypeRSA, caCN, time.Now(), time.Now().Add(time.Hour), CertTypeCA)
-	req := reqTemplate
-	req.CertType = CertTypeClient
-	key, cert, _ := req.Generate(ca)
-	mustNotVerify(t, ca.Certificate, cert, key, validZone)
-}
-
 // TestVerifyInvalidCertificateSubjectAddressName checks that invalid subject alternate names are rejected.
 func TestVerifyInvalidCertificateSubjectAddressName(t *testing.T) {
 	ca, _ := NewCertificateAuthority(KeyTypeRSA, caCN, time.Now(), time.Now().Add(time.Hour), CertTypeCA)

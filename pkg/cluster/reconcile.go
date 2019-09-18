@@ -618,13 +618,6 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 				return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCACert)
 			}
 
-			// Upgrade to a TLS connection.  Do these first few calls unverified as we haven't installed
-			// the server cert that corresponds with the cluster CA in the client yet.
-			m.SecureClient = true
-			tls := c.client.GetTLS()
-			c.client.SetTLS(&cbmgr.TLSAuth{CACert: ca, Insecure: true})
-			defer c.client.SetTLS(tls)
-
 			// Update Couchbase's TLS configuration
 			if err := c.client.UploadClusterCACert(m, ca); err != nil {
 				return err
@@ -633,17 +626,8 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 				return err
 			}
 
-			// Enable TLS verification now the certs are installed for the benefit of the the
-			// TLS verification test.
-			c.client.SetTLS(tls)
-
-			// TODO: Not available until >=5.5.0, even then does authz which we don't want :(
-			//settings := &cbmgr.ClientCertAuth{
-			//	State: "mandatory",
-			//}
-			//if err := c.client.SetClientCertAuth(m, settings); err != nil {
-			//	return err
-			//}
+			// Enable TLS verification now the certs are installed.
+			m.SecureClient = true
 
 			// Wait for the port to come backup with the correct certificate chain
 			if err := netutil.WaitForHostPortTLS(ctx, m.HostURL(), ca); err != nil {
@@ -1723,7 +1707,7 @@ func (c *Cluster) inspectUsers() ([]cbmgr.User, []cbmgr.User, []cbmgr.User, erro
 		for _, a := range actual {
 			if r.ID == a.ID {
 				// compare roles which are the only mutable user attributes
-				if !reflect.DeepEqual(r.RolesToStr(), a.RolesToStr()) {
+				if !reflect.DeepEqual(cbmgr.RolesToStr(r.Roles), cbmgr.RolesToStr(a.Roles)) {
 					update = append(update, r)
 				}
 				found = true

@@ -764,9 +764,15 @@ func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
 	})
 }
 
-func (c *CouchbaseClient) SetClientCertAuth(m *Member, settings *cbmgr.ClientCertAuth) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
+// GetClientCertAuth/SetClientCertAuth allow reconciliation of TLS settings.  The ordering constraints
+// when using mTLS make the process very messy, so this is always done over HTTP.
+func (c *CouchbaseClient) GetClientCertAuth(ms MemberSet) (*cbmgr.ClientCertAuth, error) {
+	c.client.SetEndpoints(ms.ClientURLsPlaintext())
+	return c.client.GetClientCertAuth()
+}
+
+func (c *CouchbaseClient) SetClientCertAuth(ms MemberSet, settings *cbmgr.ClientCertAuth) error {
+	c.client.SetEndpoints(ms.ClientURLsPlaintext())
 	return c.client.SetClientCertAuth(settings)
 }
 

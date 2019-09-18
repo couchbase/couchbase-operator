@@ -364,6 +364,33 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 												},
 											},
 										},
+										"clientCertificatePolicy": apiextensionsv1beta1.JSONSchemaProps{
+											Type:    "string",
+											Pattern: "^enable|mandatory$",
+										},
+										"clientCertificatePaths": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "array",
+											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Required: []string{
+														"path",
+													},
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"path": apiextensionsv1beta1.JSONSchemaProps{
+															Type:    "string",
+															Pattern: `^subject\.cn|san\.uri|san\.dnsname|san\.email$`,
+														},
+														"prefix": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+														"delimiter": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+												},
+											},
+										},
 									},
 								},
 								"exposeAdminConsole": apiextensionsv1beta1.JSONSchemaProps{
