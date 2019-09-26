@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,7 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -165,7 +164,7 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 
 	err = yaml.Unmarshal(yamlFileContent, &clusterConf)
 	if err != nil {
-		err = errors.New("unable to decode cluster config: " + err.Error())
+		err = fmt.Errorf("unable to decode cluster config: %v", err)
 		return
 	}
 
@@ -179,7 +178,7 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 		}
 	}
 	if len(reqClusters) != len(clusters) {
-		err = errors.New("unable to get cluster config for all required clusters")
+		err = fmt.Errorf("unable to get cluster config for all required clusters")
 	}
 	return
 }
@@ -188,13 +187,13 @@ func GetClusterConfigFromYml(ymlFilePath, reqClusterType string, reqClusters []s
 func GetSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = errors.New("unable to read suite config file: " + err.Error())
+		err = fmt.Errorf("unable to read suite config file: %v", err)
 		return
 	}
 
 	err = yaml.Unmarshal(yamlFileContent, &suiteData)
 	if err != nil {
-		err = errors.New("unable to decode suite config: " + err.Error())
+		err = fmt.Errorf("unable to decode suite config: %v", err)
 		return
 	}
 	return
@@ -222,7 +221,7 @@ func CreateK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) e
 }
 
 func RemoveRole(kubeClient kubernetes.Interface, roleName string) error {
-	if err := kubeClient.RbacV1().Roles(Global.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	if err := kubeClient.RbacV1().Roles(Global.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	return nil
@@ -290,7 +289,7 @@ func RemoveClusterRoleBinding(kubeClient kubernetes.Interface, namespace, cluste
 // order to pull from a private repository.
 func RecreateDockerAuthSecret(client kubernetes.Interface) error {
 	// Clean up the old authentication secret if it exists
-	if err := client.CoreV1().Secrets(runtimeParams.Namespace).Delete(dockerPullSecretName, nil); err != nil && !apierrors.IsNotFound(err) {
+	if err := client.CoreV1().Secrets(runtimeParams.Namespace).Delete(dockerPullSecretName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -368,7 +367,7 @@ func RecreateRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRol
 }
 
 func RemoveRoleBinding(kubeClient kubernetes.Interface, namespace, roleBindingName string) error {
-	if err := kubeClient.RbacV1().RoleBindings(namespace).Delete(roleBindingName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	if err := kubeClient.RbacV1().RoleBindings(namespace).Delete(roleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	return nil
@@ -385,12 +384,12 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 
 	newClusterConfig, err := ini.LoadSources(loadOptions, "")
 	if err != nil {
-		return errors.New("unable to initialize cluster file: " + err.Error())
+		return fmt.Errorf("unable to initialize cluster file: %v", err)
 	}
 
 	loginSectionForCluster, err := newClusterConfig.NewSection("all:vars")
 	if err != nil {
-		return errors.New("error while creating new section 'all'")
+		return fmt.Errorf("error while creating new section 'all'")
 	}
 
 	for key, value := range constants.AnsibleLoginSectionData {
@@ -410,16 +409,16 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 
 	_, err = newClusterConfig.NewRawSection("master_node", masterSectionData)
 	if err != nil {
-		return errors.New("unable to create master_node section: " + err.Error())
+		return fmt.Errorf("unable to create master_node section: %v", err)
 	}
 	_, err = newClusterConfig.NewRawSection("worker_node", workerSectionData)
 	if err != nil {
-		return errors.New("unable to create worker_node section: " + err.Error())
+		return fmt.Errorf("unable to create worker_node section: %v", err)
 	}
 
 	err = newClusterConfig.SaveTo(filePathToSave)
 	if err != nil {
-		return errors.New("unable to save cluster file: " + err.Error())
+		return fmt.Errorf("unable to save cluster file: %v", err)
 	}
 	return nil
 }
@@ -453,7 +452,7 @@ func SetupK8SCluster(t *testing.T, namespace, kubeType, kubeVersion, ymlFilePath
 
 		logrus.Infof("Cluster %s created successfully", kubeClusterSpec.ClusterName)
 	default:
-		return errors.New("unsupported kube-type in test_config")
+		return fmt.Errorf("unsupported kube-type in test_config")
 	}
 	return nil
 }
@@ -464,7 +463,7 @@ func WaitForClusterRoleDeleted(kubeClient kubernetes.Interface, roleName string,
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out waiting for role to be delete: " + roleName)
+			return fmt.Errorf("timed out waiting for role %s to be deleted", roleName)
 
 		case <-tickChan:
 			clusterRoleList, err := kubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
@@ -488,7 +487,7 @@ func WaitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccoun
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out waiting for service account to be delete: " + serviceAccountName)
+			return fmt.Errorf("timed out waiting for service account %s to be deleted", serviceAccountName)
 
 		case <-tickChan:
 			svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
@@ -515,7 +514,7 @@ func WaitForClusterRoleBindingDeleted(kubeClient kubernetes.Interface, clusterRo
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out waiting for cluster role binding to be delete: " + clusterRoleBindingName)
+			return fmt.Errorf("timed out waiting for cluster role binding %s to be deleted", clusterRoleBindingName)
 
 		case <-tickChan:
 			clusterRoleBindingList, err := kubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
@@ -699,7 +698,7 @@ func WaitForServiceDeleted(kubeClient kubernetes.Interface, serviceName string, 
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out waiting for service account to be delete: " + serviceName)
+			return fmt.Errorf("timed out waiting for service account %s to be deleted", serviceName)
 
 		case <-tickChan:
 			svcList, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{})
@@ -789,7 +788,7 @@ func WaitForStorageClassDeleted(kubeClient kubernetes.Interface, storageClassNam
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out waiting for storage class to be delete: " + storageClassName)
+			return fmt.Errorf("timed out waiting for storage class %s to be deleted", storageClassName)
 
 		case <-tickChan:
 			scList, err := kubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
@@ -900,7 +899,7 @@ func CreateEtcdCluster(t *testing.T, kubeClient kubernetes.Interface, namespace,
 	logrus.Info("Deploying etcd")
 	createEtcCLusterdCmd := exec.Command("bash", "./resources/thirdparty/etcd/deploy-etcd-automation.sh", "--namespace", namespace, "--kubeConfig", kubeConfigPath)
 	if err := runExecCommand(createEtcCLusterdCmd); err != nil {
-		return errors.New("error creating etcd cluster: " + err.Error())
+		return fmt.Errorf("error creating etcd cluster: %v", err)
 	}
 	if err := e2eutil.WaitForPodsReadyWithLabel(t, kubeClient, 60, "app=etcd", namespace); err != nil {
 		return err
@@ -919,7 +918,7 @@ func GetEtcdServiceEndpoint(kubeClient kubernetes.Interface, namespace string) (
 			return service.Spec.ClusterIP, nil
 		}
 	}
-	return "", errors.New("etcd client service not found")
+	return "", fmt.Errorf("etcd client service not found")
 }
 
 func CreateEtcd(t *testing.T, kubeClient kubernetes.Interface, namespace, kubeConfigPath string) error {
@@ -979,7 +978,7 @@ func CreatePortworx(t *testing.T, kubeClient kubernetes.Interface, namespace, ku
 	portworxClusterName := "test-portworx-" + e2eutil.RandomSuffix()
 	deployPortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/deploy-portworx-automation.sh", etcdEndpointIP, portworxClusterName, kubeConfigPath)
 	if err := runExecCommand(deployPortworxCmd); err != nil {
-		return errors.New("error running submit-portworx-automation.sh: " + err.Error())
+		return fmt.Errorf("error running submit-portworx-automation.sh: %v", err)
 	}
 
 	logrus.Info("Scaling up portworx pods")
@@ -1030,7 +1029,7 @@ func DeletePortworx(t *testing.T, kubeClient kubernetes.Interface, kubeConfigPat
 	logrus.Info("Running delete-portworx-automation.sh")
 	deletePortworxCmd := exec.Command("bash", "./resources/thirdparty/portworx/delete-portworx-automation.sh", kubeConfigPath)
 	if err := runExecCommand(deletePortworxCmd); err != nil {
-		return errors.New("error running delete-portworx-automation.sh: " + err.Error())
+		return fmt.Errorf("error running delete-portworx-automation.sh: %v", err)
 	}
 
 	logrus.Info("Deleting portworx-service")
@@ -1113,14 +1112,14 @@ func SetupPersistentVolume(t *testing.T, kubeClient kubernetes.Interface, namesp
 func RemoveLabels(nodeLabelName string, kubeClient kubernetes.Interface) error {
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		return errors.New("Failed to get k8s nodes " + err.Error())
+		return fmt.Errorf("failed to get k8s nodes: %v", err)
 	}
 	for _, k8sNode := range k8sNodeList.Items {
 		nodeLabels := k8sNode.GetLabels()
 		delete(nodeLabels, nodeLabelName)
 		k8sNode.SetLabels(nodeLabels)
 		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-			return errors.New("Failed to delete label for node " + k8sNode.Name + ": " + err.Error())
+			return fmt.Errorf("failed to delete label for node %s: %v", k8sNode.Name, err)
 		}
 	}
 	return nil

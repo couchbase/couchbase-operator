@@ -2,7 +2,6 @@ package e2eutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -416,7 +415,7 @@ func WaitForKubeNodesToBeReady(kubeClient kubernetes.Interface, requiredNodesInC
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out to get K8S node to ready state")
+			return fmt.Errorf("timed out to get K8S node to ready state")
 
 		case <-tickChan:
 			nodesList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -437,7 +436,7 @@ func WaitForPodsReadyWithLabel(t *testing.T, kubeClient kubernetes.Interface, wa
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out waiting for pods to enter ready state")
+			return fmt.Errorf("timed out waiting for pods to enter ready state")
 
 		case <-tickChan:
 			podReady := true
@@ -499,7 +498,7 @@ func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, 
 	for {
 		select {
 		case <-timeOutChan:
-			return errors.New("timed out to get K8S node to ready state")
+			return fmt.Errorf("timed out to get K8S node to ready state")
 
 		case <-tickChan:
 			service, err := GetService(kubeClient, namespace, loadBalancerServiceName)

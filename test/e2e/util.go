@@ -1,7 +1,7 @@
 package e2e
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"testing"
 
@@ -256,14 +256,14 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 func K8SNodesRemoveLabel(nodeLabelName string, kubeClient kubernetes.Interface) error {
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		return errors.New("Failed to get k8s nodes " + err.Error())
+		return fmt.Errorf("failed to get k8s nodes: %v", err)
 	}
 	for _, k8sNode := range k8sNodeList.Items {
 		nodeLabels := k8sNode.GetLabels()
 		delete(nodeLabels, nodeLabelName)
 		k8sNode.SetLabels(nodeLabels)
 		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-			return errors.New("Failed to delete label for node " + k8sNode.Name + ": " + err.Error())
+			return fmt.Errorf("failed to delete label for node %s: %v", k8sNode.Name, err)
 		}
 	}
 	return nil

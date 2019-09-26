@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -276,12 +275,12 @@ func verifyLogRedaction(archive string) error {
 func verifyLogCollectListJson(kubeClient kubernetes.Interface, namespace, cbClusterName, collectInfoListJson string, errMsgList *failureList) error {
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
 	if err != nil {
-		return errors.New("Failed to list pods: " + err.Error())
+		return err
 	}
 
 	for _, pod := range pods.Items {
 		if !strings.Contains(collectInfoListJson, pod.Name) {
-			errMsgList.AppendFailure("Pod missing from JSON output: "+pod.Name, errors.New("Pod missing in JSON output!"))
+			errMsgList.AppendFailure("Pod missing from JSON output: "+pod.Name, fmt.Errorf("pod missing in JSON output"))
 		}
 	}
 	return nil
@@ -779,17 +778,17 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 		execOutStr := strings.TrimSpace(string(execOut))
 		t.Logf("Returned: %s\n", execOutStr)
 		if err == nil {
-			errMsgList.AppendFailure(arg.Name, errors.New("Command executed successfully"))
+			errMsgList.AppendFailure(arg.Name, fmt.Errorf("command executed successfully"))
 		}
 
 		// Verify valid error message
 		if !strings.Contains(execOutStr, arg.ExpectedErr) {
-			errMsgList.AppendFailure(arg.Name, errors.New("Invalid error message: "+execOutStr))
+			errMsgList.AppendFailure(arg.Name, fmt.Errorf("invalid error message: %s", execOutStr))
 		}
 
 		// Check no output file is generated
 		if logFileName := getLogFileNameFromExecOutput(execOutStr); logFileName != "" {
-			errMsgList.AppendFailure(arg.Name, errors.New("Log file created"))
+			errMsgList.AppendFailure(arg.Name, fmt.Errorf("log file created unexpectedly"))
 			os.Remove(logFileName)
 		}
 	}

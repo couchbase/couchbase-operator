@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"io/ioutil"
@@ -283,19 +282,19 @@ func InsertJsonDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 		// Convert map data to byte array
 		docData, err := json.Marshal(docMap)
 		if err != nil {
-			return errors.New("Failed to unmarshal map into bytes: " + err.Error())
+			return err
 		}
 		docData = append([]byte("value="), docData...)
 
 		// Get bucket Obj
 		bucketObj, err := client.GetBucket(bucketName)
 		if err != nil {
-			return errors.New("Failed to retrieve couchbase bucket " + bucketName + ": " + err.Error())
+			return err
 		}
 
 		// Inserts document using client
 		if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
-			return errors.New("Failed to insert doc " + docKey + ": " + err.Error())
+			return err
 		}
 	}
 	return nil
@@ -753,7 +752,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 
 		request, err := http.NewRequest(requestType, hostUrl, strings.NewReader(eventingJsonFunc))
 		if err != nil {
-			return false, retryutil.RetryOkError(errors.New("Http request failed: " + err.Error()))
+			return false, retryutil.RetryOkError(err)
 		}
 
 		request.SetBasicAuth(hostUsername, hostPassword)
@@ -762,13 +761,13 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		client := http.Client{Timeout: time.Minute}
 		response, err := client.Do(request)
 		if err != nil {
-			return false, retryutil.RetryOkError(errors.New("Failed to " + err.Error()))
+			return false, retryutil.RetryOkError(err)
 		}
 		defer response.Body.Close()
 
 		responseData, _ = ioutil.ReadAll(response.Body)
 		if response.StatusCode != http.StatusOK {
-			return false, retryutil.RetryOkError(errors.New("Remote call failed with response: " + response.Status + ", " + string(responseData)))
+			return false, retryutil.RetryOkError(fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData)))
 		}
 
 		return true, nil

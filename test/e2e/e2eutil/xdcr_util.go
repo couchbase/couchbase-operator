@@ -2,7 +2,6 @@ package e2eutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -28,13 +27,9 @@ func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string
 	var request *http.Request
 	var err error
 
-	if reqParams == nil {
-		request, err = http.NewRequest(requestType, hostUrl, nil)
-	} else {
-		request, err = http.NewRequest(requestType, hostUrl, reqParams)
-	}
+	request, err = http.NewRequest(requestType, hostUrl, reqParams)
 	if err != nil {
-		return nil, errors.New("Http request failed: " + err.Error())
+		return nil, err
 	}
 
 	request.SetBasicAuth(hostUsername, hostPassword)
@@ -42,13 +37,13 @@ func GenerateHttpRequest(requestType, hostUrl, hostUsername, hostPassword string
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return nil, errors.New("Failed to " + err.Error())
+		return nil, err
 	}
 	defer response.Body.Close()
 	responseBody := response.Body
 	responseData, _ := ioutil.ReadAll(responseBody)
 	if response.StatusCode != http.StatusOK {
-		return nil, errors.New("Remote call failed with response: " + response.Status + ", " + string(responseData))
+		return nil, fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData))
 	}
 	return responseData, nil
 }
