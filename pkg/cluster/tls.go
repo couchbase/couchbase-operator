@@ -258,7 +258,7 @@ func (c *Cluster) reconcileTLS() error {
 		zone := c.cluster.Name + "." + c.cluster.Spec.Networking.DNS.Domain
 		zones = append(zones, zone)
 	}
-	if errs := util_x509.Verify(cacert, chain, key, zones); len(errs) != 0 {
+	if errs := util_x509.Verify(cacert, chain, key, x509.ExtKeyUsageServerAuth, zones); len(errs) != 0 {
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 
 		errStrings := []string{}
@@ -284,7 +284,7 @@ func (c *Cluster) reconcileTLS() error {
 			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
 			return err
 		}
-		if errs := util_x509.Verify(cacert, clientCert, clientKey, nil); len(errs) != 0 {
+		if errs := util_x509.Verify(cacert, clientCert, clientKey, x509.ExtKeyUsageClientAuth, nil); len(errs) != 0 {
 			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
 
 			errStrings := []string{}

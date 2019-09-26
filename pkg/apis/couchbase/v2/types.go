@@ -681,7 +681,6 @@ type ClientCertificatePath struct {
 	Prefix string `json:"prefix,omitempty"`
 
 	// Delimiter if specified allows a suffix to be stripped from the username.
-	// Typically this will be
 	Delimiter string `json:"delimiter,omitempty"`
 }
 

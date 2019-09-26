@@ -20,7 +20,7 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 }
 
 // Verify checks the given chain and CA are valid to be installed
-func Verify(caData, chainData, keyData []byte, zones []string) (errors []error) {
+func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, zones []string) (errors []error) {
 	// Decode CA certificate
 	caPem := DecodePEM(caData)
 	switch {
@@ -57,33 +57,26 @@ func Verify(caData, chainData, keyData []byte, zones []string) (errors []error) 
 	verifyOptions := x509.VerifyOptions{
 		Intermediates: x509.NewCertPool(),
 		Roots:         x509.NewCertPool(),
+		KeyUsages: []x509.ExtKeyUsage{
+			extKeyUsage,
+		},
 	}
 	verifyOptions.Roots.AddCert(ca)
 	for _, cert := range intermediates {
 		verifyOptions.Intermediates.AddCert(cert)
 	}
 
-	if len(cert.ExtKeyUsage) != 1 {
-		errors = append(errors, fmt.Errorf("certificate extended key usage not populated: %v", err))
-		return
+	// Verify the certificate validates on its own (valid for both server and client)
+	if _, err := cert.Verify(verifyOptions); err != nil {
+		errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
 	}
 
-	switch cert.ExtKeyUsage[0] {
-	case x509.ExtKeyUsageClientAuth:
-		verifyOptions.KeyUsages = append(verifyOptions.KeyUsages, x509.ExtKeyUsageClientAuth)
+	// Verify the certifcate validates for each supplied zone (valid for server only)
+	for _, zone := range zones {
+		verifyOptions.DNSName = "verify." + zone
 		if _, err := cert.Verify(verifyOptions); err != nil {
-			errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
+			errors = append(errors, fmt.Errorf("certificate cannot be verified for zone: %v", err))
 		}
-	case x509.ExtKeyUsageServerAuth:
-		verifyOptions.KeyUsages = append(verifyOptions.KeyUsages, x509.ExtKeyUsageServerAuth)
-		for _, zone := range zones {
-			verifyOptions.DNSName = "verify." + zone
-			if _, err := cert.Verify(verifyOptions); err != nil {
-				errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
-			}
-		}
-	default:
-		errors = append(errors, fmt.Errorf("certificate extended key usage not recognized: %v", cert.ExtKeyUsage))
 	}
 
 	// Decode key
@@ -97,7 +90,7 @@ func Verify(caData, chainData, keyData []byte, zones []string) (errors []error) 
 		return
 	}
 
-	if cert.ExtKeyUsage[0] == x509.ExtKeyUsageServerAuth {
+	if extKeyUsage == x509.ExtKeyUsageServerAuth {
 		if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
 			// This is an annoying bug with NS server not supporting PKCS8 *sigh*
 			errors = append(errors, fmt.Errorf("private key not formatted as PKCS1"))

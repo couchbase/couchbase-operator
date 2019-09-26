@@ -1,13 +1,14 @@
 package v2
 
 import (
+	"crypto/x509"
 	"fmt"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/x509"
+	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	"github.com/couchbase/couchbase-operator/pkg/validator/util"
 	"github.com/couchbase/gocbmgr"
@@ -413,7 +414,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	// Check mutual verification
-	if customResource.Spec.Networking.TLS.ClientCertificatePolicy != nil {
+	if customResource.Spec.Networking.TLS != nil && customResource.Spec.Networking.TLS.ClientCertificatePolicy != nil {
 		if len(customResource.Spec.Networking.TLS.ClientCertificatePaths) == 0 {
 			errs = append(errs, errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1))
 		}
@@ -595,8 +596,25 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		}
 
 		// Validate the TLS configuration is going to work
-		errs = x509.Verify(ca, chain, key, zones)
-		return
+		errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, zones)
+
+		// Do client certificate verification if necessary
+		if cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
+			if chain, ok = operatorSecret.Data["couchbase-operator.crt"]; !ok {
+				errs = append(errs, fmt.Errorf("tls operator secret %s must contain couchbase-operator.crt", operatorSecretName))
+			}
+			if key, ok = operatorSecret.Data["couchbase-operator.key"]; !ok {
+				errs = append(errs, fmt.Errorf("tls operator secret %s must contain couchbase-operator.key", operatorSecretName))
+			}
+
+			// Something is wrong, bomb out now
+			if len(errs) > 0 {
+				return
+			}
+
+			// Validate the TLS configuration is going to work
+			errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageClientAuth, nil)
+		}
 	}
 	return
 }

@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"crypto/x509"
 	"fmt"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
@@ -8,7 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	validationv1 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v1"
-	"github.com/couchbase/couchbase-operator/pkg/util/x509"
+	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	"github.com/couchbase/couchbase-operator/pkg/validator/util"
 	"github.com/couchbase/gocbmgr"
@@ -502,7 +503,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev1.CouchbaseCluster, zone
 		}
 
 		// Validate the TLS configuration is going to work
-		errs = x509.Verify(ca, chain, key, zones)
+		errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, zones)
 		return
 	}
 	return
