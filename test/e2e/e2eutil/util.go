@@ -2,7 +2,6 @@ package e2eutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -29,7 +28,9 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -642,12 +643,12 @@ func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, cl
 	podMemberName := couchbaseutil.CreateMemberName(clusterName, memberId)
 	pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + podMemberName})
 	if err != nil {
-		return errors.New("Unable to fetch persistent volume list for pod " + podMemberName + ": " + err.Error())
+		return fmt.Errorf("unable to fetch persistent volume list for pod %s: %v", podMemberName, err)
 	}
 
 	for _, pvc := range pvcList.Items {
 		if err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, &metav1.DeleteOptions{}); err != nil {
-			return errors.New("Failed to delete persistent volume claim " + pvc.Name + ": " + err.Error())
+			return fmt.Errorf("failed to delete persistent volume claim %s: %v", pvc.Name, err)
 		}
 	}
 	return nil
@@ -811,6 +812,40 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster, namesp
 	}
 }
 
+// MustDeleteOperatorDeployment shuts down the operator and waits for it to be garbage collected
+// once all the dependant pods are cleaned up.  This allows us to explicitly make alterations
+// while the operator is not running and see what happens on a restart without introducing race
+// conditions.
+func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, namespace string, deployment *appsv1.Deployment, timeout time.Duration) {
+	if err := k8s.KubeClient.AppsV1().Deployments(namespace).Delete(deployment.Name, metav1.NewDeleteOptions(0)); err != nil {
+		Die(t, err)
+	}
+
+	callback := func() error {
+		_, err := k8s.KubeClient.AppsV1().Deployments(namespace).Get(deployment.Name, metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		return fmt.Errorf("deployment still exists")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustCreateOperatorDeployment is the partner of MustDeleteOperatorDeployment which is used to
+// restart the operator synchronously, potentially after modifying resources.
+func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster, namespace string, deployment *appsv1.Deployment) {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(namespace).Create(deployment); err != nil {
+		Die(t, err)
+	}
+}
+
 func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -834,10 +869,10 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 		operatorPods = append(operatorPods, pod.Name)
 	}
 	if len(operatorPods) == 0 {
-		return "", errors.New("no pods available")
+		return "", fmt.Errorf("no pods available")
 	}
 	if len(operatorPods) > 1 {
-		return "couchbase-operator", errors.New("too many couchbase operators")
+		return "couchbase-operator", fmt.Errorf("too many couchbase operators")
 	}
 	return operatorPods[0], nil
 }
@@ -861,7 +896,7 @@ func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error
 		operatorPods = append(operatorPods, pods.Items[i].Name)
 	}
 	if len(operatorPods) > 1 {
-		return "couchbase-operator", errors.New("too many couchbase operators")
+		return "couchbase-operator", fmt.Errorf("too many couchbase operators")
 	}
 	return operatorPods[0], nil
 }
