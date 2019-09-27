@@ -361,15 +361,12 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
 
-// Create cb clusters on top of TLS certificates
-func TestXdcrCreateTlsCluster(t *testing.T) {
-	// Platform configuration.
+// skipTLSXDCRCheck doesn't run these tests if Couchbase server version
+// is less than 5.5.3 or 6.0.1 respectively due to a bug in GoXDCR that
+// prevented a full handshake over TLS.
+func skipTLSXDCRCheck(t *testing.T) {
 	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
 
-	// This uses a fully encrypted TLS handshake, and as such needs server
-	// 5.5.3+ or 6.0.1+ in their respective major versions.
 	rawVersion, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -378,13 +375,35 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
-	minVersion, err := couchbaseutil.NewVersion("6.0.1")
-	if err != nil {
-		e2eutil.Die(t, err)
+
+	switch version.Major() {
+	case 5:
+		minVersion, err := couchbaseutil.NewVersion("5.5.3")
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+		if version.Less(minVersion) {
+			t.Skip("Test requires Couchbase 5.5.3 or greater")
+		}
+	case 6:
+		minVersion, err := couchbaseutil.NewVersion("6.0.1")
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+		if version.Less(minVersion) {
+			t.Skip("Test requires Couchbase 6.0.1 or greater")
+		}
 	}
-	if version.Less(minVersion) {
-		t.Skip("Test requires Couchbase 6.0.1 or greater")
-	}
+}
+
+// Create cb clusters on top of TLS certificates
+func TestXDCRCreateTLSCluster(t *testing.T) {
+	skipTLSXDCRCheck(t)
+
+	// Platform configuration.
+	f := framework.Global
+	k8s1 := f.GetCluster(0)
+	k8s2 := f.GetCluster(1)
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -402,7 +421,7 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the XDCR connection.  Ensure TLS is enabled.
-	cleanup := e2eutil.MustEstablishXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name, tls2.CA.Certificate)
+	cleanup := e2eutil.MustEstablishXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name, tls2)
 	defer cleanup()
 	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls1)
 	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls2)
@@ -422,6 +441,62 @@ func TestXdcrCreateTlsCluster(t *testing.T) {
 	}
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+}
+
+// testXDCRCreateMututalTLSCluster creates a TLS enabled XDCR connection with client authentication.
+func testXDCRCreateMututalTLSCluster(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
+	skipTLSXDCRCheck(t)
+	skipMutualTLSCheck(t)
+
+	// Platform configuration.
+	f := framework.Global
+	k8s1 := f.GetCluster(0)
+	k8s2 := f.GetCluster(1)
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TlsOpts{})
+	defer teardown1()
+	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TlsOpts{})
+	defer teardown2()
+
+	// Create the clusters.
+	mustCreateXDCRBuckets(t, k8s1, k8s2)
+	xdcrCluster1 := e2eutil.MustNewMutualTLSXDCRClusterBasic(t, k8s1, f.Namespace, clusterSize, tls1, policy)
+	xdcrCluster2 := e2eutil.MustNewMutualTLSXDCRClusterBasic(t, k8s2, f.Namespace, clusterSize, tls2, policy)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
+
+	// Create the XDCR connection.  Ensure TLS is enabled.
+	cleanup := e2eutil.MustEstablishXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name, tls2)
+	defer cleanup()
+	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls1)
+	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls2)
+
+	// Check the events match what we expect:
+	// * Both clusters created
+	// * Source cluster establishes XDCR
+	expectedEvents1 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
+	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+}
+
+func TestXDCRCreateMututalTLSCluster(t *testing.T) {
+	testXDCRCreateMututalTLSCluster(t, couchbasev2.ClientCertificatePolicyEnable)
+}
+
+func TestXDCRCreateMandatoryMututalTLSCluster(t *testing.T) {
+	testXDCRCreateMututalTLSCluster(t, couchbasev2.ClientCertificatePolicyMandatory)
 }
 
 // Create two clusters and while trying to configure XDCR

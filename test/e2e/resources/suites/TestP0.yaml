@@ -90,7 +90,10 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestXdcrCreateCluster
-      - name: TestXdcrCreateTlsCluster # Must be on the same cluster for DNS resolution.
+      # TLS based tests require DNS so must be on the same cluster (for now)
+      - name: TestXDCRCreateTLSCluster
+      - name: TestXDCRCreateMututalTLSCluster
+      - name: TestXDCRCreateMandatoryMututalTLSCluster
 
   - name: XdcrCases
     clusters:

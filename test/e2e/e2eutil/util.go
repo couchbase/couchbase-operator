@@ -222,6 +222,34 @@ func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace stri
 	return cluster
 }
 
+// MustNewMutualTLSXDCRClusterBasic creates a new m and XDCR enabled basic cluster.
+func MustNewMutualTLSXDCRClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
+	clusterSpec.Name = ctx.ClusterName
+	// Don't use alternate addresses.
+	clusterSpec.Spec.Networking.ExposedFeatures = nil
+	// Enable TLS.
+	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
+				ServerSecret: ctx.ClusterSecretName,
+			},
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+		ClientCertificatePolicy: &policy,
+		ClientCertificatePaths: []couchbasev2.ClientCertificatePath{
+			{
+				Path: "subject.cn",
+			},
+		},
+	}
+	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
+	if err != nil {
+		Die(t, err)
+	}
+	return cluster
+}
+
 // NewXdcrClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection
 func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {

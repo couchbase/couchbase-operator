@@ -782,12 +782,6 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{`spec.xdcr.remoteClusters.hostname in body should match '^[0-9a-zA-Z\-\.]+(:\d+)?$'`},
 		},
 		{
-			name:           "TestValidateXDCRAuthenticationSecretExists",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/authenticationSecret", "huggy-bear")},
-			shouldFail:     true,
-			expectedErrors: []string{`secret huggy-bear referenced by spec.xdcr.remoteClusters[0].authenticationSecret must exist`},
-		},
-		{
 			name:           "TestValidateXDCRReplicationBucketExists",
 			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "huggy-bear")},
 			shouldFail:     true,

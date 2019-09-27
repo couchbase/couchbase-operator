@@ -474,7 +474,6 @@ func GetCouchbaseClusterSchema() *apiextensionsv1beta1.CustomResourceValidation 
 												"name",
 												"uuid",
 												"hostname",
-												"authenticationSecret",
 											},
 											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 												"name": apiextensionsv1beta1.JSONSchemaProps{

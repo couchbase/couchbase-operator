@@ -194,13 +194,15 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 	if customResource.Spec.XDCR.Managed {
 		for i, remoteCluster := range customResource.Spec.XDCR.RemoteClusters {
-			if secret, err := v.Abstraction.GetSecret(customResource.Namespace, remoteCluster.AuthenticationSecret); err != nil {
-				// Silently ignore permissions errors, some users may not want us seeing these resources.
-				if !apierrors.IsForbidden(err) {
-					errs = append(errs, err)
+			if remoteCluster.AuthenticationSecret != nil {
+				if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *remoteCluster.AuthenticationSecret); err != nil {
+					// Silently ignore permissions errors, some users may not want us seeing these resources.
+					if !apierrors.IsForbidden(err) {
+						errs = append(errs, err)
+					}
+				} else if secret == nil {
+					errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", *remoteCluster.AuthenticationSecret, i))
 				}
-			} else if secret == nil {
-				errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", remoteCluster.AuthenticationSecret, i))
 			}
 
 			replications, err := v.Abstraction.GetCouchbaseReplications(customResource.Namespace, remoteCluster.Replications.Selector)

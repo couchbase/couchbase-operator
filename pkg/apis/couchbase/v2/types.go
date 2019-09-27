@@ -501,8 +501,8 @@ type RemoteCluster struct {
 	Hostname string `json:"hostname,omitempty"`
 
 	// AuthenticationSecret is a secret used to authenticate when establishing a
-	// remote connection.
-	AuthenticationSecret string `json:"authenticationSecret,omitempty"`
+	// remote connection.  It is only required when not using mTLS
+	AuthenticationSecret *string `json:"authenticationSecret,omitempty"`
 
 	// Replications are replication streams from this cluster to the remote one.
 	Replications Replications `json:"replications"`
