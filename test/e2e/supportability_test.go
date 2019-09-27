@@ -519,7 +519,7 @@ func runCbopinfoCmd(cmdArgs []string) ([]byte, error) {
 func cbopinfo(t *testing.T, args argumentList) string {
 	stdout, err := runCbopinfoCmd(args.slice())
 	if err != nil {
-		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %v: %v", err, stdout))
+		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %v: %s", err, string(stdout)))
 	}
 	re, err := regexp.Compile(`Wrote cluster information to (\S+)`)
 	if err != nil {
