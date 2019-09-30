@@ -446,7 +446,7 @@ func MemberFromSpecProps(name, namespace, serverConfig string, memberIndex int) 
 	}
 }
 
-func FailoverNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) error {
+func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -457,12 +457,16 @@ func FailoverNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, i
 		}
 		defer cleanup()
 
-		member := couchbaseutil.Member{
-			Name:      couchbaseutil.CreateMemberName(couchbase.Name, index),
-			Namespace: couchbase.Namespace,
+		hostnames := []string{}
+		for _, index := range indexes {
+			member := couchbaseutil.Member{
+				Name:      couchbaseutil.CreateMemberName(couchbase.Name, index),
+				Namespace: couchbase.Namespace,
+			}
+			hostnames = append(hostnames, member.HostURLPlaintext())
 		}
 
-		if err := client.Failover(member.HostURLPlaintext()); err != nil {
+		if err := client.Failover(hostnames); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -471,7 +475,13 @@ func FailoverNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, i
 }
 
 func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) {
-	if err := FailoverNode(k8s, couchbase, index, timeout); err != nil {
+	if err := FailoverNodes(k8s, couchbase, []int{index}, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustFailoverNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, timeout time.Duration) {
+	if err := FailoverNodes(k8s, couchbase, indexes, timeout); err != nil {
 		Die(t, err)
 	}
 }

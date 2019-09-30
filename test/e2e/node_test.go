@@ -393,8 +393,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
 	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victimIndex1, time.Minute)
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victimIndex2, time.Minute)
+	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, []int{victimIndex1, victimIndex2}, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -486,8 +485,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
 	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victimIndex1, time.Minute)
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victimIndex2, time.Minute)
+	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, []int{victimIndex1, victimIndex2}, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -577,8 +575,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
 	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victimIndex1, time.Minute)
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victimIndex2, time.Minute)
+	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, []int{victimIndex1, victimIndex2}, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
