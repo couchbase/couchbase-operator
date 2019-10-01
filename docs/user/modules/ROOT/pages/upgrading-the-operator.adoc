@@ -100,7 +100,7 @@ oc edit deployment couchbase-operator
 ====
 
 Change the Operator container image version to the version that you want to upgrade to.
-If you're upgrading to version 1.2.1, the Deployment configuration should look like the following:
+If you're upgrading to version 1.2.2, the Deployment configuration should look like the following:
 
 [{tabs}]
 ====
@@ -112,7 +112,7 @@ Kubernetes::
 ...
       containers:
       - name: couchbase-operator
-        image: couchbase/operator:1.2.1
+        image: couchbase/operator:1.2.2
 ...
 ----
 --
@@ -125,7 +125,7 @@ OpenShift::
 ...
       containers:
       - name: couchbase-operator
-        image: registry.connect.redhat.com/couchbase/operator:1.2.1-1
+        image: registry.connect.redhat.com/couchbase/operator:1.2.2-1
 ...
 ----
 --
