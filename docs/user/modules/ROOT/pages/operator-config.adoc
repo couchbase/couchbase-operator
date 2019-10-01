@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: couchbase-operator
-        image: couchbase/operator:1.2.0
+        image: couchbase/operator:1.2.1
         command:
         - couchbase-operator
         args:
@@ -77,9 +77,9 @@ You can specify a list of command-line flags to pass on to the Operator to modif
       containers:
       ...
         args:
-        - -create-crd
-        - -log-level
-        - -pod-create-timeout
+        - -create-crd=false
+        - -log-level=fatal
+        - -pod-create-timeout=10m
 ----
 
 --create-crd <bool>::

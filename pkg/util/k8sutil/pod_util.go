@@ -248,12 +248,6 @@ func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.Persist
 	if err != nil {
 		return nil, err
 	}
-
-	// wait for claim to be created before allowing it to be mounted by pod
-	err = WaitForPersistentVolumeClaim(ctx, kubeCli, namespace, pvc.Name)
-	if err != nil {
-		return nil, err
-	}
 	return pvc, nil
 }
 
@@ -331,8 +325,7 @@ func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs couc
 
 	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
 
-	container := containerWithReadinessProbe(couchbaseContainer(cs.Image),
-		couchbaseReadinessProbe())
+	container := containerWithReadinessProbe(couchbaseContainer(cs.Image), couchbaseReadinessProbe())
 
 	if ns.Pod != nil {
 		container = containerWithRequirements(container, ns.Pod.Resources)

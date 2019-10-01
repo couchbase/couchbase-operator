@@ -783,6 +783,18 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 	username := string(k8s.DefaultSecret.Data["username"])
 	password := string(k8s.DefaultSecret.Data["password"])
 
+	requestBody := map[string]string{
+		"statement":         query,
+		"pretty":            "true",
+		"client_context_id": "",
+		"timeout":           "120s",
+		"mode":              "",
+	}
+	requestBodyRaw, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -796,13 +808,13 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 
 		hostUrl := "http://" + url + "/analytics/service"
 
-		request, err := http.NewRequest("POST", hostUrl, bytes.NewReader([]byte(query)))
+		request, err := http.NewRequest("POST", hostUrl, bytes.NewReader(requestBodyRaw))
 		if err != nil {
 			return err
 		}
 
 		request.SetBasicAuth(username, password)
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.Header.Set("Content-Type", "application/json")
 
 		client := http.Client{Timeout: time.Minute}
 		response, err := client.Do(request)

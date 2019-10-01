@@ -233,62 +233,23 @@ func CreatePod(kubeCli kubernetes.Interface, namespace string, pod *v1.Pod) (*v1
 // the admin port.  Accepts a context, typically with a timeout, which can
 // abort the operation.  The any timeout duration covers the whole process.
 func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, podName, hostURL string) error {
-
-	opts := metav1.ListOptions{
-		LabelSelector: "couchbase_node=" + podName,
-	}
-
-	watcher, err := kubeCli.CoreV1().Pods(namespace).Watch(opts)
-	if err != nil {
-		return err
-	}
-	events := watcher.ResultChan()
-
-	// Loop until success
-	done := false
-	for !done {
-		select {
-		// Handle timeout and cancellation events
-		case <-ctx.Done():
-			return fmt.Errorf("%v: Pod Creation error - error creating pod %v", ctx.Err(), podName)
-		// Process K8S events for our chosen pod
-		case ev := <-events:
-			if ev.Object == nil {
-				return WaitForPod(ctx, kubeCli, namespace, podName, hostURL)
-			}
-			obj := ev.Object.(*v1.Pod)
-			status := obj.Status
-			switch ev.Type {
-
-			// check if any error occurred creating pod
-			case watch.Error:
-				return cberrors.ErrCreatingPod{Reason: status.Reason}
-			case watch.Deleted:
-				return cberrors.ErrCreatingPod{Reason: status.Reason}
-			case watch.Added, watch.Modified:
-
-				// make sure created pod is now running
-				switch status.Phase {
-				case v1.PodRunning:
-					done = true
-				case v1.PodPending:
-					for _, cond := range status.Conditions {
-						if cond.Type == v1.PodScheduled {
-							if cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
-								// Ignoring unbound errors because the scheduler will eventually
-								// resolve them and actually schedule the Pod
-								// as is the case with lazy binding
-								if !strings.Contains(cond.Message, cberrors.ErrUnboundPersistedVolumeClaims) {
-									return cberrors.ErrPodUnschedulable{Reason: cond.Message}
-								}
-							}
-						}
-					}
-				default:
-					return cberrors.ErrRunningPod{Reason: status.Reason}
-				}
-			}
+	// Do the simplest check possible here.  Kubernetes will reconcile continually until the
+	// pod is successfully scheduled and all dependencies e.g. persistent volumes.  Don't ever
+	// short cut this, honour context the timeout!
+	callback := func() error {
+		pod, err := GetPod(kubeCli, namespace, podName)
+		if err != nil {
+			return err
 		}
+
+		if pod.Status.Phase != v1.PodRunning {
+			return cberrors.ErrCreatingPod{Reason: pod.Status.Reason}
+		}
+
+		return nil
+	}
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		return err
 	}
 
 	if hostURL != "" {
@@ -349,40 +310,6 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 	}
 
 	return fmt.Errorf("failed to wait for pod to delete: %s", podName)
-}
-
-// Waits for a persistent volume claim belonging to be created with bounded volumes
-func WaitForPersistentVolumeClaim(ctx context.Context, kubeCli kubernetes.Interface, namespace, name string) error {
-	var phase v1.PersistentVolumeClaimPhase
-
-	// Get PV, and retry unless bound
-	retryFunc := func() (bool, error) {
-		var err error
-		claim, err := GetPersistentVolumeClaim(kubeCli, namespace, name, nil)
-		if err != nil {
-			return false, err
-		}
-		phase = claim.Status.Phase
-		if phase == v1.ClaimBound {
-			return true, nil
-		}
-		return false, fmt.Errorf("claim is not bound to a persistent volume")
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if err := retryutil.Retry(ctx, time.Second, retryFunc); err != nil {
-		if phase == v1.ClaimPending {
-			// claim is not yet bound to volume but there was no error when
-			// creating so allow any consumer of this claim to deal with
-			// further error handling as is the case for lazy binding.
-			return nil
-		}
-		return err
-	}
-
-	// claim created and phase is bound
-	return nil
 }
 
 func GetPersistentVolumeClaim(kubeCli kubernetes.Interface, ns, name string, opts *metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
