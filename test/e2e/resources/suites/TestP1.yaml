@@ -151,6 +151,9 @@ tcGroups:
       - name: TestUpgradeKillPodOnCreate
       - name: TestUpgradeInvalidRollback
       - name: TestUpgradeSupportable
+      - name: TestUpgradeEnv
+      - name: TestUpgradeToSupportable
+      - name: TestUpgradeToTLS
 
   - name: StatusTests
     clusters:

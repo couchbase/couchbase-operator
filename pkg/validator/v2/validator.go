@@ -797,45 +797,6 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		errs = append(errs, err)
 	}
 
-	// volume mounts cannot be added/removed nor can they specify different claim templates
-	for _, cur := range current.Spec.Servers {
-		// If the current isn't in the updated it's being deleted, ignore
-		up := updated.Spec.GetServerConfigByName(cur.Name)
-		if up == nil {
-			continue
-		}
-
-		// If neither have volume mounts specified, ignore
-		curPersisted := cur.Pod != nil && cur.Pod.VolumeMounts != nil
-		upPersisted := up.Pod != nil && up.Pod.VolumeMounts != nil
-		if !curPersisted && !upPersisted {
-			continue
-		}
-
-		// If one does and the other doesn't raise an error
-		if curPersisted != upPersisted {
-			errs = append(errs, util.NewUpdateError("spec.servers[*].Pod.VolumeMounts", "body"))
-			continue
-		}
-
-		// Check the claims are the same
-		if cur.Pod.VolumeMounts.DefaultClaim != up.Pod.VolumeMounts.DefaultClaim {
-			errs = append(errs, util.NewUpdateError("default", "spec.servers[*].Pod.VolumeMounts"))
-		}
-		if cur.Pod.VolumeMounts.DataClaim != up.Pod.VolumeMounts.DataClaim {
-			errs = append(errs, util.NewUpdateError("data", "spec.servers[*].Pod.VolumeMounts"))
-		}
-		if cur.Pod.VolumeMounts.IndexClaim != up.Pod.VolumeMounts.IndexClaim {
-			errs = append(errs, util.NewUpdateError("index", "spec.servers[*].Pod.VolumeMounts"))
-		}
-		if cur.Pod.VolumeMounts.LogsClaim != up.Pod.VolumeMounts.LogsClaim {
-			errs = append(errs, util.NewUpdateError("logs", "spec.servers[*].Pod.VolumeMounts"))
-		}
-		if !util.StringArrayCompareOrdered(cur.Pod.VolumeMounts.AnalyticsClaims, up.Pod.VolumeMounts.AnalyticsClaims) {
-			errs = append(errs, util.NewUpdateError("analytics", "spec.servers[*].Pod.VolumeMounts"))
-		}
-	}
-
 	// persistent volume claim templates are immutable
 	for _, cur := range current.Spec.VolumeClaimTemplates {
 		for _, up := range updated.Spec.VolumeClaimTemplates {

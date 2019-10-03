@@ -223,6 +223,9 @@ var (
 		"TestUpgradeSupportableKillStatefulPodOnRebalance":  TestUpgradeSupportableKillStatefulPodOnRebalance,
 		"TestUpgradeSupportableKillStatelessPodOnCreate":    TestUpgradeSupportableKillStatelessPodOnCreate,
 		"TestUpgradeSupportableKillStatelessPodOnRebalance": TestUpgradeSupportableKillStatelessPodOnRebalance,
+		"TestUpgradeEnv":                                    TestUpgradeEnv,
+		"TestUpgradeToSupportable":                          TestUpgradeToSupportable,
+		"TestUpgradeToTLS":                                  TestUpgradeToTLS,
 
 		// Networking tests
 		"TestExposedFeatureIP":                TestExposedFeatureIP,

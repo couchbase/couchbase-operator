@@ -368,7 +368,6 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 			}
 
 			// compare cluster conditions to desired condition
-			t.Logf("cluster status: %v", cluster.Status.Conditions)
 			for _, condition := range cluster.Status.Conditions {
 				if condition.Type == conditionType && condition.Status == status {
 					conditionTime, err := time.Parse(time.RFC3339, condition.LastUpdateTime)

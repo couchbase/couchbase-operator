@@ -3,6 +3,7 @@ package k8sutil
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -37,7 +38,7 @@ const (
 // necessary for the Pod prior to creating the Pod.
 func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member, config couchbasev2.ServerConfig, ctx context.Context) (*v1.Pod, error) {
 
-	pod, err := createCouchbasePodSpec(m, cluster.Name, cluster.Spec, config, cluster.AsOwner())
+	pod, pvcs, err := CreateCouchbasePodSpec(kubeCli, m, cluster, config)
 	if err != nil {
 		return nil, err
 	}
@@ -46,136 +47,132 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 		return nil, err
 	}
 
-	if config.GetVolumeMounts() != nil {
-		pod, err = addPodVolumes(kubeCli, pod, cluster.Namespace, cluster.Name, cluster.Spec, config, cluster.AsOwner(), ctx)
-		if err != nil {
+	// Create PVCs if required.
+	for _, pvc := range pvcs {
+		if _, err = createPersistentVolumeClaim(kubeCli, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
 			return nil, err
+		}
+
+		// If we are creating a default mount, then also create an init container to
+		// copy Couchbase's etc directory onto the PVC.
+		if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
+			initContainer := couchbaseInitContainer(cluster.Spec.Image, pvc.Name)
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 		}
 	}
 
+	// Add ownership information only if we are going to create the resource.
+	addOwnerRefToObject(pod.GetObjectMeta(), cluster.AsOwner())
 	return CreatePod(kubeCli, cluster.Namespace, pod)
 }
 
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused
-func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, clusterName string, cs couchbasev2.ClusterSpec, config couchbasev2.ServerConfig, owner metav1.OwnerReference, ctx context.Context) (*v1.Pod, error) {
+func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) ([]*v1.PersistentVolumeClaim, error) {
+	// No mounts are required, do nothing
+	if config.GetVolumeMounts() == nil {
+		return nil, nil
+	}
 
-	volumes := pod.Spec.Volumes
+	pvcs := []*v1.PersistentVolumeClaim{}
+
 	mounts := []v1.VolumeMount{}
 	mountPaths, err := getPathsToPersist(config.Pod.VolumeMounts)
 	if err != nil {
 		return nil, err
 	}
 
-	version, err := CouchbaseVersion(cs.Image)
+	version, err := CouchbaseVersion(cluster.Spec.Image)
 	if err != nil {
 		return nil, err
 	}
 
 	// Keep track of volumes generated from the same claim
-	claimUsageCnt := make(map[string]int)
+	claimUsageCnt := map[string]int{}
 
 	for mountName, claimName := range mountPaths {
-
 		// every volume mount must have associated claim template
 		// within the spec before we can add it to the pod
-		if claim := cs.GetVolumeClaimTemplate(claimName); claim != nil {
-
-			// Update PVC name
-			if _, used := claimUsageCnt[claimName]; used {
-				claimUsageCnt[claimName] += 1
-			} else {
-				claimUsageCnt[claimName] = 0
-			}
-
-			// Find volumes that already exist for this mount path
-			// to allow pod recovery. Otherwise, create a new PVC
-			mountPath := pathForVolumeMountName(mountName)
-			pvc, _ := findMemberPVC(kubeCli, pod.Name, clusterName, namespace, mountPath)
-			if pvc == nil {
-				// Label and Annotate so that volumes
-				// can be easily targeted when recovering pods
-				claim.Labels = map[string]string{
-					constants.LabelApp:        constants.App,
-					constants.LabelNode:       pod.Name,
-					constants.LabelCluster:    clusterName,
-					constants.LabelVolumeName: claimName,
-				}
-				claim.SetAnnotations(map[string]string{
-					constants.AnnotationVolumeMountPath:     mountPath,
-					constants.AnnotationVolumeNodeConf:      config.Name,
-					constants.CouchbaseVersionAnnotationKey: version,
-				})
-				if serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
-					claim.Annotations[constants.ServerGroupLabel] = serverGroup
-				}
-				applyBaseAnnotations(claim.GetObjectMeta())
-				if gid := cs.GetFSGroup(); gid != nil {
-					claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
-				}
-				claim.Name = NameForPersistentVolumeClaim(pod.Name, claimUsageCnt[claimName], mountName)
-				pvc, err = createPersistentVolumeClaim(kubeCli, claim, namespace, owner, ctx)
-				if err != nil {
-					return nil, err
-				}
-
-				// Bootstraping the persisted volume when creating for the first time
-				// so that it has couchbase/etc directory from the install, because
-				// when the volume is mounted into the container the path is overwritten
-				if mountName == couchbasev2.DefaultVolumeMount {
-					initContainer := couchbaseInitContainer(cs.Image, claim.Name)
-					pod.Spec.InitContainers = []v1.Container{initContainer}
-				}
-			} else {
-				// Get availability zone of the Volumes and apply to Pod
-				// so that it is honored by the scheduler.
-				// When group is an empty string then scheduler will decide best
-				// group to use.
-				if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
-					pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
-				}
-			}
-
-			// Volumes will be added to Pod spec
-			volume := podVolumeSpecForClaim(pvc.Name)
-			volumes = append(volumes, volume)
-
-			// Mount point for Pod Container spec to reference volume by name.
-			if mountName == couchbasev2.DefaultVolumeMount {
-
-				// Default mount consits of 2 mounts for default(config) and etc data
-				configMount := v1.VolumeMount{
-					Name:      volume.Name,
-					MountPath: mountPath,
-					SubPath:   defaultSubPathName,
-				}
-				etcMount := v1.VolumeMount{
-					Name:      volume.Name,
-					MountPath: couchbaseVolumeDefaultEtcDir,
-					SubPath:   etcSubPathName,
-				}
-				mounts = append(mounts, configMount)
-				mounts = append(mounts, etcMount)
-			} else {
-				mounts = append(mounts, v1.VolumeMount{Name: volume.Name, MountPath: mountPath})
-			}
-		} else {
-			// It is invalid to have volumeMounts that do not
-			// map to a volumeClaimTemplates
+		claim := cluster.Spec.GetVolumeClaimTemplate(claimName)
+		if claim == nil {
 			return nil, fmt.Errorf("claim (%s) does not map to any claimTemplates", claimName)
+		}
+
+		// Update PVC name
+		claimUsageCnt[claimName]++
+
+		// Find volumes that already exist for this mount path
+		// to allow pod recovery. Otherwise, create a new PVC
+		mountPath := pathForVolumeMountName(mountName)
+		pvc, _ := findMemberPVC(kubeCli, pod.Name, cluster.Name, cluster.Namespace, mountPath)
+		if pvc == nil {
+			// Label and Annotate so that volumes
+			// can be easily targeted when recovering pods
+			claim.Labels = map[string]string{
+				constants.LabelApp:        constants.App,
+				constants.LabelNode:       pod.Name,
+				constants.LabelCluster:    cluster.Name,
+				constants.LabelVolumeName: claimName,
+			}
+			claim.SetAnnotations(map[string]string{
+				constants.AnnotationVolumeMountPath:     mountPath,
+				constants.AnnotationVolumeNodeConf:      config.Name,
+				constants.CouchbaseVersionAnnotationKey: version,
+			})
+			if serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+				claim.Annotations[constants.ServerGroupLabel] = serverGroup
+			}
+			applyBaseAnnotations(claim.GetObjectMeta())
+			if gid := cluster.Spec.GetFSGroup(); gid != nil {
+				claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
+			}
+			claim.Name = NameForPersistentVolumeClaim(pod.Name, claimUsageCnt[claimName], mountName)
+			pvcs = append(pvcs, claim)
+			pvc = claim
+		} else {
+			// Get availability zone of the Volumes and apply to Pod
+			// so that it is honored by the scheduler.
+			// When group is an empty string then scheduler will decide best
+			// group to use.
+			if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
+				pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
+			}
+		}
+
+		// Volumes will be added to Pod spec
+		volume := podVolumeSpecForClaim(pvc.Name)
+		pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+		// Mount point for Pod Container spec to reference volume by name.
+		if mountName == couchbasev2.DefaultVolumeMount {
+
+			// Default mount consists of 2 mounts for default(config) and etc data
+			configMount := v1.VolumeMount{
+				Name:      volume.Name,
+				MountPath: mountPath,
+				SubPath:   defaultSubPathName,
+			}
+			etcMount := v1.VolumeMount{
+				Name:      volume.Name,
+				MountPath: couchbaseVolumeDefaultEtcDir,
+				SubPath:   etcSubPathName,
+			}
+			mounts = append(mounts, configMount)
+			mounts = append(mounts, etcMount)
+		} else {
+			mounts = append(mounts, v1.VolumeMount{Name: volume.Name, MountPath: mountPath})
 		}
 	}
 
 	// Add volumes to the pod Spec stateful volumes
-	pod.Spec.Volumes = volumes
 	container, err := getCouchbaseContainer(pod)
 	if err != nil {
-		return pod, err
+		return nil, err
 	}
 
 	container.VolumeMounts = append(container.VolumeMounts, mounts...)
-	return pod, nil
+	return pvcs, nil
 }
 
 // Get all paths to that should be persisted within pod
@@ -239,7 +236,7 @@ func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 }
 
 // Creates custom PVC from the generic spec
-func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference, ctx context.Context) (*v1.PersistentVolumeClaim, error) {
+func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
 
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim.GetObjectMeta(), owner)
@@ -320,50 +317,69 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 	return fmt.Sprintf("%s-%s-%02d", memberName, mountName, index)
 }
 
-// Couchbase pod spec with default configuration
-func createCouchbasePodSpec(m *couchbaseutil.Member, clusterName string, cs couchbasev2.ClusterSpec, ns couchbasev2.ServerConfig, owner metav1.OwnerReference) (*v1.Pod, error) {
+// CreateCouchbasePodSpec creates an "idealized" pod specification.  This must be invariant
+// across creations e.g. init containers are only needed during the initial creation and not
+// required for recovery, therefore should not be done here.  We use this invaiance property
+// in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
+// rebalances to upgrade not only the container version, but other attributes that are configurable
+// in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
+func CreateCouchbasePodSpec(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*v1.Pod, []*v1.PersistentVolumeClaim, error) {
 
-	labels := createCouchbasePodLabels(m.Name, clusterName, ns)
-
-	container := containerWithReadinessProbe(couchbaseContainer(cs.Image), couchbaseReadinessProbe())
-
-	if ns.Pod != nil {
-		container = containerWithRequirements(container, ns.Pod.Resources)
+	// Create the standard Couchbase container image.
+	container := couchbaseContainer(cluster.Spec.Image)
+	container.ReadinessProbe = couchbaseReadinessProbe()
+	if config.Pod != nil {
+		container.Resources = config.Pod.Resources
 	}
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   m.Name,
-			Labels: labels,
+			Labels: createCouchbasePodLabels(m.Name, cluster.Name, config),
 		},
 		Spec: v1.PodSpec{
-			Containers:      []v1.Container{container},
+			Containers: []v1.Container{
+				container,
+			},
 			RestartPolicy:   v1.RestartPolicyNever,
 			Hostname:        m.Name,
-			Subdomain:       clusterName,
-			Volumes:         []v1.Volume{},
+			Subdomain:       cluster.Name,
 			NodeSelector:    map[string]string{},
-			SecurityContext: cs.SecurityContext,
+			SecurityContext: cluster.Spec.SecurityContext,
 		},
 	}
 	applyBaseAnnotations(pod.GetObjectMeta())
 
-	if cs.AntiAffinity {
-		pod = PodWithAntiAffinity(pod, clusterName)
+	if cluster.Spec.AntiAffinity {
+		pod = PodWithAntiAffinity(pod, cluster.Name)
 	}
 
-	applyPodPolicy(pod, ns.Pod)
+	applyPodPolicy(pod, config.Pod)
 
-	if err := applyPodTlsConfiguration(cs, pod); err != nil {
-		return nil, err
+	if err := applyPodTlsConfiguration(cluster.Spec, pod); err != nil {
+		return nil, nil, err
 	}
 
-	if err := SetCouchbaseVersion(pod, cs.Image); err != nil {
-		return nil, err
+	if err := SetCouchbaseVersion(pod, cluster.Spec.Image); err != nil {
+		return nil, nil, err
 	}
 
-	addOwnerRefToObject(pod.GetObjectMeta(), owner)
-	return pod, nil
+	pvcs, err := addPodVolumes(kubeCli, pod, cluster, config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Add the original specification to the annotations, we will use this to upgrade
+	// the pods when the specification differs.  We cannot rely on the Pod specification
+	// being immutable once committed to Kubernetes as it may be subject to defaulting.
+	// We work in exactly the same way as a `kubectl apply command`.
+	specJSON, err := json.Marshal(pod.Spec)
+	if err != nil {
+		return nil, nil, err
+	}
+	pod.Annotations[constants.PodSpecAnnotation] = string(specJSON)
+
+	return pod, pvcs, nil
 }
 
 func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.ServerConfig) map[string]string {
@@ -616,18 +632,13 @@ func podWithAntiAffinity(pod *v1.Pod, ls *metav1.LabelSelector) *v1.Pod {
 	return pod
 }
 
-func PodWithNodeSelector(p *v1.Pod, ns map[string]string) *v1.Pod {
-	p.Spec.NodeSelector = ns
-	return p
-}
-
 func applyPodPolicy(pod *v1.Pod, policy *couchbasev2.PodPolicy) {
 	if policy == nil {
 		return
 	}
 
 	if len(policy.NodeSelector) != 0 {
-		pod = PodWithNodeSelector(pod, policy.NodeSelector)
+		pod.Spec.NodeSelector = policy.NodeSelector
 	}
 	if len(policy.Tolerations) != 0 {
 		pod.Spec.Tolerations = policy.Tolerations
@@ -644,7 +655,7 @@ func applyPodPolicy(pod *v1.Pod, policy *couchbasev2.PodPolicy) {
 
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name == couchbaseContainerName {
-			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, policy.CouchbaseEnv...)
+			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, policy.Env...)
 			pod.Spec.Containers[i].EnvFrom = append(pod.Spec.Containers[i].EnvFrom, policy.EnvFrom...)
 		}
 	}
@@ -695,19 +706,12 @@ func applyPodTlsConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 				return err
 			}
 			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+
+			// Annotate the pod as having TLS enabled
+			pod.Annotations[constants.PodTLSAnnotation] = "enabled"
 		}
 	}
 	return nil
-}
-
-func containerWithReadinessProbe(c v1.Container, rp *v1.Probe) v1.Container {
-	c.ReadinessProbe = rp
-	return c
-}
-
-func containerWithRequirements(c v1.Container, r v1.ResourceRequirements) v1.Container {
-	c.Resources = r
-	return c
 }
 
 func couchbaseReadinessProbe() *v1.Probe {

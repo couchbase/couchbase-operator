@@ -107,7 +107,7 @@ func (c *Cluster) getManagedPersistedMembers(knownNodes []string) couchbaseutil.
 	return managedMembers
 }
 
-func podsToMemberSet(pods []*v1.Pod, sc bool) couchbaseutil.MemberSet {
+func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
 	for _, pod := range pods {
 		config := ""
@@ -121,11 +121,13 @@ func podsToMemberSet(pods []*v1.Pod, sc bool) couchbaseutil.MemberSet {
 			version = val
 		}
 
+		_, secure := pod.Annotations[constants.PodTLSAnnotation]
+
 		m := &couchbaseutil.Member{
 			Name:         pod.Name,
 			Namespace:    pod.Namespace,
 			ServerConfig: config,
-			SecureClient: sc,
+			SecureClient: secure,
 			Version:      version,
 		}
 		members.Add(m)

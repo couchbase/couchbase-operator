@@ -8,12 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/gocbmgr"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
@@ -136,9 +139,10 @@ func (c *Cluster) getTLSClientData() (ca []byte, chain []byte, key []byte, err e
 // reconcileMemberTLS reconciles both the CA and certificate chain on Couchbase server.
 // This is done in plain text due to races involving required mTLS.
 func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key []byte, leaf *x509.Certificate) (bool, error) {
+	secureClient := member.SecureClient
 	member.SecureClient = false
 	defer func() {
-		member.SecureClient = true
+		member.SecureClient = secureClient
 	}()
 
 	// Try connect to the target node, if it doesn't respond we assume it's
@@ -152,10 +156,10 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 
 	// By default we use the most up to date certificates, as the whole CA may
 	// have been rotated so we need those client certs to perform the TLS handshake,
-	// when mandatory mTLS is enables. If however we are disabling mTLS entirely but
+	// when mandatory mTLS is enabled. If however we are disabling mTLS entirely but
 	// not rotating, then we need to use the existing client cert or the check will
 	// fail.
-	if tls := c.client.GetTLS(); cert == nil && tls.ClientAuth != nil {
+	if tls := c.client.GetTLS(); cert == nil && tls != nil && tls.ClientAuth != nil {
 		cert = tls.ClientAuth.Cert
 		key = tls.ClientAuth.Key
 	}
@@ -167,6 +171,15 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 	// Reload the CA certificate if necessary.
 	if err := c.reloadCA(member, ca); err != nil {
 		return false, err
+	}
+
+	// If the pods doesn't have TLS enabled then ignore it.
+	pod, err := c.kubeClient.CoreV1().Pods(c.cluster.Namespace).Get(member.Name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	if _, ok := pod.Annotations[constants.PodTLSAnnotation]; !ok {
+		return false, nil
 	}
 
 	// Reload the server certificate chain.

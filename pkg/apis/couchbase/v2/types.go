@@ -590,7 +590,7 @@ type PodPolicy struct {
 	// created, when bad environement variables are provided. Do not overwrite
 	// any flags used to bootstrap the cluster (for example `--initial-cluster`
 	// flag). This field cannot be updated.
-	CouchbaseEnv []v1.EnvVar `json:"couchbaseEnv,omitempty"`
+	Env []v1.EnvVar `json:"env,omitempty"`
 
 	// EnvFrom allows the setting of environment variables from things like
 	// Secrets and ConfigMaps.

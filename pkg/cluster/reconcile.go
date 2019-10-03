@@ -72,7 +72,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	state := &ReconcileMachine{
-		runningPods:   podsToMemberSet(pods, c.isSecureClient()),
+		runningPods:   podsToMemberSet(pods),
 		knownNodes:    couchbaseutil.NewMemberSet(),
 		ejectNodes:    couchbaseutil.NewMemberSet(),
 		couchbase:     status,
@@ -102,10 +102,6 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	if err := c.reconcileXDCR(); err != nil {
-		return err
-	}
-
-	if err := c.verifyClusterVolumes(); err != nil {
 		return err
 	}
 
@@ -1213,22 +1209,6 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	return nil
 }
 
-// Verify that volumes are healthy for every
-// member configured for persistence.
-func (c *Cluster) verifyClusterVolumes() error {
-	for _, memberName := range c.members.Names() {
-		err := c.verifyMemberVolumes(c.members[memberName])
-		if err != nil {
-
-			// Raise an event detailing reason why volumes are unhealthy
-			ev := k8sutil.MemberVolumeUnhealthyEvent(memberName, err.Error(), c.cluster)
-			c.raiseEventCached(ev)
-			return fmt.Errorf("%s", ev.Message)
-		}
-	}
-	return nil
-}
-
 // Verify volumes of a single member
 func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
@@ -1272,23 +1252,44 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
-func (c *Cluster) needsUpgrade() (candidate *couchbaseutil.Member, target int, err error) {
-	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
-	if err != nil {
-		return
-	}
+func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, error) {
+	var candidate *couchbaseutil.Member
+	var targetConfiguration int
 
 	// Names returns a sorted list for determinism.
-	for _, member := range c.members.Names() {
-		// Book keep the target version count for status reporting and
-		// update the candidate with the first we find
-		if c.members[member].Version == version {
-			target++
-		} else if candidate == nil {
-			candidate = c.members[member]
+	for _, name := range c.members.Names() {
+		member := c.members[name]
+
+		// Get what the member actualliy looks like.
+		actual, err := c.kubeClient.CoreV1().Pods(c.cluster.Namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return nil, -1, err
+		}
+
+		// Get what the member should look like.
+		serverClass := c.cluster.Spec.GetServerConfigByName(member.ServerConfig)
+		if serverClass == nil {
+			return nil, -1, err
+		}
+		requested, _, err := k8sutil.CreateCouchbasePodSpec(c.kubeClient, member, c.cluster, *serverClass)
+		if err != nil {
+			return nil, -1, err
+		}
+
+		// Check the specification at creation with the ones that are requested
+		// currently.  If they differ then something has changed and we need to
+		// "upgrade".  Otherwise accumulate the number of pods at the correct
+		// target configuration.
+		if actual.Annotations[constants.PodSpecAnnotation] == requested.Annotations[constants.PodSpecAnnotation] {
+			targetConfiguration++
+			continue
+		}
+
+		if candidate == nil {
+			candidate = member
 		}
 	}
-	return
+	return candidate, targetConfiguration, nil
 }
 
 // reportUpgrade looks at the current state and any existing upgrade status

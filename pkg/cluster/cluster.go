@@ -236,7 +236,7 @@ func (c *Cluster) setup() error {
 		if err != nil {
 			return err
 		}
-		c.members = podsToMemberSet(running, c.isSecureClient())
+		c.members = podsToMemberSet(running)
 		if err := c.reconcileTLS(); err != nil {
 			return err
 		}
@@ -375,7 +375,7 @@ func (c *Cluster) runReconcile() {
 	// persistent volumes.
 	if c.forceUpdate || c.members.Empty() {
 		c.forceUpdate = false
-		if err := c.updateMembers(podsToMemberSet(running, c.isSecureClient())); err != nil {
+		if err := c.updateMembers(podsToMemberSet(running)); err != nil {
 			log.Error(err, "Failed to update members", "cluster", c.namespacedName())
 			reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
 			reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
@@ -760,7 +760,7 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 		log.Error(err, "Pod discovery failed", "cluster", c.namespacedName())
 		return c.members
 	}
-	podMembers := podsToMemberSet(running, c.isSecureClient())
+	podMembers := podsToMemberSet(running)
 	for _, node := range readyNodes {
 		if m, ok := c.members[node]; ok {
 			if _, ok := podMembers[node]; ok {

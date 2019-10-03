@@ -16,6 +16,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -574,6 +576,145 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		upgradeDownUnrecoverableSequence(victimName),
 		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradeEnv tests the upgrade mechanism being used to add environment variables
+// to an existing cluster.
+func TestUpgradeEnv(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster without TLS.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
+
+	// Once up and running modify the pod policy.
+	env := []v1.EnvVar{
+		{
+			Name:  "bugs",
+			Value: "bunny",
+		},
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/Spec/Servers/0/Pod/Env", env), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradeToSupportable tests we can take an ephemeral cluster and make it supportable
+// by dynamically adding persistent volumes.
+func TestUpgradeToSupportable(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster without PVs.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
+
+	// Once up and running add in PV support.
+	templates := []v1.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "couchbase",
+				Annotations: map[string]string{},
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				StorageClassName: &f.StorageClassName,
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: *resource.NewScaledQuantity(1, 30),
+					},
+				},
+			},
+		},
+	}
+	mounts := &couchbasev2.VolumeMounts{
+		DefaultClaim: "couchbase",
+	}
+	patchset := jsonpatch.NewPatchSet().
+		Add("/Spec/VolumeClaimTemplates", templates).
+		Add("/Spec/Servers/0/Pod/VolumeMounts", mounts)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradeToTLS tests that we can take an insecure cluster and make it secure
+func TestUpgradeToTLS(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster without TLS.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, f.Namespace, clusterSize)
+
+	// When ready create the required TLS secrets and patch them into the running
+	// cluster.
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{ClusterName: cluster.Name})
+	defer teardown()
+	tls := &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			Member: &couchbasev2.MemberSecret{
+				ServerSecret: ctx.ClusterSecretName,
+			},
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS", tls), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
