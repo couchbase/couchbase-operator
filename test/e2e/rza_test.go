@@ -237,7 +237,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize+newPodsToAdd, targetKube, testCouchbase)
 
 	if antiAffinity == "on" {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*f.PodCreateTimeout)
 		expectedEvents.AddClusterPodEvent(testCouchbase, "CreationFailed", clusterSize)
 		// Revert back to original cluster size
 		testCouchbase = e2eutil.MustResizeClusterNoWait(t, serviceIndex, clusterSize, targetKube, testCouchbase)
@@ -254,7 +254,7 @@ func RzaAntiAffinity(t *testing.T, antiAffinity string) {
 		expectedEvents.AddClusterEvent(testCouchbase, "RebalanceCompleted")
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*f.PodCreateTimeout)
 
 	// Create a expected RZA results map for verification
 	expectedRzaResultMap := GetExpectedRzaResultMap(clusterSize, availableServerGroupList)

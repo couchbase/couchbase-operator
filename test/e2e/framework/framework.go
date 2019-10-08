@@ -133,8 +133,8 @@ func startTimeoutTimer() {
 	}()
 }
 
-func CreateDeploymentObject(operatorImage string, operatorPort int) (deployment *appsv1.Deployment, err error) {
-	deployment = config.GetOperatorDeployment(operatorImage, dockerPullSecretName)
+func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTimeout fmt.Stringer) (deployment *appsv1.Deployment, err error) {
+	deployment = config.GetOperatorDeployment(operatorImage, dockerPullSecretName, podCreateTimeout)
 
 	// Manually set the HTTP port.
 	if operatorPort != 0 {
@@ -169,9 +169,10 @@ func Setup(t *testing.T) (err error) {
 		CouchbaseServerUpgradeVersion: runtimeParams.CbServerImgVerUpgrade,
 		StorageClassName:              runtimeParams.StorageClassName,
 		TestRetries:                   testRetries,
+		PodCreateTimeout:              5 * time.Minute,
 	}
 
-	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0)
+	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0, Global.PodCreateTimeout)
 	if err != nil {
 		return err
 	}
