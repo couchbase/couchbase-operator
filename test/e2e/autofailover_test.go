@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -74,9 +75,8 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create 9 node couchbase cluster
-// Failover multiple nodes at once and wait for multinode failover to trigger
-// NOTE: this is a shonky racy test, please make me better.
+// TestMultiNodeAutoFailover tests Couchbase's ability to handle multiple failover
+// events in series, and the Operator's ability to recover from it.
 func TestMultiNodeAutoFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -86,32 +86,34 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	clusterSize := 9
 	victims := []int{2, 3, 4}
 	victimCount := len(victims)
+	autoFailoverTimeout := 10 * time.Second
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketThreeReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = uint64(autoFailoverTimeout.Seconds())
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
-	// When ready, kill the victim nodes, expect a rebalance to happen eventually as they
-	// are replaced and await healthy status.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Minute)
+	// When ready, kill the victim nodes, waiting long enough for server to perform
+	// auto failover, then expect recovery.  Yes to test this we have to be not running
+	// in order for the condition to manifest.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/ControlPaused", true), time.Minute)
 	for _, victim := range victims {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
-		time.Sleep(31 * time.Second)
+		time.Sleep(2 * autoFailoverTimeout)
 	}
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Nodes go down, and failover
-	// * New members balanced in, kkilled members removed
+	// * New members balanced in, killed members removed
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: victimCount, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		eventschema.Repeat{Times: victimCount, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
 		eventschema.Repeat{Times: victimCount, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -120,5 +122,4 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-
 }
