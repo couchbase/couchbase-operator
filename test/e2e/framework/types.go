@@ -2,6 +2,7 @@ package framework
 
 import (
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -35,6 +36,9 @@ type Framework struct {
 	StorageClassName            string
 	// TestRetries allows you to retry a test N times before giving up.
 	TestRetries int `yaml:"testRetries"`
+	// PodCreateTimeout is the time we expect to wait when pods are failing to be
+	// created.
+	PodCreateTimeout time.Duration
 }
 
 // To decode cluster yaml file

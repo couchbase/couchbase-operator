@@ -1,6 +1,9 @@
 package config
 
 import (
+	"fmt"
+	"time"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -30,7 +33,7 @@ func DumpOperatorYAML(conf *Config) error {
 	if err := DumpYAML(conf, "operator-role-binding", GetOperatorRoleBinding(conf.Namespace)); err != nil {
 		return err
 	}
-	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.OperatorImage, conf.ImagePullSecret)); err != nil {
+	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.OperatorImage, conf.ImagePullSecret, 10*time.Minute)); err != nil {
 		return err
 	}
 	if err := DumpYAML(conf, "operator-service", GenerateOperatorService()); err != nil {
@@ -236,7 +239,7 @@ func GetOperatorRoleBinding(namespace string) *rbacv1.RoleBinding {
 }
 
 // GetOperatorDeployment returns the canonical way to run the operator.
-func GetOperatorDeployment(image string, imagePullSecret string, extraArgs ...string) *appsv1.Deployment {
+func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeout fmt.Stringer, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -269,7 +272,7 @@ func GetOperatorDeployment(image string, imagePullSecret string, extraArgs ...st
 								OperatorResourceName,
 							},
 							Args: append([]string{
-								"--pod-create-timeout=10m",
+								"--pod-create-timeout=" + podCreateTimeout.String(),
 							}, extraArgs...),
 							Env: []corev1.EnvVar{
 								{

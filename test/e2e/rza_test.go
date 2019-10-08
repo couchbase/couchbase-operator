@@ -318,9 +318,9 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, class, clusterSize+1, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*f.PodCreateTimeout)
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, class, clusterSize, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*f.PodCreateTimeout)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)

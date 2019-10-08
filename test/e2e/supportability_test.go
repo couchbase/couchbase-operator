@@ -1015,7 +1015,7 @@ func ReDeployOperator(t *testing.T, kubeClient kubernetes.Interface, imageName s
 	}
 
 	// Create new deployment object to deploy
-	deployment, err := framework.CreateDeploymentObject(imageName, port)
+	deployment, err := framework.CreateDeploymentObject(imageName, port, f.PodCreateTimeout)
 	if err != nil {
 		return err
 	}
