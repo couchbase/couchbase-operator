@@ -74,7 +74,7 @@ case ${PLATFORM} in
     OPERATOR_IMAGE=registry.connect.redhat.com/couchbase/operator:${OPERATOR_VERSION}-1
     ADMISSION_IMAGE=registry.connect.redhat.com/couchbase/admission-controller:${OPERATOR_VERSION}-1
     ${CBOPCFG} --no-operator --dynamic-admission-controller-image ${ADMISSION_IMAGE} --image-pull-secret REDHAT_CONTAINER_REGISTRY_PULL_SECRET > admission.yaml
-    ${CBOPCFG} --no-admission --operator-image ${OPERATOR_IMAGE} --file
+    ${CBOPCFG} --no-admission --operator-image ${OPERATOR_IMAGE} --image-pull-secret REDHAT_CONTAINER_REGISTRY_PULL_SECRET --file
     ;;
 esac
 popd
