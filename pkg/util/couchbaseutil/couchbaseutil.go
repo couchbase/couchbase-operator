@@ -613,32 +613,49 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 
 func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait bool, cluster string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		err := c.client.Rebalance(nodesToRemove)
-		if err != nil {
-			return err
-		}
 
-		if wait {
-			progress := c.client.NewRebalanceProgress()
-			for {
-				status, ok := <-progress.Status()
-				if !ok {
-					return progress.Error()
+	// Try rebalance a few times before giving up.
+	callback := func() error {
+		return c.client.Rebalance(nodesToRemove)
+	}
+	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+		return err
+	}
+
+	if !wait {
+		return nil
+	}
+
+	// Wait for a rebalance to commence, retry this a few times, we expect to witness
+	// the rebalance.
+	seenRebalance := false
+	callback = func() error {
+		progress := c.client.NewRebalanceProgress()
+		for {
+			status, ok := <-progress.Status()
+			if !ok {
+				if !seenRebalance {
+					return fmt.Errorf("rebalance task not observed as running: %v", progress.Error())
 				}
-				switch status.Status {
-				case cbmgr.RebalanceStatusUnknown:
-					log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
-				case cbmgr.RebalanceStatusRunning:
-					log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
-				}
+				return progress.Error()
+			}
+			seenRebalance = true
+			switch status.Status {
+			case cbmgr.RebalanceStatusUnknown:
+				log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
+			case cbmgr.RebalanceStatusRunning:
+				log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
 			}
 		}
+	}
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		return err
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func (c *CouchbaseClient) StopRebalance(ms MemberSet) error {
