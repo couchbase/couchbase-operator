@@ -635,8 +635,7 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes, f.Namespace, f.Deployment)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victimIndex), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster.Namespace, ctx)
 
@@ -646,6 +645,7 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	// * Down member is recovered
 	// * TLS update exent occurred for recovered node
 	// * Cluster recovered
+	// * Prior to 6.5.0 the cluster rebalanced
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -653,8 +653,14 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Optional{
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+				},
+			},
+		},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
