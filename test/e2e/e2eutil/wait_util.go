@@ -3,7 +3,6 @@ package e2eutil
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -581,13 +580,6 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 				return false, retryutil.RetryOkError(err)
 			}
 		}
-
-		// Temporarily report that stuff needs to be deleted synchronously
-		pvcNames := []string{}
-		for _, pvc := range pvcs.Items {
-			pvcNames = append(pvcNames, pvc.Name)
-		}
-		fmt.Println("Waiting for deletion of:", strings.Join(pvcNames, ", "))
 
 		for _, pvc := range pvcs.Items {
 			if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0)); err != nil {

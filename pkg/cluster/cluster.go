@@ -532,7 +532,9 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 
 // Selects any member that can be recovered and attempts to restart it
 func (c *Cluster) recoverClusterDown() error {
-	for _, m := range c.members {
+	// Use Names() as that returns a deterministic/sorted list for testing.
+	for _, name := range c.members.Names() {
+		m := c.members[name]
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				return fmt.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())

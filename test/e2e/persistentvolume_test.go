@@ -114,11 +114,12 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
 
 	// When ready terminate a node, expect Server to auto failover and the operator
 	// to replace the node.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events are as expected:
@@ -168,7 +169,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	// When ready terminate the victims, expect the Operator auto recover the nodes.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim1, false)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim2, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim1), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim1), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events are as expected:
@@ -178,49 +179,6 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, 2),
-	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-}
-
-// Generic function to kill pods with operator
-// Wait for recovery to happen on killed pods and reuse the volumes claims
-func persistentVolumeKillNodesWithOperatorGeneric(t *testing.T, clusterSize int, podMembersToKill []int) {
-	f := framework.Global
-	targetKube := f.GetCluster(0)
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
-
-	pvcName := "couchbase"
-
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
-	}
-	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
-	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
-
-	// Kill couchbase server pods in cluster and test auto failover
-	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
-	for _, victim := range podMembersToKill {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
-	}
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
-
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, len(podMembersToKill)),
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -260,10 +218,10 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	mustVerifyPvcMappingForPods(t, kubernetes, f.Namespace, expectedPvcMap)
 }
 
-// Create couchbase cluster with all nodes pointed to PVC
-// Kill couchbase-server process on all nodes
-// Operator should respawn all nodes with same name and reuse the PVC
-func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
+// TestPersistentVolumeKillAllPods tests the operator can recover a cluster
+// when all pods go down simultaneously.
+func TestPersistentVolumeKillAllPods(t *testing.T) {
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -271,9 +229,11 @@ func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
-	clusterSize := 4
-	pvcName := "couchbase"
+	// Static configuration.
+	clusterSize := 3
 
+	// Create the cluster.
+	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
@@ -290,27 +250,30 @@ func TestPersistentVolumeKillAllPodsDeletePod(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	for i := 0; i < clusterSize; i++ {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, i, false)
-	}
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	// When ready kill all pods while the operator is down.  Upon restart expect
+	// the operator to recover a single node, then manually recover the others.
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, false)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 2, false)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
+	// Check the results are as expected:
+	// * Cluster created
+	// * Single pod is recovered
+	// * Remaining pods are manually recovered after auto-failover timeout
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
-		eventschema.Repeat{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
-		eventschema.Repeat{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
 	}
-
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
+// TestPersistentVolumeKillPodAndOperator tests the operator is able to handle a single
+// down node after a restart.
+func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -318,9 +281,63 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
+	// Static configuration.
 	clusterSize := 4
-	pvcName := "couchbase"
+	victim := 1
 
+	// Create the cluster.
+	pvcName := "couchbase"
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
+		VolumeMounts: &couchbasev2.VolumeMounts{
+			DefaultClaim: pvcName,
+			DataClaim:    pvcName,
+			IndexClaim:   pvcName,
+		},
+	}
+	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
+
+	// When ready delete the victim node while the operator is down.  On restart
+	// Server should failover the node and the operator recovers the cluster.
+	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Check the results are as expected:
+	// * Cluster created
+	// * Victim goes down, fails over and is replaced.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownFailedWithPVCRecoverySequence(),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestPersistentVolumeKillAllPodsAndOperator tests the operator can handle all nodes
+// down after a restart.
+func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
@@ -337,41 +354,31 @@ func TestPersistentVolumeKillAllPodsKillService(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
+	// When ready kill all pods while the operator is down.  Upon restart expect
+	// the operator to recover a single node, then manually recover the others.
+	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, f.Namespace)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, false)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 2, false)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	for i := 0; i < clusterSize; i++ {
-		memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, i)
-		e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "pkill beam.smp")
+
+	// Check the results are as expected:
+	// * Cluster created
+	// * Single pod is recovered
+	// * Remaining pods are manually recovered after auto-failover timeout
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
 	}
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-
-	// Don't bother with events here, it's impossible to check.
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create PVC enabled couchbase cluster
-// Kill one of the nodes and also the operator pod
-// Operator should restart and wait for failover to happen
-// Rebalance the cluster by recovering the failedover node
-func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
-	clusterSize := 4
-	podMembersToKill := []int{1}
-	persistentVolumeKillNodesWithOperatorGeneric(t, clusterSize, podMembersToKill)
-}
-
-// Create PVC enabled couchbase cluster
-// Kill all cb pod along with operator
-// Operator should restart and wait for failover to happen
-// Rebalance the cluster by recovering the failedover nodes
-func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
-	clusterSize := 3
-	podMembersToKill := []int{0, 1, 2}
-	persistentVolumeKillNodesWithOperatorGeneric(t, clusterSize, podMembersToKill)
-}
-
-// Create couchbase cluster with Persistent volumes and server groups
-// Kill one couchbase server pod from each server group
-// Operator should replace killed pods with new one with same name and reuse PVC
+// TestPersistentVolumeRzaNodesKilled tests operator recovery of pods spanning
+// multiple server groups.
 func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -379,16 +386,17 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
+	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
-	pvcName := "couchbase"
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
+	// Create the cluster.
+	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -417,21 +425,21 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, false)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victims[0]), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
+	// Check the results are as expected:
+	// * Cluster created
+	// * Single pod is recovered
+	// * Remaining pods are manually recovered after auto-failover timeout
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
-		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, len(victims)),
 	}
-
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
