@@ -258,9 +258,30 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 				Times:     victims,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
 			},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			// This may or may not happen on 6.5.0... :/
+			eventschema.Optional{
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+					},
+				},
+			},
 		},
 	})
 	return events
+}
+
+// PodDownFailedWithPVCRecoverySequence is a common sequence when stateful pods are
+// failed over but Couchbase before Operator recovery.
+func PodDownFailedWithPVCRecoverySequence() eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
 }

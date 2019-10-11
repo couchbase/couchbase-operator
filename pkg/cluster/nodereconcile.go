@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -271,52 +272,67 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		if err := c.updateCRStatus(); err != nil {
 			return err
 		}
+	}
 
-		// Alaways flag nodes down, the observed behaviour can change based on whether
-		// a recover timer has expired or not.
-		for _, m := range r.couchbase.DownNodes {
-			c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
-		}
+	// Alaways flag nodes down, the observed behaviour can change based on whether
+	// a recover timer has expired or not.
+	for _, m := range r.couchbase.DownNodes {
+		c.raiseEventCached(k8sutil.MemberDownEvent(m.Name, c.cluster))
+	}
 
-		// Get the duration that the node has been down from the status
-		// and check if it has persistent volumes to be recovered
-		for _, m := range r.couchbase.DownNodes {
-			if _, ok := r.runningPods[m.Name]; ok {
-				// If the pod was created in the last minute then it may be a down node
-				// that was restarted and is still coming back online. If this is the
-				// case then we may be able to delta recover it in the near future.
-				if k8sutil.GetPodUptime(c.kubeClient, m.Namespace, m.Name) < downNodeThreshold {
-					log.Info("Recently created pod down, waiting", "cluster", c.namespacedName())
-					continue
-				}
-			}
-			if c.cluster.Status.Members.Unready.Contains(m.Name) {
-				if c.isPodRecoverable(m) {
-					ts := c.cluster.Status.Members.Unready.GetMember(m.Name).Ts()
+	pendingFailovers := 0
 
-					// Recover node if it has been down longer than auto-failover time
-					elapsed, remainingTs := c.elapsedRecoveryDuration(ts)
-					if elapsed {
-						if err := c.recreatePod(m); err != nil {
-							log.Error(err, "Pod recovery failed", "cluster", c.namespacedName(), "name", m.Name)
-						} else {
-							c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-							log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name)
-						}
-						r.transitionState(ReconcileNotifyFinished)
-						return nil
-					} else {
-						log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", m.Name, "timout", remainingTs)
-					}
-				} else {
-					log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", m.Name)
-				}
-			} else {
-				log.Info("Pod down, wating for unready status", "cluster", c.namespacedName(), "name", m.Name)
+	// Get the duration that the node has been down from the status
+	// and check if it has persistent volumes to be recovered
+	for _, m := range r.couchbase.DownNodes {
+		if _, ok := r.runningPods[m.Name]; ok {
+			// If the pod was created in the last minute then it may be a down node
+			// that was restarted and is still coming back online. If this is the
+			// case then we may be able to delta recover it in the near future.
+			if k8sutil.GetPodUptime(c.kubeClient, m.Namespace, m.Name) < downNodeThreshold {
+				log.Info("Recently created pod down, waiting", "cluster", c.namespacedName())
+				continue
 			}
 		}
 
-		return fmt.Errorf("unable to reconcile cluster because some nodes are down")
+		// Ephemeral clusters are handled either automatically by server or
+		// manually by the user.
+		if !c.isPodRecoverable(m) {
+			return fmt.Errorf("pod down, waiting for auto-failover on cluster: %s, pod: %s", c.namespacedName(), m.Name)
+		}
+
+		// If we've not seen this node down yet, then take note of when we should
+		// begin manual recovery.
+		recoveryTime, ok := c.recoveryTime[m.Name]
+		if !ok {
+			timeout := time.Duration(c.cluster.Spec.ClusterSettings.AutoFailoverTimeout+30) * time.Second
+			recoveryTime = time.Now().Add(timeout).Add(30 * time.Second)
+			c.recoveryTime[m.Name] = recoveryTime
+		}
+
+		// If the timeout has yet to expire then continue.
+		if recoveryTime.After(time.Now()) {
+			log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", m.Name, "recovery_in", time.Until(recoveryTime))
+			pendingFailovers++
+			continue
+		}
+
+		// Timeout has expired, recreate the pod.
+		if err := c.recreatePod(m); err != nil {
+			return fmt.Errorf("pod recovery failed for member %s", m.Name)
+		}
+
+		log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name)
+		c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
+		delete(c.recoveryTime, m.Name)
+		r.transitionState(ReconcileNotifyFinished)
+		return nil
+	}
+
+	// We are still waiting for failovers to occur, don't allow the rest of the reconcile to
+	// happen.
+	if pendingFailovers != 0 {
+		return fmt.Errorf("waiting for pod failover")
 	}
 
 	c.cluster.Status.SetReadyCondition()
@@ -432,6 +448,10 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 // Failed nodes can be recovered if the pod's volumes are healthy,
 // otherwise the node is ejected from the cluster and it's node deleted.
 func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
+	for _, name := range r.couchbase.FailedNodes.Names() {
+		c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
+	}
+
 	for _, m := range r.couchbase.FailedNodes {
 		log.Info("Pods failed over", "cluster", c.namespacedName())
 		if c.isPodRecoverable(m) {
@@ -448,10 +468,6 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", m.Name)
 		r.ejectNodes.Add(m)
 		r.runningPods.Remove(m.Name)
-	}
-
-	for _, name := range r.couchbase.FailedNodes.Names() {
-		c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
 	}
 
 	r.transitionState(ReconcileServerConfigs)

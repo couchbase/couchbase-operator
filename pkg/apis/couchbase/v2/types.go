@@ -783,12 +783,11 @@ type ClusterStatus struct {
 	ExposedPorts PortStatusMap `json:"nodePorts,omitempty"`
 }
 
-type MemberTimestamp struct {
-	Name      string
-	timestamp int64
+type MemberStatusEntry struct {
+	Name string
 }
 
-type MemberStatusList []MemberTimestamp
+type MemberStatusList []MemberStatusEntry
 
 type MembersStatus struct {
 	// Ready are the couchbase members that are ready to serve requests

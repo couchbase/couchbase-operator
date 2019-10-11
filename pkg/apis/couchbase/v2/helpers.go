@@ -277,19 +277,17 @@ func (tp *TLSPolicy) IsSecureClient() bool {
 	return len(tp.Static.OperatorSecret) != 0
 }
 
-func (m MemberTimestamp) Ts() time.Time {
-	return time.Unix(m.timestamp, 0)
-}
-
-func NewMemberTimestamp(name string) MemberTimestamp {
-	return MemberTimestamp{name, time.Now().Unix()}
+func NewMemberStatusEntry(name string) MemberStatusEntry {
+	return MemberStatusEntry{
+		Name: name,
+	}
 }
 
 func (l MemberStatusList) Contains(name string) bool {
 	return l.GetMember(name) != nil
 }
 
-func (l MemberStatusList) GetMember(name string) *MemberTimestamp {
+func (l MemberStatusList) GetMember(name string) *MemberStatusEntry {
 	for _, m := range l {
 		if m.Name == name {
 			return &m
@@ -308,7 +306,7 @@ func (l MemberStatusList) Names() []string {
 
 func (l *MemberStatusList) Add(name string) {
 	if !l.Contains(name) {
-		*l = append(*l, NewMemberTimestamp(name))
+		*l = append(*l, NewMemberStatusEntry(name))
 	}
 }
 
@@ -322,8 +320,6 @@ func (ms *MembersStatus) SetReady(ready []string) {
 }
 
 // Set Unready members from list.
-// If the member is already in the list
-// then it's old timestamp is retained
 func (ms *MembersStatus) SetUnready(unready []string) {
 	sort.Strings(unready)
 	unreadyList := MemberStatusList{}

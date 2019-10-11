@@ -15,4 +15,3 @@ tcGroups:
       - name: TestPersistentVolumeRzaFailover
       - name: TestPersistentVolumeResizeCluster
       - name: TestAnalyticsKillPodsWithPVC
-      - name: TestLogCollectClusterWithPVC

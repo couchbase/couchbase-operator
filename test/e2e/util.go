@@ -168,7 +168,7 @@ var (
 		// Persistent Volume cases
 		"TestPersistentVolumeCreateCluster":          TestPersistentVolumeCreateCluster,
 		"TestPersistentVolumeAutoFailover":           TestPersistentVolumeAutoFailover,
-		"TestPersistentVolumeNodeFailover":           TestPersistentVolumeNodeFailover,
+		"TestPersistentVolumeAutoRecovery":           TestPersistentVolumeAutoRecovery,
 		"TestPersistentVolumeKillAllPodsDeletePod":   TestPersistentVolumeKillAllPodsDeletePod,
 		"TestPersistentVolumeKillAllPodsKillService": TestPersistentVolumeKillAllPodsKillService,
 		"TestPersistentVolumeKillPodAndOperator":     TestPersistentVolumeKillPodAndOperator,
@@ -199,10 +199,6 @@ var (
 		"TestLogCollectWithClusterResizeAndOperatorPodKilled":          TestLogCollectWithClusterResizeAndOperatorPodKilled,
 		"TestLogCollectWithDefaultRetentionAndSize":                    TestLogCollectWithDefaultRetentionAndSize,
 		"TestLogCollectWithCustomRetentionAndSize":                     TestLogCollectWithCustomRetentionAndSize,
-		// Log collection from Persistent pods
-		"TestLogCollectClusterWithPVC":                TestLogCollectClusterWithPVC,
-		"TestCollectLogFromPvPodRecoveredDeletePod":   TestCollectLogFromPvPodRecoveredDeletePod,
-		"TestCollectLogFromPvPodRecoveredKillService": TestCollectLogFromPvPodRecoveredKillService,
 		// Log redaction cases
 		"TestLogRedactionVerify":       TestLogRedactionVerify,
 		"TestLogRedactionWithPvVerify": TestLogRedactionWithPvVerify,

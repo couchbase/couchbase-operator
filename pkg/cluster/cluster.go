@@ -91,6 +91,7 @@ type Cluster struct {
 	forceUpdate         bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
 	eventCache          *lru.Cache                     // Used to store events for aggregation
 	state               persistence.PersistentStorage  // Used to store persistent cluster state
+	recoveryTime        map[string]time.Time           // Used to determine when to manually recover nodes
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
@@ -102,9 +103,10 @@ func (c *Cluster) namespacedName() string {
 // creation or recovery after an Operator restart.
 func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
-		config:     config,
-		cluster:    cl,
-		eventCache: lru.New(1024),
+		config:       config,
+		cluster:      cl,
+		eventCache:   lru.New(1024),
+		recoveryTime: map[string]time.Time{},
 	}
 
 	kubeconfig, err := rest.InClusterConfig()
@@ -526,18 +528,6 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 		}
 	}
 	return recoverable
-}
-
-// Checks if a timestamp has elapsed recommended duration for cluster recovery
-// along with time remaining until reaching the required duration
-func (c *Cluster) elapsedRecoveryDuration(ts time.Time) (bool, time.Duration) {
-
-	// get duration since timestamp
-	elapsedDuration := time.Since(ts)
-
-	// require a duration of 30s after autofailover timeout
-	requiredDuration := time.Duration(c.cluster.Spec.ClusterSettings.AutoFailoverTimeout+30) * time.Second
-	return elapsedDuration > requiredDuration, (requiredDuration - elapsedDuration).Truncate(time.Second)
 }
 
 // Selects any member that can be recovered and attempts to restart it

@@ -113,7 +113,6 @@ tcGroups:
       - name: TestPersistentVolumeRzaNodesKilled
       - name: TestPersistentVolumeRzaFailover
       - name: TestPersistentVolumeResizeCluster
-      - name: TestLogCollectClusterWithPVC
 
   # MB-34928, MB-35098
   #- name: AnalyticsTests
@@ -142,9 +141,6 @@ tcGroups:
       - name: TestEphemeralLogCollectResizeCluster
       - name: TestLogCollectWithClusterResizeAndServerPodKilled
       - name: TestLogCollectWithCustomRetentionAndSize
-      # This cases will fail since it prompts for user input during cbopinfo
-      #- name: TestLogCollectWithClusterResizeAndOperatorPodKilled
-      #- name: TestCollectLogFromPvPodAndOperatorRecovered
 
   - name: UpgradeTests
     clusters:

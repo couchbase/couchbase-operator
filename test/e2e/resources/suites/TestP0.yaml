@@ -115,7 +115,7 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestPersistentVolumeAutoFailover
-      - name: TestPersistentVolumeNodeFailover
+      - name: TestPersistentVolumeAutoRecovery
 
   - name: FailoverTests
     clusters:
