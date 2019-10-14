@@ -700,6 +700,8 @@ const (
 )
 
 type ClusterCondition struct {
+	// Type is the type of condition
+	Type ClusterConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status"`
 	// The last time this condition was updated.
@@ -721,8 +723,6 @@ const (
 	ClusterConditionScaling      ClusterConditionType = "Scaling"
 	ClusterConditionUpgrading    ClusterConditionType = "Upgrading"
 )
-
-type ClusterStatusMap map[ClusterConditionType]*ClusterCondition
 
 // PortStatus contains the K8S port mappings for various services
 type PortStatus struct {
@@ -747,23 +747,23 @@ type PortStatusMap map[string]*PortStatus
 
 type ClusterStatus struct {
 	// Phase is the cluster running phase
-	Phase  ClusterPhase `json:"phase"`
-	Reason string       `json:"reason"`
+	Phase  ClusterPhase `json:"phase,omitempty"`
+	Reason string       `json:"reason,omitempty"`
 
 	// ControlPuased indicates the operator pauses the control of the cluster.
-	ControlPaused bool `json:"controlPaused"`
+	ControlPaused bool `json:"controlPaused,omitempty"`
 
 	// Condition keeps ten most recent cluster conditions
-	Conditions ClusterStatusMap `json:"conditions,omitempty"`
+	Conditions []ClusterCondition `json:"conditions,omitempty"`
 
 	// A unique cluster identifier
-	ClusterID string `json:"clusterId"`
+	ClusterID string `json:"clusterId,omitempty"`
 	// Size is the current size of the cluster
-	Size int `json:"size"`
+	Size int `json:"size,omitempty"`
 	// Members are the couchbase members in the cluster
-	Members MembersStatus `json:"members"`
+	Members MembersStatus `json:"members,omitempty"`
 	// CurrentVersion is the current cluster version
-	CurrentVersion string `json:"currentVersion"`
+	CurrentVersion string `json:"currentVersion,omitempty"`
 
 	// Name of buckets active within cluster
 	Buckets []cbmgr.Bucket `json:"buckets,omitempty"`

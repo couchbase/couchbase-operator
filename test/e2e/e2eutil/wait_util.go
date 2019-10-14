@@ -184,14 +184,14 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 			couchbasev2.ClusterConditionUpgrading: v1.ConditionFalse,
 		}
 
-		for kind, cond := range cl.Status.Conditions {
-			healthyCondition, ok := healthyConditions[kind]
+		for _, cond := range cl.Status.Conditions {
+			healthyCondition, ok := healthyConditions[cond.Type]
 			if !ok {
 				continue
 			}
 
 			if cond.Status != healthyCondition {
-				return fmt.Errorf("healthy condition %v is %v", kind, cond.Status)
+				return fmt.Errorf("healthy condition %v is %v", cond.Type, cond.Status)
 			}
 		}
 		return nil
@@ -369,8 +369,8 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 
 			// compare cluster conditions to desired condition
 			t.Logf("cluster status: %v", cluster.Status.Conditions)
-			if condition, ok := cluster.Status.Conditions[conditionType]; ok {
-				if condition.Status == status {
+			for _, condition := range cluster.Status.Conditions {
+				if condition.Type == conditionType && condition.Status == status {
 					conditionTime, err := time.Parse(time.RFC3339, condition.LastUpdateTime)
 					if err != nil {
 						return err
