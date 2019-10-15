@@ -136,17 +136,23 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 	}
 	pod := pods.Items[0]
 
-	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(pod.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
 
-	ports, ok := cluster.Status.ExposedPorts[pod.Name]
-	if !ok {
+	nodePort := -1
+	for _, port := range svc.Spec.Ports {
+		if port.Name == string(couchbasev2.AdminService) {
+			nodePort = int(port.NodePort)
+			break
+		}
+	}
+	if nodePort == -1 {
 		return "", "", fmt.Errorf("admin service port not exposed")
 	}
 
-	return cluster.Status.ClusterID, pod.Status.HostIP + ":" + strconv.Itoa(int(ports.AdminServicePort)), nil
+	return cluster.Status.ClusterID, fmt.Sprintf("%s:%d", pod.Status.HostIP, nodePort), nil
 }
 
 // getRemoteUUIDAndHostTLS returns the remote hostname, based on DNS, and the cluster UUID.

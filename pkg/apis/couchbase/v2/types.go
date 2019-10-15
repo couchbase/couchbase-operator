@@ -724,27 +724,6 @@ const (
 	ClusterConditionUpgrading    ClusterConditionType = "Upgrading"
 )
 
-// PortStatus contains the K8S port mappings for various services
-type PortStatus struct {
-	AdminServicePort        int32 `json:"adminServicePort,omitempty"`
-	AdminServicePortTLS     int32 `json:"adminServicePortTLS,omitempty"`
-	IndexServicePort        int32 `json:"indexServicePort,omitempty"`
-	IndexServicePortTLS     int32 `json:"indexServicePortTLS,omitempty"`
-	QueryServicePort        int32 `json:"queryServicePort,omitempty"`
-	QueryServicePortTLS     int32 `json:"queryServicePortTLS,omitempty"`
-	SearchServicePort       int32 `json:"searchServicePort,omitempty"`
-	SearchServicePortTLS    int32 `json:"searchServicePortTLS,omitempty"`
-	AnalyticsServicePort    int32 `json:"analyticsServicePort,omitempty"`
-	AnalyticsServicePortTLS int32 `json:"analyticsServicePortTLS,omitempty"`
-	EventingServicePort     int32 `json:"eventingServicePort,omitempty"`
-	EventingServicePortTLS  int32 `json:"eventingServicePortTLS,omitempty"`
-	DataServicePort         int32 `json:"dataServicePort,omitempty"`
-	DataServicePortTLS      int32 `json:"dataServicePortTLS,omitempty"`
-}
-
-// PortStatusMap maps a node name to port status information
-type PortStatusMap map[string]*PortStatus
-
 type ClusterStatus struct {
 	// Phase is the cluster running phase
 	Phase  ClusterPhase `json:"phase,omitempty"`
@@ -778,9 +757,6 @@ type ClusterStatus struct {
 	// ExposedFeatures keeps tabs on what features are currently
 	// exposed as node ports
 	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
-
-	// ports exposing couchbase cluster on the K8S node network
-	ExposedPorts PortStatusMap `json:"nodePorts,omitempty"`
 }
 
 type MemberStatusEntry struct {

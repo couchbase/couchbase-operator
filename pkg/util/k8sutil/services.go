@@ -11,6 +11,7 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -595,51 +596,6 @@ func UpdateAdminConsole(kubecli kubernetes.Interface, cluster *couchbasev2.Couch
 	return ReconcileStatusUpdated, nil
 }
 
-// updateExposedPorts accepts a new or existing service and adds the allocated
-// node ports to a port status structure.
-func updateExposedPorts(portStatusMap couchbasev2.PortStatusMap, nodeName string, service *v1.Service) error {
-	portStatus, ok := portStatusMap[nodeName]
-	if !ok {
-		portStatus = &couchbasev2.PortStatus{}
-		portStatusMap[nodeName] = portStatus
-	}
-	for _, servicePort := range service.Spec.Ports {
-		switch servicePort.Name {
-		case adminServicePortName:
-			portStatus.AdminServicePort = servicePort.NodePort
-		case adminServicePortNameTLS:
-			portStatus.AdminServicePortTLS = servicePort.NodePort
-		case indexServicePortName:
-			portStatus.IndexServicePort = servicePort.NodePort
-		case indexServicePortNameTLS:
-			portStatus.IndexServicePortTLS = servicePort.NodePort
-		case queryServicePortName:
-			portStatus.QueryServicePort = servicePort.NodePort
-		case queryServicePortNameTLS:
-			portStatus.QueryServicePortTLS = servicePort.NodePort
-		case searchServicePortName:
-			portStatus.SearchServicePort = servicePort.NodePort
-		case searchServicePortNameTLS:
-			portStatus.SearchServicePortTLS = servicePort.NodePort
-		case analyticsServicePortName:
-			portStatus.AnalyticsServicePort = servicePort.NodePort
-		case analyticsServicePortNameTLS:
-			portStatus.AnalyticsServicePortTLS = servicePort.NodePort
-		case eventingServicePortName:
-			portStatus.EventingServicePort = servicePort.NodePort
-		case eventingServicePortNameTLS:
-			portStatus.EventingServicePortTLS = servicePort.NodePort
-		case dataServicePortName:
-			portStatus.DataServicePort = servicePort.NodePort
-		case dataServicePortNameTLS:
-			portStatus.DataServicePortTLS = servicePort.NodePort
-		default:
-			return fmt.Errorf("unhandled port name %s", servicePort.Name)
-		}
-	}
-	return nil
-}
-
 // GetExposedServiceName returns the service name generated for each service port group
 func GetExposedServiceName(nodeName string) string {
 	return nodeName
@@ -928,7 +884,7 @@ func updateExposedService(service, requested *v1.Service) bool {
 // updateExposedServices examines existing external services.  It first filters the allowable ports on
 // a per-member basis so as not to expose services not enabled or allowable by the specification.  It then
 // returns an services which require an update or deletion.
-func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (updates, deletions, untouched []*v1.Service, err error) {
+func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (updates, deletions []*v1.Service, err error) {
 	for _, service := range services {
 		// Extract metadata from the service
 		memberName, ok := service.Labels[constants.LabelNode]
@@ -966,8 +922,6 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 		// Update if necessary.
 		if updateExposedService(service, requested) {
 			updates = append(updates, service)
-		} else {
-			untouched = append(untouched, service)
 		}
 	}
 
@@ -1006,49 +960,30 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 
 	// Calculate the services that need updating or deleting based on the member status
 	// and cluster specification.
-	updates, deletions, untouched, err := updateExposedServices(services, members, cluster, ports)
+	updates, deletions, err := updateExposedServices(services, members, cluster, ports)
 	if err != nil {
 		return nil, err
-	}
-
-	// Buffer the port status as we go through
-	portStatus := map[string]*couchbasev2.PortStatus{}
-
-	// Untouched nodes need to add their ports to the status.
-	for _, service := range untouched {
-		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
-			continue
-		}
-		if err := updateExposedPorts(portStatus, service.Labels[constants.LabelNode], service); err != nil {
-			return nil, err
-		}
 	}
 
 	// Create any required services, buffering exposed ports if we aren't using public
 	// DNS based addressing.
 	for _, service := range creations {
-		if service, err = createService(kubecli, cluster.Namespace, service, cluster.AsOwner()); err != nil {
+		if _, err := createService(kubecli, cluster.Namespace, service, cluster.AsOwner()); err != nil {
 			return nil, err
 		}
 		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
 			continue
-		}
-		if err := updateExposedPorts(portStatus, service.Labels[constants.LabelNode], service); err != nil {
-			return nil, err
 		}
 	}
 
 	// Update any required services, buffering exposed ports if we aren't using public
 	// DNS based addressing.
 	for _, service := range updates {
-		if service, err = UpdateService(kubecli, cluster.Namespace, service); err != nil {
+		if _, err := UpdateService(kubecli, cluster.Namespace, service); err != nil {
 			return nil, err
 		}
 		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
 			continue
-		}
-		if err := updateExposedPorts(portStatus, service.Labels[constants.LabelNode], service); err != nil {
-			return nil, err
 		}
 	}
 
@@ -1073,10 +1008,6 @@ func UpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseutil.M
 
 	// Finally update the status
 	status.ExposedFeatures = cluster.Spec.Networking.ExposedFeatures
-	if len(portStatus) == 0 {
-		portStatus = nil
-	}
-	status.ExposedPorts = portStatus
 
 	return ret, nil
 }
@@ -1111,11 +1042,64 @@ func WouldUpdateExposedFeatures(kubecli kubernetes.Interface, members couchbaseu
 
 	// Calculate the services that need updating or deleting based on the member status
 	// and cluster specification.
-	updates, deletions, _, err := updateExposedServices(services, members, cluster, ports)
+	updates, deletions, err := updateExposedServices(services, members, cluster, ports)
 	if err != nil {
 		return false, err
 	}
 
 	// Flag we need a reconcile if any services are created, updated or deleted.
 	return len(creations)+len(updates)+len(deletions) != 0, nil
+}
+
+// GetAlternateAddressExternalPorts polls the pod service for any alternate ports
+// that may have been set and returns a structure ready for submission to the
+// Couchbase API.
+func GetAlternateAddressExternalPorts(kubeCli kubernetes.Interface, namespace, name string) (*cbmgr.AlternateAddressesExternalPorts, error) {
+	svc, err := kubeCli.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Only NodePorts do DNAT
+	if svc.Spec.Type != v1.ServiceTypeNodePort {
+		return nil, nil
+	}
+
+	ports := &cbmgr.AlternateAddressesExternalPorts{}
+	for _, port := range svc.Spec.Ports {
+		switch port.Name {
+		case adminServicePortName:
+			ports.AdminServicePort = port.NodePort
+		case adminServicePortNameTLS:
+			ports.AdminServicePortTLS = port.NodePort
+		case indexServicePortName:
+			ports.IndexServicePort = port.NodePort
+		case indexServicePortNameTLS:
+			ports.IndexServicePortTLS = port.NodePort
+		case queryServicePortName:
+			ports.QueryServicePort = port.NodePort
+		case queryServicePortNameTLS:
+			ports.QueryServicePortTLS = port.NodePort
+		case searchServicePortName:
+			ports.SearchServicePort = port.NodePort
+		case searchServicePortNameTLS:
+			ports.SearchServicePortTLS = port.NodePort
+		case analyticsServicePortName:
+			ports.AnalyticsServicePort = port.NodePort
+		case analyticsServicePortNameTLS:
+			ports.AnalyticsServicePortTLS = port.NodePort
+		case eventingServicePortName:
+			ports.EventingServicePort = port.NodePort
+		case eventingServicePortNameTLS:
+			ports.EventingServicePortTLS = port.NodePort
+		case dataServicePortName:
+			ports.DataServicePort = port.NodePort
+		case dataServicePortNameTLS:
+			ports.DataServicePortTLS = port.NodePort
+		default:
+			return nil, fmt.Errorf("unexpected port name %s", port.Name)
+		}
+	}
+
+	return ports, nil
 }

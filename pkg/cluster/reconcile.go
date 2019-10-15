@@ -869,27 +869,14 @@ func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member)
 		}
 	}
 
-	addresses := &cbmgr.AlternateAddressesExternal{
-		Hostname: hostname,
+	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.kubeClient, c.cluster.Namespace, member.Name)
+	if err != nil {
+		return nil, err
 	}
 
-	// If any exposed ports are defined then add them to the external addresses.
-	if ports, ok := c.cluster.Status.ExposedPorts[member.Name]; ok {
-		addresses.Ports = &cbmgr.AlternateAddressesExternalPorts{
-			AdminServicePort:    ports.AdminServicePort,
-			AdminServicePortTLS: ports.AdminServicePortTLS,
-			// TODO: rename the library for consistency
-			ViewServicePort:         ports.IndexServicePort,
-			ViewServicePortTLS:      ports.IndexServicePortTLS,
-			QueryServicePort:        ports.QueryServicePort,
-			QueryServicePortTLS:     ports.QueryServicePortTLS,
-			FtsServicePort:          ports.SearchServicePort,
-			FtsServicePortTLS:       ports.SearchServicePortTLS,
-			AnalyticsServicePort:    ports.AnalyticsServicePort,
-			AnalyticsServicePortTLS: ports.AnalyticsServicePortTLS,
-			DataServicePort:         ports.DataServicePort,
-			DataServicePortTLS:      ports.DataServicePortTLS,
-		}
+	addresses := &cbmgr.AlternateAddressesExternal{
+		Hostname: hostname,
+		Ports:    ports,
 	}
 
 	return addresses, nil
@@ -926,6 +913,10 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// Get the requested alternate address specification.
 		addresses, err := c.createAlternateAddressesExternal(member)
 		if err != nil {
+			// Ignore this pod if the service hasn't been created yet.
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return err
 		}
 
@@ -969,6 +960,10 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 		// Get the requested alternate address specification.
 		addresses, err := c.createAlternateAddressesExternal(member)
 		if err != nil {
+			// Ignore this pod if the service hasn't been created yet.
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return false, err
 		}
 
