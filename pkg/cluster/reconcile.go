@@ -842,6 +842,24 @@ func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member)
 	return addresses, nil
 }
 
+// waitAlternateAddressReachable waits for advertised addresses to become reachable.
+// This takes into account the time taken to create an external load balancer and
+// DDNS updates.  Obviously this is a best effort as different DNS servers may behave
+// differently, and what we see is not necessarily what the client sees.
+func waitAlternateAddressReachable(addresses *cbmgr.AlternateAddressesExternal) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// All exposed features contain the admin port, only TLS enabled ports
+	// are always guaranteed to exist.
+	port := 18091
+	if addresses.Ports != nil {
+		port = int(addresses.Ports.AdminServicePortTLS)
+	}
+
+	return netutil.WaitForHostPort(ctx, fmt.Sprintf("%s:%d", addresses.Hostname, port))
+}
+
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate
 // ports into the requested member.  Clients may use these addresses/ports to
 // connect to the cluster if there is no direct L3 connectivity into the pod
@@ -873,6 +891,11 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// Get the requested alternate address specification.
 		addresses, err := c.createAlternateAddressesExternal(member)
 		if err != nil {
+			return err
+		}
+
+		// Don't allow addresses to be advertised unless they can be used.
+		if err := waitAlternateAddressReachable(addresses); err != nil {
 			return err
 		}
 
