@@ -359,6 +359,7 @@ func generateConsoleService(cluster *couchbasev1.CouchbaseCluster) *v1.Service {
 
 	// Create the basic service.
 	service := createServiceManifest(ConsoleServiceName(cluster.Name), cluster.Spec.AdminConsoleServiceType, ports, labels, selectors)
+	mergeLabels(service.Annotations, cluster.Spec.ServiceAnnotations)
 
 	// If a DNS domain is specified add a DNS name for use with TLS.
 	if cluster.Spec.DNS != nil {
@@ -726,6 +727,7 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	labels := labelsForNodeService(cluster.Name, name)
 	selectors := getNodeServiceSelectors(cluster, name)
 	service := createServiceManifest(exposedServiceName, cluster.Spec.ExposedFeatureServiceType, allowedPorts, labels, selectors)
+	mergeLabels(service.Annotations, cluster.Spec.ServiceAnnotations)
 
 	// If a DNS domain is specified annotate with the pod DNS name.
 	if cluster.Spec.DNS != nil {

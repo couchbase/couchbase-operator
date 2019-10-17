@@ -122,6 +122,9 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 								},
 							},
 						},
+						"serviceAnnotations": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+						},
 						"softwareUpdateNotifications": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "boolean",
 						},
