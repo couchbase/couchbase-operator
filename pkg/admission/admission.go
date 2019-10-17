@@ -141,12 +141,6 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 		ar.Request.Name)
 	glog.V(1).Infof("Validating resource: %s", string(ar.Request.Object.Raw))
 
-	// Temporary hack: explicitly validate the schema.
-	if err := validator.SchemaValidate(scheme, ar.Request.Object); err != nil {
-		glog.Error(err)
-		return errorResponse(err)
-	}
-
 	// Decode the CouchbaseCluster object
 	couchbaseCluster, err := decodeObject(ar, ar.Request.Object)
 	if err != nil {

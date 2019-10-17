@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v2"
 
 	"github.com/ghodss/yaml"
@@ -47,7 +46,7 @@ func main() {
 	buffer(v2.GetUserCRD())
 	buffer(v2.GetRoleCRD())
 	buffer(v2.GetRoleBindingCRD())
-	buffer(k8sutil.GetCRD())
+	buffer(v2.GetCouchbaseClusterCRD())
 	if err := dump(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

@@ -123,7 +123,7 @@ func TestEditClusterSettings(t *testing.T) {
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService, // No index service or we cannot update the index settings
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.

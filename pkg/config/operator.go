@@ -59,6 +59,7 @@ func GetOperatorRole() *rbacv1.Role {
 				},
 				Resources: []string{
 					couchbasev2.ClusterCRDResourcePlural,
+					couchbasev2.ClusterCRDResourcePlural + "/status",
 				},
 				Verbs: []string{
 					"get",    // used by the operator to update status.
