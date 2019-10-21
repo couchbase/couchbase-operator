@@ -120,6 +120,11 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, namespace string, 
 				// when the volume is mounted into the container the path is overwritten
 				if mountName == cbapi.DefaultVolumeMount {
 					initContainer := couchbaseInitContainer(cs.BaseImage, version, claim.Name)
+					// Always attach requirements as some platforms will not allow
+					// you to run without them!!
+					if config.Pod != nil {
+						initContainer = containerWithRequirements(initContainer, config.Pod.Resources)
+					}
 					pod.Spec.InitContainers = []v1.Container{initContainer}
 				}
 			} else {
