@@ -216,13 +216,14 @@ var (
 		"TestUpgradeSupportableKillStatelessPodOnRebalance": TestUpgradeSupportableKillStatelessPodOnRebalance,
 
 		// Networking tests
-		"TestExposedFeatureIP":                TestExposedFeatureIP,
-		"TestExposedFeatureDNS":               TestExposedFeatureDNS,
-		"TestExposedFeatureDNSModify":         TestExposedFeatureDNSModify,
-		"TestExposedFeatureServiceTypeModify": TestExposedFeatureServiceTypeModify,
-		"TestConsoleServiceDNS":               TestConsoleServiceDNS,
-		"TestConsoleServiceDNSModify":         TestConsoleServiceDNSModify,
-		"TestConsoleServiceTypeModify":        TestConsoleServiceTypeModify,
+		"TestExposedFeatureIP":                   TestExposedFeatureIP,
+		"TestExposedFeatureDNS":                  TestExposedFeatureDNS,
+		"TestExposedFeatureDNSModify":            TestExposedFeatureDNSModify,
+		"TestExposedFeatureServiceTypeModify":    TestExposedFeatureServiceTypeModify,
+		"TestConsoleServiceDNS":                  TestConsoleServiceDNS,
+		"TestConsoleServiceDNSModify":            TestConsoleServiceDNSModify,
+		"TestConsoleServiceTypeModify":           TestConsoleServiceTypeModify,
+		"TestExposedFeatureTrafficPolicyCluster": TestExposedFeatureTrafficPolicyCluster,
 	}
 
 	DecoratorFuncMap = framework.DecoratorMap{

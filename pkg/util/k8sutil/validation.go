@@ -161,6 +161,13 @@ func getCustomResourceValidation() *apiextensionsv1beta1.CustomResourceValidatio
 								{Raw: []byte(`"` + corev1.ServiceTypeLoadBalancer + `"`)},
 							},
 						},
+						"exposedFeatureTrafficPolicy": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "string",
+							Enum: []apiextensionsv1beta1.JSON{
+								{Raw: []byte(`"` + corev1.ServiceExternalTrafficPolicyTypeLocal + `"`)},
+								{Raw: []byte(`"` + corev1.ServiceExternalTrafficPolicyTypeCluster + `"`)},
+							},
+						},
 						"dns": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
 							Required: []string{

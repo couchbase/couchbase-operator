@@ -211,6 +211,7 @@ func TestNegValidationCreate(t *testing.T) {
 	if os.Getenv(envParallelTest) == envParallelTestTrue {
 		t.Parallel()
 	}
+	invalidExternalTraficPolicy := corev1.ServiceExternalTrafficPolicyType("Donkey")
 	testDefs := []testDef{
 		// Spec.ExposedFeatures list validation
 		{
@@ -555,6 +556,12 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/DNS/Domain", "acme.com"),
 			shouldFail:     true,
 			expectedErrors: []string{`certificate is valid for *.cb-example.default.svc, *.cb-example.example.com, not verify.cb-example.acme.com`},
+		},
+		{
+			name:           "TestValidateExposedFeatureTrafficPolicyInvalid",
+			mutations:      jsonpatch.NewPatchSet().Replace("/Spec/ExposedFeatureTrafficPolicy", &invalidExternalTraficPolicy),
+			shouldFail:     true,
+			expectedErrors: []string{`spec.exposedFeatureTrafficPolicy in body should be one of [Local Cluster]`},
 		},
 	}
 

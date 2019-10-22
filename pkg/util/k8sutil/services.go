@@ -740,6 +740,9 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	// Enforce that traffic has to come directly to the k8s node avoiding the
 	// penalty of an extra hop and SNAT.
 	service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	if cluster.Spec.ExposedFeatureTrafficPolicy != nil {
+		service.Spec.ExternalTrafficPolicy = *cluster.Spec.ExposedFeatureTrafficPolicy
+	}
 
 	return service, nil
 }
@@ -793,6 +796,11 @@ func updateExposedService(service, requested *v1.Service) bool {
 	// This handles updates to the service type
 	if service.Spec.Type != requested.Spec.Type {
 		service.Spec.Type = requested.Spec.Type
+		updated = true
+	}
+	// This handles traffic policy updates
+	if service.Spec.ExternalTrafficPolicy != requested.Spec.ExternalTrafficPolicy {
+		service.Spec.ExternalTrafficPolicy = requested.Spec.ExternalTrafficPolicy
 		updated = true
 	}
 	// This handles updates to spec.exposedFeatures

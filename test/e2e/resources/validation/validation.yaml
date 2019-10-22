@@ -13,6 +13,7 @@ spec:
   disableBucketManagement: false
   logRetentionTime: "24h"
   logRetentionCount: 10
+  exposedFeatureTrafficPolicy: Local
   adminConsoleServices:
       - data
       - index

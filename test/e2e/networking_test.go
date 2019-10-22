@@ -6,7 +6,9 @@ import (
 	"time"
 
 	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -331,4 +333,34 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 	e2eutil.MustCheckConsoleServiceStatus(t, targetKube, testCouchbase, time.Minute)
+}
+
+// TestExposedFeatureTrafficPolicyCluster ensures an external traffic policy of
+// Cluster doesn't cause the cluster to fail.
+func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize, constants.WithoutBucket, constants.AdminHidden)
+	testCouchbase.Spec.ExposedFeatures = couchbasev1.ExposedFeatureList{
+		couchbasev1.FeatureAdmin,
+	}
+	policy := corev1.ServiceExternalTrafficPolicyTypeCluster
+	testCouchbase.Spec.ExposedFeatureTrafficPolicy = &policy
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonNodeServiceCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

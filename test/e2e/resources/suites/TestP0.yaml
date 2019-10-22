@@ -175,3 +175,4 @@ tcGroups:
       - name: TestConsoleServiceDNS
       - name: TestConsoleServiceDNSModify
       - name: TestConsoleServiceTypeModify
+      - name: TestExposedFeatureTrafficPolicyCluster
