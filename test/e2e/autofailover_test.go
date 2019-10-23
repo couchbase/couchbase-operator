@@ -25,8 +25,10 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		t.Skip("couchbase server requires 3 or more availability zones")
 	}
 
-	// Create cluster spec for RZA feature
-	clusterSize := e2eutil.MustNumNodes(t, targetKube)
+	// Create cluster spec for RZA feature.  Ensure that data is correctly
+	// balanced by rounding down the largest multiple of number of AZs that
+	// will fit.
+	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroupList) * len(availableServerGroupList)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
