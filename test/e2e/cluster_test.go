@@ -554,118 +554,52 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// adding query service
-	t.Log("adding query service")
 	newService := couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_2",
 		Services: couchbasev2.ServiceList{couchbasev2.QueryService},
 	}
-	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	serviceMap := map[string]int{
-		"Data":  1,
-		"N1QL":  1,
-		"Index": 0,
-		"FTS":   0,
-	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Servers/-", newService), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// adding index service
-	t.Log("adding index service")
 	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_3",
 		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
-	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	serviceMap = map[string]int{
-		"Data":  1,
-		"N1QL":  1,
-		"Index": 1,
-		"FTS":   0,
-	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Servers/-", newService), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// adding search services
-	t.Log("adding search service")
 	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size2,
 		Name:     "test_config_4",
 		Services: couchbasev2.ServiceList{couchbasev2.SearchService},
 	}
-	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
-
-	for memberID := 3; memberID <= 4; memberID++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberID), 2*time.Minute)
-	}
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	serviceMap = map[string]int{
-		"Data":  1,
-		"N1QL":  1,
-		"Index": 1,
-		"FTS":   2,
-	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Servers/-", newService), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// swapping nodes search - 1 and index + 1
-	t.Log("swaping nodes: test_config_4--, test_config_3++")
-	swapMap := map[string]int{
-		"test_config_4": 1,
-		"test_config_3": 2,
-	}
-	testCouchbase = e2eutil.MustScaleServices(t, targetKube, testCouchbase, swapMap, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	serviceMap = map[string]int{
-		"Data":  1,
-		"N1QL":  1,
-		"Index": 2,
-		"FTS":   1,
-	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	patchset := jsonpatch.NewPatchSet().Replace("/Spec/Servers/2/Size", constants.Size2).Replace("/Spec/Servers/3/Size", constants.Size1)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// swapping nodes index - 1 and query + 1
-	t.Log("swaping nodes: test_config_3--, test_config_2++")
-	swapMap = map[string]int{
-		"test_config_3": 1,
-		"test_config_2": 2,
-	}
-	testCouchbase = e2eutil.MustScaleServices(t, targetKube, testCouchbase, swapMap, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	serviceMap = map[string]int{
-		"Data":  1,
-		"N1QL":  2,
-		"Index": 1,
-		"FTS":   1,
-	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	patchset = jsonpatch.NewPatchSet().Replace("/Spec/Servers/1/Size", constants.Size2).Replace("/Spec/Servers/2/Size", constants.Size1)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// swapping nodes query - 1 and data + 1
-	t.Log("swaping nodes: test_config_2--, test_config_1++")
-	swapMap = map[string]int{
-		"test_config_2": 1,
-		"test_config_1": 2,
-	}
-	testCouchbase = e2eutil.MustScaleServices(t, targetKube, testCouchbase, swapMap, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberRemoveEvent(testCouchbase, 6), 5*time.Minute)
-
-	serviceMap = map[string]int{
-		"Data":  2,
-		"N1QL":  1,
-		"Index": 1,
-		"FTS":   1,
-	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	patchset = jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/Size", constants.Size2).Replace("/Spec/Servers/1/Size", constants.Size1)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
