@@ -429,9 +429,10 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 				Kind:       couchbasev2.ClusterCRDResourceKind,
 				ShortNames: []string{"couchbase", "cbc"},
 			},
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-			},
+			// Not supported by GKE 1.13 for some odd reason
+			//Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
+			//	Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+			//},
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
 					Name:        "Version",

@@ -59,7 +59,8 @@ func GetOperatorRole() *rbacv1.Role {
 				},
 				Resources: []string{
 					couchbasev2.ClusterCRDResourcePlural,
-					couchbasev2.ClusterCRDResourcePlural + "/status",
+					// Not supported by GKE 1.13 for some odd reason
+					//couchbasev2.ClusterCRDResourcePlural + "/status",
 				},
 				Verbs: []string{
 					"get",    // used by the operator to update status.

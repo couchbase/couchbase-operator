@@ -437,7 +437,7 @@ func (c *Cluster) updateCRStatus() error {
 
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.cluster.Status
-	if _, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).UpdateStatus(cluster); err != nil {
+	if _, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 		return err
 	}
 	return nil
