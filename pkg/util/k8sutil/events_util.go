@@ -41,7 +41,6 @@ const (
 	EventReasonRollbackStarted       = "RollbackStarted"
 	EventReasonRollbackFinished      = "RollbackFinished"
 	EventReasonClusterSettingsEdited = "ClusterSettingsEdited"
-	EventReasonVolumeUnhealthy       = "VolumeUnhealthy"
 	EventReasonTLSUpdated            = "TLSUpdated"
 	EventReasonTLSInvalid            = "TLSInvalid"
 	EventReasonTLSUpdateFailed       = "TLSUpdateFailed"
@@ -260,14 +259,6 @@ func ClusterSettingsEditedEvent(settingName string, cl *couchbasev2.CouchbaseClu
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonClusterSettingsEdited
 	event.Message = fmt.Sprintf("Setting for `%s` was edited", settingName)
-	return event
-}
-
-func MemberVolumeUnhealthyEvent(memberName string, reason string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	event := newClusterEvent(cl)
-	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonVolumeUnhealthy
-	event.Message = fmt.Sprintf("Member %s volumes are unhealthy.  Failover is recommended: %s", memberName, reason)
 	return event
 }
 
