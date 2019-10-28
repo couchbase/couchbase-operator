@@ -322,6 +322,10 @@ func (c *Cluster) reconcileTLS() error {
 		return err
 	}
 
+	// Quiesce persistent connections, NS server doesn't quite work if some are
+	// still open.
+	c.client.CloseIdleConnections()
+
 	// Update the CA and any server certificate chains that require it.
 	changed := false
 	for _, member := range c.members {

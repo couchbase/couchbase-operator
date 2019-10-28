@@ -788,6 +788,10 @@ func (c *CouchbaseClient) GetClientCertAuth(ms MemberSet) (*cbmgr.ClientCertAuth
 	return c.client.GetClientCertAuth()
 }
 
+func (c *CouchbaseClient) CloseIdleConnections() {
+	c.client.CloseIdleConnections()
+}
+
 func (c *CouchbaseClient) SetClientCertAuth(ms MemberSet, settings *cbmgr.ClientCertAuth) error {
 	c.client.SetEndpoints(ms.ClientURLsPlaintext())
 	return c.client.SetClientCertAuth(settings)
