@@ -35,7 +35,7 @@ func newPVCUpgradableResource(c *Cluster) upgradableResource {
 	return &pvcUpgradableResource{
 		cluster: c,
 		actions: pvcUpgradeActionList{
-			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePVC_000000_010200},
+			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePVCFrom000000To010200},
 		},
 	}
 }
@@ -94,10 +94,10 @@ func (r *pvcUpgradableResource) commit(item int) error {
 	return nil
 }
 
-// upgradePVC_000000_010200 performs pvc upgrades to 1.2.0 from all prior versions.
+// upgradePVCFrom000000To010200 performs pvc upgrades to 1.2.0 from all prior versions.
 // * The "server.couchbase.com/version" annotation was added.
 // * The "failure-domain.beta.kubernetes.io/zone" annotation was added.
-func upgradePVC_000000_010200(cluster *Cluster, pvc *corev1.PersistentVolumeClaim) error {
+func upgradePVCFrom000000To010200(cluster *Cluster, pvc *corev1.PersistentVolumeClaim) error {
 	// Update the version annotation
 	pvc.Annotations[constants.ResourceVersionAnnotation] = "1.2.0"
 

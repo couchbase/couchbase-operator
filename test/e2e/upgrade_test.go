@@ -690,7 +690,7 @@ func TestUpgradeToTLS(t *testing.T) {
 
 	// When ready create the required TLS secrets and patch them into the running
 	// cluster.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TlsOpts{ClusterName: cluster.Name})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, f.Namespace, &e2eutil.TLSOpts{ClusterName: cluster.Name})
 	defer teardown()
 	tls := &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{

@@ -38,33 +38,33 @@ func EqualEvent(e1, e2 *v1.Event) bool {
 	return (e1.Type == e2.Type && e1.Reason == e2.Reason && e1.Message == e2.Message)
 }
 
-func NewMemberCreationFailedEvent(cl *couchbasev2.CouchbaseCluster, memberId int) *v1.Event {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func NewMemberCreationFailedEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberCreationFailedEvent(name, cl)
 }
 
-func NewMemberAddEvent(cl *couchbasev2.CouchbaseCluster, memberId int) *v1.Event {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func NewMemberAddEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberAddEvent(name, cl)
 }
 
-func NewMemberRemoveEvent(cl *couchbasev2.CouchbaseCluster, memberId int) *v1.Event {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func NewMemberRemoveEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberRemoveEvent(name, cl)
 }
 
-func FailedAddNodeEvent(cl *couchbasev2.CouchbaseCluster, memberId int) *v1.Event {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func FailedAddNodeEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.FailedAddNodeEvent(name, cl)
 }
 
-func NewMemberDownEvent(cl *couchbasev2.CouchbaseCluster, memberId int) *v1.Event {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func NewMemberDownEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberDownEvent(name, cl)
 }
 
-func NewMemberFailedOverEvent(cl *couchbasev2.CouchbaseCluster, memberId int) *v1.Event {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func NewMemberFailedOverEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberFailedOverEvent(name, cl)
 }
 
@@ -80,8 +80,8 @@ func RebalanceIncompleteEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceIncompleteEvent(cl)
 }
 
-func MemberRecoveredEvent(cl *couchbasev2.CouchbaseCluster, memberId int) *v1.Event {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func MemberRecoveredEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberRecoveredEvent(name, cl)
 }
 

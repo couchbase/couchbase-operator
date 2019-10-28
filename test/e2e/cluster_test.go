@@ -355,7 +355,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Static configuration.
-	removePodMemberId := 1
+	removePodMemberID := 1
 	clusterSize := 2
 
 	// create 2 node cluster with admin console
@@ -364,7 +364,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 
 	// pause operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
-	e2eutil.MustEjectMember(t, targetKube, testCouchbase, removePodMemberId, 5*time.Minute)
+	e2eutil.MustEjectMember(t, targetKube, testCouchbase, removePodMemberID, 5*time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
@@ -598,8 +598,8 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	}
 	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
 
-	for memeberId := 3; memeberId <= 4; memeberId++ {
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memeberId), 2*time.Minute)
+	for memberID := 3; memberID <= 4; memberID++ {
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, memberID), 2*time.Minute)
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)

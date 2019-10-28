@@ -408,15 +408,15 @@ func TestXDCRCreateTLSCluster(t *testing.T) {
 	// Static configuration.
 	clusterSize := constants.Size1
 
-	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TlsOpts{})
+	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TLSOpts{})
 	defer teardown1()
-	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TlsOpts{})
+	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TLSOpts{})
 	defer teardown2()
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, tls1)
-	xdcrCluster2 := e2eutil.MustNewTlsXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, tls2)
+	xdcrCluster1 := e2eutil.MustNewTLSXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, tls1)
+	xdcrCluster2 := e2eutil.MustNewTLSXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, tls2)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -456,9 +456,9 @@ func testXDCRCreateMututalTLSCluster(t *testing.T, policy couchbasev2.ClientCert
 	// Static configuration.
 	clusterSize := constants.Size1
 
-	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TlsOpts{})
+	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TLSOpts{})
 	defer teardown1()
-	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TlsOpts{})
+	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TLSOpts{})
 	defer teardown2()
 
 	// Create the clusters.

@@ -35,7 +35,7 @@ func newPodUpgradableResource(c *Cluster) upgradableResource {
 	return &podUpgradableResource{
 		cluster: c,
 		actions: podUpgradeActionList{
-			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePod_000000_010200},
+			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePodFrom000000To010200},
 		},
 	}
 }
@@ -94,9 +94,9 @@ func (r *podUpgradableResource) commit(item int) error {
 	return nil
 }
 
-// upgradePod_000000_010200 performs pod upgrades to 1.2.0 from all prior versions.
+// upgradePodFrom000000To010200 performs pod upgrades to 1.2.0 from all prior versions.
 // * The "couchbase.version" annotation was changed to "server.couchbase.com/version".
-func upgradePod_000000_010200(cluster *Cluster, pod *corev1.Pod) error {
+func upgradePodFrom000000To010200(cluster *Cluster, pod *corev1.Pod) error {
 	// Update the version annotation
 	pod.Annotations[constants.ResourceVersionAnnotation] = "1.2.0"
 

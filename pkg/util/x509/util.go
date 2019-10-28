@@ -315,7 +315,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 		return nil, err
 	}
 
-	subjectKeyId, err := generateSubjectKeyIdentifier(req.PublicKey)
+	subjectKeyID, err := generateSubjectKeyIdentifier(req.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 		NotBefore:             validFrom,
 		NotAfter:              validTo,
 		BasicConstraintsValid: true,
-		SubjectKeyId:          subjectKeyId,
+		SubjectKeyId:          subjectKeyID,
 		DNSNames:              req.DNSNames,
 	}
 

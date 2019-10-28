@@ -123,7 +123,7 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 }
 
 // NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
-func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
+func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -137,7 +137,7 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
+func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
 	cluster, err := NewTLSClusterBasic(t, k8s, namespace, size, ctx)
 	if err != nil {
 		Die(t, err)
@@ -146,7 +146,7 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 }
 
 // NewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
-func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext, policy couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
+func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -166,7 +166,7 @@ func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
 	cluster, err := NewMutualTLSClusterBasic(t, k8s, namespace, size, ctx, policy)
 	if err != nil {
 		Die(t, err)
@@ -175,7 +175,7 @@ func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace st
 }
 
 // NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
-func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
+func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -190,14 +190,14 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 }
 
 // MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification
-func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) {
+func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) {
 	if _, err := NewTLSClusterBasicNoWait(t, k8s, namespace, size, ctx); err == nil {
 		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
 }
 
-// NewTlsXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
-func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
+// NewTLSXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
+func NewTLSXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	// Don't use alternate addresses.
@@ -214,8 +214,8 @@ func NewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
-func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewTlsXdcrClusterBasic(t, k8s, namespace, size, ctx)
+func MustNewTLSXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewTLSXdcrClusterBasic(t, k8s, namespace, size, ctx)
 	if err != nil {
 		Die(t, err)
 	}
@@ -223,7 +223,7 @@ func MustNewTlsXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace stri
 }
 
 // MustNewMutualTLSXDCRClusterBasic creates a new m and XDCR enabled basic cluster.
-func MustNewMutualTLSXDCRClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+func MustNewMutualTLSXDCRClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	// Don't use alternate addresses.
@@ -311,7 +311,7 @@ func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace strin
 // NewSupportableTLSCluster creates a cluster with two MDS groups of 'size'.  The first is
 // a stateful group with data and index enabled.  The second is a stateless group with
 // query enabled.
-func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) (*couchbasev2.CouchbaseCluster, error) {
+func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	cluster := e2espec.NewClusterCRD("", e2espec.NewSupportableClusterSpec(size))
 	cluster.Name = ctx.ClusterName
 	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -327,7 +327,7 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 
 // MustNewSupportableTLSCluster creates a supportable cluster as described by NewSupportableTLSCluster
 // but dies on error.
-func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TlsContext) *couchbasev2.CouchbaseCluster {
+func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
 	cluster, err := NewSupportableTLSCluster(t, k8s, namespace, size, ctx)
 	if err != nil {
 		Die(t, err)
@@ -667,8 +667,8 @@ func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name strin
 	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0), removeVolumes)
 }
 
-func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberId int) error {
-	podMemberName := couchbaseutil.CreateMemberName(clusterName, memberId)
+func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberID int) error {
+	podMemberName := couchbaseutil.CreateMemberName(clusterName, memberID)
 	pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + podMemberName})
 	if err != nil {
 		return fmt.Errorf("unable to fetch persistent volume list for pod %s: %v", podMemberName, err)
@@ -771,13 +771,13 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.Couchb
 	}
 }
 
-func KillPodForMember(kubeCli kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, memberId int) error {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func KillPodForMember(kubeCli kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, memberID int) error {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return KillMember(kubeCli, cl.Namespace, cl.Name, name, true)
 }
 
-func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, memberId int, removeVolumes bool) {
-	name := couchbaseutil.CreateMemberName(cl.Name, memberId)
+func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, memberID int, removeVolumes bool) {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	if err := KillMember(k8s.KubeClient, cl.Namespace, cl.Name, name, removeVolumes); err != nil {
 		Die(t, err)
 	}
@@ -1056,7 +1056,7 @@ func GetMemberPVC(kubeCli kubernetes.Interface, namespace, memberName string, in
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
 }
 
-func TlsCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx *TlsContext) error {
+func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx *TLSContext) error {
 	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
 	if err != nil {
 		return fmt.Errorf("unable to get couchbase pods: %v", err)
@@ -1071,8 +1071,8 @@ func TlsCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx 
 	return nil
 }
 
-func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, ctx *TlsContext) {
-	if err := TlsCheckForCluster(t, k8s, namespace, ctx); err != nil {
+func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, ctx *TLSContext) {
+	if err := TLSCheckForCluster(t, k8s, namespace, ctx); err != nil {
 		Die(t, err)
 	}
 }

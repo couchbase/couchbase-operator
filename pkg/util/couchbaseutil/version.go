@@ -81,27 +81,27 @@ func (v *Version) Semver() string {
 }
 
 // Compare semantic versions
-// Returns -1 if a < b, 0 if a == b and 1 if a > b
-func (a *Version) Compare(b *Version) int {
-	for index := range a.semver {
-		if a.semver[index] > b.semver[index] {
+// Returns -1 if v < o, 0 if v == o and 1 if v > o
+func (v *Version) Compare(o *Version) int {
+	for index := range v.semver {
+		if v.semver[index] > o.semver[index] {
 			return 1
 		}
-		if a.semver[index] < b.semver[index] {
+		if v.semver[index] < o.semver[index] {
 			return -1
 		}
 	}
 	return 0
 }
 
-// Less returns true if a < b
-func (a *Version) Less(b *Version) bool {
-	return a.Compare(b) < 0
+// Less returns true if v < o
+func (v *Version) Less(o *Version) bool {
+	return v.Compare(o) < 0
 }
 
-// GreaterEqual returns true if a >= b
-func (a *Version) GreaterEqual(b *Version) bool {
-	return !a.Less(b)
+// GreaterEqual returns true if v >= o
+func (v *Version) GreaterEqual(o *Version) bool {
+	return !v.Less(o)
 }
 
 func VerifyVersion(version string) error {

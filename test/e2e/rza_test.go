@@ -36,23 +36,23 @@ func k8sNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabel
 		for _, k8sNode := range k8sNodeList.Items {
 			labelChanged := false
 			nodeLabels := k8sNode.GetLabels()
-			nodeIpAddress := k8sNode.Status.Addresses[0].Address
+			nodeIPAddress := k8sNode.Status.Addresses[0].Address
 			for _, node := range nodes.MasterNodeList {
-				if node.Ip == nodeIpAddress {
+				if node.IP == nodeIPAddress {
 					nodeLabels[nodeLabelName] = node.NodeLabel
 					labelChanged = true
 					break
 				}
 			}
 			for _, node := range nodes.WorkerNodeList {
-				if node.Ip == nodeIpAddress {
+				if node.IP == nodeIPAddress {
 					nodeLabels[nodeLabelName] = node.NodeLabel
 					labelChanged = true
 					break
 				}
 			}
 			if !labelChanged {
-				return fmt.Errorf("unable to find node %v", nodeIpAddress)
+				return fmt.Errorf("unable to find node %v", nodeIPAddress)
 			}
 			k8sNode.SetLabels(nodeLabels)
 
@@ -61,7 +61,7 @@ func k8sNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabel
 			k8sNode.Spec.Taints = []v1.Taint{}
 
 			if _, err := k8s.KubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-				return fmt.Errorf("failed to update label for node %v: %v", nodeIpAddress, err)
+				return fmt.Errorf("failed to update label for node %v: %v", nodeIPAddress, err)
 			}
 		}
 		return nil

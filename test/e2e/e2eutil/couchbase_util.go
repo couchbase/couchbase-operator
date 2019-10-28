@@ -262,7 +262,7 @@ func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 }
 
 // Inserts Json docs into couchbase bucket
-func InsertJsonDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
+func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
 	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 	if err != nil {
 		return err
@@ -299,8 +299,8 @@ func InsertJsonDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 	return nil
 }
 
-func MustInsertJsonDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) {
-	if err := InsertJsonDocsIntoBucket(k8s, cluster, bucketName, docStartIndex, numOfDocs); err != nil {
+func MustInsertJSONDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) {
+	if err := InsertJSONDocsIntoBucket(k8s, cluster, bucketName, docStartIndex, numOfDocs); err != nil {
 		Die(t, err)
 	}
 }
@@ -737,7 +737,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 	hostPassword := "password"
 	var responseData []byte
 
-	eventingJsonFunc := `[{` +
+	eventingJSONFunc := `[{` +
 		`"appname": "` + eventingFuncName + `",` +
 		`"id": 0,` +
 		`"depcfg":{"buckets":[{"alias":"dst_bucket","bucket_name":"` + dstBucketName + `"}],"metadata_bucket":"` + metaBucketName + `","source_bucket":"` + srcBucketName + `"},` +
@@ -748,18 +748,18 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		`}]`
 
 	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-		var eventingUrl string
+		var eventingURL string
 		var cleanup func()
 		var err error
-		if eventingUrl, cleanup, err = GetHostURL(targetKube, cluster, couchbasev2.EventingService); err != nil {
+		if eventingURL, cleanup, err = GetHostURL(targetKube, cluster, couchbasev2.EventingService); err != nil {
 			t.Log(err)
 			return false, retryutil.RetryOkError(err)
 		}
 		defer cleanup()
 
-		hostUrl := "http://" + eventingUrl + "/api/v1/functions?name=" + eventingFuncName
+		hostURL := "http://" + eventingURL + "/api/v1/functions?name=" + eventingFuncName
 
-		request, err := http.NewRequest(requestType, hostUrl, strings.NewReader(eventingJsonFunc))
+		request, err := http.NewRequest(requestType, hostURL, strings.NewReader(eventingJSONFunc))
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -815,9 +815,9 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 		}
 		defer cleanup()
 
-		hostUrl := "http://" + url + "/analytics/service"
+		hostURL := "http://" + url + "/analytics/service"
 
-		request, err := http.NewRequest("POST", hostUrl, bytes.NewReader(requestBodyRaw))
+		request, err := http.NewRequest("POST", hostURL, bytes.NewReader(requestBodyRaw))
 		if err != nil {
 			return err
 		}

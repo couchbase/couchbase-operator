@@ -312,7 +312,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				}
 
 				// Do dynamic TLS configuration.
-				tlsOpts := &e2eutil.TlsOpts{
+				tlsOpts := &e2eutil.TLSOpts{
 					ClusterName: object.GetName(),
 					AltNames: []string{
 						"*." + object.GetName() + "." + f.Namespace + ".svc",

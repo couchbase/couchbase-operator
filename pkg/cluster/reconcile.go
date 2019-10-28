@@ -1637,8 +1637,8 @@ func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
 			if boundUser, ok := users[user.ID]; ok {
 				// ...ignoring duplicates
 				for _, r := range roles {
-					userRoleId := user.ID + "-" + r.Role
-					if _, ok := boundUserRoles[userRoleId]; !ok {
+					userRoleID := user.ID + "-" + r.Role
+					if _, ok := boundUserRoles[userRoleID]; !ok {
 						// associate additional roles from ref with user
 						boundUser.Roles = append(boundUser.Roles, r)
 					}
@@ -1658,8 +1658,8 @@ func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
 				// keep track of specific roles so we can
 				// detect if a role has already been added
 				for _, r := range roles {
-					userRoleId := user.ID + "-" + r.Role
-					boundUserRoles[userRoleId] = true
+					userRoleID := user.ID + "-" + r.Role
+					boundUserRoles[userRoleID] = true
 				}
 			}
 		}

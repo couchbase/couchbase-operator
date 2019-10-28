@@ -22,8 +22,8 @@ import (
 
 const (
 	couchbaseContainerName          = "couchbase-server"
-	couchbaseTlsVolumeName          = "couchbase-server-tls"
-	couchbaseTlsVolumeMountDir      = "/opt/couchbase/var/lib/couchbase/inbox"
+	couchbaseTLSVolumeName          = "couchbase-server-tls"
+	couchbaseTLSVolumeMountDir      = "/opt/couchbase/var/lib/couchbase/inbox"
 	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
 	CouchbaseVolumeMountLogsDir     = "/opt/couchbase/var/lib/couchbase/logs"
 	couchbaseVolumeDefaultEtcDir    = "/opt/couchbase/etc"
@@ -356,7 +356,7 @@ func CreateCouchbasePodSpec(kubeCli kubernetes.Interface, m *couchbaseutil.Membe
 
 	applyPodPolicy(pod, config.Pod)
 
-	if err := applyPodTlsConfiguration(cluster.Spec, pod); err != nil {
+	if err := applyPodTLSConfiguration(cluster.Spec, pod); err != nil {
 		return nil, nil, err
 	}
 
@@ -672,7 +672,7 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 }
 
 // Adds any necessary pod prerequisites before enabling TLS
-func applyPodTlsConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
+func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 	if cs.Networking.TLS != nil {
 		// Static configuration:
 		// * Defines a volume which contains the secrets necessary
@@ -688,7 +688,7 @@ func applyPodTlsConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 
 			// Add the TLS secret volume to the pod
 			volume := v1.Volume{
-				Name: couchbaseTlsVolumeName,
+				Name: couchbaseTLSVolumeName,
 			}
 			volume.VolumeSource.Secret = &v1.SecretVolumeSource{
 				SecretName: cs.Networking.TLS.Static.Member.ServerSecret,
@@ -697,9 +697,9 @@ func applyPodTlsConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 
 			// Mount the secret volume in Couchbase's inbox
 			volumeMount := v1.VolumeMount{
-				Name:      couchbaseTlsVolumeName,
+				Name:      couchbaseTLSVolumeName,
 				ReadOnly:  true,
-				MountPath: couchbaseTlsVolumeMountDir,
+				MountPath: couchbaseTLSVolumeMountDir,
 			}
 			container, err := getCouchbaseContainer(pod)
 			if err != nil {

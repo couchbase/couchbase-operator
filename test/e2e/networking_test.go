@@ -56,7 +56,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	tlsOptions := &e2eutil.TlsOpts{
+	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
 		AltNames: []string{
 			"localhost",
@@ -104,7 +104,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 
 	// Create the cluster.
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
-	tlsOptions := &e2eutil.TlsOpts{
+	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
 		AltNames: []string{
 			fmt.Sprintf("*.%s.%s.svc", clusterName, f.Namespace),
@@ -160,7 +160,7 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 
 	// Create the cluster.
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
-	tlsOptions := &e2eutil.TlsOpts{
+	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
 		AltNames: []string{
 			fmt.Sprintf("*.%s.%s.svc", clusterName, f.Namespace),
@@ -209,7 +209,7 @@ func TestConsoleServiceDNS(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	tlsOptions := &e2eutil.TlsOpts{
+	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
 		AltNames: []string{
 			"localhost",
@@ -257,7 +257,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 
 	// Create the cluster.
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
-	tlsOptions := &e2eutil.TlsOpts{
+	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
 		AltNames: []string{
 			fmt.Sprintf("*.%s.%s.svc", clusterName, f.Namespace),
@@ -313,7 +313,7 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 
 	// Create the cluster.
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
-	tlsOptions := &e2eutil.TlsOpts{
+	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
 		AltNames: []string{
 			fmt.Sprintf("*.%s.%s.svc", clusterName, f.Namespace),

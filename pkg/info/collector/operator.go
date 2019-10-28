@@ -37,8 +37,8 @@ func (r *operatorCollector) Kind() string {
 	return "Operator"
 }
 
-// collectHttp genericly collects paths from a specifc port and saves the data as the specified key.
-func (r *operatorCollector) collectHttp(pod *corev1.Pod, targetPort string, paths map[string]string) error {
+// collectHTTP genericly collects paths from a specifc port and saves the data as the specified key.
+func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, paths map[string]string) error {
 	port, err := netutil.GetFreePort()
 	if err != nil {
 		return fmt.Errorf("unable to allocate port %v", err)
@@ -110,7 +110,7 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 
 	// Collect pprof data.  Technically these are available via /debug/pprof but that returns
 	// HTML, which we aren't touching without some sane Xpath support.
-	err = r.collectHttp(pod, r.context.Config.OperatorRestPort, map[string]string{
+	err = r.collectHTTP(pod, r.context.Config.OperatorRestPort, map[string]string{
 		"pprof.block":        "/debug/pprof/block?debug=1",
 		"pprof.goroutine":    "/debug/pprof/goroutine?debug=1",
 		"pprof.heap":         "/debug/pprof/heap?debug=1",
@@ -122,7 +122,7 @@ func (r *operatorCollector) Fetch(resource resource.ResourceReference) error {
 	}
 
 	// Collect prometheus metrics.
-	err = r.collectHttp(pod, r.context.Config.OperatorMetricsPort, map[string]string{
+	err = r.collectHTTP(pod, r.context.Config.OperatorMetricsPort, map[string]string{
 		"stats.cluster": "/metrics",
 	})
 	if err != nil {

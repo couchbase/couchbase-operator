@@ -307,7 +307,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 
 	// Create the first cluster.
-	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase1 = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase1)
 
 	// Create the second cluster.
-	ctx2, teardown2, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TlsOpts{})
+	ctx2, teardown2, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,10 +344,10 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 	testCouchbase2 = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase2)
 
-	if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx1); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, targetKube, f.Namespace, ctx1); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
-	if err := e2eutil.TlsCheckForCluster(t, targetKube, f.Namespace, ctx2); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, targetKube, f.Namespace, ctx2); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 

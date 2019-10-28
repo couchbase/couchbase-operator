@@ -407,7 +407,7 @@ type ClusterConfig struct {
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
 	// Auto-compaction settings
-	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty,omitempty"`
+	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.
@@ -492,7 +492,7 @@ type RemoteClusterTLS struct {
 // RemoteCluster is a reference to a remote cluster for XDCR.
 type RemoteCluster struct {
 	// Name of the remote cluster.  Referenced by Replications.
-	Name string `json:"name,onitempty"`
+	Name string `json:"name,omitempty"`
 
 	// UUID of the remote cluster.
 	UUID string `json:"uuid,omitempty"`

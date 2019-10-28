@@ -405,11 +405,11 @@ func createAnsibleHostFiles(filePathToSave string, kubeClusterSpec ClusterInfo) 
 
 	for index, nodeData := range kubeClusterSpec.MasterNodeList {
 		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-master" + strconv.Itoa(index+1)
-		masterSectionData += nodeData.Ip + " " + hostnameStr + "\n"
+		masterSectionData += nodeData.IP + " " + hostnameStr + "\n"
 	}
 	for index, nodeData := range kubeClusterSpec.WorkerNodeList {
 		hostnameStr := "hostname=k8s-" + kubeClusterSpec.ClusterName + "-worker" + strconv.Itoa(index+1)
-		workerSectionData += nodeData.Ip + " " + hostnameStr + "\n"
+		workerSectionData += nodeData.IP + " " + hostnameStr + "\n"
 	}
 
 	_, err = newClusterConfig.NewRawSection("master_node", masterSectionData)

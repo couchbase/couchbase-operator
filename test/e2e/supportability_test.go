@@ -272,14 +272,14 @@ func verifyLogRedaction(archive string) error {
 	return fmt.Errorf("file %s not redacted", archive)
 }
 
-func verifyLogCollectListJson(kubeClient kubernetes.Interface, namespace, cbClusterName, collectInfoListJson string, errMsgList *failureList) error {
+func verifyLogCollectListJSON(kubeClient kubernetes.Interface, namespace, cbClusterName, collectInfoListJSON string, errMsgList *failureList) error {
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
 	if err != nil {
 		return err
 	}
 
 	for _, pod := range pods.Items {
-		if !strings.Contains(collectInfoListJson, pod.Name) {
+		if !strings.Contains(collectInfoListJSON, pod.Name) {
 			errMsgList.AppendFailure("Pod missing from JSON output: "+pod.Name, fmt.Errorf("pod missing in JSON output"))
 		}
 	}
@@ -1658,7 +1658,7 @@ func TestLogCollectListJson(t *testing.T) {
 
 	errMsgList := failureList{}
 	testHasErrors := false
-	if err := verifyLogCollectListJson(targetKube.KubeClient, f.Namespace, cbCluster.Name, execOutStr, &errMsgList); err != nil {
+	if err := verifyLogCollectListJSON(targetKube.KubeClient, f.Namespace, cbCluster.Name, execOutStr, &errMsgList); err != nil {
 		t.Error(err)
 	}
 

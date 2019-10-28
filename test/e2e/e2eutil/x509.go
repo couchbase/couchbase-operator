@@ -307,7 +307,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 		return nil, err
 	}
 
-	subjectKeyId, err := generateSubjectKeyIdentifier(req.PublicKey)
+	subjectKeyID, err := generateSubjectKeyIdentifier(req.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +318,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 		NotBefore:             validFrom,
 		NotAfter:              validTo,
 		BasicConstraintsValid: true,
-		SubjectKeyId:          subjectKeyId,
+		SubjectKeyId:          subjectKeyID,
 		DNSNames:              req.DNSNames,
 	}
 
@@ -432,7 +432,7 @@ const (
 
 // tlsContext is generated per test, it contains certificates to be injected into
 // the cluster and the CA used to test they have been correctly installed.
-type TlsContext struct {
+type TLSContext struct {
 	// Client is the kubernetes client
 	Client kubernetes.Interface
 	// Namespace is the namespace the cluster lives in.
@@ -453,7 +453,7 @@ type TlsContext struct {
 	ClusterSecretName string
 }
 
-type TlsOpts struct {
+type TLSOpts struct {
 	// ClusterName is the name of the cluster
 	ClusterName string
 	// keyType is the type of key to use e.g. RSA or EC.  Defaults to KeyTypeRSA.
@@ -473,7 +473,7 @@ type TlsOpts struct {
 }
 
 // clusterSANs generates a valid set of SANs for a cluster.
-func (ctx *TlsContext) clusterSANs() []string {
+func (ctx *TLSContext) clusterSANs() []string {
 	return []string{
 		// Required for the Operator to connect to the cluster.
 		fmt.Sprintf("*.%s.%s.svc", ctx.ClusterName, ctx.Namespace),
@@ -484,9 +484,9 @@ func (ctx *TlsContext) clusterSANs() []string {
 
 // InitClusterTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
-func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func(), err error) {
+func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
 	// Create the context
-	ctx = &TlsContext{
+	ctx = &TLSContext{
 		Client:    client,
 		Namespace: namespace,
 	}
@@ -583,7 +583,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TlsOpts
 }
 
 // MustInitClusterTLS does the same as InitClusterTLS, dying on failure
-func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, opts *TlsOpts) (ctx *TlsContext, teardown func()) {
+func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
 	ctx, teardown, err := InitClusterTLS(k8s.KubeClient, namespace, opts)
 	if err != nil {
 		Die(t, err)
@@ -592,7 +592,7 @@ func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, opts
 }
 
 // MustRotateServerCertificate generates a new server certificate and updates the existing secret.
-func MustRotateServerCertificate(t *testing.T, ctx *TlsContext, subjectAltNames []string) {
+func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames []string) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -623,7 +623,7 @@ func MustRotateServerCertificate(t *testing.T, ctx *TlsContext, subjectAltNames 
 }
 
 // MustRotateClientCertificate generates a new client certificate and updates the existing secret.
-func MustRotateClientCertificate(t *testing.T, ctx *TlsContext) {
+func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -648,7 +648,7 @@ func MustRotateClientCertificate(t *testing.T, ctx *TlsContext) {
 }
 
 // MustRotateServerCertificateChain generates a new intermediate CA and server certificate and updates the existing secret.
-func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
+func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -685,7 +685,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TlsContext) {
 }
 
 // MustRotateClientCertificateChain generates a new intermediate CA and client certificate and updates the existing secret.
-func MustRotateClientCertificateChain(t *testing.T, ctx *TlsContext) {
+func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -722,7 +722,7 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TlsContext) {
 }
 
 // MustRotateServerCertificateAndCA generates a new CA and server certificate and updates the existing secret.
-func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
+func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -765,7 +765,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TlsContext) {
 }
 
 // MustRotateServerCertificateClientCertificateAndCA generates a new CA and client and server certificates and updates the existing secrets.
-func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TlsContext) {
+func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -820,7 +820,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TlsCon
 }
 
 // MustRotateServerCertificateWrongCA generates a new CA and server certificate, but only updates the server cert.
-func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
+func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -854,7 +854,7 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 }
 
 // MustRotateClientCertificateWrongCA generates a new CA and client certificate, but only updates the client cert.
-func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TlsContext) {
+func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
@@ -888,7 +888,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TlsContext) {
 
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
-func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TlsContext) error {
+func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TLSContext) error {
 	// Start the port forwarder
 	pf := portforward.PortForwarder{
 		Config:    k8s.Config,

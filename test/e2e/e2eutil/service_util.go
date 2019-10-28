@@ -44,7 +44,7 @@ func GetServices(kubeClient kubernetes.Interface, namespace string) ([]v1.Servic
 	return serviceList.Items, nil
 }
 
-func GetEventingIpAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
+func GetEventingIPAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
 	port, cleanup, err := forwardPort(k8s, namespace, pod, "8096")
 	if err != nil {
 		return "", "", nil, err
@@ -53,15 +53,15 @@ func GetEventingIpAndPort(k8s *types.Cluster, namespace, pod string) (string, st
 	return "127.0.0.1", port, cleanup, nil
 }
 
-func MustGetEventingIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
-	host, port, cleanup, err := GetEventingIpAndPort(k8s, namespace, pod)
+func MustGetEventingIPAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
+	host, port, cleanup, err := GetEventingIPAndPort(k8s, namespace, pod)
 	if err != nil {
 		Die(t, err)
 	}
 	return host, port, cleanup
 }
 
-func GetAnalyticsIpAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
+func GetAnalyticsIPAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
 	port, cleanup, err := forwardPort(k8s, namespace, pod, "8095")
 	if err != nil {
 		return "", "", nil, err
@@ -70,8 +70,8 @@ func GetAnalyticsIpAndPort(k8s *types.Cluster, namespace, pod string) (string, s
 	return "127.0.0.1", port, cleanup, nil
 }
 
-func MustGetAnalyticsIpAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
-	host, port, cleanup, err := GetAnalyticsIpAndPort(k8s, namespace, pod)
+func MustGetAnalyticsIPAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
+	host, port, cleanup, err := GetAnalyticsIPAndPort(k8s, namespace, pod)
 	if err != nil {
 		Die(t, err)
 	}

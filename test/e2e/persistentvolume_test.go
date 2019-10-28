@@ -558,8 +558,8 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 10*time.Minute)
 
 		// Populate the expectedPvcMap for maximum available nodes everytime
-		for memberId := 0; memberId < 9; memberId++ {
-			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberId)
+		for memberID := 0; memberID < 9; memberID++ {
+			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberID)
 			expectedPvcMap[memberName] = 0
 		}
 		podList, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + testCouchbase.Name})
