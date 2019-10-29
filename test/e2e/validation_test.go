@@ -451,6 +451,7 @@ func TestValidationCreate(t *testing.T) {
 }
 
 func TestNegValidationCreate(t *testing.T) {
+	invalidExternalTraficPolicy := corev1.ServiceExternalTrafficPolicyType("Donkey")
 	testDefs := []testDef{
 		{
 			name:           "TestValidateExposedFeaturesEnumInvalid",
@@ -804,6 +805,12 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      patchMap{"xdcr-tls-secret": jsonpatch.NewPatchSet().Remove("/data/ca")},
 			shouldFail:     true,
 			expectedErrors: []string{`xdcr tls secret xdcr-tls-secret for remote cluster starsky must contain key 'ca'`},
+		},
+		{
+			name:           "TestValidateExposedFeatureTrafficPolicyInvalid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/exposedFeatureTrafficPolicy", &invalidExternalTraficPolicy)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.exposedFeatureTrafficPolicy in body should match '^Cluster|Local$'`},
 		},
 	}
 

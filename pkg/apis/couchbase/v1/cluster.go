@@ -243,12 +243,20 @@ type ClusterSpec struct {
 	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
 	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
 
+	// ExposedFeatureTrafficPolicy defines how packets should be routed.
+	ExposedFeatureTrafficPolicy *v1.ServiceExternalTrafficPolicyType `json:"exposedFeatureTrafficPolicy,omitempty"`
+
 	// DNS points to information for Dynamic DNS support.
 	DNS *DNS `json:"dns,omitempty"`
 
 	// Platform gives a hint as to what platform we are running on and how
 	// to configure services etc.
 	Platform PlatformType `json:"platform,omitempty"`
+
+	// ServiceAnnotations allows services to be annotated with custom labels.
+	// Operator annotations are merged on top of these so have precedence as
+	// they are required for correct operation.
+	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 }
 
 // DNS contains information for Dynamic DNS support.

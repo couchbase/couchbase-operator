@@ -12,16 +12,12 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
-func init() {
-	if err := framework.ReadYamlData(); err != nil {
+func TestMain(m *testing.M) {
+	// Perform any static initialization
+	if err := framework.Init(); err != nil {
 		logrus.Error(err)
 		os.Exit(1)
 	}
-}
-
-func TestMain(m *testing.M) {
-	// Perform any static initialization
-	framework.Init()
 
 	// Run Test module
 	code := m.Run()

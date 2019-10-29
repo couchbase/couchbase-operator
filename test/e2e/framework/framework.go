@@ -43,28 +43,27 @@ import (
 
 // Init performs one time only initialization of the framework.  Dynamic calls to these
 // functions will result in race conditions and spurious failures.
-func Init() {
+func Init() error {
 	// Register CouchbaseCluster and CustomResourceDefinition types with the main library.
 	if err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	if err := couchbasev2.AddToScheme(scheme.Scheme); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	if err := apiextensionsv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	// Start the timeout timer.
 	startTimeoutTimer()
+
+	return readYamlData()
 }
 
-func ReadYamlData() (err error) {
+func readYamlData() (err error) {
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
 	flag.Parse()
 

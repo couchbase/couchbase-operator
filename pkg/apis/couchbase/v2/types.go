@@ -337,22 +337,30 @@ type CouchbaseClusterNetworkingSpec struct {
 	// AdminConsoleServices is a selector to choose specific services to expose via the admin console.
 	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`
 
+	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
+	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
+
 	// ExposedFeatures is a list of features to expose on the K8S node
 	// network.  They represent a subset of ports e.g. admin=8091,
 	// xdcr=8091,8092,11210, and thus may overlap.
 	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
 
-	// TLS contains the TLS configuration for the cluster.
-	TLS *TLSPolicy `json:"tls,omitempty"`
-
 	// ExposedFeatureServiceType defines whether to create a NodePort or LoadBalancer service.
 	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
 
-	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
-	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
+	// ExposedFeatureTrafficPolicy defines how packets should be routed.
+	ExposedFeatureTrafficPolicy *v1.ServiceExternalTrafficPolicyType `json:"exposedFeatureTrafficPolicy,omitempty"`
+
+	// TLS contains the TLS configuration for the cluster.
+	TLS *TLSPolicy `json:"tls,omitempty"`
 
 	// DNS points to information for Dynamic DNS support.
 	DNS *DNS `json:"dns,omitempty"`
+
+	// ServiceAnnotations allows services to be annotated with custom labels.
+	// Operator annotations are merged on top of these so have precedence as
+	// they are required for correct operation.
+	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {

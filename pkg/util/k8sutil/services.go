@@ -482,6 +482,7 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 
 	// Create the basic service.
 	service := createServiceManifest(ConsoleServiceName(cluster.Name), cluster.Spec.Networking.AdminConsoleServiceType, ports, labels, selectors)
+	mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
 
 	// If a DNS domain is specified add a DNS name for use with TLS.
 	if cluster.Spec.Networking.DNS != nil {
@@ -808,6 +809,7 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	labels := labelsForNodeService(cluster.Name, name)
 	selectors := getNodeServiceSelectors(cluster, name)
 	service := createServiceManifest(exposedServiceName, cluster.Spec.Networking.ExposedFeatureServiceType, allowedPorts, labels, selectors)
+	mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
 
 	// If a DNS domain is specified annotate with the pod DNS name.
 	if cluster.Spec.Networking.DNS != nil {
@@ -820,6 +822,9 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	// Enforce that traffic has to come directly to the k8s node avoiding the
 	// penalty of an extra hop and SNAT.
 	service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	if cluster.Spec.Networking.ExposedFeatureTrafficPolicy != nil {
+		service.Spec.ExternalTrafficPolicy = *cluster.Spec.Networking.ExposedFeatureTrafficPolicy
+	}
 
 	return service, nil
 }
@@ -873,6 +878,11 @@ func updateExposedService(service, requested *v1.Service) bool {
 	// This handles updates to the service type
 	if service.Spec.Type != requested.Spec.Type {
 		service.Spec.Type = requested.Spec.Type
+		updated = true
+	}
+	// This handles traffic policy updates
+	if service.Spec.ExternalTrafficPolicy != requested.Spec.ExternalTrafficPolicy {
+		service.Spec.ExternalTrafficPolicy = requested.Spec.ExternalTrafficPolicy
 		updated = true
 	}
 	// This handles updates to spec.exposedFeatures

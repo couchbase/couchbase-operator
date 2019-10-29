@@ -145,6 +145,7 @@ spec:
       - query
       - search
     adminConsoleServiceType: NodePort
+    exposedFeatureTrafficPolicy: Local
     exposedFeatureServiceType: NodePort
     dns:
       domain: "example.com"

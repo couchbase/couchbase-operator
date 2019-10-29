@@ -604,6 +604,10 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 											Type:    "string",
 											Pattern: "^NodePort|LoadBalancer$",
 										},
+										"exposedFeatureTrafficPolicy": apiextensionsv1beta1.JSONSchemaProps{
+											Type:    "string",
+											Pattern: "^Cluster|Local$",
+										},
 										"adminConsoleServiceType": apiextensionsv1beta1.JSONSchemaProps{
 											Type:    "string",
 											Pattern: "^NodePort|LoadBalancer$",
@@ -618,6 +622,9 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 													Type: "string",
 												},
 											},
+										},
+										"serviceAnnotations": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
 										},
 									},
 								},

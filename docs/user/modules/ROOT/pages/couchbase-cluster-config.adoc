@@ -33,6 +33,8 @@ spec:
   exposedFeatures:
     - xdcr
   exposedFeatureServiceType: LoadBalancer
+  serviceAnnotations:
+    my-annotation: my-value
   softwareUpdateNotifications: true
   serverGroups:
     - us-east-1a
@@ -192,6 +194,8 @@ spec:
   exposedFeatures:
     - xdcr
   exposedFeatureServiceType: LoadBalancer
+  serviceAnnotations:
+    my-annotation: my-value
   softwareUpdateNotifications: true
   serverGroups:
     - us-east-1a
@@ -303,6 +307,14 @@ This field defines how the per Couchbase node ports are exposed.  By default it 
 ____
 _Field rules:_ The `exposedFeatureServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
 ____
+
+=== serviceAnnotations
+
+This field defines any custom annotations to be added to console and per-pod (exposed feature) services.
+
+____
+_Field rules:_ The serviceAnnotations field is optional.  If specified it must be a map of key/value pairs conforming to Kubernetes annotation rules.
+___
 
 === softwareUpdateNotifications
 

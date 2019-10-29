@@ -57,6 +57,11 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 		// copy Couchbase's etc directory onto the PVC.
 		if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
 			initContainer := couchbaseInitContainer(cluster.Spec.Image, pvc.Name)
+			// Always attach requirements as some platforms will not allow
+			// you to run without them!!
+			if config.Pod != nil {
+				initContainer.Resources = config.Pod.Resources
+			}
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 		}
 	}
