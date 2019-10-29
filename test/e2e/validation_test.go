@@ -812,6 +812,12 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.networking.exposedFeatureTrafficPolicy in body should match '^Cluster|Local$'`},
 		},
+		{
+			name:           "TestValidateLoadBalancerSourceRanges",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/networking/loadBalanacerSourceRanges/-", "192.168.0.1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.loadBalanacerSourceRanges in body should match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$'`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

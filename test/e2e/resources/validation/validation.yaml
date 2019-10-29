@@ -158,6 +158,9 @@ spec:
         - path: subject.cn
           prefix: prefix
           delimiter: .
+    loadBalanacerSourceRanges:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
   logging:
     logRetentionTime: "24h"
     logRetentionCount: 10

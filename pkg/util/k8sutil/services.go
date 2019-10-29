@@ -353,6 +353,10 @@ func updatePeerService(current, requested *v1.Service) bool {
 		current.Spec.PublishNotReadyAddresses = requested.Spec.PublishNotReadyAddresses
 		updated = true
 	}
+	if !reflect.DeepEqual(current.Spec.LoadBalancerSourceRanges, requested.Spec.LoadBalancerSourceRanges) {
+		current.Spec.LoadBalancerSourceRanges = requested.Spec.LoadBalancerSourceRanges
+		updated = true
+	}
 	// Filled in by the API, so reset to what we generate
 	for i := range current.Spec.Ports {
 		current.Spec.Ports[i].TargetPort = intstr.IntOrString{}
@@ -501,6 +505,8 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 		if cluster.Spec.Platform != couchbasev2.PlatformTypeAWS {
 			service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		}
+
+		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges
 	} else {
 		// Ensure client sessions are maintained by routing to the same backend node based
 		// on the client IP address.
@@ -811,6 +817,10 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	service := createServiceManifest(exposedServiceName, cluster.Spec.Networking.ExposedFeatureServiceType, allowedPorts, labels, selectors)
 	mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
 
+	if cluster.Spec.IsExposedFeatureServiceTypePublic() {
+		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges
+	}
+
 	// If a DNS domain is specified annotate with the pod DNS name.
 	if cluster.Spec.Networking.DNS != nil {
 		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, name)
@@ -883,6 +893,10 @@ func updateExposedService(service, requested *v1.Service) bool {
 	// This handles traffic policy updates
 	if service.Spec.ExternalTrafficPolicy != requested.Spec.ExternalTrafficPolicy {
 		service.Spec.ExternalTrafficPolicy = requested.Spec.ExternalTrafficPolicy
+		updated = true
+	}
+	if !reflect.DeepEqual(service.Spec.LoadBalancerSourceRanges, requested.Spec.LoadBalancerSourceRanges) {
+		service.Spec.LoadBalancerSourceRanges = requested.Spec.LoadBalancerSourceRanges
 		updated = true
 	}
 	// This handles updates to spec.exposedFeatures

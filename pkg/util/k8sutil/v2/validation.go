@@ -626,6 +626,15 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 										"serviceAnnotations": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "object",
 										},
+										"loadBalanacerSourceRanges": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "array",
+											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+												Schema: &apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "string",
+													Pattern: `^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$`,
+												},
+											},
+										},
 									},
 								},
 								"logging": apiextensionsv1beta1.JSONSchemaProps{

@@ -361,6 +361,11 @@ type CouchbaseClusterNetworkingSpec struct {
 	// Operator annotations are merged on top of these so have precedence as
 	// they are required for correct operation.
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
+
+	// LoadBalancerSourceRanges applies only when an exposed service is of type
+	// LoadBalancer and limits the source IP ranges that are allowed to use the
+	// service.
+	LoadBalancerSourceRanges []string `json:"loadBalanacerSourceRanges,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
