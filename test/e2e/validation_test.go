@@ -1030,25 +1030,6 @@ func TestNegValidationApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services in body cannot be updated"},
 		},
-		// Verify for Default/Log volume mounts mutual exclusion
-		{
-			name:           "TestValidateVolumeMountsImmutable_1",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/pod/volumeMounts/logs", "couchbase")},
-			shouldFail:     true,
-			expectedErrors: []string{"logs in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-		},
-		{
-			name:           "TestValidateVolumeMountsImmutable_2",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/pod/volumeMounts/default", "couchbase-log-pv")},
-			shouldFail:     true,
-			expectedErrors: []string{"default in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-		},
-		{
-			name:           "TestValidateVolumeMountsImmutable_3",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/2/pod/volumeMounts/logs", "couchbase-log-pv")},
-			shouldFail:     true,
-			expectedErrors: []string{"logs in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-		},
 		// Validation for logRetentionTime and logRetentionCount field
 		{
 			name:           "TestValidateApplyLogRetentionTimeInvalidPattern",
@@ -1094,31 +1075,6 @@ func TestNegValidationApply(t *testing.T) {
 		}
 		testDefs = append(testDefs, testCase)
 	}
-
-	// Cases to validate by defining Stateful volumes without defining default
-	volMountsMap := map[string]string{
-		"data":  "data",
-		"index": "index",
-	}
-	for mntField, mntName := range volMountsMap {
-		testCase := testDef{
-			name: "TestValidateApplyServerVolumeMountsImmutable_" + mntName,
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Replace("/spec/servers/0/pod/volumeMounts/"+mntField, "couchbase").
-				Remove("/spec/servers/0/pod/volumeMounts/default")},
-			shouldFail:     true,
-			expectedErrors: []string{mntName + " in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-		}
-		testDefs = append(testDefs, testCase)
-	}
-	// analytics in an array parameter
-	testCase := testDef{
-		name:           "TestValidateApplyServerVolumeMountsImmutable_analytics",
-		mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/pod/volumeMounts/analytics", []string{"couchbase"}).Remove("/spec/servers/0/pod/volumeMounts/default")},
-		shouldFail:     true,
-		expectedErrors: []string{"analytics in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-	}
-	testDefs = append(testDefs, testCase)
 
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
@@ -1248,31 +1204,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/2/serverGroups", []string{"us-east-1a", "us-east-1b", "us-east-1c"})},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[2].serverGroups in body cannot be updated"},
-		},
-		// Persistent volume spec updation
-		{
-			name:           "TestValidateApplyVolumeMountsImmutable_data",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/pod/volumeMounts/data", "newVolumeMount")},
-			shouldFail:     true,
-			expectedErrors: []string{"data in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-		},
-		{
-			name:           "TestValidateApplyVolumeMountsImmutable_default",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/pod/volumeMounts/default", "newVolumeMount")},
-			shouldFail:     true,
-			expectedErrors: []string{"default in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-		},
-		{
-			name:           "TestValidateApplyVolumeMountsImmutable_index",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/pod/volumeMounts/index", "newVolumeMount")},
-			shouldFail:     true,
-			expectedErrors: []string{"index in spec.servers[*].Pod.VolumeMounts cannot be updated"},
-		},
-		{
-			name:           "TestValidateApplyVolumeMountsImmutable_analytics",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/pod/volumeMounts/analytics/0", "newVolumeMount")},
-			shouldFail:     true,
-			expectedErrors: []string{"analytics in spec.servers[*].Pod.VolumeMounts cannot be updated"},
 		},
 		{
 			name:           "TestValidateApplyVolumeTemplatesStorageClassImmutable",
