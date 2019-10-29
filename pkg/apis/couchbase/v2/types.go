@@ -90,6 +90,42 @@ type CouchbaseReplication struct {
 // CompressionType represents all allowable XDCR compression modes.
 type CompressionType string
 
+const (
+	// CompressionTypeNone applies no compression
+	CompressionTypeNone CompressionType = "None"
+
+	// CompressionTypeAuto automatically applies compression based on internal heuristics.
+	CompressionTypeAuto CompressionType = "Auto"
+
+	// CompressionTypeSnappy applies snappy compression to all documents.
+	CompressionTypeSnappy CompressionType = "Snappy"
+)
+
+type CouchbaseReplicationSpec struct {
+	// Bucket is the source bucket to replicate from.  This must be defined and
+	// selected by the cluster.
+	Bucket string `json:"bucket,omitempty"`
+
+	// RemoteBucket is the remote bucket name to synchronize to.
+	RemoteBucket string `json:"remoteBucket,omitempty"`
+
+	// CompressionType is the type of compression to apply to the replication.
+	CompressionType CompressionType `json:"compressionType,omitempty"`
+
+	// FilterExpression allows certain documents to be filtered out of the replication.
+	FilterExpression string `json:"filterExpression,omitempty"`
+
+	// Paused allows a replication to be stopped and restarted.
+	Paused bool `json:"paused,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseReplicationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseReplication `json:"items"`
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseUser struct {
@@ -178,39 +214,6 @@ type CouchbaseRoleBindingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CouchbaseRoleBinding `json:"items"`
-}
-
-const (
-	// CompressionTypeNone applies no compression
-	CompressionTypeNone CompressionType = "none"
-
-	// CompressionTypeAuto automatically applies compression based on internal heuristics.
-	CompressionTypeAuto CompressionType = "auto"
-
-	// CompressionTypeSnappy applies snappy compression to all documents.
-	CompressionTypeSnappy CompressionType = "snappy"
-)
-
-type CouchbaseReplicationSpec struct {
-	// Bucket is the source bucket to replicate from.  This must be defined and
-	// selected by the cluster.
-	Bucket string `json:"bucket,omitempty"`
-
-	// RemoteBucket is the remote bucket name to synchronize to.
-	RemoteBucket string `json:"remoteBucket,omitempty"`
-
-	// CompressionType is the type of compression to apply to the replication.
-	CompressionType CompressionType `json:"compressionType,omitempty"`
-
-	// FilterExpression allows certain documents to be filtered out of the replication.
-	FilterExpression string `json:"filterExpression,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type CouchbaseReplicationList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CouchbaseReplication `json:"items"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

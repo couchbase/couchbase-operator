@@ -930,6 +930,11 @@ func (c *CouchbaseClient) CreateReplication(ms MemberSet, r *cbmgr.Replication) 
 	return c.client.CreateReplication(r)
 }
 
+func (c *CouchbaseClient) UpdateReplication(ms MemberSet, r *cbmgr.Replication) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.UpdateReplication(r)
+}
+
 func (c *CouchbaseClient) DeleteReplication(ms MemberSet, r *cbmgr.Replication) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteReplication(r)

@@ -548,6 +548,48 @@ func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object, pa
 	return bucket
 }
 
+func PatchReplication(k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseReplication, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return replication, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Get(replication.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Apply the patch set
+		after := before.DeepCopy()
+		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
+			return err
+		}
+
+		// If we are not modifiying e.g. just testing, then return ok
+		if reflect.DeepEqual(before, after) {
+			return nil
+		}
+
+		// Attempt to post the update
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Update(after)
+		if err != nil {
+			return err
+		}
+
+		replication = updated
+
+		// Everything successful
+		return nil
+	})
+}
+
+func MustPatchReplication(t *testing.T, k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseReplication {
+	replication, err := PatchReplication(k8s, replication, patches, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return replication
+}
+
 func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *couchbasev2.CouchbaseCluster) {
 	if err := DeleteCluster(t, crClient, kubeClient, cluster); err != nil {
 		Die(t, err)

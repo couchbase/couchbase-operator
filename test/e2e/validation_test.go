@@ -792,7 +792,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateXDCRReplicationCompressionTypeInvalid",
 			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/compressionType", couchbasev2.CompressionType("huggy-bear"))},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.compressionType in body should match '^none|auto|snappy$'`},
+			expectedErrors: []string{`spec.compressionType in body should match '^None|Auto|Snappy$'`},
 		},
 		{
 			name:           "TestValidateXDCRTLSSecretMissing",

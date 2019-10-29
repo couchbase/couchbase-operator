@@ -130,6 +130,7 @@ var (
 		"TestXDCRCreateTLSCluster":                 TestXDCRCreateTLSCluster,
 		"TestXDCRCreateMututalTLSCluster":          TestXDCRCreateMututalTLSCluster,
 		"TestXDCRCreateMandatoryMututalTLSCluster": TestXDCRCreateMandatoryMututalTLSCluster,
+		"TestXDCRPauseReplication":                 TestXDCRPauseReplication,
 		"TestXdcrSourceNodeDown":                   TestXdcrSourceNodeDown,
 		"TestXdcrSourceNodeAdd":                    TestXdcrSourceNodeAdd,
 		"TestXdcrTargetNodeServiceDelete":          TestXdcrTargetNodeServiceDelete,

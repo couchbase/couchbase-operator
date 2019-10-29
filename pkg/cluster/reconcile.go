@@ -1492,6 +1492,7 @@ func (c *Cluster) reconcileXDCR() error {
 				ReplicationType:  "continuous",
 				CompressionType:  string(replication.Spec.CompressionType),
 				FilterExpression: replication.Spec.FilterExpression,
+				PauseRequested:   replication.Spec.Paused,
 			})
 		}
 	}
@@ -1521,11 +1522,18 @@ CreateNextCluster:
 		c.raiseEvent(k8sutil.RemoteClusterAddedEvent(c.cluster, requested.Name))
 	}
 
-	// Create any new replications...
+	// Create/update any replications...
 CreateNextReplication:
 	for _, requested := range requestedReplications {
 		for _, current := range currentReplications {
 			if replicationKey(current) == replicationKey(requested) {
+				if !reflect.DeepEqual(current, requested) {
+					log.Info("Updating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
+					if err := c.client.UpdateReplication(c.readyMembers(), &requested); err != nil {
+						return err
+					}
+					c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr replication", c.cluster))
+				}
 				continue CreateNextReplication
 			}
 		}

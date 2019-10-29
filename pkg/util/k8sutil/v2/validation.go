@@ -358,6 +358,12 @@ func GetCouchbaseReplicationCRD() *apiextensionsv1beta1.CustomResourceDefinition
 					JSONPath:    ".spec.bucket",
 				},
 				{
+					Name:        "Paused",
+					Type:        "boolean",
+					Description: "Whether the replication is paused",
+					JSONPath:    ".spec.paused",
+				},
+				{
 					Name:     "Age",
 					Type:     "date",
 					JSONPath: ".metadata.creationTimestamp",
@@ -393,10 +399,13 @@ func GetCouchbaseReplicationCRD() *apiextensionsv1beta1.CustomResourceDefinition
 								},
 								"compressionType": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "string",
-									Pattern: "^none|auto|snappy$",
+									Pattern: "^None|Auto|Snappy$",
 								},
 								"filterExpression": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
+								},
+								"paused": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
 								},
 							},
 						},
