@@ -1286,6 +1286,10 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, error) {
 		// Get what the member actualliy looks like.
 		actual, err := c.kubeClient.CoreV1().Pods(c.cluster.Namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
+			// Pod doesn't exist (deleted or evicted), ignore it
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return nil, -1, err
 		}
 
