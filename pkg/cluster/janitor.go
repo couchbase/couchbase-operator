@@ -10,8 +10,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 )
 
 // janitorAbstractionInterface is an abstraction of PVCs for the benefit of unit testing.
@@ -34,37 +32,18 @@ type janitorAbstractionInterfaceImpl struct {
 
 // LogPVCList returns a list of all logging PVCs for the specified cluster.
 func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolumeClaim, error) {
-	// Filter only PVCs related to our app and cluster.
-	appRequirement, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App})
-	if err != nil {
-		return nil, err
-	}
-	clusterRequirement, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{j.cluster.cluster.Name})
-	if err != nil {
-		return nil, err
-	}
-	selector := labels.NewSelector()
-	selector = selector.Add(*appRequirement, *clusterRequirement)
-
 	// Fetch the list of PVCs.
-	pvcs, err := j.cluster.kubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return nil, err
-	}
+	pvcs := j.cluster.k8s.PersistentVolumeClaims.List()
 
 	logPvcs := []*corev1.PersistentVolumeClaim{}
-	for _, pvc := range pvcs.Items {
+	for _, pvc := range pvcs {
 		// If it's not a log volume ignore it.
-		if ok, err := k8sutil.IsLogPVC(&pvc); err != nil {
+		if ok, err := k8sutil.IsLogPVC(pvc); err != nil {
 			return nil, err
 		} else if !ok {
 			continue
 		}
-		// Shallow copy the PVC into its own storage or we will end
-		// up referencing the loop variable which contains the last
-		// pvc examined.
-		t := pvc
-		logPvcs = append(logPvcs, &t)
+		logPvcs = append(logPvcs, pvc)
 	}
 
 	return logPvcs, nil
@@ -72,7 +51,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 
 // LogPVCUpdate updates the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVolumeClaim) error {
-	if _, err := j.cluster.kubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(pvc); err != nil {
+	if _, err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(pvc); err != nil {
 		return err
 	}
 	return nil
@@ -80,7 +59,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVol
 
 // LogPVCDelete deleted the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
-	if err := j.cluster.kubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
+	if err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	return nil
@@ -88,12 +67,9 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
 
 // PodExists returns whether a pod exists or not.
 func (j *janitorAbstractionInterfaceImpl) PodExists(name string) (bool, error) {
-	pod, err := k8sutil.GetPod(j.cluster.kubeClient, j.cluster.cluster.Namespace, name)
-	if err != nil {
-		if k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return false, nil
-		}
-		return false, err
+	pod, found := j.cluster.k8s.Pods.Get(name)
+	if !found {
+		return false, nil
 	}
 	// Check this isn't cbopinfo doing a collection.
 	if v, ok := pod.Labels["app"]; ok && v == "cbopinfo" {

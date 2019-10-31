@@ -24,8 +24,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
@@ -38,7 +38,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	// Establish DNS for cluster communication.
-	if err := k8sutil.ReconcilePeerServices(c.kubeClient, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
+	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
 		return err
 	}
 
@@ -52,7 +52,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	// internal state in all the cases when a pod fails to be created, deleted,
 	// or disappears
 	var err error
-	if c.scheduler, err = scheduler.New(c.kubeClient, c.cluster); err != nil {
+	if c.scheduler, err = scheduler.New(c.k8s, c.cluster); err != nil {
 		return err
 	}
 
@@ -160,7 +160,7 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
 
 // logFailedMember outputs any debug information we can about a failed member creation.
 func (c *Cluster) logFailedMember(name string) {
-	log.Info("Member creation failed", "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.kubeClient, c.cluster.Namespace, name))
+	log.Info("Member creation failed", "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, name))
 }
 
 // Create a new Couchbase cluster member
@@ -369,26 +369,23 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 
 // gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
 func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
-	// TODO: Shared informers/cache please
-	listOpts := metav1.ListOptions{}
+	selector := labels.Everything()
 	if c.cluster.Spec.Buckets.Selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(c.cluster.Spec.Buckets.Selector)
+		var err error
+		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Buckets.Selector); err != nil {
+			return nil, err
+		}
 	}
-	couchbaseBuckets, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseBuckets(c.cluster.Namespace).List(listOpts)
-	if err != nil {
-		return nil, err
-	}
-	couchbaseEphemeralBuckets, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseEphemeralBuckets(c.cluster.Namespace).List(listOpts)
-	if err != nil {
-		return nil, err
-	}
-	couchbaseMemcachedBuckets, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseMemcachedBuckets(c.cluster.Namespace).List(listOpts)
-	if err != nil {
-		return nil, err
-	}
+	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
+	couchbaseEphemeralBuckets := c.k8s.CouchbaseEphemeralBuckets.List()
+	couchbaseMemcachedBuckets := c.k8s.CouchbaseMemcachedBuckets.List()
 
 	buckets := []cbmgr.Bucket{}
-	for _, bucket := range couchbaseBuckets.Items {
+	for _, bucket := range couchbaseBuckets {
+		if !selector.Matches(labels.Set(bucket.Labels)) {
+			continue
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
 			BucketName:         bucket.Name,
 			BucketType:         constants.BucketTypeCouchbase,
@@ -402,7 +399,11 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
-	for _, bucket := range couchbaseEphemeralBuckets.Items {
+	for _, bucket := range couchbaseEphemeralBuckets {
+		if !selector.Matches(labels.Set(bucket.Labels)) {
+			continue
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
 			BucketName:         bucket.Name,
 			BucketType:         constants.BucketTypeEphemeral,
@@ -415,7 +416,11 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
-	for _, bucket := range couchbaseMemcachedBuckets.Items {
+	for _, bucket := range couchbaseMemcachedBuckets {
+		if !selector.Matches(labels.Set(bucket.Labels)) {
+			continue
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
 			BucketName:        bucket.Name,
 			BucketType:        constants.BucketTypeMemcached,
@@ -538,7 +543,7 @@ func (c *Cluster) reconcileBuckets() error {
 // reconcile changes to selected pod labels for
 // the nodePort service exposing admin console
 func (c *Cluster) reconcileAdminService() error {
-	status, err := k8sutil.UpdateAdminConsole(c.kubeClient, c.cluster, &c.cluster.Status)
+	status, err := k8sutil.UpdateAdminConsole(c.k8s, c.cluster, &c.cluster.Status)
 	if err != nil {
 		log.Error(err, "UI service update failed", "cluster", c.namespacedName())
 		return err
@@ -563,7 +568,7 @@ func (c *Cluster) reconcileAdminService() error {
 // specification and add/removes services as requested, raising events as
 // appropriate.
 func (c *Cluster) reconcileExposedFeatures() error {
-	status, err := k8sutil.UpdateExposedFeatures(c.kubeClient, c.members, c.cluster, &c.cluster.Status)
+	status, err := k8sutil.UpdateExposedFeatures(c.k8s, c.members, c.cluster, &c.cluster.Status)
 	if err != nil {
 		return err
 	}
@@ -621,9 +626,9 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 		if cs.Networking.TLS.Static != nil {
 			// Grab the operator secret
 			secretName := cs.Networking.TLS.Static.OperatorSecret
-			secret, err := k8sutil.GetSecret(c.kubeClient, secretName, c.cluster.Namespace, nil)
-			if err != nil {
-				return err
+			secret, found := c.k8s.Secrets.Get(secretName)
+			if !found {
+				return fmt.Errorf("unable to get operator secret %s", secretName)
 			}
 
 			// Extract the CA's PEM data
@@ -764,17 +769,11 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
 			podName := strings.Split(existingMember.HostName, ".")[0]
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.kubeClient, c.cluster.Namespace, podName)
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
 
-			// A status error from the API probably means a 404, just reuse the old
-			// server group location
+			// Just reuse the old server group location on error, the pod is likely down
 			if err != nil {
-				switch err.(type) {
-				case *errors.StatusError:
-					scheduledServerGroup = existingGroup.Name
-				default:
-					return false, err
-				}
+				scheduledServerGroup = existingGroup.Name
 			}
 
 			// TODO: should we flag this as a warning and leave it where it is?
@@ -837,17 +836,11 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
 			podName := strings.Split(existingMember.HostName, ".")[0]
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.kubeClient, c.cluster.Namespace, podName)
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
 
-			// A status error from the API probably means a 404, just reuse the old
-			// server group location
+			// Just reuse the old server group location on error, the pod is likely down
 			if err != nil {
-				switch err.(type) {
-				case *errors.StatusError:
-					scheduledServerGroup = existingGroup.Name
-				default:
-					return false, err
-				}
+				scheduledServerGroup = existingGroup.Name
 			}
 
 			// TODO: should we flag this as a warning and leave it where it is?
@@ -877,13 +870,13 @@ func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member)
 	} else {
 		// Lookup the node IP the pod is running on.
 		var err error
-		hostname, err = k8sutil.GetHostIP(c.kubeClient, c.cluster.Namespace, member.Name)
+		hostname, err = k8sutil.GetHostIP(c.k8s, member.Name)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.kubeClient, c.cluster.Namespace, member.Name)
+	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.k8s, c.cluster.Namespace, member.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -945,10 +938,6 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// Get the requested alternate address specification.
 		addresses, err := c.createAlternateAddressesExternal(member)
 		if err != nil {
-			// Ignore this pod if the service hasn't been created yet.
-			if errors.IsNotFound(err) {
-				continue
-			}
 			return err
 		}
 
@@ -997,10 +986,6 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 		// Get the requested alternate address specification.
 		addresses, err := c.createAlternateAddressesExternal(member)
 		if err != nil {
-			// Ignore this pod if the service hasn't been created yet.
-			if errors.IsNotFound(err) {
-				continue
-			}
 			return false, err
 		}
 
@@ -1258,7 +1243,7 @@ func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 		return nil
 	}
 
-	err := k8sutil.IsPodRecoverable(c.kubeClient, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
+	err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name)
 	if err != nil {
 		if _, ok := err.(cberrors.ErrNoVolumeMounts); ok {
 			// Pod is not configured for volumes
@@ -1303,21 +1288,17 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		member := c.members[name]
 
 		// Get what the member actualliy looks like.
-		actual, err := c.kubeClient.CoreV1().Pods(c.cluster.Namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			// Pod doesn't exist (deleted or evicted), ignore it
-			if errors.IsNotFound(err) {
-				continue
-			}
-			return nil, -1, "", err
+		actual, exists := c.k8s.Pods.Get(name)
+		if !exists {
+			continue
 		}
 
 		// Get what the member should look like.
 		serverClass := c.cluster.Spec.GetServerConfigByName(member.ServerConfig)
 		if serverClass == nil {
-			return nil, -1, "", err
+			continue
 		}
-		requested, _, err := k8sutil.CreateCouchbasePodSpec(c.kubeClient, member, c.cluster, *serverClass)
+		requested, _, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
 			return nil, -1, "", err
 		}
@@ -1434,11 +1415,11 @@ func (c *Cluster) reportUpgradeComplete() error {
 // number of evictions during a drain i.e. k8s upgrade.
 func (c *Cluster) reconcileReadiness() error {
 	for name := range c.members {
-		if err := k8sutil.FlagPodReady(c.kubeClient, c.cluster.Namespace, name); err != nil {
+		if err := k8sutil.FlagPodReady(c.k8s, name); err != nil {
 			return err
 		}
 	}
-	return k8sutil.ReconcilePDB(c.kubeClient, c.cluster)
+	return k8sutil.ReconcilePDB(c.k8s, c.cluster)
 }
 
 // replicationKey returns a unique identifier per replication.
@@ -1463,9 +1444,9 @@ func (c *Cluster) reconcileXDCR() error {
 		}
 
 		if cluster.AuthenticationSecret != nil {
-			secret, err := k8sutil.GetSecret(c.kubeClient, *cluster.AuthenticationSecret, c.cluster.Namespace, nil)
-			if err != nil {
-				return err
+			secret, found := c.k8s.Secrets.Get(*cluster.AuthenticationSecret)
+			if !found {
+				return fmt.Errorf("unable to get remote cluster authentication secret %s", *cluster.AuthenticationSecret)
 			}
 			requested.Username = string(secret.Data["username"])
 			requested.Password = string(secret.Data["password"])
@@ -1473,9 +1454,9 @@ func (c *Cluster) reconcileXDCR() error {
 
 		if cluster.TLS != nil {
 			if cluster.TLS.Secret != nil {
-				secret, err := k8sutil.GetSecret(c.kubeClient, *cluster.TLS.Secret, c.cluster.Namespace, nil)
-				if err != nil {
-					return err
+				secret, found := c.k8s.Secrets.Get(*cluster.TLS.Secret)
+				if !found {
+					return fmt.Errorf("unable to get remote cluster TLS secret %s", *cluster.TLS.Secret)
 				}
 				if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
 					return fmt.Errorf("CA certificate is required for TLS encryption")
@@ -1499,16 +1480,20 @@ func (c *Cluster) reconcileXDCR() error {
 
 		requestedClusters = append(requestedClusters, requested)
 
-		listOpts := metav1.ListOptions{}
+		selector := labels.Everything()
 		if cluster.Replications.Selector != nil {
-			listOpts.LabelSelector = metav1.FormatLabelSelector(c.cluster.Spec.Buckets.Selector)
+			var err error
+			if selector, err = metav1.LabelSelectorAsSelector(cluster.Replications.Selector); err != nil {
+				return err
+			}
 		}
-		replications, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseReplications(c.cluster.Namespace).List(listOpts)
-		if err != nil {
-			return err
-		}
+		replications := c.k8s.CouchbaseReplications.List()
 
-		for _, replication := range replications.Items {
+		for _, replication := range replications {
+			if !selector.Matches(labels.Set(replication.Labels)) {
+				continue
+			}
+
 			requestedReplications = append(requestedReplications, cbmgr.Replication{
 				FromBucket:       replication.Spec.Bucket,
 				ToCluster:        cluster.Name,
@@ -1630,13 +1615,16 @@ func (c *Cluster) reconcilePersistentStatus() error {
 
 // gatherUsers loads up user configurations from Kubernetes and marshalls them into canonical form.
 func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
-	listOpts := metav1.ListOptions{}
+	selector := labels.Everything()
+	if c.cluster.Spec.Security.RBAC.Selector != nil {
+		var err error
+		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector); err != nil {
+			return nil, err
+		}
+	}
 
 	// only users with role bindings can be created
-	couchbaseRoleBindings, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseRoleBindings(c.cluster.Namespace).List(listOpts)
-	if err != nil {
-		return nil, err
-	}
+	couchbaseRoleBindings := c.k8s.CouchbaseRoleBindings.List()
 
 	// requested users
 	users := make(map[string]*cbmgr.User)
@@ -1645,22 +1633,23 @@ func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
 	boundUserRoles := make(map[string]bool)
 
 	// step through role binding gathering requested users
-	for _, roleBinding := range couchbaseRoleBindings.Items {
+	for _, roleBinding := range couchbaseRoleBindings {
+		if !selector.Matches(labels.Set(roleBinding.Labels)) {
+			continue
+		}
 
 		// gather roles
 		roles := []cbmgr.UserRole{}
 		roleRef := roleBinding.Spec.RoleRef
 		roleName := roleRef.Name
-		couchbaseRole, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseRoles(c.cluster.Namespace).Get(roleName, metav1.GetOptions{})
+		couchbaseRole, found := c.k8s.CouchbaseRoles.Get(roleName)
 
 		// attempt to get referenced role, and warn if missing because
 		// users may be deleted if there are no roles to bind
-		if k8sutil.IsKubernetesResourceNotFoundError(err) {
-			err = fmt.Errorf("rolebinding `%s` refers to a missing role resource `%s`", roleBinding.Name, roleName)
+		if !found {
+			err := fmt.Errorf("rolebinding `%s` refers to a missing role resource `%s`", roleBinding.Name, roleName)
 			log.Error(err, "User may be deleted if no longer bound to roles", "cluster", c.namespacedName())
 			continue
-		} else if err != nil {
-			return nil, err
 		}
 
 		for _, role := range couchbaseRole.Spec.Roles {
@@ -1679,15 +1668,13 @@ func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
 		// gather users bound to roles
 		for _, subject := range roleBinding.Spec.Subjects {
 			subjectName := subject.Name
-			couchbaseUser, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseUsers(c.cluster.Namespace).Get(subjectName, metav1.GetOptions{})
+			couchbaseUser, found := c.k8s.CouchbaseUsers.Get(subjectName)
 
 			// missing users will be deleted
-			if k8sutil.IsKubernetesResourceNotFoundError(err) {
-				err = fmt.Errorf("rolebinding `%s` refers to a missing user resource `%s`", roleBinding.Name, subjectName)
+			if !found {
+				err := fmt.Errorf("rolebinding `%s` refers to a missing user resource `%s`", roleBinding.Name, subjectName)
 				log.Error(err, "User may be deleted if no referenced by a role binding", "cluster", c.namespacedName())
 				continue
-			} else if err != nil {
-				return nil, err
 			}
 
 			// get secret info when using local auth
@@ -1740,10 +1727,9 @@ func (c *Cluster) gatherUsers() ([]cbmgr.User, error) {
 // Get auth password to be set for user
 func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 	var password string
-	opts := metav1.GetOptions{}
-	secret, err := c.kubeClient.CoreV1().Secrets(c.cluster.Namespace).Get(authSecret, opts)
-	if err != nil {
-		return password, err
+	secret, found := c.k8s.Secrets.Get(authSecret)
+	if !found {
+		return password, fmt.Errorf("unable to get rbac secret %s", authSecret)
 	}
 
 	data := secret.Data

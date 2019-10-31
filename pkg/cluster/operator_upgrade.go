@@ -84,7 +84,7 @@ func (c *Cluster) operatorUpgrade() error {
 		if err := jsonpatch.Apply(cluster, patches); err != nil {
 			return err
 		}
-		cluster, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
+		cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
 		if err != nil {
 			return err
 		}

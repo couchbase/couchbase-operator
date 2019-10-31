@@ -4,13 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/client"
+
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/client-go/kubernetes"
 )
 
 // serverList is a list of servers in a server group
@@ -144,40 +140,25 @@ type serverClassGroupMap map[string]serverGroups
 // PodGetter is an abstraction around the Kubernetes API for the purpose of
 // testability
 type PodGetter interface {
-	Get() ([]v1.Pod, error)
+	Get() []*v1.Pod
 }
 
 // k8sPodGetter gets pods related to the specified cluster via a specified client
 type k8sPodGetter struct {
 	// client is a client for accessing Kubernetes
-	client kubernetes.Interface
-	// cluster points to a Couchbase cluster object
-	cluster *couchbasev2.CouchbaseCluster
+	client *client.Client
 }
 
 // NewK8SPodGetter allocates and initializes a new k8sPodGetter
-func NewK8SPodGetter(client kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster) PodGetter {
+func NewK8SPodGetter(client *client.Client) PodGetter {
 	return &k8sPodGetter{
-		client:  client,
-		cluster: cluster,
+		client: client,
 	}
 }
 
 // Get returns the set of pods associated with the defined cluster object
-func (g *k8sPodGetter) Get() ([]v1.Pod, error) {
-	// List all pods in our cluster
-	clusterRequirement, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{g.cluster.Name})
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate label requirement '%s': %v", constants.LabelCluster, err)
-	}
-	selector := labels.NewSelector()
-	selector = selector.Add(*clusterRequirement)
-	pods, err := g.client.CoreV1().Pods(g.cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list existing pods: %v", err)
-	}
-
-	return pods.Items, nil
+func (g *k8sPodGetter) Get() []*v1.Pod {
+	return g.client.Pods.List()
 }
 
 // nullPodGetter returns no pods, used for testing
@@ -190,6 +171,6 @@ func NewNullPodGetter() PodGetter {
 }
 
 // Get returns an empty pod list
-func (g *nullPodGetter) Get() ([]v1.Pod, error) {
-	return []v1.Pod{}, nil
+func (g *nullPodGetter) Get() []*v1.Pod {
+	return []*v1.Pod{}
 }

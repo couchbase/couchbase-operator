@@ -78,33 +78,13 @@ func GetOperatorRole() *rbacv1.Role {
 					couchbasev2.EphemeralBucketCRDResourcePlural,
 					couchbasev2.MemcachedBucketCRDResourcePlural,
 					couchbasev2.ReplicationCRDResourcePlural,
-				},
-				Verbs: []string{
-					"list", // used by the operator to configure buckets.
-				},
-			},
-			{
-				APIGroups: []string{
-					couchbasev2.GroupName,
-				},
-				Resources: []string{
 					couchbasev2.UserCRDResourcePlural,
 					couchbasev2.RoleCRDResourcePlural,
-				},
-				Verbs: []string{
-					"list", // used by the operator to discover users and roles.
-					"get",  // used by the operator to validate users and roles.
-				},
-			},
-			{
-				APIGroups: []string{
-					couchbasev2.GroupName,
-				},
-				Resources: []string{
 					couchbasev2.RoleBindingCRDResourcePlural,
 				},
 				Verbs: []string{
-					"list", // used by the operator to discover user role bindings.
+					"list",  // used by the operator for caching
+					"watch", // used by the operator for caching
 				},
 			},
 			{
@@ -131,8 +111,8 @@ func GetOperatorRole() *rbacv1.Role {
 				},
 				Verbs: []string{
 					"get",    // used by the operator to get specific resources.
-					"list",   // used by the operator to list all resources.
-					"watch",  // used by the operator to monitor changes to resources (pods, pvcs only).
+					"list",   // used by the operator for caching
+					"watch",  // used by the operator for caching
 					"create", // used by the operator to create resources.
 					"update", // used by the operator to modify resources.
 					"delete", // used by the operator to delete resources.
@@ -169,7 +149,9 @@ func GetOperatorRole() *rbacv1.Role {
 					"secrets",
 				},
 				Verbs: []string{
-					"get", // used by the operator to get cluster and TLS secrets.
+					"get",   // used by the operator to get cluster and TLS secrets.
+					"list",  // used by the operator for caching
+					"watch", // used by the operator for caching
 				},
 			},
 			// Require read/write of pod disruption budgets.
@@ -184,6 +166,8 @@ func GetOperatorRole() *rbacv1.Role {
 					"get",    // used by the operator to get pod disruption budgets.
 					"create", // used by the operator to create pod disruption budgets.
 					"delete", // used by the operator to delete pod disruption budgets.
+					"list",   // used by the operator for caching
+					"watch",  // used by the operator for caching
 				},
 			},
 		},

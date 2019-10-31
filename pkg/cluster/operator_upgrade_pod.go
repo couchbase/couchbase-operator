@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -26,7 +25,7 @@ type podUpgradableResource struct {
 	// cluster is a reference to the cluster for client and namespace access.
 	cluster *Cluster
 	// pods is a local cache of fetched resource items.
-	pods *corev1.PodList
+	pods []*corev1.Pod
 	// actions is the list of possible upgrade actions to perform on a resource item.
 	actions podUpgradeActionList
 }
@@ -46,25 +45,21 @@ func (r *podUpgradableResource) kind() string {
 }
 
 func (r *podUpgradableResource) name(item int) string {
-	return r.pods.Items[item].Name
+	return r.pods[item].Name
 }
 
 func (r *podUpgradableResource) fetch() error {
-	var err error
-	r.pods, err = r.cluster.kubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).List(k8sutil.ClusterListOpt(r.cluster.cluster.Name))
-	if err != nil {
-		return err
-	}
+	r.pods = r.cluster.k8s.Pods.List()
 	return nil
 }
 
 func (r *podUpgradableResource) lenItems() int {
-	return len(r.pods.Items)
+	return len(r.pods)
 }
 
 func (r *podUpgradableResource) itemVersion(item int) string {
 	version := "0.0.0"
-	if v, ok := r.pods.Items[item].Annotations[constants.ResourceVersionAnnotation]; ok {
+	if v, ok := r.pods[item].Annotations[constants.ResourceVersionAnnotation]; ok {
 		version = v
 	}
 	return version
@@ -79,7 +74,7 @@ func (r *podUpgradableResource) actionVersionRange(action int) upgradeRange {
 }
 
 func (r *podUpgradableResource) perform(item, action int) error {
-	pod := &r.pods.Items[item]
+	pod := r.pods[item]
 	upgrade := r.actions[action].action
 	if err := upgrade(r.cluster, pod); err != nil {
 		return err
@@ -88,8 +83,8 @@ func (r *podUpgradableResource) perform(item, action int) error {
 }
 
 func (r *podUpgradableResource) commit(item int) error {
-	pod := &r.pods.Items[item]
-	if _, err := r.cluster.kubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(pod); err != nil {
+	pod := r.pods[item]
+	if _, err := r.cluster.k8s.KubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(pod); err != nil {
 		return err
 	}
 	return nil

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -25,9 +25,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -76,22 +75,21 @@ type Config struct {
 }
 
 type Cluster struct {
-	config              Config
-	kubeClient          kubernetes.Interface
-	couchbaseKubeClient versioned.Interface
-	cluster             *couchbasev2.CouchbaseCluster
-	members             couchbaseutil.MemberSet
-	username            string
-	password            string
-	client              *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
-	ctx                 context.Context                // Context used to cancel long running operations
-	cancel              context.CancelFunc             // Closure on the context to indicate cancellation
-	lastEvent           time.Time                      // When we raised the last event (see raiseEvent)
-	scheduler           scheduler.Scheduler            // Pod placement scheduler
-	forceUpdate         bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
-	eventCache          *lru.Cache                     // Used to store events for aggregation
-	state               persistence.PersistentStorage  // Used to store persistent cluster state
-	recoveryTime        map[string]time.Time           // Used to determine when to manually recover nodes
+	config       Config
+	k8s          *client.Client
+	cluster      *couchbasev2.CouchbaseCluster
+	members      couchbaseutil.MemberSet
+	username     string
+	password     string
+	client       *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
+	ctx          context.Context                // Context used to cancel long running operations
+	cancel       context.CancelFunc             // Closure on the context to indicate cancellation
+	lastEvent    time.Time                      // When we raised the last event (see raiseEvent)
+	scheduler    scheduler.Scheduler            // Pod placement scheduler
+	forceUpdate  bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
+	eventCache   *lru.Cache                     // Used to store events for aggregation
+	state        persistence.PersistentStorage  // Used to store persistent cluster state
+	recoveryTime map[string]time.Time           // Used to determine when to manually recover nodes
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
@@ -109,24 +107,19 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 		recoveryTime: map[string]time.Time{},
 	}
 
-	kubeconfig, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
+	// Cancel is used to abort the go routine when the operator is deleted
+	c.ctx, c.cancel = context.WithCancel(context.Background())
 
-	c.kubeClient, err = kubernetes.NewForConfig(kubeconfig)
-	if err != nil {
-		return nil, err
-	}
-
-	c.couchbaseKubeClient, err = versioned.NewForConfig(kubeconfig)
+	// Initialize Kubernetes clients and caches.
+	var err error
+	c.k8s, err = client.NewClient(c.ctx, c.cluster.Namespace, labels.SelectorFromSet(k8sutil.LabelsForCluster(c.cluster.Name)))
 	if err != nil {
 		return nil, err
 	}
 
 	// Create a new persistence layer to store and retrieve state.  Add in
 	// defaults if they don't exist.
-	if c.state, err = persistence.New(c.kubeClient, cl); err != nil {
+	if c.state, err = persistence.New(c.k8s.KubeClient, cl); err != nil {
 		return nil, err
 	}
 	if err := c.state.Insert(persistence.Phase, string(couchbasev2.ClusterPhaseNone)); err != nil && !persistence.IsKeyError(err) {
@@ -136,13 +129,10 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 		return nil, err
 	}
 
-	// Cancel is used to abort the go routine when the operator is deleted
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-
 	log.Info("Watching new cluster", "cluster", c.namespacedName())
 
 	// Initialize the scheduler for the initial pod
-	if c.scheduler, err = scheduler.New(c.kubeClient, c.cluster); err != nil {
+	if c.scheduler, err = scheduler.New(c.k8s, c.cluster); err != nil {
 		log.Error(err, "Error initializing pod scheduler", "cluster", c.namespacedName())
 		return nil, err
 	}
@@ -172,6 +162,8 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 func (c *Cluster) Delete() {
 	// Notify client operations to stop what they are doing e.g. abort retry loops
 	c.cancel()
+	// Clean up caches.
+	c.k8s.Shutdown()
 }
 
 func (c *Cluster) setup() error {
@@ -205,7 +197,7 @@ func (c *Cluster) setup() error {
 	}
 
 	// Establish DNS for cluster communication.
-	if err := k8sutil.ReconcilePeerServices(c.kubeClient, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
+	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
 		return err
 	}
 
@@ -232,10 +224,7 @@ func (c *Cluster) setup() error {
 		// tries to contact Couchbase server to verify membership, that will
 		// fail as TLS invalid.  We need to just take what we are given before
 		// making any calls to Couchbase server.
-		running, _, err := c.pollPods()
-		if err != nil {
-			return err
-		}
+		running, _ := c.pollPods()
 		c.members = podsToMemberSet(running)
 		if err := c.reconcileTLS(); err != nil {
 			return err
@@ -354,14 +343,7 @@ func (c *Cluster) runReconcile() {
 	// Otherwise indicate that we are in control.
 	c.cluster.Status.Control()
 
-	running, pending, err := c.pollPods()
-	if err != nil {
-		log.Error(err, "Failed to list pods", "cluster", c.namespacedName())
-		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
-		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
-		return
-	}
-
+	running, pending := c.pollPods()
 	if len(pending) > 0 {
 		// Pod startup might take long, e.g. pulling image. It would
 		// deterministically become running or succeeded/failed later.
@@ -425,7 +407,7 @@ func (c *Cluster) updateCRStatus() error {
 	// hence what's in etcd need not reflect what's locally cached and the k8s
 	// server will reject any updates that fail the CAS test.  We only pick up
 	// these updates between reconcile executions (see handleUpdateEvent).
-	cluster, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -437,7 +419,7 @@ func (c *Cluster) updateCRStatus() error {
 
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.cluster.Status
-	if _, err := c.couchbaseKubeClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
+	if _, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 		return err
 	}
 	return nil
@@ -449,7 +431,7 @@ func (c *Cluster) isSecureClient() bool {
 
 func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
 	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name, "image", c.cluster.Spec.Image)
-	_, err := k8sutil.CreateCouchbasePod(c.kubeClient, c.scheduler, c.cluster, m, serverSpec, ctx)
+	_, err := k8sutil.CreateCouchbasePod(c.k8s, c.scheduler, c.cluster, m, serverSpec, ctx)
 	return err
 }
 
@@ -458,7 +440,7 @@ func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, server
 func (c *Cluster) removePod(name string, removeVolumes bool) error {
 
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-	err := k8sutil.DeleteCouchbasePod(c.kubeClient, c.cluster.Namespace, c.cluster.Name, name, opts, removeVolumes)
+	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, opts, removeVolumes)
 	if err != nil {
 		log.Error(err, "Pod deletion failed", "cluster", c.namespacedName())
 		return err
@@ -476,7 +458,7 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 		return fmt.Errorf("config for pod does not exist: %s", m.ServerConfig)
 	}
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-	err := k8sutil.DeletePod(c.kubeClient, c.cluster.Namespace, m.Name, opts)
+	err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name, opts)
 	if err != nil {
 		return err
 	}
@@ -502,7 +484,7 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 
 // wait with context
 func (c *Cluster) waitForCreatePod(ctx context.Context, member *couchbaseutil.Member) error {
-	if err := k8sutil.WaitForPod(ctx, c.kubeClient, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
+	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
 		return err
 	}
 	return nil
@@ -511,7 +493,7 @@ func (c *Cluster) waitForCreatePod(ctx context.Context, member *couchbaseutil.Me
 func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 	ctx, cancel := context.WithTimeout(c.ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
-	if err := k8sutil.WaitForDeletePod(ctx, c.kubeClient, c.cluster.Namespace, podName); err != nil {
+	if err := k8sutil.WaitForDeletePod(ctx, c.k8s.KubeClient, c.cluster.Namespace, podName); err != nil {
 		return err
 	}
 	return nil
@@ -520,7 +502,7 @@ func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 	recoverable := false
 	if config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig); config != nil {
-		err := k8sutil.IsPodRecoverable(c.kubeClient, *config, m.Name, c.cluster.Name, c.cluster.Namespace)
+		err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name)
 		if err != nil {
 			log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name, "reason", err)
 		} else {
@@ -548,14 +530,10 @@ func (c *Cluster) recoverClusterDown() error {
 	return nil
 }
 
-func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
-	podList, err := c.kubeClient.CoreV1().Pods(c.cluster.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Name))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list running pods: %v", err)
-	}
+func (c *Cluster) pollPods() (running, pending []*v1.Pod) {
+	pods := c.k8s.Pods.List()
 
-	for i := range podList.Items {
-		pod := &podList.Items[i]
+	for _, pod := range pods {
 		// Avoid polling deleted pods
 		if pod.DeletionTimestamp != nil {
 			continue
@@ -576,7 +554,7 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod, err error) {
 		}
 	}
 
-	return running, pending, nil
+	return running, pending
 }
 
 func (c *Cluster) updateMemberStatus() error {
@@ -605,10 +583,9 @@ func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterSta
 
 // Use username and password from secret store
 func (c *Cluster) setupAuth(authSecret string) error {
-	opts := metav1.GetOptions{}
-	secret, err := c.kubeClient.CoreV1().Secrets(c.cluster.Namespace).Get(authSecret, opts)
-	if err != nil {
-		return err
+	secret, found := c.k8s.Secrets.Get(authSecret)
+	if !found {
+		return fmt.Errorf("unable to get admin secret %s", authSecret)
 	}
 
 	data := secret.Data
@@ -634,9 +611,9 @@ func (c *Cluster) initCouchbaseClient() error {
 	if c.isSecureClient() {
 		// Grab the operator secret
 		secretName := c.cluster.Spec.Networking.TLS.Static.OperatorSecret
-		secret, err := k8sutil.GetSecret(c.kubeClient, secretName, c.cluster.Namespace, nil)
-		if err != nil {
-			return err
+		secret, found := c.k8s.Secrets.Get(secretName)
+		if !found {
+			return fmt.Errorf("unable to get operator secret %s", secretName)
 		}
 
 		// Extract the data
@@ -713,7 +690,7 @@ func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 	}
 
 	// Post the event to kubernetes
-	event, err := c.kubeClient.CoreV1().Events(c.cluster.Namespace).Create(event)
+	event, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Create(event)
 	if err != nil {
 		log.Error(err, "Event creation failed", "cluster", c.namespacedName(), "event", event.Reason)
 		return nil
@@ -734,7 +711,7 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 		if time.Since(e.LastTimestamp.Time) < 10*time.Minute {
 			e.Count++
 			e.LastTimestamp = metav1.Now()
-			e, err := c.kubeClient.CoreV1().Events(c.cluster.Namespace).Update(e)
+			e, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Update(e)
 			if err != nil {
 				log.Error(err, "Event update failed", "cluster", c.namespacedName(), "event", event.Reason)
 			}
@@ -755,11 +732,7 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	readyNodes := c.cluster.Status.Members.Ready.Names()
 
 	// Get running pods to ensure ready nodes exists
-	running, _, err := c.pollPods()
-	if err != nil {
-		log.Error(err, "Pod discovery failed", "cluster", c.namespacedName())
-		return c.members
-	}
+	running, _ := c.pollPods()
 	podMembers := podsToMemberSet(running)
 	for _, node := range readyNodes {
 		if m, ok := c.members[node]; ok {

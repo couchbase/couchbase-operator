@@ -11,6 +11,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -94,34 +95,10 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
 
-func createService(kubecli kubernetes.Interface, ns string, svc *v1.Service, owner metav1.OwnerReference) (*v1.Service, error) {
-	addOwnerRefToObject(svc.GetObjectMeta(), owner)
-	return kubecli.CoreV1().Services(ns).Create(svc)
-}
-
-func GetService(kubecli kubernetes.Interface, ns, name string, opts *metav1.GetOptions) (*v1.Service, error) {
-	if opts == nil {
-		opts = &metav1.GetOptions{}
-	}
-	return kubecli.CoreV1().Services(ns).Get(name, *opts)
-}
-
-func DeleteService(kubecli kubernetes.Interface, ns, name string, opts *metav1.DeleteOptions) error {
-	return kubecli.CoreV1().Services(ns).Delete(name, opts)
-}
-
-func UpdateService(kubecli kubernetes.Interface, ns string, svc *v1.Service) (*v1.Service, error) {
-	return kubecli.CoreV1().Services(ns).Update(svc)
-}
-
-func GetPod(kubecli kubernetes.Interface, ns, name string) (*v1.Pod, error) {
-	return kubecli.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
-}
-
-func GetHostIP(kubecli kubernetes.Interface, ns, name string) (string, error) {
-	pod, err := GetPod(kubecli, ns, name)
-	if err != nil {
-		return "", err
+func GetHostIP(client *client.Client, name string) (string, error) {
+	pod, found := client.Pods.Get(name)
+	if !found {
+		return "", fmt.Errorf("pod %s not found", name)
 	}
 	if pod.Status.HostIP == "" {
 		return "", fmt.Errorf("host IP unset, pod not scheduled")
@@ -129,23 +106,16 @@ func GetHostIP(kubecli kubernetes.Interface, ns, name string) (string, error) {
 	return pod.Status.HostIP, nil
 }
 
-func GetServerGroup(kubecli kubernetes.Interface, ns, name string) (string, error) {
-	pod, err := GetPod(kubecli, ns, name)
-	if err != nil {
-		return "", err
+func GetServerGroup(client *client.Client, name string) (string, error) {
+	pod, found := client.Pods.Get(name)
+	if !found {
+		return "", fmt.Errorf("pod %s not found", name)
 	}
 	if pod.Spec.NodeSelector == nil {
-		return "", err
+		return "", fmt.Errorf("pod %s has no node selector", name)
 	}
 	serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
 	return serverGroup, nil
-}
-
-func GetSecret(kubecli kubernetes.Interface, name, ns string, opts *metav1.GetOptions) (*v1.Secret, error) {
-	if opts == nil {
-		opts = &metav1.GetOptions{}
-	}
-	return kubecli.CoreV1().Secrets(ns).Get(name, *opts)
 }
 
 func ClusterListOpt(clusterName string) metav1.ListOptions {
@@ -212,8 +182,8 @@ func mergeLabels(l1, l2 map[string]string) {
 	}
 }
 
-func DeletePod(kubeCli kubernetes.Interface, namespace, podName string, opts *metav1.DeleteOptions) error {
-	err := kubeCli.CoreV1().Pods(namespace).Delete(podName, opts)
+func DeletePod(client *client.Client, namespace, podName string, opts *metav1.DeleteOptions) error {
+	err := client.KubeClient.CoreV1().Pods(namespace).Delete(podName, opts)
 	if err != nil {
 		if !IsKubernetesResourceNotFoundError(err) {
 			return err
@@ -222,8 +192,8 @@ func DeletePod(kubeCli kubernetes.Interface, namespace, podName string, opts *me
 	return nil
 }
 
-func CreatePod(kubeCli kubernetes.Interface, namespace string, pod *v1.Pod) (*v1.Pod, error) {
-	return kubeCli.CoreV1().Pods(namespace).Create(pod)
+func CreatePod(client *client.Client, namespace string, pod *v1.Pod) (*v1.Pod, error) {
+	return client.KubeClient.CoreV1().Pods(namespace).Create(pod)
 }
 
 // Waits for a pod to be created and for it to respond to TCP connections on
@@ -234,7 +204,8 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 	// pod is successfully scheduled and all dependencies e.g. persistent volumes.  Don't ever
 	// short cut this, honour context the timeout!
 	callback := func() error {
-		pod, err := GetPod(kubeCli, namespace, podName)
+		// TODO: cache me, used my cbopinfo :/
+		pod, err := kubeCli.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -309,13 +280,6 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 	return fmt.Errorf("failed to wait for pod to delete: %s", podName)
 }
 
-func GetPersistentVolumeClaim(kubeCli kubernetes.Interface, ns, name string, opts *metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
-	if opts == nil {
-		opts = &metav1.GetOptions{}
-	}
-	return kubeCli.CoreV1().PersistentVolumeClaims(ns).Get(name, *opts)
-}
-
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
 	version, err := kubeCli.Discovery().ServerVersion()
 	if err != nil {
@@ -362,9 +326,9 @@ func GetStorageClass(kubeCli kubernetes.Interface, name string) (*storage.Storag
 	return kubeCli.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
 }
 
-func GetPodUptime(kubecli kubernetes.Interface, ns, name string) int {
-	pod, err := GetPod(kubecli, ns, name)
-	if err != nil {
+func GetPodUptime(client *client.Client, name string) int {
+	pod, found := client.Pods.Get(name)
+	if !found {
 		return 0
 	}
 	return int(time.Since(pod.CreationTimestamp.Time).Seconds())
@@ -372,9 +336,9 @@ func GetPodUptime(kubecli kubernetes.Interface, ns, name string) int {
 
 // LogPod returns ephemeral debug information about a failed pod, e.g. it's about to be
 // deleted and we want to know why.
-func LogPod(kubeCli kubernetes.Interface, namespace, name string) string {
-	pod, err := GetPod(kubeCli, namespace, name)
-	if err != nil {
+func LogPod(client *client.Client, name string) string {
+	pod, found := client.Pods.Get(name)
+	if !found {
 		return ""
 	}
 

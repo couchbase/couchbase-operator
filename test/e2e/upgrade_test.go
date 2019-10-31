@@ -43,15 +43,21 @@ var (
 // upgradeFailedAddRecoverableSequence is a common sequence for generating events for a new
 // member being added, the pod being killed before a rebalance can commence, and the
 // recovery steps.  Due to a race condition the pod may actually go down rather than enter
-// failed add.  Technically it should be failed over too - it's a known issue with the
-// recovery timing.
+// failed add.
 func upgradeFailedAddRecoverableSequence(victimName string) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+			eventschema.Optional{
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+						eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+					},
+				},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},

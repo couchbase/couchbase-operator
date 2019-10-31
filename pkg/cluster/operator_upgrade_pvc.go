@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -26,7 +25,7 @@ type pvcUpgradableResource struct {
 	// cluster is a reference to the cluster for client and namespace access.
 	cluster *Cluster
 	// pvcs is a local cache of fetched resource items.
-	pvcs *corev1.PersistentVolumeClaimList
+	pvcs []*corev1.PersistentVolumeClaim
 	// actions is the list of possible upgrade actions to perform on a resource item.
 	actions pvcUpgradeActionList
 }
@@ -45,25 +44,21 @@ func (r *pvcUpgradableResource) kind() string {
 }
 
 func (r *pvcUpgradableResource) name(item int) string {
-	return r.pvcs.Items[item].Name
+	return r.pvcs[item].Name
 }
 
 func (r *pvcUpgradableResource) fetch() error {
-	var err error
-	r.pvcs, err = r.cluster.kubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).List(k8sutil.ClusterListOpt(r.cluster.cluster.Name))
-	if err != nil {
-		return err
-	}
+	r.pvcs = r.cluster.k8s.PersistentVolumeClaims.List()
 	return nil
 }
 
 func (r *pvcUpgradableResource) lenItems() int {
-	return len(r.pvcs.Items)
+	return len(r.pvcs)
 }
 
 func (r *pvcUpgradableResource) itemVersion(item int) string {
 	version := "0.0.0"
-	if v, ok := r.pvcs.Items[item].Annotations[constants.ResourceVersionAnnotation]; ok {
+	if v, ok := r.pvcs[item].Annotations[constants.ResourceVersionAnnotation]; ok {
 		version = v
 	}
 	return version
@@ -78,7 +73,7 @@ func (r *pvcUpgradableResource) actionVersionRange(action int) upgradeRange {
 }
 
 func (r *pvcUpgradableResource) perform(item, action int) error {
-	pvc := &r.pvcs.Items[item]
+	pvc := r.pvcs[item]
 	upgrade := r.actions[action].action
 	if err := upgrade(r.cluster, pvc); err != nil {
 		return err
@@ -87,8 +82,8 @@ func (r *pvcUpgradableResource) perform(item, action int) error {
 }
 
 func (r *pvcUpgradableResource) commit(item int) error {
-	pvc := &r.pvcs.Items[item]
-	if _, err := r.cluster.kubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(pvc); err != nil {
+	pvc := r.pvcs[item]
+	if _, err := r.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(pvc); err != nil {
 		return err
 	}
 	return nil

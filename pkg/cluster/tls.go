@@ -15,8 +15,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/gocbmgr"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
@@ -80,12 +78,14 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert, cli
 // getTLSData gets the TLS data from kubernetes and performs some error checking.
 func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) {
 	// Load the TLS data from kubernetes.
-	operatorSecret, err := k8sutil.GetSecret(c.kubeClient, c.cluster.Spec.Networking.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
-	if err != nil {
+	operatorSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
+	if !found {
+		err = fmt.Errorf("unable to get operator secret %s", c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 		return
 	}
-	serverSecret, err := k8sutil.GetSecret(c.kubeClient, c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret, c.cluster.Namespace, nil)
-	if err != nil {
+	serverSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret)
+	if !found {
+		err = fmt.Errorf("unable to get server secret %s", c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret)
 		return
 	}
 
@@ -112,8 +112,9 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 // getTLSClientData returns the PEM files required for client authentication.
 func (c *Cluster) getTLSClientData() (ca []byte, chain []byte, key []byte, err error) {
 	// Load the TLS data from kubernetes.
-	operatorSecret, err := k8sutil.GetSecret(c.kubeClient, c.cluster.Spec.Networking.TLS.Static.OperatorSecret, c.cluster.Namespace, nil)
-	if err != nil {
+	operatorSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
+	if !found {
+		err = fmt.Errorf("unable to get operator secret %s", c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 		return
 	}
 
@@ -174,9 +175,9 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 	}
 
 	// If the pods doesn't have TLS enabled then ignore it.
-	pod, err := c.kubeClient.CoreV1().Pods(c.cluster.Namespace).Get(member.Name, metav1.GetOptions{})
-	if err != nil {
-		return false, err
+	pod, found := c.k8s.Pods.Get(member.Name)
+	if !found {
+		return false, nil
 	}
 	if _, ok := pod.Annotations[constants.PodTLSAnnotation]; !ok {
 		return false, nil

@@ -30,11 +30,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 		sched.serverClasses[class.Name] = &serverList{}
 	}
 
-	pods, err := podGetter.Get()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", nullErrorHeader, err)
-	}
-	for _, pod := range pods {
+	for _, pod := range podGetter.Get() {
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
 			return nil, fmt.Errorf("%s: pod %s does not have server class label", stripeErrorHeader, pod.Name)

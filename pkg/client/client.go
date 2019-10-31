@@ -1,19 +1,14 @@
 package client
 
 import (
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"context"
+	"fmt"
 
+	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
-
-func MustNewInCluster() versioned.Interface {
-	cfg, err := k8sutil.InClusterConfig()
-	if err != nil {
-		panic(err)
-	}
-	return MustNew(cfg)
-}
 
 func MustNew(cfg *rest.Config) versioned.Interface {
 	cli, err := versioned.NewForConfig(cfg)
@@ -21,4 +16,151 @@ func MustNew(cfg *rest.Config) versioned.Interface {
 		panic(err)
 	}
 	return cli
+}
+
+// Client gives full access to the Kubernetes APIs and also caching
+// for commonly polled resources.
+type Client struct {
+	// KubeConfig is the Kubernetes config file
+	KubeConfig *rest.Config
+
+	// KubeClient is a client for accessing Kubernetes native resources
+	KubeClient kubernetes.Interface
+
+	// Couchbase is a client for accessing Couchbase custom resources
+	CouchbaseClient versioned.Interface
+
+	// Pods is a read only cache of pods (Couchbase cluster scoped)
+	Pods *PodCache
+	// PersistentVolumeClaims is a read only cache of persistent volume claims (Couchbase cluster scoped)
+	PersistentVolumeClaims *PersistentVolumeClaimCache
+
+	// Services is a read only cache of services (Couchbase cluster scoped)
+	Services *ServiceCache
+
+	// Secrets is a read only cache of secrets (namespace scoped)
+	Secrets *SecretCache
+
+	// PodDisruptionBudgets is a read only cache of pod disruption budgets (Couchbase cluster scoped)
+	PodDisruptionBudgets *PodDisruptionBudgetCache
+
+	// CouchbaseBuckets is a read only cache of couchbase buckets (namespace scoped)
+	CouchbaseBuckets *CouchbaseBucketCache
+
+	// CouchbaseEphemeralBuckets is a read only cache of ephemeral buckets (namespace scoped)
+	CouchbaseEphemeralBuckets *CouchbaseEphemeralBucketCache
+
+	// CouchbaseMemcachedBuckets is a read only cache of memcached buckets (namespace scoped)
+	CouchbaseMemcachedBuckets *CouchbaseMemcachedBucketCache
+
+	// CouchbaseReplications is a read only cache of couchbase replications (namespace scoped)
+	CouchbaseReplications *CouchbaseReplicationCache
+
+	// CouchbaseUsers is a read only cache of couchbase users (namespace scoped)
+	CouchbaseUsers *CouchbaseUserCache
+
+	// CouchbaseRoles is a read only cache of couchbase roles (namespace scoped)
+	CouchbaseRoles *CouchbaseRoleCache
+
+	// CouchbaseRoleBindings is a read only cache of couchbase rolebindings (namespace scoped)
+	CouchbaseRoleBindings *CouchbaseRoleBindingCache
+}
+
+// NewClient initializes all Kubernetes clients and caches.
+func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*Client, error) {
+	c := &Client{}
+
+	var err error
+	c.KubeConfig, err = rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	c.KubeClient, err = kubernetes.NewForConfig(c.KubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseClient, err = versioned.NewForConfig(c.KubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Pods, err = newPodCache(ctx, c.KubeClient, namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	c.PersistentVolumeClaims, err = newPersistentVolumeClaimCache(ctx, c.KubeClient, namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Services, err = newServiceCache(ctx, c.KubeClient, namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Secrets, err = newSecretCache(ctx, c.KubeClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.PodDisruptionBudgets, err = newPodDisruptionBudgetCache(ctx, c.KubeClient, namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseBuckets, err = newCouchbaseBucketCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseEphemeralBuckets, err = newCouchbaseEphemeralBucketCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseMemcachedBuckets, err = newCouchbaseMemcachedBucketCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseReplications, err = newCouchbaseReplicationCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseUsers, err = newCouchbaseUserCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseRoles, err = newCouchbaseRoleCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseRoleBindings, err = newCouchbaseRoleBindingCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
+// Shutdown stops all cache synchronization routines.
+func (c *Client) Shutdown() {
+	c.Pods.stop()
+	c.PersistentVolumeClaims.stop()
+	c.Services.stop()
+	c.Secrets.stop()
+	c.PodDisruptionBudgets.stop()
+	c.CouchbaseBuckets.stop()
+	c.CouchbaseEphemeralBuckets.stop()
+	c.CouchbaseMemcachedBuckets.stop()
+	c.CouchbaseReplications.stop()
+	c.CouchbaseUsers.stop()
+	c.CouchbaseRoles.stop()
+	c.CouchbaseRoleBindings.stop()
 }

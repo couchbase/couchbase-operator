@@ -165,7 +165,7 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 	}
 
 	// TEMPORARY HACK
-	if updated, err := k8sutil.WouldUpdateExposedFeatures(c.kubeClient, c.members, c.cluster); err != nil {
+	if updated, err := k8sutil.WouldUpdateExposedFeatures(c.k8s, c.members, c.cluster); err != nil {
 		return err
 	} else if updated {
 		needsReconcile = true
@@ -289,7 +289,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			// If the pod was created in the last minute then it may be a down node
 			// that was restarted and is still coming back online. If this is the
 			// case then we may be able to delta recover it in the near future.
-			if k8sutil.GetPodUptime(c.kubeClient, m.Namespace, m.Name) < downNodeThreshold {
+			if k8sutil.GetPodUptime(c.k8s, m.Name) < downNodeThreshold {
 				log.Info("Recently created pod down, waiting", "cluster", c.namespacedName())
 				continue
 			}

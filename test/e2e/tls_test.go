@@ -527,6 +527,10 @@ func TestTLSRotateCA(t *testing.T) {
 	// * Client TLS updated (new CA)
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		// Race condition updating secrets.
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
 	}
@@ -565,6 +569,10 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 	// * Cluster successfully connects to, initializes and balances in new nodes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		// Race condition updating secrets.
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
 		e2eutil.ClusterScaleUpSequence(clusterScaleUpSize),
@@ -974,6 +982,10 @@ func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePol
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		// Race condition updating secrets.
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
 		e2eutil.ClusterScaleUpSequence(1),

@@ -72,10 +72,7 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (*couchbaseuti
 
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
-	pvcMembers, err := k8sutil.PVCToMemberset(c.kubeClient,
-		c.cluster.Namespace,
-		c.cluster.Name,
-		c.isSecureClient())
+	pvcMembers, err := k8sutil.PVCToMemberset(c.k8s, c.cluster.Namespace, c.isSecureClient())
 	if err != nil {
 		log.Error(err, "Member discovery failed", "cluster", c.namespacedName())
 	} else {

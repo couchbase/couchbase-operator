@@ -4,16 +4,15 @@ import (
 	"reflect"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
 )
 
 // ReconcilePDB takes a cluster and creates a PodDisruptionBudget based on cluster size.
-func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster) error {
+func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
 	name := cluster.Name + "-pdb"
 
 	required := &policyv1beta1.PodDisruptionBudget{
@@ -34,11 +33,9 @@ func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev2.CouchbaseClu
 	addOwnerRefToObject(required.GetObjectMeta(), cluster.AsOwner())
 
 	// Get any existing budgets, creating one if it doesn't exist.
-	actual, err := client.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Get(name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			_, err = client.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required)
-		}
+	actual, found := client.PodDisruptionBudgets.Get(name)
+	if !found {
+		_, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required)
 		return err
 	}
 
@@ -49,9 +46,9 @@ func ReconcilePDB(client kubernetes.Interface, cluster *couchbasev2.CouchbaseClu
 	}
 
 	// Delete and recreate as the spec is immutable.
-	if err := client.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Delete(name, nil); err != nil {
+	if err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Delete(name, nil); err != nil {
 		return err
 	}
-	_, err = client.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required)
+	_, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required)
 	return err
 }

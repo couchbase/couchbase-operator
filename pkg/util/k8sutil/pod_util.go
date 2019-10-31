@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -37,9 +38,9 @@ const (
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member, config couchbasev2.ServerConfig, ctx context.Context) (*v1.Pod, error) {
+func CreateCouchbasePod(client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member, config couchbasev2.ServerConfig, ctx context.Context) (*v1.Pod, error) {
 
-	pod, pvcs, err := CreateCouchbasePodSpec(kubeCli, m, cluster, config)
+	pod, pvcs, err := CreateCouchbasePodSpec(client, m, cluster, config)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 			pvc.Annotations[constants.ServerGroupLabel] = zone
 		}
 
-		if _, err = createPersistentVolumeClaim(kubeCli, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
+		if _, err = createPersistentVolumeClaim(client, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
 			return nil, err
 		}
 
@@ -80,13 +81,13 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 
 	// Add ownership information only if we are going to create the resource.
 	addOwnerRefToObject(pod.GetObjectMeta(), cluster.AsOwner())
-	return CreatePod(kubeCli, cluster.Namespace, pod)
+	return CreatePod(client, cluster.Namespace, pod)
 }
 
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused
-func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) ([]*v1.PersistentVolumeClaim, error) {
+func addPodVolumes(client *client.Client, pod *v1.Pod, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) ([]*v1.PersistentVolumeClaim, error) {
 	// No mounts are required, do nothing
 	if config.GetVolumeMounts() == nil {
 		return nil, nil
@@ -132,7 +133,7 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, cluster *couchbase
 		// Find volumes that already exist for this mount path
 		// to allow pod recovery. Otherwise, create a new PVC
 		mountPath := pathForVolumeMountName(mountName)
-		pvc, _ := findMemberPVC(kubeCli, pod.Name, cluster.Name, cluster.Namespace, mountPath)
+		pvc, _ := findMemberPVC(client, pod.Name, mountPath)
 		if pvc == nil {
 			// Label and Annotate so that volumes
 			// can be easily targeted when recovering pods
@@ -260,12 +261,12 @@ func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 }
 
 // Creates custom PVC from the generic spec
-func createPersistentVolumeClaim(kubeCli kubernetes.Interface, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
+func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
 
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim.GetObjectMeta(), owner)
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-	pvc, err := kubeCli.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
+	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
 	if err != nil {
 		return nil, err
 	}
@@ -284,16 +285,16 @@ func podVolumeSpecForClaim(claimName string) v1.Volume {
 
 // Delete pod and any associated persisted volumes
 // when removeVolumes is 'true'
-func DeleteCouchbasePod(kubeCli kubernetes.Interface, namespace, clusterName, name string, opts *metav1.DeleteOptions, removeVolumes bool) error {
+func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *metav1.DeleteOptions, removeVolumes bool) error {
 
 	var errs []string
 
-	if err := DeletePod(kubeCli, namespace, name, opts); err != nil {
+	if err := DeletePod(client, namespace, name, opts); err != nil {
 		errs = append(errs, err.Error())
 	}
 
 	if removeVolumes {
-		if err := deletePodVolumes(kubeCli, namespace, clusterName, name); err != nil {
+		if err := deletePodVolumes(client, name); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
@@ -305,33 +306,23 @@ func DeleteCouchbasePod(kubeCli kubernetes.Interface, namespace, clusterName, na
 }
 
 // list and delete persistent volumes associated with the member
-func deletePodVolumes(kubeCli kubernetes.Interface, namespace, clusterName, memberName string) error {
-
-	pvcList, err := listMemberPVCS(kubeCli, memberName, clusterName, namespace)
-	if err != nil {
-		return err
-	}
-	if len(pvcList.Items) > 0 {
-		for _, pvc := range pvcList.Items {
-			if err := kubeCli.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, CascadeDeleteOptions(0)); err != nil {
-				return err
-			}
+func deletePodVolumes(client *client.Client, memberName string) error {
+	for _, pvc := range listMemberPVCS(client, memberName) {
+		if err := client.KubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, CascadeDeleteOptions(0)); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 // list all PVC's belonging to the member
-func listMemberPVCS(kubeCli kubernetes.Interface, memberName, clusterName, namespace string) (*v1.PersistentVolumeClaimList, error) {
-	labelSelector := fmt.Sprintf("couchbase_node=%s,couchbase_cluster=%s", memberName, clusterName)
-	opts := metav1.ListOptions{
-		LabelSelector: labelSelector,
+func listMemberPVCS(client *client.Client, memberName string) (pvcs []*v1.PersistentVolumeClaim) {
+	for _, pvc := range client.PersistentVolumeClaims.List() {
+		if name, ok := pvc.Labels[constants.LabelNode]; ok && name == memberName {
+			pvcs = append(pvcs, pvc)
+		}
 	}
-	return listPersistentVolumeClaims(kubeCli, namespace, opts)
-}
-
-func listPersistentVolumeClaims(kubeCli kubernetes.Interface, namespace string, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
-	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).List(opts)
+	return
 }
 
 // Names of persistent volume claims are combinations of
@@ -347,7 +338,7 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
-func CreateCouchbasePodSpec(kubeCli kubernetes.Interface, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*v1.Pod, []*v1.PersistentVolumeClaim, error) {
+func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*v1.Pod, []*v1.PersistentVolumeClaim, error) {
 
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster.Spec.Image)
@@ -396,7 +387,7 @@ func CreateCouchbasePodSpec(kubeCli kubernetes.Interface, m *couchbaseutil.Membe
 		return nil, nil, err
 	}
 
-	pvcs, err := addPodVolumes(kubeCli, pod, cluster, config)
+	pvcs, err := addPodVolumes(client, pod, cluster, config)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -814,18 +805,14 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 
 // Find the PVC belonging to a member that was mounted at the specified path.
 // It's not considered an error in the case that PVC cannot be found
-func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namespace, path string) (*v1.PersistentVolumeClaim, error) {
-	pvcList, err := listMemberPVCS(kubeCli, memberName, clusterName, namespace)
-	if err != nil {
-		return nil, err
-	}
-	for _, pvc := range pvcList.Items {
+func findMemberPVC(client *client.Client, memberName, path string) (*v1.PersistentVolumeClaim, error) {
+	for _, pvc := range listMemberPVCS(client, memberName) {
 		if pvcPath, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; ok {
 			if pvcPath == path {
 				phase := pvc.Status.Phase
 				switch phase {
 				case v1.ClaimBound:
-					return &pvc, nil
+					return pvc, nil
 				case v1.ClaimPending:
 					return nil, cberrors.ErrVolumeClaimPending{Path: path, Phase: phase}
 				case v1.ClaimLost:
@@ -841,17 +828,9 @@ func findMemberPVC(kubeCli kubernetes.Interface, memberName, clusterName, namesp
 }
 
 // Recreate list of members from persistent volumes
-func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName string, secure bool) (couchbaseutil.MemberSet, error) {
-	labelSelector := fmt.Sprintf("couchbase_cluster=%s", clusterName)
-	opts := metav1.ListOptions{
-		LabelSelector: labelSelector,
-	}
+func PVCToMemberset(client *client.Client, namespace string, secure bool) (couchbaseutil.MemberSet, error) {
 	ms := couchbaseutil.MemberSet{}
-	pvcList, err := listPersistentVolumeClaims(kubeCli, namespace, opts)
-	if err != nil {
-		return ms, err
-	}
-	for _, pvc := range pvcList.Items {
+	for _, pvc := range client.PersistentVolumeClaims.List() {
 
 		// claim must be bound to a volume
 		if pvc.Status.Phase != v1.ClaimBound {
@@ -891,7 +870,7 @@ func PVCToMemberset(kubeCli kubernetes.Interface, namespace string, clusterName 
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume
-func IsPodRecoverable(kubeCli kubernetes.Interface, config couchbasev2.ServerConfig, podName, clusterName, namespace string) error {
+func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, podName string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return cberrors.ErrNoVolumeMounts{}
@@ -908,7 +887,7 @@ func IsPodRecoverable(kubeCli kubernetes.Interface, config couchbasev2.ServerCon
 		}
 		for mountName := range mountPaths {
 			mountPath := pathForVolumeMountName(mountName)
-			_, err := findMemberPVC(kubeCli, podName, clusterName, namespace, mountPath)
+			_, err := findMemberPVC(client, podName, mountPath)
 			if err != nil {
 				return err
 			}
@@ -962,12 +941,12 @@ func exec(client kubernetes.Interface, pod *v1.Pod, command []string) error {
 
 // FlagPodReady adds a file on the pod that flags the pod is ready and can be safely
 // killed by Kubernetes.
-func FlagPodReady(client kubernetes.Interface, namespace, name string) error {
-	pod, err := GetPod(client, namespace, name)
-	if err != nil {
-		return err
+func FlagPodReady(client *client.Client, name string) error {
+	pod, found := client.Pods.Get(name)
+	if !found {
+		return fmt.Errorf("pod %s not found", name)
 	}
-	if err := exec(client, pod, []string{"touch", readinessFile}); err != nil {
+	if err := exec(client.KubeClient, pod, []string{"touch", readinessFile}); err != nil {
 		return err
 	}
 	return nil

@@ -57,11 +57,7 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 	}
 
 	// Populate the server group lists with pods
-	pods, err := podGetter.Get()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", stripeErrorHeader, err)
-	}
-	for _, pod := range pods {
+	for _, pod := range podGetter.Get() {
 		// Pod is faulty ignore it
 		if pod.Status.Phase != v1.PodPending && pod.Status.Phase != v1.PodRunning {
 			continue

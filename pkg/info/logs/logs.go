@@ -273,7 +273,7 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	}
 
 	var err error
-	pod, err = k8sutil.CreatePod(context.KubeClient, pvc.Namespace, pod)
+	pod, err = context.KubeClient.CoreV1().Pods(pvc.Namespace).Create(pod)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ephemeral pod %s failed creation for log collection", podName)
 	}
@@ -283,13 +283,13 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	c, cancel := ctx.WithTimeout(ctx.Background(), 5*time.Minute)
 	defer cancel()
 	if err := k8sutil.WaitForPod(c, context.KubeClient, pvc.Namespace, podName, ""); err != nil {
-		_ = k8sutil.DeletePod(context.KubeClient, pvc.Namespace, podName, nil)
+		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(podName, nil)
 		return nil, nil, fmt.Errorf("ephemeral pod %s failed to come up for log collection", podName)
 	}
 
 	// Return a clean up closure which can be deferred by the caller.
 	cleanup := func() {
-		_ = k8sutil.DeletePod(context.KubeClient, pvc.Namespace, podName, nil)
+		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(podName, nil)
 	}
 	return pod, cleanup, nil
 }

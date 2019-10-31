@@ -20,7 +20,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -706,7 +705,17 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName str
 
 // Kill member deletes Pod and optionally checks for any associated Volume to delete
 func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string, removeVolumes bool) error {
-	return k8sutil.DeleteCouchbasePod(kubecli, namespace, clusterName, name, metav1.NewDeleteOptions(0), removeVolumes)
+	if err := kubecli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil {
+		return err
+	}
+
+	if removeVolumes {
+		if err := kubecli.CoreV1().PersistentVolumeClaims(namespace).DeleteCollection(metav1.NewDeleteOptions(0), k8sutil.NodeListOpt(name, clusterName)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberID int) error {
@@ -826,25 +835,42 @@ func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couc
 }
 
 func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member) (*v1.Pod, error) {
-	podGetter := scheduler.NewNullPodGetter()
-	scheduler, _ := scheduler.NewNullScheduler(podGetter, cl)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: m.Name,
+			Labels: map[string]string{
+				operator_constants.LabelApp:      "couchbase",
+				operator_constants.LabelCluster:  cl.Name,
+				operator_constants.LabelNode:     m.Name,
+				operator_constants.LabelNodeConf: m.ServerConfig,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				cl.AsOwner(),
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				k8sutil.CouchbaseContainer(cl.Spec.Image),
+			},
+			Hostname:  m.Name,
+			Subdomain: cl.Name,
+		},
+	}
 
 	for _, config := range cl.Spec.Servers {
 		if config.Name == m.ServerConfig {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
-			pod, err := k8sutil.CreateCouchbasePod(k8s.KubeClient, scheduler, cl, m, config, ctx)
+			p, err := k8s.KubeClient.CoreV1().Pods(cl.Namespace).Create(pod)
 			if err != nil {
 				return nil, err
 			}
 
-			ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 			err = k8sutil.WaitForPod(ctx, k8s.KubeClient, cl.Namespace, pod.Name, "")
 			if err != nil {
 				return nil, err
 			}
-			return k8s.KubeClient.CoreV1().Pods(cl.Namespace).Get(pod.Name, metav1.GetOptions{})
+			return p, nil
 		}
 	}
 

@@ -47,7 +47,7 @@ type kubeAbstractionImpl struct {
 // secretExists checks whether the named secret exists in the specified namespace.
 func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret, error) {
 	// Warning, this returns a valid pointer on error
-	secret, err := k8sutil.GetSecret(ab.client, name, namespace, nil)
+	secret, err := ab.client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return nil, nil
