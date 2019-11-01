@@ -56,8 +56,6 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestNegPodResourcesBasic
-      - name: TestPodResourcesHigh
-      - name: TestPodResourcesLow
 
   - name: TlsTests
     clusters:
@@ -100,7 +98,6 @@ tcGroups:
       # K8S-393, Unsupported in 1.0
       #- name: TestRzaServerGroupRemoval
       - name: TestRzaServerGroupAddition
-      - name: TestRzaKillServerPods
       - name: TestRzaNegScaleupCluster
       - name: TestRzaServerGroupDown
       - name: TestRzaAntiAffinityOn

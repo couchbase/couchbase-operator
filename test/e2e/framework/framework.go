@@ -57,10 +57,14 @@ func Init() error {
 		return err
 	}
 
+	if err := readYamlData(); err != nil {
+		return err
+	}
+
 	// Start the timeout timer.
 	startTimeoutTimer()
 
-	return readYamlData()
+	return nil
 }
 
 func readYamlData() (err error) {
