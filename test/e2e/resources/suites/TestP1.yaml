@@ -57,8 +57,6 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestNegPodResourcesBasic
-      - name: TestPodResourcesHigh
-      - name: TestPodResourcesLow
 
   - name: TlsTests
     clusters:
@@ -98,7 +96,6 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-      - name: TestRzaKillServerPods
       - name: TestRzaAntiAffinityOn
       - name: TestRzaAntiAffinityOff
 

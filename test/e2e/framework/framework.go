@@ -57,10 +57,14 @@ func Init() error {
 		return err
 	}
 
-	// Start the timeout timer.
+	if err := readYamlData(); err != nil {
+		return err
+	}
+
+	// Start the timeout timer, after reading in suite configuration.
 	startTimeoutTimer()
 
-	return readYamlData()
+	return nil
 }
 
 func readYamlData() (err error) {
