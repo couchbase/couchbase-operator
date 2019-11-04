@@ -20,6 +20,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1275,9 +1277,10 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
-func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, error) {
+func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 	var candidate *couchbaseutil.Member
 	var targetConfiguration int
+	var diff string
 
 	// Names returns a sorted list for determinism.
 	for _, name := range c.members.Names() {
@@ -1290,17 +1293,17 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, error) {
 			if errors.IsNotFound(err) {
 				continue
 			}
-			return nil, -1, err
+			return nil, -1, "", err
 		}
 
 		// Get what the member should look like.
 		serverClass := c.cluster.Spec.GetServerConfigByName(member.ServerConfig)
 		if serverClass == nil {
-			return nil, -1, err
+			return nil, -1, "", err
 		}
 		requested, _, err := k8sutil.CreateCouchbasePodSpec(c.kubeClient, member, c.cluster, *serverClass)
 		if err != nil {
-			return nil, -1, err
+			return nil, -1, "", err
 		}
 
 		// Check the specification at creation with the ones that are requested
@@ -1313,10 +1316,11 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, error) {
 		}
 
 		if candidate == nil {
+			diff = cmp.Diff(actual.Annotations[constants.PodSpecAnnotation], requested.Annotations[constants.PodSpecAnnotation])
 			candidate = member
 		}
 	}
-	return candidate, targetConfiguration, nil
+	return candidate, targetConfiguration, diff, nil
 }
 
 // reportUpgrade looks at the current state and any existing upgrade status
@@ -1365,7 +1369,7 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 // the condition and raise any necessary events.
 func (c *Cluster) reportUpgradeComplete() error {
 	// Still upgrading do nothing
-	if candidate, _, err := c.needsUpgrade(); err != nil {
+	if candidate, _, _, err := c.needsUpgrade(); err != nil {
 		return err
 	} else if candidate != nil {
 		return nil

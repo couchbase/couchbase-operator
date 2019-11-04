@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -94,7 +95,17 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, cluster *couchbase
 	// Keep track of volumes generated from the same claim
 	claimUsageCnt := map[string]int{}
 
-	for mountName, claimName := range mountPaths {
+	// Order the mounts so that the pod spec is deterministic
+	mountNames := []string{}
+	for name := range mountPaths {
+		mountNames = append(mountNames, string(name))
+	}
+	sort.Strings(mountNames)
+
+	for _, name := range mountNames {
+		mountName := couchbasev2.VolumeMountName(name)
+		claimName := mountPaths[mountName]
+
 		// every volume mount must have associated claim template
 		// within the spec before we can add it to the pod
 		claim := cluster.Spec.GetVolumeClaimTemplate(claimName)

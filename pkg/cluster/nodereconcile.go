@@ -183,7 +183,7 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 		needsReconcile = true
 	}
 
-	if candidate, _, err := c.needsUpgrade(); err != nil {
+	if candidate, _, _, err := c.needsUpgrade(); err != nil {
 		return err
 	} else if candidate != nil {
 		needsReconcile = true
@@ -591,7 +591,7 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 	}
 
 	// Nothing to do, move along.
-	candidate, targetCount, err := c.needsUpgrade()
+	candidate, targetCount, diff, err := c.needsUpgrade()
 	if err != nil {
 		return err
 	}
@@ -605,7 +605,7 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 		return err
 	}
 
-	log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name, "source", candidate.Version, "target", targetVersion)
+	log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name, "source", candidate.Version, "target", targetVersion, "diff", diff)
 	status := &couchbasev2.UpgradeStatus{
 		Source:      candidate.Version,
 		Target:      targetVersion,
