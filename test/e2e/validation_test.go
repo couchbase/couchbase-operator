@@ -822,7 +822,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateMonitoringInvalidImage",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/monitoring/prometheus/image", "mr-tickle")},
 			shouldFail:     true,
-			expectedErrors: []string{`CouchbaseCluster.couchbase.com "cluster" is invalid: spec.monitoring.prometheus.image: Invalid value: "": spec.monitoring.prometheus.image in body should match '^[\w_\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$'`},
+			expectedErrors: []string{`spec.monitoring.prometheus.image in body should match '^[\w_\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$'`},
 		},
 	}
 
