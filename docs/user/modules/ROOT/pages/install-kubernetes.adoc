@@ -54,21 +54,26 @@ kubectl create -f operator-role.yaml --namespace default
 
 == Create a Service Account
 
-After the cluster role is created, you need to create a service account in the namespace where you are installing the Operator, and then assign the cluster role to that service account using a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[cluster role binding^]. (In this example, the service account is created in the namespace called `default`.)
+After the role is created, you need to create a service account in the namespace where you are installing the Operator, and then assign the cluster role to that service account using a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[cluster role binding^]. (In this example, the service account is created in the namespace called `default`.)
 
 To create the service account:
 
 [source,console]
 ----
-kubectl create serviceaccount couchbase-operator --namespace default
+kubectl create -f operator-service-account.yaml --namespace default
 ----
 
 To assign the role to the service account:
 
 [source,console]
 ----
-kubectl create rolebinding couchbase-operator --role couchbase-operator --serviceaccount default:couchbase-operator --namespace default
+kubectl create -f operator-role-binding.yaml --namespace default
 ----
+
+[NOTE]
+====
+If you choose to install the Operator in a namespace other than default, be sure to modify the namespace defined in the `RoleBinding` subjects to match that of your chosen namespace.
+====
 
 == Create the Operator
 
