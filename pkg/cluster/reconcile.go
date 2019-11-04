@@ -399,7 +399,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			ConflictResolution: bucket.Spec.ConflictResolution,
 			EnableFlush:        bucket.Spec.EnableFlush,
 			EnableIndexReplica: bucket.Spec.EnableIndexReplica,
-			CompressionMode:    bucket.Spec.CompressionMode,
+			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
 	for _, bucket := range couchbaseEphemeralBuckets.Items {
@@ -412,7 +412,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			EvictionPolicy:     bucket.Spec.EvictionPolicy,
 			ConflictResolution: bucket.Spec.ConflictResolution,
 			EnableFlush:        bucket.Spec.EnableFlush,
-			CompressionMode:    bucket.Spec.CompressionMode,
+			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
 	for _, bucket := range couchbaseMemcachedBuckets.Items {
@@ -516,7 +516,22 @@ func (c *Cluster) reconcileBuckets() error {
 		c.raiseEvent(k8sutil.BucketDeleteEvent(bucket.BucketName, c.cluster))
 	}
 
-	c.cluster.Status.Buckets = requested
+	c.cluster.Status.Buckets = []couchbasev2.BucketStatus{}
+	for _, bucket := range requested {
+		bucketStatus := couchbasev2.BucketStatus{
+			BucketName:         bucket.BucketName,
+			BucketType:         bucket.BucketType,
+			BucketMemoryQuota:  bucket.BucketMemoryQuota,
+			BucketReplicas:     bucket.BucketReplicas,
+			IoPriority:         string(bucket.IoPriority),
+			EvictionPolicy:     bucket.EvictionPolicy,
+			ConflictResolution: bucket.ConflictResolution,
+			EnableFlush:        bucket.EnableFlush,
+			EnableIndexReplica: bucket.EnableIndexReplica,
+			CompressionMode:    couchbasev2.BucketCompressionMode(bucket.CompressionMode),
+		}
+		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, bucketStatus)
+	}
 	return nil
 }
 

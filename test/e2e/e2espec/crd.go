@@ -7,7 +7,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +28,7 @@ var (
 			ConflictResolution: constants.BucketConflictResolutionSeqno,
 			EnableFlush:        constants.BucketFlushEnabled,
 			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
-			CompressionMode:    cbmgr.CompressionModePassive,
+			CompressionMode:    couchbasev2.CompressionModePassive,
 		},
 	}
 
@@ -45,7 +44,7 @@ var (
 			ConflictResolution: constants.BucketConflictResolutionSeqno,
 			EnableFlush:        constants.BucketFlushEnabled,
 			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
-			CompressionMode:    cbmgr.CompressionModePassive,
+			CompressionMode:    couchbasev2.CompressionModePassive,
 		},
 	}
 
@@ -61,7 +60,7 @@ var (
 			ConflictResolution: constants.BucketConflictResolutionSeqno,
 			EnableFlush:        constants.BucketFlushEnabled,
 			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
-			CompressionMode:    cbmgr.CompressionModePassive,
+			CompressionMode:    couchbasev2.CompressionModePassive,
 		},
 	}
 )
@@ -117,7 +116,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 												ConflictResolution: conflictResolution,
 												EnableFlush:        enableFlush,
 												EnableIndexReplica: enableIndexReplica,
-												CompressionMode:    "passive",
+												CompressionMode:    couchbasev2.CompressionModePassive,
 											},
 										})
 									}
@@ -167,7 +166,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 											EvictionPolicy:     evictionPolicy,
 											ConflictResolution: conflictResolution,
 											EnableFlush:        enableFlush,
-											CompressionMode:    "passive",
+											CompressionMode:    couchbasev2.CompressionModePassive,
 										},
 									})
 								}

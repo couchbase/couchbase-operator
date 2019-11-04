@@ -32,7 +32,7 @@ var (
 			ConflictResolution: "seqno",
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    "passive",
+			CompressionMode:    couchbasev2.CompressionModePassive,
 		},
 	}
 
@@ -48,7 +48,7 @@ var (
 			ConflictResolution: "seqno",
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    "passive",
+			CompressionMode:    couchbasev2.CompressionModePassive,
 		},
 	}
 
@@ -64,7 +64,7 @@ var (
 			ConflictResolution: "seqno",
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    "passive",
+			CompressionMode:    couchbasev2.CompressionModePassive,
 		},
 	}
 )

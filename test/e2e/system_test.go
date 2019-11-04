@@ -283,7 +283,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 			ConflictResolution: "seqno",
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    "passive",
+			CompressionMode:    couchbasev2.CompressionModePassive,
 		},
 	}
 

@@ -1,11 +1,17 @@
 package v2
 
 import (
-	"github.com/couchbase/gocbmgr"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type BucketCompressionMode string
+
+const (
+	CompressionModeOff     BucketCompressionMode = "off"
+	CompressionModePassive BucketCompressionMode = "passive"
+	CompressionModeActive  BucketCompressionMode = "active"
 )
 
 // +genclient
@@ -24,7 +30,7 @@ type CouchbaseBucketSpec struct {
 	ConflictResolution string                `json:"conflictResolution,omitempty"`
 	EnableFlush        bool                  `json:"enableFlush,omitempty"`
 	EnableIndexReplica bool                  `json:"enableIndexReplica,omitempty"`
-	CompressionMode    cbmgr.CompressionMode `json:"compressionMode,omitempty"`
+	CompressionMode    BucketCompressionMode `json:"compressionMode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -49,7 +55,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	EvictionPolicy     string                `json:"evictionPolicy,omitempty"`
 	ConflictResolution string                `json:"conflictResolution,omitempty"`
 	EnableFlush        bool                  `json:"enableFlush,omitempty"`
-	CompressionMode    cbmgr.CompressionMode `json:"compressionMode,omitempty"`
+	CompressionMode    BucketCompressionMode `json:"compressionMode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -769,7 +775,7 @@ type ClusterStatus struct {
 	CurrentVersion string `json:"currentVersion,omitempty"`
 
 	// Name of buckets active within cluster
-	Buckets []cbmgr.Bucket `json:"buckets,omitempty"`
+	Buckets []BucketStatus `json:"buckets,omitempty"`
 
 	// Name of users active within cluster
 	Users []string `json:"users,omitempty"`
@@ -781,6 +787,20 @@ type ClusterStatus struct {
 	// ExposedFeatures keeps tabs on what features are currently
 	// exposed as node ports
 	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
+}
+
+type BucketStatus struct {
+	BucketName         string                `json:"name"`
+	BucketType         string                `json:"type"`
+	BucketMemoryQuota  int                   `json:"memoryQuota"`
+	BucketReplicas     int                   `json:"replicas"`
+	IoPriority         string                `json:"ioPriority"`
+	EvictionPolicy     string                `json:"evictionPolicy"`
+	ConflictResolution string                `json:"conflictResolution"`
+	EnableFlush        bool                  `json:"enableFlush"`
+	EnableIndexReplica bool                  `json:"enableIndexReplica"`
+	BucketPassword     string                `json:"password"`
+	CompressionMode    BucketCompressionMode `json:"compressionMode"`
 }
 
 type MemberStatusEntry struct {

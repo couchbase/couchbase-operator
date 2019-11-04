@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-	"github.com/couchbase/gocbmgr"
 
 	other_jsonpatch "github.com/evanphx/json-patch"
 	"github.com/ghodss/yaml"
@@ -539,13 +538,13 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", cbmgr.CompressionMode("invalid"))},
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.BucketCompressionMode("invalid"))},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForEphemeral",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", cbmgr.CompressionMode("invalid"))},
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.BucketCompressionMode("invalid"))},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
 		},
@@ -928,12 +927,12 @@ func TestValidationDefaultCreate(t *testing.T) {
 		{
 			name:        "TestValidateBucketCompressionModeDefaultForCouchbase",
 			mutations:   patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/spec/compressionMode")},
-			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().Test("/spec/compressionMode", cbmgr.CompressionModePassive)},
+			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CompressionModePassive)},
 		},
 		{
 			name:        "TestValidateBucketCompressionModeDefaultForEphemeral",
 			mutations:   patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/spec/compressionMode")},
-			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().Test("/spec/compressionMode", cbmgr.CompressionModePassive)},
+			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CompressionModePassive)},
 		},
 		{
 			name:        "TestValidateSecurityContextDefault",

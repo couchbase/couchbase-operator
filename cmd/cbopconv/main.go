@@ -310,7 +310,7 @@ func main() {
 							ConflictResolution: bucket.ConflictResolution,
 							EnableFlush:        bucket.EnableFlush,
 							EnableIndexReplica: bucket.EnableIndexReplica,
-							CompressionMode:    bucket.CompressionMode,
+							CompressionMode:    couchbasev2.BucketCompressionMode(bucket.CompressionMode),
 						},
 					}
 					buckets = append(buckets, newBucket)
@@ -334,7 +334,7 @@ func main() {
 							EvictionPolicy:     bucket.EvictionPolicy,
 							ConflictResolution: bucket.ConflictResolution,
 							EnableFlush:        bucket.EnableFlush,
-							CompressionMode:    bucket.CompressionMode,
+							CompressionMode:    couchbasev2.BucketCompressionMode(bucket.CompressionMode),
 						},
 					}
 					ephemeralBuckets = append(ephemeralBuckets, newBucket)

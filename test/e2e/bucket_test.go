@@ -47,7 +47,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
 				EnableFlush:        constants.BucketFlushEnabled,
 				EnableIndexReplica: constants.IndexReplicaEnabled,
-				CompressionMode:    "passive",
+				CompressionMode:    couchbasev2.CompressionModePassive,
 			},
 		},
 		&couchbasev2.CouchbaseMemcachedBucket{
@@ -70,7 +70,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				EvictionPolicy:     pkg_constants.BucketEvictionPolicyNoEviction,
 				ConflictResolution: pkg_constants.BucketConflictResolutionTimestamp,
 				EnableFlush:        constants.BucketFlushEnabled,
-				CompressionMode:    "passive",
+				CompressionMode:    couchbasev2.CompressionModePassive,
 			},
 		},
 		&couchbasev2.CouchbaseEphemeralBucket{
@@ -84,7 +84,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				EvictionPolicy:     pkg_constants.BucketEvictionPolicyNRUEviction,
 				ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
 				EnableFlush:        constants.BucketFlushEnabled,
-				CompressionMode:    "passive",
+				CompressionMode:    couchbasev2.CompressionModePassive,
 			},
 		},
 	}
@@ -206,11 +206,11 @@ func TestEditBucket(t *testing.T) {
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/EnableFlush", enabled), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", enabled), time.Minute)
 
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionModeActive), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CompressionModeActive), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeActive), time.Minute)
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionModeOff), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CompressionModeOff), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeOff), time.Minute)
-	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", cbmgr.CompressionModePassive), time.Minute)
+	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CompressionModePassive), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModePassive), time.Minute)
 
 	// Avoid a race where Couchbase has been updated but the event not raise yet.
