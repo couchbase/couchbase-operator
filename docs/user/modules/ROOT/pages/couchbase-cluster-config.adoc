@@ -836,6 +836,7 @@ For more information, see the Kubernetes documentation about https://kubernetes.
 
 ____
 _Field rules:_ The value of this field must be a map of key value pairs.  This field is optional and immutable.
+____
 
 === nodeSelector
 
@@ -847,7 +848,12 @@ ____
 
 === tolerations
 
-This field specifies conditions upon which a node should not be selected when deploying a pod. From the sample configuration file referenced in this topic, you can see that any node with a label `app:cbapp` should not be allowed to run the pod defined in this node specification. You might do this if you have nodes dedicated for running an application using Couchbase where you don't want the database and application to be running on the same node. For more information about tolerations, see the Kubernetes documentation on https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[taints and tolerations]. The tolerations section is optional.
+This field specifies conditions -- that usually prevent pod scheduling or execution -- that should be tolerated when scheduling a pod.
+From the sample configuration file referenced in this topic, any node with a taint `app=cbapp:NoSchedule` would not usually allow the scheduler to start running any new pods upon it.
+You may wish to taint nodes -- marking them as dedicated -- for running Couchbase Server, where you don't also want other application pods to be running on the same node and causing interference.
+In order to allow Couchbase pods to be scheduled to run on a tainted node the pod must tolerate all taints.
+For more information about tolerations, see the Kubernetes documentation on https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[taints and tolerations].
+The tolerations section is optional.
 
 ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
