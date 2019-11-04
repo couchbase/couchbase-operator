@@ -66,7 +66,7 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/TimeWindow/AbortCompactionOutsideWindow", true), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/IndexCircularCompaction/Interval/AbortOutside", true), time.Minute)
 
-	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/TombstonePurgeInterval", purgeInterval), time.Minute)
+	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoCompaction/TombstonePurgeInterval", &purgeInterval), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/PurgeInterval", purgeIntervalInternal), time.Minute)
 
 	// Check the events match what we expect:

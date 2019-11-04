@@ -49,6 +49,8 @@ func TestExposedFeatureIP(t *testing.T) {
 // TestExposedFeatureDNS tests alternate addresses are populated with DNS addresses with
 // a DNS enabled cluster.
 func TestExposedFeatureDNS(t *testing.T) {
+	t.Skip("requires DDNS")
+
 	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -97,6 +99,8 @@ func TestExposedFeatureDNS(t *testing.T) {
 // TestExposedFeatureDNSModify tests modifications to the DNS configuration are mirrored by
 // node services.
 func TestExposedFeatureDNSModify(t *testing.T) {
+	t.Skip("requires DDNS")
+
 	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -153,6 +157,8 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 // TestExposedFeatureServiceTypeModify tests modifications to the node service type are mirrored
 // by the node services.
 func TestExposedFeatureServiceTypeModify(t *testing.T) {
+	t.Skip("requires DDNS")
+
 	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
