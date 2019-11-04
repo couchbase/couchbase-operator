@@ -39,8 +39,7 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.BucketCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.BucketCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
@@ -157,8 +156,7 @@ func GetCouchbaseEphemeralBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.EphemeralBucketCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.EphemeralBucketCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
@@ -272,8 +270,7 @@ func GetCouchbaseMemcachedBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.MemcachedBucketCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.MemcachedBucketCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
@@ -338,8 +335,7 @@ func GetCouchbaseReplicationCRD() *apiextensionsv1beta1.CustomResourceDefinition
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.ReplicationCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.ReplicationCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
@@ -418,8 +414,7 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.ClusterCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.ClusterCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
@@ -1235,8 +1230,7 @@ func GetUserCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.UserCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.UserCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
@@ -1291,8 +1285,7 @@ func GetRoleCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.RoleCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.RoleCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
@@ -1359,8 +1352,7 @@ func GetRoleBindingCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Kind:       "CustomResourceDefinition",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   couchbasev2.RoleBindingCRDName,
-			Labels: map[string]string{"group": "couchbase.com"},
+			Name: couchbasev2.RoleBindingCRDName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group: couchbasev2.SchemeGroupVersion.Group,
