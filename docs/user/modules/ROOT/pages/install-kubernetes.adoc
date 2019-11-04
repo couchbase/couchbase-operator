@@ -49,7 +49,7 @@ To create the role for the Operator, run the following command:
 
 [source,console]
 ----
-kubectl create -f operator-role.yaml
+kubectl create -f operator-role.yaml --namespace default
 ----
 
 == Create a Service Account
@@ -67,7 +67,7 @@ To assign the role to the service account:
 
 [source,console]
 ----
-kubectl create rolebinding couchbase-operator --role couchbase-operator --serviceaccount default:couchbase-operator
+kubectl create rolebinding couchbase-operator --role couchbase-operator --serviceaccount default:couchbase-operator --namespace default
 ----
 
 == Create the Operator
@@ -76,7 +76,7 @@ Now that the service account is set up with the appropriate permissions, you can
 
 [source,console]
 ----
-kubectl create -f operator-deployment.yaml
+kubectl create -f operator-deployment.yaml --namespace default
 ----
 
 Running this command downloads the Operator Docker image (specified in the `operator-deployment.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment^], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.

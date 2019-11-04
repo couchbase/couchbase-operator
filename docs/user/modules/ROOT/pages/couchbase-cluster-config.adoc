@@ -67,7 +67,7 @@ spec:
       memoryQuota: 1024
       replicas: 1
       ioPriority: high
-      evictionPolicy: value-eviction
+      evictionPolicy: valueOnly
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
@@ -95,11 +95,9 @@ spec:
           limits:
             cpu: 4
             memory: 8Gi
-            storage: 100Gi
           requests:
             cpu: 2
             memory: 8Gi
-            storage: 50Gi
         labels:
           couchbase_services: all
         annotations:
@@ -314,7 +312,7 @@ This field defines any custom annotations to be added to console and per-pod (ex
 
 ____
 _Field rules:_ The serviceAnnotations field is optional.  If specified it must be a map of key/value pairs conforming to Kubernetes annotation rules.
-___
+____
 
 === softwareUpdateNotifications
 
@@ -549,7 +547,7 @@ spec:
       memoryQuota: 1024
       replicas: 1
       ioPriority: high
-      evictionPolicy: value-eviction
+      evictionPolicy: valueOnly
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
@@ -677,11 +675,9 @@ spec:
         limits:
           cpu: 4
           memory: 8Gi
-          storage: 100Gi
         requests:
           cpu: 2
           memory: 8Gi
-          storage: 50Gi
       labels:
         couchbase_services: all
       annotations:
@@ -746,11 +742,9 @@ spec:
         limits:
           cpu: 4
           memory: 8Gi
-          storage: 100Gi
         requests:
           cpu: 2
           memory: 8Gi
-          storage: 50Gi
       labels:
         couchbase_services: all
       annotations:
@@ -787,6 +781,7 @@ This field specifies a reference to either a `Secret` or `ConfigMap` which is us
 
 ____
 _Field rules:_ The value of this field must be an array of Kubernetes `EnvFromSource` types.  This field is optional and immutable.
+____
 
 === resources
 
@@ -799,18 +794,16 @@ spec:
         limits:
           cpu: 2
           memory: 8Gi
-          storage: 100Gi
         requests:
           cpu: 1.5
           memory: 8Gi
-          storage: 50Gi
 ----
 
 limits::
-This field lets you reserve resources on a specific node. It defines the maximum amount of CPU, memory, and storage the pods created in this node specification will reserve.
+This field lets you reserve resources on a specific node. It defines the maximum amount of CPU and memory the pods created in this node specification can allocate.  Exceeding these limits will cause the offending pod to be terminated.
 
 requests::
-This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU, memory, and storage the pods created in this node specification will reserve.
+This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU and memory the pods created in this node specification will reserve.
 
 TIP: In general, CPU limits are specified as the number of threads required on physical hardware (vCPUs if in the cloud), and memory is specified in bytes. Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
 

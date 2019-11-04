@@ -1,9 +1,10 @@
 * xref:overview.adoc[Introduction]
 * xref:whats-new.adoc[What's New?]
+* Best Practices
+ ** xref:best-practices.adoc[Guidelines and Best Practices]
 * Getting Started
  ** xref:prerequisite-and-setup.adoc[System Requirements]
  ** xref:network-requirements.adoc[Network Requirements]
- ** xref:best-practices.adoc[Guidelines and Best Practices]
 * xref:cloud-intro.adoc[Cloud Environment Setup]
  ** xref:install-aks.adoc[Installing on AKS]
  ** xref:install-eks.adoc[Installing on EKS]
