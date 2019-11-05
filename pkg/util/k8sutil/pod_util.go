@@ -44,12 +44,23 @@ func CreateCouchbasePod(kubeCli kubernetes.Interface, scheduler scheduler.Schedu
 		return nil, err
 	}
 
+	// If the pod is being recreated then the node selector will be populated and
+	// the scheduler will honour those constraints.
 	if err := scheduler.Create(pod); err != nil {
 		return nil, err
 	}
 
 	// Create PVCs if required.
 	for _, pvc := range pvcs {
+		// If the pod was explicitly scheduled then we need to keep note of the
+		// availability zone in the persistent volume claim so it can be copied
+		// back to a reconstructed pod.  For example A:0,3 B:1 C:2.  Killing pods
+		// 0 and 1 in A and B would result in the new pod for 0 being scheduled in
+		// B to keep things in balance, however its volumes are still in A.
+		if zone, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+			pvc.Annotations[constants.ServerGroupLabel] = zone
+		}
+
 		if _, err = createPersistentVolumeClaim(kubeCli, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
 			return nil, err
 		}
@@ -136,9 +147,6 @@ func addPodVolumes(kubeCli kubernetes.Interface, pod *v1.Pod, cluster *couchbase
 				constants.AnnotationVolumeNodeConf:      config.Name,
 				constants.CouchbaseVersionAnnotationKey: version,
 			})
-			if serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
-				claim.Annotations[constants.ServerGroupLabel] = serverGroup
-			}
 			applyBaseAnnotations(claim.GetObjectMeta())
 			if gid := cluster.Spec.GetFSGroup(); gid != nil {
 				claim.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)

@@ -889,13 +889,19 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
 func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TLSContext) error {
+	// Allocate a free port to use
+	sport, err := getFreePort()
+	if err != nil {
+		return err
+	}
+
 	// Start the port forwarder
 	pf := portforward.PortForwarder{
 		Config:    k8s.Config,
 		Client:    k8s.KubeClient,
 		Namespace: namespace,
 		Pod:       podName,
-		Port:      "18091",
+		Port:      sport + ":18091",
 	}
 	if err := pf.ForwardPorts(); err != nil {
 		return err
@@ -916,7 +922,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 	}
 	tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
 
-	conn, err := tls.Dial("tcp", "localhost:18091", tlsConfig)
+	conn, err := tls.Dial("tcp", "localhost:"+sport, tlsConfig)
 	if err != nil {
 		return err
 	}
@@ -943,7 +949,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 			DialTLS: dialer,
 		},
 	}
-	request, err := http.NewRequest("GET", "https://localhost:18091/pools/default/certificate", nil)
+	request, err := http.NewRequest("GET", "https://localhost:"+sport+"/pools/default/certificate", nil)
 	if err != nil {
 		return err
 	}

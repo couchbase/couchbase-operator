@@ -108,6 +108,7 @@ tcGroups:
       - name: TestPersistentVolumeKillPodAndOperator
       - name: TestPersistentVolumeKillAllPodsAndOperator
       - name: TestPersistentVolumeRzaNodesKilled
+      - name: TestPersistentVolumeRzaNodesKilledUnbalanced
       - name: TestPersistentVolumeRzaFailover
       - name: TestPersistentVolumeResizeCluster
 

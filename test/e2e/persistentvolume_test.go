@@ -386,11 +386,82 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
+	// Create cluster spec for RZA feature
+	availableServerGroups := getAvailabilityZones(t, targetKube)
+
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube)
+	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroups) * len(availableServerGroups)
+
+	// Create the cluster.
+	pvcName := "couchbase"
+	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ServerGroups = availableServerGroups
+	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
+		VolumeMounts: &couchbasev2.VolumeMounts{
+			DefaultClaim: pvcName,
+			DataClaim:    pvcName,
+			IndexClaim:   pvcName,
+		},
+	}
+	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+
+	// Create a expected RZA results map for verification
+	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+
+	// kill the first N pods where N is the no of server groups
+	victims := []int{}
+	for i := 0; i < len(availableServerGroups); i++ {
+		victims = append(victims, i)
+	}
+
+	// Loop to kill the nodes
+	for _, podMemberToKill := range victims {
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, false)
+	}
+
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victims[0]), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+
+	// Cross check rza deployment matches the expected values
+	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+
+	// Check the results are as expected:
+	// * Cluster created
+	// * Single pod is recovered
+	// * Remaining pods are manually recovered after auto-failover timeout
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, len(victims)),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestPersistentVolumeRzaNodesKilledUnbalanced tests operator recovery of pods spanning
+// multiple server groups. However with this test the groups are unbalanced.  So we have
+// A:0,3 B:1 C:2, killing 0, 1, 2 leaves a pod alive in A.  The scheduler will want to
+// schedule pod 0 into B to keep things balanced, however it needs to back into A as that
+// is where the volumes are.
+func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	if !supportsMultipleVolumeClaims(t, targetKube) {
+		t.Skip("storage class unsupported")
+	}
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, targetKube)
+
+	// Static configuration.
+	clusterSize := len(availableServerGroups) + 1
 
 	// Create the cluster.
 	pvcName := "couchbase"
@@ -454,11 +525,12 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
-	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 	pvcName := "couchbase"
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, targetKube)
+
+	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroups) * len(availableServerGroups)
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)

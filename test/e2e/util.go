@@ -173,15 +173,16 @@ var (
 		"TestMultiNodeAutoFailover":   TestMultiNodeAutoFailover,
 
 		// Persistent Volume cases
-		"TestPersistentVolumeCreateCluster":          TestPersistentVolumeCreateCluster,
-		"TestPersistentVolumeAutoFailover":           TestPersistentVolumeAutoFailover,
-		"TestPersistentVolumeAutoRecovery":           TestPersistentVolumeAutoRecovery,
-		"TestPersistentVolumeKillAllPods":            TestPersistentVolumeKillAllPods,
-		"TestPersistentVolumeKillPodAndOperator":     TestPersistentVolumeKillPodAndOperator,
-		"TestPersistentVolumeKillAllPodsAndOperator": TestPersistentVolumeKillAllPodsAndOperator,
-		"TestPersistentVolumeRzaNodesKilled":         TestPersistentVolumeRzaNodesKilled,
-		"TestPersistentVolumeRzaFailover":            TestPersistentVolumeRzaFailover,
-		"TestPersistentVolumeResizeCluster":          TestPersistentVolumeResizeCluster,
+		"TestPersistentVolumeCreateCluster":            TestPersistentVolumeCreateCluster,
+		"TestPersistentVolumeAutoFailover":             TestPersistentVolumeAutoFailover,
+		"TestPersistentVolumeAutoRecovery":             TestPersistentVolumeAutoRecovery,
+		"TestPersistentVolumeKillAllPods":              TestPersistentVolumeKillAllPods,
+		"TestPersistentVolumeKillPodAndOperator":       TestPersistentVolumeKillPodAndOperator,
+		"TestPersistentVolumeKillAllPodsAndOperator":   TestPersistentVolumeKillAllPodsAndOperator,
+		"TestPersistentVolumeRzaNodesKilled":           TestPersistentVolumeRzaNodesKilled,
+		"TestPersistentVolumeRzaNodesKilledUnbalanced": TestPersistentVolumeRzaNodesKilledUnbalanced,
+		"TestPersistentVolumeRzaFailover":              TestPersistentVolumeRzaFailover,
+		"TestPersistentVolumeResizeCluster":            TestPersistentVolumeResizeCluster,
 
 		// Supportability cases
 		"TestLogCollectValidateArguments": TestLogCollectValidateArguments,

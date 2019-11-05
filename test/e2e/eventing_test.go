@@ -199,7 +199,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	defer stop()
 	for _, victim := range []int{0, 1, 2} {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 20*time.Minute)
 	}
 	stop()
 	time.Sleep(time.Minute) // Wait for eventing to catch up
