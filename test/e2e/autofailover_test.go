@@ -11,6 +11,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Create 3 server groups
@@ -33,7 +35,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 10
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
 	testCouchbase.Spec.ServerGroups = availableServerGroupList
@@ -92,7 +94,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketThreeReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = uint64(autoFailoverTimeout.Seconds())
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autoFailoverTimeout}
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 

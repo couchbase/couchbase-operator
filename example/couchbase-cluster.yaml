@@ -3,7 +3,7 @@ kind: CouchbaseBucket
 metadata:
   name: default
 spec:
-  memoryQuota: 128
+  memoryQuota: 128Mi
   replicas: 1
   ioPriority: high
   evictionPolicy: fullEviction
@@ -31,16 +31,16 @@ spec:
     exposedFeatureServiceType: NodePort
     adminConsoleServiceType: NodePort
   cluster:
-    dataServiceMemoryQuota: 256
-    indexServiceMemoryQuota: 256
-    searchServiceMemoryQuota: 256
-    eventingServiceMemoryQuota: 256
-    analyticsServiceMemoryQuota: 1024
+    dataServiceMemoryQuota: 256Mi
+    indexServiceMemoryQuota: 256Mi
+    searchServiceMemoryQuota: 256Mi
+    eventingServiceMemoryQuota: 256Mi
+    analyticsServiceMemoryQuota: 1Gi
     indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 120
+    autoFailoverTimeout: 120s
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
-    autoFailoverOnDataDiskIssuesTimePeriod: 120
+    autoFailoverOnDataDiskIssuesTimePeriod: 120s
     autoFailoverServerGroup: false
   buckets:
     managed: true

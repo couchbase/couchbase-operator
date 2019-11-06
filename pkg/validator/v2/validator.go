@@ -3,6 +3,7 @@ package v2
 import (
 	"crypto/x509"
 	"fmt"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -16,17 +17,18 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
 	defaultIndexStorageSetting                    = "memory_optimized"
-	defaultAutoFailoverTimeout                    = 120
+	defaultAutoFailoverTimeout                    = "120s"
 	defaultAutoFailoverMaxCount                   = 3
-	defaultAutoFailoverOnDataDiskIssuesTimePeriod = 120
-	defaultServiceMemQuota                        = 256
-	defaultAnalyticsServiceMemQuota               = 1024
+	defaultAutoFailoverOnDataDiskIssuesTimePeriod = "120s"
+	defaultServiceMemQuota                        = "256Mi"
+	defaultAnalyticsServiceMemQuota               = "1Gi"
 	defaultFSGroup                                = 1000
 	defaultMetricsImage                           = "couchbase/prometheus-exporter:1.0.0"
 )
@@ -185,8 +187,48 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	if customResource.Spec.Networking.ExposeAdminConsole && len(customResource.Spec.Networking.AdminConsoleServices) == 0 {
 		errs = append(errs, errors.Required("spec.networking.adminConsoleServices", "body"))
 	}
-	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssues && customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == 0 {
-		errs = append(errs, errors.Required("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body"))
+
+	// Cluster validation
+	if customResource.Spec.ClusterSettings.DataServiceMemQuota != nil {
+		if customResource.Spec.ClusterSettings.DataServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256Mi"))
+		}
+	}
+	if customResource.Spec.ClusterSettings.IndexServiceMemQuota != nil {
+		if customResource.Spec.ClusterSettings.IndexServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256Mi"))
+		}
+	}
+	if customResource.Spec.ClusterSettings.SearchServiceMemQuota != nil {
+		if customResource.Spec.ClusterSettings.SearchServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256Mi"))
+		}
+	}
+	if customResource.Spec.ClusterSettings.EventingServiceMemQuota != nil {
+		if customResource.Spec.ClusterSettings.EventingServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.eventingServiceMemoryQuota in body should be greater than or equal to 256Mi"))
+		}
+	}
+	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota != nil {
+		if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.analyticsServiceMemoryQuota in body should be greater than or equal to 1Gi"))
+		}
+	}
+	if customResource.Spec.ClusterSettings.AutoFailoverTimeout != nil {
+		if customResource.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() < 5.0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5s"))
+		}
+		if customResource.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() > 3600.0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be less than or equal to 1h"))
+		}
+	}
+	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod != nil {
+		if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() < 5.0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be greater than or equal to 5s"))
+		}
+		if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() > 3600.0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h"))
+		}
 	}
 
 	// Referenced object validation
@@ -447,6 +489,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
 	errs := []error{}
 
+	if bucket.Spec.MemoryQuota != nil {
+		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
+		}
+	}
+
 	if err := validateMemoryConstraints(v, bucket); err != nil {
 		errs = append(errs, err)
 	}
@@ -461,6 +509,12 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) error {
 	errs := []error{}
 
+	if bucket.Spec.MemoryQuota != nil {
+		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
+		}
+	}
+
 	if err := validateMemoryConstraints(v, bucket); err != nil {
 		errs = append(errs, err)
 	}
@@ -474,6 +528,12 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 
 func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket) error {
 	errs := []error{}
+
+	if bucket.Spec.MemoryQuota != nil {
+		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
+		}
+	}
 
 	if err := validateMemoryConstraints(v, bucket); err != nil {
 		errs = append(errs, err)
@@ -714,18 +774,18 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 		return err
 	}
 
-	allocated := uint64(0)
+	allocated := resource.NewQuantity(0, resource.BinarySI)
 	for _, bucket := range buckets.Items {
-		allocated += uint64(bucket.Spec.MemoryQuota)
+		allocated.Add(*bucket.Spec.MemoryQuota)
 	}
 	for _, bucket := range ephemeralBuckets.Items {
-		allocated += uint64(bucket.Spec.MemoryQuota)
+		allocated.Add(*bucket.Spec.MemoryQuota)
 	}
 	for _, bucket := range memcachedBuckets.Items {
-		allocated += uint64(bucket.Spec.MemoryQuota)
+		allocated.Add(*bucket.Spec.MemoryQuota)
 	}
 
-	if allocated > cluster.Spec.ClusterSettings.DataServiceMemQuota {
+	if allocated.Cmp(*cluster.Spec.ClusterSettings.DataServiceMemQuota) > 0 {
 		return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
 	}
 

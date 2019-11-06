@@ -89,12 +89,6 @@ const (
 )
 
 const (
-	Mem256Mb = 256
-	Mem512Mb = 512
-	Mem1Gb   = 1024
-)
-
-const (
 	// CRD Object naming
 	CouchbaseUserName = "admin"
 	ClusterRoleName   = "admin-role"

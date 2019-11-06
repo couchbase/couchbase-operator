@@ -3,7 +3,7 @@ kind: CouchbaseBucket
 metadata:
   name: default
 spec:
-  memoryQuota: 128
+  memoryQuota: 128Mi
   replicas: 1
   ioPriority: high
   evictionPolicy: fullEviction
@@ -31,14 +31,14 @@ spec:
     - us-east-1b
     - us-east-1c
   cluster:
-    dataServiceMemoryQuota: 256
-    indexServiceMemoryQuota: 256
-    searchServiceMemoryQuota: 256
+    dataServiceMemoryQuota: 256Mi
+    indexServiceMemoryQuota: 256Mi
+    searchServiceMemoryQuota: 256Mi
     indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 120
+    autoFailoverTimeout: 120s
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
-    autoFailoverOnDataDiskIssuesTimePeriod: 120
+    autoFailoverOnDataDiskIssuesTimePeriod: 120s
     autoFailoverServerGroup: false
   buckets:
     managed: true

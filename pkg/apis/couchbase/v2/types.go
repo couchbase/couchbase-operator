@@ -77,7 +77,7 @@ type CouchbaseBucket struct {
 }
 
 type CouchbaseBucketSpec struct {
-	MemoryQuota        int                               `json:"memoryQuota,omitempty"`
+	MemoryQuota        *resource.Quantity                `json:"memoryQuota,omitempty"`
 	Replicas           int                               `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority         `json:"ioPriority,omitempty"`
 	EvictionPolicy     CouchbaseBucketEvictionPolicy     `json:"evictionPolicy,omitempty"`
@@ -103,7 +103,7 @@ type CouchbaseEphemeralBucket struct {
 }
 
 type CouchbaseEphemeralBucketSpec struct {
-	MemoryQuota        int                                    `json:"memoryQuota,omitempty"`
+	MemoryQuota        *resource.Quantity                     `json:"memoryQuota,omitempty"`
 	Replicas           int                                    `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority              `json:"ioPriority,omitempty"`
 	EvictionPolicy     CouchbaseEphemeralBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
@@ -128,8 +128,8 @@ type CouchbaseMemcachedBucket struct {
 }
 
 type CouchbaseMemcachedBucketSpec struct {
-	MemoryQuota int  `json:"memoryQuota,omitempty"`
-	EnableFlush bool `json:"enableFlush,omitempty"`
+	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+	EnableFlush bool               `json:"enableFlush,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -465,25 +465,25 @@ type ClusterConfig struct {
 	ClusterName string `json:"clusterName,omitempty"`
 
 	// The amount of memory that should be allocated to the data service
-	DataServiceMemQuota uint64 `json:"dataServiceMemoryQuota,omitempty"`
+	DataServiceMemQuota *resource.Quantity `json:"dataServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the index service
-	IndexServiceMemQuota uint64 `json:"indexServiceMemoryQuota,omitempty"`
+	IndexServiceMemQuota *resource.Quantity `json:"indexServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the search service
-	SearchServiceMemQuota uint64 `json:"searchServiceMemoryQuota,omitempty"`
+	SearchServiceMemQuota *resource.Quantity `json:"searchServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the eventing service
-	EventingServiceMemQuota uint64 `json:"eventingServiceMemoryQuota,omitempty"`
+	EventingServiceMemQuota *resource.Quantity `json:"eventingServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the analytics service
-	AnalyticsServiceMemQuota uint64 `json:"analyticsServiceMemoryQuota,omitempty"`
+	AnalyticsServiceMemQuota *resource.Quantity `json:"analyticsServiceMemoryQuota,omitempty"`
 
 	// The index storage mode to use for secondary indexing
 	IndexStorageSetting CouchbaseClusterIndexStorageSetting `json:"indexStorageSetting,omitempty"`
 
 	// Timeout that expires to trigger the auto failover.
-	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout,omitempty"`
+	AutoFailoverTimeout *metav1.Duration `json:"autoFailoverTimeout,omitempty"`
 
 	// The number of failover events we can tolerate
 	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount,omitempty"`
@@ -492,7 +492,7 @@ type ClusterConfig struct {
 	AutoFailoverOnDataDiskIssues bool `json:"autoFailoverOnDataDiskIssues,omitempty"`
 
 	// How long to wait for transient errors before failing over a faulty disk
-	AutoFailoverOnDataDiskIssuesTimePeriod uint64 `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
+	AutoFailoverOnDataDiskIssuesTimePeriod *metav1.Duration `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
 
 	// Whether to enable failing over a server group
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
@@ -507,7 +507,7 @@ type DatabaseFragmentationThreshold struct {
 	Percent *int `json:"percent,omitempty"`
 
 	// Size is the size of disk framentation.
-	Size resource.Quantity `json:"size,omitempty"`
+	Size *resource.Quantity `json:"size,omitempty"`
 }
 
 // ViewFragmentationThreshold lists triggers for when view compaction should start.
@@ -516,7 +516,7 @@ type ViewFragmentationThreshold struct {
 	Percent *int `json:"percent,omitempty"`
 
 	// Size is the size of disk framentation.
-	Size resource.Quantity `json:"size,omitempty"`
+	Size *resource.Quantity `json:"size,omitempty"`
 }
 
 // TimeWindow allows the user to restrict when compaction can occur.
@@ -858,7 +858,7 @@ type ClusterStatus struct {
 type BucketStatus struct {
 	BucketName         string `json:"name"`
 	BucketType         string `json:"type"`
-	BucketMemoryQuota  int    `json:"memoryQuota"`
+	BucketMemoryQuota  int64  `json:"memoryQuota"`
 	BucketReplicas     int    `json:"replicas"`
 	IoPriority         string `json:"ioPriority"`
 	EvictionPolicy     string `json:"evictionPolicy"`

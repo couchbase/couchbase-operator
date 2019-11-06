@@ -12,6 +12,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	couchbaseclient "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
@@ -183,16 +184,16 @@ func main() {
 				AntiAffinity: cluster.Spec.AntiAffinity,
 				ClusterSettings: couchbasev2.ClusterConfig{
 					ClusterName:                            cluster.Spec.ClusterSettings.ClusterName,
-					DataServiceMemQuota:                    cluster.Spec.ClusterSettings.DataServiceMemQuota,
-					IndexServiceMemQuota:                   cluster.Spec.ClusterSettings.IndexServiceMemQuota,
-					SearchServiceMemQuota:                  cluster.Spec.ClusterSettings.SearchServiceMemQuota,
-					EventingServiceMemQuota:                cluster.Spec.ClusterSettings.EventingServiceMemQuota,
-					AnalyticsServiceMemQuota:               cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota,
+					DataServiceMemQuota:                    k8sutil.NewResourceQuantityMi(int64(cluster.Spec.ClusterSettings.DataServiceMemQuota)),
+					IndexServiceMemQuota:                   k8sutil.NewResourceQuantityMi(int64(cluster.Spec.ClusterSettings.IndexServiceMemQuota)),
+					SearchServiceMemQuota:                  k8sutil.NewResourceQuantityMi(int64(cluster.Spec.ClusterSettings.SearchServiceMemQuota)),
+					EventingServiceMemQuota:                k8sutil.NewResourceQuantityMi(int64(cluster.Spec.ClusterSettings.EventingServiceMemQuota)),
+					AnalyticsServiceMemQuota:               k8sutil.NewResourceQuantityMi(int64(cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota)),
 					IndexStorageSetting:                    couchbasev2.CouchbaseClusterIndexStorageSetting(cluster.Spec.ClusterSettings.IndexStorageSetting),
-					AutoFailoverTimeout:                    cluster.Spec.ClusterSettings.AutoFailoverTimeout,
+					AutoFailoverTimeout:                    k8sutil.NewDurationS(int64(cluster.Spec.ClusterSettings.AutoFailoverTimeout)),
 					AutoFailoverMaxCount:                   cluster.Spec.ClusterSettings.AutoFailoverMaxCount,
 					AutoFailoverOnDataDiskIssues:           cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssues,
-					AutoFailoverOnDataDiskIssuesTimePeriod: cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod,
+					AutoFailoverOnDataDiskIssuesTimePeriod: k8sutil.NewDurationS(int64(cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod)),
 					AutoFailoverServerGroup:                cluster.Spec.ClusterSettings.AutoFailoverServerGroup,
 				},
 				SoftwareUpdateNotifications: cluster.Spec.SoftwareUpdateNotifications,
@@ -303,7 +304,7 @@ func main() {
 							},
 						},
 						Spec: couchbasev2.CouchbaseBucketSpec{
-							MemoryQuota:        bucket.BucketMemoryQuota,
+							MemoryQuota:        k8sutil.NewResourceQuantityMi(int64(bucket.BucketMemoryQuota)),
 							Replicas:           bucket.BucketReplicas,
 							IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
 							EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicy(bucket.EvictionPolicy),
@@ -328,7 +329,7 @@ func main() {
 							},
 						},
 						Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
-							MemoryQuota:        bucket.BucketMemoryQuota,
+							MemoryQuota:        k8sutil.NewResourceQuantityMi(int64(bucket.BucketMemoryQuota)),
 							Replicas:           bucket.BucketReplicas,
 							IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
 							EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicy(bucket.EvictionPolicy),
@@ -352,7 +353,7 @@ func main() {
 							},
 						},
 						Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
-							MemoryQuota: bucket.BucketMemoryQuota,
+							MemoryQuota: k8sutil.NewResourceQuantityMi(int64(bucket.BucketMemoryQuota)),
 							EnableFlush: bucket.EnableFlush,
 						},
 					}

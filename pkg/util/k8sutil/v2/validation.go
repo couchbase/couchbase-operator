@@ -8,23 +8,18 @@ import (
 )
 
 var (
-	maximumAutofailoverTimeout         float64 = 3600
-	minimumServiceMemoryQuota          float64 = 256
-	minimumAnalyticsServiceMemoryQuota float64 = 1024
-	minimumBucketQuota                 float64 = 100
-	minimumAutofailoverTimeout         float64 = 5
-	minimumServersSize                 float64 = 1
-	minimumItemLength                  int64   = 1
-	minimumServicesLength              int64   = 1
-	minimumServersLength               int64   = 1
-	minimumStringLength                int64   = 1
-	minimumBucketReplicas              float64 = 0
-	maximumBucketReplicas              float64 = 3
-	minimumAutofailoverMaxCount        float64 = 1
-	maximumAutofailoverMaxCount        float64 = 3
-	minimumLogRetentionCount           float64 = 0
-	minimumAutoCompactionPercent       float64 = 2
-	maximumAutoCompactionPercent       float64 = 100
+	minimumServersSize           float64 = 1
+	minimumItemLength            int64   = 1
+	minimumServicesLength        int64   = 1
+	minimumServersLength         int64   = 1
+	minimumStringLength          int64   = 1
+	minimumBucketReplicas        float64 = 0
+	maximumBucketReplicas        float64 = 3
+	minimumAutofailoverMaxCount  float64 = 1
+	maximumAutofailoverMaxCount  float64 = 3
+	minimumLogRetentionCount     float64 = 0
+	minimumAutoCompactionPercent float64 = 2
+	maximumAutoCompactionPercent float64 = 100
 )
 
 const (
@@ -51,7 +46,7 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
 					Name:        "Memory Quota",
-					Type:        "integer",
+					Type:        "string",
 					Description: "Maximum memory size in MiB of the bucket",
 					JSONPath:    ".spec.memoryQuota",
 				},
@@ -110,8 +105,7 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-									Type:    "integer",
-									Minimum: &minimumBucketQuota,
+									Type: "string",
 								},
 								"replicas": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "integer",
@@ -168,7 +162,7 @@ func GetCouchbaseEphemeralBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
 					Name:        "Memory Quota",
-					Type:        "integer",
+					Type:        "string",
 					Description: "Maximum memory size in MiB of the bucket",
 					JSONPath:    ".spec.memoryQuota",
 				},
@@ -227,8 +221,7 @@ func GetCouchbaseEphemeralBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-									Type:    "integer",
-									Minimum: &minimumBucketQuota,
+									Type: "string",
 								},
 								"replicas": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "integer",
@@ -282,7 +275,7 @@ func GetCouchbaseMemcachedBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
 					Name:        "Memory Quota",
-					Type:        "integer",
+					Type:        "string",
 					Description: "Maximum memory size in MiB of the bucket",
 					JSONPath:    ".spec.memoryQuota",
 				},
@@ -313,8 +306,7 @@ func GetCouchbaseMemcachedBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-									Type:    "integer",
-									Minimum: &minimumBucketQuota,
+									Type: "string",
 								},
 								"enableFlush": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
@@ -750,33 +742,26 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 											Type: "string",
 										},
 										"dataServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-											Type:    "integer",
-											Minimum: &minimumServiceMemoryQuota,
+											Type: "string",
 										},
 										"indexServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-											Type:    "integer",
-											Minimum: &minimumServiceMemoryQuota,
+											Type: "string",
 										},
 										"searchServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-											Type:    "integer",
-											Minimum: &minimumServiceMemoryQuota,
+											Type: "string",
 										},
 										"eventingServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-											Type:    "integer",
-											Minimum: &minimumServiceMemoryQuota,
+											Type: "string",
 										},
 										"analyticsServiceMemoryQuota": apiextensionsv1beta1.JSONSchemaProps{
-											Type:    "integer",
-											Minimum: &minimumAnalyticsServiceMemoryQuota,
+											Type: "string",
 										},
 										"indexStorageSetting": apiextensionsv1beta1.JSONSchemaProps{
 											Type:    "string",
 											Pattern: "^plasma|memory_optimized$",
 										},
 										"autoFailoverTimeout": apiextensionsv1beta1.JSONSchemaProps{
-											Type:    "integer",
-											Minimum: &minimumAutofailoverTimeout,
-											Maximum: &maximumAutofailoverTimeout,
+											Type: "string",
 										},
 										"autoFailoverMaxCount": apiextensionsv1beta1.JSONSchemaProps{
 											Type:    "integer",
@@ -787,9 +772,7 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 											Type: "boolean",
 										},
 										"autoFailoverOnDataDiskIssuesTimePeriod": apiextensionsv1beta1.JSONSchemaProps{
-											Type:    "integer",
-											Minimum: &minimumAutofailoverTimeout,
-											Maximum: &maximumAutofailoverTimeout,
+											Type: "string",
 										},
 										"autoFailoverServerGroup": apiextensionsv1beta1.JSONSchemaProps{
 											Type: "boolean",

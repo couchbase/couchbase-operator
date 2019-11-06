@@ -25,7 +25,7 @@ var (
 			Name: "source",
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        100,
+			MemoryQuota:        e2espec.NewResourceQuantityMi(100),
 			Replicas:           1,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
@@ -41,7 +41,7 @@ var (
 			Name: "destination",
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        100,
+			MemoryQuota:        e2espec.NewResourceQuantityMi(100),
 			Replicas:           1,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
@@ -57,7 +57,7 @@ var (
 			Name: "metadata",
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        100,
+			MemoryQuota:        e2espec.NewResourceQuantityMi(100),
 			Replicas:           1,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
@@ -69,10 +69,12 @@ var (
 	}
 )
 
-const (
+var (
 	// dataServiceMemoryQuota is enough memory to support the bucket requirements
-	dataServiceMemoryQuota = 300
+	dataServiceMemoryQuota = e2espec.NewResourceQuantityMi(300)
+)
 
+const (
 	// function is a basic test eventing function that populates a destination
 	// bucket with a test value when a document appears in a source bucket.  It
 	// deletes it when the corresponding source document is deleted.
@@ -185,7 +187,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)

@@ -532,9 +532,9 @@ func TestNegValidationCreate(t *testing.T) {
 		//		},
 		{
 			name:           "TestValidateBucketQuotaOverflow",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", 601)},
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
 			shouldFail:     true,
-			expectedErrors: []string{"bucket memory allocation (1001) exceeds data service quota (600) on cluster cluster"},
+			expectedErrors: []string{"bucket memory allocation (1001Mi) exceeds data service quota (600Mi) on cluster cluster"},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
@@ -823,6 +823,60 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.monitoring.prometheus.image in body should match '^[\w_\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$'`},
 		},
+		{
+			name:           "TestValidateDataServiceMemoryQuotaUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/dataServiceMemoryQuota", "0Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256Mi`},
+		},
+		{
+			name:           "TestValidateIndexServiceMemoryQuotaUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexServiceMemoryQuota", "0Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256Mi`},
+		},
+		{
+			name:           "TestValidateSearchServiceMemoryQuotaUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/searchServiceMemoryQuota", "0Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256Mi`},
+		},
+		{
+			name:           "TestValidateEventingServiceMemoryQuotaUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/eventingServiceMemoryQuota", "0Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.eventingServiceMemoryQuota in body should be greater than or equal to 256Mi`},
+		},
+		{
+			name:           "TestValidateAnalyticsServiceMemoryQuotaUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/analyticsServiceMemoryQuota", "0Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.analyticsServiceMemoryQuota in body should be greater than or equal to 1Gi`},
+		},
+		{
+			name:           "TestValidateAutoFailoverTimeoutUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", "0s")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5s`},
+		},
+		{
+			name:           "TestValidateAutoFailoverTimeoutOverflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", "2h")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoFailoverTimeout in body should be less than or equal to 1h`},
+		},
+		{
+			name:           "TestValidateAutoFailoverOnDataDiskIssuesTimePeriodUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "0s")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be greater than or equal to 5s`},
+		},
+		{
+			name:           "TestValidateAutoFailoverOnDataDiskIssuesTimePeriodOverflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "2h")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]
@@ -901,20 +955,28 @@ func TestNegValidationCreate(t *testing.T) {
 func TestValidationDefaultCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:      "TestValidateClusterDefault",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Test("/spec/cluster/dataServiceMemoryQuota", 256).
-				Test("/spec/cluster/indexServiceMemoryQuota", 256).
-				Test("/spec/cluster/searchServiceMemoryQuota", 256).
-				Test("/spec/cluster/eventingServiceMemoryQuota", 256).
-				Test("/spec/cluster/analyticsServiceMemoryQuota", 1024).
-				Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
-				Test("/spec/cluster/autoFailoverTimeout", 120).
-				Test("/spec/cluster/autoFailoverMaxCount", 3).
-				Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", 120),
+			name: "TestValidateClusterDefault",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				// Data cannot be tested as we require at least 500Mi of buckets
+				Remove("/spec/cluster/indexServiceMemoryQuota").
+				Remove("/spec/cluster/searchServiceMemoryQuota").
+				Remove("/spec/cluster/eventingServiceMemoryQuota").
+				Remove("/spec/cluster/analyticsServiceMemoryQuota").
+				Remove("/spec/cluster/indexStorageSetting").
+				Remove("/spec/cluster/autoFailoverTimeout").
+				Remove("/spec/cluster/autoFailoverMaxCount").
+				Remove("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod"),
 			},
-			shouldFail: true, // Bucket allocation is greater than data allocation.
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Test("/spec/cluster/indexServiceMemoryQuota", "256Mi").
+				Test("/spec/cluster/searchServiceMemoryQuota", "256Mi").
+				Test("/spec/cluster/eventingServiceMemoryQuota", "256Mi").
+				Test("/spec/cluster/analyticsServiceMemoryQuota", "1Gi").
+				Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
+				Test("/spec/cluster/autoFailoverTimeout", "120s").
+				Test("/spec/cluster/autoFailoverMaxCount", 3).
+				Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "120s"),
+			},
 		},
 		{
 			name:      "TestValidateNetworkingDefault",
@@ -961,7 +1023,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 			name:           "TestValidateDataServiceMemoryQuotaDefault",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/dataServiceMemoryQuota")},
 			shouldFail:     true,
-			expectedErrors: []string{"bucket memory allocation (500) exceeds data service quota (256) on cluster cluster"},
+			expectedErrors: []string{"bucket memory allocation (500Mi) exceeds data service quota (256Mi) on cluster cluster"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1096,17 +1158,17 @@ func TestValidationDefaultApply(t *testing.T) {
 		{
 			name:        "TestValidateApplyIndexServiceMemoryQuotaDefault",
 			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/indexServiceMemoryQuota")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/indexServiceMemoryQuota", 256)},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/indexServiceMemoryQuota", "256Mi")},
 		},
 		{
 			name:        "TestValidateApplySearchServiceMemoryQuotaDefault",
 			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/searchServiceMemoryQuota")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/searchServiceMemoryQuota", 256)},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/searchServiceMemoryQuota", "256Mi")},
 		},
 		{
 			name:        "TestValidateApplyAutoFailoverTimeoutDefault",
 			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/autoFailoverTimeout")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/autoFailoverTimeout", 120)},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/autoFailoverTimeout", "120s")},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

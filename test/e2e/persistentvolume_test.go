@@ -101,7 +101,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 10
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -153,7 +153,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 10
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -236,7 +236,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -289,7 +289,7 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -340,7 +340,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -396,7 +396,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -467,7 +467,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{
@@ -534,7 +534,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
 	testCouchbase.Spec.ServerGroups = availableServerGroups
@@ -603,7 +603,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = 30
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{

@@ -39,7 +39,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				Name: names[0],
 			},
 			Spec: couchbasev2.CouchbaseBucketSpec{
-				MemoryQuota:        256,
+				MemoryQuota:        e2espec.NewResourceQuantityMi(256),
 				Replicas:           1,
 				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
@@ -54,7 +54,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				Name: names[1],
 			},
 			Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
-				MemoryQuota: constants.Mem256Mb,
+				MemoryQuota: e2espec.NewResourceQuantityMi(256),
 				EnableFlush: false,
 			},
 		},
@@ -63,7 +63,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				Name: names[2],
 			},
 			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
-				MemoryQuota:        101,
+				MemoryQuota:        e2espec.NewResourceQuantityMi(101),
 				Replicas:           1,
 				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 				EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction,
@@ -77,7 +77,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				Name: names[3],
 			},
 			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
-				MemoryQuota:        101,
+				MemoryQuota:        e2espec.NewResourceQuantityMi(101),
 				Replicas:           1,
 				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 				EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction,
@@ -89,7 +89,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	}
 
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = 1024
+	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// create connection to couchbase nodes
@@ -190,10 +190,10 @@ func TestEditBucket(t *testing.T) {
 
 	// Create a direct connection to a couchbase node.
 	// When healthy change the memory quota, replicas, whether flushes are allowed and the compression mode.
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", 128), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", 128), time.Minute)
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", 256), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", 256), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", int64(128)), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", e2espec.NewResourceQuantityMi(256)), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", int64(256)), time.Minute)
 
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/Replicas", 2), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 2), time.Minute)
@@ -368,7 +368,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	// Create the cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = 1024
+	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 10)

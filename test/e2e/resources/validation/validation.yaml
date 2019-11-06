@@ -10,7 +10,7 @@ kind: CouchbaseBucket
 metadata:
   name: bucket0
 spec:
-  memoryQuota: 100
+  memoryQuota: 100Mi
   replicas: 0
   ioPriority: high
   evictionPolicy: fullEviction
@@ -24,7 +24,7 @@ kind: CouchbaseBucket
 metadata:
   name: bucket1
 spec:
-  memoryQuota: 100
+  memoryQuota: 100Mi
   replicas: 0
   ioPriority: high
   evictionPolicy: valueOnly
@@ -38,7 +38,7 @@ kind: CouchbaseMemcachedBucket
 metadata:
   name: bucket2 
 spec:
-  memoryQuota: 100
+  memoryQuota: 100Mi
   enableFlush: true
 ---
 apiVersion: couchbase.com/v2
@@ -46,7 +46,7 @@ kind: CouchbaseEphemeralBucket
 metadata:
   name: bucket3
 spec:
-  memoryQuota: 100
+  memoryQuota: 100Mi
   replicas: 3
   ioPriority: low
   evictionPolicy: noEviction
@@ -59,7 +59,7 @@ kind: CouchbaseEphemeralBucket
 metadata:
   name: bucket4
 spec:
-  memoryQuota: 100
+  memoryQuota: 100Mi
   replicas: 3
   ioPriority: low
   evictionPolicy: nruEviction
@@ -169,15 +169,15 @@ spec:
     - RzaGroup-2
     - RzaGroup-3
   cluster:
-    dataServiceMemoryQuota: 600
-    indexServiceMemoryQuota: 256
-    searchServiceMemoryQuota: 256
-    eventingServiceMemoryQuota: 256
-    analyticsServiceMemoryQuota: 1024
+    dataServiceMemoryQuota: 600Mi
+    indexServiceMemoryQuota: 512Mi
+    searchServiceMemoryQuota: 512Mi
+    eventingServiceMemoryQuota: 512Mi
+    analyticsServiceMemoryQuota: 2Gi
     indexStorageSetting: memory_optimized
-    autoFailoverOnDataDiskIssuesTimePeriod: 10
+    autoFailoverOnDataDiskIssuesTimePeriod: 10s
     autoFailoverMaxCount: 1
-    autoFailoverTimeout: 10
+    autoFailoverTimeout: 10s
     autoCompaction:
       databaseFragmentationThreshold:
         percent: 50

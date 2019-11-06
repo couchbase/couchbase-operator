@@ -10,6 +10,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -224,11 +225,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 			Image:        f.CouchbaseServerImage,
 			AntiAffinity: true,
 			ClusterSettings: couchbasev2.ClusterConfig{
-				DataServiceMemQuota:   2000,
-				IndexServiceMemQuota:  2000,
-				SearchServiceMemQuota: 2000,
+				DataServiceMemQuota:   e2espec.NewResourceQuantityMi(2048),
+				IndexServiceMemQuota:  e2espec.NewResourceQuantityMi(2048),
+				SearchServiceMemQuota: e2espec.NewResourceQuantityMi(2048),
 				IndexStorageSetting:   couchbasev2.CouchbaseClusterIndexStorageSettingStandard,
-				AutoFailoverTimeout:   120,
+				AutoFailoverTimeout:   e2espec.NewDurationS(120),
 			},
 			Security: couchbasev2.CouchbaseClusterSecuritySpec{
 				AdminSecret: targetKube.DefaultSecret.Name,
@@ -276,7 +277,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	bucketTemplate := &couchbasev2.CouchbaseBucket{
 		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        100,
+			MemoryQuota:        e2espec.NewResourceQuantityMi(100),
 			Replicas:           1,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,

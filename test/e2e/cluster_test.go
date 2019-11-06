@@ -113,11 +113,6 @@ func TestEditClusterSettings(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size1
-	newDataServiceMemQuota := uint64(257)
-	newIndexServiceMemQuota := uint64(257)
-	newSearchServiceMemQuota := uint64(257)
-	newAutoFailoverTimeout := uint64(31)
-	newIndexStorageSetting := couchbasev2.CouchbaseClusterIndexStorageSettingStandard
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1)
@@ -128,15 +123,15 @@ func TestEditClusterSettings(t *testing.T) {
 
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/DataServiceMemQuota", newDataServiceMemQuota), time.Minute)
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/DataMemoryQuotaMB", newDataServiceMemQuota), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", newIndexServiceMemQuota), time.Minute)
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/IndexMemoryQuotaMB", newIndexServiceMemQuota), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/SearchServiceMemQuota", newSearchServiceMemQuota), time.Minute)
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/SearchMemoryQuotaMB", newSearchServiceMemQuota), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoFailoverTimeout", newAutoFailoverTimeout), time.Minute)
-	e2eutil.MustPatchAutoFailoverInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Timeout", newAutoFailoverTimeout), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexStorageSetting", newIndexStorageSetting), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/DataServiceMemQuota", e2espec.NewResourceQuantityMi(257)), time.Minute)
+	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/DataMemoryQuotaMB", int64(257)), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", e2espec.NewResourceQuantityMi(257)), time.Minute)
+	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/IndexMemoryQuotaMB", int64(257)), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/SearchServiceMemQuota", e2espec.NewResourceQuantityMi(257)), time.Minute)
+	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/SearchMemoryQuotaMB", int64(257)), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
+	e2eutil.MustPatchAutoFailoverInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StorageMode", cbmgr.IndexStoragePlasma), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 

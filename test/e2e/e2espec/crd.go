@@ -3,6 +3,7 @@ package e2espec
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -21,7 +22,7 @@ var (
 			Name: e2e_constants.DefaultBucket,
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        e2e_constants.Mem256Mb,
+			MemoryQuota:        NewResourceQuantityMi(256),
 			Replicas:           1,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
@@ -37,7 +38,7 @@ var (
 			Name: e2e_constants.DefaultBucket,
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        e2e_constants.Mem256Mb,
+			MemoryQuota:        NewResourceQuantityMi(256),
 			Replicas:           2,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
@@ -53,7 +54,7 @@ var (
 			Name: e2e_constants.DefaultBucket,
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        e2e_constants.Mem256Mb,
+			MemoryQuota:        NewResourceQuantityMi(256),
 			Replicas:           3,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
@@ -64,6 +65,14 @@ var (
 		},
 	}
 )
+
+func NewResourceQuantityMi(value int64) *resource.Quantity {
+	return resource.NewQuantity(value<<20, resource.BinarySI)
+}
+
+func NewDurationS(value uint64) *metav1.Duration {
+	return &metav1.Duration{Duration: time.Duration(value) * time.Second}
+}
 
 func SetCouchbaseServerImage(imageName string) {
 	if imageName = strings.TrimSpace(imageName); imageName != "" {
@@ -90,7 +99,9 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 	for _, bucketType := range bucketTypes {
 		switch {
 		case bucketType == constants.BucketTypeCouchbase:
-			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
+			bucketMemoryQuotas := []*resource.Quantity{
+				NewResourceQuantityMi(256),
+			}
 			bucketReplicas := []int{1}
 			ioPriorities := []couchbasev2.CouchbaseBucketIOPriority{
 				couchbasev2.CouchbaseBucketIOPriorityHigh,
@@ -138,7 +149,9 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 				}
 			}
 		case bucketType == constants.BucketTypeMemcached:
-			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
+			bucketMemoryQuotas := []*resource.Quantity{
+				NewResourceQuantityMi(256),
+			}
 			enableFlushes := []bool{
 				true,
 				false,
@@ -157,7 +170,9 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 				}
 			}
 		case bucketType == constants.BucketTypeEphemeral:
-			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
+			bucketMemoryQuotas := []*resource.Quantity{
+				NewResourceQuantityMi(256),
+			}
 			bucketReplicas := []int{1}
 			ioPriorities := []couchbasev2.CouchbaseBucketIOPriority{
 				couchbasev2.CouchbaseBucketIOPriorityHigh,
@@ -350,7 +365,7 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 	// The defaults are too aggressive.  When killing a pod during a rebalance the operator
 	// may hang for ~30 seconds due to network retries. During this period we may or may not
 	// observe a failover leading to non-determinism.
-	spec.ClusterSettings.AutoFailoverTimeout = 120
+	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(120)
 
 	if platform != "" {
 		spec.Platform = platform
@@ -389,7 +404,7 @@ func NewBasicXdcrCluster(genName, secretName string, size int) *couchbasev2.Couc
 			},
 		}},
 	}
-	spec.ClusterSettings.AutoFailoverTimeout = 30
+	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
 	spec.ClusterSettings.AutoFailoverMaxCount = 3
 	if platform != "" {
 		spec.Platform = platform

@@ -7,10 +7,10 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,10 +22,7 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	// Static configuration.
 	clusterSize := 1
 	thresholdPercent := 69
-	thresholdSize, err := resource.ParseQuantity("69Mi")
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
+	thresholdSize := e2espec.NewResourceQuantityMi(69)
 	thresholdSizeInternal := int64(69 * 1024 * 1024)
 	purgeIntervalBase, err := time.ParseDuration("42h")
 	if err != nil {

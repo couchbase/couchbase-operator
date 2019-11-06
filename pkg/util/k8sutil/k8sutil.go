@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -349,4 +350,26 @@ func LogPod(client *client.Client, name string) string {
 	}
 
 	return string(data)
+}
+
+// NewResourceQuantityMi accepts an integral value representing megabytes (2^20)
+// and returns a quantity.
+func NewResourceQuantityMi(value int64) *resource.Quantity {
+	return resource.NewQuantity(value<<20, resource.BinarySI)
+}
+
+// NewDurationS accepts an integral value representing seconds and returns
+// a duration.
+func NewDurationS(value int64) *metav1.Duration {
+	return &metav1.Duration{Duration: time.Duration(value) * time.Second}
+}
+
+// Megabytes accepts a quantity and returns an integral value representing megabytes.
+func Megabytes(quantity *resource.Quantity) int64 {
+	return quantity.Value() >> 20
+}
+
+// Seconds accepts a duration and returns an integral value representing seconds.
+func Seconds(duration *metav1.Duration) int64 {
+	return int64(duration.Seconds())
 }

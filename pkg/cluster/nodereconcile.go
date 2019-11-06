@@ -305,8 +305,8 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		// begin manual recovery.
 		recoveryTime, ok := c.recoveryTime[m.Name]
 		if !ok {
-			timeout := time.Duration(c.cluster.Spec.ClusterSettings.AutoFailoverTimeout+30) * time.Second
-			recoveryTime = time.Now().Add(timeout).Add(30 * time.Second)
+			timeout := c.cluster.Spec.ClusterSettings.AutoFailoverTimeout
+			recoveryTime = time.Now().Add(timeout.Duration).Add(30 * time.Second)
 			c.recoveryTime[m.Name] = recoveryTime
 		}
 

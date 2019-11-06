@@ -389,7 +389,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 		buckets = append(buckets, cbmgr.Bucket{
 			BucketName:         bucket.Name,
 			BucketType:         constants.BucketTypeCouchbase,
-			BucketMemoryQuota:  bucket.Spec.MemoryQuota,
+			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
 			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
 			EvictionPolicy:     string(bucket.Spec.EvictionPolicy),
@@ -407,7 +407,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 		buckets = append(buckets, cbmgr.Bucket{
 			BucketName:         bucket.Name,
 			BucketType:         constants.BucketTypeEphemeral,
-			BucketMemoryQuota:  bucket.Spec.MemoryQuota,
+			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
 			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
 			EvictionPolicy:     string(bucket.Spec.EvictionPolicy),
@@ -424,7 +424,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 		buckets = append(buckets, cbmgr.Bucket{
 			BucketName:        bucket.Name,
 			BucketType:        constants.BucketTypeMemcached,
-			BucketMemoryQuota: bucket.Spec.MemoryQuota,
+			BucketMemoryQuota: k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			EnableFlush:       bucket.Spec.EnableFlush,
 		})
 	}
@@ -588,11 +588,11 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 
 	defaults := &cbmgr.PoolsDefaults{
 		ClusterName:          c.cluster.Name,
-		DataMemoryQuota:      settings.DataServiceMemQuota,
-		IndexMemoryQuota:     settings.IndexServiceMemQuota,
-		SearchMemoryQuota:    settings.SearchServiceMemQuota,
-		EventingMemoryQuota:  settings.EventingServiceMemQuota,
-		AnalyticsMemoryQuota: settings.AnalyticsServiceMemQuota,
+		DataMemoryQuota:      k8sutil.Megabytes(settings.DataServiceMemQuota),
+		IndexMemoryQuota:     k8sutil.Megabytes(settings.IndexServiceMemQuota),
+		SearchMemoryQuota:    k8sutil.Megabytes(settings.SearchServiceMemQuota),
+		EventingMemoryQuota:  k8sutil.Megabytes(settings.EventingServiceMemQuota),
+		AnalyticsMemoryQuota: k8sutil.Megabytes(settings.AnalyticsServiceMemQuota),
 	}
 
 	// set default volume paths and allow for override of via spec
@@ -605,11 +605,11 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 	// enables autofailover by default
 	autoFailoverSettings := &cbmgr.AutoFailoverSettings{
 		Enabled:  true,
-		Timeout:  settings.AutoFailoverTimeout,
+		Timeout:  k8sutil.Seconds(settings.AutoFailoverTimeout),
 		MaxCount: settings.AutoFailoverMaxCount,
 		FailoverOnDataDiskIssues: cbmgr.FailoverOnDiskFailureSettings{
 			Enabled:    settings.AutoFailoverOnDataDiskIssues,
-			TimePeriod: settings.AutoFailoverOnDataDiskIssuesTimePeriod,
+			TimePeriod: k8sutil.Seconds(settings.AutoFailoverOnDataDiskIssuesTimePeriod),
 		},
 		FailoverServerGroup: settings.AutoFailoverServerGroup,
 	}
@@ -1036,11 +1036,11 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	clusterSettings := c.cluster.Spec.ClusterSettings
 	specFailoverSettings := &cbmgr.AutoFailoverSettings{
 		Enabled:  true,
-		Timeout:  clusterSettings.AutoFailoverTimeout,
+		Timeout:  k8sutil.Seconds(clusterSettings.AutoFailoverTimeout),
 		MaxCount: clusterSettings.AutoFailoverMaxCount,
 		FailoverOnDataDiskIssues: cbmgr.FailoverOnDiskFailureSettings{
 			Enabled:    clusterSettings.AutoFailoverOnDataDiskIssues,
-			TimePeriod: clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod,
+			TimePeriod: k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod),
 		},
 		FailoverServerGroup: clusterSettings.AutoFailoverServerGroup,
 	}
@@ -1093,17 +1093,17 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	config := c.cluster.Spec.ClusterSettings
 	requested := &cbmgr.PoolsDefaults{
 		ClusterName:          name,
-		DataMemoryQuota:      config.DataServiceMemQuota,
-		IndexMemoryQuota:     config.IndexServiceMemQuota,
-		SearchMemoryQuota:    config.SearchServiceMemQuota,
-		EventingMemoryQuota:  config.EventingServiceMemQuota,
-		AnalyticsMemoryQuota: config.AnalyticsServiceMemQuota,
+		DataMemoryQuota:      k8sutil.Megabytes(config.DataServiceMemQuota),
+		IndexMemoryQuota:     k8sutil.Megabytes(config.IndexServiceMemQuota),
+		SearchMemoryQuota:    k8sutil.Megabytes(config.SearchServiceMemQuota),
+		EventingMemoryQuota:  k8sutil.Megabytes(config.EventingServiceMemQuota),
+		AnalyticsMemoryQuota: k8sutil.Megabytes(config.AnalyticsServiceMemQuota),
 	}
 
 	if !reflect.DeepEqual(current, requested) {
 		if err := c.client.SetPoolsDefault(c.readyMembers(), requested); err != nil {
 			log.Error(err, "Cluster settings update failed", "cluster", c.namespacedName())
-			message := fmt.Sprintf("Unable update memory quota's [data:%d, index:%d, search:%d]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
+			message := fmt.Sprintf("Unable update memory quota's [data:%v, index:%v, search:%v]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)
 			return err
 		}
@@ -1172,13 +1172,19 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent != nil {
 		databaseFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent
 	}
-	databaseFragmentationThresholdSize, _ := c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Size.AsInt64()
+	databaseFragmentationThresholdSize := int64(0)
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Size != nil {
+		databaseFragmentationThresholdSize = c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Size.Value()
+	}
 
 	viewFragmentationThresholdPercentage := 0
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent != nil {
 		viewFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent
 	}
-	viewFragmentationThresholdSize, _ := c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size.AsInt64()
+	viewFragmentationThresholdSize := int64(0)
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size != nil {
+		viewFragmentationThresholdSize = c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size.Value()
+	}
 
 	fromHour := 0
 	fromMinute := 0

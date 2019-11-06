@@ -15,6 +15,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestDenyCommunityEdition tries installing with a CE version of Couchbase server
@@ -686,11 +688,11 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 5
-	autofailoverTimeout := uint64(30)
+	autofailoverTimeout := 30 * time.Second
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = autofailoverTimeout
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autofailoverTimeout}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Generate workload during the operation.
@@ -701,7 +703,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	//block all incoming and outgoing traffic expect ssh on port 22
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
-	time.Sleep(time.Duration(autofailoverTimeout/2) * time.Second)
+	time.Sleep(autofailoverTimeout / 2)
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -F")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -X")
 	e2eutil.MustExecShellInPod(t, targetKube, f.Namespace, memberName, "iptables -P INPUT DROP")
