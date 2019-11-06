@@ -117,7 +117,7 @@ func TestEditClusterSettings(t *testing.T) {
 	newIndexServiceMemQuota := uint64(257)
 	newSearchServiceMemQuota := uint64(257)
 	newAutoFailoverTimeout := uint64(31)
-	newIndexStorageSetting := "plasma"
+	newIndexStorageSetting := couchbasev2.CouchbaseClusterIndexStorageSettingStandard
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1)

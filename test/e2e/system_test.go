@@ -227,7 +227,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 				DataServiceMemQuota:   2000,
 				IndexServiceMemQuota:  2000,
 				SearchServiceMemQuota: 2000,
-				IndexStorageSetting:   "plasma",
+				IndexStorageSetting:   couchbasev2.CouchbaseClusterIndexStorageSettingStandard,
 				AutoFailoverTimeout:   120,
 			},
 			Security: couchbasev2.CouchbaseClusterSecuritySpec{
@@ -278,12 +278,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        100,
 			Replicas:           1,
-			IoPriority:         "high",
-			EvictionPolicy:     "fullEviction",
-			ConflictResolution: "seqno",
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    couchbasev2.CompressionModePassive,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 

@@ -188,7 +188,7 @@ func main() {
 					SearchServiceMemQuota:                  cluster.Spec.ClusterSettings.SearchServiceMemQuota,
 					EventingServiceMemQuota:                cluster.Spec.ClusterSettings.EventingServiceMemQuota,
 					AnalyticsServiceMemQuota:               cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota,
-					IndexStorageSetting:                    cluster.Spec.ClusterSettings.IndexStorageSetting,
+					IndexStorageSetting:                    couchbasev2.CouchbaseClusterIndexStorageSetting(cluster.Spec.ClusterSettings.IndexStorageSetting),
 					AutoFailoverTimeout:                    cluster.Spec.ClusterSettings.AutoFailoverTimeout,
 					AutoFailoverMaxCount:                   cluster.Spec.ClusterSettings.AutoFailoverMaxCount,
 					AutoFailoverOnDataDiskIssues:           cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssues,
@@ -305,12 +305,12 @@ func main() {
 						Spec: couchbasev2.CouchbaseBucketSpec{
 							MemoryQuota:        bucket.BucketMemoryQuota,
 							Replicas:           bucket.BucketReplicas,
-							IoPriority:         bucket.IoPriority,
-							EvictionPolicy:     bucket.EvictionPolicy,
-							ConflictResolution: bucket.ConflictResolution,
+							IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
+							EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicy(bucket.EvictionPolicy),
+							ConflictResolution: couchbasev2.CouchbaseBucketConflictResolution(bucket.ConflictResolution),
 							EnableFlush:        bucket.EnableFlush,
 							EnableIndexReplica: bucket.EnableIndexReplica,
-							CompressionMode:    couchbasev2.BucketCompressionMode(bucket.CompressionMode),
+							CompressionMode:    couchbasev2.CouchbaseBucketCompressionMode(bucket.CompressionMode),
 						},
 					}
 					buckets = append(buckets, newBucket)
@@ -330,11 +330,11 @@ func main() {
 						Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
 							MemoryQuota:        bucket.BucketMemoryQuota,
 							Replicas:           bucket.BucketReplicas,
-							IoPriority:         bucket.IoPriority,
-							EvictionPolicy:     bucket.EvictionPolicy,
-							ConflictResolution: bucket.ConflictResolution,
+							IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
+							EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicy(bucket.EvictionPolicy),
+							ConflictResolution: couchbasev2.CouchbaseBucketConflictResolution(bucket.ConflictResolution),
 							EnableFlush:        bucket.EnableFlush,
-							CompressionMode:    couchbasev2.BucketCompressionMode(bucket.CompressionMode),
+							CompressionMode:    couchbasev2.CouchbaseBucketCompressionMode(bucket.CompressionMode),
 						},
 					}
 					ephemeralBuckets = append(ephemeralBuckets, newBucket)

@@ -6,12 +6,66 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type BucketCompressionMode string
+// CouchbaseBucketCompressionMode defines the available compression modes for Couchbase
+// and Ephemeral bucket types.
+type CouchbaseBucketCompressionMode string
 
 const (
-	CompressionModeOff     BucketCompressionMode = "off"
-	CompressionModePassive BucketCompressionMode = "passive"
-	CompressionModeActive  BucketCompressionMode = "active"
+	CouchbaseBucketCompressionModeOff     CouchbaseBucketCompressionMode = "off"
+	CouchbaseBucketCompressionModePassive CouchbaseBucketCompressionMode = "passive"
+	CouchbaseBucketCompressionModeActive  CouchbaseBucketCompressionMode = "active"
+)
+
+// CouchbaseBucketEvictionPolicy defines the available eviction policies for
+// Couchbase bucket types.
+type CouchbaseBucketEvictionPolicy string
+
+const (
+	// CouchbaseBucketEvictionPolicyValueOnly evicts the document body only from
+	// memory and retains the metadata.
+	CouchbaseBucketEvictionPolicyValueOnly CouchbaseBucketEvictionPolicy = "valueOnly"
+
+	// CouchbaseBucketEvictionPolicyFullEviction evicts both the document and
+	// metadata from memory.
+	CouchbaseBucketEvictionPolicyFullEviction CouchbaseBucketEvictionPolicy = "fullEviction"
+)
+
+// CouchbaseEphemeralBucketEvictionPolicy defines the available eviction
+// policies for ephemeral bucket types.
+type CouchbaseEphemeralBucketEvictionPolicy string
+
+const (
+	// CouchbaseEphemeralBucketEvictionPolicyNoEviction never evicts a docuement from
+	// memory.
+	CouchbaseEphemeralBucketEvictionPolicyNoEviction CouchbaseEphemeralBucketEvictionPolicy = "noEviction"
+
+	// CouchbaseEphemeralBucketEvictionPolicyNRUEviction evict not recently used
+	// documents from memory.
+	CouchbaseEphemeralBucketEvictionPolicyNRUEviction CouchbaseEphemeralBucketEvictionPolicy = "nruEviction"
+)
+
+// CouchbaseBucketIOPriority defines the priority of a bucket.
+type CouchbaseBucketIOPriority string
+
+const (
+	// CouchbaseBucketIOPriorityHigh runs the bucket with a high number of threads.
+	CouchbaseBucketIOPriorityHigh CouchbaseBucketIOPriority = "high"
+
+	// CouchbaseBucketIOPriorityLow runs the bucket with a low number of threads.
+	CouchbaseBucketIOPriorityLow CouchbaseBucketIOPriority = "low"
+)
+
+// CouchbsaeBucketConflictResolution defines the XDCR conflict resolution for a bucket.
+type CouchbaseBucketConflictResolution string
+
+const (
+	// CouchbaseBucketConflictResolutionSequenceNumber chooses the most recent document based
+	// on sequence number.
+	CouchbaseBucketConflictResolutionSequenceNumber CouchbaseBucketConflictResolution = "seqno"
+
+	// CouchbaseBucketConflictResolutionTimestamp chooses the most recent document based
+	// on timestamps.
+	CouchbaseBucketConflictResolutionTimestamp CouchbaseBucketConflictResolution = "lww"
 )
 
 // +genclient
@@ -23,14 +77,14 @@ type CouchbaseBucket struct {
 }
 
 type CouchbaseBucketSpec struct {
-	MemoryQuota        int                   `json:"memoryQuota,omitempty"`
-	Replicas           int                   `json:"replicas,omitempty"`
-	IoPriority         string                `json:"ioPriority,omitempty"`
-	EvictionPolicy     string                `json:"evictionPolicy,omitempty"`
-	ConflictResolution string                `json:"conflictResolution,omitempty"`
-	EnableFlush        bool                  `json:"enableFlush,omitempty"`
-	EnableIndexReplica bool                  `json:"enableIndexReplica,omitempty"`
-	CompressionMode    BucketCompressionMode `json:"compressionMode,omitempty"`
+	MemoryQuota        int                               `json:"memoryQuota,omitempty"`
+	Replicas           int                               `json:"replicas,omitempty"`
+	IoPriority         CouchbaseBucketIOPriority         `json:"ioPriority,omitempty"`
+	EvictionPolicy     CouchbaseBucketEvictionPolicy     `json:"evictionPolicy,omitempty"`
+	ConflictResolution CouchbaseBucketConflictResolution `json:"conflictResolution,omitempty"`
+	EnableFlush        bool                              `json:"enableFlush,omitempty"`
+	EnableIndexReplica bool                              `json:"enableIndexReplica,omitempty"`
+	CompressionMode    CouchbaseBucketCompressionMode    `json:"compressionMode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -49,13 +103,13 @@ type CouchbaseEphemeralBucket struct {
 }
 
 type CouchbaseEphemeralBucketSpec struct {
-	MemoryQuota        int                   `json:"memoryQuota,omitempty"`
-	Replicas           int                   `json:"replicas,omitempty"`
-	IoPriority         string                `json:"ioPriority,omitempty"`
-	EvictionPolicy     string                `json:"evictionPolicy,omitempty"`
-	ConflictResolution string                `json:"conflictResolution,omitempty"`
-	EnableFlush        bool                  `json:"enableFlush,omitempty"`
-	CompressionMode    BucketCompressionMode `json:"compressionMode,omitempty"`
+	MemoryQuota        int                                    `json:"memoryQuota,omitempty"`
+	Replicas           int                                    `json:"replicas,omitempty"`
+	IoPriority         CouchbaseBucketIOPriority              `json:"ioPriority,omitempty"`
+	EvictionPolicy     CouchbaseEphemeralBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
+	ConflictResolution CouchbaseBucketConflictResolution      `json:"conflictResolution,omitempty"`
+	EnableFlush        bool                                   `json:"enableFlush,omitempty"`
+	CompressionMode    CouchbaseBucketCompressionMode         `json:"compressionMode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -394,6 +448,18 @@ type DNS struct {
 	Domain string `json:"domain,omitempty"`
 }
 
+// CouchbaseClusterIndexStorageSetting describes the allowed storage engines for
+// databsae indexes.
+type CouchbaseClusterIndexStorageSetting string
+
+const (
+	// CouchbaseClusterIndexStorageSettingMemoryOptimized uses indexes in memory.
+	CouchbaseClusterIndexStorageSettingMemoryOptimized CouchbaseClusterIndexStorageSetting = "memory_optimized"
+
+	// CouchbaseClusterIndexStorageSettingStandard uses indexes both in memory and on disk.
+	CouchbaseClusterIndexStorageSettingStandard CouchbaseClusterIndexStorageSetting = "plasma"
+)
+
 type ClusterConfig struct {
 	// The name of the cluster
 	ClusterName string `json:"clusterName,omitempty"`
@@ -414,7 +480,7 @@ type ClusterConfig struct {
 	AnalyticsServiceMemQuota uint64 `json:"analyticsServiceMemoryQuota,omitempty"`
 
 	// The index storage mode to use for secondary indexing
-	IndexStorageSetting string `json:"indexStorageSetting,omitempty"`
+	IndexStorageSetting CouchbaseClusterIndexStorageSetting `json:"indexStorageSetting,omitempty"`
 
 	// Timeout that expires to trigger the auto failover.
 	AutoFailoverTimeout uint64 `json:"autoFailoverTimeout,omitempty"`
@@ -790,17 +856,17 @@ type ClusterStatus struct {
 }
 
 type BucketStatus struct {
-	BucketName         string                `json:"name"`
-	BucketType         string                `json:"type"`
-	BucketMemoryQuota  int                   `json:"memoryQuota"`
-	BucketReplicas     int                   `json:"replicas"`
-	IoPriority         string                `json:"ioPriority"`
-	EvictionPolicy     string                `json:"evictionPolicy"`
-	ConflictResolution string                `json:"conflictResolution"`
-	EnableFlush        bool                  `json:"enableFlush"`
-	EnableIndexReplica bool                  `json:"enableIndexReplica"`
-	BucketPassword     string                `json:"password"`
-	CompressionMode    BucketCompressionMode `json:"compressionMode"`
+	BucketName         string `json:"name"`
+	BucketType         string `json:"type"`
+	BucketMemoryQuota  int    `json:"memoryQuota"`
+	BucketReplicas     int    `json:"replicas"`
+	IoPriority         string `json:"ioPriority"`
+	EvictionPolicy     string `json:"evictionPolicy"`
+	ConflictResolution string `json:"conflictResolution"`
+	EnableFlush        bool   `json:"enableFlush"`
+	EnableIndexReplica bool   `json:"enableIndexReplica"`
+	BucketPassword     string `json:"password"`
+	CompressionMode    string `json:"compressionMode"`
 }
 
 type MemberStatusEntry struct {

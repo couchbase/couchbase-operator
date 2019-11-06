@@ -10,37 +10,7 @@ const (
 var (
 	BucketTypeCouchbase = "couchbase"
 	BucketTypeEphemeral = "ephemeral"
-	BucketTypeMembase   = "membase"
 	BucketTypeMemcached = "memcached"
-
-	BucketReplicasZero  = 0
-	BucketReplicasOne   = 1
-	BucketReplicasTwo   = 2
-	BucketReplicasThree = 3
-
-	BucketIoPriorityHigh = "high"
-	BucketIoPriorityLow  = "low"
-
-	BucketEvictionPolicyValueOnly    = "valueOnly"
-	BucketEvictionPolicyFullEviction = "fullEviction"
-	BucketEvictionPolicyNRUEviction  = "nruEviction"
-	BucketEvictionPolicyNoEviction   = "noEviction"
-
-	BucketConflictResolutionSeqno     = "seqno"
-	BucketConflictResolutionTimestamp = "lww"
-
-	BucketFlushEnabled  = true
-	BucketFlushDisabled = false
-
-	BucketIndexReplicasEnabled  = true
-	BucketIndexReplicasDisabled = false
-
-	BucketCompressionModeOff     = "off"
-	BucketCompressionModePassive = "passive"
-	BucketCompressionModeActive  = "active"
-
-	IndexStorageModeMemoryOptimized = "memory_optimized"
-	IndexStorageModePlasma          = "plasma"
 
 	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase/data"
 	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase/data"

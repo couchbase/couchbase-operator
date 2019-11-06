@@ -392,8 +392,8 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			BucketMemoryQuota:  bucket.Spec.MemoryQuota,
 			BucketReplicas:     bucket.Spec.Replicas,
 			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
-			EvictionPolicy:     bucket.Spec.EvictionPolicy,
-			ConflictResolution: bucket.Spec.ConflictResolution,
+			EvictionPolicy:     string(bucket.Spec.EvictionPolicy),
+			ConflictResolution: string(bucket.Spec.ConflictResolution),
 			EnableFlush:        bucket.Spec.EnableFlush,
 			EnableIndexReplica: bucket.Spec.EnableIndexReplica,
 			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
@@ -410,8 +410,8 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			BucketMemoryQuota:  bucket.Spec.MemoryQuota,
 			BucketReplicas:     bucket.Spec.Replicas,
 			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
-			EvictionPolicy:     bucket.Spec.EvictionPolicy,
-			ConflictResolution: bucket.Spec.ConflictResolution,
+			EvictionPolicy:     string(bucket.Spec.EvictionPolicy),
+			ConflictResolution: string(bucket.Spec.ConflictResolution),
 			EnableFlush:        bucket.Spec.EnableFlush,
 			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
 		})
@@ -533,7 +533,7 @@ func (c *Cluster) reconcileBuckets() error {
 			ConflictResolution: bucket.ConflictResolution,
 			EnableFlush:        bucket.EnableFlush,
 			EnableIndexReplica: bucket.EnableIndexReplica,
-			CompressionMode:    couchbasev2.BucketCompressionMode(bucket.CompressionMode),
+			CompressionMode:    string(bucket.CompressionMode),
 		}
 		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, bucketStatus)
 	}
@@ -598,7 +598,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 	// set default volume paths and allow for override of via spec
 	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
 	if err := c.client.InitializeCluster(m, c.username, c.password, defaults,
-		serverSpec.Services, dataPath, indexPath, analyticsPaths, settings.IndexStorageSetting); err != nil {
+		serverSpec.Services, dataPath, indexPath, analyticsPaths, string(settings.IndexStorageSetting)); err != nil {
 		return err
 	}
 
@@ -1147,8 +1147,8 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 	}
 
 	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
-	if specStorageMode != string(settings.StorageMode) {
-		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, specStorageMode, settings); err != nil {
+	if cbmgr.IndexStorageMode(specStorageMode) != settings.StorageMode {
+		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, string(specStorageMode), settings); err != nil {
 			log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	pkg_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -40,14 +39,14 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				Name: names[0],
 			},
 			Spec: couchbasev2.CouchbaseBucketSpec{
-				MemoryQuota:        constants.Mem256Mb,
-				Replicas:           pkg_constants.BucketReplicasOne,
-				IoPriority:         pkg_constants.BucketIoPriorityHigh,
-				EvictionPolicy:     pkg_constants.BucketEvictionPolicyFullEviction,
-				ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
-				EnableFlush:        constants.BucketFlushEnabled,
-				EnableIndexReplica: constants.IndexReplicaEnabled,
-				CompressionMode:    couchbasev2.CompressionModePassive,
+				MemoryQuota:        256,
+				Replicas:           1,
+				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+				EnableFlush:        true,
+				EnableIndexReplica: true,
+				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
 		&couchbasev2.CouchbaseMemcachedBucket{
@@ -56,7 +55,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
 				MemoryQuota: constants.Mem256Mb,
-				EnableFlush: constants.BucketFlushDisabled,
+				EnableFlush: false,
 			},
 		},
 		&couchbasev2.CouchbaseEphemeralBucket{
@@ -65,12 +64,12 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
 				MemoryQuota:        101,
-				Replicas:           pkg_constants.BucketReplicasOne,
-				IoPriority:         pkg_constants.BucketIoPriorityHigh,
-				EvictionPolicy:     pkg_constants.BucketEvictionPolicyNoEviction,
-				ConflictResolution: pkg_constants.BucketConflictResolutionTimestamp,
-				EnableFlush:        constants.BucketFlushEnabled,
-				CompressionMode:    couchbasev2.CompressionModePassive,
+				Replicas:           1,
+				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+				EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction,
+				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionTimestamp,
+				EnableFlush:        true,
+				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
 		&couchbasev2.CouchbaseEphemeralBucket{
@@ -79,12 +78,12 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
 				MemoryQuota:        101,
-				Replicas:           pkg_constants.BucketReplicasOne,
-				IoPriority:         pkg_constants.BucketIoPriorityHigh,
-				EvictionPolicy:     pkg_constants.BucketEvictionPolicyNRUEviction,
-				ConflictResolution: pkg_constants.BucketConflictResolutionSeqno,
-				EnableFlush:        constants.BucketFlushEnabled,
-				CompressionMode:    couchbasev2.CompressionModePassive,
+				Replicas:           1,
+				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+				EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction,
+				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+				EnableFlush:        true,
+				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
 	}
@@ -206,11 +205,11 @@ func TestEditBucket(t *testing.T) {
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/EnableFlush", enabled), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", enabled), time.Minute)
 
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CompressionModeActive), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CouchbaseBucketCompressionModeActive), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeActive), time.Minute)
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CompressionModeOff), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CouchbaseBucketCompressionModeOff), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModeOff), time.Minute)
-	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CompressionModePassive), time.Minute)
+	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CouchbaseBucketCompressionModePassive), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", cbmgr.CompressionModePassive), time.Minute)
 
 	// Avoid a race where Couchbase has been updated but the event not raise yet.

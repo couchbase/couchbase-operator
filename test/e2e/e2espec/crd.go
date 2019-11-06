@@ -22,13 +22,13 @@ var (
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        e2e_constants.Mem256Mb,
-			Replicas:           constants.BucketReplicasOne,
-			IoPriority:         constants.BucketIoPriorityHigh,
-			EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
-			ConflictResolution: constants.BucketConflictResolutionSeqno,
-			EnableFlush:        constants.BucketFlushEnabled,
-			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
-			CompressionMode:    couchbasev2.CompressionModePassive,
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 
@@ -38,13 +38,13 @@ var (
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        e2e_constants.Mem256Mb,
-			Replicas:           constants.BucketReplicasTwo,
-			IoPriority:         constants.BucketIoPriorityHigh,
-			EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
-			ConflictResolution: constants.BucketConflictResolutionSeqno,
-			EnableFlush:        constants.BucketFlushEnabled,
-			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
-			CompressionMode:    couchbasev2.CompressionModePassive,
+			Replicas:           2,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 
@@ -54,13 +54,13 @@ var (
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        e2e_constants.Mem256Mb,
-			Replicas:           constants.BucketReplicasThree,
-			IoPriority:         constants.BucketIoPriorityHigh,
-			EvictionPolicy:     constants.BucketEvictionPolicyFullEviction,
-			ConflictResolution: constants.BucketConflictResolutionSeqno,
-			EnableFlush:        constants.BucketFlushEnabled,
-			EnableIndexReplica: constants.BucketIndexReplicasDisabled,
-			CompressionMode:    couchbasev2.CompressionModePassive,
+			Replicas:           3,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: false,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 )
@@ -92,11 +92,22 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 		case bucketType == constants.BucketTypeCouchbase:
 			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
 			bucketReplicas := []int{1}
-			ioPriorities := []string{constants.BucketIoPriorityHigh}
-			evictionPolicies := []string{constants.BucketEvictionPolicyFullEviction}
-			conflictResolutions := []string{constants.BucketConflictResolutionSeqno, constants.BucketConflictResolutionTimestamp}
-			enableFlushes := []bool{constants.BucketFlushEnabled}
-			enableIndexReplicas := []bool{constants.BucketIndexReplicasEnabled}
+			ioPriorities := []couchbasev2.CouchbaseBucketIOPriority{
+				couchbasev2.CouchbaseBucketIOPriorityHigh,
+			}
+			evictionPolicies := []couchbasev2.CouchbaseBucketEvictionPolicy{
+				couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			}
+			conflictResolutions := []couchbasev2.CouchbaseBucketConflictResolution{
+				couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+				couchbasev2.CouchbaseBucketConflictResolutionTimestamp,
+			}
+			enableFlushes := []bool{
+				true,
+			}
+			enableIndexReplicas := []bool{
+				true,
+			}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, bucketReplica := range bucketReplicas {
 					for _, ioPriority := range ioPriorities {
@@ -116,7 +127,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 												ConflictResolution: conflictResolution,
 												EnableFlush:        enableFlush,
 												EnableIndexReplica: enableIndexReplica,
-												CompressionMode:    couchbasev2.CompressionModePassive,
+												CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 											},
 										})
 									}
@@ -128,7 +139,10 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 			}
 		case bucketType == constants.BucketTypeMemcached:
 			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
-			enableFlushes := []bool{true, false}
+			enableFlushes := []bool{
+				true,
+				false,
+			}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, enableFlush := range enableFlushes {
 					buckets = append(buckets, &couchbasev2.CouchbaseMemcachedBucket{
@@ -145,10 +159,21 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 		case bucketType == constants.BucketTypeEphemeral:
 			bucketMemoryQuotas := []int{e2e_constants.Mem256Mb}
 			bucketReplicas := []int{1}
-			ioPriorities := []string{constants.BucketIoPriorityHigh}
-			evictionPolicies := []string{constants.BucketEvictionPolicyNoEviction, constants.BucketEvictionPolicyNRUEviction}
-			conflictResolutions := []string{constants.BucketConflictResolutionSeqno, constants.BucketConflictResolutionTimestamp}
-			enableFlushes := []bool{constants.BucketFlushEnabled, constants.BucketFlushDisabled}
+			ioPriorities := []couchbasev2.CouchbaseBucketIOPriority{
+				couchbasev2.CouchbaseBucketIOPriorityHigh,
+			}
+			evictionPolicies := []couchbasev2.CouchbaseEphemeralBucketEvictionPolicy{
+				couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction,
+				couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction,
+			}
+			conflictResolutions := []couchbasev2.CouchbaseBucketConflictResolution{
+				couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+				couchbasev2.CouchbaseBucketConflictResolutionTimestamp,
+			}
+			enableFlushes := []bool{
+				true,
+				false,
+			}
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, bucketReplica := range bucketReplicas {
 					for _, ioPriority := range ioPriorities {
@@ -166,7 +191,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 											EvictionPolicy:     evictionPolicy,
 											ConflictResolution: conflictResolution,
 											EnableFlush:        enableFlush,
-											CompressionMode:    couchbasev2.CompressionModePassive,
+											CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 										},
 									})
 								}

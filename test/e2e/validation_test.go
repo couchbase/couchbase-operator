@@ -502,13 +502,13 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_1",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "valueOnly")},
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_2",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "fullEviction")},
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
@@ -520,7 +520,7 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidInvalidForCouchbase_2",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "nruEviction")},
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
@@ -538,13 +538,13 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.BucketCompressionMode("invalid"))},
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionMode("invalid"))},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForEphemeral",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.BucketCompressionMode("invalid"))},
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionMode("invalid"))},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
 		},
@@ -909,7 +909,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 				Test("/spec/cluster/searchServiceMemoryQuota", 256).
 				Test("/spec/cluster/eventingServiceMemoryQuota", 256).
 				Test("/spec/cluster/analyticsServiceMemoryQuota", 1024).
-				Test("/spec/cluster/indexStorageSetting", "memory_optimized").
+				Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
 				Test("/spec/cluster/autoFailoverTimeout", 120).
 				Test("/spec/cluster/autoFailoverMaxCount", 3).
 				Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", 120),
@@ -927,12 +927,12 @@ func TestValidationDefaultCreate(t *testing.T) {
 		{
 			name:        "TestValidateBucketCompressionModeDefaultForCouchbase",
 			mutations:   patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/spec/compressionMode")},
-			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CompressionModePassive)},
+			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive)},
 		},
 		{
 			name:        "TestValidateBucketCompressionModeDefaultForEphemeral",
 			mutations:   patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/spec/compressionMode")},
-			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CompressionModePassive)},
+			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive)},
 		},
 		{
 			name:        "TestValidateSecurityContextDefault",
@@ -996,13 +996,13 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "valueOnly")},
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "nruEviction")},
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
@@ -1135,14 +1135,14 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 		},
 		{
 			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForEphemeral",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "valueOnly")},
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
 		},
 
 		{
 			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "nruEviction")},
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
 		},
@@ -1156,7 +1156,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		// Bucket spec updation
 		{
 			name:           "TestValidateApplyBucketConflictResolutionImmutableForEphemeral",
-			mutations:      patchMap{"bucket4": jsonpatch.NewPatchSet().Replace("/spec/conflictResolution", "seqno")},
+			mutations:      patchMap{"bucket4": jsonpatch.NewPatchSet().Replace("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.conflictResolution in body cannot be updated"},
 		},
@@ -1168,7 +1168,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 		{
 			name:           "TestValidateApplyBucketConflictResolutionImmutableForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/conflictResolution", "lww")},
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionTimestamp)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.conflictResolution in body cannot be updated"},
 		},
@@ -1199,7 +1199,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 		{
 			name:           "TestValidateApplyIndexStorageSettingsImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexStorageSetting", "plasma")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingStandard)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.cluster.indexStorageSetting in body cannot be updated"},
 		},

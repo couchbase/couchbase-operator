@@ -85,11 +85,6 @@ const (
 )
 
 const (
-	BucketFlushEnabled   = true
-	BucketFlushDisabled  = false
-	IndexReplicaEnabled  = true
-	IndexReplicaDisabled = false
-
 	DefaultBucket = "default"
 )
 

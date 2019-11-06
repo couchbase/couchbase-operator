@@ -27,12 +27,12 @@ var (
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        100,
 			Replicas:           1,
-			IoPriority:         "high",
-			EvictionPolicy:     "fullEviction",
-			ConflictResolution: "seqno",
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    couchbasev2.CompressionModePassive,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 
@@ -43,12 +43,12 @@ var (
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        100,
 			Replicas:           1,
-			IoPriority:         "high",
-			EvictionPolicy:     "fullEviction",
-			ConflictResolution: "seqno",
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    couchbasev2.CompressionModePassive,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 
@@ -59,12 +59,12 @@ var (
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			MemoryQuota:        100,
 			Replicas:           1,
-			IoPriority:         "high",
-			EvictionPolicy:     "fullEviction",
-			ConflictResolution: "seqno",
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    couchbasev2.CompressionModePassive,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 )
