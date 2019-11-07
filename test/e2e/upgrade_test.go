@@ -106,7 +106,9 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -576,7 +578,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		upgradeDownUnrecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: clusterSize - (victimCycle + 1), Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
