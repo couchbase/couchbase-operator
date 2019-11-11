@@ -33,6 +33,7 @@ spec:
   exposedFeatures:
     - xdcr
   exposedFeatureServiceType: LoadBalancer
+  exposedFeatureTrafficPolicy: Local
   serviceAnnotations:
     my-annotation: my-value
   softwareUpdateNotifications: true
@@ -192,6 +193,7 @@ spec:
   exposedFeatures:
     - xdcr
   exposedFeatureServiceType: LoadBalancer
+  exposedFeatureTrafficPolicy: Local
   serviceAnnotations:
     my-annotation: my-value
   softwareUpdateNotifications: true
@@ -304,6 +306,18 @@ This field defines how the per Couchbase node ports are exposed.  By default it 
 
 ____
 _Field rules:_ The `exposedFeatureServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
+____
+
+=== exposedFeatureTrafficPolicy
+
+This field defines how traffic ingressing into Kubernetes is handled.
+By default this is set to `Local` meaning that traffic from a public load balancer must be routed directly to the node upon which the destination `Pod` is resident.
+This enforces consistent network performance by keeping the number of hops from the edge to the pod consistent.
+Some environments may have external firewall rules in place that prevent the Operator from connecting to an externally advertised address to verify client connectivity before allowing data to reside on that node.
+This field may be set to `Cluster` to work around this issue, masquerading connectivity checks as normal node-to-node Kubernetes traffic, but at the expense of inconsistent network paths.
+
+____
+_Field rules:_ The `exposedFeatureTrafficPolicy` field is optional and defaults to `Local`.  Allowed values are `Local` and `Cluster`.
 ____
 
 === serviceAnnotations
