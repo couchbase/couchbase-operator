@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -1309,8 +1310,17 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		// Check the specification at creation with the ones that are requested
 		// currently.  If they differ then something has changed and we need to
 		// "upgrade".  Otherwise accumulate the number of pods at the correct
-		// target configuration.
-		if actual.Annotations[constants.PodSpecAnnotation] == requested.Annotations[constants.PodSpecAnnotation] {
+		// target configuration.  Do this with reflection as the spec may contain
+		// maps (e.g. NodeSelector)
+		actualSpec := &v1.PodSpec{}
+		if err := json.Unmarshal([]byte(actual.Annotations[constants.PodSpecAnnotation]), actualSpec); err != nil {
+			return nil, -1, "", err
+		}
+		requestedSpec := &v1.PodSpec{}
+		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
+			return nil, -1, "", err
+		}
+		if reflect.DeepEqual(actualSpec, requestedSpec) {
 			targetConfiguration++
 			continue
 		}
