@@ -31,8 +31,11 @@ func (r *configMapResource) Kind() string {
 
 // Fetch collects all configMaps as defined by the configuration
 func (r *configMapResource) Fetch() error {
-	var err error
-	r.configMaps, err = r.context.KubeClient.CoreV1().ConfigMaps(r.context.Namespace()).List(metav1.ListOptions{})
+	selector, err := GetResourceSelector(&r.context.Config)
+	if err != nil {
+		return err
+	}
+	r.configMaps, err = r.context.KubeClient.CoreV1().ConfigMaps(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}

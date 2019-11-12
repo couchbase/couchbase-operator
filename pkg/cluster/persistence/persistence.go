@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -81,7 +82,8 @@ func New(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (
 
 		configMap = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: couchbase.Name,
+				Name:   couchbase.Name,
+				Labels: k8sutil.LabelsForCluster(couchbase.Name),
 				OwnerReferences: []metav1.OwnerReference{
 					couchbase.AsOwner(),
 				},
