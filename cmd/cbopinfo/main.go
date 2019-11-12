@@ -32,6 +32,7 @@ var (
 		resource.NewCouchbaseReplicationResource,
 		resource.NewDeploymentResource,
 		resource.NewEndpointResource,
+		resource.NewNamespaceResource,
 		resource.NewPersistentVolumeClaimResource,
 		resource.NewPodDisruptionBudgetResource,
 		resource.NewPodResource,
