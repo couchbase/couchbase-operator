@@ -137,6 +137,7 @@ func GetOperatorRole() *rbacv1.Role {
 					"events",
 				},
 				Verbs: []string{
+					"list",   // used by the operator for supportability.
 					"create", // used by the operator to create events.
 					"update", // used by the operator to update events.
 				},

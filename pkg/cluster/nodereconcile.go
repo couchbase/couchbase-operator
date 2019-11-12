@@ -317,6 +317,8 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			continue
 		}
 
+		c.logFailedMember("Node failed", m.Name)
+
 		// Timeout has expired, recreate the pod.
 		if err := c.recreatePod(m); err != nil {
 			return fmt.Errorf("pod recovery failed for member %s", m.Name)
@@ -369,6 +371,7 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 	// start. If the node is configured to use volumes then we will recreate it,
 	// otherwise, we will remove these nodes and re-add them in other pods later.
 	for _, m := range r.couchbase.FailedAddNodes {
+		c.logFailedMember("Node failed", m.Name)
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", m.Name)
@@ -727,6 +730,10 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 // corresponding running pod.
 func handleDeadMembers(r *ReconcileMachine, c *Cluster) error {
 	dead := c.members.Diff(r.runningPods)
+
+	for _, node := range r.couchbase.FailedNodes {
+		c.logFailedMember("Node failed", node.Name)
+	}
 
 	for name := range dead {
 		removeVolumes := shouldRemoveVolumes(r, c, name)

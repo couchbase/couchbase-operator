@@ -1,8 +1,10 @@
 package k8sutil
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"regexp"
@@ -337,19 +339,73 @@ func GetPodUptime(client *client.Client, name string) int {
 
 // LogPod returns ephemeral debug information about a failed pod, e.g. it's about to be
 // deleted and we want to know why.
-func LogPod(client *client.Client, name string) string {
+func LogPod(client *client.Client, namespace, name string) (output string) {
 	pod, found := client.Pods.Get(name)
-	if !found {
-		return ""
+	if found {
+		// Dump the pod
+		data, err := yaml.Marshal(pod)
+		if err == nil {
+			output += string(data) + "\n"
+		}
+
+		// Dump the pod's logs
+		for _, container := range pod.Spec.Containers {
+			logs := client.KubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, &v1.PodLogOptions{Container: container.Name})
+
+			readCloser, err := logs.Stream()
+			if err != nil {
+				continue
+			}
+
+			buffer := &bytes.Buffer{}
+			if _, err := io.Copy(buffer, readCloser); err != nil {
+				readCloser.Close()
+				continue
+			}
+			readCloser.Close()
+
+			output += buffer.String() + "\n"
+		}
 	}
 
-	// Format as YAML
-	data, err := yaml.Marshal(pod)
-	if err != nil {
-		return ""
+	// Dump the pods's events
+	events, err := GetEventsForResource(client.KubeClient, namespace, "Pod", name)
+	if err == nil {
+		for _, event := range events {
+			data, err := yaml.Marshal(event)
+			if err != nil {
+				continue
+			}
+			output += string(data) + "\n"
+		}
 	}
 
-	return string(data)
+	for _, pvc := range client.PersistentVolumeClaims.List() {
+		node, ok := pvc.Labels[constants.LabelNode]
+		if !ok || node != name {
+			continue
+		}
+
+		// Dump the pod's PVC.
+		data, err := yaml.Marshal(pvc)
+		if err == nil {
+			output += string(data) + "\n"
+		}
+
+		// Dump the pod's PVC events.
+		events, err := GetEventsForResource(client.KubeClient, namespace, "PersistentVolumeClaim", pvc.Name)
+		if err == nil {
+			for _, event := range events {
+				data, err := yaml.Marshal(event)
+				if err != nil {
+					continue
+				}
+				output += string(data) + "\n"
+			}
+		}
+	}
+
+	return
 }
 
 // NewResourceQuantityMi accepts an integral value representing megabytes (2^20)

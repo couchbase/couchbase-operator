@@ -159,8 +159,8 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
 }
 
 // logFailedMember outputs any debug information we can about a failed member creation.
-func (c *Cluster) logFailedMember(name string) {
-	log.Info("Member creation failed", "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, name))
+func (c *Cluster) logFailedMember(message, name string) {
+	log.Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
 }
 
 // Create a new Couchbase cluster member
@@ -202,7 +202,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	}()
 
 	if err := c.createPod(ctx, newMember, serverSpec); err != nil {
-		c.logFailedMember(newMember.Name)
+		c.logFailedMember("Member creation failed", newMember.Name)
 		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
 	}
 
@@ -211,7 +211,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 		// We will delete the pod on error, so collect any ephemeral debug we can before
 		// discarding it forever.  This will capture errors such as users specifying the
 		// wrong image name (pull error), PVCs taking an age to become bound etc.
-		c.logFailedMember(newMember.Name)
+		c.logFailedMember("Member creation failed", newMember.Name)
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		return nil, err
 	}
