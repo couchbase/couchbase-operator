@@ -42,7 +42,7 @@ spec:
       memoryQuota: 1024
       replicas: 1
       ioPriority: high
-      evictionPolicy: value-eviction
+      evictionPolicy: valueOnly
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false

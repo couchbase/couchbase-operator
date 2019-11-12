@@ -33,6 +33,7 @@ spec:
   exposedFeatures:
     - xdcr
   exposedFeatureServiceType: LoadBalancer
+  exposedFeatureTrafficPolicy: Local
   serviceAnnotations:
     my-annotation: my-value
   softwareUpdateNotifications: true
@@ -67,7 +68,7 @@ spec:
       memoryQuota: 1024
       replicas: 1
       ioPriority: high
-      evictionPolicy: value-eviction
+      evictionPolicy: valueOnly
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
@@ -95,11 +96,9 @@ spec:
           limits:
             cpu: 4
             memory: 8Gi
-            storage: 100Gi
           requests:
             cpu: 2
             memory: 8Gi
-            storage: 50Gi
         labels:
           couchbase_services: all
         annotations:
@@ -194,6 +193,7 @@ spec:
   exposedFeatures:
     - xdcr
   exposedFeatureServiceType: LoadBalancer
+  exposedFeatureTrafficPolicy: Local
   serviceAnnotations:
     my-annotation: my-value
   softwareUpdateNotifications: true
@@ -308,13 +308,25 @@ ____
 _Field rules:_ The `exposedFeatureServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
 ____
 
+=== exposedFeatureTrafficPolicy
+
+This field defines how traffic ingressing into Kubernetes is handled.
+By default this is set to `Local` meaning that traffic from a public load balancer must be routed directly to the node upon which the destination `Pod` is resident.
+This enforces consistent network performance by keeping the number of hops from the edge to the pod consistent.
+Some environments may have external firewall rules in place that prevent the Operator from connecting to an externally advertised address to verify client connectivity before allowing data to reside on that node.
+This field may be set to `Cluster` to work around this issue, masquerading connectivity checks as normal node-to-node Kubernetes traffic, but at the expense of inconsistent network paths.
+
+____
+_Field rules:_ The `exposedFeatureTrafficPolicy` field is optional and defaults to `Local`.  Allowed values are `Local` and `Cluster`.
+____
+
 === serviceAnnotations
 
 This field defines any custom annotations to be added to console and per-pod (exposed feature) services.
 
 ____
 _Field rules:_ The serviceAnnotations field is optional.  If specified it must be a map of key/value pairs conforming to Kubernetes annotation rules.
-___
+____
 
 === softwareUpdateNotifications
 
@@ -549,7 +561,7 @@ spec:
       memoryQuota: 1024
       replicas: 1
       ioPriority: high
-      evictionPolicy: value-eviction
+      evictionPolicy: valueOnly
       conflictResolution: seqno
       enableFlush: true
       enableIndexReplica: false
@@ -677,11 +689,9 @@ spec:
         limits:
           cpu: 4
           memory: 8Gi
-          storage: 100Gi
         requests:
           cpu: 2
           memory: 8Gi
-          storage: 50Gi
       labels:
         couchbase_services: all
       annotations:
@@ -746,11 +756,9 @@ spec:
         limits:
           cpu: 4
           memory: 8Gi
-          storage: 100Gi
         requests:
           cpu: 2
           memory: 8Gi
-          storage: 50Gi
       labels:
         couchbase_services: all
       annotations:
@@ -787,6 +795,7 @@ This field specifies a reference to either a `Secret` or `ConfigMap` which is us
 
 ____
 _Field rules:_ The value of this field must be an array of Kubernetes `EnvFromSource` types.  This field is optional and immutable.
+____
 
 === resources
 
@@ -799,18 +808,16 @@ spec:
         limits:
           cpu: 2
           memory: 8Gi
-          storage: 100Gi
         requests:
           cpu: 1.5
           memory: 8Gi
-          storage: 50Gi
 ----
 
 limits::
-This field lets you reserve resources on a specific node. It defines the maximum amount of CPU, memory, and storage the pods created in this node specification will reserve.
+This field lets you reserve resources on a specific node. It defines the maximum amount of CPU and memory the pods created in this node specification can allocate.  Exceeding these limits will cause the offending pod to be terminated.
 
 requests::
-This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU, memory, and storage the pods created in this node specification will reserve.
+This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU and memory the pods created in this node specification will reserve.
 
 TIP: In general, CPU limits are specified as the number of threads required on physical hardware (vCPUs if in the cloud), and memory is specified in bytes. Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
 
@@ -843,6 +850,7 @@ For more information, see the Kubernetes documentation about https://kubernetes.
 
 ____
 _Field rules:_ The value of this field must be a map of key value pairs.  This field is optional and immutable.
+____
 
 === nodeSelector
 
@@ -854,7 +862,12 @@ ____
 
 === tolerations
 
-This field specifies conditions upon which a node should not be selected when deploying a pod. From the sample configuration file referenced in this topic, you can see that any node with a label `app:cbapp` should not be allowed to run the pod defined in this node specification. You might do this if you have nodes dedicated for running an application using Couchbase where you don't want the database and application to be running on the same node. For more information about tolerations, see the Kubernetes documentation on https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[taints and tolerations]. The tolerations section is optional.
+This field specifies conditions -- that usually prevent pod scheduling or execution -- that should be tolerated when scheduling a pod.
+From the sample configuration file referenced in this topic, any node with a taint `app=cbapp:NoSchedule` would not usually allow the scheduler to start running any new pods upon it.
+You may wish to taint nodes -- marking them as dedicated -- for running Couchbase Server, where you don't also want other application pods to be running on the same node and causing interference.
+In order to allow Couchbase pods to be scheduled to run on a tainted node the pod must tolerate all taints.
+For more information about tolerations, see the Kubernetes documentation on https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[taints and tolerations].
+The tolerations section is optional.
 
 ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.

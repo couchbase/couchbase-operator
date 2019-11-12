@@ -2,7 +2,7 @@
 
 The Couchbase Operator can detect node failures, rebalance out bad nodes, and bring the cluster back up to the desired capacity. In most cases, all of this happens automatically without any user intervention. In a typical case where a node becomes unresponsive, the Operator waits for Couchbase Server to recognize the node as being down and fails it over. Couchbase Server waits for the node to be down for a specified amount of time before failing over the node, and this failover timeout can be set using the `autoFailoverTimeout` in the cluster configuration file.
 
-Once the node has been failed over, the Operator detects whether the node that is down has persistent volumes attached. In the case that the nodes are configured to use persistent volumes, then the Operator will recover the failed pod by attaching its volumes to a new pod and performing a delta-recovery to add the Couchbsae Server node back into the cluster.
+Once the node has been failed over, the Operator detects whether the node that is down has persistent volumes attached. In the case that the nodes are configured to use persistent volumes, then the Operator will recover the failed pod by attaching its volumes to a new pod and performing a delta-recovery to add the Couchbase Server node back into the cluster.
 
 In the case where the node is not configured to use persistent volumes, the Operator marks the node for removal, creates a new pod running Couchbase, and finally rebalances the cluster.
 

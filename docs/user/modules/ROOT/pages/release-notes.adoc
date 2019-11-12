@@ -4,10 +4,50 @@ Couchbase Autonomous Operator 1.2 is a substantial update that introduces severa
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
+[#release-v122]
+== Release 1.2.2
+
+Couchbase Autonomous Operator 1.2.2, released in November 2019, is the second maintenance release in the 1.2.x series for Couchbase Autonomous Operator.
+This release further fortifies the previously released 1.2.x series with bug fixes to improve product stability.
+
+[#behavior-changes-v122]
+=== Fixed Issues
+
+[#table-behavior-changes-v122,cols="25,66"]
+|===
+| Issue | Description
+
+| https://issues.couchbase.com/browse/K8S-1125[K8S-1125]
+| An issue occurred in environments where the https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#limitranger[LimitRanger] admission controller was enabled and LimitRange objects were present in the namespace that the Operator is deployed into.
+Specifically, the issue occurred when the LimitRange specifies requests and/or limits but no default was given (i.e. Pod resource requests are mandatory) and a `CouchbaseCluster` resource was using `PersistentVolume` backing storage.
+
+Although the `CouchbaseCluster` does allow the setting of Pod resources with the `spec.servers[*].pod.requests` attribute, it is not applied to init containers used to bootstrap the Couchbase Server instances for use with `PersistentVolumes`.
+A deployment that exhibited this defect would report that Pods cannot be created due to the required resource limits not being set even when the corresponding configuration is specified in the `CouchbaseCluster` resource.
+
+| https://issues.couchbase.com/browse/K8S-1073[K8S-1073]
+| The Operator contains logic to xref:operator-config.html#command-line-arguments[control the period to wait before declaring `Pod` creation failed].
+This allows the underlying platform sufficient time to provision `PersistentVolume` storage, provision the Pod itself, and to establish network connectivity.
+
+In certain circumstances this time period would not be honored, declaring a Pod as failed when -- if it had been left alone -- it would have eventually provisioned successfully.
+
+| https://issues.couchbase.com/browse/K8S-1084[K8S-1084] and https://issues.couchbase.com/browse/K8S-1126[K8S-1126]
+a| 
+
+A `CouchbaseCluster` deployment using xref:network-requirements.html#public-connectivity-ddns[public connectivity] would balance new nodes into a cluster without first establishing whether the advertised address was reachable by a connected client.
+As a result, when documents were migrated onto the new node, there was a high likelihood those documents would not be able to be accessed by the client until network connectivity was established by the platform and DNS entries were propagated -- potentially causing application disruption.
+
+The Operator now asserts that the advertised address is reachable before allowing the nodes to be added to the cluster.
+
+NOTE: This feature requires that traffic be allowed to egress from the Operator, out of the Kubernetes cluster and back to either a load-balancer or node port.
+External firewall policies may block this traffic and prevent the Operator from functioning.
+The `spec.exposedFeatureTrafficPolicy` attribute may be set to `Cluster` to avoid this issue by masquerading reachability checks as standard Kubernetes node-to-node traffic.
+|===
+
 [#release-v121]
 == Release 1.2.1
 
-Couchbase Autonomous Operator 1.2.1, released in August 2019, is the first maintenance release in the 1.2.x series for Couchbase Autonomous Operator. This release further fortifies the previously released 1.2.x series with bug fixes to improve product stability.
+Couchbase Autonomous Operator 1.2.1, released in August 2019, is the first maintenance release in the 1.2.x series for Couchbase Autonomous Operator.
+This release further fortifies the previously released 1.2.x series with bug fixes to improve product stability.
 
 [#behavior-changes-v121]
 === Behavior Changes

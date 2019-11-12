@@ -26,10 +26,10 @@ spec:
       type: couchbase
       memoryQuota: 128
       replicas: 1
-      ioPriority: high
-      evictionPolicy: fullEviction
+      ioPriority: low
+      evictionPolicy: valueOnly
       conflictResolution: seqno
-      enableFlush: true
+      enableFlush: false
       enableIndexReplica: false
   servers:
     - size: 3
