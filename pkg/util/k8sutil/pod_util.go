@@ -704,6 +704,8 @@ func applyPodPolicy(pod *v1.Pod, policy *couchbasev2.PodPolicy) {
 		return
 	}
 
+	pod.Spec.ServiceAccountName = policy.ServiceAccountName
+
 	if len(policy.NodeSelector) != 0 {
 		pod.Spec.NodeSelector = policy.NodeSelector
 	}

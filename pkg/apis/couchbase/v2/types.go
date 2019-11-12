@@ -623,6 +623,11 @@ type PodPolicy struct {
 	// AutomountServiceAccountToken indicates whether pods running with the service account should have an API token automatically mounted.
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
 
+	// ServiceAccountName allows pods to be run under a specific service account
+	// rather than 'default'.  This can be used to inherit image pull secrets
+	// and limit role permissions.
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
 	// ImagePullSecrets allows users to pull Couchbase Server images from private repos.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
