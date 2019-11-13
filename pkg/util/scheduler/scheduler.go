@@ -4,7 +4,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 
-	"k8s.io/api/core/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
@@ -17,7 +16,7 @@ type Scheduler interface {
 	// Create examines the cluster state and cluster specification in order to
 	// schedule the creation of a new pod.  The pod parameter is mutated to
 	// contain the necessary label selectors to facilitate correct placement.
-	Create(pod *v1.Pod) error
+	Create(class, name, group string) (string, error)
 
 	// Delete selects a server name to delete from a specific server class.
 	Delete(class string) (string, error)

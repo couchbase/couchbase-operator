@@ -194,13 +194,9 @@ func podFixtureFailed(name, class, group string) *v1.Pod {
 }
 
 // checkCreateScheduling asserts that the the pod has been scheduled where we expected
-func checkCreateScheduling(t *testing.T, p *v1.Pod, group string) {
-	selector, ok := p.Spec.NodeSelector[constants.ServerGroupLabel]
-	if !ok {
-		t.Fatal("Pod missing node selector")
-	}
-	if selector != group {
-		t.Fatalf("Scheduler created server in group '%s', expected '%s'", selector, group)
+func checkCreateScheduling(t *testing.T, selected, expected string) {
+	if selected != expected {
+		t.Fatalf("Scheduler created server in group '%s', expected '%s'", selected, expected)
 	}
 }
 
@@ -209,6 +205,15 @@ func checkDeleteScheduling(t *testing.T, selected, expected string) {
 	if selected != expected {
 		t.Fatalf("Scheduler deleted '%s', expected '%s'", selected, expected)
 	}
+}
+
+// mustCreate ensures create completes without error.
+func mustCreate(t *testing.T, s Scheduler, name, class, group string) string {
+	group, err := s.Create(name, class, group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return group
 }
 
 // Adds a pod to global server groups and expects it to be scheduled deterministically
@@ -220,13 +225,7 @@ func TestStripeCreateGlobalSingle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p1 := podFixture("", serverClass1, "")
-
-	if err := s.Create(p1); err != nil {
-		t.Fatal(err)
-	}
-
-	checkCreateScheduling(t, p1, serverGroup1)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
 }
 
 // Adds four pods to global server groups and expects them to be scheduled deterministically
@@ -238,28 +237,10 @@ func TestStripeCreateGlobalMultiple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p1 := podFixture("", serverClass1, "")
-	p2 := podFixture("", serverClass1, "")
-	p3 := podFixture("", serverClass1, "")
-	p4 := podFixture("", serverClass1, "")
-
-	if err := s.Create(p1); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Create(p2); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Create(p3); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Create(p4); err != nil {
-		t.Fatal(err)
-	}
-
-	checkCreateScheduling(t, p1, serverGroup1)
-	checkCreateScheduling(t, p2, serverGroup2)
-	checkCreateScheduling(t, p3, serverGroup3)
-	checkCreateScheduling(t, p4, serverGroup1)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup2)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
 }
 
 // Adds three pods to override server groups and expects them to be scheduled deterministically
@@ -271,23 +252,9 @@ func TestStripeCreateOverrideMultiple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p1 := podFixture("", serverClass2, "")
-	p2 := podFixture("", serverClass2, "")
-	p3 := podFixture("", serverClass2, "")
-
-	if err := s.Create(p1); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Create(p2); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Create(p3); err != nil {
-		t.Fatal(err)
-	}
-
-	checkCreateScheduling(t, p1, serverGroup1)
-	checkCreateScheduling(t, p2, serverGroup2)
-	checkCreateScheduling(t, p3, serverGroup1)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup1)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup2)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup1)
 }
 
 // TestStripe bad configurations error
@@ -329,13 +296,7 @@ func TestStripeCreateGlobalExistingPods(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p1 := podFixture("", serverClass1, "")
-
-	if err := s.Create(p1); err != nil {
-		t.Fatal(err)
-	}
-
-	checkCreateScheduling(t, p1, serverGroup3)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
 }
 
 // Test that pods are deterministically scheduled when initialised with existing pods
@@ -347,13 +308,7 @@ func TestStripeCreateOverrideExistingPods(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p1 := podFixture("", serverClass2, "")
-
-	if err := s.Create(p1); err != nil {
-		t.Fatal(err)
-	}
-
-	checkCreateScheduling(t, p1, serverGroup2)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup2)
 }
 
 // Test that scheduling a deletion of an empty server class errors
@@ -423,18 +378,13 @@ func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p1 := podFixture(podName7, serverClass1, "")
-
 	server1, err := s.Delete(serverClass1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Create(p1); err != nil {
-		t.Fatal(err)
-	}
 
 	checkDeleteScheduling(t, server1, podName6)
-	checkCreateScheduling(t, p1, serverGroup3)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, podName7, ""), serverGroup3)
 }
 
 // Test that the scheduler correctly interrogates pod state
@@ -446,11 +396,5 @@ func TestStripeAddGlobalSingleOnPodFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p1 := podFixture(podName4, serverClass1, "")
-
-	if err := s.Create(p1); err != nil {
-		t.Fatal(err)
-	}
-
-	checkCreateScheduling(t, p1, serverGroup3)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, podName4, ""), serverGroup3)
 }

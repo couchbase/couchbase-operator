@@ -5,7 +5,6 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"k8s.io/api/core/v1"
 )
 
 const (
@@ -46,19 +45,14 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 }
 
 // Create does nothing
-func (sched *nullSchedulerImpl) Create(pod *v1.Pod) error {
-	// Infer the server configuration from the pod
-	class, ok := pod.Labels[constants.LabelNodeConf]
-	if !ok {
-		return fmt.Errorf("%s: pod missing label '%s'", stripeErrorHeader, constants.LabelNodeConf)
-	}
+func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
-		return fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, pod.Name, class)
+		return "", fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, name, class)
 	}
 
-	sched.serverClasses[class].push(pod.Name)
+	sched.serverClasses[class].push(name)
 
-	return nil
+	return "", nil
 }
 
 // Delete removes the largest server name from the sorted list of servers

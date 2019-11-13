@@ -1298,7 +1298,20 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		if serverClass == nil {
 			continue
 		}
-		requested, _, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass)
+
+		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member.Name, c.cluster, *serverClass)
+		if err != nil {
+			return nil, -1, "", err
+		}
+
+		serverGroup := ""
+		if actual.Spec.NodeSelector != nil {
+			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+				serverGroup = group
+			}
+		}
+
+		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState)
 		if err != nil {
 			return nil, -1, "", err
 		}

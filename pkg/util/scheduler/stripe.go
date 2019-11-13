@@ -89,27 +89,17 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 // to the set of server groups.  To schedule we pick the set of server groups which
 // contain the fewest pods, then deterministically select the lexicaly smallest
 // before labelling the pod with this server group as a label selector.
-func (sched *stripeSchedulerImpl) Create(pod *v1.Pod) error {
-	// Infer the server configuration from the pod
-	class, ok := pod.Labels[constants.LabelNodeConf]
-	if !ok {
-		return fmt.Errorf("%s: pod missing label '%s'", stripeErrorHeader, constants.LabelNodeConf)
-	}
+func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
-		return fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, pod.Name, class)
+		return "", fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, name, class)
 	}
 
-	// Reuse the existing NodeSelector if already applied to a Pod,
-	// otherwise find the smallest server group population and add
-	// the selected group to the pod's node selectors
-	group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
-	if !ok {
+	if group == "" {
 		group = sched.serverClasses[class].smallestGroup()
 	}
-	pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
-	sched.serverClasses[class][group].push(pod.Name)
+	sched.serverClasses[class][group].push(name)
 
-	return nil
+	return group, nil
 }
 
 func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
