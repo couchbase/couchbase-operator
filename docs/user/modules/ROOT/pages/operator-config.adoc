@@ -67,7 +67,8 @@ It is recommended that you use a service account named `couchbase-operator`, but
 
 Normally deployments are used to create multiple instances of a pod in order to provide redundancy. However, when deploying the Operator, you should always set replicas to `1`. This is because the Operator pod uses leader election to ensure that only one Operator is running in a specific namespace. If you start more than one Operator pod in the same namespace, only the first one will start successfully. The Operator uses deployments so that if the Operator dies, a new Operator pod gets created and picks up from where the old one left off.
 
-== Command-Line Arguments
+[#command-line-arguments]
+== Command-line Arguments
 
 You can specify a list of command-line flags to pass on to the Operator to modify its behavior.
 
