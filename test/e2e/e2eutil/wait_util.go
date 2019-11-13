@@ -20,6 +20,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -753,4 +754,23 @@ func MustWaitForFirstPodContainerWaiting(t *testing.T, k8s *types.Cluster, couch
 	if err := WaitForFirstPodContainerWaiting(k8s, couchbase, timeout, reasons...); err != nil {
 		Die(t, err)
 	}
+}
+
+// WaitForCRDDeletion waits until CRD is deleted
+func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 1*time.Second, IntMax, func() (bool, error) {
+		if _, err := cs.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crdName, metav1.GetOptions{}); err != nil {
+			if k8sutil.IsKubernetesResourceNotFoundError(err) {
+				// api reported crd deleted ok
+				return true, nil
+			}
+			// crd doesn't exists, but for unknown reason
+			return false, retryutil.RetryOkError(err)
+		}
+		// crd still exists, retry
+		return false, nil
+	})
 }
