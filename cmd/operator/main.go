@@ -31,6 +31,7 @@ var (
 	printVersion     bool
 	podCreateTimeout string
 	chaosLevel       int
+	concurrency      int
 
 	metricsHost       = "0.0.0.0"
 	metricsPort int32 = 8383
@@ -47,6 +48,7 @@ func main() {
 	pflag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
 	pflag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	pflag.StringVar(&podCreateTimeout, "pod-create-timeout", "10m", "Sets the amount of time to wait for Pod creation to complete")
+	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
 	pflag.Parse()
 
 	logf.SetLogger(zap.Logger())
@@ -95,7 +97,7 @@ func main() {
 
 	log.V(1).Info("Initializing controller.")
 
-	if err := controller.AddToManager(mgr, podCreateTimeout); err != nil {
+	if err := controller.AddToManager(mgr, podCreateTimeout, concurrency); err != nil {
 		log.Error(err, "Error adding controller to manager")
 		os.Exit(1)
 	}
