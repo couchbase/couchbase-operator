@@ -76,6 +76,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
 	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
