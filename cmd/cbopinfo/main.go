@@ -43,6 +43,7 @@ var (
 		resource.NewRoleBindingResource,
 		resource.NewSecretResource,
 		resource.NewServiceResource,
+		resource.NewServiceAccountResource,
 	}
 
 	// Define all implied sub-resources we can collect information for

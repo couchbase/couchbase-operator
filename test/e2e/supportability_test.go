@@ -372,6 +372,10 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+	serviceaccounts, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
 	for _, bucket := range buckets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/couchbasebucket/%s/%s.yaml", base, namespace, bucket.Name, bucket.Name))
@@ -393,6 +397,9 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 	for _, secret := range secrets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
+	}
+	for _, serviceaccount := range serviceaccounts.Items {
+		files = append(files, fmt.Sprintf("%s/%s/serviceaccount/%s/%s.yaml", base, namespace, serviceaccount.Name, serviceaccount.Name))
 	}
 
 	// Deployments are special, we only collect them if the image matches the operator image.
