@@ -26,7 +26,7 @@ func NewNamespaceResource(context *context.Context) Resource {
 }
 
 func (r *namespaceResource) Kind() string {
-	return "Namespaces"
+	return "Namespace"
 }
 
 // Fetch collects all namespaces as defined by the configuration

@@ -324,6 +324,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 		e2eutil.Die(t, err)
 	}
 
+	files = append(files, fmt.Sprintf("%s/namespace/%s/%s.yaml", base, namespace, namespace))
 	for _, clusterRole := range clusterRoles.Items {
 		files = append(files, fmt.Sprintf("%s/clusterrole/%s/%s.yaml", base, clusterRole.Name, clusterRole.Name))
 	}
