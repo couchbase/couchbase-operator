@@ -382,6 +382,11 @@ func RecreateCRDs(k8s *types.Cluster) error {
 			if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, metav1.NewDeleteOptions(0)); err != nil {
 				return fmt.Errorf("failed to delete CRD: %v", err)
 			}
+
+			// wait for crd delete
+			if err := e2eutil.WaitForCRDDeletion(clientSet, crd.Name, time.Minute); err != nil {
+				return err
+			}
 		}
 	}
 
