@@ -307,6 +307,16 @@ storage.k8s.io/storageclasses::
 Used by the admission controller to look for storage class references in the `CouchbaseCluster` specification.
 It will ensure that, if present, any storage class templates reference existing storage classes.
 
+[NOTE]
+====
+`Secret` and `StorageClass` resources are only interrogated -- as described -- for existence and correctness.
+The admission controller only performs `get` operations based on the names specified in the `CouchbaseCluster` specification.
+These resources will never be leaked through logs and are never persisted by the admission controller.
+If, however, your security policies declare that such permissions cannot be granted to an application, then they can be safely removed from the admission controller's role.
+Permissions errors will be silently ignored by the admission controller.
+You will then no longer be informed about missing secrets and storage classes, incorrectly formatted secrets, and invalid TLS configurations.
+====
+
 == Uninstalling the Admission Controller
 
 Run the following command to uninstall the admission controller:
