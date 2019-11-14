@@ -202,15 +202,34 @@ func test(document interface{}, path string, value interface{}) error {
 		return err
 	}
 
-	// If the value is nil then compare against the zero value, while
-	// not part of the specification it makes the tests cleaner
-	switch value.(type) {
-	case nil:
-		value = reflect.Zero(v.Type()).Interface()
+	// If the value is nil then we need to use the type of the underlying
+	// structure element, or value has no meaning.
+	expected := reflect.ValueOf(value)
+	if expected.Kind() == reflect.Invalid {
+		expected = reflect.Zero(v.Type())
+	}
+
+	// Printing a nil map or slice interface{} will actually always display
+	// an empty map or slice.  Here we intervene by explicitly setting the
+	// interface{} to nil to show the different between a nil and empty map
+	// or slice.
+	v1 := v.Interface()
+	switch v.Kind() {
+	case reflect.Slice, reflect.Map:
+		if v.IsNil() {
+			v1 = nil
+		}
+	}
+	v2 := expected.Interface()
+	switch expected.Kind() {
+	case reflect.Slice, reflect.Map:
+		if expected.IsNil() {
+			v2 = nil
+		}
 	}
 
 	if !reflect.DeepEqual(v.Interface(), value) {
-		return fmt.Errorf(`values for "%s" do not match: actual "%v", required "%v"`, path, v.Interface(), value)
+		return fmt.Errorf(`values for "%s" do not match: actual %v %v, required %v %v`, path, v1, v.Type().String(), v2, expected.Type().String())
 	}
 
 	return nil
