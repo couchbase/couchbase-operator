@@ -122,6 +122,36 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 	}
 }
 
+// getRemoteUUID returns the UUID of the remote cluster, or if it is not populated polls until
+// it is populated.
+func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, error) {
+	if cluster.Status.ClusterID != "" {
+		return cluster.Status.ClusterID, nil
+	}
+
+	var uuid string
+	callback := func() error {
+		cluster, err := kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if cluster.Status.ClusterID == "" {
+			return fmt.Errorf("remote cluster UUID not populated")
+		}
+		uuid = cluster.Status.ClusterID
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+		return "", err
+	}
+
+	return uuid, nil
+}
+
 // getRemoteUUIDAndHost returns the remote hostname, based on IP and node port, and the cluster UUID.
 // Used for generic XDCR testing.
 func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
@@ -152,7 +182,12 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 		return "", "", fmt.Errorf("admin service port not exposed")
 	}
 
-	return cluster.Status.ClusterID, fmt.Sprintf("%s:%d", pod.Status.HostIP, nodePort), nil
+	uuid, err := getRemoteUUID(kubernetes, cluster)
+	if err != nil {
+		return "", "", err
+	}
+
+	return uuid, fmt.Sprintf("%s:%d", pod.Status.HostIP, nodePort), nil
 }
 
 // getRemoteUUIDAndHostTLS returns the remote hostname, based on DNS, and the cluster UUID.
@@ -174,7 +209,12 @@ func getRemoteUUIDAndHostTLS(kubernetes *types.Cluster, cluster *couchbasev2.Cou
 		return "", "", err
 	}
 
-	return cluster.Status.ClusterID, fmt.Sprintf("%s.%s.%s.svc:18091", pod.Name, cluster.Name, cluster.Namespace), nil
+	uuid, err := getRemoteUUID(kubernetes, cluster)
+	if err != nil {
+		return "", "", err
+	}
+
+	return uuid, fmt.Sprintf("%s.%s.%s.svc:18091", pod.Name, cluster.Name, cluster.Namespace), nil
 }
 
 // EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
