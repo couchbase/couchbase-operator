@@ -15,8 +15,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type GroupSetupFunction map[string]func(*testing.T, []framework.ClusterInfo) error
-
 // Variable to store random suffix for couchbase-server name & tls certificates
 var (
 	TestFuncMap = framework.FuncMap{
@@ -244,10 +242,6 @@ var (
 
 		// Status tests
 		"TestStatusRecovery": TestStatusRecovery,
-	}
-
-	DecoratorFuncMap = framework.DecoratorMap{
-		"recoverDecorator": framework.RecoverDecorator,
 	}
 )
 

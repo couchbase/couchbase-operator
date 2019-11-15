@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -82,8 +81,6 @@ func goroutineLeakCheck(expected int) {
 
 func runSuite(t *testing.T) {
 	f := framework.Global
-	reqOpImage := f.Deployment.Spec.Template.Spec.Containers[0].Image
-	ymlFilePath := "./resources/ansible"
 
 	// Over riding pullImage to true since if new cluster is created, images should be pulled
 	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
@@ -92,88 +89,6 @@ func runSuite(t *testing.T) {
 		// Add the cluster names to the global test clusters so the
 		// individual tests can reference them.
 		f.TestClusters = testGroup.ClusterName
-
-		skipCurrTestGroup := false
-		requiredClusters := []string{}
-		for _, currClusterName := range testGroup.ClusterName {
-			if !framework.ElementExistsInArr(currClusterName, requiredClusters) {
-				requiredClusters = append(requiredClusters, currClusterName)
-			}
-		}
-
-		kubeClustersToSetup, err := framework.GetClusterConfigFromYml(f.ClusterConfFile, f.KubeType, requiredClusters)
-		if err != nil {
-			logrus.Info("Skipping ", testGroup.GroupName, ".. ", err.Error())
-			break
-		}
-
-		for _, kubeCluster := range kubeClustersToSetup {
-			if _, ok := f.ClusterSpec[kubeCluster.ClusterName]; ok {
-				continue
-			}
-			kubeName := kubeCluster.ClusterName
-			logrus.Info("Creating K8S cluster " + kubeName + " for " + testGroup.GroupName)
-			if err := framework.SetupK8SCluster(t, f.Namespace, f.KubeType, f.KubeVersion, ymlFilePath, reqOpImage, kubeCluster); err != nil {
-				skipCurrTestGroup = true
-				t.Error(err)
-				break
-			}
-
-			kubeConfigPath := e2eutil.GetKubeConfigToUse(f.KubeType, kubeCluster.ClusterName)
-			clusterSpec, err := framework.CreateKubeClusterObject(kubeConfigPath, "")
-			if err != nil {
-				skipCurrTestGroup = true
-				t.Error(err)
-				break
-			}
-
-			f.ClusterSpec[kubeName] = clusterSpec
-
-			totalNodes := len(kubeCluster.MasterNodeList) + len(kubeCluster.WorkerNodeList)
-			logrus.Infof("Waiting for '%d' nodes to become available", totalNodes)
-			if err := e2eutil.WaitForKubeNodesToBeReady(f.ClusterSpec[kubeName].KubeClient, totalNodes, 600); err != nil {
-				skipCurrTestGroup = true
-				t.Error(err)
-				// Remove the map entry and break the loop
-				delete(f.ClusterSpec, kubeName)
-				break
-			}
-
-			if err := f.SetupFramework(kubeName); err != nil {
-				skipCurrTestGroup = true
-				t.Errorf("Failed to setup framework: %v", err)
-				// Remove the map entry and break the loop
-				delete(f.ClusterSpec, kubeName)
-				break
-			}
-
-			// Override default storage class behaviour with special clusters.
-			f.ClusterSpec[kubeName].SupportsMultipleVolumeClaims = kubeCluster.SupportsMultipleVolumeClaims
-
-			if err := framework.SetupPersistentVolume(t, f.ClusterSpec[kubeName].KubeClient, f.Namespace, kubeCluster.ClusterName, kubeCluster.StorageClassType); err != nil {
-				skipCurrTestGroup = true
-				t.Error(err)
-				// Remove the map entry and break the loop
-				delete(f.ClusterSpec, kubeName)
-				break
-			}
-
-			// Add required K8S node labels
-			if err := k8sNodesAddLabel(clusterSpec, kubeCluster, constants.FailureDomainZoneLabel, time.Minute); err != nil {
-				t.Errorf("Failed to label the nodes: %v", err)
-				skipCurrTestGroup = true
-				delete(f.ClusterSpec, kubeName)
-			}
-
-			if skipCurrTestGroup {
-				break
-			}
-		}
-
-		// Avoid executing particular test group in case of setup failure
-		if skipCurrTestGroup {
-			continue
-		}
 
 		for _, currTestCase := range testGroup.TestCase {
 			testName := currTestCase.TcName
@@ -186,17 +101,8 @@ func runSuite(t *testing.T) {
 			decoratorArgs := framework.DecoratorArgs{
 				KubeNames: testGroup.ClusterName,
 			}
-			for _, funcName := range currTestCase.Decorators {
-				if _, ok := DecoratorFuncMap[funcName]; !ok {
-					t.Logf("Skipping %s.. Undefined decorator %s", testName, funcName)
-					testFunc = nil
-					break
-				}
 
-				testFunc = DecoratorFuncMap[funcName](testFunc, decoratorArgs)
-			}
-
-			testFunc = DecoratorFuncMap["recoverDecorator"](testFunc, decoratorArgs)
+			testFunc = framework.RecoverDecorator(testFunc, decoratorArgs)
 
 			if testFunc == nil {
 				continue

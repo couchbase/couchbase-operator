@@ -41,28 +41,6 @@ type Framework struct {
 	PodCreateTimeout time.Duration
 }
 
-// To decode cluster yaml file
-type ClusterInfo struct {
-	ClusterName                  string `yaml:"name"`
-	StorageClassType             string `yaml:"storageClassType"`
-	SupportsMultipleVolumeClaims bool   `yaml:"supportsMultipleVolumeClaims"`
-	MasterNodeList               []struct {
-		IP        string `yaml:"ip"`
-		NodeLabel string `yaml:"label"`
-	} `yaml:"master"`
-	WorkerNodeList []struct {
-		IP        string `yaml:"ip"`
-		NodeLabel string `yaml:"label"`
-	} `yaml:"worker"`
-}
-
-type ClusterConfig struct {
-	ClusterInfo []struct {
-		Type        string        `yaml:"type"`
-		ClusterList []ClusterInfo `yaml:"clusters"`
-	} `yaml:"types"`
-}
-
 // Runtime configuration
 type KubeConfData struct {
 	ClusterName   string `yaml:"name"`
@@ -122,18 +100,8 @@ type DecoratorArgs struct {
 	KubeNames []string
 }
 
-// TestDecorator decorates a test function.  This is used to augment an
-// existing test usually to perform setup and tear-down tasks e.g.
-// initializing and deleting a cluster or applying TLS configuration
-type TestDecorator func(TestFunc, DecoratorArgs) TestFunc
-
-// TestSuite defines a suite of tests
-type TestSuite map[string]TestFunc
-type TestSuiteDecorator map[string]TestDecorator
-
 // Map to store Testcase name to their respective Function objects
-type FuncMap map[string]func(*testing.T)
-type DecoratorMap map[string]TestDecorator
+type FuncMap map[string]TestFunc
 
 // TestResult simply maps a test name to a pass/fail flag
 type TestResult struct {
@@ -147,13 +115,10 @@ type SuiteData struct {
 	SuiteName     string `yaml:"suite"`
 	Timeout       string `yaml:"timeout"`
 	TestCaseGroup []struct {
-		GroupName     string   `yaml:"name"`
-		GroupSetup    []string `yaml:"groupSetup"`
-		GroupTeardown []string `yaml:"groupTearDown"`
-		ClusterName   []string `yaml:"clusters"`
-		TestCase      []struct {
-			TcName     string   `yaml:"name"`
-			Decorators []string `yaml:"decorators"`
+		GroupName   string   `yaml:"name"`
+		ClusterName []string `yaml:"clusters"`
+		TestCase    []struct {
+			TcName string `yaml:"name"`
 		} `yaml:"testcases"`
 	} `yaml:"tcGroups"`
 }

@@ -73,6 +73,10 @@ func createAdmissionController(client kubernetes.Interface) error {
 		return err
 	}
 
+	if err := waitAdmissionController(client); err != nil {
+		return err
+	}
+
 	return nil
 }
 

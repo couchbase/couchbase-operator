@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -11,7 +10,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -19,54 +17,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// Labels k8s nodes based on the values provided from the ClusterInfo struct
-func k8sNodesAddLabel(k8s *types.Cluster, nodes framework.ClusterInfo, nodeLabelName string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		k8sNodeList, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to get k8s nodes: %v", err)
-		}
-		for _, k8sNode := range k8sNodeList.Items {
-			labelChanged := false
-			nodeLabels := k8sNode.GetLabels()
-			nodeIPAddress := k8sNode.Status.Addresses[0].Address
-			for _, node := range nodes.MasterNodeList {
-				if node.IP == nodeIPAddress {
-					nodeLabels[nodeLabelName] = node.NodeLabel
-					labelChanged = true
-					break
-				}
-			}
-			for _, node := range nodes.WorkerNodeList {
-				if node.IP == nodeIPAddress {
-					nodeLabels[nodeLabelName] = node.NodeLabel
-					labelChanged = true
-					break
-				}
-			}
-			if !labelChanged {
-				return fmt.Errorf("unable to find node %v", nodeIPAddress)
-			}
-			k8sNode.SetLabels(nodeLabels)
-
-			// Reset Taints and set schedulable property for nodes
-			k8sNode.Spec.Unschedulable = false
-			k8sNode.Spec.Taints = []v1.Taint{}
-
-			if _, err := k8s.KubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-				return fmt.Errorf("failed to update label for node %v: %v", nodeIPAddress, err)
-			}
-		}
-		return nil
-	})
-}
 
 // rzaMap maps an availability zone to the number of pods scheduled in it.
 type rzaMap map[string]int

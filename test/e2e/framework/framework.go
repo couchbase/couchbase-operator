@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
@@ -18,7 +17,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	validationv2 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -72,7 +70,7 @@ func readYamlData() (err error) {
 	flag.Parse()
 
 	logrus.Info("Using test_config file ", *testConfigFilePath)
-	runtimeParams, err = ReadRuntimeConfig(*testConfigFilePath)
+	runtimeParams, err = readRuntimeConfig(*testConfigFilePath)
 	if err != nil {
 		return err
 	}
@@ -80,7 +78,7 @@ func readYamlData() (err error) {
 	suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
 
 	logrus.Info("Using suite file ", suiteFilePath)
-	suiteData, err = GetSuiteDataFromYml(suiteFilePath)
+	suiteData, err = getSuiteDataFromYml(suiteFilePath)
 	return err
 }
 
@@ -185,7 +183,7 @@ func Setup(t *testing.T) (err error) {
 	}
 
 	for _, kubeConf := range runtimeParams.KubeConfig {
-		clusterSpec, cerr := CreateKubeClusterObject(kubeConf.ClusterConfig, kubeConf.Context)
+		clusterSpec, cerr := createKubeClusterObject(kubeConf.ClusterConfig, kubeConf.Context)
 		if cerr != nil {
 			return cerr
 		}
@@ -224,78 +222,6 @@ func Setup(t *testing.T) (err error) {
 		}
 	}
 	return nil
-}
-
-func DeleteAllJobs(kubeClient kubernetes.Interface) error {
-	logrus.Info("Deleting jobs")
-	jobs, err := kubeClient.BatchV1().Jobs(Global.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to list jobs: %v", err)
-	}
-	for _, job := range jobs.Items {
-		if err := kubeClient.BatchV1().Jobs(Global.Namespace).Delete(job.Name, metav1.NewDeleteOptions(0)); err != nil {
-			return fmt.Errorf("failed to delete job: %v", err)
-		}
-		logrus.Infof("Job deleted: %s", job.Name)
-	}
-	return nil
-}
-
-func DeleteCouchbaseServices(kubeClient kubernetes.Interface) error {
-	logrus.Info("Deleting Couchbase services")
-	services, err := kubeClient.CoreV1().Services(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	if err != nil {
-		return fmt.Errorf("failed to list services: %v", err)
-	}
-	for _, service := range services.Items {
-		if err := kubeClient.CoreV1().Services(Global.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
-		logrus.Infof("Service deleted: %s", service.Name)
-	}
-	return nil
-}
-
-func DeleteCouchbaseClusters(kubeClient kubernetes.Interface, crClient versioned.Interface) error {
-	logrus.Info("Deleting Couchbase clusters")
-	clusters, err := crClient.CouchbaseV2().CouchbaseClusters(Global.Namespace).List(metav1.ListOptions{})
-	if err != nil && !k8sutil.IsKubernetesResourceNotFoundError(err) {
-		return err
-	}
-	for _, cluster := range clusters.Items {
-		if err := crClient.CouchbaseV2().CouchbaseClusters(Global.Namespace).Delete(cluster.Name, metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
-		logrus.Infof("Deleted Couchbase cluster: %s", cluster.Name)
-		pods, err := kubeClient.CoreV1().Pods(Global.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
-		if err != nil {
-			return fmt.Errorf("failed to list pods for cluster: %v", err)
-		}
-		killPods := []string{}
-		for _, pod := range pods.Items {
-			killPods = append(killPods, pod.Name)
-		}
-		if err := e2eutil.KillMembers(kubeClient, Global.Namespace, cluster.Name, killPods...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func CreateAdmissionController(client kubernetes.Interface) error {
-	logrus.Infof("Creating admission controller")
-	if err := createAdmissionController(client); err != nil {
-		return err
-	}
-	if err := waitAdmissionController(client); err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeleteAdmissionController(client kubernetes.Interface) error {
-	logrus.Info("Deleting admission controller")
-	return deleteAdmissionController(client)
 }
 
 func cleanUpNamespace() (err error) {
@@ -344,7 +270,7 @@ func Teardown() error {
 	return nil
 }
 
-func CreateKubeClusterObject(kubeConfPath, context string) (*types.Cluster, error) {
+func createKubeClusterObject(kubeConfPath, context string) (*types.Cluster, error) {
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfPath},
 		&clientcmd.ConfigOverrides{CurrentContext: context},
@@ -372,7 +298,7 @@ func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
 	return err
 }
 
-func RecreateCRDs(k8s *types.Cluster) error {
+func recreateCRDs(k8s *types.Cluster) error {
 	clientSet, err := clientset.NewForConfig(k8s.Config)
 	if err != nil {
 		return fmt.Errorf("failed to create clientset object: %v", err)
@@ -454,7 +380,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	// Creating required namespaces and cluster roles before deploying the operator
-	if err := CreateK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
+	if err := createK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
 		return err
 	}
 
@@ -463,7 +389,8 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return fmt.Errorf("failed to delete operator: %v", err)
 	}
 
-	if err := DeleteAdmissionController(targetKube.KubeClient); err != nil {
+	logrus.Infof("Deleting admission controller")
+	if err := deleteAdmissionController(targetKube.KubeClient); err != nil {
 		return err
 	}
 
@@ -501,17 +428,17 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	logrus.Info("Recreating CRD")
-	if err := RecreateCRDs(targetKube); err != nil {
+	if err := recreateCRDs(targetKube); err != nil {
 		return err
 	}
 
 	logrus.Info("Recreating docker auth secret")
-	if err := RecreateDockerAuthSecret(targetKube.KubeClient); err != nil {
+	if err := recreateDockerAuthSecret(targetKube.KubeClient); err != nil {
 		return err
 	}
 
 	logrus.Info("Recreating role")
-	if err := RecreateRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
 	logrus.Info("Recreating service account")
@@ -519,7 +446,7 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 	logrus.Info("Recreating role binding")
-	if err := RecreateRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
 	logrus.Info("Creating secret")
@@ -527,7 +454,8 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		return err
 	}
 
-	if err := CreateAdmissionController(targetKube.KubeClient); err != nil {
+	logrus.Infof("Creating admission controller")
+	if err := createAdmissionController(targetKube.KubeClient); err != nil {
 		return err
 	}
 
@@ -608,14 +536,14 @@ func (f *Framework) GetCluster(index int) *types.Cluster {
 }
 
 func makeLogDir() (string, error) {
-	dir, err := GenerateLogDir()
+	dir, err := generateLogDir()
 	if err != nil {
 		return "", err
 	}
 	return dir, os.MkdirAll(dir, os.ModePerm)
 }
 
-func GenerateLogDir() (string, error) {
+func generateLogDir() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -623,16 +551,4 @@ func GenerateLogDir() (string, error) {
 	t := time.Now()
 	ts := t.Format(time.RFC3339)
 	return filepath.Join(cwd, "logs", ts), nil
-}
-
-// Execute shell command and returns the stderr and stdout buffers
-func runExecCommand(command *exec.Cmd) error {
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("error during execution: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
-	}
-	return nil
 }
