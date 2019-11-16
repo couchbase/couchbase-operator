@@ -405,16 +405,16 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 
 	applyPodPolicy(pod, config.Pod)
 
+	// Add PVCs before TLS as that may append some stuff to the slice.
+	if pvcState != nil {
+		pod.Spec.Volumes = pvcState.volumes
+	}
 	if err := applyPodTLSConfiguration(cluster.Spec, pod); err != nil {
 		return nil, err
 	}
 
 	if err := SetCouchbaseVersion(pod, cluster.Spec.Image); err != nil {
 		return nil, err
-	}
-
-	if pvcState != nil {
-		pod.Spec.Volumes = pvcState.volumes
 	}
 
 	if serverGroup != "" {
