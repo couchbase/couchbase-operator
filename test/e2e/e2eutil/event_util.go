@@ -233,7 +233,11 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 func ServerCrashRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			// The server instance may come back before being registered as down,
+			// especially if the operator is dead that time.
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
