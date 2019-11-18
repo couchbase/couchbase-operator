@@ -409,6 +409,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create a expected RZA results map for verification
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
