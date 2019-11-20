@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -14,10 +14,12 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
@@ -107,6 +109,9 @@ type persistentVolumeClaimState struct {
 	// create is a list of PVCs that needs creating.
 	create []*v1.PersistentVolumeClaim
 
+	// update is a list of PVCs that need updating.
+	update []*v1.PersistentVolumeClaim
+
 	// volumes is an ordered list of volumes to attach to the pod.
 	volumes []v1.Volume
 
@@ -115,6 +120,19 @@ type persistentVolumeClaimState struct {
 
 	// availabilityZone is where any existing PVCs reside when using server groups.
 	availabilityZone string
+
+	// diff records any changes to the specification.
+	diff string
+}
+
+// NeedsUpdate indicates whether any PVCs need updating.
+func (p *persistentVolumeClaimState) NeedsUpdate() bool {
+	return len(p.update) != 0 || len(p.create) != 0
+}
+
+// Diff returns a diff of changes when PVCs are created or updated.
+func (p *persistentVolumeClaimState) Diff() string {
+	return p.diff
 }
 
 // Add a persistent volume to the pod spec for each volumeMount.
@@ -159,33 +177,62 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 		// to allow pod recovery. Otherwise, create a new PVC
 		mountPath := pathForVolumeMountName(mountName)
 		pvc, _ := findMemberPVC(client, memberName, mountPath)
+
+		// every volume mount must have associated claim template
+		// within the spec before we can add it to the pod
+		required := cluster.Spec.GetVolumeClaimTemplate(claimName)
+		if required == nil {
+			return nil, fmt.Errorf("claim (%s) does not map to any claimTemplates", claimName)
+		}
+
+		// Label and Annotate so that volumes
+		// can be easily targeted when recovering pods
+		required.Labels = map[string]string{
+			constants.LabelApp:        constants.App,
+			constants.LabelNode:       memberName,
+			constants.LabelCluster:    cluster.Name,
+			constants.LabelVolumeName: claimName,
+		}
+		required.SetAnnotations(map[string]string{
+			constants.AnnotationVolumeMountPath:     mountPath,
+			constants.AnnotationVolumeNodeConf:      config.Name,
+			constants.CouchbaseVersionAnnotationKey: version,
+		})
+		applyBaseAnnotations(required.GetObjectMeta())
+		if gid := cluster.Spec.GetFSGroup(); gid != nil {
+			required.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
+		}
+		required.Name = NameForPersistentVolumeClaim(memberName, claimUsageCnt[claimName], mountName)
+
+		specJSON, err := json.Marshal(required.Spec)
+		if err != nil {
+			return nil, err
+		}
+		required.Annotations[constants.PVCSpecAnnotation] = string(specJSON)
+
+		// If a PVC does exist and differs, mark it for update.
+		if pvc != nil {
+			existingSpec := v1.PersistentVolumeClaimSpec{}
+			if err := json.Unmarshal([]byte(pvc.Annotations[constants.PVCSpecAnnotation]), &existingSpec); err != nil {
+				return nil, err
+			}
+			if !reflect.DeepEqual(existingSpec, required.Spec) {
+				state.update = append(state.update, pvc)
+				d, err := diff.Diff(existingSpec, required.Spec)
+				if err == nil {
+					state.diff += d
+				}
+			}
+		}
+
+		// If a PVC doesn't exist mark it for creation.
 		if pvc == nil {
-			// every volume mount must have associated claim template
-			// within the spec before we can add it to the pod
-			if pvc = cluster.Spec.GetVolumeClaimTemplate(claimName); pvc == nil {
-				return nil, fmt.Errorf("claim (%s) does not map to any claimTemplates", claimName)
-			}
-
-			// Label and Annotate so that volumes
-			// can be easily targeted when recovering pods
-			pvc.Labels = map[string]string{
-				constants.LabelApp:        constants.App,
-				constants.LabelNode:       memberName,
-				constants.LabelCluster:    cluster.Name,
-				constants.LabelVolumeName: claimName,
-			}
-			pvc.SetAnnotations(map[string]string{
-				constants.AnnotationVolumeMountPath:     mountPath,
-				constants.AnnotationVolumeNodeConf:      config.Name,
-				constants.CouchbaseVersionAnnotationKey: version,
-			})
-			applyBaseAnnotations(pvc.GetObjectMeta())
-			if gid := cluster.Spec.GetFSGroup(); gid != nil {
-				pvc.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
-			}
-			pvc.Name = NameForPersistentVolumeClaim(memberName, claimUsageCnt[claimName], mountName)
-
+			pvc = required
 			state.create = append(state.create, pvc)
+			d, err := diff.Diff(nil, required.Spec)
+			if err == nil {
+				state.diff += d
+			}
 		}
 
 		state.pvcs = append(state.pvcs, pvc)

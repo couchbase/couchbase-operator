@@ -888,42 +888,6 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		errs = append(errs, err)
 	}
 
-	// persistent volume claim templates are immutable
-	for _, cur := range current.Spec.VolumeClaimTemplates {
-		for _, up := range updated.Spec.VolumeClaimTemplates {
-			if cur.Name == up.Name {
-				if !util.StringPtrEquals(cur.Spec.StorageClassName, up.Spec.StorageClassName) {
-					err := util.NewUpdateError(`"storageClassName"`, "spec.volumeClaimTemplates[*]")
-					errs = append(errs, err)
-				}
-
-				// cannot change storage requests or limits
-				for resource, curQuantity := range cur.Spec.Resources.Requests {
-					if string(resource) == "storage" {
-						upStorageQuantity, ok := up.Spec.Resources.Requests[resource]
-						if ok {
-							if curQuantity.Cmp(upStorageQuantity) != 0 {
-								err := util.NewUpdateError(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests")
-								errs = append(errs, err)
-							}
-						}
-					}
-				}
-				for resource, curQuantity := range cur.Spec.Resources.Limits {
-					if string(resource) == "storage" {
-						upStorageQuantity, ok := up.Spec.Resources.Limits[resource]
-						if ok {
-							if curQuantity.Cmp(upStorageQuantity) != 0 {
-								err := util.NewUpdateError(`"storage"`, "spec.volumeClaimTemplates[*].resources.limits")
-								errs = append(errs, err)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
 	// Upgrade validation
 	// * Deny downgrades if no upgrade in progress
 	// * Deny upgrade if across major versions

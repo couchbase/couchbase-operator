@@ -15,13 +15,12 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
-
-	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1287,7 +1286,7 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 	var candidate *couchbaseutil.Member
 	var targetConfiguration int
-	var diff string
+	var d string
 
 	// Names returns a sorted list for determinism.
 	for _, name := range c.members.Names() {
@@ -1309,6 +1308,7 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		if err != nil {
 			return nil, -1, "", err
 		}
+		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
 		serverGroup := ""
 		if actual.Spec.NodeSelector != nil {
@@ -1335,17 +1335,23 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
 			return nil, -1, "", err
 		}
-		if reflect.DeepEqual(actualSpec, requestedSpec) {
+		if reflect.DeepEqual(actualSpec, requestedSpec) && pvcsEqual {
 			targetConfiguration++
 			continue
 		}
 
 		if candidate == nil {
-			diff = cmp.Diff(actual.Annotations[constants.PodSpecAnnotation], requested.Annotations[constants.PodSpecAnnotation])
+			d, err = diff.Diff(actualSpec, requestedSpec)
+			if err != nil {
+				log.Error(err, "cluster", c.namespacedName())
+			}
+			if !pvcsEqual {
+				d += pvcState.Diff()
+			}
 			candidate = member
 		}
 	}
-	return candidate, targetConfiguration, diff, nil
+	return candidate, targetConfiguration, d, nil
 }
 
 // reportUpgrade looks at the current state and any existing upgrade status

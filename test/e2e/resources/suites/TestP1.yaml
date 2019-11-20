@@ -153,6 +153,7 @@ tcGroups:
       - name: TestUpgradeEnv
       - name: TestUpgradeToSupportable
       - name: TestUpgradeToTLS
+      - name: TestUpgradePVC
 
   - name: StatusTests
     clusters:

@@ -19,7 +19,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1277,24 +1276,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/2/serverGroups", []string{"us-east-1a", "us-east-1b", "us-east-1c"})},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[2].serverGroups in body cannot be updated"},
-		},
-		{
-			name:           "TestValidateApplyVolumeTemplatesStorageClassImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/storageClassName", &unavailableStorageClass)},
-			shouldFail:     true,
-			expectedErrors: []string{`"storageClassName" in spec.volumeClaimTemplates[*] cannot be updated`},
-		},
-		{
-			name:           "TestValidateApplyVolumeTemplatesResourcesRequestsImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", corev1.ResourceList{corev1.ResourceStorage: *apiresource.NewScaledQuantity(10, 30)})},
-			shouldFail:     true,
-			expectedErrors: []string{`"storage" in spec.volumeClaimTemplates[*].resources.requests cannot be updated`},
-		},
-		{
-			name:           "TestValidateApplyVolumeTemplatesResourcesLimitsImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/limits", corev1.ResourceList{corev1.ResourceStorage: *apiresource.NewScaledQuantity(10, 30)})},
-			shouldFail:     true,
-			expectedErrors: []string{`"storage" in spec.volumeClaimTemplates[*].resources.limits cannot be updated`},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

@@ -14,13 +14,12 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/gocbmgr"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/groupcache/lru"
-	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/api/core/v1"
@@ -389,17 +388,12 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 }
 
 func (c *Cluster) logUpdate(old, new interface{}) {
-	oldBytes, err := yaml.Marshal(old)
+	d, err := diff.Diff(old, new)
 	if err != nil {
-		log.Error(err, "YAML marshal failed", "cluster", c.namespacedName())
+		log.Error(err, "cluster", c.namespacedName())
+		return
 	}
-	newBytes, err := yaml.Marshal(new)
-	if err != nil {
-		log.Error(err, "YAML marshal failed", "cluster", c.namespacedName())
-	}
-
-	diff := cmp.Diff(string(oldBytes), string(newBytes))
-	log.Info("Resource updated", "cluster", c.namespacedName(), "diff", diff)
+	log.Info("Resource updated", "cluster", c.namespacedName(), "diff", d)
 }
 
 func (c *Cluster) updateCRStatus() error {

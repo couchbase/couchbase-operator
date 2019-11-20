@@ -228,6 +228,7 @@ var (
 		"TestUpgradeEnv":                                    TestUpgradeEnv,
 		"TestUpgradeToSupportable":                          TestUpgradeToSupportable,
 		"TestUpgradeToTLS":                                  TestUpgradeToTLS,
+		"TestUpgradePVC":                                    TestUpgradePVC,
 
 		// Networking tests
 		"TestExposedFeatureIP":                   TestExposedFeatureIP,

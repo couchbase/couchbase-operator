@@ -23,6 +23,7 @@ var (
 	AutoFailoverOnDataDiskIssuesTimePeriodMax uint64 = 3600
 
 	PodSpecAnnotation             = "pod.couchbase.com/spec"
+	PVCSpecAnnotation             = "pvc.couchbase.com/spec"
 	PodTLSAnnotation              = "pod.couchbase.com/tls"
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"

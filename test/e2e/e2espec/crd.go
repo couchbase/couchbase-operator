@@ -354,7 +354,7 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 					StorageClassName: &storageClassName,
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							v1.ResourceStorage: *resource.NewScaledQuantity(1, 30),
+							v1.ResourceStorage: *NewResourceQuantityMi(1024),
 						},
 					},
 				},
