@@ -372,10 +372,6 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
-	configMaps, err := k8s.KubeClient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
 
 	for _, bucket := range buckets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/couchbasebucket/%s/%s.yaml", base, namespace, bucket.Name, bucket.Name))
@@ -397,9 +393,6 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 	for _, secret := range secrets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
-	}
-	for _, configMap := range configMaps.Items {
-		files = append(files, fmt.Sprintf("%s/%s/configmap/%s/%s.yaml", base, namespace, configMap.Name, configMap.Name))
 	}
 
 	// Deployments are special, we only collect them if the image matches the operator image.
@@ -490,6 +483,10 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+	configMaps, err := k8s.KubeClient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
 	for _, endpoint := range endpoints.Items {
 		files = append(files, fmt.Sprintf("%s/%s/endpoints/%s/%s.yaml", base, namespace, endpoint.Name, endpoint.Name))
@@ -505,6 +502,9 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 	for _, service := range services.Items {
 		files = append(files, fmt.Sprintf("%s/%s/service/%s/%s.yaml", base, namespace, service.Name, service.Name))
+	}
+	for _, configMap := range configMaps.Items {
+		files = append(files, fmt.Sprintf("%s/%s/configmap/%s/%s.yaml", base, namespace, configMap.Name, configMap.Name))
 	}
 
 	return files
