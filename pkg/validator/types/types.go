@@ -20,6 +20,8 @@ type KubeAbstraction interface {
 	GetSecret(string, string) (*corev1.Secret, error)
 	// GetStorageClass checks whether the named stoage class exists.
 	GetStorageClass(string) (*storagev1.StorageClass, error)
+	// GetNamespace returns the requested namespace.
+	GetNamespace(string) (*corev1.Namespace, error)
 	// GetCouchbaseClusters returns all clusters in the specified namespace.
 	GetCouchbaseClusters(string) (*couchbasev2.CouchbaseClusterList, error)
 	// GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
@@ -68,6 +70,11 @@ func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageC
 		return nil, err
 	}
 	return storageClass, nil
+}
+
+// GetNamespace returns the requested namespace.
+func (ab *kubeAbstractionImpl) GetNamespace(name string) (*corev1.Namespace, error) {
+	return ab.client.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
 }
 
 // GetCouchbaseClusters returns all clusters in the specified namespace.

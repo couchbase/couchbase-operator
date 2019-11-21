@@ -109,6 +109,7 @@ func GetAdmissionClusterRole() *rbacv1.ClusterRole {
 					"",
 				},
 				Resources: []string{
+					"namespaces",
 					"secrets",
 				},
 				Verbs: []string{

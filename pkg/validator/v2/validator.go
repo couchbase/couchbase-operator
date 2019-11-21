@@ -3,6 +3,8 @@ package v2
 import (
 	"crypto/x509"
 	"fmt"
+	"strconv"
+	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -33,7 +35,7 @@ const (
 	defaultMetricsImage                           = "couchbase/prometheus-exporter:1.0.0"
 )
 
-func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	emptyObject := struct{}{}
 
 	var patch jsonpatch.PatchList
@@ -99,7 +101,31 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
 	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: defaultFSGroup})
+		fsgroup := defaultFSGroup
+
+		// OCP specific hack, set the fsGroup to that defined in the namespace.
+		// Otherwise default to the default for the dockerhub container.
+		namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
+		if !apierrors.IsForbidden(err) {
+			if namespace.Annotations != nil {
+				if groups, ok := namespace.Annotations["openshift.io/sa.scc.supplemental-groups"]; ok {
+					// This may either look like 1000140000/10000
+					// or 1000140000-1000150000, just pick the first
+					// group.
+					i := strings.Index(groups, "-")
+					if i == -1 {
+						i = strings.Index(groups, "/")
+					}
+					if i != -1 {
+						if val, err := strconv.Atoi(groups[:i]); err == nil {
+							fsgroup = val
+						}
+					}
+				}
+			}
+		}
+
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: fsgroup})
 	}
 	if enableMonitoring, found, _ := unstructured.NestedBool(object.Object, "spec", "monitoring", "prometheus", "enabled"); found && enableMonitoring {
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "monitoring", "prometheus", "image"); !found {
@@ -110,7 +136,7 @@ func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	return patch
 }
 
-func ApplyBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
@@ -120,7 +146,7 @@ func ApplyBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList 
 	return patch
 }
 
-func ApplyEphemeralBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
@@ -130,11 +156,11 @@ func ApplyEphemeralBucketDefaults(object *unstructured.Unstructured) jsonpatch.P
 	return patch
 }
 
-func ApplyMemcachedBucketDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyMemcachedBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	return nil
 }
 
-func ApplyReplicationDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyReplicationDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionType"); !found {
@@ -144,7 +170,7 @@ func ApplyReplicationDefaults(object *unstructured.Unstructured) jsonpatch.Patch
 	return patch
 }
 
-func ApplyRoleDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyRoleDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 	roles, _, _ := unstructured.NestedSlice(object.Object, "spec", "roles")
 	for i, role := range roles {

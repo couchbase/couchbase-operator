@@ -204,7 +204,7 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 		PatchType: &pt,
 	}
 
-	patch := validator.ApplyDefaults(object)
+	patch := validator.ApplyDefaults(validator.New(getClient(), getCouchbaseClient()), object)
 	if patch != nil {
 		data, err := json.Marshal(patch)
 		if err != nil {

@@ -78,7 +78,8 @@ func (c *Cluster) operatorUpgrade() error {
 	if err := json.Unmarshal(data, unstructuredCluster); err != nil {
 		return err
 	}
-	if patches := validator.ApplyDefaults(unstructuredCluster); patches != nil {
+	v := validator.New(c.k8s.KubeClient, c.k8s.CouchbaseClient)
+	if patches := validator.ApplyDefaults(v, unstructuredCluster); patches != nil {
 		cluster := c.cluster.DeepCopy()
 		log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
 		if err := jsonpatch.Apply(cluster, patches); err != nil {

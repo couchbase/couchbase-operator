@@ -16,22 +16,22 @@ func New(client kubernetes.Interface, couchbaseClient versioned.Interface) *type
 	return types.New(client, couchbaseClient)
 }
 
-func ApplyDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	switch object.GetAPIVersion() {
 	case couchbasev2.GroupName + "/v2":
 		switch object.GetKind() {
 		case couchbasev2.ClusterCRDResourceKind:
-			return validationv2.ApplyDefaults(object)
+			return validationv2.ApplyDefaults(v, object)
 		case couchbasev2.BucketCRDResourceKind:
-			return validationv2.ApplyBucketDefaults(object)
+			return validationv2.ApplyBucketDefaults(v, object)
 		case couchbasev2.EphemeralBucketCRDResourceKind:
-			return validationv2.ApplyEphemeralBucketDefaults(object)
+			return validationv2.ApplyEphemeralBucketDefaults(v, object)
 		case couchbasev2.MemcachedBucketCRDResourceKind:
-			return validationv2.ApplyMemcachedBucketDefaults(object)
+			return validationv2.ApplyMemcachedBucketDefaults(v, object)
 		case couchbasev2.ReplicationCRDResourceKind:
-			return validationv2.ApplyReplicationDefaults(object)
+			return validationv2.ApplyReplicationDefaults(v, object)
 		case couchbasev2.RoleCRDResourceKind:
-			return validationv2.ApplyRoleDefaults(object)
+			return validationv2.ApplyRoleDefaults(v, object)
 		}
 	}
 	return nil
