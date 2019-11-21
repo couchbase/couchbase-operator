@@ -158,6 +158,11 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 		}
 	}
 
+	// Reset any timeout counters if nodes have recovered.
+	for _, member := range r.couchbase.ActiveNodes {
+		delete(c.recoveryTime, member.Name)
+	}
+
 	// When nodes are being removed, the default behavior is to remove volumes
 	// unless user is initiating the removal and only logs are mounted
 	for _, m := range c.members {

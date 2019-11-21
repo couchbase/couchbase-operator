@@ -121,7 +121,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	}
 	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
 	defer stop()
-	for _, newClusterSize := range []int{2, 3, 2} {
+	for _, newClusterSize := range []int{2, 3, 2, 1} {
 		testCouchbase = e2eutil.MustResizeCluster(t, 0, newClusterSize, targetKube, testCouchbase, 20*time.Minute)
 	}
 	stop()
@@ -142,11 +142,13 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	// * Cluster scales from 1 -> 2
 	// * Cluster scales from 2 -> 3
 	// * Cluster scales from 3 -> 2
+	// * Cluster scales from 2 -> 1
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.ClusterScaleUpSequence(1),
 		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleDownSequence(1),
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
@@ -298,13 +300,8 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{
-			Times: 3,
-			Validator: eventschema.Sequence{
-				Validators: []eventschema.Validatable{
-					eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
-					eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
-				},
-			},
+			Times:     3,
+			Validator: e2eutil.PodDownFailedWithPVCRecoverySequence(1),
 		},
 	}
 
