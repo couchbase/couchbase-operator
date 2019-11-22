@@ -1,0 +1,109 @@
+= About the CouchbaseMemcachedBucket Resource
+
+:toc: macro
+
+The Couchbase Autonomous Operator operates on `CouchbaseCluster` objects.
+Buckets are decoupled from this configuration and are selected for inclusion within a cluster with configurable label selectors.
+
+`CouchbaseBucket` resources provide memcached compatible in-memory storage.
+
+The following YAML shows all possible fields that may be configured for a `CouchbaseMemcachedBucket`.
+This configuration may not be valid and is only for illustrative purposes.
+
+.All available CouchbaseMemcachedBucket configuration parameters
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseMemcachedBucket
+metadata:
+  name: my-bucket
+  labels:
+    cluster: my-cluster
+spec:
+  memoryQuota: 100Mi
+  enableFlush: false
+----
+
+toc::[]
+
+== Top-Level Definitions
+
+The following are relevant generic parameters that can be defined:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseMemcachedBucket
+metadata:
+  name: my-bucket
+  labels:
+    cluster: my-cluster
+----
+
+=== apiVersion
+
+The apiVersion defines which version of the resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `couchbase.com/v2`
+____
+
+=== kind
+
+The kind defines the type of resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `CouchbaseMemcachedBucket`
+____
+
+=== metadata.name
+
+The metadata name defines the name of the resource.
+The name must be unique for the kind defined.
+Furthermore the name must be unique for all bucket kinds defined and used by the cluster.
+For example you cannot have a `CouchbaseMemcachedBucket` named "default" and a CouchbaseBucket also named "default".
+
+____
+_Field rules:_ This field is required and must be unique as described above.
+____
+
+=== metadata.labels
+
+The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+Further details about resource selection can be found on the xref:couchbase-resource-rbac.adoc[Couchbase Resources and RBAC page].
+
+____
+_Field rules:_ This field is optional and must be a map of string key/value pairs.
+____
+
+== spec
+
+The following are parameters that may be set on the bucket:
+
+[source,yaml]
+----
+spec:
+  memoryQuota: 100Mi
+  enableFlush: false
+----
+
+=== spec.memoryQuota
+
+This field specifies the amount of memory to allocate to this bucket per-node.
+It is deducted from the per-node `spec.cluster.dataServiceMemoryQuota` parameter in a related `CouchbaseCluster` resource.
+The total quota allocated for all buckets must not exceed the `spec.cluster.dataServiceMemoryQuota` parameter in a related `CouchbaseCluster` resource.
+The minimum size is 100Mi.
+If not specified this field will default to 100Mi.
+
+____
+_Field rules:_ This field is optional and must be a Kubernetes resource quantity greater than or equal to 100Mi.
+____
+
+=== spec.enableFlush
+
+This field specifies whether or not to enable the flush command on this bucket.
+This parameter defaults to `false` if it is not specified.
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____

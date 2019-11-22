@@ -1,0 +1,118 @@
+= About the CouchbaseUser Resource
+
+:toc: macro
+
+The Couchbase Autonomous Operator operates on `CouchbaseCluster` objects.
+Users are decoupled from this configuration and are selected for inclusion within a cluster with configurable label selectors.
+
+`CouchbaseUser` resources are analogous to Kubernetes `ServiceAccount` or OpenShift `User` resources.
+
+The following YAML shows all possible fields that may be configured for a `CouchbaseUser`.
+This configuration may not be valid and is only for illustrative purposes.
+
+.All available CouchbaseUser configuration parameters
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: my-user
+  labels:
+    cluster: my-cluster
+spec:
+  fullName: "Jane Doe"
+  authDomain: local
+  authSecret: my-password-secret
+----
+
+toc::[]
+
+== Top-Level Definitions
+
+The following are relevant generic parameters that can be defined:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: my-bucket
+  labels:
+    cluster: my-cluster
+----
+
+=== apiVersion
+
+The apiVersion defines which version of the resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `couchbase.com/v2`
+____
+
+=== kind
+
+The kind defines the type of resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `CouchbaseUser`
+____
+
+=== metadata.name
+
+The metadata name defines the name of the resource.
+The name must be unique for the kind defined.
+
+____
+_Field rules:_ This field is required and must be unique as described above.
+____
+
+=== metadata.labels
+
+The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+Further details about resource selection can be found on the xref:couchbase-resource-rbac.adoc[Couchbase Resources and RBAC page].
+
+____
+_Field rules:_ This field is optional and must be a map of string key/value pairs.
+____
+
+== spec
+
+The following are parameters that may be set on the user:
+
+[source,yaml]
+----
+spec:
+  fullName: "Jane Doe"
+  authDomain: local
+  authSecret: my-password-secret
+----
+
+=== spec.fullName
+
+This field defines the full name of the user.
+The internal user ID is derived from the `metadata.name` field.
+
+____
+_Field rules:_ This field is required and must be a string.
+____
+
+=== spec.authDomain
+
+This field defines how to authenticate the user.
+If set to `local` the user will be authenticated against a local password.
+If set to `ldap` the user will be authenticated against a remote LDAP server.
+LDAP authentication requires the `spec.security.rbac.ldap` object to be configured in a related `CouchbaseCluster` resource.
+
+____
+_Field rules:_ This field is required and must be either `local` or `ldap`.
+____
+
+=== spec.authSecret
+
+This field defines the password of the user.
+It is only relevant when using `local` authentication.
+If defined it must reference a `Secret` resource in the current namespace containing the user's password under the key `password`.
+
+____
+_Field rules:_ This field is required when using `local` authentication and must be a string.
+____

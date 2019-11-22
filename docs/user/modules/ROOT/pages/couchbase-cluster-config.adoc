@@ -1,4 +1,4 @@
-= About the CouchbaseCluster Configuration File
+= About the CouchbaseCluster Resource
 
 :toc: macro
 
@@ -10,124 +10,159 @@ The following CouchbaseCluster configuration shows all of the available paramete
 .All available CouchbaseCluster configuration parameters
 [source,yaml]
 ----
-apiVersion: couchbase.com/v1
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cb-example
-  namespace: default
 spec:
-  baseImage: couchbase/server
-  version: enterprise-6.0.1
+  image: couchbase/server:6.0.3
   paused: false
   antiAffinity: true
-  tls:
-    static:
-      member:
-        serverSecret: couchbase-server-tls
-      operatorSecret: couchbase-operator-tls
-  authSecret: my-secret
-  exposeAdminConsole: true
-  adminConsoleServiceType: LoadBalancer
-  adminConsoleServices:
-    - data
-  exposedFeatures:
-    - xdcr
-  exposedFeatureServiceType: LoadBalancer
-  exposedFeatureTrafficPolicy: Local
-  serviceAnnotations:
-    my-annotation: my-value
   softwareUpdateNotifications: true
   serverGroups:
-    - us-east-1a
-    - us-east-1b
-    - us-east-1c
+  - us-east-1a
+  - us-east-1b
+  - us-east-1c
   securityContext:
     runAsUser: 1000
     runAsNonRoot: true
     fsGroup: 1000
-  disableBucketManagement: false
-  logRetentionTime: 604800s
-  logRetentionCount: 20
-  dns:
-    domain: couchbase-0.us-east-1.example.com
+  platform: aws
   cluster:
-    dataServiceMemoryQuota: 256
-    indexServiceMemoryQuota: 256
-    searchServiceMemoryQuota: 256
-    eventingServiceMemoryQuota: 256
-    analyticsServiceMemoryQuota: 1024
+    clusterName: cb-example
+    dataServiceMemoryQuota: 256Mi
+    indexServiceMemoryQuota: 256Mi
+    searchServiceMemoryQuota: 256Mi
+    eventingServiceMemoryQuota: 256Mi
+    analyticsServiceMemoryQuota: 1Gi
     indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 120
+    autoFailoverTimeout: 120s
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
-    autoFailoverOnDataDiskIssuesTimePeriod: 120
+    autoFailoverOnDataDiskIssuesTimePeriod: 120s
     autoFailoverServerGroup: false
-  buckets:
-    - name: default
-      type: couchbase
-      memoryQuota: 1024
-      replicas: 1
-      ioPriority: high
-      evictionPolicy: valueOnly
-      conflictResolution: seqno
-      enableFlush: true
-      enableIndexReplica: false
-      compressionMode: passive
+    autoCompaction:
+      databaseFragmentationThreshold:
+        percent: 30
+        size: 1Gi
+      viewFragmentationThreshold:
+        percent: 30
+        size: 1Gi
+      parallelCompaction: false
+      timeWindow:
+        start: 02:00
+        end: 06:00
+        abortCompactionOutsideWindow: true
+      tombstonePurgeInterval: 72h
+  security:
+    adminSecret: my-secret
+    rbac:
+      managed: true
+      selector:
+        matchLabels:
+          cluster: cb-example
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServices:
+    - data
+    adminConsoleServiceType: LoadBalancer
+    exposedFeatures:
+    - xdcr
+    exposedFeatureServiceType: LoadBalancer
+    exposedFeatureTrafficPolicy: Local
+    tls:
+      static:
+        member:
+          serverSecret: couchbase-server-tls
+        operatorSecret: couchbase-operator-tls
+      clientCertificatePolicy: mandatory
+      clientCertificatePaths:
+      - path: san.email
+        prefix: ""
+        delimiter: "@"
+    dns:
+      domain: couchbase-0.us-east-1.example.com
+    serviceAnnotations:
+      my-annotation: my-value
+    loadBalancerSourceRanges:
+    - "10.0.0.0/8"
+  logging:
+    logRetentionTime: 604800s
+    logRetentionCount: 20
   servers:
-    - size: 1
-      name: all_services
-      services:
-        - data
-        - index
-        - query
-        - search
-        - eventing
-        - analytics
-      serverGroups:
-        - us-east-1a
-      pod:
-        couchbaseEnv:
-          - name: ENV1
-            value: value
-        envFrom:
-          - secretRef:
-              name: environment-secret
-        resources:
-          limits:
-            cpu: 4
-            memory: 8Gi
-          requests:
-            cpu: 2
-            memory: 8Gi
-        labels:
-          couchbase_services: all
-        annotations:
-          couchbase.acme.com: production
-        nodeSelector:
-          instanceType: large
-        tolerations:
-          - key: app
-            operator: Equal
-            value: cbapp
-            effect: NoSchedule
-        automountServiceAccountToken: false
-        imagePullSecrets:
-          - name: my-pull-secret
-        volumeMounts:
-          default: couchbase
-          data:  couchbase
-          index: couchbase
-          analytics:
-            - couchbase
-            - couchbase
+  - size: 1
+    name: all_services
+    services:
+    - data
+    - index
+    - query
+    - search
+    - eventing
+    - analytics
+    serverGroups:
+    - us-east-1a
+    pod:
+      labels:
+        couchbase_services: all
+      annotations:
+        couchbase.acme.com: production
+      nodeSelector:
+        instanceType: large
+      env:
+      - name: ENV1
+        value: value
+      envFrom:
+        - secretRef:
+          name: environment-secret
+      resources:
+        limits:
+          cpu: 4
+          memory: 8Gi
+        requests:
+          cpu: 2
+          memory: 8Gi
+      tolerations:
+      - key: app
+        operator: Equal
+        value: cbapp
+        effect: NoSchedule
+      automountServiceAccountToken: false
+      serviceAccountName: couchbase-pods
+      imagePullSecrets:
+      - name: my-pull-secret
+      volumeMounts:
+        default: couchbase
+        data:  couchbase
+        index: couchbase
+        analytics:
+        - couchbase
+        - couchbase
+  buckets:
+    managed: true
+    selector:
+      matchLabels:
+        cluster: cb-example
+  xdcr:
+    managed: true
+    remoteClusters:
+    - name: remote
+      uuid: 611e50b21e333a56e3d6d3570309d7e3
+      hostname: 10.1.0.2:31851
+      authenticationSecret: my-xdcr-secret
+      tls:
+        secret: my-xdcr-tls-secret
+      replications:
+        selector:
+          matchLabels:
+            cluster: cb-example
   volumeClaimTemplates:
-    - metadata:
-        name: couchbase
-      spec:
-        storageClassName: "standard"
-        resources:
-          requests:
-            storage: 1Gi
+  - metadata:
+      name: couchbase
+    spec:
+      storageClassName: "standard"
+      resources:
+        requests:
+          storage: 1Gi
 ----
 
 toc::[]
@@ -138,7 +173,7 @@ The following are the top-level parameters for a CouchbaseCluster configuration:
 
 [source,yaml]
 ----
-apiVersion: couchbase.com/v1
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cb-example
@@ -150,7 +185,7 @@ metadata:
 This field specifies the API version for the Couchbase integration. As the integration changes over time, you can change the API version whenever new features are added. For any given release, the API versions that are supported by that Operator will be specified in the documentation. It is recommended that you upgrade to the latest API version whenever possible.
 
 ____
-_Field rules:_ This field is required and must be set to a valid API Version. The value of this field cannot be changed after the cluster is created.
+_Field rules:_ This field is required and must be `couchbase.com/v2`.
 ____
 
 === kind
@@ -161,12 +196,15 @@ ____
 _Field rules:_ This field is required and must always be set to `CouchbaseCluster`. The value of this field cannot be changed after the cluster is created.
 ____
 
-=== metadata
+=== metadata.name
 
-Allows setting a name for the Couchbase cluster and a namespace that the cluster should be deployed in.
+This field sets the name of the Couchbase cluster.
+It must be unique within the Kubernetes namespace.
+This name controls how Operator managed resources are named.
+The logical cluster name -- as displayed in the Couchbase UI -- may be changed with the <<spec-cluster-clustername>> parameter.
 
 ____
-_Field rules:_ A name is highly recommended, but not required. If values are not set in the metadata field then defaults will be set. The value of `name` will be autogenerated and the value of `namespace` will be set to `default`. The value of these fields cannot be changed after the cluster is created.
+_Field rules:_ This field must be a valid DNS hostname string.
 ____
 
 == spec
@@ -176,57 +214,37 @@ This section describes the top-level parameters related to a Couchbase cluster d
 [source,yaml]
 ----
 spec:
-  baseImage: couchbase/server
-  version: enterprise-6.0.1
+  image: couchbase/server:6.0.3
   paused: false
   antiAffinity: true
-  tls:
-    static:
-      member:
-        serverSecret: couchbase-server-tls
-      operatorSecret: couchbase-operator-tls
-  authSecret: my-auth-secret
-  exposeAdminConsole: true
-  adminConsoleServiceType: LoadBalancer
-  adminConsoleServices:
-    - data
-  exposedFeatures:
-    - xdcr
-  exposedFeatureServiceType: LoadBalancer
-  exposedFeatureTrafficPolicy: Local
-  serviceAnnotations:
-    my-annotation: my-value
   softwareUpdateNotifications: true
   serverGroups:
-    - us-east-1a
-    - us-east-1b
-    - us-east-1c
+  - us-east-1a
+  - us-east-1b
+  - us-east-1c
   securityContext:
     runAsUser: 1000
     runAsNonRoot: true
     fsGroup: 1000
-  disableBucketManagement: false
-  logRetentionTime: 604800s
-  logRetentionCount: 20
+  platform: aws
 ----
 
-=== baseImage
+=== spec.image
 
 This field specifies the image that should be used.
+For docker hub images for use on Kubernetes this should be similar to `couchbase/server:6.0.3`.
+For Red Hat images for use with OCP this should be similar to `registry.connect.redhat.com/couchbase/server:6.0.3-1`.
+Please check the relevant registry for the most up to date image tags.
+You may use a different location if, for example, you have a local container registry.
+
+Image tags must contain a valid semantic version in order to dynamically enable/disable Operator features and control upgrade paths.
+For further information on upgrade constraints, please consult the xref:upgrading-couchbase.adoc[upgrade documentation].
 
 ____
-_Field rules:_ The `baseImage` field is required and should be set to `couchbase/server` unless you want Kubernetes to pull the Couchbase Server docker container from a different location. The value of this field cannot be changed after the cluster is created.
+_Field rules:_ The `image` field is required and must be a valid container image.
 ____
 
-=== version
-
-This field specifies the version number of Couchbase Server to install. This should match an available version number in the Couchbase Docker repository. It may never be changed to a lower version number than the version that is currently running.
-
-____
-_Field rules:_ The `version` field is required and should be set to the version of Couchbase Server that should be used to build the cluster. The version must contain a semantic version string, e.g. `5.5.3` or `6.0.1`. Please consult the xref:upgrading-couchbase.adoc[upgrade documentation] for further constraints.
-____
-
-=== paused
+=== spec.paused
 
 This field specifies whether or not the Operator is currently managing this cluster. This parameter should generally be set to `true`, but may be set to `false` if you decide to make manual changes to the cluster. By disabling the Operator you can change the cluster configuration without having to worry about the Operator reverting the changes. However, before re-enabling the Operator, ensure that the Kubernetes configuration matches the cluster configuration.
 
@@ -234,7 +252,7 @@ ____
 _Field rules:_ The `paused` field is not required and defaults to `false` if not specified.
 ____
 
-=== antiAffinity
+=== spec.antiAffinity
 
 This field specifies whether or not two pods in this cluster can be deployed on the same Kubernetes node. In a production setting this parameter should always be set to `true` in order to reduce the chance of data loss in case a Kubernetes node crashes.
 
@@ -242,93 +260,7 @@ ____
 _Field rules:_ The `antiAffinity` field is not required and defaults to `false` if not specified. The value of this field cannot be changed after the cluster is created.
 ____
 
-=== tls
-
-This field is optional and controls whether the Operator uses TLS for communication with the cluster. It also sets the TLS certificates that are used by Couchbase clients and XDCR. Refer to the xref:tls.adoc[TLS documentation] for more information.
-
-=== authSecret
-
-This field specifies the name of a Kubernetes Secret that should be used as the user name and password of the Couchbase super-user.
-
-____
-_Field rules:_ The `authSecret` field is required and should reference the name of a https://kubernetes.io/docs/concepts/configuration/secret/[Kubernetes Secret] that already exists. The value of this field cannot be changed after the cluster is created.
-____
-
-=== exposeAdminConsole
-
-This field specifies whether or not the Couchbase Server Web Console should be exposed externally. Exposing the web console is done using a NodePort service and the port for the service can be found in the describe output when describing this cluster. This parameter may be changed while the cluster is running and the Operator will create/destroy the NodePort service as appropriate.
-
-____
-_Field rules:_ The `exposeAdminConsole` field is not required and defaults to `false` if not specified.  If set to `true` the specification must also have the <<adminConsoleServices>> property defined.
-____
-
-=== adminConsoleServiceType
-
-This field defines how the admin console service is exposed.  By default it will use a `NodePort` which exposes the console on a random port on all nodes in the cluster.  It is accessible only within the cluster or via an IP tunnel into the Kubernetes underlay network.  If set to `LoadBalancer` it will expose the default admin console port to the public internet via a load balancer on platforms which support this service type.  Only the TLS enabled port (18091) will be exposed to public networks.
-
-____
-_Field rules:_ The `adminConsoleServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
-____
-
-=== adminConsoleServices
-
-When the Couchbase Server Web Console is exposed with the <<exposeAdminConsole>> property, by default, opening a browser session to the Web Console will be automatically load balanced across all pods in the cluster to provide high availability. However, the Web Console will display different features based on the services that are running on the particular pod that it's connected to.
-
-This property allows the UI service to be constrained to pods running one or more specific services. The services that you specify are subtractive in nature — they will only identify pods running all of those services — so care must be used. For example, if the cluster is deployed with multi-dimensional scaling, the data service on one set of pods, and the analytics service on another mutually exclusive set, then specifying `data` and `analytics` as your Web Console services list would result in the Web Console not being accessible — no pods match all the constraints, i.e. no pods are running both the data and analytics services.
-
-If you require access to a specific pod running a specific service, this can also be achieved by using the `admin` option of the <<exposedFeatures>> property.  This will allow access via a node port. You must connect directly to the IP address of the node that the pod is running on. The assigned node port is available via the cluster status structure returned by `kubectl describe`, or via the output of `kubectl get services`. Refer to the xref:services.adoc[services documentation] for more information.
-
-____
-_Field rules:_ The `adminConsoleServices` list is not required and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing`, and `analytics`, and must be unique. An empty list means that any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
-____
-
-=== exposedFeatures
-
-This field specified a list of per-pod features to expose on the cluster network (as opposed to the pod network).  These define sets of ports which are required to support the specified features.  The supported values are as follows:
-
-admin::
-
-Exposes the admin API and UI
-
-xdcr::
-Exposes the ports necessary to support XDCR via L3 connectivity at the cluster network layer.
-
-client::
-Exposes all client services.  These include data, views, query, full text search, analytics.
-
-____
-_Field rules:_ The `exposedFeatures` list is optional, no feature sets are exposed to the cluster network if unset.
-____
-
-=== exposedFeatureServiceType
-
-This field defines how the per Couchbase node ports are exposed.  By default it will use a `NodePort` which exposes the `exposedFeatures` on random ports per service on the Kubernetes nodes running the cluster.  They are accessible only within the cluster or via an IP tunnel into the Kubernetes underlay network.  If set to `LoadBalancer` it will expose the default exposed service ports on the public internet via a load balancer on platforms which support this service type.  Only the TLS enabled ports will be exposed to public networks.
-
-____
-_Field rules:_ The `exposedFeatureServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
-____
-
-=== exposedFeatureTrafficPolicy
-
-This field defines how traffic ingressing into Kubernetes is handled.
-By default this is set to `Local` meaning that traffic from a public load balancer must be routed directly to the node upon which the destination `Pod` is resident.
-This enforces consistent network performance by keeping the number of hops from the edge to the pod consistent.
-Some environments may have external firewall rules in place that prevent the Operator from connecting to an externally advertised address to verify client connectivity before allowing data to reside on that node.
-This field may be set to `Cluster` to work around this issue, masquerading connectivity checks as normal node-to-node Kubernetes traffic, but at the expense of inconsistent network paths.
-
-____
-_Field rules:_ The `exposedFeatureTrafficPolicy` field is optional and defaults to `Local`.  Allowed values are `Local` and `Cluster`.
-____
-
-=== serviceAnnotations
-
-This field defines any custom annotations to be added to console and per-pod (exposed feature) services.
-
-____
-_Field rules:_ The serviceAnnotations field is optional.  If specified it must be a map of key/value pairs conforming to Kubernetes annotation rules.
-____
-
-=== softwareUpdateNotifications
+=== spec.softwareUpdateNotifications
 
 This field specifies whether or not software update notifications are displayed in the Couchbase UI.  This provides a visual indication as to whether a software update is available and should be applied in order to increase functionality or fix defects.
 
@@ -337,7 +269,7 @@ _Field rules:_ The `softwareUpdateNotifications` field is optional and defaults 
 ____
 
 [[servergroups_main]]
-=== serverGroups
+=== spec.serverGroups
 
 Setting the server groups field enables automatic management of Couchbase server groups.  The end user is responsible for adding labels to thier Kubernetes nodes which will be used to evenly distribute nodes across server groups so the cluster is tolerant to the loss of an entire data center (or any other desired failure domain).  Nodes are labelled with a key of `failure-domain.beta.kubernetes.io/zone` and an arbitrary name string.  Multiple nodes may have the same server group to allow multiple pods to be scheduled there regardless of anti-affinity settings.  An example of applying the label is as follows:
 
@@ -356,7 +288,7 @@ ____
 _Field rules:_ The `serverGroups` field is optional.  If set pods will be scheduled across the specified set of server groups.  The server groups must be set at cluster creation time, and currently should be assumed to be immutable.
 ____
 
-=== securityContext
+=== spec.securityContext
 
 This field is a Kubernetes PodSecurityContext object which is attached to all pods that are created by the Operator. If unspecified, this will default to the `couchbase` user, mount attached volumes as that user, and ensure that the containers are running as non-root. You may override the default behavior if using a custom container image or for testing purposes.
 
@@ -364,38 +296,8 @@ ____
 _Field rules:_ The `securityContext` field is optional. If set, this will be attached to all new pods that are created by the Operator. This field should not be modified during the cluster lifecycle.
 ____
 
-=== disableBucketManagement
-
-This field specifies whether to ignore the bucket configuration. When `disableBucketManagement` is set to `false` (the default), the Operator will have sole control over creating the buckets that are specified in the configuration (and deleting the buckets that are not).
-
-If set to `true`, the creation and deletion of buckets must be done manually using the the Couchbase Server Web Console, CLI, REST API, or SDK. Even if buckets are specified in the configuration, as long as `disableBucketManagement` is set to `false`, the Operator will not create or delete any buckets.
-
-____
-_Field rules:_ The `disableBucketManagement` field is optional and defaults to `false`.
-____
-
-=== logRetentionTime
-
-This field is used in conjunction with the `logs` persistent volume mount.  The value can be anything that can be parsed by the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration] function.  If specified this controls the retention period that log volumes are kept for after their associated pods have been deleted.  If not specified (the default) or zero e.g. 0s, log volumes are retained indefinitely.
-
-It is recommended to specify this field when using ephemeral server classes so that potentially sensitive information is not retained indefinitely.  This allows compliance with data privacy legislation.
-
-____
-_Field rules:_ The `logRetentionTime` field is optional and defaults to `""`.  If specified it must contain a decimal number and a unit suffix such as `s`, `m` or `h`.  The decimal number cannot be negative.
-____
-
-=== logRetentionCount
-
-This field is used in conjunction with the `logs` persistent volume mount.  If specified this controls the maximum number of log volumes that can be kept after their associated pods have been deleted.  If this threshold is passed, log volumes are deleted starting with the oldest first.  If not specified or zero, log volumes are retained indefinitely.
-
-It is recommended to specify this field when using ephemeral server classes so an unlimited number of persistent volumes cannot be created.  This ensures storage quotas are not exhausted or significant costs are incurred.
-
-____
-_Field rules:_ The `logRetentionCount` field is optional and defaults to `0`.  The value must be any non-negative integer.
-____
-
 [#spec-platform]
-=== platform
+=== spec.platform
 
 This field indicates which underlying cloud platform the Kubernetes cluster is running on and is used as a hint to correctly configure managed resources.
 
@@ -403,7 +305,337 @@ ____
 _Field rules:_ The `platform` field is optional.  The Value must be one of `aws`, `gce` or `azure`.
 ____
 
-== spec.dns
+== spec.cluster
+
+This object allows configuration of global Couchbase cluster settings.
+
+[source,yaml]
+----
+spec:
+  cluster:
+    clusterName: cb-example
+    dataServiceMemoryQuota: 256Mi
+    indexServiceMemoryQuota: 256Mi
+    searchServiceMemoryQuota: 256Mi
+    eventingServiceMemoryQuota: 256Mi
+    analyticsServiceMemoryQuota: 1Gi
+    indexStorageSetting: memory_optimized
+    autoFailoverTimeout: 120s
+    autoFailoverMaxCount: 3
+    autoFailoverOnDataDiskIssues: true
+    autoFailoverOnDataDiskIssuesTimePeriod: 120s
+    autoFailoverServerGroup: false
+    autoCompaction:
+      databaseFragmentationThreshold:
+        percent: 30
+        size: 1Gi
+      viewFragmentationThreshold:
+        percent: 30
+        size: 1Gi
+      parallelCompaction: false
+      timeWindow:
+        start: 02:00
+        end: 06:00
+        abortCompactionOutsideWindow: true
+      tombstonePurgeInterval: 72h
+----
+
+=== spec.cluster.clusterName
+
+This field allows the cluster name -- as displayed in the Couchbase UI -- to be overridden.
+This field will be set to `metadata.name` if not specified.
+As `metadata.name` is required to be a valid DNS hostname, this field allows those limitations to be bypassed.
+
+____
+_field rules:_ This field is optional and must be a string.
+____
+
+=== spec.cluster.dataServiceMemoryQuota
+
+The amount of memory to assign -- per-node -- to the data service if it is present on a specific Couchbase node.
+This parameter defaults to 256Mi if it is not set.
+
+____
+_Field rules:_ This field is optional and must be a resource quantity greater than or equal to 256Mi. The sum of all memory quotas must be no more than 80% of a pod's available memory.
+____
+
+=== spec.cluster.indexServiceMemoryQuota
+
+The amount of memory to assign -- per-node -- to the index service if it is present on a specific Couchbase node.
+This parameter defaults to 256Mi if it is not set.
+
+____
+_Field rules:_ This field is optional and must be a resource quantity greater than or equal to 256Mi. The sum of all memory quotas must be no more than 80% of a pod's available memory.
+____
+
+=== spec.cluster.searchServiceMemoryQuota
+
+The amount of memory to assign -- per-node -- to the search service if it is present on a specific Couchbase node.
+This parameter defaults to 256Mi if it is not set.
+
+____
+_Field rules:_ This field is optional and must be a resource quantity greater than or equal to 256Mi. The sum of all memory quotas must be no more than 80% of a pod's available memory.
+____
+
+=== spec.cluster.eventingServiceMemoryQuota
+
+The amount of memory to assign -- per-node -- to the eventing service if present on a specific Couchbase node in Mi.
+This parameter defaults to 256Mi if it is not set.
+
+____
+_Field rules:_ This field is optional and must be a resource quantity greater than or equal to 256Mi. The sum of all memory quotas must be no more than 80% of a pod's available memory.
+____
+
+=== spec.cluster.analyticsServiceMemoryQuota
+
+The amount of memory to assign -- per-node -- to the analytics service if present on a specific Couchbase node in Mi.
+This parameter defaults to 1Gi if it is not set.
+
+____
+_Field rules:_ This field is optional and must be a resource quantity greater than or equal to 1GI. The sum of all memory quotas must be no more than 80% of a pod's available memory.
+____
+
+=== spec.cluster.indexStorageSetting
+
+Specifies the backend storage type to use for the index service. If the cluster already contains a Couchbase Server instance running the index service, then this parameter cannot be changed until all Couchbase instances running the index service are removed.
+
+____
+_Field rules:_ The `indexStorageSetting` is optional and defaults to `memory_optimized`. Values allowed are `plasma` or `memory_optimized`. After the Couchbase cluster is deployed, the value of this field can only be changed if there are no Index nodes in the cluster.
+____
+
+=== spec.cluster.autoFailoverTimeout
+
+Specifies the auto-failover timeout. The Operator relies on the CouchbaseCluster to auto-failover nodes before removing them, so setting this field to an appropriate value is important.
+
+____
+_Field rules:_ The `autoFailoverTimeout` is optional and must be a duration in the range 5s-3600s.
+____
+
+=== spec.cluster.autoFailoverMaxCount
+
+Specifies the maximum number of failover events we can tolerate before manual intervention is required.  If a bucket as 2 replicas we can tolerate 2 pods failing over.  Applies to entire server groups also.
+
+____
+_Field rules:_ The `autoFailoverMaxCount` is required and must be in the range 1-3.
+____
+
+=== spec.cluster.autoFailoverOnDataDiskIssues
+
+Specifies whether a node will automatically fail over on data disk issues.
+
+____
+_Field rules:_ The `autoFailoverOnDataDiskIssues` is required and must be `true` or `false`.
+____
+
+=== spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod
+
+Specifies the time period to wait before automatically failing over a node experiencing data disk issues.  This field's units are in seconds.
+
+____
+_Field rules:_ The `autoFailoverOnDataDiskIssuesTimePeriod` is only required if `autoFailoverOnDataDiskIssues` is also set to `true`.  It must be a duration in the range 5s-3600s.
+____
+
+=== spec.cluster.autoFailoverServerGroup
+
+Specifies whether the cluster will automatically failover an entire server group.
+
+____
+_Field rules:_ The `autoFailoverServerGroup` is optional, defaulting to false.
+____
+
+== spec.cluster.autoCompaction
+
+This object allows configuration of global Couchbase auto-comapaction settings.
+Auto compaction occurs automatically by default.
+Auto compaction is required periodically to reclaim disk space caused by fragmentation.
+
+[source,yaml]
+----
+spec:
+  cluster:
+    autoCompaction:
+      databaseFragmentationThreshold:
+        percent: 30
+        size: 1Gi
+      viewFragmentationThreshold:
+        percent: 30
+        size: 1Gi
+      parallelCompaction: false
+      timeWindow:
+        start: 02:00
+        end: 06:00
+        abortCompactionOutsideWindow: true
+      tombstonePurgeInterval: 72h
+----
+
+=== spec.cluster.autoCompaction.databaseFragmentationThreshold.percent
+
+=== spec.cluster.autoCompaction.databaseFragmentationThreshold.size
+
+=== spec.cluster.autoCompaction.viewFragmentationThreshold.percent
+
+=== spec.cluster.autoCompaction.viewFragmentationThreshold.size
+
+=== spec.cluster.autoCompaction.parallelCompaction
+
+=== spec.cluster.autoCompaction.timeWindow.start
+
+=== spec.cluster.autoCompaction.timeWindow.end
+
+=== spec.cluster.autoCompaction.timeWindow.abortCompactionOutsideWindow
+
+=== spec.cluster.autoCompaction.tombstonePurgeInterval
+
+== spec.security
+
+This object allows configuration of global Couchbase security settings and RBAC.
+
+[source,yaml]
+----
+spec:
+  security:
+    adminSecret: my-secret
+    rbac:
+      managed: true
+      selector:
+        matchLabels:
+          cluster: cb-example
+----
+
+=== spec.security.adminSecret 
+
+This field specifies the name of a Kubernetes Secret that should be used as the user name and password of the Couchbase super-user.
+
+____
+_Field rules:_ The `adminSecret` field is required and should reference the name of a https://kubernetes.io/docs/concepts/configuration/secret/[Kubernetes Secret] that already exists. The value of this field cannot be changed after the cluster is created.
+____
+
+== spec.security.rbac
+
+[source,yaml]
+----
+spec:
+  security:
+    rbac:
+      managed: true
+      selector:
+        matchLabels:
+          cluster: cb-example
+----
+
+=== spec.security.rbac.managed
+
+=== spec.security.rbac.selector
+
+== spec.networking
+
+This object allows configuration of network related options.
+These options allow you to connect to Couchbase from outside the Kubernetes cluster, and secure network traffic with transport layer security (TLS).
+
+[source,yaml]
+----
+spec:
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServices:
+    - data
+    adminConsoleServiceType: LoadBalancer
+    exposedFeatures:
+    - xdcr
+    exposedFeatureServiceType: LoadBalancer
+    exposedFeatureTrafficPolicy: Local
+    dns:
+      domain: couchbase-0.us-east-1.example.com
+    serviceAnnotations:
+      my-annotation: my-value
+    loadBalancerSourceRanges:
+    - "10.0.0.0/8"
+    tls:
+      static:
+        serverSecret: couchbase-server-tls
+        operatorSecret: couchbase-operator-tls
+      clientCertificatePolicy: mandatory
+      clientCertificatePaths:
+      - path: san.email
+        prefix: ""
+        delimiter: "@"
+----
+
+=== spec.networking.exposeAdminConsole
+
+This field specifies whether or not the Couchbase Server Web Console should be exposed externally. Exposing the web console is done using a NodePort service and the port for the service can be found in the describe output when describing this cluster. This parameter may be changed while the cluster is running and the Operator will create/destroy the NodePort service as appropriate.
+
+____
+_Field rules:_ The `exposeAdminConsole` field is not required and defaults to `false` if not specified.  If set to `true` the specification must also have the <<spec-networking-adminconsoleservices>> property defined.
+____
+
+=== spec.networking.adminConsoleServices
+
+When the Couchbase Server Web Console is exposed with the <<spec-networking-exposeadminconsole>> property, by default, opening a browser session to the Web Console will be automatically load balanced across all pods in the cluster to provide high availability. However, the Web Console will display different features based on the services that are running on the particular pod that it's connected to.
+
+This property allows the UI service to be constrained to pods running one or more specific services. The services that you specify are subtractive in nature — they will only identify pods running all of those services — so care must be used. For example, if the cluster is deployed with multi-dimensional scaling, the data service on one set of pods, and the analytics service on another mutually exclusive set, then specifying `data` and `analytics` as your Web Console services list would result in the Web Console not being accessible — no pods match all the constraints, i.e. no pods are running both the data and analytics services.
+
+If you require access to a specific pod running a specific service, this can also be achieved by using the `admin` option of the <<spec-networking-exposedfeatures>> property.  This will allow access via a node port. You must connect directly to the IP address of the node that the pod is running on. The assigned node port is available via the cluster status structure returned by `kubectl describe`, or via the output of `kubectl get services`. Refer to the xref:services.adoc[services documentation] for more information.
+
+____
+_Field rules:_ The `adminConsoleServices` list is not required and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing`, and `analytics`, and must be unique. An empty list means that any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
+____
+
+=== spec.networking.adminConsoleServiceType
+
+This field defines how the admin console service is exposed.  By default it will use a `NodePort` which exposes the console on a random port on all nodes in the cluster.  It is accessible only within the cluster or via an IP tunnel into the Kubernetes underlay network.  If set to `LoadBalancer` it will expose the default admin console port to the public internet via a load balancer on platforms which support this service type.  Only the TLS enabled port (18091) will be exposed to public networks.
+
+____
+_Field rules:_ The `adminConsoleServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
+____
+
+=== spec.networking.exposedFeatures
+
+This field specified a list of per-pod features to expose on the cluster network (as opposed to the pod network).  These define sets of ports which are required to support the specified features.  The supported values are as follows:
+
+admin::
+
+Exposes the admin API and UI
+
+xdcr::
+Exposes the ports necessary to support XDCR via L3 connectivity at the cluster network layer.
+
+client::
+Exposes all client services.  These include data, views, query, full text search, analytics.
+
+____
+_Field rules:_ The `exposedFeatures` list is optional, no feature sets are exposed to the cluster network if unset.
+____
+
+=== spec.networking.exposedFeatureServiceType
+
+This field defines how the per Couchbase node ports are exposed.  By default it will use a `NodePort` which exposes the `exposedFeatures` on random ports per service on the Kubernetes nodes running the cluster.  They are accessible only within the cluster or via an IP tunnel into the Kubernetes underlay network.  If set to `LoadBalancer` it will expose the default exposed service ports on the public internet via a load balancer on platforms which support this service type.  Only the TLS enabled ports will be exposed to public networks.
+
+____
+_Field rules:_ The `exposedFeatureServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
+____
+
+=== spec.networking.exposedFeatureTrafficPolicy
+
+This field defines how traffic ingressing into Kubernetes is handled.
+By default this is set to `Local` meaning that traffic from a public load balancer must be routed directly to the node upon which the destination `Pod` is resident.
+This enforces consistent network performance by keeping the number of hops from the edge to the pod consistent.
+Some environments may have external firewall rules in place that prevent the Operator from connecting to an externally advertised address to verify client connectivity before allowing data to reside on that node.
+This field may be set to `Cluster` to work around this issue, masquerading connectivity checks as normal node-to-node Kubernetes traffic, but at the expense of inconsistent network paths.
+
+____
+_Field rules:_ The `exposedFeatureTrafficPolicy` field is optional and defaults to `Local`.  Allowed values are `Local` and `Cluster`.
+____
+
+=== spec.networking.serviceAnnotations
+
+This field defines any custom annotations to be added to console and per-pod (exposed feature) services.
+
+____
+_Field rules:_ The serviceAnnotations field is optional.  If specified it must be a map of key/value pairs conforming to Kubernetes annotation rules.
+____
+
+== spec.networking.dns
 
 This section describes the configuration of the dynamic domain name system [DDNS].  When exposing services to the public internet we mandate that TLS is used to protect against plain text user names, passwords and data.  DDNS is used to dynamically populate the DNS with Couchbase nodes during the cluster lifecycle so they are addressable with stable names.
 
@@ -429,7 +661,7 @@ spec:
     domain: couchbase-0.us-east-1.example.com
 ----
 
-=== domain
+=== spec.networking.dns.domain
 
 This field defines the DNS A records that should be dynamically added to the public DNS for console and per-pod services.  It must be a valid domain name which you have ownership of and the ability to dynamically update as services are created, updated and deleted by the Operator.
 
@@ -437,231 +669,78 @@ ____
 _Field rules:_ The `domain` field is required when either the `exposedFeatureServiceType` or `adminConsoleServiceType` fields are configured as _LoadBalancer_.
 ____
 
-== spec.cluster
+== spec.networking.tls
 
-This section describes the various Couchbase cluster settings. This section is not meant to encompass every setting that is configurable on Couchbase. Cluster settings not mentioned here can be managed manually.
-
-[source,yaml]
-----
-spec:
-  cluster:
-    dataServiceMemoryQuota: 4096
-    indexServiceMemoryQuota: 1024
-    searchServiceMemoryQuota: 2048
-    eventingServiceMemoryQuota: 256
-    analyticsServiceMemoryQuota: 1024
-    indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 120
-    autoFailoverMaxCount: 3
-    autoFailoverOnDataDiskIssues: true
-    autoFailoverOnDataDiskIssuesTimePeriod: 120
-    autoFailoverServerGroup: false
-----
-
-=== dataServiceMemoryQuota
-
-The amount of memory to assign to the data service if it is present on a specific Couchbase node. The amount of memory is defined in Megabytes (MB).
-
-____
-_Field rules:_ The `dataServiceMemoryQuota` field is required and must be set to be greater than or equal to 256. Keep in mind that the sum of all memory quotas must be no more than 80% of a pod's available memory.
-____
-
-=== indexServiceMemoryQuota
-
-The amount of memory to assign to the index service if it is present on a specific Couchbase node. The amount of memory is defined in Megabytes (MB).
-
-____
-_Field rules:_ The `indexServiceMemoryQuota` field is required and must be set to be greater than or equal to 256. Keep in mind that the sum of all memory quotas must be no more than 80% of a pod's available memory.
-____
-
-=== searchServiceMemoryQuota
-
-The amount of memory to assign to the search service if it is present on a specific Couchbase node. The amount of memory is defined in Megabytes (MB). This parameter defaults to 256 MB if it is not set.
-
-____
-_Field rules:_ The `searchServiceMemoryQuota` field is required and must be set to be greater than or equal to 256. Keep in mind that the sum of all memory quotas must be no more than 80% of a pod's available memory.
-____
-
-=== eventingServiceMemoryQuota
-
-The amount of memory to assign to the eventing service if present on a specific Couchbase node in Mi.
-
-____
-_Field rules:_ The `eventingServiceMemoryQuota` field is required and must be set to be greater than or equal to 256. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
-____
-
-=== analyticsServiceMemoryQuota
-
-The amount of memory to assign to the analytics service if present on a specific Couchbase node in Mi.
-
-____
-_Field rules:_ The `analyticsServiceMemoryQuota` field is required and must be set to be greater than or equal to 1024. Keep in mind that the sum of all memory quotas must be no more than 80% of a pods available memory.
-____
-
-=== indexStorageSetting
-
-Specifies the backend storage type to use for the index service. If the cluster already contains a Couchbase Server instance running the index service, then this parameter cannot be changed until all Couchbase instances running the index service are removed.
-
-____
-_Field rules:_ The `indexStorageSetting` is optional and defaults to `memory_optimized`. Values allowed are `plasma` or `memory_optimized`. After the Couchbase cluster is deployed, the value of this field can only be changed if there are no Index nodes in the cluster.
-____
-
-=== autoFailoverTimeout
-
-Specifies the auto-failover timeout in seconds. The Operator relies on the CouchbaseCluster to auto-failover nodes before removing them, so setting this field to an appropriate value is important.
-
-____
-_Field rules:_ The `autoFailoverTimeout` is required and must be in the range 5-3600
-____
-
-=== autoFailoverMaxCount
-
-Specifies the maximum number of failover events we can tolerate before manual intervention is required.  If a bucket as 2 replicas we can tolerate 2 pods failing over.  Applies to entire server groups also.
-
-____
-_Field rules:_ The `autoFailoverMaxCount` is required and must be in the range 1-3
-____
-
-=== autoFailoverOnDataDiskIssues
-
-Specifies whether a node will automatically fail over on data disk issues.
-
-____
-_Field rules:_ The `autoFailoverOnDataDiskIssues` is required and must be `true` or `false`.
-____
-
-=== autoFailoverOnDataDiskIssuesTimePeriod
-
-Specifies the time period to wait before automatically failing over a node experiencing data disk issues.  This field's units are in seconds.
-
-____
-_Field rules:_ The `autoFailoverOnDataDiskIssuesTimePeriod` is only required if `autoFailoverOnDataDiskIssues` is also set to `true`.  Must be in the range 5-3600
-____
-
-=== autoFailoverServerGroup
-
-Specifies whether the cluster will automatically failover an entire server group.
-
-____
-_Field rules:_ The `autoFailoverServerGroup` is optional, defaulting to false.
-____
-
-== spec.buckets
-
-This section describes one or more buckets that must be created in the cluster.
-
-NOTE: If you remove an already specified bucket from the configuration, the Operator will delete that bucket from the cluster.
+This field is optional and controls whether the Operator uses TLS for communication with the cluster. It also sets the TLS certificates that are used by Couchbase clients and XDCR. Refer to the xref:tls.adoc[TLS documentation] for more information.
 
 [source,yaml]
 ----
 spec:
-  buckets:
-    - name: default
-      type: couchbase
-      memoryQuota: 1024
-      replicas: 1
-      ioPriority: high
-      evictionPolicy: valueOnly
-      conflictResolution: seqno
-      enableFlush: true
-      enableIndexReplica: false
-      compressionMode: passive
+  networking:
+    tls:
+      static:
+        serverSecret: couchbase-server-tls
+        operatorSecret: couchbase-operator-tls
+      clientCertificatePolicy: mandatory
+      clientCertificatePaths:
+      - path: san.email
+        prefix: ""
+        delimiter: "@"
 ----
 
-=== name
+=== spec.networking.tls.static.serverSecret
 
-This field specifies the name of the bucket. This parameter is required when specifying a bucket.
+=== spec.networking.tls.static.operatorSecret
 
-____
-_Field rules:_ The `name` is required and must be a string using characters and numbers. The value of this field cannot be changed after the bucket is created.
-____
+=== spec.networking.tls.clientCertificatePolicy
 
-=== type
+=== spec.networking.tls.clientCertificatePaths[]
 
-This field specifies the type of bucket to create. This parameter can be set to `couchbase`, `ephemeral`, or `memcached`. If the type is not specified, it defaults to `couchbase`.
+=== spec.networking.tls.clientCertificatePaths[].path
 
-____
-_Field rules:_ The `type` is required and must be set to either `couchbase`, `ephemeral`, or `memcached`. The value of this field cannot be changed after the bucket is created.
-____
+=== spec.networking.tls.clientCertificatePaths[].prefix
 
-=== memoryQuota
+=== spec.networking.tls.clientCertificatePaths[].delimiter
 
-This field specifies the amount of memory to allocate to this bucket in Megabytes (MB). If the quota is not specified, it defaults to 100.
+== spec.logging
 
-____
-_Field rules:_ The `memoryQuota` is required and must be set to greater than or equal to 100.
-____
+This object allows configuration of Operator logging functionality.
+This ensures any persistent logs do not consume excessive amounts of resource or persist for too long.
 
-=== replicas
+[source,yaml]
+----
+spec:
+  logging:
+    logRetentionTime: 604800s
+    logRetentionCount: 20
+----
 
-This field specifies the number of replicas that should be created for this bucket. This value may be set between 0 and 3 inclusive. If the number is not set, it defaults to 1. Note that this parameter has no effect for the memcached bucket type.
+=== spec.logging.logRetentionTime
 
-____
-_Field rules:_ The `replicas` field is required for buckets with type `couchbase` and `ephemeral` and must be set between 0 and 3. Memcached buckets will ignore values in this field. Changing the value of this field will cause a rebalance to occur.
-____
+This field is used in conjunction with the `logs` persistent volume mount.  The value can be anything that can be parsed by the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration] function.  If specified this controls the retention period that log volumes are kept for after their associated pods have been deleted.  If not specified (the default) or zero e.g. 0s, log volumes are retained indefinitely.
 
-=== ioPriority
-
-This field sets the IO priority of background threads for this bucket. This option is valid for Couchbase and Ephemeral buckets only. Memcached buckets will ignore values in this field.
+It is recommended to specify this field when using ephemeral server classes so that potentially sensitive information is not retained indefinitely.  This allows compliance with data privacy legislation.
 
 ____
-_Field rules:_ The `ioPriority` is required for buckets with type `couchbase` and `ephemeral` and must be set to either `high` or `low`. Memcached buckets will ignore values in this field. Changing the value of this field will cause downtime while the bucket is restarted.
+_Field rules:_ The `logRetentionTime` field is optional and defaults to `""`.  If specified it must contain a decimal number and a unit suffix such as `s`, `m` or `h`.  The decimal number cannot be negative.
 ____
 
-=== evictionPolicy
+=== spec.logging.logRetentionCount
 
-This field sets the memory-cache eviction policy for this bucket. This option is valid for Couchbase and Ephemeral buckets only.
+This field is used in conjunction with the `logs` persistent volume mount.  If specified this controls the maximum number of log volumes that can be kept after their associated pods have been deleted.  If this threshold is passed, log volumes are deleted starting with the oldest first.  If not specified or zero, log volumes are retained indefinitely.
 
-Couchbase buckets support either `valueOnly` or `fullEviction`. Specifying the `valueOnly` policy means that each key stored in this bucket must be kept in memory. This is the default policy; using this policy improves the performance of key-value operations, but limits the maximum size of the bucket. Specifying the `fullEviction` policy means that the performance is impacted for key-value operations, but the maximum size of the bucket is unbounded.
-
-Ephemeral buckets support either `noEviction` or `nruEviction`.
-Specifying `noEviction` means that the bucket will not evict items from the cache if the cache is full. This type of eviction policy should be used for in-memory database use cases.
-
-Specifying `nruEviction` means that items not recently used will be evicted from memory when all the memory in the bucket is used. This type of eviction policy should be used for caching use cases.
+It is recommended to specify this field when using ephemeral server classes so an unlimited number of persistent volumes cannot be created.  This ensures storage quotas are not exhausted or significant costs are incurred.
 
 ____
-_Field rules:_ The `evictionPolicy` is required for buckets with type `couchbase` and `ephemeral`. Memcached buckets will ignore values in this field. Changing the value of this field will cause downtime while the bucket is restarted.
-____
-
-=== conflictResolution
-
-This field specifies the bucket's conflict resolution mechanism which is to be used if a conflict occurs during cross-datacenter replication (XDCR). There are two supported mechanisms: sequence-based and timestamp-based.
-
-The sequence-based conflict resolution mechanism selects the document that has been updated the greatest number of times since the last sync. For example, if one cluster has updated a document twice since the last sync, and the other cluster has updated the document three times, the document updated three times is selected regardless of the specific times at which these updates took place.
-
-The timestamp-based conflict resolution mechanism selects the document with the most recent timestamp. This is only supported when all of the clocks on all of the nodes are fully synchronized.
-
-____
-_Field rules:_ The `conflictResolution` field is required for buckets with type `couchbase` and `ephemeral` and can be set to either `seqno` or `lww`. Memcached buckets will ignore values in this field. The value of this field cannot be changed after the bucket has been created.
-____
-
-=== enableFlush
-
-This field specifies whether or not to enable the flush command on this bucket. This parameter defaults to `false` if it is not specified. This parameter only affects Couchbase and Ephemeral buckets.
-
-____
-_Field rules:_ The `enableFlush` field can be set to either `true` or `false`. If this parameter is not specified, it defaults to `false`.
-____
-
-=== enableIndexReplica
-
-This field specifies whether or not to enable view index replicas for this bucket. This parameter defaults to `false` if it is not specified. This parameter only affects Couchbase buckets.
-
-____
-_Field rules:_ The `enableIndexReplica` field is required for buckets with type `couchbase` and can be set to either `true` or `false`. Memcached and Ephemeral buckets will ignore values in this field.
-____
-
-=== compressionMode
-
-This field sets the compression mode for the specified bucket.
-
-____
-_Field rules:_ The `compressionMode` field is optional for buckets with type `couchbase` and `ephemeral` can be set to either `off`, `passive` or `active`.  If omitted it will default to `passive`.
+_Field rules:_ The `logRetentionCount` field is optional and defaults to `0`.  The value must be any non-negative integer.
 ____
 
 == spec.servers
 
-You must specify at least one - but possibly multiple - node specifications. A node specification is used to allow multi-dimensional scaling of a Couchbase cluster with Kubernetes.
+This object allows the configuration of the Couchbase cluster topology.
+Servers are grouped in to server classes also known as mutli-dimensional scaling (MDS) groups.
+You must specify at least one server class.
+At least one server class must contain the `data` service.
 
 [source,yaml]
 ----
@@ -670,21 +749,27 @@ spec:
   - size: 1
     name: all_services
     services:
-      - data
-      - index
-      - query
-      - search
-      - eventing
-      - analytics
+    - data
+    - index
+    - query
+    - search
+    - eventing
+    - analytics
     serverGroups:
-      - us-east-1a
+    - us-east-1a
     pod:
-      couchbaseEnv:
-        - name: CB_ENV_VAR
-          value: value
+      labels:
+        couchbase_services: all
+      annotations:
+        couchbase.acme.com: production
+      nodeSelector:
+        instanceType: large
+      env:
+      - name: ENV1
+        value: value
       envFrom:
         - secretRef:
-            name: environment-secret
+          name: environment-secret
       resources:
         limits:
           cpu: 4
@@ -692,24 +777,25 @@ spec:
         requests:
           cpu: 2
           memory: 8Gi
-      labels:
-        couchbase_services: all
-      annotations:
-        couchbase.acme.com: production
-      nodeSelector:
-        instanceType: large
       tolerations:
-        - key: app
-          operator: Equal
-          value: cbapp
-          effect: NoSchedule
+      - key: app
+        operator: Equal
+        value: cbapp
+        effect: NoSchedule
+      automountServiceAccountToken: false
+      serviceAccountName: couchbase-pods
       imagePullSecrets:
-        - name: my-pull-secret
+      - name: my-pull-secret
+      volumeMounts:
+        default: couchbase
+        data:  couchbase
+        index: couchbase
+        analytics:
+        - couchbase
+        - couchbase
 ----
 
-_Specification rules:_ The `servers` portion of the specification is required and must always contain at least one server definition. There must also be at least one definition that contains the data service.
-
-=== size
+=== spec.servers[].size
 
 This field specifies the number of nodes of this type that should be in the cluster. This allows the user to scale up different parts of the cluster as necessary. If this parameter is changed at runtime, the Operator will xref:scaling-couchbase.adoc[automatically scale the cluster].
 
@@ -717,7 +803,7 @@ ____
 _Field rules:_ The `size` is required and can be set to greater than or equal to 1.
 ____
 
-=== name
+=== spec.servers[].name
 
 This field specifies a name for this group of servers.
 
@@ -725,7 +811,7 @@ ____
 _Field rules:_ The `name` field is required and must be unique in comparison to the `name` field of other server definitions. The value of this field cannot be changed after a server has been defined.
 ____
 
-=== services
+=== spec.servers[].services
 
 This field specifies a list of services that should be run on nodes of this type. Users can specify `data`, `index`, `query`, `search`, `eventing` and `analytics` in the list. At least one service must be specified and all clusters must contain at least one node specification that includes the data service.
 
@@ -733,25 +819,29 @@ ____
 _Field rules:_ The `services` list is required and must contain at least one service. Valid values for services are `data`, `index`, `query`, `search`, `eventing` and `analytics`. The values of this list cannot be changed after a server has been defined.
 ____
 
-=== serverGroups
+=== spec.servers[].serverGroups
 
-This controls the set of server groups to schedule pods in.  Functionality is identical to that defined in the top level specification, but overrides it and allows the end user to specify exactly where pods of individual server/service configuration are scheduled.  See the <<servergroups_main,main documentation>> for details.
+This controls the set of server groups to schedule pods in.  Functionality is identical to that defined in the top level specification, but overrides it and allows the end user to specify exactly where pods of individual server/service configuration are scheduled.  See the <<spec-servergroups,main documentation>> for details.
 
-== spec.servers.pod
-
-The pod policy defines settings that apply to all pods deployed with this node configuration. A pod always contains a single running instance of Couchbase Server.
+== spec.servers[].pod
 
 [source,yaml]
 ----
 spec:
   servers:
   - pod:
-      couchbaseEnv:
-        - name: CB_ENV_VAR
-          value: value
+      labels:
+        couchbase_services: all
+      annotations:
+        couchbase.acme.com: production
+      nodeSelector:
+        instanceType: large
+      env:
+      - name: ENV1
+        value: value
       envFrom:
         - secretRef:
-            name: environment-secret
+          name: environment-secret
       resources:
         limits:
           cpu: 4
@@ -759,29 +849,25 @@ spec:
         requests:
           cpu: 2
           memory: 8Gi
-      labels:
-        couchbase_services: all
-      annotations:
-        couchbase.acme.com: production
-      nodeSelector:
-        instanceType: large
       tolerations:
-        - key: app
-          operator: Equal
-          value: cbapp
-          effect: NoSchedule
+      - key: app
+        operator: Equal
+        value: cbapp
+        effect: NoSchedule
+      automountServiceAccountToken: false
+      serviceAccountName: couchbase-pods
       imagePullSecrets:
-        - name: my-pull-secret
+      - name: my-pull-secret
       volumeMounts:
         default: couchbase
         data:  couchbase
         index: couchbase
         analytics:
-          - couchbase
-          - couchbase
+        - couchbase
+        - couchbase
 ----
 
-=== couchbaseEnv
+=== spec.servers[].pod.env
 
 This field specifies the environment variables (as key-values pairs) that should be set when the pod is started. This section is optional.
 
@@ -789,7 +875,7 @@ ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
 ____
 
-=== envFrom
+=== spec.servers[].pod.envFrom
 
 This field specifies a reference to either a `Secret` or `ConfigMap` which is used to create environment variables when the pod is started.
 
@@ -797,7 +883,7 @@ ____
 _Field rules:_ The value of this field must be an array of Kubernetes `EnvFromSource` types.  This field is optional and immutable.
 ____
 
-=== resources
+=== spec.servers[].pod.resources
 
 [source,yaml]
 ----
@@ -821,7 +907,7 @@ This field lets you reserve resources on a specific node. The requests section d
 
 TIP: In general, CPU limits are specified as the number of threads required on physical hardware (vCPUs if in the cloud), and memory is specified in bytes. Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
 
-=== labels
+=== spec.servers[].pod.labels
 
 Labels are key-value pairs that are attached to objects in Kubernetes. They are intended to specify identifying attributes of objects that are meaningful to the user and do not directly imply semantics to the core system. Labels can be used to organize and select subsets of objects. They do not need to be unique across multiple objects. This section is optional.
 
@@ -842,7 +928,7 @@ ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
 ____
 
-=== annotations
+=== spec.servers[].pod.annotations
 
 Annotations are similar to labels but cannot be used for resource selection.  User supplied annotations should not use the `couchbase.com` key namespace.
 
@@ -852,7 +938,7 @@ ____
 _Field rules:_ The value of this field must be a map of key value pairs.  This field is optional and immutable.
 ____
 
-=== nodeSelector
+=== spec.servers[].pod.nodeSelector
 
 This field specifies a key-value map of the constraints on node placement for pods. For a pod to be eligible to run on a node, the node must have each of the indicated key-value pairs as labels (it can have additional labels as well). If this section is not specified, then Kubernetes will place the pod on any available node. For more information, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors[label selectors].
 
@@ -860,7 +946,7 @@ ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
 ____
 
-=== tolerations
+=== spec.servers[].pod.tolerations
 
 This field specifies conditions -- that usually prevent pod scheduling or execution -- that should be tolerated when scheduling a pod.
 From the sample configuration file referenced in this topic, any node with a taint `app=cbapp:NoSchedule` would not usually allow the scheduler to start running any new pods upon it.
@@ -873,7 +959,7 @@ ____
 _Field rules:_ The value of this field cannot be changed after a server has been defined.
 ____
 
-=== imagePullSecrets
+=== spec.servers[].pod.imagePullSecrets
 
 This field specifies a list of secrets that can be used to authorize Couchbase server containers to be pulled from a private docker registry.
 
@@ -881,7 +967,11 @@ ____
 _Field rules:_ The value of this field is optional.  If specified it must be a list of objects mapping `name` to an existing pull `secret` resource.
 ____
 
-== spec.servers.pod.volumeMounts
+=== spec.servers[].pod.automountServiceAccountToken
+
+=== spec.servers[].pod.serviceAccountName
+
+== spec.servers[].pod.volumeMounts
 
 [source,yaml]
 ----
@@ -899,7 +989,7 @@ spec:
 
 The `VolumeMounts` configuration specifies the claims to use for the storage that is used by the Couchbase Server cluster.
 
-=== default
+=== spec.servers[].pod.volumeMounts.default
 
 This field is required when using persistent volumes. The value specifies the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `default` path. This is always `/opt/couchbase/var/lib/couchbase`. The claim must match the name of a `volumeClaimTemplate` within the spec.
 
@@ -907,7 +997,7 @@ ____
 _Field rules:_ The `default` volume mount may be specified for production clusters or those that require support.  Please consult xref:best-practices.adoc#storage[the best practices guide] for more information. It must be specified with server classes running any of the `data`, `index` or `analytics` services.  It may however, be used with any service.  It cannot be specified at the same time as the `logs` volume mount for a specific server configuration.
 ____
 
-=== data
+=== spec.servers[].pod.volumeMounts.data
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `data` path. When specified, the data path will be `/mnt/data`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
@@ -915,7 +1005,7 @@ ____
 _Field rules:_ The `data` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `data` service.
 ____
 
-=== index
+=== spec.servers[].pod.volumeMounts.index
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `index` path. When specified, the index path will be `/mnt/index`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
@@ -923,13 +1013,13 @@ ____
 _Field rules:_ The `index` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `index` service.
 ____
 
-=== analytics
+=== spec.servers[].pod.volumeMounts.analytics
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `analytics` paths. When specified, the analytics paths will be `/mnt/analytics-00` (where `00` denotes the first path), with all subsequent paths having incrementing values. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
 _Field rules:_ The `analytics` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `analytics` service.
 
-=== logs
+=== spec.servers[].pod.volumeMounts.logs
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `logs` path.  When specified, the logs path will be `/opt/couchbase/var/lib/couchbase/logs`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created.
 
@@ -937,7 +1027,69 @@ ____
 _Field rules:_ The `logs` volume mount may be specified for production clusters that require support. Please consult xref:best-practices.adoc#storage[the best practices guide] for more information.  It may only be specified with server classes not running any of the `data`, `index` or `analytics` services.  It cannot be specified at the same time as the `default` volume mount a specific server configuration.
 ____
 
-== spec.volumeClaimTemplates
+== spec.buckets
+
+This object defines whether to manage buckets and how to select which bucket resources to use.
+
+[source,yaml]
+----
+spec:
+  buckets:
+    managed: true
+    selector:
+      matchLabels:
+        cluster: cb-example
+----
+
+=== spec.buckets.managed
+
+=== spec.buckets.selector
+
+== spec.xdcr
+
+This object defines whether to manage XDCR, any remote clusters and replications to them.
+
+[source,yaml]
+----
+spec:
+  xdcr:
+    managed: true
+    remoteClusters:
+    - name: remote
+      uuid: 611e50b21e333a56e3d6d3570309d7e3
+      hostname: 10.1.0.2:31851
+      authenticationSecret: my-xdcr-secret
+      tls:
+        secret: my-xdcr-tls-secret
+      replications:
+        selector:
+          matchLabels:
+            cluster: cb-example
+----
+
+=== spec.xdcr.managed
+
+=== spec.xdcr.remoteClusters[]
+
+=== spec.xdcr.remoteClusters[].name
+
+=== spec.xdcr.remoteClusters[].uuid
+
+=== spec.xdcr.remoteClusters[].hostname
+
+=== spec.xdcr.remoteClusters[].authenticationSecret
+
+=== spec.xdcr.remoteClusters[].tls.secret
+
+=== spec.xdcr.remoteClusters[].replications[]
+
+=== spec.xdcr.remoteClusters[].replications[].selector
+
+== spec.volumeClaimTemplates[]
+
+This list defines templates of persistent volume claims.
+At runtime, the Operator will create a persistent volume from these templates for each pod referencing them.
+Claims can request volumes from various types of storage systems as identified by the storage class name.
 
 [source,yaml]
 ----
@@ -952,22 +1104,16 @@ spec:
             storage: 1Gi
 ----
 
-Defines a template of a persistent volume claim. At runtime, the Operator will create a persistent volume from this template for each pod. Claims can request volumes from various types of storage systems as identified by the storage class name.
-
-== spec.volumeClaimTemplates.metadata
-
-=== name
+=== spec.volumeClaimTemplates[].metadata.name
 
 The metadata name identifies the claim template. This name is used by the `volumeMounts` to reference which template to fulfill the mount request.
 
-== spec.volumeClaimTemplates.spec
-
-=== storageClassName
+=== spec.volumeClaimTemplates[].spec.storageClassName
 
 The `storageClassName` is optional for a claim. A `storageClassName` provides a way for administrators to describe the classes of storage they offer. If no `storageClassName` is specified, then the default storage class is used.
 
 Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/storage/storage-classes/[storage classes].
 
-=== resources
+=== spec.volumeClaimTemplates[].spec.resources
 
 The minimum resources the volume should have. Only the storage requests are valid in this context.

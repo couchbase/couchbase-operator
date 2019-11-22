@@ -1,0 +1,137 @@
+= About the CouchbaseReplication Resource
+
+:toc: macro
+
+The Couchbase Autonomous Operator operates on `CouchbaseCluster` objects.
+XDCR replications are decoupled from this configuration and are selected for inclusion within a cluster with configurable label selectors.
+
+The following YAML shows all possible fields that may be configured for a `CouchbaseReplication`.
+This configuration may not be valid and is only for illustrative purposes.
+
+.All available CouchbaseReplication configuration parameters
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: my-replication
+  labels:
+    cluster: my-cluster
+spec:
+  bucket: local-bucket-name
+  remoteBucket: remote-bucket-name
+  compressionType: Snappy
+  filterExpression: ""
+  paused: false
+----
+
+toc::[]
+
+== Top-Level Definitions
+
+The following are relevant generic parameters that can be defined:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: my-bucket
+  labels:
+    cluster: my-cluster
+----
+
+=== apiVersion
+
+The apiVersion defines which version of the resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `couchbase.com/v2`
+____
+
+=== kind
+
+The kind defines the type of resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `CouchbaseBucket`
+____
+
+=== metadata.name
+
+The metadata name defines the name of the resource.
+The name must be unique for the kind defined.
+Furthermore the name must be unique for all bucket kinds defined and used by the cluster.
+For example you cannot have a `CouchbaseBucket` named "default" and a CouchbaseEphemeralBucket also named "default".
+
+____
+_Field rules:_ This field is required and must be unique as described above.
+____
+
+=== metadata.labels
+
+The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+Further details about resource selection can be found on the xref:couchbase-resource-rbac.adoc[Couchbase Resources and RBAC page].
+
+____
+_Field rules:_ This field is optional and must be a map of string key/value pairs.
+____
+
+== spec
+
+The following are parameters that may be set on the replication:
+
+[source,yaml]
+----
+spec:
+  bucket: local-bucket-name
+  remoteBucket: remote-bucket-name
+  compressionType: Snappy
+  filterExpression: ""
+  paused: false
+----
+
+=== spec.bucket
+
+This field specifies the local bucket to replicate from.
+A `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource of the same name must exist on a related `CouchbaseCluster` instance.
+
+____
+_Field rules:_ This field is required and must be a bucket name string.
+____
+
+=== spec.remoteBucket
+
+This field specifies the remote bucket to replicate to.
+A `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource of the same name must exist on a related `CouchbaseCluster` instance.
+
+____
+_Field rules:_ This field is required and must be a bucket name string.
+____
+
+=== spec.compressionType
+
+This field specifies the compression type to use when replicating data.
+This field will default to `Auto` if not specified.
+
+____
+_Field rules:_ This field is optional and must be either `None`, `Auto` or `Snappy`.
+____
+
+=== spec.filterExpression
+
+This field controls what documents are replicated to the remote cluster.
+Further information can be read in the https://docs.couchbase.com/server/6.0/manage/manage-xdcr/create-xdcr-replication.html#xdcr-advanced-filtering-pointer[Couchbase Server XDCR^] documentation.
+
+____
+_Field rules:_ This field is optional and must be a string.
+____
+
+=== spec.paused
+
+This field controls whether a replication is paused or not.
+This field defaults to `false` if not specified.
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____

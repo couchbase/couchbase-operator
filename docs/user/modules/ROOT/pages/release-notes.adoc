@@ -78,10 +78,10 @@ This release further fortifies the previously released 1.2.x series with bug fix
 
 | https://issues.couchbase.com/browse/K8S-965[K8S-965]
 | The Operator now uses the default Storage Class of the Kubernetes cluster if none is specified in the CouchbaseCluster configuration.
-In previous releases, you were required to specify xref:couchbase-cluster-config.adoc#storageclassname[`spec.volumeClaimTemplates.storageClassName`] even if a default Storage Class was defined in your Kubernetes cluster.
+In previous releases, you were required to specify xref:couchbase-cluster-config.adoc#spec-volumeclaimtemplates-spec-storageclassname[`spec.volumeClaimTemplates.storageClassName`] even if a default Storage Class was defined in your Kubernetes cluster.
 
 | https://issues.couchbase.com/browse/K8S-1017[K8S-1017]
-| Specifying `client` for the xref:couchbase-cluster-config.adoc#exposedfeatures[`exposedFeatures`] property in the CouchbaseCluster configuration now exposes the Couchbase admin ports, including 8091.
+| Specifying `client` for the xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatures[`exposedFeatures`] property in the CouchbaseCluster configuration now exposes the Couchbase admin ports, including 8091.
 In previous releases, you would need to specify both `client` and `admin` to ensure proper communication with the Couchbase SDK, or for performing administration tasks like creating buckets or users via an application.
 |===
 

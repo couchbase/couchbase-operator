@@ -1,0 +1,130 @@
+= About the CouchbaseRoleBinding Resource
+
+:toc: macro
+
+The Couchbase Autonomous Operator operates on `CouchbaseCluster` objects.
+Role bindings are decoupled from this configuration and are selected for inclusion within a cluster with configurable label selectors.
+
+`CouchbaseRoleBinding` resources are analogous to Kubernetes `RoleBinding` resources.
+
+The following YAML shows all possible fields that may be configured for a `CouchbaseRoleBinding`.
+This configuration may not be valid and is only for illustrative purposes.
+
+.All available CouchbaseRoleBinding configuration parameters
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: my-role-binding
+  labels:
+    cluster: my-cluster
+spec:
+  subjects:
+  - kind: CouchbaseUser
+    name: my-user
+  roleRef:
+    kind: CouchbaseRole
+    name: my-role
+----
+
+toc::[]
+
+== Top-Level Definitions
+
+The following are relevant generic parameters that can be defined:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: my-bucket
+  labels:
+    cluster: my-cluster
+----
+
+=== apiVersion
+
+The apiVersion defines which version of the resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `couchbase.com/v2`
+____
+
+=== kind
+
+The kind defines the type of resource this configuration refers to.
+
+____
+_Field rules:_ This field is required and must be set to `CouchbaseRoleBinding`
+____
+
+=== metadata.name
+
+The metadata name defines the name of the resource.
+The name must be unique for the kind defined.
+
+____
+_Field rules:_ This field is required and must be unique as described above.
+____
+
+=== metadata.labels
+
+The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+Further details about resource selection can be found on the xref:couchbase-resource-rbac.adoc[Couchbase Resources and RBAC page].
+
+____
+_Field rules:_ This field is optional and must be a map of string key/value pairs.
+____
+
+== spec
+
+The following are parameters that may be set on the rolebinding:
+
+[source,yaml]
+----
+spec:
+  subjects:
+  - kind: CouchbaseUser
+    name: my-user
+  roleRef:
+    kind: CouchbaseRole
+    name: my-role
+----
+
+=== spec.subjects[]
+
+This field is a list of subjects to a apply role to.
+
+=== spec.subjects[].kind
+
+This defines the the type of resource to apply the role to.
+
+____
+_Field rules:_ This field is required and must be either `CouchbaseUser` or `CouchbaseGroup`.
+____
+
+=== spec.subjects[].name
+
+This defines the the name of the resource to apply the role to.
+
+____
+_Field rules:_ This field is required and must be the name of an existing `CouchbaseUser` or `CouchbaseGroup`.
+____
+
+=== spec.roleRef.kind
+
+This field defines the type of resource to extract the roles from.
+
+____
+_Field rules:_ This field is required and must be `CouchbaseRole`.
+____
+
+=== spec.roleRef.name
+
+This defines the the name of the resource to extract the roles from.
+
+____
+_Field rules:_ This field is required and must be the name of an existing `CouchbaseRole`.
+____

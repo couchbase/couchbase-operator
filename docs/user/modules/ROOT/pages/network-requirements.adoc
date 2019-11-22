@@ -9,8 +9,8 @@ For more detailed documentation, please consult the xref:networking.adoc[network
 
 In general:
 
-* Diagrams depicting Couchbase nodes being advertised with IP addresses or non-default port numbers (3xxxx) require the xref:couchbase-cluster-config.adoc#exposedfeatures[exposed features] configuration parameter to be specified.
-* Diagrams depicting Couchbase nodes being advertised with non-default DNS addresses require the xref:couchbase-cluster-config.adoc#spec-dns[DNS] configuration parameter to be specified.
+* Diagrams depicting Couchbase nodes being advertised with IP addresses or non-default port numbers (3xxxx) require the xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatures[exposed features] configuration parameter to be specified.
+* Diagrams depicting Couchbase nodes being advertised with non-default DNS addresses require the xref:couchbase-cluster-config.adoc#spec-networking-dns[DNS] configuration parameter to be specified.
 
 == In-cluster Networking
 
