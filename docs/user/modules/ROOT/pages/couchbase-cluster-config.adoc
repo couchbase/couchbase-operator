@@ -446,8 +446,13 @@ ____
 == spec.cluster.autoCompaction
 
 This object allows configuration of global Couchbase auto-comapaction settings.
-Auto compaction occurs automatically by default.
+
+It is far more efficient to append database updates to files rather than rewriting them.
+This gives rise to stale data within the database file.
+This is known as fragmentation.
+
 Auto compaction is required periodically to reclaim disk space caused by fragmentation.
+Auto compaction occurs automatically by default in Couchbase Server.
 
 [source,yaml]
 ----
@@ -470,21 +475,103 @@ spec:
 
 === spec.cluster.autoCompaction.databaseFragmentationThreshold.percent
 
+This field defines the relative amount of fragmentation allowed in persistent database files before triggering compaction.
+This field defaults to `30`.
+
+____
+_Field rules:_ This field is optional and must be an integer in the range 2-100.
+____
+
 === spec.cluster.autoCompaction.databaseFragmentationThreshold.size
+
+This field defines the absolute amount of fragmentation allowed in persistent database files before triggering compaction.
+This field is not set by default.
+
+____
+_Field rules:_ This field is optional and must be a Kubernetes https://godoc.org/k8s.io/apimachinery/pkg/api/resource#Quantity[resource quantity^].
+____
 
 === spec.cluster.autoCompaction.viewFragmentationThreshold.percent
 
+This field defines the relative amount of fragmentation allowed in persistent view files before triggering compaction.
+
+This field defaults to `30`.
+
+____
+_Field rules:_ This field is optional and must be an integer in the range 2-100.
+____
+
 === spec.cluster.autoCompaction.viewFragmentationThreshold.size
+
+This field defines the absolute amount of fragmentation allowed in persistent view files before triggering compaction.
+This field is not set by default.
+
+____
+_Field rules:_ This field is optional and must be a Kubernetes https://godoc.org/k8s.io/apimachinery/pkg/api/resource#Quantity[resource quantity^].
+____
 
 === spec.cluster.autoCompaction.parallelCompaction
 
+This field defines wether auto-compaction should be performed in parallel.
+
+Setting this field to `true` will potentially yield shorter compaction times.
+This comes at the expense of far greater disk IO that may compete with normal database operation.
+This field should only be used on storage capable of handling the greater IO requirements e.g. solid state.
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____
+
 === spec.cluster.autoCompaction.timeWindow.start
+
+This field defines when an auto-compaction may start to run.
+
+Auto compaction comes with a cost associated with disk IO.
+It may be undesirable for it to run during core business hours as it competes with normal database operation.
+This field allows auto-compaction to be limited to a specific time window when fewer resources are required by normal database operation.
+This field is not set by default.
+
+____
+_Field rules:_ This field is optional and must be a string in the form `HH:MM` where HH is in the range 0-23 and MM is in the range 0-59.
+____
 
 === spec.cluster.autoCompaction.timeWindow.end
 
+This field defines when an auto-compaction may run until.
+
+Auto compaction comes with a cost associated with disk IO.
+It may be undesirable for it to run during core business hours as it competes with normal database operation.
+This field allows auto-compaction to be limited to a specific time window when fewer resources are required by normal database operation.
+This field is not set by default.
+
+____
+_Field rules:_ This field is optional and must be a string in the form `HH:MM` where HH is in the range 0-23 and MM is in the range 0-59.
+____
+
 === spec.cluster.autoCompaction.timeWindow.abortCompactionOutsideWindow
 
+This field defines whether to stop auto-compaction after the time window end.
+
+By default an auto-compaction will run until completion.
+In some situations it may be desirable to stop auto-compaction to free up resources for normal database operation.
+This field defaults to `false` if not set.
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____
+
 === spec.cluster.autoCompaction.tombstonePurgeInterval
+
+This field defines how frequently tombstones may be purged.
+
+Couchbase Server maintains tombstones.
+These are records of deleted documents.
+Tomestones are retained so that eventually consistent consumers can observe document deletion in the event of a disconnection.
+This field defaults to `72h` if not set.
+
+____
+_Field rules:_ This field is optional and must be a valid https://golang.org/pkg/time/#ParseDuration[duration^] in the range 1h-60d.
+____
 
 == spec.security
 
