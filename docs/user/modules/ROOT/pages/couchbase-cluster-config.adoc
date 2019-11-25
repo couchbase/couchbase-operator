@@ -1211,6 +1211,12 @@ spec:
 
 This object defines whether to manage XDCR, any remote clusters and replications to them.
 
+[NOTE]
+====
+As the Couchbase Server API does not expose XDCR passwords or TLS certificates these cannot be automatically rotated by the Operator.
+In order to rotate these either manually update or delete and recreate the remote cluster.
+====
+
 [source,yaml]
 ----
 spec:
@@ -1231,21 +1237,86 @@ spec:
 
 === spec.xdcr.managed
 
+This field defines whether the Operator should manage XDCR remote clusters and replications.
+
+If set to `true` the Operator will assume full control of all XDCR primitives.
+Any existing XDCR remote clusters and replications will be deleted by the Operator unless matching configuration is provided.
+This field defaults to `false` if not set.
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____
+
 === spec.xdcr.remoteClusters[]
+
+This list contains references to any remote clusters to replicate to.
 
 === spec.xdcr.remoteClusters[].name
 
+This field specifies a textual name for the remote cluster.
+The name must be unique within the Couchbase cluster.
+
+____
+_Field rules:_ This field is required and must be a string.
+____
+
 === spec.xdcr.remoteClusters[].uuid
+
+This field specifies the remote cluster UUID.
+
+Every Couchbase cluster generates a unique cluster ID.
+The UUID of a remote cluster managed by the Operator is available in the `CouchbaseCluster` resource in the `status.clusterId` field.
+
+____
+_Field rules:_ This field is required and must be a Couchbase UUID string.
+____
 
 === spec.xdcr.remoteClusters[].hostname
 
+This field specifies the hostname and port of the remote cluster.
+
+____
+_Field rules:_ This field is required and must be a valid DNS domain name and admin port (either plain text or TLS).
+____
+
 === spec.xdcr.remoteClusters[].authenticationSecret
+
+This field specifies basic authentication on the remote cluster.
+
+This field is only relevant if not using client certificate authentication.
+If specified the autentication secret must refer to a Kuberenetes secret containing the keys `username` and `password`.
+The user on the remote cluster must have have the correct roles to allow XDCR to write to the target bucket(s).
+
+____
+_Field rules:_ This field is optional and must be a string.
+____
 
 === spec.xdcr.remoteClusters[].tls.secret
 
+This field defines any TLS configuration required to establish a connection with the remote cluster.
+
+This field references a Kubernetes secret containing remote cluster TLS information.
+If replications to the remote cluster are to be encrypted then `spec.xdcr.remoteClusters[].hostname` must specify the TLS port (18091 by default), and at least the CA certificate.
+The CA certificate is specified by the key `ca`.
+
+If the remote cluster requires client certificate authentication then the `certificate` and `key` keys are used to specify the client certificate chain and client certificate's private key respectively.
+Client certificate authentication cannot be used with basic authentication.
+
+____
+_Field rules:_ This field is optional and must be a string.
+____
+
 === spec.xdcr.remoteClusters[].replications[]
 
+This field is a list of replications from the local cluster to the remote cluster.
+
 === spec.xdcr.remoteClusters[].replications[].selector
+
+This field defines a label selector to choose which xref:couchbase-replication-config.adoc[`CouchbaseReplication`] resources should be included for this remote cluster.
+
+____
+_Field rules:_ This field is optional and must be a Kubernetes https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[label selector^].
+____
 
 == spec.volumeClaimTemplates[]
 
