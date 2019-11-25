@@ -1,0 +1,63 @@
+= How-to Configure Client Certificate Authentication
+
+[abstract]
+How to configure Couchbase Server and the Operator to use client certificate based authentication.
+
+By default a Couchbase Server deployment uses basic authentication, commonly known as username and password.
+Basic authentication may be used over a plain text network communication where a malicious party can see the password.
+Basic authentication may also be used over a server-side TLS protected network connection which encrypts the password and prevents a malicious party from acquiring it.
+
+Couchbase Server also supports a mode of authentication using client certificates.
+It uses the same technology that a client uses to assert the validity of a server certificate, but the server validates the client as well.
+This is known as mutual TLS (mTLS).
+Couchbase server does not support basic authentication over mTLS, instead requiring a username to be encoded into the client certificate.
+This page documents configuration of mTLS.
+
+== Prerequisites
+
+It is assumed that you have created all required certificates as defined by the xref:tls.adoc[TLS documentation] and added them to their respective secrets.
+
+== Couchbase Cluster Configuration
+
+TLS certificate configuration is done in the networking section of the `CouchbaseCluster` resource.
+
+[source,yaml]
+----
+apiVersion: couchbase/v2
+kind: CouchbaseCluster
+spec:
+  security:
+    adminSecret: my-admin-secret
+  networking:
+    tls:
+      static:
+        member:
+          serverSecret: my-server-secret
+        operatorSecret: my-operator-secret
+      clientCertificatePolicy: mandatory
+      clientCertificatePaths:
+      - path: subject.cn
+      - path: san.email
+        delimiter: @
+----
+
+xref:couchbase-cluster-config.adoc#spec-networking-tls-static-member-serversecret[`spec.networking.tls.static.member.serverSecret`] defines a secret that will be mounted to all Couchbase Server pods.
+It contains the server wildcard certificate and it's private key.
+As the private key is securely mounted to the pod by Kubernetes it is never exposed over the network.
+
+xref:couchbase-cluster-config.adoc#spec-networking-tls-static-operatorsecret[`spec.networking.tls.static.operatorSecret`] defines a secret containing client related certificates.
+The client certificate contains a subject common name e.g. `Administrator`.
+The administrator user `Administrator` is configured by the xref:couchbase-cluster-config.adoc#spec-security-adminsecret[`spec.security.adminSecret`].
+
+xref:couchbase-cluster-config.adoc#spec-networking-tls-clientcertificatepolicy[`spec.networking.tls.clientCertificatePolicy`] is set to mandatory meaning all clients will need to provide a valid client certificate in order to authenticate against the cluster.
+
+xref:couchbase-cluster-config.adoc#spec-networking-tls-clientcertificatepaths[`spec.networking.tls.clientCertificatePaths`] defines a path that is able to correctly parse and extract the Operator's `Administrator` use from the client certificate.
+In this example all we need to specify is that the user name is explicitly encoded in the certificate's subject common name.
+This covers the base requirements in order for the Operator to be able to connect to the cluster.
+
+In a more realistic setup users will likely be identified by an email address.
+In this illustration it is encoded in a subject alternative name (SAN).
+When Couchbase Server looks at a client certificate it will not find a valid user using the first path (but it would match for our `Administrator` user).
+It then proceeds down the list of paths in order trying to extract a valid username.
+If the client certificate contained a SAN `EMAIL:jane.doe@example.com`, then it would resolve to `jane.doe` with our second path rule.
+If `jane.doe` matched a local or LDAP user then they would be granted permission to access the Couchbase Server instance.

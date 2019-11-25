@@ -758,7 +758,9 @@ ____
 
 == spec.networking.tls
 
-This field is optional and controls whether the Operator uses TLS for communication with the cluster. It also sets the TLS certificates that are used by Couchbase clients and XDCR. Refer to the xref:tls.adoc[TLS documentation] for more information.
+This field is optional and controls whether the Operator uses TLS for communication with the cluster.
+It also sets the TLS certificates that are used by Couchbase clients and XDCR.
+Refer to the xref:tls.adoc[TLS documentation] for more information.
 
 [source,yaml]
 ----
@@ -777,17 +779,90 @@ spec:
 
 === spec.networking.tls.static.serverSecret
 
+This field defines the certificate and private key used by Couchbase Server services.
+
+This field is required if any static TLS configuration is specified under `spec.networking.tls.static`.
+This field references a secret containing a key `chain.pem` whose value is a wildcard certificate chain signed by the cluster CA defined in `spec.networking.tls.static.operatorSecret`, and `pkey.key` whose value is a private key corresponding to the leaf certificate.
+The xref:tls.adoc[TLS documentation] contains detailed information on generating valid certificates for your cluster.
+
+____
+_Field rules:_ This field is required when `spec.networking.tls.static` is defined and must be a string referencing a Kubernetes `Secret` resource.
+____
+
 === spec.networking.tls.static.operatorSecret
+
+This field defines the CA certificate and optionally a client certificate and private key used to authenticate the Operator.
+
+This field is required if any static TLS configuration is specified under `spec.networking.tls.static`.
+This field references a secret containing a key `ca.crt` whose value is a CA certificate.
+The CA certificate must be the root authority for a server certifcate defined in `spec.networking.tls.static.member.serverSecret`.
+The xref:tls.adoc[TLS documentation] contains detailed information on generating valid certificates for your cluster.
+
+If `spec.networking.tls.clientCertificatePolicy` is set to `enable` then `operatorSecret` may contain a client certificate and private key.
+
+If `spec.networking.tls.clientCertificatePolicy` is set to `mandatory` then `operatorSecret` must contain a client certificate and private key.
+
+When using client certificates the secret must contain a key `couchbase-operator.crt` whose value is a client certificate chain signed by the cluster CA defined above, and `couchbase-operator.key` whose value is a private key corresponding the leaf client certificate.
+The client certificate must resolve -- with `spec.networking.tls.clientCertificatePaths[]` -- to the administrative user name defined in `spec.security.adminSecret`.
+
+____
+_Field rules:_ This field is required when `spec.networking.tls.static` is defined and must be a string referencing a Kubernetes `Secret` resource.
+____
 
 === spec.networking.tls.clientCertificatePolicy
 
+This field defines the client certificate policy that Couchbase Server should use.
+
+If not defined Couchbase Server will use basic authentication -- username and password -- over server side TLS.
+
+If set to `enable` then Couchbase Server will request a client certifcate and the clients may return one in order to authenticate.
+If a client certificate is not returned by the client Couchbase Server will fall back to basic authentication.
+If you require certificate authentication by the Operator then you may define it in `spec.networking.tls.static.operatorSecret`.
+
+If set to `mandatory` then Couchbase Server will request a client certificate and the client must return one in order to authenticate.
+You must define the client certificate in `spec.networking.tls.static.operatorSecret`.
+
+____
+_Field rules:_ This field is optional and must be either `enable` or `mandatory`.
+____
+
 === spec.networking.tls.clientCertificatePaths[]
+
+This list defines how Couchbase Server should parse client certificates in order to extract a valid user.
+
+____
+_Field rules:_ If using client certifcates this list should contain at least one item.
+____
 
 === spec.networking.tls.clientCertificatePaths[].path
 
+This field defines where to extract the username from.
+Couchbase Server currently allows usernames to be defined in the certifcate subject common name (CN), or subject alternative names (SAN).
+Valid SANs that can be parsed are URI, DNS or EMAIL records.
+
+____
+_Field rules:_ This field is required and must be either `subject.cn`, `san.uri`, `san.dns` or `san.email`.
+____
+
 === spec.networking.tls.clientCertificatePaths[].prefix
 
+This field defines whether the username is prefixed.
+
+This allows, for example, a CN of `www.example.com` to be mapped to a username `example.com` by specifying a prefix of `www.`.
+
+____
+_Field rules:_ This field is optional and must be a string.
+____
+
 === spec.networking.tls.clientCertificatePaths[].delimiter
+
+This field defines whether the username is delimted.
+
+This allows, for example, an EMAIL SAN of `jane.doe@example.com` to be mapped to the username `jane.doe` by specifying a delimiter of `@`.
+
+____
+_Field rules:_ This field is optional and must be a string.
+____
 
 == spec.logging
 

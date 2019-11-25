@@ -12,10 +12,13 @@ The basic requirements are:
 +
 Couchbase currently supports using wildcard entries only. For example, `*.cluster.domain.svc` where _cluster_ is the name of the CouchbaseCluster resource, and _domain_ is the namespace that the cluster is running in (typically `default`).
 
-[IMPORTANT]
-====
-TLS certificates are installed as part of the pod creation process, and cannot be enabled on an existing cluster.
-====
+Additionally Couchbase Server may be configured to use mutual-TLS and client certificate authentication.
+
+These additional requirements are:
+
+* A client certificate/key pair that is valid for the administrative user defined in the `CouchbaseCluster` attribute `spec.security.adminSecret`.
++
+The username is encoded into the certificate as per the xref:couchbase-cluster-config.adoc#spec-networking-tls-clientcertificatepaths[username extraction rules].
 
 == Configuration
 
@@ -59,9 +62,20 @@ kubectl create secret generic couchbase-operator-tls \
   --from-file example/tls/certs/ca.crt
 ----
 
+If using client certificate authentication you will also need to specify the client certificate chain and key pair with the keys `couchbase-operator.crt` and `couchbase-operator.key` respectively:
+
+[source,console]
+----
+kubectl create secret generic couchbase-operator-tls \
+  --from-file example/tls/certs/ca.crt \
+  --from-file example/tls/certs/couchbase-operator.crt \
+  --from-file example/tls/certs/couchbase-operator.key
+----
+
 == Creating Certificates
 
 Creating X.509 certificates is beyond the scope of this documentation and is given only for illustrative purposes only.
+Please consult the https://docs.couchbase.com/server/6.5/learn/security/certificates.html[Couchbase Server documentation^] for additional details on certificate and TLS configuration.
 
 === EasyRSA
 
@@ -114,6 +128,18 @@ openssl rsa -in pkey.key -out pkey.key.der -outform DER
 openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
 ----
 
+==== Creating a Client Certificate
+
+This process is very similar to creating a server certificate.
+Assuming the administrative user defined for Couchbase Server is `Administrator` you can create a client certificate for the Operator to use with the following command:
+
+[source,console]
+----
+./easyrsa build-client-full Administrator nopass
+----
+
+The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `couchbase-operator.crt` and `couchbase-operator.key` respectively when specifying the `CouchbaseCluster` `spec.networking.tls.static.operatorSecret`.
+
 == Certificate Rotation
 
 Certificates can go out of date, or the private keys of the server certificate and the signing CA can become compromised.
@@ -147,6 +173,14 @@ certificate cannot be verified: x509: certificate has expired or is not yet vali
 ----
 certificate cannot be verified: x509: certificate signed by unknown authority
 ----
+
+[NOTE]
+====
+Certificate rotation is fully supported when using client certificate authentication.
+Due to technical reasons all TLS reconciliation occurs over plain text.
+This is however still secure as private keys are never exposed by the Operator over the wire.
+Private keys are securely mounted on Couchbase Server pods by Kubernetes.
+====
 
 === Replacing Server Certificates
 

@@ -47,6 +47,7 @@
 * xref:running-couchbase.adoc[Managing Couchbase Server]
  ** xref:updating-couchbase.adoc[Modifying a Couchbase Deployment]
  ** xref:scaling-couchbase.adoc[Scaling a Couchbase Deployment]
+ ** xref:howto-tls-client-certificates.adoc[How-to Configure Client Certificate Authentication]
  ** xref:node-recovery.adoc[Recovering From a Node Failure]
  ** xref:delete-couchbase-cluster.adoc[Deleting a Couchbase Deployment]
  ** xref:upgrading-couchbase.adoc[Upgrading a Couchbase Deployment]
