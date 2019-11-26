@@ -213,8 +213,10 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 		// If a PVC does exist and differs, mark it for update.
 		if pvc != nil {
 			existingSpec := v1.PersistentVolumeClaimSpec{}
-			if err := json.Unmarshal([]byte(pvc.Annotations[constants.PVCSpecAnnotation]), &existingSpec); err != nil {
-				return nil, err
+			if annotation, ok := pvc.Annotations[constants.PVCSpecAnnotation]; ok {
+				if err := json.Unmarshal([]byte(annotation), &existingSpec); err != nil {
+					return nil, err
+				}
 			}
 			if !reflect.DeepEqual(existingSpec, required.Spec) {
 				state.update = append(state.update, pvc)

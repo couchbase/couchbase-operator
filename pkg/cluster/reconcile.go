@@ -1328,8 +1328,10 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		// target configuration.  Do this with reflection as the spec may contain
 		// maps (e.g. NodeSelector)
 		actualSpec := &v1.PodSpec{}
-		if err := json.Unmarshal([]byte(actual.Annotations[constants.PodSpecAnnotation]), actualSpec); err != nil {
-			return nil, -1, "", err
+		if annotation, ok := actual.Annotations[constants.PodSpecAnnotation]; ok {
+			if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
+				return nil, -1, "", err
+			}
 		}
 		requestedSpec := &v1.PodSpec{}
 		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
