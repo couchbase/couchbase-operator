@@ -426,7 +426,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, false)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victims[0]), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.MemberRecoveredEvent(testCouchbase, victims[0]), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
