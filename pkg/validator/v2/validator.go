@@ -139,6 +139,21 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "replicas"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/replicas", Value: 1})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "ioPriority"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/ioPriority", Value: couchbasev2.CouchbaseBucketIOPriorityLow})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "evictionPolicy"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/evictionPolicy", Value: couchbasev2.CouchbaseBucketEvictionPolicyValueOnly})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "conflictResolution"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/conflictResolution", Value: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
 	}
@@ -149,6 +164,21 @@ func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) 
 func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "replicas"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/replicas", Value: 1})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "ioPriority"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/ioPriority", Value: couchbasev2.CouchbaseBucketIOPriorityLow})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "evictionPolicy"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/evictionPolicy", Value: couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction})
+	}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "conflictResolution"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/conflictResolution", Value: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
 	}
@@ -157,7 +187,13 @@ func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstr
 }
 
 func ApplyMemcachedBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	return nil
+	var patch jsonpatch.PatchList
+
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
+	}
+
+	return patch
 }
 
 func ApplyReplicationDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {

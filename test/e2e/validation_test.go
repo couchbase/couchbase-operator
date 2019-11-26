@@ -986,14 +986,51 @@ func TestValidationDefaultCreate(t *testing.T) {
 			},
 		},
 		{
-			name:        "TestValidateBucketCompressionModeDefaultForCouchbase",
-			mutations:   patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/spec/compressionMode")},
-			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive)},
+			name: "TestValidateCouchbaseBucketDefault",
+			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
+				Remove("/spec/memoryQuota").
+				Remove("/spec/replicas").
+				Remove("/spec/ioPriority").
+				Remove("/spec/evictionPolicy").
+				Remove("/spec/conflictResolution").
+				Remove("/spec/compressionMode"),
+			},
+			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().
+				Test("/spec/memoryQuota", "100Mi").
+				Test("/spec/replicas", 1).
+				Test("/spec/ioPriority", couchbasev2.CouchbaseBucketIOPriorityLow).
+				Test("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly).
+				Test("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber).
+				Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive),
+			},
 		},
 		{
-			name:        "TestValidateBucketCompressionModeDefaultForEphemeral",
-			mutations:   patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/spec/compressionMode")},
-			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive)},
+			name: "TestValidateEphemeralBucketDefault",
+			mutations: patchMap{"bucket3": jsonpatch.NewPatchSet().
+				Remove("/spec/memoryQuota").
+				Remove("/spec/replicas").
+				Remove("/spec/ioPriority").
+				Remove("/spec/evictionPolicy").
+				Remove("/spec/conflictResolution").
+				Remove("/spec/compressionMode"),
+			},
+			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().
+				Test("/spec/memoryQuota", "100Mi").
+				Test("/spec/replicas", 1).
+				Test("/spec/ioPriority", couchbasev2.CouchbaseBucketIOPriorityLow).
+				Test("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction).
+				Test("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber).
+				Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive),
+			},
+		},
+		{
+			name: "TestValidateMemcachedBucketDefault",
+			mutations: patchMap{"bucket2": jsonpatch.NewPatchSet().
+				Remove("/spec/memoryQuota"),
+			},
+			validations: patchMap{"bucket2": jsonpatch.NewPatchSet().
+				Test("/spec/memoryQuota", "100Mi"),
+			},
 		},
 		{
 			name:        "TestValidateSecurityContextDefault",
