@@ -464,42 +464,6 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{"spec.networking.exposedFeatures in body shouldn't contain duplicates"},
 		},
 		{
-			name:           "TestValidateBucketConflictResolutionRequiredForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/spec/conflictResolution")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body is required"},
-		},
-		{
-			name:           "TestValidateBucketEvictionPolicyRequiredForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/spec/evictionPolicy")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body is required"},
-		},
-		{
-			name:           "TestValidateBucketIOPriorityRequiredForCouchbase",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/spec/ioPriority")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body is required"},
-		},
-		{
-			name:           "TestValidateBucketConflictResolutionRequiredForEphemeral",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/spec/conflictResolution")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body is required"},
-		},
-		{
-			name:           "TestValidateBucketEvictionPolicyRequiredForEphemeral",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/spec/evictionPolicy")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body is required"},
-		},
-		{
-			name:           "TestValidateBucketIOPriorityRequiredForEphemeral",
-			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Remove("/spec/ioPriority")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body is required"},
-		},
-		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_1",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
