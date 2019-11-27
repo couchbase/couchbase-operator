@@ -1,67 +1,74 @@
 * xref:overview.adoc[Introduction]
 * xref:whats-new.adoc[What's New?]
-* Best Practices
- ** xref:best-practices.adoc[Guidelines and Best Practices]
 * Getting Started
+ ** xref:best-practices.adoc[Guidelines and Best Practices]
  ** xref:prerequisite-and-setup.adoc[System Requirements]
  ** xref:network-requirements.adoc[Network Requirements]
-* xref:cloud-intro.adoc[Cloud Environment Setup]
- ** xref:install-aks.adoc[Installing on AKS]
- ** xref:install-eks.adoc[Installing on EKS]
- ** xref:install-gke.adoc[Installing on GKE]
-* Helm
- ** xref:helm-setup-guide.adoc[Helm Setup]
- ** xref:helm-managing-guide.adoc[Helm Management]
- ** xref:helm-operator-config.adoc[Operator Chart Spec]
- ** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
-* Deploying the Operator
- ** xref:install-admission-controller.adoc[Installing the Admission Controller]
- ** xref:install-kubernetes.adoc[Installing on Kubernetes]
- ** xref:install-openshift.adoc[Installing on OpenShift]
- ** xref:operator-config.adoc[About the Operator Deployment Settings]
- ** xref:kubernetes-rbac.adoc[About Kubernetes RBAC]
- ** xref:upgrading-the-operator.adoc[Upgrading the Operator]
-* Managing the Operator
- ** xref:list-and-describe.adoc[Monitoring Kubernetes Resources]
- ** xref:services.adoc[Monitoring Services]
-* xref:deploying-couchbase.adoc[Deploying Couchbase Server]
- ** xref:couchbase-resource-rbac.adoc[Couchbase Resources and Kubernetes RBAC]
-  *** xref:couchbase-cluster-config.adoc[CouchbaseCluster Configuration Settings]
-  *** xref:couchbase-bucket-config.adoc[CouchbaseBucket Configuration Settings]
-  *** xref:couchbase-ephemeral-bucket-config.adoc[CouchbaseEphemeralBucket Configuration Settings]
-  *** xref:couchbase-memcached-bucket-config.adoc[CouchbaseMemcachedBucket Configuration Settings]
-  *** xref:couchbase-replication-config.adoc[CouchbaseReplication Configuration Settings]
-  *** xref:couchbase-user-config.adoc[CouchbaseUser Configuration Settings]
-  *** xref:couchbase-role-config.adoc[CouchbaseRole Configuration Settings]
-  *** xref:couchbase-rolebinding-config.adoc[CouchbaseRoleBinding Configuration Settings]
- ** xref:networking.adoc[About Kubernetes Networking]
-  *** xref:xdcr.adoc[Using XDCR]
-  *** xref:tls.adoc[Configuring TLS]
- ** xref:accessing-couchbase.adoc[Accessing the Couchbase User Interfaces]
- ** xref:persistent-volumes-guide.adoc[Persistent Volumes]
- *** xref:persistent-volumes-setup.adoc[Persistent Volume Kubernetes Guide]
- *** xref:persistent-volumes-zoning-guide-legacy.adoc[Persistent Volume Kubernetes Guide (Legacy)]
- *** xref:persistent-volumes-zoning-guide.adoc[Persistent Volume Zoning Guide]
- ** xref:server-groups.adoc[Using Server Groups]
- ** xref:couchbase-clients.adoc[Using Couchbase Clients]
-* xref:running-couchbase.adoc[Managing Couchbase Server]
- ** xref:updating-couchbase.adoc[Modifying a Couchbase Deployment]
- ** xref:scaling-couchbase.adoc[Scaling a Couchbase Deployment]
- ** xref:howto-tls-client-certificates.adoc[How-to Configure Client Certificate Authentication]
- ** xref:howto-xdcr-external.adoc[How-to Configure XDCR]
- ** xref:node-recovery.adoc[Recovering From a Node Failure]
- ** xref:delete-couchbase-cluster.adoc[Deleting a Couchbase Deployment]
- ** xref:upgrading-couchbase.adoc[Upgrading a Couchbase Deployment]
- ** xref:upgrading-kubernetes.adoc[Upgrading the Kubernetes Cluster]
- ** xref:backup-and-restore.adoc[Backing up and Restoring a Couchbase Deployment]
- ** xref:conditions-and-events.adoc[Monitoring Couchbase Events]
- ** xref:cluster-status-guide.adoc[Monitoring Couchbase Cluster Status]
-* Troubleshooting
- ** xref:logs-troubleshooting.adoc[Viewing and Retrieving Logs]
-* Tools
- ** xref:cbopinfo.adoc[cbopinfo]
- * xref:demo.adoc[Couchbase Deployment Tutorial]
- * xref:release-notes.adoc[Release Notes]
-
-.Other Resources
-* xref:sync-gateway::kubernetes/deploy-cluster.adoc[Sync Gateway on Kubernetes]
+ ** xref:cloud-intro.adoc[Managed Cloud]
+  *** xref:install-aks.adoc[Installing on AKS]
+  *** xref:install-eks.adoc[Installing on EKS]
+  *** xref:install-gke.adoc[Installing on GKE]
+ ** Installing the Operator
+  *** xref:install-admission-controller.adoc[Install the Admission Controller]
+  *** xref:install-kubernetes.adoc[Install the Operator on Kubernetes]
+  *** xref:install-openshift.adoc[Install the Operator on OpenShift]
+ ** xref:release-notes.adoc[Release Notes]
+* Learn
+ ** Kubernetes Concepts
+  *** xref:couchbase-resource-rbac.adoc[Kubernetes RBAC]
+  *** xref:networking.adoc[Kubernetes Networking]
+  *** xref:persistent-volumes-setup.adoc[Persistent Volumes]
+  *** xref:persistent-volumes-zoning-guide.adoc[Persistent Volumes and Availability Zone]
+  *** xref:upgrading-kubernetes.adoc[Kubernetes Automated Upgrade]
+ ** Couchbase Concepts
+  *** xref:running-couchbase.adoc[Couchbase Server]
+  *** xref:xdcr.adoc[XDCR]
+  *** xref:tls.adoc[TLS]
+  *** xref:server-groups.adoc[Server Groups]
+* Manage
+ ** Operator
+  *** xref:upgrading-the-operator.adoc[Upgrade the Operator]
+  *** xref:logs-troubleshooting.adoc[View Operator Logs]
+ ** Couchbase Cluster
+  *** Lifecycle
+   **** xref:deploying-couchbase.adoc[Create a Couchbase Deployment]
+   **** xref:updating-couchbase.adoc[Modify a Couchbase Deployment]
+   **** xref:upgrading-couchbase.adoc[Upgrade a Couchbase Deployment]
+   **** xref:delete-couchbase-cluster.adoc[Delete a Couchbase Deployment]
+   **** xref:scaling-couchbase.adoc[Scale a Couchbase Deployment]
+  *** Configure
+   **** xref:persistent-volumes-guide.adoc[Configure Persistent Volumes]
+   **** xref:howto-xdcr-external.adoc[Configure XDCR]
+   **** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
+  *** Connect
+   **** xref:accessing-couchbase.adoc[Access the Couchbase User Interface]
+   **** xref:couchbase-clients.adoc[Use Couchbase Clients]
+ ** Helm
+  *** xref:helm-setup-guide.adoc[Install Helm]
+  *** xref:helm-managing-guide.adoc[Manage Helm]
+* Reference
+ ** Resource Types
+  *** xref:couchbase-cluster-config.adoc[CouchbaseCluster]
+   **** xref:conditions-and-events.adoc[CouchbaseCluster Events]
+   **** xref:cluster-status-guide.adoc[CouchbaseCluster Status]
+  *** xref:couchbase-bucket-config.adoc[CouchbaseBucket]
+  *** xref:couchbase-ephemeral-bucket-config.adoc[CouchbaseEphemeralBucket]
+  *** xref:couchbase-memcached-bucket-config.adoc[CouchbaseMemcachedBucket]
+  *** xref:couchbase-replication-config.adoc[CouchbaseReplication]
+  *** xref:couchbase-user-config.adoc[CouchbaseUser]
+  *** xref:couchbase-role-config.adoc[CouchbaseRole]
+  *** xref:couchbase-rolebinding-config.adoc[CouchbaseRoleBinding]
+ ** Operator
+  *** xref:operator-config.adoc[Operator Deployment Settings]
+  *** xref:kubernetes-rbac.adoc[Operator RBAC Settings]
+ ** Couchbase Cluster
+  *** xref:services.adoc[Monitoring Services]
+ ** Helm
+  *** xref:helm-operator-config.adoc[Operator Chart Spec]
+  *** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
+ ** Tools
+  *** xref:cbopinfo.adoc[cbopinfo]
+* Tutorials
+ ** xref:demo.adoc[Couchbase Deployment Tutorial]
+* Other Resources
+ ** xref:sync-gateway::kubernetes/deploy-cluster.adoc[Sync Gateway on Kubernetes]
