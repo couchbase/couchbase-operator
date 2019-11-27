@@ -38,7 +38,7 @@ The following example shows how to mount a volume to persist data for the Data s
 
 [source,yaml]
 ----
-apiVersion: couchbase.com/v1
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 spec:
   servers:

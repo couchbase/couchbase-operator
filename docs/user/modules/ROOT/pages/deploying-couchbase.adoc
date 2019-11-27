@@ -22,58 +22,48 @@ The Operator package contains an example CouchbaseCluster configuration file (`c
 .Example CouchbaseCluster Configuration for open source Kubernetes (couchbase-cluster.yaml)
 [source,yaml]
 ----
-apiVersion: couchbase.com/v1
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: default  # <.>
+spec:
+  memoryQuota: 128Mi
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
-  name: cb-example
+  name: cb-example  # <.>
 spec:
-  baseImage: couchbase/server
-  version: enterprise-6.0.1
-  authSecret: cb-example-auth
-  exposeAdminConsole: true
-  adminConsoleServices:
+  image: couchbase/server:6.0.3  # <.>
+  security:
+    adminSecret: cb-example-auth  # <.>
+  networking:
+    exposeAdminConsole: true
+    adminConsoleServices:
     - data
-  cluster:
-    dataServiceMemoryQuota: 256
-    indexServiceMemoryQuota: 256
-    searchServiceMemoryQuota: 256
-    eventingServiceMemoryQuota: 256
-    analyticsServiceMemoryQuota: 1024
-    indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 120
-    autoFailoverMaxCount: 3
-    autoFailoverOnDataDiskIssues: true
-    autoFailoverOnDataDiskIssuesTimePeriod: 120
-    autoFailoverServerGroup: false
   buckets:
-    - name: default
-      type: couchbase
-      memoryQuota: 128
-      replicas: 1
-      ioPriority: high
-      evictionPolicy: fullEviction
-      conflictResolution: seqno
-      enableFlush: true
-      enableIndexReplica: false
+    managed: true
   servers:
-    - size: 3
-      name: all_services
-      services:
-        - data
-        - index
-        - query
-        - search
-        - eventing
-        - analytics
+  - size: 3  # <.>
+    name: all_services
+    services:
+    - data
+    - index
+    - query
+    - search
+    - eventing
+    - analytics
 ----
 
-By taking a quick look at this configuration file, you can see that it defines a cluster by specifying the following:
+By taking a quick look at this configuration file, you can see that it defines a cluster (with buckets) by specifying the following:
 
-* Cluster name: cb-example (`metadata.name`)
-* Couchbase version: enterprise-6.0.1 (`spec.version`)
-* Buckets: 1 bucket named default (`spec.buckets`)
-* Size: 3 node cluster with all services on each node (`spec.servers`)
-* Secret: cb-example-auth (`authSecret`)
+<.> Buckets: 1 bucket named `default` 
++
+NOTE: In this example, bucket management for the cluster (`spec.buckets.managed`) is set to `true`, meaning that the Autonomous Operator will handle the creation and deletion of Couchbase buckets.
+<.> Cluster name: `cb-example`
+<.> Couchbase image: `couchbase/server:6.0.3`
+<.> Secret: `cb-example-auth`
+<.> Size: 3-node cluster with all services on each node
 
 You can use this example CouchbaseCluster configuration file "as-is" to test out how the Operator deploys a Couchbase Server cluster. However, to deploy a Couchbase cluster that is more specifically tailored to your development and production needs, you need to create your own custom configuration file that conforms to the xref:couchbase-cluster-config.adoc[CouchbaseCluster specification].
 
