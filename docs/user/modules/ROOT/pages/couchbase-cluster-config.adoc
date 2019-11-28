@@ -155,6 +155,15 @@ spec:
         selector:
           matchLabels:
             cluster: cb-example
+  monitoring:
+    prometheus:
+      enabled: true
+      image: couchbase/prometheus-exporter:1.0.0
+      authorizationSecret: cb-metrics-token
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
   volumeClaimTemplates:
   - metadata:
       name: couchbase
@@ -1316,6 +1325,61 @@ This field defines a label selector to choose which xref:couchbase-replication-c
 
 ____
 _Field rules:_ This field is optional and must be a Kubernetes https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[label selector^].
+____
+
+[#spec-monitoring]
+== spec.monitoring
+
+This object defines any integrations with third party monitoring software.
+
+[source,yaml]
+----
+spec:
+  monitoring:
+    prometheus:
+      enabled: true
+      image: couchbase/prometheus-exporter:1.0.0
+      authorizationSecret: cb-metrics-token
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+----
+
+=== spec.monitoring.prometheus.enabled
+
+This field defines whether Prometheus metric collection is enabled for the cluster.
+
+____
+_Field rules:_ This field is optional and must be a boolean value.
+____
+
+=== spec.monitoring.prometheus.image
+
+This field defines the path to the Prometheus Exporter image that the Autonomous Operator will inject as a "sidecar" container in each Couchbase Server pod.
+
+If left unspecified, the dynamic admission controller will automatically default to the most recent container image from Docker Hub (open source Kubernetes) or Red Hat Container Catalog (OpenShift) that was available when the installed version of the Autonomous Operator was released.
+Refer to xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection] for more detailed instructions.
+
+____
+_Field rules:_ This field is optional and must be a valid path to a valid container image.
+____
+
+=== spec.monitoring.prometheus.authorizationSecret
+
+This field specifies the name of a Kubernetes Secret that should contain a bearer token value that clients use to gain access to the Prometheus metrics.
+
+____
+_Field rules:_ This field is optional and must be the name of a valid Kubernetes secret, with a key of "token".
+____
+
+=== spec.monitoring.prometheus.resources
+
+This field defines resource requests and limits for the Prometheus Exporter "sidecar" container.
+Some environments may require these fields to be explicitly set when using Kubernetes `LimitRange` resources without namespace defaults.
+
+____
+_Field rules:_ This field is optional and must be a valid Kubernetes https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[resource descriptor^].
 ____
 
 == spec.volumeClaimTemplates[]
