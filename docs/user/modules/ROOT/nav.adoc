@@ -15,13 +15,14 @@
  ** xref:release-notes.adoc[Release Notes]
 * Learn
  ** Kubernetes Concepts
-  *** xref:couchbase-resource-rbac.adoc[Kubernetes RBAC]
   *** xref:networking.adoc[Kubernetes Networking]
   *** xref:persistent-volumes-setup.adoc[Persistent Volumes]
   *** xref:persistent-volumes-zoning-guide.adoc[Persistent Volumes and Availability Zone]
   *** xref:upgrading-kubernetes.adoc[Kubernetes Automated Upgrade]
  ** Couchbase Concepts
   *** xref:running-couchbase.adoc[Couchbase Server]
+  *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
+  *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
   *** xref:xdcr.adoc[XDCR]
   *** xref:tls.adoc[TLS]
   *** xref:server-groups.adoc[Server Groups]
