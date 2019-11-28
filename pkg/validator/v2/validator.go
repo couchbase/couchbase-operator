@@ -330,7 +330,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 			for _, replication := range replications.Items {
 				if err := validateBucketExists(v, customResource, replication.Spec.Bucket); err != nil {
-					errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist", replication.Spec.Bucket, replication.Name))
+					errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %v", replication.Spec.Bucket, replication.Name, err))
 				}
 			}
 		}
@@ -920,10 +920,30 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 	if err != nil {
 		return err
 	}
+	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
 
 	for _, bucket := range buckets.Items {
 		if bucket.Name == name {
 			return nil
+		}
+	}
+	for _, bucket := range ephemeralBuckets.Items {
+		if bucket.Name == name {
+			return nil
+		}
+	}
+
+	memcachedBuckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	for _, bucket := range memcachedBuckets.Items {
+		if bucket.Name == name {
+			return fmt.Errorf("memcached bucket %s cannot be replicated", name)
 		}
 	}
 

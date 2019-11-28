@@ -748,7 +748,13 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateXDCRReplicationBucketExists",
 			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "huggy-bear")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must exist`},
+			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must exist: bucket huggy-bear not found`},
+		},
+		{
+			name:           "TestValidateXDCRReplicationBucketTypeInvalid",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket2")},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket bucket2 referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must exist: memcached bucket bucket2 cannot be replicated`},
 		},
 		{
 			name:           "TestValidateXDCRReplicationCompressionTypeInvalid",
