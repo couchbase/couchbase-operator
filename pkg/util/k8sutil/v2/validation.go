@@ -526,20 +526,12 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 												"static": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "object",
 													Required: []string{
-														"member",
+														"serverSecret",
 														"operatorSecret",
 													},
 													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-														"member": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "object",
-															Required: []string{
-																"serverSecret",
-															},
-															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																"serverSecret": apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "string",
-																},
-															},
+														"serverSecret": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
 														},
 														"operatorSecret": apiextensionsv1beta1.JSONSchemaProps{
 															Type: "string",

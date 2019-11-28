@@ -702,9 +702,7 @@ func TestUpgradeToTLS(t *testing.T) {
 	defer teardown()
 	tls := &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}

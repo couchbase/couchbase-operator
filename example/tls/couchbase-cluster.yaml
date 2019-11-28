@@ -28,8 +28,7 @@ spec:
       - xdcr
     tls:
       static:
-        member:
-          serverSecret: couchbase-server-tls
+        serverSecret: couchbase-server-tls
         operatorSecret: couchbase-operator-tls
   cluster:
     dataServiceMemoryQuota: 256Mi

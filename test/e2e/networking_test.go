@@ -82,9 +82,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 	}
 	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -131,9 +129,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	}
 	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -189,9 +185,7 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 	}
 	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -240,9 +234,7 @@ func TestConsoleServiceDNS(t *testing.T) {
 	}
 	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -287,9 +279,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	}
 	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -343,9 +333,7 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	}
 	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}

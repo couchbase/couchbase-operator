@@ -127,9 +127,7 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -150,9 +148,7 @@ func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		ClientCertificatePolicy: &policy,
@@ -179,9 +175,7 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -204,9 +198,7 @@ func NewTLSXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	// Enable TLS.
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
@@ -230,9 +222,7 @@ func MustNewMutualTLSXDCRClusterBasic(t *testing.T, k8s *types.Cluster, namespac
 	// Enable TLS.
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		ClientCertificatePolicy: &policy,
@@ -315,9 +305,7 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 	cluster.Name = ctx.ClusterName
 	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx.ClusterSecretName,
-			},
+			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}

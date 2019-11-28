@@ -320,7 +320,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOpts)
 				defer teardown()
 
-				if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "member", "serverSecret"); err != nil {
+				if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "serverSecret"); err != nil {
 					e2eutil.Die(t, err)
 				}
 				if err := unstructured.SetNestedField(object.Object, ctx.OperatorSecretName, "spec", "networking", "tls", "static", "operatorSecret"); err != nil {
@@ -624,9 +624,9 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateTLSServerSecretMissing",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/static/member/serverSecret", "does-not-exist")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/static/serverSecret", "does-not-exist")},
 			shouldFail:     true,
-			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.member.serverSecret must exist"},
+			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.serverSecret must exist"},
 		},
 		{
 			name:           "TestValidateTLSOperatorSecretMissing",

@@ -819,18 +819,12 @@ func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 		// * Mounts the volume in in the correct location so that API
 		//   calls to /node/controller/reloadCertificate succeed
 		if cs.Networking.TLS.Static != nil {
-			// Ensure the schema is correct
-			// TODO: does this make sense not to be a pointer?
-			if cs.Networking.TLS.Static.Member == nil {
-				return fmt.Errorf("static tls member secret required")
-			}
-
 			// Add the TLS secret volume to the pod
 			volume := v1.Volume{
 				Name: constants.CouchbaseTLSVolumeName,
 			}
 			volume.VolumeSource.Secret = &v1.SecretVolumeSource{
-				SecretName: cs.Networking.TLS.Static.Member.ServerSecret,
+				SecretName: cs.Networking.TLS.Static.ServerSecret,
 			}
 			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
 

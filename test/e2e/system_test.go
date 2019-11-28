@@ -318,9 +318,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase1.Name = ctx1.ClusterName
 	testCouchbase1.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx1.ClusterSecretName,
-			},
+			ServerSecret:   ctx1.ClusterSecretName,
 			OperatorSecret: ctx1.OperatorSecretName,
 		},
 	}
@@ -337,9 +335,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase2.Name = ctx2.ClusterName
 	testCouchbase2.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
-			Member: &couchbasev2.MemberSecret{
-				ServerSecret: ctx2.ClusterSecretName,
-			},
+			ServerSecret:   ctx2.ClusterSecretName,
 			OperatorSecret: ctx2.OperatorSecretName,
 		},
 	}

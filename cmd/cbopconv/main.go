@@ -228,9 +228,7 @@ func main() {
 					OperatorSecret: cluster.Spec.TLS.Static.OperatorSecret,
 				}
 				if cluster.Spec.TLS.Static.Member != nil {
-					newCluster.Spec.Networking.TLS.Static.Member = &couchbasev2.MemberSecret{
-						ServerSecret: cluster.Spec.TLS.Static.Member.ServerSecret,
-					}
+					newCluster.Spec.Networking.TLS.Static.ServerSecret = cluster.Spec.TLS.Static.Member.ServerSecret
 				}
 			}
 		}

@@ -254,22 +254,6 @@ func (cs *ClusterSpec) IsAdminConsoleServiceTypePublic() bool {
 	return cs.Networking.AdminConsoleServiceType == v1.ServiceTypeLoadBalancer
 }
 
-func (tp *TLSPolicy) Validate() error {
-	if tp.Static == nil {
-		return nil
-	}
-	st := tp.Static
-
-	if len(st.OperatorSecret) != 0 {
-		if len(st.Member.ServerSecret) == 0 {
-			return fmt.Errorf("operator secret set but member serverSecret not set")
-		}
-	} else if st.Member != nil && len(st.Member.ServerSecret) != 0 {
-		return fmt.Errorf("member serverSecret set but operator secret not set")
-	}
-	return nil
-}
-
 func (tp *TLSPolicy) IsSecureClient() bool {
 	if tp == nil || tp.Static == nil {
 		return false

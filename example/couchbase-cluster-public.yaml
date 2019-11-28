@@ -31,8 +31,7 @@ spec:
     exposedFeatureServiceType: LoadBalancer
     tls:
       static:
-        member:
-          serverSecret: couchbase-server-tls
+        serverSecret: couchbase-server-tls
         operatorSecret: couchbase-operator-tls
     dns:
       domain: us-east1.example.com

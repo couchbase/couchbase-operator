@@ -83,9 +83,9 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 		err = fmt.Errorf("unable to get operator secret %s", c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 		return
 	}
-	serverSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret)
+	serverSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.ServerSecret)
 	if !found {
-		err = fmt.Errorf("unable to get server secret %s", c.cluster.Spec.Networking.TLS.Static.Member.ServerSecret)
+		err = fmt.Errorf("unable to get server secret %s", c.cluster.Spec.Networking.TLS.Static.ServerSecret)
 		return
 	}
 

@@ -744,8 +744,9 @@ type TLSPolicy struct {
 }
 
 type StaticTLS struct {
-	// Member contains secrets containing TLS certs used by each couchbase member pod.
-	Member *MemberSecret `json:"member,omitempty"`
+	// ServerSecret is the secret containing TLS certs used by each couchbase member pod
+	// for the communication between couchbase server and its clients.
+	ServerSecret string `json:"serverSecret,omitempty"`
 
 	// OperatorSecret is the secret containing TLS certs used by operator to
 	// talk securely to this cluster.
@@ -778,12 +779,6 @@ type ClientCertificatePath struct {
 
 	// Delimiter if specified allows a suffix to be stripped from the username.
 	Delimiter string `json:"delimiter,omitempty"`
-}
-
-type MemberSecret struct {
-	// ServerSecret is the secret containing TLS certs used by each couchbase member pod
-	// for the communication between couchbase server and its clients.
-	ServerSecret string `json:"serverSecret,omitempty"`
 }
 
 type ClusterPhase string

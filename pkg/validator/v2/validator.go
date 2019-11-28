@@ -678,7 +678,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 	if cluster.Spec.Networking.TLS != nil {
 		// CRD validation requires all the necessary fields are populated
 		operatorSecretName := cluster.Spec.Networking.TLS.Static.OperatorSecret
-		serverSecretName := cluster.Spec.Networking.TLS.Static.Member.ServerSecret
+		serverSecretName := cluster.Spec.Networking.TLS.Static.ServerSecret
 
 		var key []byte
 		var chain []byte
@@ -710,7 +710,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 			}
 			errs = append(errs, err)
 		} else if serverSecret == nil {
-			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.member.serverSecret must exist", serverSecretName))
+			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.serverSecret must exist", serverSecretName))
 		} else {
 			if chain, ok = serverSecret.Data["chain.pem"]; !ok {
 				errs = append(errs, fmt.Errorf("tls server secret %s must contain chain.pem", serverSecretName))
