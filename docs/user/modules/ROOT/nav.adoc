@@ -23,6 +23,7 @@
   *** xref:running-couchbase.adoc[Couchbase Server]
   *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
   *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
+  *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
   *** xref:xdcr.adoc[XDCR]
   *** xref:tls.adoc[TLS]
   *** xref:server-groups.adoc[Server Groups]
