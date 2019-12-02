@@ -25,6 +25,7 @@
   *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
   *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
   *** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
+  *** xref:concept-sizing.adoc[Couchbase Sizing]
   *** xref:xdcr.adoc[XDCR]
   *** xref:tls.adoc[TLS]
   *** xref:server-groups.adoc[Server Groups]

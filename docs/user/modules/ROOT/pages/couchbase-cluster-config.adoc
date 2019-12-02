@@ -277,7 +277,6 @@ ____
 _Field rules:_ The `softwareUpdateNotifications` field is optional and defaults to false if not specified.  This setting can be modified at any point in the cluster life-cycle.
 ____
 
-[[servergroups_main]]
 === spec.serverGroups
 
 Setting the server groups field enables automatic management of Couchbase server groups.  The end user is responsible for adding labels to thier Kubernetes nodes which will be used to evenly distribute nodes across server groups so the cluster is tolerant to the loss of an entire data center (or any other desired failure domain).  Nodes are labelled with a key of `failure-domain.beta.kubernetes.io/zone` and an arbitrary name string.  Multiple nodes may have the same server group to allow multiple pods to be scheduled there regardless of anti-affinity settings.  An example of applying the label is as follows:
