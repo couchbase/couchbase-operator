@@ -16,8 +16,7 @@
 * Learn
  ** Kubernetes Concepts
   *** xref:networking.adoc[Kubernetes Networking]
-  *** xref:persistent-volumes-setup.adoc[Persistent Volumes]
-  *** xref:persistent-volumes-zoning-guide.adoc[Persistent Volumes and Availability Zone]
+  *** xref:concept-persistent-volumes.adoc[Persistent Volumes]
   *** xref:upgrading-kubernetes.adoc[Kubernetes Automated Upgrade]
  ** Couchbase Concepts
   *** xref:running-couchbase.adoc[Couchbase Server]
@@ -41,7 +40,8 @@
    **** xref:delete-couchbase-cluster.adoc[Delete a Couchbase Deployment]
    **** xref:scaling-couchbase.adoc[Scale a Couchbase Deployment]
   *** Configure
-   **** xref:persistent-volumes-guide.adoc[Configure Persistent Volumes]
+   **** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
+   **** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
    **** xref:howto-xdcr-external.adoc[Configure XDCR]
    **** xref:howto-tls.adoc[Configure TLS]
    **** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
@@ -49,6 +49,8 @@
   *** Connect
    **** xref:accessing-couchbase.adoc[Access the Couchbase User Interface]
    **** xref:couchbase-clients.adoc[Use Couchbase Clients]
+ ** Kubernetes
+  *** xref:howto-storage-class.adoc[Create a Lazy Bound Storage Class]
  ** Helm
   *** xref:helm-setup-guide.adoc[Install Helm]
   *** xref:helm-managing-guide.adoc[Manage Helm]

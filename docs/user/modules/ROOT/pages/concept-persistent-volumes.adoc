@@ -1,0 +1,121 @@
+= About Persistent Volumes
+
+[abstract]
+The Operator fully supports Couchbase Clusters running with persistent storage.
+This section details benefits and requirements in order to correctly function.
+
+== Benefits of Using Persistent Storage
+
+All production deployments should be run with persistent volumes.
+At a very basic level this allows us to collect logs and diagnose any Couchbase Server issues.
+Due to the ephemeral nature of Kubernetes, without persistent volumes those logs would be gone forever in the event of a pod terminally crashing.
+
+Using persistent storage also allows the Couchbase cluster to be tailored to the workload.
+Persistent volumes allow the selection of storage media type e.g. flash can be explicitly selected for high performance.
+
+Persistent storage also makes the Couchbase cluster far more resilient.
+In a total disaster an ephemeral cluster cannot be recovered, the data is lost forever.
+With persistent storage the Operator can recover the cluster.
+
+Recovery is faster with persistent storage.
+As data is persisted there is a high probability that a large percentage of data is still valid and can be reused.
+The Operator makes use of delta-node recovery to dramatically reduce rebalance times.
+
+== Storage Topologies
+
+The most basic storage topology per node is show below:
+
+.Basic Storage Topology
+image::pv-Basic.png[]
+
+This uses the xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-default[default] volume mount.
+The volume has two sub volumes, one for configuration data that must be retained for Couchbase recovery, and one for data and logs.
+
+The Operator additionally allows more advanced configurations as shown below:
+
+.Advanced Storage Topology
+image::pv-Advanced.png[]
+
+Your workload may require high performance disk I/O for data and index services, however configuration and logs may reside on cheaper storage media.
+For this reason you can specify xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-data[data], xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-index[index] and xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-analytics[analytics] volumes.
+
+== Supported Storage Classes
+
+The Operator is designed to work with dynamically provisioned storage classes.
+While a Couchbase cluster can be configured to use other storage types they are not rigorously tested.
+
+Couchbase Server pods may have different storage volumes associated with each service.
+For example xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-default[`spec.servers[\].pod.volumeMounts.default`] which is used for configuration and logging may be on cost effective storage whereas xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-data[`spec.servers[\].pod.volumeMounts.data`] may reside on high performance SSD backed storage.
+
+In most cloud providers persistent volumes are scheduled across all possible availability zones.
+If these two volumes were provisioned in different availability zones then a pod that they were attached to could not be scheduled.
+Pods must reside in the same availability zone as their storage.
+
+It is for this reason that the Operator requires lazily bound storage classes to function on Kubernetes clusters spread across multiple availability zones.
+When using lazy binding persistent volumes are not scheduled until after the pod is scheduled.
+Persistent volumes attached to a pod would then inherit its availability zone and provision correctly.
+
+Please refer to the xref:howto-storage-class.adoc[storage class how-to guide] to configure lazy bound storage classes.
+
+[IMPORTANT]
+====
+Some storage providers or platforms may work transparently across availability zones.
+If this is the case then you may use any existing storage class.
+Please consult with your Kubernetes vendor to confirm.
+====
+
+== Using Storage Classes
+
+Couchbase Server pods never run as root.
+Persistent storage mounts, by default, are mounted as root.
+This means that Couchbase Server pods are unable to write to the persistent volume.
+
+In order to allow Couchbase Server to write to the persistent storage you must specify a file system group to mount the persistent volume as.
+This mounts the persistent volume so the Couchbase Server user is able to write to the persistent volume.
+
+The xref:couchbase-cluster-config.adoc#spec-securitycontext-fsgroup[`spec.securityContext.fsGroup`] parameter allows this to be explicitly set.
+By default the Operator dynamic admission controller will populate this parameter for you based on whether you are deploying on Kubernetes or Redhat OCP.
+
+[TIP]
+====
+On Kubernetes the file system group can be any non-zero value.
+
+On Redhat OCP the Couchbase Server user is random and so is the set of groups they are members of.
+This is defined in the project/namespace:
+
+[source,console]
+----
+$ oc get project operator-example-namespace -o json
+{
+    "apiVersion": "project.openshift.io/v1",
+    "kind": "Project",
+    "metadata": {
+        "annotations": {
+            "openshift.io/description": "",
+            "openshift.io/display-name": "",
+            "openshift.io/requester": "developer",
+            "openshift.io/sa.scc.mcs": "s0:c12,c9",
+            "openshift.io/sa.scc.supplemental-groups": "1000150000/10000",
+            "openshift.io/sa.scc.uid-range": "1000150000/10000"
+        },
+        "creationTimestamp": "2018-09-04T20:39:38Z",
+        "name": "operator-example-namespace",
+        "resourceVersion": "312376",
+        "selfLink": "/apis/project.openshift.io/v1/projects/operator-example-namespace",
+        "uid": "a42f48b0-b082-11e8-9a10-020859cce73e"
+    },
+    "spec": {
+        "finalizers": [
+            "openshift.io/origin",
+            "kubernetes"
+        ]
+    },
+    "status": {
+        "phase": "Active"
+    }
+}
+----
+
+A valid file system group is determined by the `openshift.io/sa.scc.supplemental-groups` annotation.
+In this example `1000150000` would allow the Couchbase Server pod to write to attached storage.
+====

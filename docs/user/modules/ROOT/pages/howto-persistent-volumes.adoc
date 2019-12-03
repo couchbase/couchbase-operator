@@ -1,0 +1,48 @@
+= How-to Configure Persistent Volumes
+
+[abstract]
+How to use persistent volumes with a Couchbase cluster.
+
+== Storage Class Configuration
+
+Ensure you have read the xref:concept-persistent-volumes.adoc#supported-storage-classes[storage classes] documentation and created any necessary storage classes for your platform.
+
+== Couchbase Cluster Configuration
+
+Once storage classes are provisioned correctly using them is simple:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  servers:
+  - size: 1
+    name: data_services
+    services:
+      - data
+    pod:
+      volumeMounts:
+        default: couchbase # <.>
+  volumeClaimTemplates: # <.>
+  - metadata:
+      name: couchbase # <.>
+    spec:
+      storageClassName: standard # <.>
+      resources: # <.>
+        requests:
+          storage: 1Gi
+----
+
+<.> xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-default[`spec.servers[\].pod.volumeMounts.default`] tells the Operator to provision a default persistent volume claim and attach it to a pod of that server class.
+
+<.> xref:couchbase-cluster-config.adoc#spec-volumeclaimtemplates[`spec.volumeClaimTemplates[\]`] defines a list of templates related to storage.
+These will be used to create Kubernetes persistent volume claims and therefore have the same data structure.
+However the Operator is only concerned with the following parameters, any others are ignored.
+
+<.> xref:couchbase-cluster-config.adoc#spec-volumeclaimtemplates-metadata-name[`spec.volumeClaimTemplates[\].metadata.name`] is a unique identifier for a persistent volume template.
+It is referred to by attributes in the xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts[`spec.servers[\].pod.volumeMounts`] object.
+
+<.> xref:couchbase-cluster-config.adoc#spec-volumeclaimtemplates-spec-storageclassname[`spec.volumeClaimTemplates[\].spec.storageClassName`] refers to a dynamically allocated storage class defined on the platform.
+
+<.> xref:couchbase-cluster-config.adoc#spec-volumeclaimtemplates-spec-resources[`spec.volumeClaimTemplates[\].spec.resources`] defines the size of the volume that will be allocated.
