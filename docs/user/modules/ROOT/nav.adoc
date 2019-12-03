@@ -26,8 +26,8 @@
   *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
   *** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
   *** xref:concept-sizing.adoc[Couchbase Sizing]
+  *** xref:concept-tls.adoc[Couchbase TLS]
   *** xref:xdcr.adoc[XDCR]
-  *** xref:tls.adoc[TLS]
   *** xref:server-groups.adoc[Server Groups]
 * Manage
  ** Operator
@@ -43,6 +43,7 @@
   *** Configure
    **** xref:persistent-volumes-guide.adoc[Configure Persistent Volumes]
    **** xref:howto-xdcr-external.adoc[Configure XDCR]
+   **** xref:howto-tls.adoc[Configure TLS]
    **** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
    **** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
   *** Connect
@@ -74,6 +75,7 @@
  ** Tools
   *** xref:cbopinfo.adoc[cbopinfo]
 * Tutorials
+ ** xref:tutorial-tls.adoc[Creating TLS Certificates]
  ** xref:demo.adoc[Couchbase Deployment Tutorial]
 * Other Resources
  ** xref:sync-gateway::kubernetes/deploy-cluster.adoc[Sync Gateway on Kubernetes]

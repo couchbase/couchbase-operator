@@ -1,0 +1,79 @@
+= TLS Certificate Tutorial
+
+[abstract]
+This section shows a simple way to create and manage a TLS certificate hierarchy.
+
+Creating X.509 certificates is beyond the scope of this documentation and is given only for illustrative purposes only.
+Please consult the https://docs.couchbase.com/server/6.5/learn/security/certificates.html[Couchbase Server documentation^] for additional details on certificate and TLS configuration.
+
+== EasyRSA
+
+EasyRSA by OpenVPN makes operating a public key infrastructure (PKI) relatively simple, and is the recommended method to get up and running quickly.
+
+First clone the repository:
+
+[source,console]
+----
+git clone https://github.com/OpenVPN/easy-rsa
+----
+
+Initialize and create the CA certificate/key. You will be prompted for a private key password and the CA common name (CN), something like _Couchbase CA_ is sufficient. The CA certificate will be available as `pki/ca.crt`.
+
+[source,console]
+----
+cd easy-rsa/easyrsa3
+----
+
+[source,console]
+----
+./easyrsa init-pki
+----
+
+[source,console]
+----
+./easyrsa build-ca
+----
+
+Create a server wildcard certificate and key to be used on Couchbase Server pods. The Operator/clients will access the pods via Kubernetes services (`cb-example-0000.cb-example.default.svc`, for example) so this needs to be in the SAN list in order for a client to verify the certificate belongs to the host that is being connected to. To this end, we add in a `--subject-alt-name`, this can be specified multiple times in case your client uses a different method of addressing. The key/certificate pair can be found in `pki/private/couchbase-server.key` and `pki/issued/couchbase-server.crt` and used as `pkey.pem` and `chain.pem`, respectively, in the `serverSecret`.
+
+[source,console]
+----
+./easyrsa --subject-alt-name=DNS:*.cb-example.default.svc build-server-full couchbase-server nopass
+----
+
+Note, password-protected keys are not supported by Couchbase Server or the Operator.
+
+To create a server certificate that can be used by the dynamic admission controller, simply specify the service name that the Kubernetes API webhooks will connect to.
+This is in the form `${service}.${default}.svc`, so if our service is called `couchbase-operator-admission` and we were deploying it in the `operator-admission` namespace, run the following:
+
+[source,console]
+----
+./easyrsa --subject-alt-name=couchbase-operator-admission.operator-admission.svc build-server-full couchbase-admission-controller nopass`
+----
+
+=== Private Key Formatting
+
+Due to an https://issues.couchbase.com/browse/MB-24404[issue] with Couchbase Server's private key handling, server keys need to be PKCS#1 formatted. This can be achieved with the following commands:
+
+[source,console]
+----
+openssl rsa -in pkey.key -out pkey.key.der -outform DER
+----
+
+[source,console]
+----
+openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
+----
+
+== Creating a Client Certificate
+
+This process is very similar to creating a server certificate.
+Assuming the administrative user defined for Couchbase Server is `Administrator` you can create a client certificate for the Operator to use with the following command:
+ 
+[source,console]
+----
+./easyrsa build-client-full Administrator nopass
+----
+
+The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `couchbase-operator.key` and `couchbase-operator.crt` respectively when specifying the `CouchbaseCluster` `spec.networking.tls.static.operatorSecret`.
+
