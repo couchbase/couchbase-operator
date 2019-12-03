@@ -310,6 +310,17 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	} else if secret == nil {
 		errs = append(errs, fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", customResource.Spec.Security.AdminSecret))
 	}
+
+	// Referenced object validation
+	if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Monitoring.Prometheus.AuthorizationSecret); err != nil {
+		// Silently ignore permissions errors, some users may not want us seeing these resources.
+		if !apierrors.IsForbidden(err) {
+			errs = append(errs, err)
+		}
+	} else if secret == nil {
+		errs = append(errs, fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", customResource.Spec.Monitoring.Prometheus.AuthorizationSecret))
+	}
+
 	if customResource.Spec.XDCR.Managed {
 		for i, remoteCluster := range customResource.Spec.XDCR.RemoteClusters {
 			if remoteCluster.AuthenticationSecret != nil {
@@ -785,7 +796,11 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		}
 
 		// Validate the TLS configuration is going to work
-		errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, zones)
+		hosts := util_x509.PrependZones(zones)
+		if cluster.Spec.Monitoring.Prometheus.Enabled {
+			hosts = append(hosts, "localhost")
+		}
+		errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, hosts)
 
 		// Do client certificate verification if necessary
 		if cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {

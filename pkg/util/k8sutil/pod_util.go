@@ -36,6 +36,9 @@ const (
 	etcSubPathName                  = "etc"
 	readinessFile                   = "/tmp/ready"
 	prometheusPort                  = 9091
+	serverSecretMountPath           = "/var/run/secrets/couchbase.com/couchbase-server-tls"
+	operatorSecretMountPath         = "/var/run/secrets/couchbase.com/couchbase-operator-tls"
+	metricsTokenMountPath           = "/var/run/secrets/couchbase.com/metrics-token"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -439,13 +442,6 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 		},
 	}
 
-	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
-		if cluster.Spec.Monitoring.Prometheus.Enabled {
-			metricsContainer := createMetricsContainer(cluster.Spec)
-			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
-		}
-	}
-
 	applyBaseAnnotations(pod.GetObjectMeta())
 
 	if cluster.Spec.AntiAffinity {
@@ -460,6 +456,17 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	}
 	if err := applyPodTLSConfiguration(cluster.Spec, pod); err != nil {
 		return nil, err
+	}
+
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
+		if cluster.Spec.Monitoring.Prometheus.Enabled {
+			metricsContainer := createMetricsContainer(cluster.Spec)
+			applyMetricsPodSecurity(cluster.Spec, &metricsContainer, pod)
+			if err := applyMetricsPodTLS(cluster.Spec, &metricsContainer, pod); err != nil {
+				return nil, err
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
+		}
 	}
 
 	if err := SetCouchbaseVersion(pod, cluster.Spec.Image); err != nil {
@@ -484,6 +491,100 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	pod.Annotations[constants.PodSpecAnnotation] = string(specJSON)
 
 	return pod, nil
+}
+
+func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) error {
+	if cs.Networking.TLS != nil {
+		// Static configuration:
+		// * Defines a (new) volume which contains the secrets necessary
+		//   to explicitly define TLS certificates and keys
+		// * K8S won't allow us to re-use the previous volume for Couchbase Pod TLS
+		// * Mounts the volume in in the correct location so that API
+		//   calls to /node/controller/reloadCertificate succeed
+		if cs.Networking.TLS.Static != nil {
+			// Add the TLS server secret volume to the metrics pod
+			volume := v1.Volume{
+				Name: constants.CouchbaseTLSVolumeName + "-metrics",
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName: cs.Networking.TLS.Static.ServerSecret,
+					},
+				},
+			}
+			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+			// Mount the secret volume
+			volumeMount := v1.VolumeMount{
+				Name:      constants.CouchbaseTLSVolumeName + "-metrics",
+				ReadOnly:  true,
+				MountPath: serverSecretMountPath,
+			}
+			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+
+			// add the TLS server flags to the couchbase-exporter binary
+			container.Command = append(container.Command,
+				"--cert", serverSecretMountPath+"/chain.pem",
+				"--key", serverSecretMountPath+"/pkey.key")
+
+			// Add the TLS server secret volume to the metrics pod
+			volume = v1.Volume{
+				Name: "couchbase-operator-tls-metrics",
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName: cs.Networking.TLS.Static.OperatorSecret,
+					},
+				},
+			}
+			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+			// Mount the secret volume
+			volumeMount = v1.VolumeMount{
+				Name:      "couchbase-operator-tls-metrics",
+				ReadOnly:  true,
+				MountPath: operatorSecretMountPath,
+			}
+			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+
+			// add the TLS server flags to the couchbase-exporter binary
+			container.Command = append(container.Command,
+				"--ca", operatorSecretMountPath+"/ca.crt")
+
+		}
+
+		if cs.Networking.TLS.ClientCertificatePolicy != nil {
+			// add the TLS server flags to the couchbase-exporter binary
+			container.Command = append(container.Command,
+				"--client-cert", operatorSecretMountPath+"/couchbase-operator.crt",
+				"--client-key", operatorSecretMountPath+"/couchbase-operator.key")
+		}
+	}
+
+	return nil
+}
+
+func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) {
+	// if bearer token is enabled for authorization, mount token as volume
+	if len(cs.Monitoring.Prometheus.AuthorizationSecret) != 0 {
+		volume := v1.Volume{
+			Name: "metrics-token",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: cs.Monitoring.Prometheus.AuthorizationSecret,
+				},
+			},
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+		// Mount the secret volume
+		volumeMount := v1.VolumeMount{
+			Name:      "metrics-token",
+			ReadOnly:  true,
+			MountPath: metricsTokenMountPath,
+		}
+		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+
+		container.Command = append(container.Command, "--token", metricsTokenMountPath+"/token")
+	}
 }
 
 func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.ServerConfig) map[string]string {
@@ -719,9 +820,33 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 	}
 
 	return v1.Container{
-		Name:    "metrics",
-		Image:   cs.Monitoring.Prometheus.Image,
-		Command: []string{"couchbase_exporter"},
+		Name:  "metrics",
+		Image: cs.Monitoring.Prometheus.Image,
+		Env: []v1.EnvVar{
+			{
+				Name: "COUCHBASE_OPERATOR_USER",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: cs.Security.AdminSecret,
+						},
+						Key: "username",
+					},
+				},
+			},
+			{
+				Name: "COUCHBASE_OPERATOR_PASS",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: cs.Security.AdminSecret,
+						},
+						Key: "password",
+					},
+				},
+			},
+		},
+		Command: []string{"couchbase-exporter"},
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "prometheus",

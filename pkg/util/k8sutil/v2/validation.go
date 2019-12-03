@@ -1173,6 +1173,9 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 														},
 													},
 												},
+												"authorizationSecret": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
 											},
 										},
 									},

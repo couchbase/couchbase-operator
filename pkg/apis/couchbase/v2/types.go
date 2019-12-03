@@ -1017,4 +1017,7 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 	// This field cannot be updated once the cluster is created.
 	// Will be populated by defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+	// AuthorizationSecret is the name of a Kubernetes secret that contains a
+	// bearer token to authorize GET requests to the metrics endpoint
+	AuthorizationSecret string `json:"authorizationSecret,omitempty"`
 }

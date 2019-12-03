@@ -19,8 +19,16 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 	return
 }
 
+// PrependZones prepends zone strings to create valid host addresses
+func PrependZones(zones []string) []string {
+	for i, zone := range zones {
+		zones[i] = "verify." + zone
+	}
+	return zones
+}
+
 // Verify checks the given chain and CA are valid to be installed
-func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, zones []string) (errors []error) {
+func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, hosts []string) (errors []error) {
 	// Decode CA certificate
 	caPem := DecodePEM(caData)
 	switch {
@@ -71,9 +79,9 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, zon
 		errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
 	}
 
-	// Verify the certifcate validates for each supplied zone (valid for server only)
-	for _, zone := range zones {
-		verifyOptions.DNSName = "verify." + zone
+	// Verify the certificate validates for each supplied zone (valid for server only)
+	for _, host := range hosts {
+		verifyOptions.DNSName = host
 		if _, err := cert.Verify(verifyOptions); err != nil {
 			errors = append(errors, fmt.Errorf("certificate cannot be verified for zone: %v", err))
 		}
