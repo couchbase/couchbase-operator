@@ -929,11 +929,7 @@ type BucketStatus struct {
 	CompressionMode    string `json:"compressionMode"`
 }
 
-type MemberStatusEntry struct {
-	Name string
-}
-
-type MemberStatusList []MemberStatusEntry
+type MemberStatusList []string
 
 type MembersStatus struct {
 	// Ready are the couchbase members that are ready to serve requests

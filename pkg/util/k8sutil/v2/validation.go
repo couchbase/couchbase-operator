@@ -1229,12 +1229,7 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 											Type: "array",
 											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 												Schema: &apiextensionsv1beta1.JSONSchemaProps{
-													Type: "object",
-													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-														"name": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "string",
-														},
-													},
+													Type: "string",
 												},
 											},
 										},
@@ -1242,12 +1237,7 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 											Type: "array",
 											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 												Schema: &apiextensionsv1beta1.JSONSchemaProps{
-													Type: "object",
-													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-														"name": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "string",
-														},
-													},
+													Type: "string",
 												},
 											},
 										},

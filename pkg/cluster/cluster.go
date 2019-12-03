@@ -723,7 +723,7 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 // according to status readiness.  Otherwise, fallback to cluster members
 func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
-	readyNodes := c.cluster.Status.Members.Ready.Names()
+	readyNodes := c.cluster.Status.Members.Ready
 
 	// Get running pods to ensure ready nodes exists
 	running, _ := c.pollPods()

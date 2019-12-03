@@ -261,60 +261,22 @@ func (tp *TLSPolicy) IsSecureClient() bool {
 	return len(tp.Static.OperatorSecret) != 0
 }
 
-func NewMemberStatusEntry(name string) MemberStatusEntry {
-	return MemberStatusEntry{
-		Name: name,
-	}
-}
-
-func (l MemberStatusList) Contains(name string) bool {
-	return l.GetMember(name) != nil
-}
-
-func (l MemberStatusList) GetMember(name string) *MemberStatusEntry {
-	for _, m := range l {
-		if m.Name == name {
-			return &m
-		}
-	}
-	return nil
-}
-
-func (l MemberStatusList) Names() []string {
-	names := []string{}
-	for _, m := range l {
-		names = append(names, m.Name)
-	}
-	return names
-}
-
-func (l *MemberStatusList) Add(name string) {
-	if !l.Contains(name) {
-		*l = append(*l, NewMemberStatusEntry(name))
-	}
-}
-
 // Set ready members from list.
 func (ms *MembersStatus) SetReady(ready []string) {
+	ms.Ready = nil
 	sort.Strings(ready)
-	ms.Ready = MemberStatusList{}
-	for _, m := range ready {
-		ms.Ready.Add(m)
+	for _, name := range ready {
+		ms.Ready = append(ms.Ready, name)
 	}
 }
 
 // Set Unready members from list.
 func (ms *MembersStatus) SetUnready(unready []string) {
+	ms.Unready = nil
 	sort.Strings(unready)
-	unreadyList := MemberStatusList{}
-	for _, m := range unready {
-		if oldMember := ms.Unready.GetMember(m); oldMember != nil {
-			unreadyList = append(unreadyList, *oldMember)
-		} else {
-			unreadyList.Add(m)
-		}
+	for _, name := range unready {
+		ms.Unready = append(ms.Unready, name)
 	}
-	ms.Unready = unreadyList
 }
 
 func (cs *ClusterStatus) SetVersion(v string) {
