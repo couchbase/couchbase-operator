@@ -1,0 +1,59 @@
+= About the Operator
+
+[abstract]
+This section gives a high level overview of the Operator architecture.
+
+== Custom Resource Definitions
+
+A custom resource definition (CRD) is a user defined type in Kubernetes.
+These allow us to create domain specific resources such as Couchbase clusters or Couchbase buckets that cannot be represented by other native types.
+
+A CRD simply defines a type name within a group e.g. `CouchbaseCluster` in `couchbase.com`.
+The Operator distributes CRDs with full JSON schema definitions attached to them.
+This allows the Kubernetes API server to check the structure and types of incoming custom resources for validity.
+
+== Dynamic Admission Controller
+
+Builtin Kubernetes resources function differently to Couchbase custom resources.
+Kubernetes will raise errors when creating Pod resources with additional illegal fields.
+Kubernetes will also insert default values for certain attributes.
+Neither of these things happen by default with custom resources.
+While this functionality is now present in Kubernetes 1.16+ with v1 CRDs, the Operator still supports earlier versions so cannot make use of this functionality.
+
+To this end the Operator comes with a dynamic admission controller (DAC).
+The DAC allows custom resources to be modified and interrogated before a resource is accepted and committed to etcd.
+
+Running the DAC allows us to add sensible defaults to Couchbase cluster configurations thus minimizing the size of specifications.
+It also allows us to maintain backwards compatibility when new attributes are added and must be populated.
+This makes the experience of using Couchbase resources similar to that of native resource types.
+
+Another benefit is that Couchbase specific configuration errors are synchronously reported back to the user in real time, rather than errors appearing in the Operator log and going unnoticed.
+
+For these reasons the DAC is a required component of the Operator and must be installed.
+The DAC is a standalone service and processes Couchbase cluster resources for the entire Kubernetes cluster, therefore only a single instance is required.
+
+[TIP]
+====
+By default the DAC will check that Kubernetes secrets and storage classes exist and have not been misconfigured.
+This is important because the validity of things like TLS certificates can be checked before attempting to create the cluster.
+If the required permissions are too permissive for your environment then you can remove them.
+The DAC will ignore permissions errors when polling for resources.
+====
+
+== Operator
+
+The Operator watches for events related to `CouchbaseCluster` resources.
+It also periodically polls the managed Couchbase cluster.
+The Operator reacts to creation events by provisioning new resources and initializing the Couchbase cluster.
+
+During the lifetime of the Couchbase cluster the Operator continually compares the state of Kubernetes resources with what is requested in the `CouchbaseCluster` resource, reconciling as necessary to make reality match what was requested.
+The Operator is also Couchbase Server aware, so can detect and fix faults that would not otherwise be visible to Kubernetes.
+
+.How Couchbase Operator Works
+image::cb-operator-working.jpg[]
+
+Polling the Kubernetes API continually to check for resource statuses is a costly operation.
+Etcd is commonly shown to be a bottleneck.
+To prevent the Operator from causing unnecessary API traffic and database accesses it uses local caching of every resource type it manages.
+Subsequently it needs list and watch permissions on all managed resources.
+After the initial list operation, the API only informs the Operator of changes that have happened, reducing API traffic to the absolute minimum.

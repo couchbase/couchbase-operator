@@ -19,7 +19,7 @@
   *** xref:concept-persistent-volumes.adoc[Persistent Volumes]
   *** xref:upgrading-kubernetes.adoc[Kubernetes Automated Upgrade]
  ** Couchbase Concepts
-  *** xref:running-couchbase.adoc[Couchbase Server]
+  *** xref:concept-operator.adoc[Couchbase Operator Architecture]
   *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
   *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
   *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
