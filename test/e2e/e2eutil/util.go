@@ -194,6 +194,7 @@ func NewTLSXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	clusterSpec := e2espec.NewBasicXdcrCluster(constants.ClusterNamePrefix, k8s.DefaultSecret.Name, size)
 	clusterSpec.Name = ctx.ClusterName
 	// Don't use alternate addresses.
+	clusterSpec.Spec.Networking.ExposeAdminConsole = false
 	clusterSpec.Spec.Networking.ExposedFeatures = nil
 	// Enable TLS.
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{

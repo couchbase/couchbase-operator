@@ -156,24 +156,14 @@ func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseClus
 // Used for generic XDCR testing.
 func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
 	// List the pods on the remote cluster and pick one
-	selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster.Name)).String()
-	pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
-	if err != nil {
-		return "", "", err
-	}
-	if len(pods.Items) == 0 {
-		return "", "", fmt.Errorf("no pods listed")
-	}
-	pod := pods.Items[0]
-
-	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(pod.Name, metav1.GetOptions{})
+	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name+"-ui", metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
 
 	nodePort := -1
 	for _, port := range svc.Spec.Ports {
-		if port.Name == string(couchbasev2.AdminService) {
+		if port.Port == 8091 {
 			nodePort = int(port.NodePort)
 			break
 		}
@@ -182,12 +172,28 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 		return "", "", fmt.Errorf("admin service port not exposed")
 	}
 
+	nodes, err := kubernetes.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return "", "", err
+	}
+
+	ip := ""
+	for _, address := range nodes.Items[0].Status.Addresses {
+		if address.Type == "InternalIP" {
+			ip = address.Address
+			break
+		}
+	}
+	if ip == "" {
+		return "", "", fmt.Errorf("unable to determine node IP address")
+	}
+
 	uuid, err := getRemoteUUID(kubernetes, cluster)
 	if err != nil {
 		return "", "", err
 	}
 
-	return uuid, fmt.Sprintf("%s:%d", pod.Status.HostIP, nodePort), nil
+	return uuid, fmt.Sprintf("%s:%d", ip, nodePort), nil
 }
 
 // getRemoteUUIDAndHostTLS returns the remote hostname, based on DNS, and the cluster UUID.

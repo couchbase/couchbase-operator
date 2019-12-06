@@ -257,9 +257,6 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
 		}
 	}
-	if customResource.Spec.Networking.ExposeAdminConsole && len(customResource.Spec.Networking.AdminConsoleServices) == 0 {
-		errs = append(errs, errors.Required("spec.networking.adminConsoleServices", "body"))
-	}
 
 	// Cluster validation
 	if customResource.Spec.ClusterSettings.DataServiceMemQuota != nil {

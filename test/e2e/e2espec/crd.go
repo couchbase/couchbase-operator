@@ -389,7 +389,8 @@ func NewBasicXdcrCluster(genName, secretName string, size int) *couchbasev2.Couc
 			AdminSecret: e2e_constants.KubeTestSecretName,
 		},
 		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
-			ExposedFeatures: []string{"xdcr"},
+			ExposeAdminConsole: true,
+			ExposedFeatures:    []string{"xdcr"},
 		},
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
