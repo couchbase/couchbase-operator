@@ -9,6 +9,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
@@ -407,6 +408,28 @@ func (cs *ClusterStatus) ContainsNode(name string) bool {
 	return cs.managedNodes.Contains(name)
 }
 
+// RebalanceSucceeded looks at the state and determines whether what we inteded to happen
+// actually happened in light of Server not behaving sensibly.
+func (cs *ClusterStatus) RebalanceSucceeded(members, ejected MemberSet) (bool, error) {
+	// For all managed nodes, we expect them to either be active (after being balanced in)
+	// or unclustered after being ejected.
+	for name := range cs.managedNodes {
+		switch state := cs.NodeStateMap[name]; state {
+		case NodeStateActive:
+			if _, ok := members[name]; !ok {
+				return false, fmt.Errorf("unexpected member %s active", name)
+			}
+		case NodeStateUnclustered:
+			if _, ok := ejected[name]; !ok {
+				return false, fmt.Errorf("unexpected member %s ejected", name)
+			}
+		default:
+			return false, fmt.Errorf("unexpected state %s for member %s", state.String(), name)
+		}
+	}
+	return true, nil
+}
+
 // Filter named nodes from a cluster status map
 func (nsm NodeStateMap) Exclude(excludes ...string) NodeStateMap {
 	states := NodeStateMap{}
@@ -611,51 +634,76 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 	})
 }
 
-func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, wait bool, cluster string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
+// triggerRebalance triggers a rebalance.
+func (c *CouchbaseClient) triggerRebalance(nodesToRemove []string) error {
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
 
-	// Try rebalance a few times before giving up.
 	callback := func() error {
 		return c.client.Rebalance(nodesToRemove)
 	}
+
 	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
+	return nil
+}
 
-	if !wait {
-		return nil
-	}
+// witnessRebalance waits until we can start streaming progress from the rebalance task.
+func (c *CouchbaseClient) witnessRebalance() (cbmgr.RebalanceProgress, *cbmgr.RebalanceStatusEntry, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+	defer cancel()
 
-	// Wait for a rebalance to commence, retry this a few times, we expect to witness
-	// the rebalance.
-	seenRebalance := false
-	callback = func() error {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+
+WitnessLoop:
+	for {
 		progress := c.client.NewRebalanceProgress()
-		for {
-			status, ok := <-progress.Status()
-			if !ok {
-				if !seenRebalance {
-					return fmt.Errorf("rebalance task not observed as running: %v", progress.Error())
-				}
-				return progress.Error()
-			}
-			seenRebalance = true
-			switch status.Status {
-			case cbmgr.RebalanceStatusUnknown:
-				log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
-			case cbmgr.RebalanceStatusRunning:
-				log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
-			}
+		status, ok := <-progress.Status()
+		if ok {
+			return progress, status, nil
+		}
+		select {
+		case <-tick.C:
+		case <-ctx.Done():
+			break WitnessLoop
 		}
 	}
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+
+	return nil, nil, errors.RebalanceNotObservedError
+}
+
+func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, cluster string) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+
+	// Start the rebalance.
+	if err := c.triggerRebalance(nodesToRemove); err != nil {
 		return err
 	}
 
-	return nil
+	// Ensure we see the rebalance happen, if we don't do this then we can delete
+	// pods prematurely.
+	progress, status, err := c.witnessRebalance()
+	if err != nil {
+		return err
+	}
+
+	// Stream out rebalance status.
+	for {
+		switch status.Status {
+		case cbmgr.RebalanceStatusUnknown:
+			log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
+		case cbmgr.RebalanceStatusRunning:
+			log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
+		}
+
+		var ok bool
+		status, ok = <-progress.Status()
+		if !ok {
+			return progress.Error()
+		}
+	}
 }
 
 func (c *CouchbaseClient) StopRebalance(ms MemberSet) error {

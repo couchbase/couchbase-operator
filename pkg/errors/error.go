@@ -16,6 +16,14 @@ var (
 	ErrUnboundPersistedVolumeClaims = "unbound immediate PersistentVolumeClaims"
 )
 
+type rebalanceNotObservedError struct{}
+
+func (e rebalanceNotObservedError) Error() string {
+	return "rebalance task not observed as running"
+}
+
+var RebalanceNotObservedError error = rebalanceNotObservedError{}
+
 type ErrSecretMissingUsername struct {
 	Reason string
 }

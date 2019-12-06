@@ -314,7 +314,7 @@ func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseu
 }
 
 // Rebalance nodes in the cluster
-func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string) error {
+func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged []string) error {
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
 	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
@@ -325,9 +325,25 @@ func (c *Cluster) rebalance(managed couchbaseutil.MemberSet, unmanaged []string)
 
 	// Perform the operation
 	nodesToRemove := append(managed.HostURLsPlaintext(), unmanaged...)
-	if err := c.client.Rebalance(c.members, nodesToRemove, true, c.namespacedName()); err != nil {
-		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-		return err
+	err := c.client.Rebalance(c.members, nodesToRemove, c.namespacedName())
+	if err != nil {
+		// If the rebalance was observed but failed raise an error.
+		if err != cberrors.RebalanceNotObservedError {
+			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
+			return err
+		}
+
+		// If the rebalance wasn't observed check to see it what we intended to
+		// happen happened without being seen. Magic as we like to call it.
+		status, err := c.client.GetClusterStatus(c.members)
+		if err != nil {
+			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
+			return err
+		}
+		if ok, err := status.RebalanceSucceeded(members, managed); !ok {
+			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
+			return fmt.Errorf("cluster not rebalanced as expected: %s", err)
+		}
 	}
 
 	// Error checking... perfom this a few times as there is a race between when

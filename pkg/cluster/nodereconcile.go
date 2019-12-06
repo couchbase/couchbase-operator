@@ -688,7 +688,7 @@ func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
 
 func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.NeedsRebalance {
-		if err := c.rebalance(r.ejectNodes, r.couchbase.UnmanagedNodes); err != nil {
+		if err := c.rebalance(r.knownNodes, r.ejectNodes, r.couchbase.UnmanagedNodes); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state
 			// will have changed from add-back to pending-add, so we won't loop
