@@ -1,0 +1,60 @@
+= How-to Configure Public Networking
+
+[abstract]
+This guide shows you how to configure Couchbase Server to be accessible from the public internet.
+
+Public networking leverages public cloud provider load-balancer services.
+These by default are allocated a public IP address which allows them to be accessed from anywhere with an internet connection.
+This may be the best option if connecting another public cloud service to your Couchbase cluster.
+
+Due to the public nature of connections the Operator enforces the use of TLS to keep data private.
+Please see the xref:howto-tls.adoc[TLS configuration how-to] for more information.
+
+== Couchbase Cluster Configuration
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  networking:
+    exposeAdminConsole: true # <.>
+    adminConsoleServiceType: LoadBalancer # <.>
+    exposedFeatures: # <.>
+    - client
+    exposedFeatureServiceType: LoadBalancer # <.>
+    dns:
+      domain: my-cluster.example.com # <.>
+    tls:
+      static:
+        serverSecret: my-server-secret # <.>
+        operatorSecret: my-operator-secret
+----
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-exposeadminconsole[`spec.networking.exposeAdminConsole`] is enabled to allow the creation of a service pointing to the Couchbase admin port.
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-adminconsoleservicetype[`spec.networking.adminConsoleServiceType`] is set to `LoadBalancer` causing the admin console service to use a load balancer.
+Combining the two attributes means a client can connect to a stable and highly-available public DNS endpoint that is load balanced across the entire cluster.
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatures[`spec.networking.exposedFeatures`] defines the `client` feature set, meaning all enabled services are exposed.
+This also causes a per-pod service to be created allowing direct access by a client to each pod as required.
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatureservicetype[`spec.networking.exposedFeautureServiceType`] is set to `LoadBalanacer` meaning each per-pod service is created with a load balancer and allocated a public IP address.
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] defines the domain DDNS entries will be created under.
+A separate https://github.com/kubernetes-sigs/external-dns[External DNS^] service needs to be created to actually replicate DNS names and IP addresses into a public DDNS server.
+The Operator will create annotations for the admin console as `console.my-cluster.example.com` for example.
+Annotations are attached to the admin console and per-pod services.
+The External DNS controller needs to create DNS A records for these service endpoints.
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-tls-serversecret[`spec.networking.tls.static.serverSecret`] specifies the Couchbase server certificate.
+It needs two DNS subject alternative names.
+The first is `\*.clustername.namespace.svc` as described in the xref:tutorial-tls.adoc[TLS certificate tutorial].
+The second needs to be valid for the public DNS names, in this case `*.my-cluster.example.com`.
+
+== Connecting Clients
+
+The admin console service provides a highly available endpoint for clients to connect to.
+The use of DDNS also provides stable naming, so clients will not need to be modified, just tolerant to any delays as infrastructure heals in the event of a failure.
+
+This admin console address can be used by clients to connect to the cluster with the connection string `https://console.my-cluster.example.com:18091` as defined in this example.

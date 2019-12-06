@@ -1,0 +1,34 @@
+= How-to Configure Node Port Networking
+
+[abstract]
+This guide shows you how to configure node port networking.
+
+Node port networking allows connection to a Couchbase cluster when you have access to the Kubernetes node network.
+It cannot be secured and has no stable client connection method.
+Its use is highly discouraged.
+
+== Couchbase Cluster Configuration
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  networking:
+    exposeAdminConsole: true # <.>
+    exposedFeatures: # <.>
+    - client
+----
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-exposeadminconsole[`spec.networking.exposeAdminConsole`] is enabled to allow the creation of a service pointing to the Couchbase admin port.
+The node port can be accessed on any Kubernetes node and will provide a degree of high-availability to a client connecting to it.
+However as node IP addresses may vary during the life cycle of a Kubernetes cluster it is considered unstable and may cause clients to fail.
+
+<.> xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatures[`spec.networking.exposedFeatures`] defines the `client` feature set, meaning all enabled services are exposed.
+This also causes a per-pod service to be created allowing direct access by a client to each pod as required.
+
+== Connecting Clients
+
+The following procedure defines how to create the address for a client to connect to.
+
+include::partial$nodeport-lookup.adoc[]

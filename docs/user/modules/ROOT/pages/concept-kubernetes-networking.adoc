@@ -24,6 +24,8 @@ In Kubernetes, there is no concept of a fixed IP address, thus the only stable i
 There are two types of network options that you can choose from for your deployment: _Routed networking_ or _overlay networking_.
 The choice is entirely up to you, unless you're deploying on a particular container service that limits these options.
 
+Please refer to the xref:concept-couchbase-networking.adoc[Couchbase Networking concepts] page to understand how Kubernetes networking affects your options when designing your network architecture.
+
 === Routed Networking
 
 Routed networking is by far the simplest approach.
@@ -67,13 +69,3 @@ When establishing a tunnel between two Kubernetes clusters that are running over
 While it is possible, it is not easy relying on a node receiving traffic from the remote cluster, performing SNAT to avoid asymmetric routing, and then encapsulating it an putting it into the overlay.
 
 image:NetworkDocsRouted-Overlay.png["Overlay network architecture"]
-
-== Couchbase Clients
-
-Couchbase SDKs are clients in exactly the same way as XDCR.
-Consult the xref:xdcr.adoc[XDCR documentation] for different deployment scenarios.
-
-== Service Meshes
-
-The use of the Operator with service meshes (such as Istio) is not supported and will not work.
-The Operator and Couchbase cluster must be deployed in a namespace with the service mesh disabled in Kubernetes clusters where these technologies are deployed.

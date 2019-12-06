@@ -26,14 +26,18 @@ metadata:
   name: my-remote-cluster
 spec:
   networking:
-    exposedFeatures:
+    exposeAdminConsole: true # <.>
+    exposedFeatures: # <.>
     - xdcr
-    exposedFeatureServiceType: NodePort
+    exposedFeatureServiceType: NodePort # <.>
 ----
 
-`spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster.
+<.> `spec.networking.exposeAdminConsole` creates a load balanced service used to connect to the remote cluster.
+
+<.> `spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster.
 In this instance the `xdcr` feature set exposes the admin, data and index ports required for XDCR replication.
-`spec.networking.exposedFeatureServiceType` is set to `NodePort` (this is the default set by the dynamic admission controller) which surfaces the exposed feature sets, per-pod, on the Kubernetes node network.
+
+<.> `spec.networking.exposedFeatureServiceType` is set to `NodePort` (this is the default set by the dynamic admission controller) which surfaces the exposed feature sets, per-pod, on the Kubernetes node network.
 This allows the cluster to escape the confines of any overlay network and be seen by the local cluster.
 
 === Local Cluster
@@ -47,13 +51,13 @@ kind: CouchbaseReplication
 metadata:
   name: replicate-source-to-destination-in-remote-cluster
   labels:
-    replication: from-my-cluster-to-remote-cluster
+    replication: from-my-cluster-to-remote-cluster # <.>
 spec:
   bucket: source
   remoteBucket: destination
 ----
 
-The resource is labeled with `replication:from-my-cluster-to-remote-cluster` to avoid any ambiguity because by default the Operator will select all `CouchbaseReplication` resources in the namespace and apply them to all remote clusters.
+<.> The resource is labeled with `replication:from-my-cluster-to-remote-cluster` to avoid any ambiguity because by default the Operator will select all `CouchbaseReplication` resources in the namespace and apply them to all remote clusters.
 Thus the label is specific to the source cluster and target cluster.
 
 We define a remote cluster on our local resource:
@@ -68,21 +72,31 @@ spec:
   xdcr:
     managed: true
     remoteClusters:
-    - name: remote-cluster
-      uid: 611e50b21e333a56e3d6d3570309d7e3
-      hostname: 10.16.5.87:30584
-      authenticationSecret: my-xdcr-secret
-      replications:
+    - name: remote-cluster # <.>
+      uid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
+      hostname: 10.16.5.87:30584 # <.>
+      authenticationSecret: my-xdcr-secret # <.>
+      replications: # <.>
         selector:
           matchLabels:
              replication: from-my-cluster-to-remote-cluster
 ----
 
-The name `remote-cluster` is unique among remote clusters on this local cluster.
-The `uid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
-The correct hostname to use is determined on the remote cluster following the xref:xdcr.adoc[XDCR technical guide].
-As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
-Finally we select replications that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
+<.> The name `remote-cluster` is unique among remote clusters on this local cluster.
+
+<.> The `uid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
+
+<.> The correct hostname to use is detailed below.
+
+<.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
+
+<.> Finally we select replications that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
+
+==== Determining the Hostname
+
+On the remote Kubernetes cluster, the following proceedure can be used to calculate the XDCR hostname.
+
+include::partial$nodeport-lookup.adoc[]
 
 == Encrypted
 
@@ -101,33 +115,33 @@ metadata:
   name: my-remote-cluster
 spec:
   networking:
-    tls:
+    tls: # <.>
       static:
         member:
           serverSecret: my-server-tls-secret
         operatorSecret: my-operator-tls-secret
-    dns:
+    dns: # <.>
       domain: my-remote-cluster.example.com
-    exposeAdminConsole: true
-    adminConsoleServices:
-    - data
-    exposedFeatures:
+    exposeAdminConsole: true # <.>
+    exposedFeatures: # <.>
     - xdcr
-    exposedFeatureServiceType: LoadBalancer
+    exposedFeatureServiceType: LoadBalancer # <.>
 ----
 
-TLS configuration is required and `spec.networking.tls` is configured as per the xref:tls.adoc[TLS configuration guide].
+<.> TLS configuration is required and `spec.networking.tls` is configured as per the xref:tls.adoc[TLS configuration guide].
 The TLS server certificate needs a subject alternative name (SAN) valid for the domain names that will be generated for the pods.
 In this instance `DNS:*.my-remote-cluster.example.com`.
-This domain is also specified in `spec.networking.dns.domain` so that per-pod and console services are annotated correctly.
+
+<.> The domain is also specified in `spec.networking.dns.domain` so that per-pod and console services are annotated correctly.
 A 3rd party solution is required to synchronize these DNS name annotations with a DDNS server in the cloud.
 
-By specifying `spec.networking.exposeAdminConsole` as true this creates a service for `console.spec.networking.dns.domain`.
+<.> By specifying `spec.networking.exposeAdminConsole` as true this creates a service for `console.my-remote-cluster.example.com`.
 This admin console service is a stable DNS name and can be used to perform service discovery -- it does not change as the cluster topology does.
 
-`spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster.
+<.> `spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster.
 In this instance the `xdcr` feature set exposes the admin, data and index ports required for XDCR replication.
-`spec.networking.exposedFeatureServiceType` is set to `LoadBalancer` and causes the Operator to create a load balancer per-pod.
+
+<.> `spec.networking.exposedFeatureServiceType` is set to `LoadBalancer` and causes the Operator to create a load balancer per-pod.
 Each load-balancer has a unique IP address -- unlike a `NodePort` -- so that standard port number can be used.
 
 === Local Cluster
@@ -141,13 +155,13 @@ kind: CouchbaseReplication
 metadata:
   name: replicate-source-to-destination-in-remote-cluster
   labels:
-    replication: from-my-cluster-to-remote-cluster
+    replication: from-my-cluster-to-remote-cluster # <.>
 spec:
   bucket: source
   remoteBucket: destination
 ----
 
-The resource is labeled with `replication:from-my-cluster-to-remote-cluster` to avoid any obliquity because by default the Operator will select all `CouchbaseReplication` resources in the namespace and apply them to all remote clusters.
+<.> The resource is labeled with `replication:from-my-cluster-to-remote-cluster` to avoid any obliquity because by default the Operator will select all `CouchbaseReplication` resources in the namespace and apply them to all remote clusters.
 Thus the label is specific to the source cluster and target cluster.
 
 We define a remote cluster on our local resource:
@@ -162,18 +176,22 @@ spec:
   xdcr:
     managed: true
     remoteClusters:
-    - name: remote-cluster
-      uid: 611e50b21e333a56e3d6d3570309d7e3
-      hostname: console.my-remote-cluster.example.com:18091
-      authenticationSecret: my-xdcr-secret
-      replications:
+    - name: remote-cluster # <.>
+      uid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
+      hostname: console.my-remote-cluster.example.com:18091 # <.>
+      authenticationSecret: my-xdcr-secret # <.>
+      replications: # <.>
         selector:
           matchLabels:
              replication: from-my-cluster-to-remote-cluster
 ----
 
-The name `remote-cluster` is unique among remote clusters on this local cluster.
-The `uid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
-The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery, it's port is the default admin service TLS port (18091).
-As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
-Finally we select replications that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
+<.> The name `remote-cluster` is unique among remote clusters on this local cluster.
+
+<.> The `uid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
+
+<.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery, its port is the default admin service TLS port (18091).
+
+<.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
+
+<.> Finally we select replications that match the labels we specify, in this instance the ones that go from this cluster to the remote one.

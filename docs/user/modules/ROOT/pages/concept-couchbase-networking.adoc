@@ -1,0 +1,148 @@
+= About Couchbase Networking
+
+[abstract]
+Connecting to a Couchbase cluster in Kubernetes is challenging.
+This section outlines supported strategies and key concepts.
+
+Couchbase Server is a high performance database, with data is distributed across all pods in a cluster.
+Clients are aware of which pod a data item should reside on and perform client-side load balancing.
+By performing the load balancing in the client, this avoids unnecessary network hops and improves performance.
+For this reason Couchbase Server cannot be accessed using normal Kubernetes `Service` or `Ingress` resources.
+
+The following options depict the possible networking topologies for connecting clients to a Couchbase cluster.
+Clients includes all Couchbase Client SDKs, Couchbase Mobile and Couchbase XDCR connections unless otherwise stated.
+
+== Supported Networking Types
+
+=== Intra-Kubernetes Networking
+
+Intra-Kubernetes networking is the simplest and allow clients running in the same Kubernetes cluster as the Couchbase server instance.
+This method of communication can be used by any client.
+
+.Basic Intra-Kubernetes Networking
+image::networking-basic-intra.png[]
+
+The client can use endpoint DNS entries to connect to individual Couchbase nodes.
+Stable service discovery is provided by SRV records.
+TLS can be used to secure communications.
+
+.Learn More
+* xref:howto-xdcr-external.adoc#encrypted[How-to configure XDCR]
+
+=== Inter-Kubernetes Networking with Kubernetai
+
+Inter-Kubernetes networking allows clients to connect to Couchbase server instances in another Kubernetes cluster.
+
+https://github.com/coredns/kubernetai[Kubernetai^] is a plugin that can be added to Kubernetes CoreDNS service.
+It allows local DNS entries to be populated from a remote cluster.
+
+This method of communication can only be used if clients in one cluster can communicate with pods in another -- it uses xref:concept-kubernetes-networking.adoc#routed-networking[routed networking].
+For example:
+
+* Google GKE allows multiple Kubernetes clusters in the same virtual private cloud, and has routed networking by default.
+* Amazon AWS can use the https://github.com/aws/amazon-vpc-cni-k8s[VPC CNI plugin^] to create routed networks that can be peered together.
+
+.Basic Inter-Kubernetes Networking
+image::networking-basic-kubernetai.png[]
+
+The client can use replicated endpoint DNS entries to connect to individual Couchbase nodes.
+Stable service discovery is provided by SRV records.
+TLS can be used to secure communications.
+
+.Learn More
+* xref:howto-xdcr-external.adoc#encrypted[How-to configure XDCR]
+
+=== Public Networking with External DNS
+
+Public networking allows clients to connect to Couchbase server instances from anywhere with an Internet connection.
+
+https://github.com/kubernetes-sigs/external-dns[External DNS^] is a service that can be run in a Kubernetes namespace.
+It allows services to advertise load-balancer service public IP addresses with public DDNS services.
+This networking type requires <<exposed-features>> and has some client limitations.
+
+.Basic Public Networking
+image::networking-basic-external-dns.png[]
+
+The client can use DNS names for load-balancer service public IP addresses to connect to individual Couchbase nodes.
+Stable service discovery is provided by a load-balanced HTTP connection to the cluster admin service.
+TLS must be used to secure communications.
+
+.Learn More
+* xref:howto-public-networking.adoc[How-to configure public networking]
+* xref:howto-xdcr-external.adoc#encrypted[How-to configure XDCR]
+
+=== Generic Networking
+
+Generic networking use is discouraged for production deployments.
+It should be avoided in preference for one of the prior methods of communication.
+This networking type requires <<exposed-features>> and has some client limitations.
+
+.Generic Networking
+image::networking-basic-nodeport.png[]
+
+The client uses Kubernetes node ports to connect to individual Couchbase nodes.
+Stable service discovery is not possible.
+TLS cannot be used to secure communications.
+
+.Learn More
+* xref:howto-nodeport-networking.adoc[How-to configure node port networking]
+* xref:howto-xdcr-external.adoc#unencrypted[How-to configure XDCR]
+
+== Exposed Features
+
+Both <<public-networking-with-external-dns>> and <<generic-networking>> require client traffic to cross as DNAT boundary.
+In both cases clients connect to different IP addresses than those of the underlying Couchbase pods.
+As a result when clients initially contact Couchbase Server to get a map of nodes and their hostnames then Operator must override the internal Kubernetes DNS names.
+
+Setting xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatures[`spec.networking.exposedFeatures`] when creating a Couchbase cluster will instruct the Operator to override node mappings so that clients can connect to the correct IP address that a client can connect to.
+It will also cause the Operator to create separate services that are visible external to the Kubernetes cluster.
+
+Additionally xref:couchbase-cluster-config.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] is specified when using <<public-networking-with-external-dns>>, populating the cluster node maps with DNS names and annotating the services so https://github.com/kubernetes-sigs/external-dns[External DNS^] can replicate this to a cloud DDNS service provider.
+
+=== Supported Client Versions for use with Exposed Features
+
+As <<public-networking-with-external-dns>> and <<generic-networking>> require exposed features, clients need to be able to support this feature.
+The minimum versions are specified below.
+
+.Supported Clients for Exposed Features
+[#table-public-connectivity,cols="1,2",options="header"]
+|===
+| Client | Version
+
+| Couchbase Server (XDCR)
+| 6.0.1+
+
+5.5.3+
+
+| Node.js SDK
+a| 2.5.0+
+
+NOTE: When not using the embedded `libcouchbase` and choosing to build with an external installation, `libcouchbase` 2.9.2+ is required.
+
+| PHP SDK
+| Any supported version using `libcouchbase` 2.9.2+
+
+| Python SDK
+| Any supported version using `libcouchbase` 2.9.2+
+
+| C SDK (a.k.a. `libcouchbase`)
+| 2.9.2+
+
+| Java SDK
+| 2.7.7+
+
+| .NET SDK
+| 2.7.9+
+
+| Go SDK
+| 1.6.1+
+
+| Couchbase Sync Gateway
+| Not yet supported
+
+| Couchbase Elasticsearch Connector
+| 4.1.0+
+
+| Couchbase Kafka Connector
+| 3.4.5+
+|===
