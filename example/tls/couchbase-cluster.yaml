@@ -30,6 +30,9 @@ spec:
       static:
         serverSecret: couchbase-server-tls
         operatorSecret: couchbase-operator-tls
+      clientCertificatePolicy: mandatory
+      clientCertificatePaths:
+      - path: subject.cn
   cluster:
     dataServiceMemoryQuota: 256Mi
     indexServiceMemoryQuota: 256Mi
