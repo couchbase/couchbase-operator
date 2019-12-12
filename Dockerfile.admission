@@ -1,4 +1,4 @@
-FROM alpine:3.6
+FROM scratch
 
 ADD docs/License.txt /License.txt
 ADD docs/README.txt /README.txt
