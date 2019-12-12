@@ -28,7 +28,7 @@ func TestPodResourcesBasic(t *testing.T) {
 	memLimit := strconv.Itoa(int(0.8*maxMem)) + "Mi"
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
@@ -61,7 +61,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 	memLimit := strconv.Itoa(int(0.7*maxMem)) + "Mi"
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
@@ -96,7 +96,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	clusterSize := e2eutil.MustGetMaxScale(t, targetKube, memoryRequest)
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
@@ -131,7 +131,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	memReq := strconv.Itoa(int(2*maxMem)) + "Mi"
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
@@ -154,7 +154,7 @@ func TestAntiAffinityOn(t *testing.T) {
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
@@ -175,7 +175,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
@@ -200,7 +200,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 

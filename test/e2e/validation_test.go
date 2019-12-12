@@ -863,6 +863,60 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.analytics requires the analytics service to be enabled`},
 		},
+		{
+			name:           "TestValidateBackupInvalidCronSchedule",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/full/schedule", "*7 * * * *")},
+			shouldFail:     true,
+			expectedErrors: []string{`failed to parse int from *7: strconv.Atoi: parsing "*7": invalid syntax`},
+		},
+		{
+			name:           "TestValidateBackupMissingCronSchedule",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Remove("/spec/incremental")},
+			shouldFail:     true,
+			expectedErrors: []string{`cronjob schedule spec.incremental cannot be empty`},
+		},
+		{
+			name:           "TestValidateBackupInvalidStrategy",
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/strategy", "tumbleweed")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.strategy in body should match 'full_incremental|full_only$'`},
+		},
+		{
+			name:           "TestValidateBackupSizeZero",
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", 0)},
+			shouldFail:     true,
+			expectedErrors: []string{`size: 0 must be greater than 0`},
+		},
+		{
+			name:           "TestValidateBackupSizeNegative",
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", -2)},
+			shouldFail:     true,
+			expectedErrors: []string{`size: -2 must be greater than 0`},
+		},
+		{
+			name:           "TestValidateBackupRestoreMissingBackupField",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Remove("/spec/backup")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.backup: Required value`},
+		},
+		{
+			name:           "TestValidateBackupRestoreStartPositiveInteger",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/start", "0")},
+			shouldFail:     true,
+			expectedErrors: []string{`Spec.Start must be a positive integer`},
+		},
+		{
+			name:           "TestValidateBackupRestoreEndPositiveInteger",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/end", "-27")},
+			shouldFail:     true,
+			expectedErrors: []string{`Spec.End must be a positive integer`, `start integer cannot be larger than end integer`},
+		},
+		{
+			name:           "TestValidateBackupRestoreInvalidStrategy",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Replace("/spec/strategy", "bigbucks")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.strategy in body should match 'full_incremental|full_only$'`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

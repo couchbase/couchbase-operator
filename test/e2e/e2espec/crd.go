@@ -1,6 +1,7 @@
 package e2espec
 
 import (
+	"github.com/couchbase/couchbase-operator/pkg/config"
 	"strconv"
 	"strings"
 	"time"
@@ -248,7 +249,7 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster) {
 }
 
 // basic 3 node cluster
-func NewBasicCluster(genName, secretName string, size int) *couchbasev2.CouchbaseCluster {
+func NewBasicCluster(size int) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
@@ -273,7 +274,7 @@ func NewBasicCluster(genName, secretName string, size int) *couchbasev2.Couchbas
 	if platform != "" {
 		spec.Platform = platform
 	}
-	return NewClusterCRD(genName, spec)
+	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
 func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
@@ -374,6 +375,14 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 	return spec
 }
 
+func NewBackupCluster(size int) *couchbasev2.CouchbaseCluster {
+	spec := NewSupportableCluster(size)
+	spec.Spec.Backup.Managed = true
+
+	spec.Spec.Backup.ServiceAccount = config.BackupResourceName
+	return spec
+}
+
 // NewSupportableCluster returns a basic supportable cluster with a stateful and stateless
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
 func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
@@ -382,7 +391,7 @@ func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
 }
 
 // basic 3 node cluster with Xdcr cluster
-func NewBasicXdcrCluster(genName, secretName string, size int) *couchbasev2.CouchbaseCluster {
+func NewBasicXdcrCluster(size int) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
@@ -410,7 +419,7 @@ func NewBasicXdcrCluster(genName, secretName string, size int) *couchbasev2.Couc
 	if platform != "" {
 		spec.Platform = platform
 	}
-	return NewClusterCRD(genName, spec)
+	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
 func CreateClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
@@ -419,9 +428,9 @@ func CreateClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2
 
 // Stateful 3 node cluster with a single volume.
 // Spec will request 1Gb of storage (minikube default is 5gb).
-func NewStatefulCluster(genName, secretName string, size int) *couchbasev2.CouchbaseCluster {
+func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 
-	crd := NewBasicCluster(genName, secretName, size)
+	crd := NewBasicCluster(size)
 	couchbase := "couchbase"
 	crd.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: couchbase},

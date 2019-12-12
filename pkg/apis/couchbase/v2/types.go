@@ -70,6 +70,161 @@ const (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseBackup struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseBackupSpec   `json:"spec"`
+	Status            CouchbaseBackupStatus `json:"status"`
+}
+
+type CouchbaseBackupSpec struct {
+	// CB backup strategy - Full/Incremental, Full only. Default: Full/Incremental
+	Strategy Strategy `json:"strategy"`
+
+	// Incremental is the schedule on when to take incremental backups.
+	// Used in Full/Incremental backup strategies
+	Incremental *CouchbaseBackupSchedule `json:"incremental,omitempty"`
+
+	// Full is the schedule on when to take full backups.
+	// Used in Full/Incremental and FullOnly backup strategies
+	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
+
+	// Amount of successful jobs to keep
+	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit,omitempty"`
+
+	// Amount of failed jobs to keep
+	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
+
+	// Number of hours to hold backups for, everything older will be deleted
+	BackupRetention *metav1.Duration `json:"backupRetention,omitempty"`
+
+	// Number of hours to hold script logs for, everything older will be deleted
+	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
+
+	// Size in GB of the associated PVC
+	Size *resource.Quantity `json:"size,omitempty"`
+}
+
+type CouchbaseBackupStatus struct {
+	// CapacityUsed tells us how much of the PVC we are using
+	CapacityUsed *resource.Quantity `json:"capacityUsed,omitempty"`
+	// Location of Backup Archive
+	Archive string `json:"archive,omitempty"`
+	// Repo is where we are currently performing operations
+	Repo string `json:"repo,omitempty"`
+	// RepoList gives us the complete list of Repos in the Backup Archive,
+	// useful for selecting a restore Repo
+	RepoList []string `json:"repoList"`
+	// Running indicates whether a backup is currently being performed
+	Running bool `json:"running"`
+	// Failed indicates whether the most recent backup has failed
+	Failed bool `json:"failed"`
+	// Output reports useful information from the backup_script
+	Output string `json:"output,omitempty"`
+	// Pod tells us which pod is running/ran last
+	Pod string `json:"pod"`
+	// Job tells us which job is running/ran last
+	Job string `json:"job"`
+	// Cronjob tells us which Cronjob the job belongs to
+	CronJob string `json:"cronjob"`
+	// Duration tells us how long the last backup took
+	Duration *metav1.Duration `json:"duration,omitempty"`
+	// LastFailure tells us the time the last failed backup failed
+	LastFailure *metav1.Time `json:"lastFailure,omitempty"`
+	// LastSuccess gives us the time the last successful backup finished
+	LastSuccess *metav1.Time `json:"lastSuccess,omitempty"`
+	// LastRun tells us the time the last backup job started
+	LastRun *metav1.Time `json:"lastRun,omitempty"`
+}
+
+type Strategy string
+
+const (
+	// Similar to Periodic but we create a new backup repo and take a full backup instead of merging.
+	FullIncremental Strategy = "full_incremental"
+
+	// Expensive Full Backup only recommended for small clusters.
+	FullOnly Strategy = "full_only"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseBackupList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseBackup `json:"items"`
+}
+
+type CouchbaseBackupSchedule struct {
+	// Schedule takes a cronjob string
+	Schedule string `json:"schedule"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseBackupRestore struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseBackupRestoreSpec   `json:"spec"`
+	Status            CouchbaseBackupRestoreStatus `json:"status"`
+}
+
+type CouchbaseBackupRestoreSpec struct {
+	// the cbbackup we associate this restore with or the cbbackup pvc we want to restore from
+	Backup string `json:"backup"`
+	// Repo is the backup folder to restore from
+	Repo string `json:"repo,omitempty"`
+	// Start and End denote the names of the start and end backups of a time range to restore backups from
+	// this will restore these two backups and any backups in between.
+	// If we only wish to restore one backup leave end blank or use the same backup for End
+	Start *StrOrInt `json:"start"`
+	End   *StrOrInt `json:"end,omitempty"`
+	// Number of hours to hold restore script logs for, everything older will be deleted
+	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
+}
+
+// struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness
+type StrOrInt struct {
+	Str *string `json:"str,omitempty"`
+	Int *int    `json:"int,omitempty"`
+}
+
+type CouchbaseBackupRestoreStatus struct {
+	// Location of Backup Archive
+	Archive string `json:"archive,omitempty"`
+	// Repo is where we are currently performing operations
+	Repo string `json:"repo,omitempty"`
+	// RepoList gives us the complete list of Repos in the Backup Archive,
+	// useful for selecting a restore Repo
+	RepoList []string `json:"repoList"`
+	// Running indicates whether a restore is currently being performed
+	Running bool `json:"running"`
+	// Failed indicates whether the most recent restore has failed
+	Failed bool `json:"failed"`
+	// Output reports useful information from the backup_script
+	Output string `json:"output,omitempty"`
+	// Pod tells us which pod is running/ran last
+	Pod string `json:"pod"`
+	// Job tells us which job is running/ran last
+	Job string `json:"job"`
+	// Duration tells us how long the last restore took
+	Duration *metav1.Duration `json:"duration,omitempty"`
+	// LastFailure tells us the time the last failed restore failed
+	LastFailure *metav1.Time `json:"lastFailure,omitempty"`
+	// LastSuccess gives us the time the last successful restore finished
+	LastSuccess *metav1.Time `json:"lastSuccess,omitempty"`
+	// LastRun tells us the time the last restore job started
+	LastRun *metav1.Time `json:"lastRun,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseBackupRestoreList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseBackupRestore `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -426,6 +581,26 @@ type ClusterSpec struct {
 
 	// Prometheus Monitoring settings.
 	Monitoring *CouchbaseClusterMonitoringSpec `json:"monitoring,omitempty"`
+
+	// Backup specific settings
+	Backup Backup `json:"backup"`
+}
+
+type Backup struct {
+	// Managed defines whether backups are managed by us or the clients.
+	Managed bool `json:"managed,omitempty"`
+	// The Backup Image to run on backup pods
+	Image string `json:"image,omitempty"`
+	// The Service Account to run backup (and restore) pods under.
+	// Without this backup pods will not be able to update status
+	ServiceAccount string `json:"serviceAccountName,omitempty"`
+	// Resources is the resource requirements for the backup container.
+	// This field cannot be updated once the cluster is created.
+	// Will be populated by defaults if not specified.
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+	// Selector allows CouchbaseBackup resources to be filtered
+	// based on labels.
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 type LDAPEncryption string
@@ -933,7 +1108,7 @@ type ClusterStatus struct {
 	Phase  ClusterPhase `json:"phase,omitempty"`
 	Reason string       `json:"reason,omitempty"`
 
-	// ControlPuased indicates the operator pauses the control of the cluster.
+	// ControlPaused indicates the operator pauses the control of the cluster.
 	ControlPaused bool `json:"controlPaused,omitempty"`
 
 	// Condition keeps ten most recent cluster conditions

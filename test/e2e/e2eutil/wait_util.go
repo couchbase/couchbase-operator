@@ -3,6 +3,8 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +30,122 @@ var retryInterval = 10 * time.Second
 
 type filterFunc func(*v1.Pod) bool
 type filterFuncDaemonSet func(*v1beta1.DaemonSet) bool
+
+func WaitForCronjob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
+		listOptions := metav1.ListOptions{}
+		cronjobs, err := k8s.KubeClient.BatchV1beta1().CronJobs(couchbase.Namespace).List(listOptions)
+		if err != nil {
+			return false, err
+		}
+
+		for _, cronjob := range cronjobs.Items {
+			if strings.HasSuffix(cronjob.Name, name) {
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+}
+
+func MustWaitForCronjob(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) {
+	if err := WaitForCronjob(k8s, couchbase, name, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// this function waits for a job and also waits for it to succeed
+func WaitForJob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration, waitForComplete bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
+		listOptions := metav1.ListOptions{}
+		jobs, err := k8s.KubeClient.BatchV1().Jobs(couchbase.Namespace).List(listOptions)
+		if err != nil {
+			return false, err
+		}
+
+		for _, job := range jobs.Items {
+			if strings.Contains(job.Name, name) {
+				if job.Status.Active == 1 {
+					return !waitForComplete, nil
+				}
+				if job.Status.Failed == 1 {
+					return false, fmt.Errorf("job %s failed", job.Name)
+				}
+				if job.Status.Succeeded == 1 {
+					return true, nil
+				}
+			}
+		}
+
+		return false, nil
+	})
+}
+
+func MustWaitForJob(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) {
+	if err := WaitForJob(k8s, couchbase, name, timeout, false); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitForJobCompletion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) {
+	if err := WaitForJob(k8s, couchbase, name, timeout, true); err != nil {
+		Die(t, err)
+	}
+}
+
+func WaitForStatusUpdate(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, backupName, statusField string, timeout time.Duration) (reflect.Value, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var statusFieldToCheck reflect.Value
+
+	return statusFieldToCheck, retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
+		getOptions := metav1.GetOptions{}
+		backup, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(couchbase.Namespace).Get(backupName, getOptions)
+		if err != nil {
+			return false, err
+		}
+
+		statusFieldToCheck = reflect.ValueOf(backup.Status).FieldByName(statusField)
+
+		switch statusFieldToCheck.Type().Kind() {
+		case reflect.String:
+			return !(len(statusFieldToCheck.String()) == 0), nil
+		case reflect.Struct:
+			if statusFieldToCheck.String() == "<v1.Time Value>" {
+				timeValueStr := fmt.Sprintf("%s", statusFieldToCheck.Interface())
+				goTimeFmt := "2006-01-02 15:04:05 -0700 MST"
+				newTime, err := time.Parse(goTimeFmt, timeValueStr)
+				if err != nil {
+					return false, err
+				}
+
+				return !newTime.IsZero(), nil
+			}
+			// isValid checks that v has a value, returns false if it is the 0 value
+			return statusFieldToCheck.IsValid(), nil
+		case reflect.Bool:
+			return statusFieldToCheck.Bool(), nil
+		}
+
+		return false, nil
+	})
+}
+
+func MustWaitStatusUpdate(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, backupName, statusField string, timeout time.Duration) reflect.Value {
+	s, err := WaitForStatusUpdate(k8s, couchbase, backupName, statusField, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+	return s
+}
 
 func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, size int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -598,6 +716,65 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 	})
 }
 
+// DeleteAndWaitForPVCDeletionSingle deletes a specific PVC in the cluster and waits for it
+// to be deleted.  If this operation fails we retry again and again until it does
+// work or the context timeout triggers.
+func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Select all Couchbase PVCs in the namespace.
+	requirements := []labels.Requirement{}
+	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
+	if err != nil {
+		return err
+	}
+	requirements = append(requirements, *req)
+
+	selector := labels.NewSelector()
+	selector = selector.Add(requirements...)
+
+	// Retry deletion until success or the timeout context fires.
+	return retryutil.Retry(ctx, time.Second, func() (bool, error) {
+		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		found := false
+		// If there are any finalizers make sure they aren't there, this causes most hangs
+		for _, pvc := range pvcs.Items {
+			if len(pvc.Finalizers) == 0 {
+				continue
+			}
+			pvc.Finalizers = []string{}
+			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(&pvc); err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+			if pvc.Name == pvcName {
+				found = true
+			}
+		}
+
+		if !found {
+			return true, nil
+		}
+
+		if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvcName, metav1.NewDeleteOptions(0)); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		// Wait for upto a minute for the PVCs to be deleted before we retry the deletion.
+		waitContext, waitCancel := context.WithTimeout(ctx, time.Minute)
+		defer waitCancel()
+
+		if err := WaitForPVCDeletion(k8s, namespace, waitContext); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+		return true, nil
+	})
+}
+
 // WaitForRebalanceProgress waits until a rebalance is running and the progress is greater
 // than or eual to the defined threshold.  This allows us to kill pods during a rebalance
 // with greater confidence that some vbuckets have migrated to the new master.
@@ -968,4 +1145,22 @@ func MustReceiveErrorValue(t *testing.T, echan chan error) {
 	if err := <-echan; err != nil {
 		Die(t, err)
 	}
+}
+
+func WaitForBackupDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(backups.Items) != 0 {
+			return fmt.Errorf("waiting for %v backups to delete", len(backups.Items))
+		}
+		return nil
+	}
+
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }

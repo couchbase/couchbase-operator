@@ -48,6 +48,8 @@ func main() {
 	buffer(v2.GetRoleCRD())
 	buffer(v2.GetRoleBindingCRD())
 	buffer(v2.GetCouchbaseClusterCRD())
+	buffer(v2.GetCouchbaseBackupCRD())
+	buffer(v2.GetCouchbaseBackupRestoreCRD())
 	if err := dump(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

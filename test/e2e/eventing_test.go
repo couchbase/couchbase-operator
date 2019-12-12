@@ -97,7 +97,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -135,7 +135,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -186,7 +186,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota

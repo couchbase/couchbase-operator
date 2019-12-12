@@ -33,7 +33,7 @@ func TestDenyCommunityEdition(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Image = constants.CommunityEditionImage
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
@@ -348,7 +348,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
 	// Kill a single pod and wait for the cluster to recover.
@@ -691,7 +691,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 	autofailoverTimeout := 30 * time.Second
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autofailoverTimeout}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 

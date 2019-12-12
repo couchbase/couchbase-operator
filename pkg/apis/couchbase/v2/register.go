@@ -6,38 +6,48 @@ import (
 )
 
 const (
-	ClusterCRDResourceKind           = "CouchbaseCluster"
-	ClusterCRDResourcePlural         = "couchbaseclusters"
-	BucketCRDResourceKind            = "CouchbaseBucket"
-	BucketCRDResourcePlural          = "couchbasebuckets"
-	EphemeralBucketCRDResourceKind   = "CouchbaseEphemeralBucket"
-	EphemeralBucketCRDResourcePlural = "couchbaseephemeralbuckets"
-	MemcachedBucketCRDResourceKind   = "CouchbaseMemcachedBucket"
-	MemcachedBucketCRDResourcePlural = "couchbasememcachedbuckets"
-	ReplicationCRDResourceKind       = "CouchbaseReplication"
-	ReplicationCRDResourcePlural     = "couchbasereplications"
-	UserCRDResourceKind              = "CouchbaseUser"
-	UserCRDResourcePlural            = "couchbaseusers"
-	GroupCRDResourceKind             = "CouchbaseGroup"
-	GroupCRDResourcePlural           = "couchbasegroups"
-	RoleCRDResourceKind              = "CouchbaseRole"
-	RoleCRDResourcePlural            = "couchbaseroles"
-	RoleBindingCRDResourceKind       = "CouchbaseRoleBinding"
-	RoleBindingCRDResourcePlural     = "couchbaserolebindings"
-	GroupName                        = "couchbase.com"
-	ClusterCRDName                   = ClusterCRDResourcePlural + "." + GroupName
-	BucketCRDName                    = BucketCRDResourcePlural + "." + GroupName
-	EphemeralBucketCRDName           = EphemeralBucketCRDResourcePlural + "." + GroupName
-	MemcachedBucketCRDName           = MemcachedBucketCRDResourcePlural + "." + GroupName
-	ReplicationCRDName               = ReplicationCRDResourcePlural + "." + GroupName
-	UserCRDName                      = UserCRDResourcePlural + "." + GroupName
-	GroupCRDName                     = GroupCRDResourcePlural + "." + GroupName
-	RoleCRDName                      = RoleCRDResourcePlural + "." + GroupName
-	RoleBindingCRDName               = RoleBindingCRDResourcePlural + "." + GroupName
+	ClusterCRDResourceKind            = "CouchbaseCluster"
+	ClusterCRDResourcePlural          = "couchbaseclusters"
+	BackupCRDResourceKind             = "CouchbaseBackup"
+	BackupCRDResourcePlural           = "couchbasebackups"
+	BackupRestoreCRDResourceKind      = "CouchbaseBackupRestore"
+	BackupRestoreCRDResourcePlural    = "couchbasebackuprestores"
+	BackupCRDResourceShortName        = "cbbackup"
+	BackupRestoreCRDResourceShortName = "cbrestore"
+	BucketCRDResourceKind             = "CouchbaseBucket"
+	BucketCRDResourcePlural           = "couchbasebuckets"
+	EphemeralBucketCRDResourceKind    = "CouchbaseEphemeralBucket"
+	EphemeralBucketCRDResourcePlural  = "couchbaseephemeralbuckets"
+	MemcachedBucketCRDResourceKind    = "CouchbaseMemcachedBucket"
+	MemcachedBucketCRDResourcePlural  = "couchbasememcachedbuckets"
+	ReplicationCRDResourceKind        = "CouchbaseReplication"
+	ReplicationCRDResourcePlural      = "couchbasereplications"
+	UserCRDResourceKind               = "CouchbaseUser"
+	UserCRDResourcePlural             = "couchbaseusers"
+	GroupCRDResourceKind              = "CouchbaseGroup"
+	GroupCRDResourcePlural            = "couchbasegroups"
+	RoleCRDResourceKind               = "CouchbaseRole"
+	RoleCRDResourcePlural             = "couchbaseroles"
+	RoleBindingCRDResourceKind        = "CouchbaseRoleBinding"
+	RoleBindingCRDResourcePlural      = "couchbaserolebindings"
+	GroupVersion                      = "v2"
+	GroupName                         = "couchbase.com"
+	Group                             = GroupName + "/" + GroupVersion
+	ClusterCRDName                    = ClusterCRDResourcePlural + "." + GroupName
+	BackupCRDName                     = BackupCRDResourcePlural + "." + GroupName
+	BackupRestoreCRDName              = BackupRestoreCRDResourcePlural + "." + GroupName
+	BucketCRDName                     = BucketCRDResourcePlural + "." + GroupName
+	EphemeralBucketCRDName            = EphemeralBucketCRDResourcePlural + "." + GroupName
+	MemcachedBucketCRDName            = MemcachedBucketCRDResourcePlural + "." + GroupName
+	ReplicationCRDName                = ReplicationCRDResourcePlural + "." + GroupName
+	UserCRDName                       = UserCRDResourcePlural + "." + GroupName
+	GroupCRDName                      = GroupCRDResourcePlural + "." + GroupName
+	RoleCRDName                       = RoleCRDResourcePlural + "." + GroupName
+	RoleBindingCRDName                = RoleBindingCRDResourcePlural + "." + GroupName
 )
 
 var (
-	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v2"}
+	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: GroupVersion}
 
 	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
 
@@ -54,6 +64,8 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseGroup{}, &CouchbaseGroupList{})
 	SchemeBuilder.Register(&CouchbaseRole{}, &CouchbaseRoleList{})
 	SchemeBuilder.Register(&CouchbaseRoleBinding{}, &CouchbaseRoleBindingList{})
+	SchemeBuilder.Register(&CouchbaseBackup{}, &CouchbaseBackupList{})
+	SchemeBuilder.Register(&CouchbaseBackupRestore{}, &CouchbaseBackupRestoreList{})
 }
 
 func Resource(resource string) schema.GroupResource {
@@ -76,6 +88,10 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: RoleCRDResourceKind}
 	case "couchbaserolebinding":
 		return schema.GroupResource{Group: GroupName, Resource: RoleBindingCRDResourceKind}
+	case "couchbasebackup":
+		return schema.GroupResource{Group: GroupName, Resource: BackupCRDResourceKind}
+	case "couchbasebackuprestore":
+		return schema.GroupResource{Group: GroupName, Resource: BackupRestoreCRDResourceKind}
 	default:
 		return schema.GroupResource{}
 	}

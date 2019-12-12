@@ -65,8 +65,8 @@ func newLDAPSettings(namespace string) *couchbasev2.CouchbaseClusterLDAPSpec {
 }
 
 // NewLDAPClusterBasic creates a new cluster with LDAP configured
-func NewLDAPClusterBasic(secretName string, namespace string, size int, secretCa string, secretPassword string) *couchbasev2.CouchbaseCluster {
-	clusterSpec := NewBasicCluster(constants.ClusterNamePrefix, secretName, size)
+func NewLDAPClusterBasic(namespace string, size int, secretCa string, secretPassword string) *couchbasev2.CouchbaseCluster {
+	clusterSpec := NewBasicCluster(size)
 	clusterSpec.Spec.Security.LDAP = newLDAPSettings(namespace)
 	clusterSpec.Spec.Security.LDAP.BindSecret = secretPassword
 	clusterSpec.Spec.Security.LDAP.TLSSecret = secretCa

@@ -201,7 +201,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 			constants.AnnotationVolumeNodeConf:      config.Name,
 			constants.CouchbaseVersionAnnotationKey: version,
 		})
-		applyBaseAnnotations(required.GetObjectMeta())
+		ApplyBaseAnnotations(required.GetObjectMeta())
 		if gid := cluster.Spec.GetFSGroup(); gid != nil {
 			required.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
 		}
@@ -442,7 +442,14 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 		},
 	}
 
-	applyBaseAnnotations(pod.GetObjectMeta())
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
+		if cluster.Spec.Monitoring.Prometheus.Enabled {
+			metricsContainer := createMetricsContainer(cluster.Spec)
+			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
+		}
+	}
+
+	ApplyBaseAnnotations(pod.GetObjectMeta())
 
 	if cluster.Spec.AntiAffinity {
 		pod = PodWithAntiAffinity(pod, cluster.Name)

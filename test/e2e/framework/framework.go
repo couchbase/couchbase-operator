@@ -348,6 +348,12 @@ func recreateCRDs(k8s *types.Cluster) error {
 	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetRoleBindingCRD()); err != nil {
 		return err
 	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseBackupCRD()); err != nil {
+		return err
+	}
+	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseBackupRestoreCRD()); err != nil {
+		return err
+	}
 	return nil
 }
 

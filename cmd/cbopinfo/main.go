@@ -26,6 +26,8 @@ var (
 	resourceInitializers = []resource.ResourceInitializer{
 		resource.NewConfigMapResource,
 		resource.NewCouchbaseClusterResource,
+		resource.NewCouchbaseBackupResource,
+		resource.NewCouchbaseBackupRestoreResource,
 		resource.NewCouchbaseBucketResource,
 		resource.NewCouchbaseEphemeralBucketResource,
 		resource.NewCouchbaseMemcachedBucketResource,

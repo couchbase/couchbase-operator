@@ -115,7 +115,7 @@ func TestEditClusterSettings(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1)
+	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService, // No index service or we cannot update the index settings
 	}
@@ -153,7 +153,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1)
+	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
 	testCouchbase.Spec.Image = "basecouch/123:enterprise-5.5.0"
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
@@ -177,7 +177,7 @@ func TestInvalidVersion(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(constants.Size1)
+	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
 	testCouchbase.Spec.Image = "couchbase/server:enterprise-9.9.9"
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
 
@@ -211,7 +211,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	allocatableMemory := e2eutil.MustGetMinNodeMem(t, targetKube)
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(1)
+	testCouchbase := e2espec.NewBasicCluster(1)
 	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
@@ -413,7 +413,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
@@ -547,7 +547,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
@@ -638,7 +638,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(mdsGroup1Size)
+	testCouchbase := e2espec.NewBasicCluster(mdsGroup1Size)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
@@ -687,7 +687,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(mdsGroup1Size)
+	testCouchbase := e2espec.NewBasicCluster(mdsGroup1Size)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
@@ -746,7 +746,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	clusterSize := mdsGroupSize1 + mdsGroupSize2
 
 	// Create the cluster with two server classes, and exposed features.
-	testCouchbase := e2espec.NewBasicClusterSpec(0)
+	testCouchbase := e2espec.NewBasicCluster(0)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "data",

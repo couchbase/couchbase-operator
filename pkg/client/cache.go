@@ -3,12 +3,13 @@ package client
 import (
 	"context"
 	"fmt"
+	"k8s.io/api/batch/v1beta1"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	couchbaseclientv2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -651,5 +652,183 @@ func (c *CouchbaseRoleBindingCache) List() (resources []*couchbasev2.CouchbaseRo
 
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseRoleBindingCache) stop() {
+	c.resourceCache.stop()
+}
+
+// JobCache is a wrapper around a resourceCache that provides concrete typing for
+// Job resources.
+type JobCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newJobCache creates a new synchronized cache for Job resources.
+func newJobCache(ctx context.Context, client kubernetes.Interface, namespace string, selector fmt.Stringer) (*JobCache, error) {
+	resourceCache, err := newResourceCache(ctx, client.BatchV1().RESTClient(), &batchv1.Job{}, selector, "jobs", namespace)
+	if err != nil {
+		return nil, err
+	}
+	return &JobCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested job based on name.
+func (c *JobCache) Get(name string) (*batchv1.Job, bool) {
+	key := c.namespace + "/" + name
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+	return obj.(*batchv1.Job), true
+}
+
+// list returns all jobs.
+func (c *JobCache) List() (resources []*batchv1.Job) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*batchv1.Job))
+	}
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *JobCache) stop() {
+	c.resourceCache.stop()
+}
+
+// JobCache is a wrapper around a resourceCache that provides concrete typing for
+// Job resources.
+type CronJobCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newJobCache creates a new synchronized cache for Job resources.
+func newCronJobCache(ctx context.Context, client kubernetes.Interface, namespace string, selector fmt.Stringer) (*CronJobCache, error) {
+	resourceCache, err := newResourceCache(ctx, client.BatchV1beta1().RESTClient(), &v1beta1.CronJob{}, selector, "cronjobs", namespace)
+	if err != nil {
+		return nil, err
+	}
+	return &CronJobCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested job based on name.
+func (c *CronJobCache) Get(name string) (*v1beta1.CronJob, bool) {
+	key := c.namespace + "/" + name
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+	return obj.(*v1beta1.CronJob), true
+}
+
+// list returns all jobs.
+func (c *CronJobCache) List() (resources []*v1beta1.CronJob) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*v1beta1.CronJob))
+	}
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CronJobCache) stop() {
+	c.resourceCache.stop()
+}
+
+// CouchbaseBackupCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseBackup resources.
+type CouchbaseBackupCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseBackupCache creates a new synchronized cache for CouchbaseBackup resources.
+func newCouchbaseBackupCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseBackupCache, error) {
+	selector := labels.Everything()
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseBackup{}, selector, couchbasev2.BackupCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return &CouchbaseBackupCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested couchbasebackup based on name.
+func (c *CouchbaseBackupCache) Get(name string) (*couchbasev2.CouchbaseBackup, bool) {
+	key := c.namespace + "/" + name
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+	return obj.(*couchbasev2.CouchbaseBackup), true
+}
+
+// list returns all couchbasebackups.
+func (c *CouchbaseBackupCache) List() (resources []*couchbasev2.CouchbaseBackup) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseBackup))
+	}
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseBackupCache) stop() {
+	c.resourceCache.stop()
+}
+
+// CouchbaseBackupRestoreCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseBackupRestore resources.
+type CouchbaseBackupRestoreCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseBackupRestoreCache creates a new synchronized cache for CouchbaseBackupRestore resources.
+func newCouchbaseBackupRestoreCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseBackupRestoreCache, error) {
+	selector := labels.Everything()
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseBackupRestore{}, selector, couchbasev2.BackupRestoreCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return &CouchbaseBackupRestoreCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested couchbasebackuprestore based on name.
+func (c *CouchbaseBackupRestoreCache) Get(name string) (*couchbasev2.CouchbaseBackupRestore, bool) {
+	key := c.namespace + "/" + name
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+	return obj.(*couchbasev2.CouchbaseBackupRestore), true
+}
+
+// list returns all couchbasebackuprestores.
+func (c *CouchbaseBackupRestoreCache) List() (resources []*couchbasev2.CouchbaseBackupRestore) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseBackupRestore))
+	}
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseBackupRestoreCache) stop() {
 	c.resourceCache.stop()
 }

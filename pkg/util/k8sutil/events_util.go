@@ -15,44 +15,47 @@ import (
 )
 
 const (
-	EventReasonMemberCreationFailed  = "MemberCreationFailed"
-	EventReasonNewMemberAdded        = "NewMemberAdded"
-	EventReasonMemberRemoved         = "MemberRemoved"
-	EventReasonMemberDown            = "MemberDown"
-	EventReasonMemberRecovered       = "MemberRecovered"
-	EventReasonMemberFailedOver      = "MemberFailedOver"
-	EventReasonRebalanceStarted      = "RebalanceStarted"
-	EventReasonRebalanceIncomplete   = "RebalanceIncomplete"
-	EventReasonRebalanceCompleted    = "RebalanceCompleted"
-	EventReasonFailedAddNode         = "FailedAddNode"
-	EventReasonFailedAddBackNode     = "FailedAddBackNode"
-	EventReasonBucketCreated         = "BucketCreated"
-	EventReasonBucketDeleted         = "BucketDeleted"
-	EventReasonBucketEdited          = "BucketEdited"
-	EventReasonUserCreated           = "UserCreated"
-	EventReasonUserDeleted           = "UserDeleted"
-	EventReasonUserEdited            = "UserEdited"
-	EventReasonGroupCreated          = "GroupCreated"
-	EventReasonGroupDeleted          = "GroupDeleted"
-	EventReasonGroupEdited           = "GroupEdited"
-	EventReasonServiceCreated        = "ServiceCreated"
-	EventReasonServiceDeleted        = "ServiceDeleted"
-	EventReasonNodeServiceCreated    = "NodeServiceCreated"
-	EventReasonNodeServiceDeleted    = "NodeServiceDeleted"
-	EventReasonUpgradeStarted        = "UpgradeStarted"
-	EventReasonUpgradeFinished       = "UpgradeFinished"
-	EventReasonRollbackStarted       = "RollbackStarted"
-	EventReasonRollbackFinished      = "RollbackFinished"
-	EventReasonClusterSettingsEdited = "ClusterSettingsEdited"
-	EventReasonTLSUpdated            = "TLSUpdated"
-	EventReasonTLSInvalid            = "TLSInvalid"
-	EventReasonTLSUpdateFailed       = "TLSUpdateFailed"
-	EventReasonClientTLSUpdated      = "ClientTLSUpdated"
-	EventReasonClientTLSInvalid      = "ClientTLSInvalid"
-	EventReasonRemoteClusterAdded    = "RemoteClusterAdded"
-	EventReasonRemoteClusterRemoved  = "RemoteClusterRemoved"
-	EventReasonReplicationAdded      = "ReplicationAdded"
-	EventReasonReplicationRemoved    = "ReplicationRemoved"
+	EventReasonMemberCreationFailed    = "MemberCreationFailed"
+	EventReasonNewMemberAdded          = "NewMemberAdded"
+	EventReasonMemberRemoved           = "MemberRemoved"
+	EventReasonMemberDown              = "MemberDown"
+	EventReasonMemberRecovered         = "MemberRecovered"
+	EventReasonMemberFailedOver        = "MemberFailedOver"
+	EventReasonRebalanceStarted        = "RebalanceStarted"
+	EventReasonRebalanceIncomplete     = "RebalanceIncomplete"
+	EventReasonRebalanceCompleted      = "RebalanceCompleted"
+	EventReasonFailedAddNode           = "FailedAddNode"
+	EventReasonFailedAddBackNode       = "FailedAddBackNode"
+	EventReasonBucketCreated           = "BucketCreated"
+	EventReasonBucketDeleted           = "BucketDeleted"
+	EventReasonBucketEdited            = "BucketEdited"
+	EventReasonUserCreated             = "UserCreated"
+	EventReasonUserDeleted             = "UserDeleted"
+	EventReasonUserEdited              = "UserEdited"
+	EventReasonGroupCreated            = "GroupCreated"
+	EventReasonGroupDeleted            = "GroupDeleted"
+	EventReasonGroupEdited             = "GroupEdited"
+	EventReasonServiceCreated          = "ServiceCreated"
+	EventReasonServiceDeleted          = "ServiceDeleted"
+	EventReasonNodeServiceCreated      = "NodeServiceCreated"
+	EventReasonNodeServiceDeleted      = "NodeServiceDeleted"
+	EventReasonUpgradeStarted          = "UpgradeStarted"
+	EventReasonUpgradeFinished         = "UpgradeFinished"
+	EventReasonRollbackStarted         = "RollbackStarted"
+	EventReasonRollbackFinished        = "RollbackFinished"
+	EventReasonClusterSettingsEdited   = "ClusterSettingsEdited"
+	EventReasonTLSUpdated              = "TLSUpdated"
+	EventReasonTLSInvalid              = "TLSInvalid"
+	EventReasonTLSUpdateFailed         = "TLSUpdateFailed"
+	EventReasonClientTLSUpdated        = "ClientTLSUpdated"
+	EventReasonClientTLSInvalid        = "ClientTLSInvalid"
+	EventReasonRemoteClusterAdded      = "RemoteClusterAdded"
+	EventReasonRemoteClusterRemoved    = "RemoteClusterRemoved"
+	EventReasonReplicationAdded        = "ReplicationAdded"
+	EventReasonReplicationRemoved      = "ReplicationRemoved"
+	EventReasonBackupCronjobCreated    = "BackupCronjobCreated"
+	EventReasonBackupCronjobEdited     = "BackupCronjobEdited"
+	EventReasonBackupRestoreJobCreated = "BackupRestoreJobCreated"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
@@ -142,6 +145,38 @@ func FailedAddBackNodeEvent(memberName string, cl *couchbasev2.CouchbaseCluster)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonFailedAddBackNode
 	event.Message = fmt.Sprintf("Removed existing member %s because it could not be added back to the cluster", memberName)
+	return event
+}
+
+func BackupCronjobCreateEvent(backup, cronjob string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupCronjobCreated
+	event.Message = fmt.Sprintf("A new cronjob `%s` for `%s` was created", cronjob, backup)
+	return event
+}
+
+func BackupCronjobEditEvent(backup, cronjob string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupCronjobEdited
+	event.Message = fmt.Sprintf("Cronjob `%s` for `%s` was edited", cronjob, backup)
+	return event
+}
+
+func BackupRestoreJobCreateEvent(restore, job string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupRestoreJobCreated
+	event.Message = fmt.Sprintf("A new restore job `%s` for `%s` was created", job, restore)
+	return event
+}
+
+func BackupRestoreJobEditEvent(restore, job string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupRestoreJobCreated
+	event.Message = fmt.Sprintf("Restore job `%s` for `%s` was edited", job, restore)
 	return event
 }
 

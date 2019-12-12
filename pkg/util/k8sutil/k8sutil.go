@@ -33,9 +33,9 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// applyBaseAnnotations adds common annotations to resources.
+// ApplyBaseAnnotations adds common annotations to resources.
 // All resources created should have this set of annotations for upgrade reasons.
-func applyBaseAnnotations(object metav1.Object) {
+func ApplyBaseAnnotations(object metav1.Object) {
 	annotations := map[string]string{
 		constants.ResourceVersionAnnotation: version.Version,
 	}

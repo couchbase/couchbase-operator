@@ -22,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/robfig/cron"
 )
 
 const (
@@ -34,6 +36,7 @@ const (
 	defaultFSGroup                                = 1000
 	defaultMetricsImage                           = "couchbase/exporter:1.0.0"
 	redhatMetricsImage                            = "http://registry.connect.redhat.com/couchbase/exporter:1.0.0-1"
+	defaultBackupImage                            = "couchbase/operator-backup:6.5.0-1"
 )
 
 var (
@@ -129,6 +132,11 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 		}
 
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: fsgroup})
+	}
+	if managedBackup, found, _ := unstructured.NestedBool(object.Object, "spec", "backup", "managed"); found && managedBackup {
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "image"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/image", Value: defaultBackupImage})
+		}
 	}
 	if enableMonitoring, found, _ := unstructured.NestedBool(object.Object, "spec", "monitoring", "prometheus", "enabled"); found && enableMonitoring {
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "monitoring", "prometheus", "image"); !found {
@@ -259,6 +267,53 @@ func ApplyRoleDefaults(v *types.Validator, object *unstructured.Unstructured) js
 
 		}
 	}
+
+	return patch
+}
+
+func ApplyBackupDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "strategy"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/strategy", Value: couchbasev2.FullIncremental})
+	}
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "successfulJobsHistoryLimit"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/successfulJobsHistoryLimit", Value: 3})
+	}
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "failedJobsHistoryLimit"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/failedJobsHistoryLimit", Value: 5})
+	}
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "backupRetention"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backupRetention", Value: "720h"})
+	}
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "logRetention"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/logRetention", Value: "168h"})
+	}
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "size"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/size", Value: "20Gi"})
+	}
+
+	return patch
+}
+
+func ApplyBackupRestoreDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
+	var patch jsonpatch.PatchList
+
+	if start, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "start"); found {
+		if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "end"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/end", Value: start})
+		}
+	}
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "logRetention"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/logRetention", Value: "168h"})
+	}
+
 	return patch
 }
 
@@ -751,6 +806,73 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	return nil
 }
 
+func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
+	errs := []error{}
+
+	if err := validateBackupCronSchedules(v, backup); err != nil {
+		errs = err
+	}
+
+	if backup.Spec.Size.Value() <= 0 {
+		errs = append(errs, fmt.Errorf("size: %d must be greater than 0", backup.Spec.Size.Value()))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+	return nil
+}
+
+func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	errs := []error{}
+
+	if len(restore.Spec.Backup) == 0 && len(restore.Spec.Repo) == 0 {
+		errs = append(errs, fmt.Errorf("both Spec.Backup and Spec.Repo fields are empty. Please supply a value for at least one"))
+	}
+
+	start := restore.Spec.Start
+	// start is required
+	if start == nil {
+		errs = append(errs, fmt.Errorf("specify a start point or backup"))
+	} else {
+		// both str and int are specified
+		if start.Str != nil && start.Int != nil {
+			errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
+		}
+		if *start.Int <= 0 {
+			errs = append(errs, fmt.Errorf("Spec.Start.Int must be a positive integer"))
+		}
+	}
+
+	end := restore.Spec.End
+	// if end has been specified
+	if start != nil && end != nil {
+		// both str and int are specified
+		if end.Str != nil && end.Int != nil {
+			errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
+		}
+
+		// end and start differ
+		if end != start {
+			if *end.Str == "oldest" && *start.Str == "newest" {
+				errs = append(errs, fmt.Errorf("start point %s is after end point %s", *start.Str, *end.Str))
+			}
+
+			// start and end are using integer arguments
+			if start.Int != nil && end.Int != nil {
+				if *start.Int > *end.Int {
+					errs = append(errs, fmt.Errorf("start integer cannot be larger than end integer"))
+				}
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+	return nil
+}
+
 func CheckConstraintsCouchbaseRole(v *types.Validator, role *couchbasev2.CouchbaseRole) error {
 	errs := []error{}
 
@@ -991,6 +1113,43 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 	}
 
 	return fmt.Errorf("bucket %s not found", name)
+}
+
+// validateBackupCronSchedules ensures that the correct cronjob schedules are valid for the desired backup strategy.
+func validateBackupCronSchedules(v *types.Validator, backup *couchbasev2.CouchbaseBackup) []error {
+	errs := []error{}
+
+	switch backup.Spec.Strategy {
+	case couchbasev2.FullIncremental:
+		if err := validateCronJobString(backup.Spec.Incremental.Schedule, "spec.incremental"); err != nil {
+			errs = append(errs, err)
+		}
+		if err := validateCronJobString(backup.Spec.Full.Schedule, "spec.full"); err != nil {
+			errs = append(errs, err)
+		}
+	case couchbasev2.FullOnly:
+		if err := validateCronJobString(backup.Spec.Full.Schedule, "spec.full"); err != nil {
+			errs = append(errs, err)
+		}
+	default:
+		errs = append(errs, fmt.Errorf("specified strategy not valid, must be one of %s | %s",
+			couchbasev2.FullIncremental, couchbasev2.FullOnly))
+	}
+
+	return errs
+}
+
+func validateCronJobString(s, name string) error {
+	if len(s) == 0 {
+		return fmt.Errorf("cronjob schedule %s cannot be empty", name)
+	}
+
+	p := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	if _, err := p.Parse(s); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error {

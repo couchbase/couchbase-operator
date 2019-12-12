@@ -120,7 +120,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
@@ -156,7 +156,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(class1Size)
+	testCouchbase := e2espec.NewBasicCluster(class1Size)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
@@ -215,7 +215,7 @@ func TestRzaResizeCluster(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
@@ -260,7 +260,7 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	class := 0
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -298,7 +298,7 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 	class := 0
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 

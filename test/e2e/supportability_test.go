@@ -1574,7 +1574,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucketTwoReplicas)
 	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
-	cbCluster := e2espec.NewBasicClusterSpec(clusterSize)
+	cbCluster := e2espec.NewBasicCluster(clusterSize)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	cbCluster.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
 		VolumeMounts: &couchbasev2.VolumeMounts{

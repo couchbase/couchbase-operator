@@ -242,6 +242,18 @@ var (
 
 		// Status tests
 		"TestStatusRecovery": TestStatusRecovery,
+
+		// Backup tests
+		"TestFullIncremental":              TestFullIncremental,
+		"TestFullOnly":                     TestFullOnly,
+		"TestFailedBackupBehaviour":        TestFailedBackupBehaviour,
+		"TestBackupPVCReconcile":           TestBackupPVCReconcile,
+		"TestReplaceFullOnlyBackup":        TestReplaceFullOnlyBackup,
+		"TestReplaceFullIncrementalBackup": TestReplaceFullIncrementalBackup,
+		"TestBackupAndRestore":             TestBackupAndRestore,
+		"TestUpdateBackupStatus":           TestUpdateBackupStatus,
+		"TestMultipleBackups":              TestMultipleBackups,
+		"TestFullIncrementalOverTLS":       TestFullIncrementalOverTLS,
 	}
 )
 

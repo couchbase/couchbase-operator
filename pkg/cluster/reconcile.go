@@ -127,6 +127,14 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	if err := c.reconcileBackup(); err != nil {
+		return err
+	}
+
+	if err := c.reconcileBackupRestore(); err != nil {
+		return err
+	}
+
 	c.cluster.Status.Size = c.members.Size()
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
 	c.cluster.Status.SetReadyCondition()
@@ -1657,6 +1665,217 @@ func (c *Cluster) reconcilePersistentStatus() error {
 	c.cluster.Status.CurrentVersion = version
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("failed to update cluster status", "cluster", c.namespacedName())
+	}
+	return nil
+}
+
+// gatherBackups returns CouchbaseBackups based on the cluster Spec selector
+func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
+	selector := labels.Everything()
+	if c.cluster.Spec.Backup.Selector != nil {
+		var err error
+		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Backup.Selector); err != nil {
+			return nil, err
+		}
+	}
+	couchbaseBackups := c.k8s.CouchbaseBackups.List()
+
+	backups := []couchbasev2.CouchbaseBackup{}
+	for _, backup := range couchbaseBackups {
+		if !selector.Matches(labels.Set(backup.Labels)) {
+			continue
+		}
+
+		backups = append(backups, *backup)
+	}
+
+	return backups, nil
+}
+
+// gatherBackupRestores returns CouchbaseBackupRestores based on the cluster Spec selector
+func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, error) {
+	selector := labels.Everything()
+	if c.cluster.Spec.Backup.Selector != nil {
+		var err error
+		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Backup.Selector); err != nil {
+			return nil, err
+		}
+	}
+	couchbaseBackupRestores := c.k8s.CouchbaseBackupRestores.List()
+
+	restores := []couchbasev2.CouchbaseBackupRestore{}
+	for _, restore := range couchbaseBackupRestores {
+		if !selector.Matches(labels.Set(restore.Labels)) {
+			continue
+		}
+
+		restores = append(restores, *restore)
+	}
+
+	return restores, nil
+}
+
+func (c *Cluster) reconcileBackup() error {
+	if !c.cluster.Spec.Backup.Managed {
+		return nil
+	}
+
+	// get existing CouchbaseBackup resources
+	currentBackups, err := c.gatherBackups()
+	if err != nil {
+		return err
+	}
+
+	// start the backup reconcile process
+	for _, currentBackup := range currentBackups {
+		if err := c.reconcileBackupPVC(&currentBackup); err != nil {
+			return err
+		}
+		if err := c.reconcileCronjobs(&currentBackup); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) reconcileBackupRestore() error {
+	if !c.cluster.Spec.Backup.Managed {
+		return nil
+	}
+
+	// poll for an existing CouchbaseBackupRestore resource
+	currentRestores, err := c.gatherBackupRestores()
+	if err != nil {
+		return err
+	}
+
+	// for the current CouchbaseBackupRestores, loop through and see if they have a Job created
+	for _, currentRestore := range currentRestores {
+		// check if Repo field is populated, if not, try and find the repo
+		if len(currentRestore.Spec.Repo) == 0 {
+			if err := c.getBackupRepo(&currentRestore); err != nil {
+				return err
+			}
+		}
+
+		requested, err := c.generateRestoreJob(currentRestore)
+		if err != nil {
+			return err
+		}
+		k8sutil.ApplyBaseAnnotations(requested.GetObjectMeta())
+
+		// check if restore job already exists
+		currentjob, ok := c.k8s.Jobs.Get(requested.Name)
+		if ok {
+			// update any existing requested specs
+			if currentjob.Annotations[constants.CronJobAnnotation] != requested.Annotations[constants.CronJobAnnotation] {
+				updatedRestore, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Update(&currentRestore)
+				if err != nil {
+					return err
+				}
+
+				// compare the specs
+				if updatedRestore.Annotations[constants.CronJobAnnotation] != requested.Annotations[constants.CronJobAnnotation] {
+					return fmt.Errorf("inconsistency between requested job and actual job")
+				}
+
+				log.Info("restore job updated", "cbrestore", currentRestore.Name, "updated job", requested.Name)
+				c.raiseEvent(k8sutil.BackupRestoreJobEditEvent(currentRestore.Name, requested.Name, c.cluster))
+			}
+
+			// cleanup completed restores
+			if currentjob.Status.Succeeded == 1 {
+				if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(currentRestore.Name, metav1.NewDeleteOptions(0)); err != nil {
+					return err
+				}
+			}
+		} else {
+			// else try to create the job as it does not exist
+			createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(requested)
+			if err != nil {
+				return err
+			}
+
+			log.Info("restore job created", "cbrestore", currentRestore.Name, "requested job", requested.Name)
+			c.raiseEvent(k8sutil.BackupRestoreJobCreateEvent(currentRestore.Name, createdJob.Name, c.cluster))
+		}
+	}
+	return nil
+}
+
+// create PVC if it does not exist
+func (c *Cluster) reconcileBackupPVC(backup *couchbasev2.CouchbaseBackup) error {
+	// each cbbackup has its own pvc
+	pvcName := backup.Name
+
+	// check if pvc already exists, if it does, return
+	_, exists := c.k8s.PersistentVolumeClaims.Get(pvcName)
+	if exists {
+		return nil
+	}
+
+	// else create pvc
+	pvcToCreate := generateBackupPVC(pvcName, c.cluster.Name, backup.Spec.Size)
+	if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(pvcToCreate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Cluster) reconcileCronjobs(backup *couchbasev2.CouchbaseBackup) error {
+	if backup == nil {
+		return nil
+	}
+
+	// get cronjobs from CouchbaseBackupSpec
+	requestedCronjobs, err := c.generateCronJobs(backup)
+	if err != nil {
+		return err
+	}
+
+	if len(requestedCronjobs) == 0 {
+		return fmt.Errorf("somehow reached unreachable code. No requestedCronjobs exist, but somehow a cbbackup does")
+	}
+
+	// perform any updates to cronjobs
+	for _, requested := range requestedCronjobs {
+		// apply annotations
+		k8sutil.ApplyBaseAnnotations(requested.GetObjectMeta())
+
+		specJSON, err := json.Marshal(requested.Spec)
+		if err != nil {
+			return err
+		}
+		requested.Annotations[constants.CronJobAnnotation] = string(specJSON)
+
+		// if any changes are detected to a found existing cronjob attempt to apply them
+		// otherwise create the cronjob if it does not exist
+		current, ok := c.k8s.CronJobs.Get(requested.Name)
+		if ok {
+			if requested.Annotations[constants.CronJobAnnotation] != current.Annotations[constants.CronJobAnnotation] {
+				// update any existing requested specs
+				updatedCronjob, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(requested)
+				if err != nil {
+					return err
+				}
+
+				// compare the specs
+				if updatedCronjob.Annotations[constants.CronJobAnnotation] != requested.Annotations[constants.CronJobAnnotation] {
+					return fmt.Errorf("inconsistency between requested Cronjob and actual Cronjob")
+				}
+
+				log.Info("Backup Cronjob updated", "cbbackup", backup.Name, "requested", requested.Name)
+				c.raiseEvent(k8sutil.BackupCronjobEditEvent(backup.Name, requested.Name, c.cluster))
+			}
+		} else {
+			if _, err = c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(requested); err != nil {
+				return err
+			}
+			log.Info("Backup Cronjob created", "cbbackup", backup.Name, "requested cronjob", requested.Name)
+			c.raiseEvent(k8sutil.BackupCronjobCreateEvent(backup.Name, requested.Name, c.cluster))
+		}
 	}
 	return nil
 }

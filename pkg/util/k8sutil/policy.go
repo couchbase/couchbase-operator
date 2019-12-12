@@ -29,7 +29,7 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 			},
 		},
 	}
-	applyBaseAnnotations(required.GetObjectMeta())
+	ApplyBaseAnnotations(required.GetObjectMeta())
 	addOwnerRefToObject(required.GetObjectMeta(), cluster.AsOwner())
 
 	// Get any existing budgets, creating one if it doesn't exist.

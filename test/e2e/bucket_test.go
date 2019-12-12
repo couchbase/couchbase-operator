@@ -88,7 +88,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		},
 	}
 
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 
@@ -287,7 +287,7 @@ func TestBucketUnmanaged(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
 
 	// Create a cluster with buckets unmanaged.
-	couchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	couchbase := e2espec.NewBasicCluster(clusterSize)
 	couchbase.Spec.Buckets.Managed = false
 	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, couchbase)
 
@@ -327,7 +327,7 @@ func TestBucketSelection(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
 
 	// Create a cluster that selects only labelled buckets.
-	couchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	couchbase := e2espec.NewBasicCluster(clusterSize)
 	couchbase.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
@@ -364,7 +364,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 
 	// Create the cluster
 	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2espec.NewBasicClusterSpec(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)

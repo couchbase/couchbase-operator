@@ -252,6 +252,9 @@ func recreateRoles(kubeClient kubernetes.Interface, roleName string) error {
 		return nil
 	}
 
+	if err := CreateBackupRole(kubeClient, Global.Namespace); err != nil {
+		return nil
+	}
 	roleSpec := config.GetOperatorRole()
 	roleSpec.Name = roleName
 	_, err := kubeClient.RbacV1().Roles(Global.Namespace).Create(roleSpec)
@@ -265,6 +268,13 @@ func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceA
 	if serviceAccountName == "default" {
 		return nil
 	}
+	if err := RemoveServiceAccount(kubeClient, namespace, config.BackupResourceName); err != nil {
+		return err
+	}
+
+	if err := CreateBackupServiceAccount(kubeClient, namespace); err != nil {
+		return err
+	}
 	// Create service account given by the name
 	serviceAccount := config.GetOperatorServiceAccount()
 	serviceAccount.Name = serviceAccountName
@@ -277,6 +287,9 @@ func recreateRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRol
 		return err
 	}
 
+	if err := CreateBackupRoleBinding(kubeClient, namespace); err != nil {
+		return err
+	}
 	clusterRoleBindingSpec := config.GetOperatorRoleBinding(Global.Namespace)
 	_, err := kubeClient.RbacV1().RoleBindings(Global.Namespace).Create(clusterRoleBindingSpec)
 	return err

@@ -68,6 +68,18 @@ type Client struct {
 
 	// CouchbaseRoleBindings is a read only cache of couchbase rolebindings (namespace scoped)
 	CouchbaseRoleBindings *CouchbaseRoleBindingCache
+
+	// CouchbaseBackups is a read only cache of couchbase backups (namespace scoped)
+	CouchbaseBackups *CouchbaseBackupCache
+
+	// CouchbaseBackupRestores is a read only cache of couchbase restores (namespace scoped)
+	CouchbaseBackupRestores *CouchbaseBackupRestoreCache
+
+	// Jobs is a read only cache of jobs
+	Jobs *JobCache
+
+	// CronJobs is a read only cache of cronjobs
+	CronJobs *CronJobCache
 }
 
 // NewClient initializes all Kubernetes clients and caches.
@@ -155,6 +167,26 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
+	c.Jobs, err = newJobCache(ctx, c.KubeClient, namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CronJobs, err = newCronJobCache(ctx, c.KubeClient, namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseBackups, err = newCouchbaseBackupCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseBackupRestores, err = newCouchbaseBackupRestoreCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -173,4 +205,8 @@ func (c *Client) Shutdown() {
 	c.CouchbaseGroups.stop()
 	c.CouchbaseRoles.stop()
 	c.CouchbaseRoleBindings.stop()
+	c.Jobs.stop()
+	c.CronJobs.stop()
+	c.CouchbaseBackups.stop()
+	c.CouchbaseBackupRestores.stop()
 }

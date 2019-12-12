@@ -40,6 +40,10 @@ type KubeAbstraction interface {
 	GetCouchbaseRoles(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleList, error)
 	// GetCouchbaseRoleBindings returns all user role bindings for a specified selector
 	GetCouchbaseRoleBindings(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleBindingList, error)
+	// GetCouchbaseBackups returns all backups for a specified selector.
+	GetCouchbaseBackups(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupList, error)
+	// GetCouchbaseBackups returns all backups for a specified selector.
+	GetCouchbaseBackupRestores(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupRestoreList, error)
 }
 
 // kubeAbstractionImpl Implements KubeAbstraction, operating on a real kubernetes cluster.
@@ -154,6 +158,22 @@ func (ab *kubeAbstractionImpl) GetCouchbaseRoleBindings(namespace string, select
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseRoleBindings(namespace).List(listOpts)
+}
+
+func (ab *kubeAbstractionImpl) GetCouchbaseBackups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupList, error) {
+	listOpts := metav1.ListOptions{}
+	if selector != nil {
+		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	}
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackups(namespace).List(listOpts)
+}
+
+func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupRestoreList, error) {
+	listOpts := metav1.ListOptions{}
+	if selector != nil {
+		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	}
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackupRestores(namespace).List(listOpts)
 }
 
 // Validator is an abstraction layer for communicating with kubernetes

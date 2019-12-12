@@ -15,6 +15,8 @@ var (
 	minimumStringLength          int64   = 1
 	minimumBucketReplicas        float64 = 0
 	maximumBucketReplicas        float64 = 3
+	minimumJobsHistorySize       float64 = 0
+	minimumBackupIndexSize       float64 = 1
 	minimumAutofailoverMaxCount  float64 = 1
 	maximumAutofailoverMaxCount  float64 = 3
 	minimumLogRetentionCount     float64 = 0
@@ -398,6 +400,346 @@ func GetCouchbaseReplicationCRD() *apiextensionsv1beta1.CustomResourceDefinition
 								},
 								"paused": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiextensionsv1beta1.SchemeGroupVersion.String(),
+			Kind:       "CustomResourceDefinition",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: couchbasev2.BackupCRDName,
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group: couchbasev2.SchemeGroupVersion.Group,
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     couchbasev2.BackupCRDResourcePlural,
+				Kind:       couchbasev2.BackupCRDResourceKind,
+				ShortNames: []string{couchbasev2.BackupCRDResourceShortName},
+			},
+			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
+				{
+					Name:        "Strategy",
+					Type:        "string",
+					Description: "what backup strategy is being followed",
+					JSONPath:    ".spec.strategy",
+				},
+				{
+					Name:        "Volume Size",
+					Type:        "string",
+					Description: "total size of the backup volume",
+					JSONPath:    ".spec.size",
+				},
+				{
+					Name:        "Capacity Used",
+					Type:        "string",
+					Description: "total size of the backup volume",
+					JSONPath:    ".status.CapacityUsed",
+				},
+				{
+					Name:        "Last Run",
+					Type:        "string",
+					Description: "last time backup was run",
+					JSONPath:    ".status.LastRun",
+				},
+				{
+					Name:        "Last Success",
+					Type:        "string",
+					Description: "last time backup was successful",
+					JSONPath:    ".status.LastSuccess",
+				},
+				{
+					Name:     "Running",
+					Type:     "boolean",
+					JSONPath: ".status.Running",
+				},
+				{
+					Name:     "Age",
+					Type:     "date",
+					JSONPath: ".metadata.creationTimestamp",
+				},
+			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1",
+				},
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: true,
+				},
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"spec": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Required: []string{
+								"strategy",
+							},
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"strategy": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: "^full_incremental|full_only$",
+								},
+								"incremental": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Required: []string{
+										"schedule",
+									},
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"schedule": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+								},
+								"full": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Required: []string{
+										"schedule",
+									},
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"schedule": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+								},
+								"successfulJobsHistoryLimit": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "integer",
+									Minimum: &minimumJobsHistorySize,
+								},
+								"failedJobsHistoryLimit": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "integer",
+									Minimum: &minimumJobsHistorySize,
+								},
+								"backupRetention": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: `^\d+(ns|us|ms|s|m|h)$`,
+								},
+								"logRetention": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: `^\d+(ns|us|ms|s|m|h)$`,
+								},
+								"size": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+						"status": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"capacityused": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"archive": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"repo": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"repolist": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+								},
+								"running": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
+								},
+								"failed": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
+								},
+								"output": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"pod": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"job": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"cronjob": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"duration": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"lastfailure": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"lastsuccess": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"lastrun": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiextensionsv1beta1.SchemeGroupVersion.String(),
+			Kind:       "CustomResourceDefinition",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: couchbasev2.BackupRestoreCRDName,
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group: couchbasev2.SchemeGroupVersion.Group,
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     couchbasev2.BackupRestoreCRDResourcePlural,
+				Kind:       couchbasev2.BackupRestoreCRDResourceKind,
+				ShortNames: []string{couchbasev2.BackupRestoreCRDResourceShortName},
+			},
+			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
+				{
+					Name:        "Capacity Used",
+					Type:        "string",
+					Description: "total size of the backup volume",
+					JSONPath:    ".status.CapacityUsed",
+				},
+				{
+					Name:        "Last Run",
+					Type:        "string",
+					Description: "last time backup was run",
+					JSONPath:    ".status.LastRun",
+				},
+				{
+					Name:        "Last Success",
+					Type:        "string",
+					Description: "last time restore was successful",
+					JSONPath:    ".status.LastSuccess",
+				},
+				{
+					Name:     "Duration",
+					Type:     "string",
+					JSONPath: ".status.Duration",
+				},
+				{
+					Name:     "Running",
+					Type:     "boolean",
+					JSONPath: ".status.Running",
+				},
+				{
+					Name:     "Age",
+					Type:     "date",
+					JSONPath: ".metadata.creationTimestamp",
+				},
+			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1",
+				},
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: true,
+				},
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"spec": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Required: []string{
+								"strategy",
+								"backup",
+								"start",
+							},
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"strategy": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: "full_incremental|full_only$",
+								},
+								"backup": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"repo": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"start": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"int": apiextensionsv1beta1.JSONSchemaProps{
+											Type:    "integer",
+											Minimum: &minimumBackupIndexSize,
+										},
+										"str": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+								},
+								"end": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"int": apiextensionsv1beta1.JSONSchemaProps{
+											Type:    "integer",
+											Minimum: &minimumBackupIndexSize,
+										},
+										"str": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+								},
+								"logRetention": apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: `^\d+(ns|us|ms|s|m|h)$`,
+								},
+							},
+						},
+						"status": apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"archive": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"repo": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"running": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
+								},
+								"failed": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
+								},
+								"output": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"pod": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"job": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"completed": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "boolean",
+								},
+								"duration": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"lastfailure": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"lastsuccess": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"lastrun": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "string",
 								},
 							},
 						},
@@ -1132,6 +1474,48 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 																	},
 																},
 															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								"backup": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"managed": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "boolean",
+										},
+										"image": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+										"serviceAccountName": apiextensionsv1beta1.JSONSchemaProps{
+											Type:      "string",
+											MinLength: &minimumItemLength,
+										},
+										"resources": apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"limits": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"cpu": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+														"memory": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+												},
+												"requests": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"cpu": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+														"memory": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
 														},
 													},
 												},

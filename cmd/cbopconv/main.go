@@ -168,8 +168,8 @@ func main() {
 		// Do like for like copies into the new locations where we can.
 		newCluster := &couchbasev2.CouchbaseCluster{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "couchbase.com/v2",
-				Kind:       "CouchbaseCluster",
+				APIVersion: couchbasev2.Group,
+				Kind:       couchbasev2.ClusterCRDResourceKind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              cluster.Name,
@@ -292,7 +292,7 @@ func main() {
 				case "couchbase":
 					newBucket := &couchbasev2.CouchbaseBucket{
 						TypeMeta: metav1.TypeMeta{
-							APIVersion: "couchbase.com/v2",
+							APIVersion: couchbasev2.Group,
 							Kind:       "CouchbaseBucket",
 						},
 						ObjectMeta: metav1.ObjectMeta{
@@ -317,7 +317,7 @@ func main() {
 				case "ephemeral":
 					newBucket := &couchbasev2.CouchbaseEphemeralBucket{
 						TypeMeta: metav1.TypeMeta{
-							APIVersion: "couchbase.com/v2",
+							APIVersion: couchbasev2.Group,
 							Kind:       "CouchbaseEphemeralBucket",
 						},
 						ObjectMeta: metav1.ObjectMeta{
@@ -341,7 +341,7 @@ func main() {
 				case "memcached":
 					newBucket := &couchbasev2.CouchbaseMemcachedBucket{
 						TypeMeta: metav1.TypeMeta{
-							APIVersion: "couchbase.com/v2",
+							APIVersion: couchbasev2.Group,
 							Kind:       "CouchbaseMemcachedBucket",
 						},
 						ObjectMeta: metav1.ObjectMeta{
@@ -446,7 +446,7 @@ func main() {
 
 		for _, pod := range pods.Items {
 			for i := range pod.OwnerReferences {
-				pod.OwnerReferences[i].APIVersion = "couchbase.com/v2"
+				pod.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
 			if _, err := kubeclient.CoreV1().Pods(namespace).Update(&pod); err != nil {
 				fmt.Println("Update of Pod", pod.Name, "failed:", err)
@@ -460,7 +460,7 @@ func main() {
 
 		for _, service := range services.Items {
 			for i := range service.OwnerReferences {
-				service.OwnerReferences[i].APIVersion = "couchbase.com/v2"
+				service.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
 			if _, err := kubeclient.CoreV1().Services(namespace).Update(&service); err != nil {
 				fmt.Println("Update of Service", service.Name, "failed:", err)
@@ -474,7 +474,7 @@ func main() {
 
 		for _, pvc := range pvcs.Items {
 			for i := range pvc.OwnerReferences {
-				pvc.OwnerReferences[i].APIVersion = "couchbase.com/v2"
+				pvc.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
 			if _, err := kubeclient.CoreV1().PersistentVolumeClaims(namespace).Update(&pvc); err != nil {
 				fmt.Println("Update of PersistentVolumeClaim", pvc.Name, "failed:", err)
@@ -488,7 +488,7 @@ func main() {
 
 		for _, pdb := range pdbs.Items {
 			for i := range pdb.OwnerReferences {
-				pdb.OwnerReferences[i].APIVersion = "couchbase.com/v2"
+				pdb.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
 			if _, err := kubeclient.PolicyV1beta1().PodDisruptionBudgets(namespace).Update(&pdb); err != nil {
 				fmt.Println("Update of PodDisruptionBudgets", pdb.Name, "failed:", err)

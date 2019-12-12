@@ -27,6 +27,8 @@ var (
 	PodTLSAnnotation              = "pod.couchbase.com/tls"
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
+
+	CronJobAnnotation = "cronjob.couchbase.com/spec"
 )
 
 // Label types added to pods
