@@ -511,8 +511,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		customResource.Name + "." + customResource.Namespace + ".svc",
 	}
 	if customResource.Spec.Networking.DNS != nil {
-		zone := customResource.Name + "." + customResource.Spec.Networking.DNS.Domain
-		zones = append(zones, zone)
+		zones = append(zones, customResource.Spec.Networking.DNS.Domain)
 	}
 
 	// Check TLS

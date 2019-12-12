@@ -234,7 +234,7 @@ func main() {
 		}
 		if cluster.Spec.DNS != nil {
 			newCluster.Spec.Networking.DNS = &couchbasev2.DNS{
-				Domain: cluster.Spec.DNS.Domain,
+				Domain: cluster.Name + "." + cluster.Spec.DNS.Domain,
 			}
 		}
 		for _, class := range cluster.Spec.ServerSettings {

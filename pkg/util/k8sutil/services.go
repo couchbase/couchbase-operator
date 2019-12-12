@@ -304,7 +304,7 @@ func updateService(c *client.Client, ns string, svc *v1.Service) (*v1.Service, e
 
 // dnsAdminConsoleName returns the DNS name for the admin console.
 func dnsAdminConsoleName(cluster *couchbasev2.CouchbaseCluster) string {
-	return "console." + cluster.Name + "." + cluster.Spec.Networking.DNS.Domain
+	return "console." + cluster.Spec.Networking.DNS.Domain
 }
 
 // ConsoleServiceName generates the console service name.
@@ -709,12 +709,12 @@ func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
 
 // GetDNSName returns the public DNS name we expect to be created for the member.
 func GetDNSName(cluster *couchbasev2.CouchbaseCluster, hostname string) string {
-	return hostname + "." + cluster.Name + "." + cluster.Spec.Networking.DNS.Domain
+	return hostname + "." + cluster.Spec.Networking.DNS.Domain
 }
 
 // GetSRVName returns the public SRV name to create for service discovery.
 func GetSRVName(cluster *couchbasev2.CouchbaseCluster) string {
-	return "_couchbases._tcp." + cluster.Name + "." + cluster.Spec.Networking.DNS.Domain + " 0 0 " + strconv.Itoa(dataServicePortTLS)
+	return "_couchbases._tcp." + cluster.Spec.Networking.DNS.Domain + " 0 0 " + strconv.Itoa(dataServicePortTLS)
 }
 
 // filterInsecurePorts takes a set of ports and removes any that are not allowed
