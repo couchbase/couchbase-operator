@@ -797,7 +797,6 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 		"pretty":            "true",
 		"client_context_id": "",
 		"timeout":           "120s",
-		"mode":              "",
 	}
 	requestBodyRaw, err := json.Marshal(requestBody)
 	if err != nil {
@@ -838,7 +837,7 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 		}
 
 		if response.StatusCode != http.StatusOK {
-			return fmt.Errorf("bad status: %v", response.Status)
+			return fmt.Errorf("bad status: %v (%s)", response.Status, string(data))
 		}
 
 		return nil
