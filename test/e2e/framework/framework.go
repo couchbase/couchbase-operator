@@ -459,8 +459,8 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	}
 
 	logrus.Infof("Cleaning up namespace %s before deployment in %s", f.Namespace, kubeName)
-	if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, f.Namespace); err == nil {
-		logrus.Infof("Deployment deleted: %v", Global.Deployment.Name)
+	if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, f.Namespace); err != nil {
+		return fmt.Errorf("failed to delete operator: %v", err)
 	}
 
 	if err := DeleteAdmissionController(targetKube.KubeClient); err != nil {
@@ -574,7 +574,7 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
