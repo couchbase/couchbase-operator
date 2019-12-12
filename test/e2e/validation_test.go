@@ -846,6 +846,24 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h`},
 		},
+		{
+			name:           "TestValidateServerServiceRequiredForVaolumeMountData",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/0")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.data requires the data service to be enabled`},
+		},
+		{
+			name:           "TestValidateServerServiceRequiredForVaolumeMountIndex",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.index requires the index service to be enabled`},
+		},
+		{
+			name:           "TestValidateServerServiceRequiredForVaolumeMountAnalytics",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/2")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.analytics requires the analytics service to be enabled`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]
@@ -860,24 +878,6 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/pod/volumeMounts/"+mntField, "invalidClaim")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[1]." + mntName + " should be one of [couchbase couchbase-log-pv]"},
-		}
-		testDefs = append(testDefs, testCase)
-	}
-
-	// Cases to validate with all volume mounts present in Pod.VolumeMounts but one of the Service missing in ServersSettings
-	for _, serviceToSkip := range constants.StatefulCbServiceList {
-		fieldValueToUse := constants.StatelessCbServiceList
-		for _, statefulService := range constants.StatefulCbServiceList {
-			if statefulService == serviceToSkip {
-				continue
-			}
-			fieldValueToUse = append(fieldValueToUse, statefulService)
-		}
-		testCase := testDef{
-			name:           "TestValidateServerServicesRequiredForVolumeMount_" + string(serviceToSkip),
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/services", fieldValueToUse)},
-			shouldFail:     true,
-			expectedErrors: []string{string(serviceToSkip) + " in spec.servers[1].services is required"},
 		}
 		testDefs = append(testDefs, testCase)
 	}

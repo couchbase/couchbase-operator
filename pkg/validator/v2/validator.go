@@ -409,13 +409,13 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 			// Check the associated service is enabled
 			if mounts.DataClaim != "" && !config.Services.Contains(couchbasev2.DataService) {
-				errs = append(errs, errors.Required(string(couchbasev2.DataService), fmt.Sprintf("spec.servers[%d].services", index)))
+				errs = append(errs, fmt.Errorf("spec.servers[%d].pod.volumeMounts.data requires the data service to be enabled", index))
 			}
 			if mounts.IndexClaim != "" && !config.Services.Contains(couchbasev2.IndexService) {
-				errs = append(errs, errors.Required(string(couchbasev2.IndexService), fmt.Sprintf("spec.servers[%d].services", index)))
+				errs = append(errs, fmt.Errorf("spec.servers[%d].pod.volumeMounts.index requires the index service to be enabled", index))
 			}
 			if mounts.AnalyticsClaims != nil && !config.Services.Contains(couchbasev2.AnalyticsService) {
-				errs = append(errs, errors.Required(string(couchbasev2.AnalyticsService), fmt.Sprintf("spec.servers[%d].services", index)))
+				errs = append(errs, fmt.Errorf("spec.servers[%d].pod.volumeMounts.analytics requires the analytics service to be enabled", index))
 			}
 
 			templateNames := customResource.Spec.GetVolumeClaimTemplateNames()
