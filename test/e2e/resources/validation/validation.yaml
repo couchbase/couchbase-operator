@@ -174,16 +174,16 @@ spec:
       port: 389
       encryption: StartTLSExtension
       query_dn: "cn=admin,dc=cb-ldap,dc=default,dc=svc"
-      authentication_enabled: true
-      user_dn_mapping:
+      authenticationEnabled: true
+      userDNMapping:
       - template: "uid={0},ou=People,dc=example,dc=com"
         re: "(.+)"
-      authorization_enabled: true
-      groups_query: "cn=mygroup,ou=Groups,dc=example,dc=com??base?"
-      server_cert_validation: true
-      nested_groups_enabled: false
-      nested_groups_max_depth: 10
-      cache_value_lifetime: 300000
+      authorizationEnabled: true
+      groupsQuery: "cn=mygroup,ou=Groups,dc=example,dc=com??base?"
+      serverCertValidation: true
+      nestedGroupsEnabled: false
+      nestedGroupsMaxDepth: 10
+      cacheValueLifetime: 300000
   networking:
     exposeAdminConsole: false
     adminConsoleServices:

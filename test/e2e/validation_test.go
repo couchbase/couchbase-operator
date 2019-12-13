@@ -1415,10 +1415,9 @@ func TestNegValidationImmutableApply(t *testing.T) {
 func TestRBACValidationCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:        "TestValidateLDAPDomain",
-			mutations:   patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "ldap")},
-			validations: patchMap{"user1": jsonpatch.NewPatchSet().Test("/spec/authDomain", "ldap")},
-			shouldFail:  false,
+			name:       "TestValidateLDAPDomain",
+			mutations:  patchMap{"user2": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "ldap")},
+			shouldFail: false,
 		}, {
 			name:        "TestValidateClusterRole",
 			mutations:   patchMap{"role": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "cluster_admin")},
@@ -1481,14 +1480,14 @@ func TestRBACValidationLDAP(t *testing.T) {
 		},
 		{
 			name:        "TestValidateDefaultRegex",
-			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/user_dn_mapping/0/re")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/user_dn_mapping/0/re", "(.+)")},
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/userDNMapping/0/re")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/userDNMapping/0/re", "(.+)")},
 			shouldFail:  false,
 		}, {
 			name:           "TestValidateGroupRequired",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/groups_query")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/groupsQuery")},
 			shouldFail:     true,
-			expectedErrors: []string{"security.ldap.groups_query in body is required"},
+			expectedErrors: []string{"security.ldap.groupsQuery in body is required"},
 		}, {
 			name:           "TestValidateAuthSecretRejected",
 			mutations:      patchMap{"user2": jsonpatch.NewPatchSet().Add("/spec/authSecret", "auth-secret")},

@@ -10,11 +10,18 @@ spec:
     rbac:
       managed: true
     ldap:
-      bindSecret: bind-secret
       hosts:
-      - example.ldap.default.svc
+      - ldap.example.com
       port: 389
-      encryption: "false"
+      encryption: None
+      bindSecret: cb-example-auth
+      bindDN: "cn=admin,dc=example,dc=com"
+      authenticationEnabled: true
+      userDNMapping:
+      - template: "uid={0},ou=People,dc=example,dc=com"
+        re: "(.+)"
+      authorizationEnabled: true
+      groupsQuery: "cn=mygroup,ou=Groups,dc=example,dc=com??base?"
   networking:
     exposeAdminConsole: true
     adminConsoleServices:

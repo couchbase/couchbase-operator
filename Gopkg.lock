@@ -71,7 +71,7 @@
     "urlencoding",
   ]
   pruneopts = "UT"
-  revision = "f5d6c1ae6a63974a91025069ca0984dac59aeec1"
+  revision = "e88df8c7ce9bb658991ddbed3544f7032f03db0d"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"

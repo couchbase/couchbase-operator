@@ -863,10 +863,10 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 												"tlsSecret": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "string",
 												},
-												"authentication_enabled": apiextensionsv1beta1.JSONSchemaProps{
+												"authenticationEnabled": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "boolean",
 												},
-												"authorization_enabled": apiextensionsv1beta1.JSONSchemaProps{
+												"authorizationEnabled": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "boolean",
 												},
 												"hosts": apiextensionsv1beta1.JSONSchemaProps{
@@ -882,18 +882,18 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 												},
 												"encryption": apiextensionsv1beta1.JSONSchemaProps{
 													Type:    "string",
-													Pattern: "^false|StartTLSExtension|TLS$",
+													Pattern: "^None|StartTLSExtension|TLS$",
 												},
-												"server_cert_validation": apiextensionsv1beta1.JSONSchemaProps{
+												"serverCertValidation": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "boolean",
 												},
-												"groups_query": apiextensionsv1beta1.JSONSchemaProps{
+												"groupsQuery": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "string",
 												},
-												"query_dn": apiextensionsv1beta1.JSONSchemaProps{
+												"bindDN": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "string",
 												},
-												"user_dn_mapping": apiextensionsv1beta1.JSONSchemaProps{
+												"userDNMapping": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "array",
 													Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 														Schema: &apiextensionsv1beta1.JSONSchemaProps{
@@ -912,13 +912,13 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 														},
 													},
 												},
-												"nested_groups_enabled": apiextensionsv1beta1.JSONSchemaProps{
+												"nestedGroupsEnabled": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "boolean",
 												},
-												"nested_groups_max_depth": apiextensionsv1beta1.JSONSchemaProps{
+												"nestedGroupsMaxDepth": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "integer",
 												},
-												"cache_value_lifetime": apiextensionsv1beta1.JSONSchemaProps{
+												"cacheValueLifetime": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "integer",
 												},
 											},

@@ -618,13 +618,13 @@ type CouchbaseClusterLDAPSpec struct {
 	BindSecret string `json:"bindSecret"`
 
 	// TLSSecret is the name of a kubernetes secret to use for LDAP ca cert.
-	TLSSecret string `json:"tlsSecret"`
+	TLSSecret string `json:"tlsSecret,omitempty"`
 
 	// Enables using LDAP to authenticate users.
-	AuthenticationEnabled bool `json:"authentication_enabled"`
+	AuthenticationEnabled bool `json:"authenticationEnabled,omitempty"`
 
 	// Enables use of LDAP groups for authorization.
-	AuthorizationEnabled bool `json:"authorization_enabled"`
+	AuthorizationEnabled bool `json:"authorizationEnabled,omitempty"`
 
 	// List of LDAP hosts.
 	Hosts []string `json:"hosts"`
@@ -637,28 +637,31 @@ type CouchbaseClusterLDAPSpec struct {
 	Encryption LDAPEncryption `json:"encryption,omitempty"`
 
 	// Whether server certificate validation be enabled
-	EnableCertValidation bool `json:"server_cert_validation"`
+	EnableCertValidation bool `json:"serverCertValidation,omitempty"`
+
+	// Certificate in PEM format to be used in LDAP server certificate validation
+	CACert string `json:"cacert,omitempty"`
 
 	// LDAP query, to get the users' groups by username in RFC4516 format.
-	GroupsQuery string `json:"groups_query,omitempty"`
+	GroupsQuery string `json:"groupsQuery,omitempty"`
 
 	// DN to use for searching users and groups synchronization.
-	QueryDN string `json:"query_dn,omitempty"`
+	BindDN string `json:"bindDN,omitempty"`
 
 	// User to distinguished name (DN) mapping. If none is specified,
 	// the username is used as the user’s distinguished name.
-	UserDNMapping *[]LDAPUserDNMapping `json:"user_dn_mapping,omitempty"`
+	UserDNMapping *[]LDAPUserDNMapping `json:"userDNMapping,omitempty"`
 
 	// If enabled Couchbase server will try to recursively search for groups
 	// for every discovered ldap group. groups_query will be user for the search.
-	NestedGroupsEnabled bool `json:"nested_groups_enabled,omitempty"`
+	NestedGroupsEnabled bool `json:"nestedGroupsEnabled,omitempty"`
 
 	// Maximum number of recursive groups requests the server is allowed to perform.
 	// Requires NestedGroupsEnabled.  Values between 1 and 100: the default is 10.
-	NestedGroupsMaxDepth uint64 `json:"nested_groups_max_depth,omitempty"`
+	NestedGroupsMaxDepth uint64 `json:"nestedGroupsMaxDepth,omitempty"`
 
 	// Lifetime of values in cache in milliseconds. Default 300000 ms.
-	CacheValueLifetime uint64 `json:"cache_value_lifetime,omitempty"`
+	CacheValueLifetime uint64 `json:"cacheValueLifetime,omitempty"`
 }
 
 type LDAPUserDNMapping struct {

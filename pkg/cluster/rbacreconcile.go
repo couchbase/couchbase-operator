@@ -275,16 +275,12 @@ func (c *Cluster) reconcileLDAPSettings() error {
 			Encryption:            cbmgr.LDAPEncryption(ldap.Encryption),
 			EnableCertValidation:  ldap.EnableCertValidation,
 			GroupsQuery:           ldap.GroupsQuery,
-			QueryDN:               ldap.QueryDN,
+			BindDN:                ldap.BindDN,
 			UserDNMapping:         &updatedUserDNMapping,
 			NestedGroupsEnabled:   ldap.NestedGroupsEnabled,
 			NestedGroupsMaxDepth:  ldap.NestedGroupsMaxDepth,
 			CacheValueLifetime:    ldap.CacheValueLifetime,
 		}
-
-		// It's not possible to reconcile on password
-		// change because api just returns asterisks
-		specLDAPSettings.QueryPass = apiLDAPSettings.QueryPass
 
 		// set cacert if provided and validation cert is enabled
 		if specLDAPSettings.EnableCertValidation {
@@ -315,7 +311,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 				if !ok {
 					return fmt.Errorf("unable to find %s in ldap bind secret", constants.LDAPSecretPassword)
 				}
-				specLDAPSettings.QueryPass = string(password)
+				specLDAPSettings.BindPass = string(password)
 			}
 
 			// Update ldap settings according requested spec
