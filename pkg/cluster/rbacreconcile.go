@@ -8,10 +8,18 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/cluster/rbac"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/gocbmgr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+type RBACFeature string
+
+const (
+	RBACFeatureLDAPAuth  RBACFeature = "ldap"
+	RBACFeatureGroupAuth RBACFeature = "groups"
 )
 
 // reconcileRBACResources compares requested and actual rbac resources
@@ -106,8 +114,16 @@ func (c *Cluster) gatherRequestResources() (rbac.ResourceList, error) {
 			continue
 		}
 
-		// Gather roles for each subject subject
+		// Gather roles for each subject
 		for _, roleSubject := range roleBinding.Spec.Subjects {
+
+			// roleSubjects are version gated
+			if roleSubject.Kind == couchbasev2.RoleBindingTypeGroup {
+				if !c.allowRBACFeature(RBACFeatureGroupAuth) {
+					log.Info(fmt.Sprintf("Couchbase Groups require version: %s, please remove from role binding `%s`", constants.CouchbaseVersion650, roleBinding.Name), "cluster", c.namespacedName())
+					continue
+				}
+			}
 
 			for _, r := range roles {
 
@@ -162,7 +178,6 @@ func (c *Cluster) getRoleBindingSubject(roleSubject couchbasev2.CouchbaseRoleBin
 		}
 
 	case couchbasev2.RoleBindingTypeGroup:
-
 		// fetch resource as couchbase group
 		if group, found := c.k8s.CouchbaseGroups.Get(roleSubject.Name); found {
 			return rbac.NewResource(group, &opts)
@@ -201,12 +216,14 @@ func (c *Cluster) gatherActualResources() (rbac.ResourceList, error) {
 		return nil, err
 	}
 	// gather groups
-	groups, err := rbac.ListGroupResources(c.client, c.readyMembers())
-	if err != nil {
-		return nil, err
+	if c.allowRBACFeature(RBACFeatureGroupAuth) {
+		groups, err := rbac.ListGroupResources(c.client, c.readyMembers())
+		if err != nil {
+			return nil, err
+		}
+		resources.Extend(groups)
 	}
 
-	resources.Extend(groups)
 	return resources, nil
 }
 
@@ -223,13 +240,25 @@ func (c *Cluster) handleResourceAction(action rbac.ResourceAction, resource rbac
 
 // reconcileLDAPSettings synchronizes couchbase ldap settings with requested settings
 func (c *Cluster) reconcileLDAPSettings() error {
-	if ldap := c.cluster.Spec.Security.LDAP; ldap != nil {
 
-		// Get current ldap cluster spec
-		apiLDAPSettings, err := c.client.GetLDAPSettings(c.readyMembers())
-		if err != nil {
-			return err
+	if !c.allowRBACFeature(RBACFeatureLDAPAuth) {
+		return nil
+	}
+
+	// Get current ldap cluster spec
+	apiLDAPSettings, err := c.client.GetLDAPSettings(c.readyMembers())
+	if err != nil {
+		return err
+	}
+	if ldap := c.cluster.Spec.Security.LDAP; ldap == nil {
+		if len(apiLDAPSettings.Hosts) > 0 {
+			// Reset settings to default
+			settings := cbmgr.LDAPSettings{Encryption: cbmgr.LDAPEncryptionNone}
+			return c.client.SetLDAPSettings(c.readyMembers(), &settings)
 		}
+		// nothing to reconcile
+		return nil
+	} else {
 
 		// Convert requested ldap spec
 		updatedUserDNMapping := []cbmgr.LDAPUserDNMapping{}
@@ -263,7 +292,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 			if tlsSecretName != "" {
 				tlsSecret, found := c.k8s.Secrets.Get(tlsSecretName)
 				if !found {
-					return fmt.Errorf("unable to get ldap tls secret `%s`: %v", tlsSecretName, err)
+					return fmt.Errorf("unable to get ldap tls secret `%s`", tlsSecretName)
 				}
 				ca, ok := tlsSecret.Data[constants.LDAPSecretCACert]
 				if !ok {
@@ -280,7 +309,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 			if bindSecretName != "" {
 				bindSecret, found := c.k8s.Secrets.Get(bindSecretName)
 				if !found {
-					return fmt.Errorf("unable to get ldap bind secret `%s`: %v", bindSecretName, err)
+					return fmt.Errorf("unable to get ldap bind secret `%s`", bindSecretName)
 				}
 				password, ok := bindSecret.Data[constants.LDAPSecretPassword]
 				if !ok {
@@ -294,4 +323,31 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		}
 	}
 	return nil
+}
+
+// allowRBACFeature determines if a feature used for RBAC is allowed
+// for the current version
+func (c *Cluster) allowRBACFeature(feature RBACFeature) bool {
+	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("Unable to get current cluster version, not allowing rbac feature: %s", feature), "cluster", c.namespacedName())
+		return false
+	}
+	switch feature {
+	case RBACFeatureLDAPAuth:
+		required, _ := couchbaseutil.NewVersion(constants.CouchbaseVersion650)
+		if version.Less(required) {
+			if c.cluster.Spec.Security.LDAP != nil {
+				message := fmt.Sprintf("LDAP Security settings not allowed for version: %s, requires: %s", version, required)
+				log.Info(message, "cluster", c.namespacedName())
+			}
+			return false
+		}
+	case RBACFeatureGroupAuth:
+		required, _ := couchbaseutil.NewVersion(constants.CouchbaseVersion650)
+		if version.Less(required) {
+			return false
+		}
+	}
+	return true
 }

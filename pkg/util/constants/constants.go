@@ -88,7 +88,7 @@ func (v KubernetesVersion) String() string {
 
 const (
 	CouchbaseVersionMin = "enterprise-5.5.0"
-	LDAPVersionMin      = "enterprise-6.5.0"
+	CouchbaseVersion650 = "enterprise-6.5.0"
 )
 
 const (
