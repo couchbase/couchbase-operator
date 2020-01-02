@@ -314,7 +314,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 					ClusterName: object.GetName(),
 					AltNames: []string{
 						"*." + object.GetName() + "." + f.Namespace + ".svc",
-						"*." + object.GetName() + ".example.com",
+						"*.example.com",
 					},
 				}
 				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOpts)
@@ -694,7 +694,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateMissingDNSSubjectAltName",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", "acme.com")},
 			shouldFail:     true,
-			expectedErrors: []string{`certificate is valid for *.cluster.default.svc, *.cluster.example.com, not verify.cluster.acme.com`},
+			expectedErrors: []string{`certificate is valid for *.cluster.default.svc, *.example.com, not verify.acme.com`},
 		},
 		{
 			name:           "TestValidateAutoCompactionMinimum",
