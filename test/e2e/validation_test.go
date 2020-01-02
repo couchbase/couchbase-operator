@@ -847,19 +847,19 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{`spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h`},
 		},
 		{
-			name:           "TestValidateServerServiceRequiredForVaolumeMountData",
+			name:           "TestValidateServerServiceRequiredForVolumeMountData",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/0")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.data requires the data service to be enabled`},
 		},
 		{
-			name:           "TestValidateServerServiceRequiredForVaolumeMountIndex",
+			name:           "TestValidateServerServiceRequiredForVolumeMountIndex",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/1")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.index requires the index service to be enabled`},
 		},
 		{
-			name:           "TestValidateServerServiceRequiredForVaolumeMountAnalytics",
+			name:           "TestValidateServerServiceRequiredForVolumeMountAnalytics",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/2")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.analytics requires the analytics service to be enabled`},
