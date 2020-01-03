@@ -1,0 +1,27 @@
+= How-to Upgrade a Couchbase Cluster
+  
+[abstract]
+How-to upgrade Couchbase Server to a newer version.
+
+Given the existing configuration:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  image: couchbase/server:5.5.3 # <.>
+----
+
+<.> xref:couchbase-cluster-config.adoc#spec-image[spec.image] can be modified to any valid Couchbase Server image, in this example we want to upgrade the version only.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  image: couchbase/server:6.0.1 # <.>
+----
+
+<.> The modification will trigger the Operator to detect that existing pod specifications do not match the existing pod specifications.
+This will perform a xref:concept-upgrade.adoc#upgrading-couchbase-server[rolling upgrade] of Couchbase Server.

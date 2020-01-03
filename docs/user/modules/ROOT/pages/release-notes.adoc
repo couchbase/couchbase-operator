@@ -181,7 +181,7 @@ a| Upgrading Couchbase Server using the Operator is not currently supported.
 [NOTE]
 .Fixed
 ====
-You can now use the Operator to xref:upgrading-couchbase[automatically upgrade Couchbase Server].
+You can now use the Operator to xref:concept-upgrade.adoc[automatically upgrade Couchbase Server].
 ====
 
 | General 

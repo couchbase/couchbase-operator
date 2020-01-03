@@ -73,7 +73,7 @@ Couchbase clusters that were created with Operator versions prior to 1.2.0 canno
 * Change the name of all server classes (the `spec.servers[].name` attribute).
 This will swap the pods that are using old specifications with new ones, all in a single operation.
 This is an online upgrade.
-* Perform an xref:upgrading-couchbase.adoc[upgrade] of Couchbase server.
+* Perform an xref:concept-upgrade.adoc[upgrade] of Couchbase server.
 This will upgrade the pods that are using old specifications with new ones via the rolling upgrade mechanism.
 This is an online upgrade.
 This is the preferred method to perform this upgrade action.

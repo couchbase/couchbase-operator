@@ -247,7 +247,7 @@ Please check the relevant registry for the most up to date image tags.
 You may use a different location if, for example, you have a local container registry.
 
 Image tags must contain a valid semantic version in order to dynamically enable/disable Operator features and control upgrade paths.
-For further information on upgrade constraints, please consult the xref:upgrading-couchbase.adoc[upgrade documentation].
+For further information on upgrade constraints, please consult the xref:concept-upgrade.adoc[upgrade documentation].
 
 ____
 _Field rules:_ The `image` field is required and must be a valid container image.

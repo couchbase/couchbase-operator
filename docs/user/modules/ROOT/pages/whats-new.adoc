@@ -10,7 +10,7 @@ The Operator is now capable of performing automated upgrades of Couchbase Server
 Upgrading an entire Couchbase cluster is as easy as specifying the desired Couchbase version in the CouchbaseCluster configuration, and then pushing it to Kubernetes.
 The Operator manages the entire online rolling upgrade by itself.
 
-See xref:upgrading-couchbase.adoc[Upgrading a Couchbase Cluster]
+See xref:concept-upgrade.adoc[Upgrading a Couchbase Cluster]
 
 == Integrated CouchbaseCluster Resource Validation
 

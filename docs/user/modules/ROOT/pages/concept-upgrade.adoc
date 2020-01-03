@@ -1,0 +1,70 @@
+= Couchbase Upgrades
+
+[abstract]
+The Operator allows a managed Couchbase cluster to be upgraded.
+This includes upgrading the Couchbase Server version and also related Kubernetes resources.
+
+== Upgrading Couchbase Server
+
+The Couchbase Server version can be xref:howto-upgrade-couchbase.adoc[upgraded] by the Operator.
+The Operator performs a rolling upgrade of a Couchbase cluster one node at a time.
+This process is as follows:
+
+* A candidate pod is selected
+* A new pod created with the same Couchbase configuration as the existing one
+* Data is rebalanced from the old pod to the new one
+* The candidate pod is deleted
+
+This ensures that there are always enough pods to handle client load.
+Furthermore by performing the operation one pod at a time, risk is limited in the event of an issue.
+
+[IMPORTANT]
+====
+Ideally, the Operator should replace an old pod for a new one, retaining any existing persistent storage, then performing a delta-node recovery to perform a fast upgrade.
+Couchbase Server requires an offline upgrade task to migrate old data structures to new ones before starting the service.
+The Operator is unable -- at present -- to perform this upgrade action, therefore it must create new storage for new pods and copy data to the new storage.
+Any time required for an upgrade must be considered when planning an upgrade.
+====
+
+=== Couchbase Server Upgrade Constraints
+
+Not all upgrade paths are supported by Couchbase Server.
+The Operator enforces the following constraints on Couchbase Server version upgrades.
+
+* Upgrades must be an upgrade, downgrades are not supported due to potential protocol incompatibility, for example:
+** 5.5.0 to 5.5.3 is allowed
+** 5.5.3 to 5.5.0 is not allowed
+* Upgrades must not cross multiple major version boundaries, for example:
+** 5.x.x to 6.x.x is allowed
+** 5.x.x to 7.x.x is not allowed
+* Couchbase Server versions cannot be changed during an upgrade
+
+Refer to the Couchbase Server xref:server:install:upgrade.adoc[upgrade documentation] for more information about direct upgrade paths.
+
+[NOTE]
+====
+Modifying the Couchbase Server version during an upgrade is permitted only if the end result is a roll-back to the previous version.
+====
+
+== Upgrading Pods
+
+In Kubernetes pods are immutable -- they cannot be modified once they are created.
+If a CouchbaseCluster configuration value is modified that would also modify the underlying pod, then the Operator must create a new pod to replace the old one that does not match the required specification.
+Pod upgrades work in exactly the same way as an upgrade to the Couchbase Server version; in fact upgrading the Couchbase Server image is just a subset of modifying any other pod specification parameter.
+
+The Operator compares the required pod specification with the one used to create the original pod, a candidate is selected if the specifications differ.
+The Operator therefore can perform the following tasks:
+
+* Modification of environment variables
+* xref:concept-scheduling.adoc[Modification of scheduling constraints]
+* xref:concept-memory-allocation.adoc[Modification of memory constraints]
+* xref:concept-tls.adoc[Enabling and disabling of TLS]
+* xref:concept-persistent-volumes.adoc[Enabling and disabling of persistent storage]
+
+This mechanism allows a cluster to be used from evaluation right up to production, with features enabled as they are required, without service disruption.
+
+== Upgrading Persistent Volumes
+
+Online persistent volume resizing support is not yet available in all supported versions of Kubernetes.
+As a result the Operator supports xref:howto-persistent-volume-resize.adoc[persistent volume resizing] using a similar mechanism to <<upgrading-pods>>.
+The Operator will detect a modification to the specification of a persistent volume template and schedule a pod upgrade in order to satisfy the request.

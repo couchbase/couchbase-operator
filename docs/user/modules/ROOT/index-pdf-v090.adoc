@@ -80,7 +80,7 @@ include::{includedir}/node-recovery.adoc[]
 
 include::{includedir}/updating-couchbase.adoc[]
 
-include::{includedir}/upgrading-couchbase.adoc[]
+include::{includedir}/concept-upgrade.adoc[]
 
 include::{includedir}/delete-couchbase-cluster.adoc[]
 

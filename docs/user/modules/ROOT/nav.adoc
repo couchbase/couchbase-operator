@@ -26,7 +26,8 @@
   *** xref:concept-sizing.adoc[Couchbase Sizing]
   *** xref:concept-couchbase-networking.adoc[Couchbase Networking]
   *** xref:concept-tls.adoc[Couchbase TLS]
-  *** xref:server-groups.adoc[Server Groups]
+  *** xref:server-groups.adoc[Couchbase Server Groups]
+  *** xref:concept-upgrade.adoc[Couchbase Upgrades]
 * Manage
  ** Operator
   *** xref:upgrading-the-operator.adoc[Upgrade the Operator]
@@ -35,7 +36,7 @@
   *** Lifecycle
    **** xref:deploying-couchbase.adoc[Create a Couchbase Deployment]
    **** xref:updating-couchbase.adoc[Modify a Couchbase Deployment]
-   **** xref:upgrading-couchbase.adoc[Upgrade a Couchbase Deployment]
+   **** xref:howto-upgrade-couchbase.adoc[Upgrade a Couchbase Deployment]
    **** xref:delete-couchbase-cluster.adoc[Delete a Couchbase Deployment]
    **** xref:scaling-couchbase.adoc[Scale a Couchbase Deployment]
   *** Configure
