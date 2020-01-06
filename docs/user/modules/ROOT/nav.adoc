@@ -26,7 +26,7 @@
   *** xref:concept-sizing.adoc[Couchbase Sizing]
   *** xref:concept-couchbase-networking.adoc[Couchbase Networking]
   *** xref:concept-tls.adoc[Couchbase TLS]
-  *** xref:server-groups.adoc[Couchbase Server Groups]
+  *** xref:concept-server-groups.adoc[Couchbase Server Groups]
   *** xref:concept-upgrade.adoc[Couchbase Upgrades]
 * Manage
  ** Operator
@@ -46,6 +46,7 @@
    **** xref:howto-public-networking.adoc[Configure Public Networking]
    **** xref:howto-nodeport-networking.adoc[Configure Node Port Networking]
    **** xref:howto-tls.adoc[Configure TLS]
+   **** xref:howto-server-groups.adoc[Configure Server Groups]
    **** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
    **** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
   *** Connect

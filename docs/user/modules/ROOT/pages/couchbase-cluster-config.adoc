@@ -905,7 +905,7 @@ ____
 _Field rules:_ The `logRetentionCount` field is optional and defaults to `0`.  The value must be any non-negative integer.
 ____
 
-== spec.servers
+== spec.servers[]
 
 This object allows the configuration of the Couchbase cluster topology.
 Servers are grouped in to server classes also known as mutli-dimensional scaling (MDS) groups.
