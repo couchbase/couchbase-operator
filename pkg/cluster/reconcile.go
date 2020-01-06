@@ -378,6 +378,7 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 	}
 
 	// Report the cluster is balanced
+	log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.cluster.Status.SetBalancedCondition()
 	if err := c.updateCRStatus(); err != nil {
