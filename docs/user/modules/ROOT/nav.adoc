@@ -81,6 +81,7 @@
   *** xref:cbopinfo.adoc[cbopinfo]
 * Tutorials
  ** xref:tutorial-tls.adoc[Creating TLS Certificates]
+ ** xref:tutorial-public-addressability.adoc[Creating a Publicly Addressable Cluster]
  ** xref:demo.adoc[Couchbase Deployment Tutorial]
 * Other Resources
  ** xref:sync-gateway::kubernetes/deploy-cluster.adoc[Sync Gateway on Kubernetes]

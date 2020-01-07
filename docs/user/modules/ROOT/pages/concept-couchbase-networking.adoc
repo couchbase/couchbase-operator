@@ -70,6 +70,7 @@ TLS must be used to secure communications.
 .Learn More
 * xref:howto-public-networking.adoc[How-to configure public networking]
 * xref:howto-xdcr-external.adoc#encrypted[How-to configure XDCR]
+* xref:tutorial-public-addressability.adoc[Public networking tutorial]
 
 === Generic Networking
 
