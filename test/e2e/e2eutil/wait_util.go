@@ -1164,3 +1164,45 @@ func WaitForBackupDeletion(k8s *types.Cluster, namespace string, timeout time.Du
 
 	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
+
+func WaitForPrometheusReady(k8s *types.Cluster, namespace string, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, retryInterval, func() (bool, error) {
+		listOptions := &metav1.ListOptions{
+			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+		}
+		pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(*listOptions)
+		if err != nil {
+			return false, err
+		}
+
+		ready := map[string]bool{}
+
+		for _, pod := range pods.Items {
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Name == k8sutil.MetricsContainerName && status.Image == couchbase.Spec.Monitoring.Prometheus.Image {
+					if status.Ready {
+						ready[pod.Name] = true
+					}
+				}
+			}
+		}
+
+		for s, b := range ready {
+			if !b {
+				return false, fmt.Errorf("prometheus container belonging to pod %s is not ready", s)
+			}
+		}
+
+		return true, nil
+	})
+}
+
+func MustWaitForPrometheusReady(t *testing.T, k8s *types.Cluster, namespace string, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	err := WaitForPrometheusReady(k8s, namespace, couchbase, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+}

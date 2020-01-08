@@ -270,6 +270,10 @@ var (
 		// Status tests
 		"TestStatusRecovery": TestStatusRecovery,
 
+		// Monitoring tests
+		"TestPrometheusMetrics":       TestPrometheusMetrics,
+		"TestPrometheusMetricsEnable": TestPrometheusMetricsEnable,
+
 		// Backup tests
 		"TestFullIncremental":              TestFullIncremental,
 		"TestFullOnly":                     TestFullOnly,

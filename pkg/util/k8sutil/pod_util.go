@@ -39,6 +39,7 @@ const (
 	serverSecretMountPath           = "/var/run/secrets/couchbase.com/couchbase-server-tls"
 	operatorSecretMountPath         = "/var/run/secrets/couchbase.com/couchbase-operator-tls"
 	metricsTokenMountPath           = "/var/run/secrets/couchbase.com/metrics-token"
+	MetricsContainerName            = "metrics"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -836,7 +837,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 	}
 
 	return v1.Container{
-		Name:  "metrics",
+		Name:  MetricsContainerName,
 		Image: cs.Monitoring.Prometheus.Image,
 		Env: []v1.EnvVar{
 			{

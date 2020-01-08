@@ -169,7 +169,7 @@ func GetHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, servi
 	// Forward port to a pod to the local host.  Pick a random pod this will prevent hangs
 	// if the pod we are always selecting isn't the one we need.
 
-	// Admin is special as it's enabled everyehere and doesn't have a label selector
+	// Admin is special as it's enabled everywhere and doesn't have a label selector
 	services := []couchbasev2.Service{}
 	if service != couchbasev2.AdminService {
 		services = append(services, service)

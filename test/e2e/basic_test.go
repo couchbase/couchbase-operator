@@ -15,7 +15,7 @@ import (
 // 2. Check the events to make sure the operator took the correct actions
 // 3. Verifies that the cluster is balanced and all data is available
 func TestCreateCluster(t *testing.T) {
-	// Plaform configuration.
+	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
