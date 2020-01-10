@@ -12,9 +12,7 @@ For this reason Couchbase Server cannot be accessed using normal Kubernetes `Ser
 The following options depict the possible networking topologies for connecting clients to a Couchbase cluster.
 Clients includes all Couchbase Client SDKs, Couchbase Mobile and Couchbase XDCR connections unless otherwise stated.
 
-== Supported Networking Types
-
-=== Intra-Kubernetes Networking
+== Intra-Kubernetes Networking
 
 Intra-Kubernetes networking is the simplest and allow clients running in the same Kubernetes cluster as the Couchbase server instance.
 This method of communication can be used by any client.
@@ -27,14 +25,15 @@ Stable service discovery is provided by SRV records.
 TLS can be used to secure communications.
 
 .Learn More
-* xref:howto-xdcr-external.adoc#encrypted[How-to configure XDCR]
+* xref:howto-xdcr-external.adoc#dns-based-addressing[How-to configure XDCR]
 
-=== Inter-Kubernetes Networking with Kubernetai
+== Inter-Kubernetes Networking with Forwarded DNS
 
 Inter-Kubernetes networking allows clients to connect to Couchbase server instances in another Kubernetes cluster.
 
-https://github.com/coredns/kubernetai[Kubernetai^] is a plugin that can be added to Kubernetes CoreDNS service.
-It allows local DNS entries to be populated from a remote cluster.
+Any DNS server that supports forwarding of zones to remote DNS servers can be used, but we recommend https://coredns.io[CoreDNS^] as the defacto cloud native standard.
+A local DNS server is used by Couchbase Server pods to forward DNS requests for a remote namespace to a remote cluster.
+Requests that do not fall into this zone are forwarded to the local Kubernetes cluster DNS instance.
 
 This method of communication can only be used if clients in one cluster can communicate with pods in another -- it uses xref:concept-kubernetes-networking.adoc#routed-networking[routed networking].
 For example:
@@ -50,9 +49,10 @@ Stable service discovery is provided by SRV records.
 TLS can be used to secure communications.
 
 .Learn More
-* xref:howto-xdcr-external.adoc#encrypted[How-to configure XDCR]
+* xref:howto-xdcr-external.adoc#dns-based-addressing[How-to configure XDCR]
+* xref:tutorial-remote-dns.adoc[Inter-kubernetes networking with forwarded DNS tutorial]
 
-=== Public Networking with External DNS
+== Public Networking with External DNS
 
 Public networking allows clients to connect to Couchbase server instances from anywhere with an Internet connection.
 
@@ -69,10 +69,10 @@ TLS must be used to secure communications.
 
 .Learn More
 * xref:howto-public-networking.adoc[How-to configure public networking]
-* xref:howto-xdcr-external.adoc#encrypted[How-to configure XDCR]
+* xref:howto-xdcr-external.adoc#dns-based-addressing-with-external-dns[How-to configure XDCR]
 * xref:tutorial-public-addressability.adoc[Public networking tutorial]
 
-=== Generic Networking
+== Generic Networking
 
 Generic networking use is discouraged for production deployments.
 It should be avoided in preference for one of the prior methods of communication.
@@ -87,7 +87,7 @@ TLS cannot be used to secure communications.
 
 .Learn More
 * xref:howto-nodeport-networking.adoc[How-to configure node port networking]
-* xref:howto-xdcr-external.adoc#unencrypted[How-to configure XDCR]
+* xref:howto-xdcr-external.adoc#ip-based-addressing[How-to configure XDCR]
 
 == Exposed Features
 

@@ -130,6 +130,12 @@ spec:
       serviceAccountName: couchbase-pods
       imagePullSecrets:
       - name: my-pull-secret
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+        - "10.0.0.2"
+        searches:
+        - cluster.local
       volumeMounts:
         default: couchbase
         data:  couchbase
@@ -956,6 +962,12 @@ spec:
       serviceAccountName: couchbase-pods
       imagePullSecrets:
       - name: my-pull-secret
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+        - "10.0.0.2"
+        searches:
+        - cluster.local
       volumeMounts:
         default: couchbase
         data:  couchbase
@@ -1035,6 +1047,12 @@ spec:
         analytics:
         - couchbase
         - couchbase
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+        - "10.0.0.2"
+        searches:
+        - cluster.local
 ----
 
 === spec.servers[].pod.env
@@ -1140,6 +1158,31 @@ ____
 === spec.servers[].pod.automountServiceAccountToken
 
 === spec.servers[].pod.serviceAccountName
+
+=== spec.servers[].pod.dnsPolicy
+
+This field defines how Kubernetes populates Couchbase Server pods' DNS resolver.
+By default, when not specified, this will use the builtin cluster DNS server.
+This field allows the operator to inhibit the population of DNS configuration by Kubernetes.
+Valid values are `None`.
+
+For additional information see https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy[the Kubernetes documentation^].
+
+____
+_Field rules:_ The `dnsPolicy` field is optional and must be a string.
+____
+
+=== spec.servers[].pod.dnsConfig
+
+This object defines DNS configuration in addition to that defined by Kubernetes under the control of the DNS policy.
+The `nameservers` sub-attribute is a list of DNS nameserver IP addresses.
+The `searches` sub-attribute is a list of DNS search domains.
+
+For additional information see https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-config[the Kubernetes documentation^].
+
+____
+_Field rules:_ The `dnsConfig` field is optional and must be a valid Kubernetes DNS configuration object.
+____
 
 == spec.servers[].pod.volumeMounts
 
