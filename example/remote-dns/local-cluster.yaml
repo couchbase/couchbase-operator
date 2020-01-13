@@ -1,0 +1,46 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: default
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:enterprise-6.0.1
+  security:
+    adminSecret: cb-example-auth
+  buckets:
+    managed: true
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+      pod:
+        dnsPolicy: None
+        # Configuration:
+        # * "10.39.255.231" is the local DNS service IP, as provisioned by local-coredns.yaml.
+        dnsConfig:
+          nameservers:
+          - "10.39.255.231"
+          searches:
+          - cluster.local
+  xdcr:
+    managed: true
+    # Configuration:
+    # * "cb-example-0000.cb-example.remote.svc" is a host in the remote DNS zone
+    # * "5192c4cbba3cf377f3d6fec6ad0ec80d" is the UUID extracted from the remote
+    #   clusters status field.
+    remoteClusters:
+    - authenticationSecret: cb-example-auth
+      hostname: cb-example-0000.cb-example.remote.svc:8091
+      name: remote
+      replications: {}
+      uuid: 5192c4cbba3cf377f3d6fec6ad0ec80d

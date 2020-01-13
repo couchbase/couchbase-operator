@@ -903,6 +903,12 @@ func applyPodPolicy(pod *v1.Pod, policy *couchbasev2.PodPolicy) {
 
 	pod.Spec.ServiceAccountName = policy.ServiceAccountName
 
+	pod.Spec.DNSPolicy = v1.DNSClusterFirst
+	if policy.DNSPolicy != nil {
+		pod.Spec.DNSPolicy = *policy.DNSPolicy
+	}
+	pod.Spec.DNSConfig = policy.DNSConfig
+
 	if len(policy.NodeSelector) != 0 {
 		pod.Spec.NodeSelector = policy.NodeSelector
 	}

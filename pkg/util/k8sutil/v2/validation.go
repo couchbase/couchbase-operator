@@ -1039,6 +1039,13 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 														"automountServiceAccountToken": apiextensionsv1beta1.JSONSchemaProps{
 															Type: "boolean",
 														},
+														"dnsPolicy": apiextensionsv1beta1.JSONSchemaProps{
+															Type:    "string",
+															Pattern: `^None$`,
+														},
+														"dnsConfig": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+														},
 														"volumeMounts": apiextensionsv1beta1.JSONSchemaProps{
 															Type: "object",
 															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{

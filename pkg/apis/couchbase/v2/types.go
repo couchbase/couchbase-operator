@@ -806,6 +806,15 @@ type PodPolicy struct {
 
 	// ImagePullSecrets allows users to pull Couchbase Server images from private repos.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
+	// DNSPolicy allows the default DNS policy to be modified.  Usually Kubernetes will
+	// use the configured cluster DNS service to serve requests, however this can be set
+	// to "None" to make Kubernetes supply no default DNS servers.
+	DNSPolicy *v1.DNSPolicy `json:"dnsPolicy,omitempty"`
+
+	// DNSConfig allows additional DNS servers to be added to the pod's DNS configuration.
+	// Used in conjunction with DNSPolicy this can completely override Kubernetes DNS.
+	DNSConfig *v1.PodDNSConfig `json:"dnsConfig,omitempty"`
 }
 
 type VolumeMountName string
