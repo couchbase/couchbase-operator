@@ -49,6 +49,7 @@
    **** xref:howto-server-groups.adoc[Configure Server Groups]
    **** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
    **** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
+   **** xref:howto-non-root-install.adoc[Configure Non-Root Installs]
   *** Connect
    **** xref:accessing-couchbase.adoc[Access the Couchbase User Interface]
    **** xref:couchbase-clients.adoc[Use Couchbase Clients]
