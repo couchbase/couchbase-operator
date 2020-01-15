@@ -68,7 +68,7 @@ include::{includedir}/cluster-status-guide.adoc[]
 
 include::{includedir}/list-and-describe.adoc[]
 
-include::{includedir}/accessing-couchbase.adoc[]
+include::{includedir}/howto-ui.adoc[]
 
 include::{includedir}/couchbase-clients.adoc[]
 

@@ -25,6 +25,7 @@ Stable service discovery is provided by SRV records.
 TLS can be used to secure communications.
 
 .Learn More
+* xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#dns-based-addressing[How-to connect a client SDK]
 * xref:howto-xdcr-external.adoc#dns-based-addressing[How-to configure XDCR]
 
@@ -50,6 +51,7 @@ Stable service discovery is provided by SRV records.
 TLS can be used to secure communications.
 
 .Learn More
+* xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#dns-based-addressing[How-to connect a client SDK]
 * xref:howto-xdcr-external.adoc#dns-based-addressing[How-to configure XDCR]
 * xref:tutorial-remote-dns.adoc[Inter-kubernetes networking with forwarded DNS tutorial]
@@ -71,6 +73,7 @@ TLS must be used to secure communications.
 
 .Learn More
 * xref:howto-public-networking.adoc[How-to configure public networking]
+* xref:howto-ui.adoc#dns-based-addressing[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[How-to connect a client SDK]
 * xref:howto-xdcr-external.adoc#dns-based-addressing-with-external-dns[How-to configure XDCR]
 * xref:tutorial-public-addressability.adoc[Public networking tutorial]
@@ -90,6 +93,7 @@ TLS cannot be used to secure communications.
 
 .Learn More
 * xref:howto-nodeport-networking.adoc[How-to configure node port networking]
+* xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#ip-based-addressing[How-to connect a client SDK]
 * xref:howto-xdcr-external.adoc#ip-based-addressing[How-to configure XDCR]
 

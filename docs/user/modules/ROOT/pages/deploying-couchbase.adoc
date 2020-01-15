@@ -180,4 +180,4 @@ A CouchbaseCluster object is also created for the cluster and can be used to xre
 
 == Next Steps
 
-* xref:accessing-couchbase.adoc[Access the Couchbase Server interfaces]
+* xref:howto-ui.adoc[Access the Couchbase Server interfaces]

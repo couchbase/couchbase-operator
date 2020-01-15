@@ -152,7 +152,7 @@ This will allow nodes in each cluster to talk to each other.
 
 === Setup XDCR in the Admin Dashboard
 
-The last step is to xref:accessing-couchbase.adoc[access the Couchbase Server Web Console] on each Couchbase cluster to set up and test XDCR.
+The last step is to xref:howto-ui.adoc[access the Couchbase Server Web Console] on each Couchbase cluster to set up and test XDCR.
 An alternative way is to access the Admin Dashboard UI as outlined in the xref:best-practices[Best Practises] section.
 
 Take note of which cluster you are opening the XDCR connection on and its CIDR block.

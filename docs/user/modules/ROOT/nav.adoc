@@ -51,7 +51,7 @@
    **** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
    **** xref:howto-non-root-install.adoc[Configure Non-Root Installs]
   *** Connect
-   **** xref:accessing-couchbase.adoc[Access the Couchbase User Interface]
+   **** xref:howto-ui.adoc[Access the Couchbase User Interface]
    **** xref:howto-client-sdks.adoc[Configure Client SDKs]
  ** Kubernetes
   *** xref:howto-storage-class.adoc[Create a Lazy Bound Storage Class]

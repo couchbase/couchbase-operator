@@ -1,0 +1,79 @@
+= How-to Access the Couchbase Server User Interface
+
+[abstract]
+Connect to the Couchbase Server user interface.
+
+The Couchbase user interface (UI) provides a rich environment for cluster management, debugging and application development.
+Access to the UI varies based on your chosen xref:concept-couchbase-networking.adoc[network architecture].
+
+[IMPORTANT]
+====
+Kubernetes ingress resources are not supported as they are neither fully featured nor generic across platforms.
+It is highly recommended that one of the methods outlined below be used for correct functionality as no technical support will be provided.
+====
+
+== Port Forwarding
+
+The standard way to connect to a Couchbase UI is through port-forwarding.
+In order to forward a Couchbase Server pod, list the pods belonging to the cluster you wish to connect to:
+
+[source,console]
+----
+$ kubectl get pods -l couchbase_cluster=cb-example # <1>
+NAME              READY   STATUS    RESTARTS   AGE
+cb-example-0000   1/1     Running   0          69m
+cb-example-0001   1/1     Running   0          68m
+cb-example-0002   1/1     Running   0          68m
+----
+
+<1> Replace `cb-example` with the cluster name you require.
+
+If you are using multi-dimensional scaling then you will need to specify the subset of pods to use.
+Versions of Couchbase Server before version 6.5.0 require you to connect to a node that is running the service you are trying to access.
+This can be achieved by providing a second filter to specify the service you require (`data`, `index`, `query`, `search`, `eventing` or `analytics`):
+
+[source,console]
+----
+$ kubectl get pods -l couchbase_cluster=cb-example,couchbase_service_query=enabled # <1>
+NAME              READY   STATUS    RESTARTS   AGE
+cb-example-0000   1/1     Running   0          73m
+cb-example-0001   1/1     Running   0          72m
+cb-example-0002   1/1     Running   0          72m
+----
+
+<1> Replace `query` with the service you require.
+
+To port forward to a chosen pod use the following command:
+
+[source,console]
+----
+$ kubectl port-forward cb-example-0000 8091
+Forwarding from 127.0.0.1:8091 -> 8091
+Forwarding from [::1]:8091 -> 8091
+----
+
+You can then connect to http://localhost:8091 to access the UI.
+
+[IMPORTANT]
+====
+If you must connect over TLS then forward port 18091 and use the address https://localhost:18091.
+Ensure your cluster administrator has provided a CA certificate to be installed into your browser's trust store.
+If certificate based authentication is used, then ensure you have installed your client certificate/key into your browser too.
+As you are connecting to `localhost` it is also important that your cluster administrator has added the `localhost` subject alternative address name into the cluster TLS certificate.
+====
+
+== DNS Based Addressing
+
+If you are using the xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[public networking with External DNS] network configuration then DNS based addressing can be used.
+When using public networking the Couchbase administrative service is exposed as a load balancer service in order to provide resilient connectivity for clients.
+This same service provides access to the UI.
+
+The connection string is determined by the xref:couchbase-cluster-comfig.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
+The connection string is in the form `https://console.${dns-domain}`.
+Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `https://console.my-cluster.acme.org:18091`.
+
+[NOTE]
+====
+The UI is available as a result of providing service discovery for Couchbase clients.
+It does not handle multi-dimensional scaling groups, so should only be used on homogeneous clusters.
+====
