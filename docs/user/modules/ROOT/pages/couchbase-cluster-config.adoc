@@ -1347,7 +1347,7 @@ ____
 This field defines any TLS configuration required to establish a connection with the remote cluster.
 
 This field references a Kubernetes secret containing remote cluster TLS information.
-If replications to the remote cluster are to be encrypted then `spec.xdcr.remoteClusters[].hostname` must specify the TLS port (18091 by default), and at least the CA certificate.
+If replications to the remote cluster are to be encrypted then at least the CA certificate must be provided.
 The CA certificate is specified by the key `ca`.
 
 If the remote cluster requires client certificate authentication then the `certificate` and `key` keys are used to specify the client certificate chain and client certificate's private key respectively.

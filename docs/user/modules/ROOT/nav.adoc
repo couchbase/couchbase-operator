@@ -52,7 +52,7 @@
    **** xref:howto-non-root-install.adoc[Configure Non-Root Installs]
   *** Connect
    **** xref:accessing-couchbase.adoc[Access the Couchbase User Interface]
-   **** xref:couchbase-clients.adoc[Use Couchbase Clients]
+   **** xref:howto-client-sdks.adoc[Configure Client SDKs]
  ** Kubernetes
   *** xref:howto-storage-class.adoc[Create a Lazy Bound Storage Class]
  ** Helm

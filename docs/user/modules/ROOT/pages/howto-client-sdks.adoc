@@ -1,0 +1,91 @@
+= How-to Configure Client SDKs
+
+[abstract]
+Connecting a Couchbase SDK to an Operator managed Couchbase cluster.
+
+Couchbase Server requires clients in order to do productive work.
+The operator is only concerned with cluster life cycle and high availability.
+
+Configuration and use of a client SDK is available in xref:server::sdk/overview.adoc[language specific documentation].
+All client SDKs share a common connection string format; used by the SDK to connect to the Couchbase cluster and discover nodes.
+This how-to documents how to calculate the required connection string based on your chosen xref:concept-couchbase-networking.adoc[network architecture].
+
+[NOTE]
+====
+While we discuss client SDKs, these configurations also apply to Couchbase Connectors and Couchbase Mobile.
+====
+
+== DNS Based Addressing
+
+DNS based addressing is the simplest form of connecting a client to a Couchbase cluster.
+All supported DNS based solutions support dynamic, DNS based service discovery that provides fault-tolerance.
+
+All that is required to calculate the connection string is the cluster name and namespace it is running in.
+For the following examples we will use `my-cluster` and `my-namespace` respectively.
+
+Due to the fact that service discovery occurs only though the data service, we need to use a separate service to identify only these nodes.
+The service name is in the form `${cluster-name}-srv`.
+
+The complete connection string is in the form `${scheme}://${cluster-name}-srv.${namespace}.svc`.
+Given our example cluster and namespace names:
+
+* To connect to the cluster using plain text use the connection string `couchbase://my-cluster-srv.my-namespace.svc`.
+* To connect to the cluster using TLS use the connection string `couchbases://my-cluster-srv.my-namespace.svc`.
+
+== DNS Based Addressing with External DNS
+
+DNS based addressing with External DNS is slightly different to plain DNS.
+The External DNS controller does not support SRV records, instead we use HTTPS.
+Fault-tolerance is provided by a load balancer service.
+
+The connection string is determined by the xref:couchbase-cluster-comfig.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
+The connection string is in the form `https://console.${dns-domain}`.
+Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `https://console.my-cluster.acme.org:18091`.
+
+[NOTE]
+====
+Use of client SDKs with this network configuration relies on support for DNAT.
+Consult the xref:concept-couchbase-networking.adoc#supported-client-versions-for-use-with-exposed-features[networking concepts page] for compatibility information.
+====
+
+[IMPORTANT]
+====
+Using SRV based connection strings is the recommended method of connecting client SDKs.
+Defects exist due to performance issues when using HTTP transport for cluster discovery.
+To mitigate the potential for errors, ensure your clients are not continually connecting and disconnecting from your Couchbase clusters.
+====
+
+== IP Based Addressing
+
+IP based addressing is only used when connecting a client SDK with a node-port service.
+As this is IP based TLS is not supported.
+It is also HTTP based so suffers from the same issues as <<dns-based-addressing-with-external-dns>>.
+This addressing method is highly discouraged.
+
+To calculate the connection string, first get the admin console service for your cluster, assuming it is called `cb-example`:
+
+[source,console]
+----
+$ kubectl get svc cb-example-ui
+NAME            TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)                          AGE
+cb-example-ui   NodePort   10.110.92.187   <none>        8091:31410/TCP,18091:31972/TCP   114s
+----
+
+Get all nodes in the cluster:
+
+[source,console]
+----
+$ kubectl get nodes -o wide
+NAME       STATUS   ROLES    AGE   VERSION    INTERNAL-IP   EXTERNAL-IP   OS-IMAGE              KERNEL-VERSION   CONTAINER-RUNTIME
+minikube   Ready    master   49d   v1.13.11   10.0.2.15     <none>        Buildroot 2018.05.3   4.15.0           docker://18.9.9
+----
+
+You may use any node IP address, however be aware these could change or be deprovisioned and break clients.
+The port must be the node port mapped to Couchbase port `8091`.
+The address to connect to is `http://10.0.2.15:31410`.
+
+[NOTE]
+====
+Use of client SDKs with this network configuration relies on support for DNAT.
+Consult the xref:concept-couchbase-networking.adoc#supported-client-versions-for-use-with-exposed-features[networking concepts page] for compatibility information.
+====

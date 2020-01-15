@@ -14,7 +14,7 @@ In this scenario the remote cluster is accessible with Kubernetes based DNS.
 This applies to both xref:concept-couchbase-networking.adoc#intra-kubernetes-networking[intra-Kubernetes networking] and xref:concept-couchbase-networking.adoc#inter-kubernetes-networking-with-forwarded-dns[inter-Kubernetes networking with forwarded DNS].
 
 TLS is optional with this configuration, but shown for completeness.
-To configure without TLS, omit any TLS related attributes and use port 8091 to connect to the remote cluster.
+To configure without TLS, omit any TLS related attributes.
 
 === Remote Cluster
 
@@ -35,7 +35,7 @@ spec:
         operatorSecret: my-operator-tls-secret
 ----
 
-<.> TLS configuration is required and `spec.networking.tls` is configured as per the xref:tutorial-tls.adoc[TLS configuration guide].
+<.> **TLS only:** TLS configuration is configured as per the xref:tutorial-tls.adoc[TLS configuration guide].
 The TLS server certificate needs a subject alternative name (SAN) valid for internal Kubernetes DNS.
 In this instance `DNS:*.my-remote-cluster.ny-namespace.svc`.
 
@@ -75,6 +75,8 @@ spec:
       uuid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
       hostname: my-remote-cluster.my-remote-namespace.svc # <.>
       authenticationSecret: my-xdcr-secret # <.>
+      tls:
+        secret: my-xdcr-tls-secret # <.>
       replications: # <.>
         selector:
           matchLabels:
@@ -94,8 +96,12 @@ spec:
 <.> The `uuid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
 
 <.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
+The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing[SDK configuration how-to], *without* the scheme.
 
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
+
+<.> **TLS only:** For TLS connections you need to specify the remote cluster CA certificate in order to verify the remote cluster is trusted.
+xref:couchbase-cluster-config.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdcr.remoteClusters[\].tls.secret`] documents the secret format.
 
 <.> Replications are selected that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
 
@@ -187,6 +193,8 @@ spec:
       uuid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
       hostname: console.my-remote-cluster.example.com:18091 # <.>
       authenticationSecret: my-xdcr-secret # <.>
+      tls:
+        secret: my-xdcr-tls-secret # <.>
       replications: # <.>
         selector:
           matchLabels:
@@ -197,9 +205,13 @@ spec:
 
 <.> The `uuid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
 
-<.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery, its port is the default admin service TLS port (18091).
+<.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
+The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[SDK configuration how-to], *without* the scheme.
 
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
+
+<.> For TLS connections you need to specify the remote cluster CA certificate in order to verify the remote cluster is trusted.
+xref:couchbase-cluster-config.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdcr.remoteClusters[\].tls.secret`] documents the secret format.
 
 <.> Replications are selected that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
 
@@ -281,14 +293,9 @@ spec:
 
 <.> The `uuid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
 
-<.> The correct hostname to use is detailed below.
+<.> The correct hostname to use.
+The hostname is calculated as per the xref:howto-client-sdks.adoc#ip-based-addressing[SDK configuration how-to], *without* the scheme.
 
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 
 <.> Finally we select replications that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
-
-==== Determining the Hostname
-
-On the remote Kubernetes cluster, the following procedure can be used to calculate the XDCR hostname.
-
-include::partial$nodeport-lookup.adoc[]

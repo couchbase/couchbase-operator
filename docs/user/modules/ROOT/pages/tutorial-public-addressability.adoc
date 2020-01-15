@@ -212,4 +212,5 @@ Configuration options are fully documented in the xref:howto-public-networking.a
 Now you have a publicly addressable cluster you can start using it.
 Consult the following guides for details on client operations:
 
-* xref:howto-xdcr-external.adoc#local-cluster-2[Connecting XDCR to a publicly addressable cluster].
+* xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[How-to connect a client SDK]
+* xref:howto-xdcr-external.adoc#local-cluster-2[How-to configure XDCR]

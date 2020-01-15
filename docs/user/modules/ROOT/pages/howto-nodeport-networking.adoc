@@ -26,9 +26,3 @@ However as node IP addresses may vary during the life cycle of a Kubernetes clus
 
 <.> xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatures[`spec.networking.exposedFeatures`] defines the `client` feature set, meaning all enabled services are exposed.
 This also causes a per-pod service to be created allowing direct access by a client to each pod as required.
-
-== Connecting Clients
-
-The following procedure defines how to create the address for a client to connect to.
-
-include::partial$nodeport-lookup.adoc[]
