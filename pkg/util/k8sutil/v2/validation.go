@@ -474,7 +474,6 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 							Required: []string{
 								"image",
 								"security",
-								"cluster",
 								"servers",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{

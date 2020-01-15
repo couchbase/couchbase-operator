@@ -35,9 +35,11 @@ const (
 	defaultMetricsImage                           = "couchbase/prometheus-exporter:1.0.0"
 )
 
-func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	emptyObject := struct{}{}
+var (
+	emptyObject = struct{}{}
+)
 
+func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster"); !found {
@@ -150,6 +152,9 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
 	}
@@ -175,6 +180,9 @@ func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) 
 func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
 	}
@@ -200,6 +208,9 @@ func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstr
 func ApplyMemcachedBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
+	}
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
 	}

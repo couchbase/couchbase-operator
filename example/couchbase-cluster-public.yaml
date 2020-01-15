@@ -2,15 +2,6 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: default
-spec:
-  memoryQuota: 128Mi
-  replicas: 1
-  ioPriority: high
-  evictionPolicy: fullEviction
-  conflictResolution: seqno
-  enableFlush: true
-  enableIndexReplica: false
-  compressionMode: passive
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
@@ -36,18 +27,6 @@ spec:
     dns:
       domain: us-east1.example.com
   platform: gce
-  cluster:
-    dataServiceMemoryQuota: 256Mi
-    indexServiceMemoryQuota: 256Mi
-    searchServiceMemoryQuota: 256Mi
-    eventingServiceMemoryQuota: 256Mi
-    analyticsServiceMemoryQuota: 1Gi
-    indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 120s
-    autoFailoverMaxCount: 3
-    autoFailoverOnDataDiskIssues: true
-    autoFailoverOnDataDiskIssuesTimePeriod: 120s
-    autoFailoverServerGroup: false
   buckets:
     managed: true
   servers:
