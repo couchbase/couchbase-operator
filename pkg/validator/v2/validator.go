@@ -538,15 +538,13 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	// Record the zones that the server certificate needs to support as we look at the network configuration.
-	zones := []string{
-		customResource.Name + "." + customResource.Namespace + ".svc",
-	}
+	subjectAltNames := util_x509.MandatorySANs(customResource.Name, customResource.Namespace)
 	if customResource.Spec.Networking.DNS != nil {
-		zones = append(zones, customResource.Spec.Networking.DNS.Domain)
+		subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", customResource.Spec.Networking.DNS.Domain))
 	}
 
 	// Check TLS
-	errs = append(errs, validateTLS(v, customResource, zones)...)
+	errs = append(errs, validateTLS(v, customResource, subjectAltNames)...)
 	errs = append(errs, validateTLSXDCR(v, customResource)...)
 
 	// Require that publically visible service ports have DNS information available.
@@ -764,7 +762,7 @@ func CheckConstraintsCouchbaseRole(v *types.Validator, role *couchbasev2.Couchba
 //   * in date
 //   * have the correct attributes
 // * leaf certificate has the correct SANs
-func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zones []string) (errs []error) {
+func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subjectAltNames []string) (errs []error) {
 	if cluster.Spec.Networking.TLS != nil {
 		// CRD validation requires all the necessary fields are populated
 		operatorSecretName := cluster.Spec.Networking.TLS.Static.OperatorSecret
@@ -816,11 +814,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, zone
 		}
 
 		// Validate the TLS configuration is going to work
-		hosts := util_x509.PrependZones(zones)
-		if cluster.Spec.Monitoring.Prometheus.Enabled {
-			hosts = append(hosts, "localhost")
-		}
-		errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, hosts)
+		errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames)
 
 		// Do client certificate verification if necessary
 		if cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {

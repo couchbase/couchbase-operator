@@ -7,6 +7,23 @@ import (
 	"fmt"
 )
 
+// MandatorySANs returns the list of SANs that all server certificates must implement.
+func MandatorySANs(clusterName, namespace string) []string {
+	return []string{
+		fmt.Sprintf("*.%s", clusterName),
+		fmt.Sprintf("*.%s.%s", clusterName, namespace),
+		// Used by the Operator for node connections.
+		fmt.Sprintf("*.%s.%s.svc", clusterName, namespace),
+		// Used by clients for connection in the same namespace.
+		fmt.Sprintf("%s-srv", clusterName),
+		// Used by clients for connection in a different/remote namespace.
+		fmt.Sprintf("%s-srv.%s", clusterName, namespace),
+		fmt.Sprintf("%s-srv.%s.svc", clusterName, namespace),
+		// Used for prometheus side-car and UI access.
+		"localhost",
+	}
+}
+
 // DecodePEM takes a raw blob of data and tries to decode PEM encoded data.
 func DecodePEM(data []byte) (blocks []*pem.Block) {
 	for len(data) != 0 {
@@ -19,16 +36,8 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 	return
 }
 
-// PrependZones prepends zone strings to create valid host addresses
-func PrependZones(zones []string) []string {
-	for i, zone := range zones {
-		zones[i] = "verify." + zone
-	}
-	return zones
-}
-
 // Verify checks the given chain and CA are valid to be installed
-func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, hosts []string) (errors []error) {
+func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string) (errors []error) {
 	// Decode CA certificate
 	caPem := DecodePEM(caData)
 	switch {
@@ -80,8 +89,12 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, hos
 	}
 
 	// Verify the certificate validates for each supplied zone (valid for server only)
-	for _, host := range hosts {
-		verifyOptions.DNSName = host
+	for _, san := range subjectAltNames {
+		hostname := san
+		if san[0] == '*' {
+			hostname = fmt.Sprintf("host%s", san[1:])
+		}
+		verifyOptions.DNSName = hostname
 		if _, err := cert.Verify(verifyOptions); err != nil {
 			errors = append(errors, fmt.Errorf("certificate cannot be verified for zone: %v", err))
 		}

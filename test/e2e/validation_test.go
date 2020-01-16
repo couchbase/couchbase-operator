@@ -9,6 +9,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -312,12 +313,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				// Do dynamic TLS configuration.
 				tlsOpts := &e2eutil.TLSOpts{
 					ClusterName: object.GetName(),
-					AltNames: []string{
-						"*." + object.GetName() + "." + f.Namespace + ".svc",
-						"*.example.com",
-						"localhost",
-					},
+					AltNames:    util_x509.MandatorySANs(object.GetName(), f.Namespace),
 				}
+				tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
 				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOpts)
 				defer teardown()
 

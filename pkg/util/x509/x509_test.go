@@ -9,9 +9,9 @@ import (
 
 const (
 	// zone is a valid zone for the cert.
-	validZone = "cluster.namespace.svc"
+	validZone = "*.cluster.namespace.svc"
 	// invalidZone is an invalid zone for the cert.
-	invalidZone = "invalid.namespace.svc"
+	invalidZone = "*.invalid.namespace.svc"
 	// caCN is the default root CA's common name.
 	caCN = "Root CA"
 	// intermediateCN is the default intermediate CA's common name.
@@ -32,7 +32,7 @@ var (
 				CommonName: serverCN,
 			},
 			DNSNames: []string{
-				"*." + validZone,
+				validZone,
 			},
 		},
 	}
@@ -40,7 +40,7 @@ var (
 
 // mustVerify checks that the PKI is valid for the given cluster.
 func mustVerify(t *testing.T, ca, chain, key []byte, extKeyUsage x509.ExtKeyUsage, zone string) {
-	if errors := Verify(ca, chain, key, extKeyUsage, PrependZones([]string{zone})); len(errors) > 0 {
+	if errors := Verify(ca, chain, key, extKeyUsage, []string{zone}); len(errors) > 0 {
 		for _, err := range errors {
 			t.Log(err)
 		}
@@ -50,7 +50,7 @@ func mustVerify(t *testing.T, ca, chain, key []byte, extKeyUsage x509.ExtKeyUsag
 
 // mustNotVerify checks that the PKI is invalid for the given cluster.
 func mustNotVerify(t *testing.T, ca, chain, key []byte, extKeyUsage x509.ExtKeyUsage, zone string) {
-	if errors := Verify(ca, chain, key, extKeyUsage, PrependZones([]string{zone})); len(errors) == 0 {
+	if errors := Verify(ca, chain, key, extKeyUsage, []string{zone}); len(errors) == 0 {
 		t.Fatal("verification succeeded unexpectedly")
 	}
 }

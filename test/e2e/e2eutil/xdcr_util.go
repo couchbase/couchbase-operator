@@ -20,7 +20,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string, reqParams io.Reader) ([]byte, error) {
@@ -199,17 +198,7 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 // getRemoteUUIDAndHostTLS returns the remote hostname, based on DNS, and the cluster UUID.
 // Used for generic XDCR testing.
 func getRemoteUUIDAndHostTLS(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
-	// List the pods on the remote cluster and pick one
-	selector := labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster.Name)).String()
-	pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector})
-	if err != nil {
-		return "", "", err
-	}
-	if len(pods.Items) == 0 {
-		return "", "", fmt.Errorf("no pods listed")
-	}
-	pod := pods.Items[0]
-
+	var err error
 	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
@@ -220,7 +209,8 @@ func getRemoteUUIDAndHostTLS(kubernetes *types.Cluster, cluster *couchbasev2.Cou
 		return "", "", err
 	}
 
-	return uuid, fmt.Sprintf("%s.%s.%s.svc:18091", pod.Name, cluster.Name, cluster.Namespace), nil
+	// Use an SRV lookup.
+	return uuid, fmt.Sprintf("%s-srv.%s", cluster.Name, cluster.Namespace), nil
 }
 
 // EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
@@ -476,12 +477,7 @@ type TLSOpts struct {
 
 // clusterSANs generates a valid set of SANs for a cluster.
 func (ctx *TLSContext) clusterSANs() []string {
-	return []string{
-		// Required for the Operator to connect to the cluster.
-		fmt.Sprintf("*.%s.%s.svc", ctx.ClusterName, ctx.Namespace),
-		// Required for e2e tests to connect over a port-forward.
-		"localhost",
-	}
+	return util_x509.MandatorySANs(ctx.ClusterName, ctx.Namespace)
 }
 
 // InitClusterTLS accepts a key type (only RSA works for now) and returns a context
