@@ -564,12 +564,12 @@ func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod
 
 func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) {
 	// if bearer token is enabled for authorization, mount token as volume
-	if len(cs.Monitoring.Prometheus.AuthorizationSecret) != 0 {
+	if cs.Monitoring.Prometheus.AuthorizationSecret != nil {
 		volume := v1.Volume{
 			Name: "metrics-token",
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
-					SecretName: cs.Monitoring.Prometheus.AuthorizationSecret,
+					SecretName: *cs.Monitoring.Prometheus.AuthorizationSecret,
 				},
 			},
 		}

@@ -323,13 +323,22 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	// Referenced object validation
-	if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Monitoring.Prometheus.AuthorizationSecret); err != nil {
-		// Silently ignore permissions errors, some users may not want us seeing these resources.
-		if !apierrors.IsForbidden(err) {
-			errs = append(errs, err)
+	if customResource.Spec.Monitoring != nil && customResource.Spec.Monitoring.Prometheus != nil {
+		authSecret := customResource.Spec.Monitoring.Prometheus.AuthorizationSecret
+		if authSecret != nil {
+			if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *authSecret); err != nil {
+				// Silently ignore permissions errors, some users may not want us seeing these resources.
+				if !apierrors.IsForbidden(err) {
+					errs = append(errs, err)
+				}
+			} else if secret == nil {
+				errs = append(errs, fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", *customResource.Spec.Monitoring.Prometheus.AuthorizationSecret))
+			} else {
+				if _, ok := secret.Data["token"]; !ok {
+					errs = append(errs, fmt.Errorf("monitoring authorization secret %s must contain key 'token'", *authSecret))
+				}
+			}
 		}
-	} else if secret == nil {
-		errs = append(errs, fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", customResource.Spec.Monitoring.Prometheus.AuthorizationSecret))
 	}
 
 	if customResource.Spec.XDCR.Managed {

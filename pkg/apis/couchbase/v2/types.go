@@ -1028,5 +1028,5 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 	// AuthorizationSecret is the name of a Kubernetes secret that contains a
 	// bearer token to authorize GET requests to the metrics endpoint
-	AuthorizationSecret string `json:"authorizationSecret,omitempty"`
+	AuthorizationSecret *string `json:"authorizationSecret,omitempty"`
 }
