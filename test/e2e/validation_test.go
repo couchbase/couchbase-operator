@@ -315,6 +315,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 					AltNames: []string{
 						"*." + object.GetName() + "." + f.Namespace + ".svc",
 						"*.example.com",
+						"localhost",
 					},
 				}
 				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOpts)
