@@ -36,8 +36,6 @@ spec:
 ----
 
 <.> **TLS only:** TLS configuration is configured as per the xref:tutorial-tls.adoc[TLS configuration guide].
-The TLS server certificate needs a subject alternative name (SAN) valid for internal Kubernetes DNS.
-In this instance `DNS:*.my-remote-cluster.ny-namespace.svc`.
 
 === Local Cluster
 
@@ -73,7 +71,7 @@ spec:
     remoteClusters:
     - name: remote-cluster # <.>
       uuid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
-      hostname: my-remote-cluster.my-remote-namespace.svc # <.>
+      hostname: my-remote-cluster.my-remote-namespace # <.>
       authenticationSecret: my-xdcr-secret # <.>
       tls:
         secret: my-xdcr-tls-secret # <.>
@@ -88,6 +86,8 @@ spec:
         nameservers:
           - "172.20.92.77"
         searches:
+          - default.svc.cluster.local
+          - svc.cluster.local
           - cluster.local
 ----
 
@@ -110,6 +110,7 @@ xref:couchbase-cluster-config.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdc
 <.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:couchbase-cluster-config.adoc#spec-servers-pod-dnsconfig[`spec.servers[\].pod.dnsConfig`] field explicitly defines the local DNS name server to use.
 This name server is capable of forwarding DNS requests for the remote cluster to the remote Kubernetes DNS server.
 Other DNS requests are forwarded to the local Kubernetes DNS server.
+DNS search domains should remain as shown, however `default` should be modified to be the same as the namespace the cluster is deployed in.
 
 == DNS Based Addressing with External DNS
 
@@ -142,8 +143,8 @@ spec:
 ----
 
 <.> TLS configuration is required and `spec.networking.tls` is configured as per the xref:tutorial-tls.adoc[TLS configuration guide].
-The TLS server certificate needs a subject alternative name (SAN) valid for the domain names that will be generated for the pods, as well as the SAN for internal Kubernetes DNS.
-In this instance `DNS:*.my-remote-cluster.example.com` and `DNS:*.my-remote-cluster.ny-namespace.svc`.
+The TLS server certificate needs an additional subject alternative name (SAN) valid for the public host names that will be generated for the pods.
+In this instance `DNS:*.my-remote-cluster.example.com`.
 
 <.> The domain is also specified in `spec.networking.dns.domain` so that per-pod and console services are annotated correctly.
 A 3rd party solution is required to synchronize these DNS name annotations with a DDNS server in the cloud.

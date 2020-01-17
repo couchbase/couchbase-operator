@@ -48,13 +48,5 @@ Annotations are attached to the admin console and per-pod services.
 The External DNS controller needs to create DNS A records for these service endpoints.
 
 <.> xref:couchbase-cluster-config.adoc#spec-networking-tls-serversecret[`spec.networking.tls.static.serverSecret`] specifies the Couchbase server certificate.
-It needs two DNS subject alternative names.
-The first is `\*.clustername.namespace.svc` as described in the xref:tutorial-tls.adoc[TLS certificate tutorial].
-The second needs to be valid for the public DNS names, in this case `*.my-cluster.example.com`.
-
-== Connecting Clients
-
-The admin console service provides a highly available endpoint for clients to connect to.
-The use of DDNS also provides stable naming, so clients will not need to be modified, just tolerant to any delays as infrastructure heals in the event of a failure.
-
-This admin console address can be used by clients to connect to the cluster with the connection string `https://console.my-cluster.example.com:18091` as defined in this example.
+Mandatory subject alternative names (SANs) are described in the xref:tutorial-tls.adoc[TLS certificate tutorial].
+An additional SAN is required for the public DNS names, in this case `DNS:*.my-cluster.example.com`.
