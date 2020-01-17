@@ -32,7 +32,8 @@ const (
 	defaultServiceMemQuota                        = "256Mi"
 	defaultAnalyticsServiceMemQuota               = "1Gi"
 	defaultFSGroup                                = 1000
-	defaultMetricsImage                           = "couchbase/prometheus-exporter:1.0.0"
+	defaultMetricsImage                           = "couchbase/exporter:1.0.0"
+	redhatMetricsImage                            = "http://registry.connect.redhat.com/couchbase/exporter:1.0.0-1"
 )
 
 var (
@@ -131,7 +132,21 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 	}
 	if enableMonitoring, found, _ := unstructured.NestedBool(object.Object, "spec", "monitoring", "prometheus", "enabled"); found && enableMonitoring {
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "monitoring", "prometheus", "image"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/monitoring/prometheus/image", Value: defaultMetricsImage})
+			metricsImage := defaultMetricsImage
+
+			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
+			if !apierrors.IsForbidden(err) {
+				if namespace.Annotations != nil {
+					for _, annotation := range namespace.Annotations {
+						if strings.HasPrefix(annotation, "openshift.io") {
+							metricsImage = redhatMetricsImage
+							break
+						}
+					}
+				}
+			}
+
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/monitoring/prometheus/image", Value: metricsImage})
 		}
 	}
 	if dn, found, _ := unstructured.NestedSlice(object.Object, "spec", "security", "ldap", "user_dn_mapping"); found {
