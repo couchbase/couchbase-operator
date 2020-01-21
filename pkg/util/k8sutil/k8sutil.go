@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
@@ -45,10 +46,19 @@ func ApplyBaseAnnotations(object metav1.Object) {
 
 func CouchbaseVersion(image string) (string, error) {
 	parts := strings.Split(image, ":")
+
 	if len(parts) != 2 {
 		return "", fmt.Errorf("invalid image string: %s", image)
 	}
-	return parts[1], nil
+
+	version := parts[1]
+
+	// lookup version associated with sha256 digest
+	if couchbaseutil.IsSHA256Version(version) {
+		return couchbaseutil.GetSHA256Version(version)
+	}
+
+	return version, nil
 }
 
 func SetCouchbaseVersion(pod *v1.Pod, image string) error {

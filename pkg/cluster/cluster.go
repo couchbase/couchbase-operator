@@ -261,7 +261,7 @@ func (c *Cluster) updatePhase(phase couchbasev2.ClusterPhase) error {
 func (c *Cluster) create() error {
 	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.namespacedName())
 
-	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return err
 	}
@@ -424,7 +424,7 @@ func (c *Cluster) isSecureClient() bool {
 }
 
 func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
-	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name, "image", c.cluster.Spec.Image)
+	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name, "image", c.cluster.Spec.CouchbaseImage())
 	_, err := k8sutil.CreateCouchbasePod(c.k8s, c.scheduler, c.cluster, m, serverSpec, ctx)
 	return err
 }

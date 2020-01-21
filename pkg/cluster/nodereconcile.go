@@ -608,7 +608,7 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 		return nil
 	}
 
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return err
 	}

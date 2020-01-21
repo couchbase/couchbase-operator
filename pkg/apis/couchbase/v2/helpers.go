@@ -2,9 +2,12 @@ package v2
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -219,6 +222,41 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 		}
 	}
 	return nil
+}
+
+// Couchbase Image represents the image that will actually be deployed by cluster.
+// Defaults to Spec.Image unless image is provided by env variable
+func (cs *ClusterSpec) CouchbaseImage() string {
+
+	image := cs.Image
+	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
+		image = annotatedImage
+	}
+
+	return image
+}
+
+// Backup Image represents the image to use for backup.
+// defaults to Backup.Image when provided then falls back to
+// relatedImage env variable
+func (cs *ClusterSpec) BackupImage() string {
+
+	image := cs.Backup.Image
+	if annotatedImage, ok := os.LookupEnv(constants.EnvBackupImageName); ok {
+		image = annotatedImage
+	}
+	return image
+}
+
+// Monitoring Image represents the image to use for metrics exporter for monitoring.
+// defaults to Spec.Image when provided then falls back to relatedImage env variable
+func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {
+
+	image := m.Image
+	if annotatedImage, ok := os.LookupEnv(constants.EnvMetricsImageName); ok {
+		image = annotatedImage
+	}
+	return image
 }
 
 // get list of items which are in first array but not in second

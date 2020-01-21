@@ -3,6 +3,10 @@ package constants
 const (
 	EnvOperatorPodName      = "MY_POD_NAME"
 	EnvOperatorPodNamespace = "MY_POD_NAMESPACE"
+	EnvCouchbaseImageName   = "RELATED_IMAGE_COUCHBASE_SERVER"
+	EnvBackupImageName      = "RELATED_IMAGE_COUCHBASE_BACKUP"
+	EnvMetricsImageName     = "RELATED_IMAGE_COUCHBASE_METRICS"
+	EnvDigestsConfigMap     = "IMAGE_DIGESTS_CONFIG_MAP"
 	AuthSecretUsernameKey   = "username"
 	AuthSecretPasswordKey   = "password"
 )
@@ -106,3 +110,16 @@ const (
 	// LDAPSecretPassword is the field within a k8s secret containing the password PEM
 	LDAPSecretPassword = "password"
 )
+
+// sha256 to image conversion map
+// ¯\_(ツ)_/¯
+//
+// TODO: Use downward api to VolumeMount annotations into Pod and do this lookup because
+// annotations can only be accessed in volumes and not in environment variables."
+// https://docs.openshift.com/container-platform/4.3/nodes/containers/nodes-containers-downward-api.html
+var ImageDigests = map[string]string{
+	"e83852666816dd0a0d86180a0867aa25458c21702f28e5903bb012e079ebe055": "couchbase-6.0.4-1",
+	"b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501": "couchbase-6.5.0-3",
+	"218080954d616b78405a42e0df7561b7cd1bae09c4b2addc9cc56244d1eab0e0": "backup-6.5.0-3",
+	"b5a052fab4c635ab2d880a6ac771c66f554b9a4b5b1b53a73ba8ef1b573be372": "metrics-1.0.0-2",
+}

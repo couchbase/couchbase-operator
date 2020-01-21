@@ -88,7 +88,7 @@ func CreateCouchbasePod(client *client.Client, scheduler scheduler.Scheduler, cl
 			// If we are creating a default mount, then also create an init container to
 			// copy Couchbase's etc directory onto the PVC.
 			if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
-				initContainer := couchbaseInitContainer(cluster.Spec.Image, pvc.Name, config)
+				initContainer := couchbaseInitContainer(cluster.Spec.CouchbaseImage(), pvc.Name, config)
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 			}
 		}
@@ -150,7 +150,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 		return nil, err
 	}
 
-	version, err := CouchbaseVersion(cluster.Spec.Image)
+	version, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +411,7 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
 func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *persistentVolumeClaimState) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
-	container := couchbaseContainer(cluster.Spec.Image, &config)
+	container := couchbaseContainer(cluster.Spec.CouchbaseImage(), &config)
 	container.ReadinessProbe = couchbaseReadinessProbe()
 	if pvcState != nil {
 		container.VolumeMounts = pvcState.volumeMounts
@@ -467,7 +467,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	}
 
 	// Set the Couchbase version metadata.
-	if err := SetCouchbaseVersion(pod, cluster.Spec.Image); err != nil {
+	if err := SetCouchbaseVersion(pod, cluster.Spec.CouchbaseImage()); err != nil {
 		return nil, err
 	}
 
@@ -607,6 +607,7 @@ func CouchbaseContainer(image string) v1.Container {
 }
 
 func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Container {
+
 	c := v1.Container{
 		Name:  constants.CouchbaseContainerName,
 		Image: image,
@@ -825,7 +826,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 
 	return v1.Container{
 		Name:  MetricsContainerName,
-		Image: cs.Monitoring.Prometheus.Image,
+		Image: cs.Monitoring.Prometheus.MetricsImage(),
 		Env: []v1.EnvVar{
 			{
 				Name: "COUCHBASE_OPERATOR_USER",

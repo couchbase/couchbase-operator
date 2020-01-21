@@ -4,6 +4,7 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 
@@ -27,6 +28,15 @@ func NewVersion(version string) (*Version, error) {
 		return nil, fmt.Errorf("null version")
 	}
 
+	// lookup version associated with sha256 digest
+	if IsSHA256Version(version) {
+		if v, err := GetSHA256Version(version); err == nil {
+			version = v
+		} else {
+			return nil, err
+		}
+	}
+
 	// Gather semver and optional edition with expected format
 	// "<edition>-<semver>" or "<semver>-<edition>", ie:
 	//			"5.5.0" and "enterprise-5.5.0" and "5.5.0-beta"
@@ -48,6 +58,34 @@ func NewVersion(version string) (*Version, error) {
 	}
 
 	return &Version{version, prefix, semver}, nil
+}
+
+// Checks if version is sha256
+func IsSHA256Version(version string) bool {
+	re := regexp.MustCompile(`^[A-Fa-f0-9]{64}$`)
+	matches := re.FindStringSubmatch(version)
+	return len(matches) != 0
+}
+
+// Get readable version from sha256
+func GetSHA256Version(version string) (string, error) {
+
+	if v, ok := constants.ImageDigests[version]; ok {
+		return v, nil
+	} else {
+
+		// attempt additional lookup on associated config map
+		if digests, ok := os.LookupEnv(constants.EnvDigestsConfigMap); ok {
+
+			// match against digests presented as list of equalities
+			re := regexp.MustCompile(version + `=(.*)\s?\n`)
+			parts := re.FindStringSubmatch(digests)
+			if len(parts) == 2 {
+				return parts[1], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("unknown version digest: %s", version)
 }
 
 // Return the full version string

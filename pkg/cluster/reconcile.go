@@ -193,7 +193,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	}
 
 	// Create a new member
-	newMember, err := c.newMember(index, serverSpec.Name, c.cluster.Spec.Image)
+	newMember, err := c.newMember(index, serverSpec.Name, c.cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return nil, err
 	}
@@ -1336,7 +1336,7 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 	for _, name := range c.members.Names() {
 		member := c.members[name]
 
-		// Get what the member actualliy looks like.
+		// Get what the member actually looks like.
 		actual, exists := c.k8s.Pods.Get(name)
 		if !exists {
 			continue
@@ -1468,7 +1468,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
 
-	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return err
 	}
@@ -1914,7 +1914,10 @@ Outerloop:
 func (c *Cluster) reconcileRBAC() error {
 
 	// rbac features require 6.5
-	version, _ := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
+	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
+	if err != nil {
+		return err
+	}
 	required, _ := couchbaseutil.NewVersion(constants.CouchbaseVersion650)
 	if version.GreaterEqual(required) {
 		if err := c.reconcileLDAPSettings(); err != nil {

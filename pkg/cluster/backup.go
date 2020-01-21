@@ -218,7 +218,7 @@ func (c *Cluster) generateBackupContainer(containerName string, strategy couchba
 
 	return corev1.Container{
 		Name:    containerName,
-		Image:   c.cluster.Spec.Backup.Image,
+		Image:   c.cluster.Spec.BackupImage(),
 		Command: []string{"backup_script"},
 		Args: []string{c.cluster.Name, "--strategy", string(strategy), "--config", strconv.FormatBool(config),
 			"--mode", "backup",
@@ -325,7 +325,7 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 
 	return corev1.Container{
 		Name:    "cbbackupmgr-restore",
-		Image:   c.cluster.Spec.Backup.Image,
+		Image:   c.cluster.Spec.BackupImage(),
 		Command: []string{"backup_script"},
 		Args: []string{c.cluster.Name, "--mode", "restore",
 			"--repo", spec.Repo, "--start", start, "--end", end,
