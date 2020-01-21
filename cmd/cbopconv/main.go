@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/x509"
 	"fmt"
 	"os"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	couchbaseclient "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
@@ -60,6 +62,41 @@ func parseYesNo(input string, defaultValue bool) (bool, error) {
 	}
 
 	return false, fmt.Errorf("invalid input")
+}
+
+// validateTLS checks that TLS certificates have been regenerated and rotated prior to upgrade.
+func validateTLS(kubeclient kubernetes.Interface, cluster *couchbasev1.CouchbaseCluster) error {
+	// We have some new rules that are enforced for 2.0 that need to be fixed
+	// first by the user...
+	serverSecret, err := kubeclient.CoreV1().Secrets(cluster.Namespace).Get(cluster.Spec.TLS.Static.Member.ServerSecret, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get TLS server secret for cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+	operatorSecret, err := kubeclient.CoreV1().Secrets(cluster.Namespace).Get(cluster.Spec.TLS.Static.OperatorSecret, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get TLS operator secret for cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+
+	ca, ok := operatorSecret.Data["ca.crt"]
+	if !ok {
+		return fmt.Errorf("failed to get TLS CA certiftcate for cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+	cert, ok := serverSecret.Data["chain.pem"]
+	if !ok {
+		return fmt.Errorf("failed to get TLS certiftcate chain for cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+	key, ok := serverSecret.Data["pkey.key"]
+	if !ok {
+		return fmt.Errorf("failed to get TLS private key for cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+
+	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace)
+	errs := util_x509.Verify(ca, cert, key, x509.ExtKeyUsageServerAuth, subjectAltNames)
+	if len(errs) != 0 {
+		return fmt.Errorf("failed to verifiy TLS server secret for cluster %s/%s: %v", cluster.Namespace, cluster.Name, errs)
+	}
+
+	return nil
 }
 
 func main() {
@@ -229,6 +266,13 @@ func main() {
 				}
 				if cluster.Spec.TLS.Static.Member != nil {
 					newCluster.Spec.Networking.TLS.Static.ServerSecret = cluster.Spec.TLS.Static.Member.ServerSecret
+
+					// We have some new rules that are enforced for 2.0 that need to be fixed
+					// first by the user...
+					if err := validateTLS(kubeclient, cluster); err != nil {
+						fmt.Println(err)
+						continue
+					}
 				}
 			}
 		}
