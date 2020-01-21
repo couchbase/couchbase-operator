@@ -322,3 +322,54 @@ spec:
   monitoring:
     prometheus:
       enabled: true
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: backup0
+spec:
+  strategy: full_incremental
+  incremental:
+    schedule: "*/2 * * * *"
+  full:
+    schedule: "*/5 * * * *"
+  failedJobsHistoryLimit: 3
+  logRetention: 2h
+  size: "20Gi"
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: backup1
+spec:
+  strategy: full_only
+  full:
+    schedule: "*/5 * * * *"
+  failedJobsHistoryLimit: 3
+  backupRetention: 24h
+  logRetention: 24h
+  size: "30Gi"
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+metadata:
+  name: restore0
+spec:
+  backup: cbbackup-full
+  repo: cb-example-2020-01-21T11_08_04
+  start:
+    int: 1
+  end:
+    int: 1
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+metadata:
+  name: restore1
+spec:
+  backup: cbbackup
+  repo: cb-example-2020-01-21T11_08_04
+  start:
+    str: oldest
+  end:
+    str: latest

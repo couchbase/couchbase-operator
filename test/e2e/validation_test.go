@@ -649,7 +649,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateTLSClientCertificatePathRequired",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/networking/tls/clientCertificatePaths/0/path")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path in body is required`},
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path: Required value`},
 		},
 		{
 			name:           "TestValidateTLSClientCertificateNoPaths",
@@ -693,7 +693,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateMissingDNSSubjectAltName",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", "acme.com")},
 			shouldFail:     true,
-			expectedErrors: []string{`certificate is valid for *.cluster.default.svc, *.example.com, not verify.acme.com`},
+			expectedErrors: []string{`certificate is valid for *.cluster, *.cluster.default, *.cluster.default.svc, cluster-srv, cluster-srv.default, cluster-srv.default.svc, localhost, *.example.com, not host.acme.com`},
 		},
 		{
 			name:           "TestValidateAutoCompactionMinimum",
@@ -870,28 +870,28 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{`failed to parse int from *7: strconv.Atoi: parsing "*7": invalid syntax`},
 		},
 		{
-			name:           "TestValidateBackupMissingCronSchedule",
-			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Remove("/spec/incremental")},
-			shouldFail:     true,
-			expectedErrors: []string{`cronjob schedule spec.incremental cannot be empty`},
-		},
-		{
 			name:           "TestValidateBackupInvalidStrategy",
 			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/strategy", "tumbleweed")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.strategy in body should match 'full_incremental|full_only$'`},
+			expectedErrors: []string{`spec.strategy in body should match '^full_incremental|full_only$'`},
 		},
 		{
 			name:           "TestValidateBackupSizeZero",
-			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", 0)},
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "0")},
 			shouldFail:     true,
 			expectedErrors: []string{`size: 0 must be greater than 0`},
 		},
 		{
 			name:           "TestValidateBackupSizeNegative",
-			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", -2)},
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "-2")},
 			shouldFail:     true,
 			expectedErrors: []string{`size: -2 must be greater than 0`},
+		},
+		{
+			name:           "TestValidateBackupSizeInteger",
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", 21)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.size: Invalid value: "integer": spec.size in body must be of type string: "integer"`},
 		},
 		{
 			name:           "TestValidateBackupRestoreMissingBackupField",
@@ -901,21 +901,51 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateBackupRestoreStartPositiveInteger",
-			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/start", "0")},
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/start/int", 0)},
 			shouldFail:     true,
-			expectedErrors: []string{`Spec.Start must be a positive integer`},
+			expectedErrors: []string{`spec.start.int: Invalid value: 1: spec.start.int in body should be greater than or equal to 1`},
 		},
 		{
 			name:           "TestValidateBackupRestoreEndPositiveInteger",
-			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/end", "-27")},
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/end/int", -27)},
 			shouldFail:     true,
-			expectedErrors: []string{`Spec.End must be a positive integer`, `start integer cannot be larger than end integer`},
+			expectedErrors: []string{`spec.end.int: Invalid value: 1: spec.end.int in body should be greater than or equal to 1`},
 		},
 		{
-			name:           "TestValidateBackupRestoreInvalidStrategy",
-			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Replace("/spec/strategy", "bigbucks")},
+			name:           "TestValidateBackupRestoreStartIntWithString",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/start/int", "20")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.strategy in body should match 'full_incremental|full_only$'`},
+			expectedErrors: []string{`spec.start.int: Invalid value: "string": spec.start.int in body must be of type integer: "string"`},
+		},
+		{
+			name:           "TestValidateBackupRestoreEndIntWithString",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/end/int", "latest")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.end.int: Invalid value: "string": spec.end.int in body must be of type integer: "string"`},
+		},
+		{
+			name:           "TestValidateBackupRestoreStartStringWithInt",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/start/str", 2)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.start.str: Invalid value: "integer": spec.start.str in body must be of type string: "integer"`},
+		},
+		{
+			name:           "TestValidateBackupRestoreEndStringWithInt",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/end/str", 17)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.end.str: Invalid value: "integer": spec.end.str in body must be of type string: "integer"`},
+		},
+		{
+			name:           "TestValidateBackupMissingCronSchedule",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Remove("/spec/incremental")},
+			shouldFail:     true,
+			expectedErrors: []string{`cronjob schedule spec.incremental cannot be empty`},
+		},
+		{
+			name:           "TestValidateBackupMissingCronSchedule2",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/incremental/schedule", "")},
+			shouldFail:     true,
+			expectedErrors: []string{`cronjob schedule spec.incremental cannot be empty`},
 		},
 	}
 
@@ -1175,6 +1205,18 @@ func TestNegValidationApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.logging.logRetentionCount in body should be greater than or equal to 0"},
 		},
+		{
+			name:           "TestValidateBackupRestoreStartGreaterThanEnd",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/start/int", 27)},
+			shouldFail:     true,
+			expectedErrors: []string{`start integer cannot be larger than end integer`},
+		},
+		{
+			name:           "TestValidateBackupRestoreStartBothStringAndInt",
+			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Add("/spec/start/str", "oldest")},
+			shouldFail:     true,
+			expectedErrors: []string{`specify just one value, either Str or Int`},
+		},
 	}
 
 	// Cases to validate with all volume mounts present in Pod.VolumeMounts but one of the Service missing
@@ -1332,10 +1374,16 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			expectedErrors: []string{"spec.serverGroups in body cannot be updated"},
 		},
 		{
-			name:           "TestValidateApplyServerSserverGroupsImmutable",
+			name:           "TestValidateApplyServerServerGroupsImmutable",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/2/serverGroups", []string{"us-east-1a", "us-east-1b", "us-east-1c"})},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[2].serverGroups in body cannot be updated"},
+		},
+		{
+			name:           "TestValidateBackupStrategyImmutable",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/strategy", []string{"full_only", "full_incremental"})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.strategy in body cannot be updated"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]

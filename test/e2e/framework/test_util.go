@@ -251,9 +251,12 @@ func recreateRoles(kubeClient kubernetes.Interface, roleName string) error {
 	if err := removeRole(kubeClient, config.OperatorResourceName); err != nil {
 		return nil
 	}
+	if err := removeRole(kubeClient, config.BackupResourceName); err != nil {
+		return nil
+	}
 
 	if err := CreateBackupRole(kubeClient, Global.Namespace); err != nil {
-		return nil
+		return err
 	}
 	roleSpec := config.GetOperatorRole()
 	roleSpec.Name = roleName
@@ -284,6 +287,9 @@ func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceA
 
 func recreateRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
 	if err := removeRoleBinding(kubeClient, namespace, config.OperatorResourceName); err != nil {
+		return err
+	}
+	if err := removeRoleBinding(kubeClient, namespace, config.BackupResourceName); err != nil {
 		return err
 	}
 

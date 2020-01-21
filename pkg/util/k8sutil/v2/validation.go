@@ -657,15 +657,10 @@ func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefiniti
 						"spec": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
 							Required: []string{
-								"strategy",
 								"backup",
 								"start",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"strategy": apiextensionsv1beta1.JSONSchemaProps{
-									Type:    "string",
-									Pattern: "full_incremental|full_only$",
-								},
 								"backup": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},

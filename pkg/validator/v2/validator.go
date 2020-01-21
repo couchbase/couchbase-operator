@@ -809,7 +809,7 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
 	errs := []error{}
 
-	if err := validateBackupCronSchedules(v, backup); err != nil {
+	if err := validateBackupCronSchedules(backup); err != nil {
 		errs = err
 	}
 
@@ -839,9 +839,6 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		if start.Str != nil && start.Int != nil {
 			errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
 		}
-		if *start.Int <= 0 {
-			errs = append(errs, fmt.Errorf("Spec.Start.Int must be a positive integer"))
-		}
 	}
 
 	end := restore.Spec.End
@@ -854,8 +851,11 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 
 		// end and start differ
 		if end != start {
-			if *end.Str == "oldest" && *start.Str == "newest" {
-				errs = append(errs, fmt.Errorf("start point %s is after end point %s", *start.Str, *end.Str))
+			// start and end are using string arguments
+			if end.Str != nil && start.Str != nil {
+				if *end.Str == "oldest" && *start.Str == "newest" {
+					errs = append(errs, fmt.Errorf("start point %s is after end point %s", *start.Str, *end.Str))
+				}
 			}
 
 			// start and end are using integer arguments
@@ -1116,19 +1116,19 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 }
 
 // validateBackupCronSchedules ensures that the correct cronjob schedules are valid for the desired backup strategy.
-func validateBackupCronSchedules(v *types.Validator, backup *couchbasev2.CouchbaseBackup) []error {
+func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
 	errs := []error{}
 
 	switch backup.Spec.Strategy {
 	case couchbasev2.FullIncremental:
-		if err := validateCronJobString(backup.Spec.Incremental.Schedule, "spec.incremental"); err != nil {
+		if err := validateCronJobString(backup.Spec.Incremental, "spec.incremental"); err != nil {
 			errs = append(errs, err)
 		}
-		if err := validateCronJobString(backup.Spec.Full.Schedule, "spec.full"); err != nil {
+		if err := validateCronJobString(backup.Spec.Full, "spec.full"); err != nil {
 			errs = append(errs, err)
 		}
 	case couchbasev2.FullOnly:
-		if err := validateCronJobString(backup.Spec.Full.Schedule, "spec.full"); err != nil {
+		if err := validateCronJobString(backup.Spec.Full, "spec.full"); err != nil {
 			errs = append(errs, err)
 		}
 	default:
@@ -1139,13 +1139,13 @@ func validateBackupCronSchedules(v *types.Validator, backup *couchbasev2.Couchba
 	return errs
 }
 
-func validateCronJobString(s, name string) error {
-	if len(s) == 0 {
+func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name string) error {
+	if schedule == nil || len(schedule.Schedule) == 0 {
 		return fmt.Errorf("cronjob schedule %s cannot be empty", name)
 	}
 
 	p := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
-	if _, err := p.Parse(s); err != nil {
+	if _, err := p.Parse(schedule.Schedule); err != nil {
 		return err
 	}
 
@@ -1282,5 +1282,19 @@ func CheckImmutableFieldsMemcachedBucket(prev, curr *couchbasev2.CouchbaseMemcac
 func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplication) error {
 	// Todo validate all clusters referencing the replication also reference the
 	// source bucket.
+	return nil
+}
+
+func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
+	errs := []error{}
+
+	if prev.Spec.Strategy != curr.Spec.Strategy {
+		errs = append(errs, util.NewUpdateError("spec.strategy", "body"))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
 	return nil
 }

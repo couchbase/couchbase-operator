@@ -92,6 +92,11 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 		case *couchbasev2.CouchbaseReplication:
 			return validationv2.CheckImmutableFieldsReplication(t, t2)
 		}
+	case *couchbasev2.CouchbaseBackup:
+		switch t2 := updated.(type) {
+		case *couchbasev2.CouchbaseBackup:
+			return validationv2.CheckImmutableFieldsBackup(t, t2)
+		}
 	}
 	return nil
 }
