@@ -1,0 +1,32 @@
+= Deploying Openshift with Code Ready Containers
+
+These instruction detail how to install the Couchbase operator and create a Couchbase cluster using Red Hat Code Ready Containers (CRC) which is the single node version of Red Hat OpenShift.
+
+The first thing that we need to do is download the crc binary. Click the download link on the page below and log in with your Red Hat credentials to download the appropriate binary for your operating system.
+https://developers.redhat.com/products/codeready-containers/overview
+
+[source,console]
+----
+# linux
+wget https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz
+----
+
+Prior to running the `crc` command, you will need to copy or download your Red Hat credentials in the form of a Pull Secret for authenticating with the container catalog.  Pull Secrets are generated on the same page as the download link above.
+
+Now you can setup and start an instance of OpenShift
+[source,console]
+----
+tar xf crc-linux-amd64.tar.xz
+cd crc-linux-1.4.0-amd64
+./crc setup
+./crc start
+----
+
+The start command will return login credentials for both admin and developer views of the OpenShift cluster. To login to OpenShift console run:
+[source,console]
+----
+./crc console
+----
+
+Now we're all setup and ready to go. We can install our the Operator, create a Secret, and then deploy our first Couchbase Cluster.
+https://docs.couchbase.com/operator/1.2/install-openshift.html
