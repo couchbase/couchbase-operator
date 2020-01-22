@@ -83,6 +83,7 @@ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 
 --namespace <string>::
 If specified this will override the default namespace `default`.
+Specifying the namespace is especially important when installing the dynamic admission controller as this flag affects TLS certificate generation.
 
 --operator-image <string>::
 If specified this will override the default operator image `couchbase/operator:${version}`.

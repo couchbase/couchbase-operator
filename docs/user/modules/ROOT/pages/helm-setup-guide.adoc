@@ -240,7 +240,7 @@ helm install -n <unique-name> --set rbac.clusterRoleAccess=false couchbase/couch
 ----
 ====
 
-. Deploy the Couchbase Server cluster using the traditional method of using a xref:deploying-couchbase.adoc[CouchbaseCluster specification].
+. Deploy the Couchbase Server cluster using the traditional method of using a xref:howto-couchbase-create.adoc[CouchbaseCluster specification].
 +
 Note that you're not deploying the Couchbase cluster using a Helm chart.
 Due to the complex structure of production configurations (which usually include server groups and persistent volumes), Couchbase clusters are better expressed and managed directly using a cluster spec.

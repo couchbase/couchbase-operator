@@ -22,6 +22,15 @@ The Operator package contains an example CouchbaseCluster configuration file (`c
 .Example CouchbaseCluster Configuration for open source Kubernetes (couchbase-cluster.yaml)
 [source,yaml]
 ----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cb-example-auth
+type: Opaque
+data:
+  username: QWRtaW5pc3RyYXRvcg==  # Administrator
+  password: cGFzc3dvcmQ=          # password
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
@@ -36,7 +45,7 @@ metadata:
 spec:
   image: couchbase/server:6.0.3  # <.>
   security:
-    adminSecret: cb-example-auth  # <.>
+    adminSecret: cb-example-auth
   networking:
     exposeAdminConsole: true
     adminConsoleServices:
@@ -58,11 +67,8 @@ spec:
 By taking a quick look at this configuration file, you can see that it defines a cluster (with buckets) by specifying the following:
 
 <.> Buckets: 1 bucket named `default` 
-+
-NOTE: In this example, bucket management for the cluster (`spec.buckets.managed`) is set to `true`, meaning that the Autonomous Operator will handle the creation and deletion of Couchbase buckets.
 <.> Cluster name: `cb-example`
 <.> Couchbase image: `couchbase/server:6.0.3`
-<.> Secret: `cb-example-auth`
 <.> Size: 3-node cluster with all services on each node
 
 You can use this example CouchbaseCluster configuration file "as-is" to test out how the Operator deploys a Couchbase Server cluster. However, to deploy a Couchbase cluster that is more specifically tailored to your development and production needs, you need to create your own custom configuration file that conforms to the xref:couchbase-cluster-config.adoc[CouchbaseCluster specification].
@@ -79,36 +85,6 @@ You can set the recommended memory and CPU allocation when you start Minikube or
   minikube start --cpus 2 --memory 8192
 
   minishift start --cpus 2 --memory 8192
-====
-
-[#about-auth-secret]
-=== About the authSecret Field
-
-One thing that's important to note is the `authSecret` field. The Operator uses Kubernetes https://kubernetes.io/docs/concepts/configuration/secret/[Secrets] to create and manage the Couchbase super-user credentials. As a result, the `authSecret` field must refer to a secret that contains both a user name and a password field.
-
-For convenience, a sample secret is provided in the Operator package. When you push it to your Kubernetes cluster, the secret sets the user name to `Administrator` and the password to `password`.
-
-To push the secret into your Kubernetes cluster, run the following command:
-
-[{tabs}]
-====
-Kubernetes::
-+
---
-[source,console]
-----
-kubectl create -f secret.yaml
-----
---
-
-OpenShift::
-+
---
-[source,console]
-----
-oc create -f secret.yaml
-----
---
 ====
 
 == Deploying the Couchbase Cluster

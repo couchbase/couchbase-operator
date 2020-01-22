@@ -154,5 +154,5 @@ kubectl create clusterrolebinding john-doe-admin-binding \
 
 * xref:install-admission-controller.adoc[Install the Couchbase Autonomous Operator admission controller]
 * xref:install-kubernetes.adoc[Install the Couchbase Autonomous Operator]
-* xref:deploying-couchbase.adoc[Deploy a Couchbase cluster]
+* xref:howto-couchbase-create.adoc[Deploy a Couchbase cluster]
 * xref:xdcr.adoc[Set up XDCR between clusters]

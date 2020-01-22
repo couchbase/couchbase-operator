@@ -7,5 +7,15 @@ rules:
   - couchbase.com
   resources:
   - couchbaseclusters
+  - couchbasebuckets
+  - couchbaseephemeralbuckets
+  - couchbasememcachedbuckets
+  - couchbasereplications
+  - couchbaseusers
+  - couchbasegroups
+  - couchbaseroles
+  - couchbaseuserrolebindings
+  - couchbasebackups
+  - couchbasebackuprestores
   verbs:
   - "*"

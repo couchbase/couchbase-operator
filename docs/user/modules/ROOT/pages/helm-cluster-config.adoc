@@ -3,7 +3,7 @@
 This guide outlines the design and usage of the helm chart for deploying a couchbase cluster.
 This chart is especially helpful for rolling out development clusters and generating TLS certificates and keys.
 Howerver, configurations requiring server groups and persistent volumes are better expressed and managed directly using a cluster spec.
-Refer to the couchbase operator documentation regarding https://docs.couchbase.com/operator/1.1/deploying-couchbase.html[deploying couchbase] directly from kubectl.
+Refer to the couchbase operator documentation regarding https://docs.couchbase.com/operator/1.1/howto-couchbase-create.html[deploying couchbase] directly from kubectl.
 
 [NOTE]
 ====
@@ -126,7 +126,7 @@ The secret to use for overriding the auto-generated secret.
 When specified the username and password from the secret are used for Administrator login.
 
 _Value rules:_ The `couchbaseCluster.authSecretOverride` value is the name of a kubernetes secret and is not set by default.
-Refer to the couchbase operator documentation for more information about https://docs.couchbase.com/operator/1.1/deploying-couchbase.html#about-auth-secret[ creating auth secrets ].
+Refer to the couchbase operator documentation for more information about https://docs.couchbase.com/operator/1.1/howto-couchbase-create.html#about-auth-secret[ creating auth secrets ].
 
 
 === additional values

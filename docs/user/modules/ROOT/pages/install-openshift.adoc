@@ -1,352 +1,133 @@
 = Installing on OpenShift
 
+[abstract]
 This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on a Red Hat OpenShift project.
-
-If you are looking to upgrade an existing installation of the Operator, see xref:upgrading-the-operator.adoc[Upgrading the Autonomous Operator].
-
-.This guide assumes the following:
-* You have a working knowledge of OpenShift and Kubernetes
-* You are installing on a new OpenShift cluster
-* You have access to an OpenShift user that has cluster-admin privileges (`system:admin` in this guide)
-* You have access to a standard OpenShift user without cluster-admin privileges (`developer` in this guide)
-
-If you have an OpenShift environment that already has a custom setup (non-default), you should be able to modify a few of the parameters in the various commands and configuration files mentioned in this guide in order to fit your requirements.
-
-IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your OpenShift environment. Refer to the  xref:kubernetes-rbac.adoc[RBAC documentation] before you install the Operator, as your OpenShift environment may differ from the environment upon which this guide is based.
-
-== Prerequisites
-
-* Make sure you have installed the xref:install-admission-controller.adoc[admission controller] and that it is running.
-* Download the Operator https://www.couchbase.com/downloads[package^] and unpack it on the same computer where you normally run `oc`.
-+
-The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
-+
-IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-openshift.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
-
-== Create an OpenShift Project
-
-The first thing that you need to do is use a standard OpenShift user to create a https://docs.openshift.com/container-platform/latest/architecture/core_concepts/projects_and_users.html#projects[project^] where the Operator will reside:
-
-[source,console]
-----
-oc login -u developer
-----
-
-[source,console]
-----
-oc new-project operator-example-namespace
-----
-
-[source,console]
-----
-oc logout
-----
-
-In this example, the standard user is `developer`, and the project is `operator-example-namespace`. Later in this guide you will give `developer` the ability to manage the Operator and the Couchbase Server clusters in `operator-example-namespace`.
-
-== Install the Custom Resource Definition
-
-The next step in setting up the Operator is to install the CouchbaseCluster custom resource definition (CRD). The Operator can do this for you automatically (xref:install-kubernetes.adoc[as it does when installing on open source Kubernetes]), but in OpenShift it's better to do it manually because installing a CRD is a cluster-level operation and requires cluster-level permissions that should not be given to typical users.
-
-To install the CRD, log in as an OpenShift user that has cluster-admin privileges (in this case `system:admin`) and run the following commands:
-
-[source,console]
-----
-oc login -u system:admin
-----
-
-[source,console]
-----
-oc create -f crd.yaml
-----
-
-NOTE: You only need to install the CRD once. After that, you can create the Operator in any OpenShift project.
-
-== Create an imagePullSecret
-
-Red Hat recommends that all containers that run in OpenShift be built with Red Hat Enterprise Linux. Couchbase provides these images to users through the Red Hat Container Catalog. Using this catalog requires creating an imagePullSecret so that Docker knows where to look for images. To create an imagePullSecret for the Red Hat Container Catalog, run the following command:
-
-[source,console]
-----
-oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
-  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
-----
-
-== Create a Role and Service Account for the Operator
-
-You need to create a https://docs.openshift.com/container-platform/latest/architecture/additional_concepts/authorization.html#roles[role^] in OpenShift that allows the Operator to access the resources that it needs to run.
-
-[TIP]
-====
-If you plan to run the Operator in more than one project, it may be preferable to create a cluster role because you can assign that role to a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#service-account-permissions[service account^] in any OpenShift project.
-Note that if you chose to to use a cluster role, making modifications to it will affect all instances of the Operator that use it.
-This has the potential to cause adverse affects in production environments, such as removing required premissions used by older instances of the Operator.
-====
-
-To create the role for the Operator, run the following command:
-
-[source,console]
-----
-oc create -f operator-role.yaml --namespace operator-example-namespace
-----
-
-After the role is created, you need to create a service account in the project where you are installing the Operator, and then assign the role to that service account using a https://docs.openshift.com/container-platform/latest/admin_guide/manage_rbac.html[role binding^]:
-
-To create the service account:
-
-[source,console]
-----
-oc create serviceaccount couchbase-operator --namespace operator-example-namespace
-----
-
-Next we need to register our imagePullSecret with the service account that runs the Operator so that it can pull images from the Red Hat Container Catalog.
-
-[source,console]
-----
-oc secrets add serviceaccount/couchbase-operator secrets/rh-catalog --for=pull
-oc secrets add serviceaccount/default secrets/rh-catalog --for=pull
-----
-
-To assign the role to the service account:
-
-[source,console]
-----
-oc create rolebinding couchbase-operator-rolebinding --role couchbase-operator --serviceaccount operator-example-namespace:couchbase-operator --namespace operator-example-namespace
-----
-
-A service account is used as opposed to a traditional user for the Operator because service accounts are meant to be used for processes running in OpenShift.
-
-TIP: To set up a service account for the Operator in another OpenShift project, repeat these steps again in that project.
-
-== Create a Role for a User
-
-Since the `developer` user needs to be able to create and delete the Couchbase cluster, you need to create a cluster role with permissions to handle the management of the CouchbaseCluster resource.
-
-Run the following command to create the cluster role for `developer`:
-
-[source,console]
-----
-oc create -f cluster-role-user.yaml
-----
-
-Next, you need to allow `developer` to be able to manage the CouchbaseCluster resource in the `operator-example-namespace` project:
-
-[source,console]
-----
-oc create rolebinding couchbasecluster-developer-rolebinding --clusterrole couchbasecluster --user developer --namespace operator-example-namespace
-----
-
-Alternatively, if you want `developer` to be able to manage CouchbaseCluster objects in all projects, then you can run the following command instead:
-
-[source,console]
-----
-oc create clusterrolebinding couchbasecluster-developer-rolebinding --clusterrole couchbasecluster --user developer
-----
-
-NOTE: If you want to create role bindings for multiple users either at the cluster or namespace level, they will need to have unique names. In the previous examples, if you were to create a role binding for user `alice`, you'd use the name `couchbasecluster-alice` in place of `couchbasecluster-developer`.
-
-== Create the Operator
-
-At this point you can now use the `developer` user to create the Operator in the `operator-example-namespace` project. To create and start the Operator, run the following command:
-
-[source,console]
-----
-oc logout
-oc login -u developer
-oc create -f operator-deployment.yaml -n operator-example-namespace
-----
-
-Running this command downloads the Operator Docker image (specified in the `operator-deployment.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment^], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
-
-After you run the `oc create` command, it generally takes less than a minute for OpenShift to deploy the Operator and for the Operator to be ready to run.
 
 [IMPORTANT]
 ====
-If you encounter a `ErrImagePull` or `ImagePullBackOff` event associated with the Operator pod, check that the container image URL in `operator-deployment.yaml` is reachable, and that the specified image is available.
-
-The images that are specified in the provided YAML files are hosted in common public container registries.
-Couchbase regularly publishes new container images that incorporate the latest security updates and patches.
-In rare cases, a registry's security policy may force the removal of older container images, causing the provided YAML definitions to become invalid.
-It's recommended that you check the registry for new and discontinued container images, and update your deployment accordingly.
-
-To use a newer container image, simply update the container image URL in `operator-deployment.yaml` with the new image name, and then push the definition to your OpenShift environment.
-Container images are available in the following repository:
-
-* https://access.redhat.com/containers/?tab=tags#/registry.connect.redhat.com/couchbase/operator[Red Hat Container Catalog (use for OpenShift)^]
+If you are looking to upgrade an existing installation of the Operator, see xref:upgrading-the-operator.adoc[Upgrading the Autonomous Operator].
 ====
 
-=== Check the Status of the Deployment
+== Prerequisites
 
-You can use the following command to check on the status of the deployment:
+Download the Operator https://www.couchbase.com/downloads[package^] and unpack it on the same computer where you normally run `oc`.
+The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
 
-[source,console]
-----
-oc get deployments
-----
+[IMPORTANT]
+====
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-openshift.x.x-linux_x86_64`.
+Make sure to `cd` into this directory before you run the commands in this guide.
+====
 
-If you run the previous command immediately after the Operator is deployed, the output will look something like the following:
+All commands in this guide are run as a system administrator account; they require the creation of cluster scoped resources or the granting of roles to service accounts (privilege escalation).
 
-[source,console]
-----
-NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-couchbase-operator   1         1         1            0           10s
-----
+== Install the CRD
 
-In this case, the deployment is called `couchbase-operator`. The `DESIRED` field in the output shows that this deployment will create one pod running the Operator. The `CURRENT` field shows that one Operator pod has been created. However, the `AVAILABLE` field indicates that the pod is not ready yet since its value is 0 and not 1. That means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task, it will be able to start managing Couchbase Server clusters and the status will be shown as `AVAILABLE`.
-
-You should continue to poll the status of the Operator until the output looks similar to the following:
+The first step in installing the Operator is to install the custom resource definitions (CRD) that describe the Couchbase resource types.
+This can be achieved with the following command:
 
 [source,console]
 ----
-NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-couchbase-operator   1         1         1            1           47s
+$ oc create -f crd.yaml
 ----
 
-=== Check the Status of the Operator
+== Install the Operator
 
-You can use the following command to verify that the Operator has started successfully:
+The operator is composed of two components; a per-cluster dynamic admission controller (DAC) and a per-namespace Operator.
+Refer to the xref:concept-operator.adoc[operator architecture document] for additional information on what is required and security considerations.
+
+The DAC and Operator will be installed into the current project/namespace selected by the `oc` command.
+Ensure you have created and selected the correct namespace to install into.
+
+The Redhat container catalog requires that deployments have login credentials that allow access to container images; these are provided by a secret:
 
 [source,console]
 ----
-oc get pods -l app=couchbase-operator
+$ oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
+  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
 ----
 
-If the Operator is up and running, the command returns an output where the `READY` field shows `1/1`, such as:
+[IMPORTANT]
+====
+This command uses 3rd party resources and is subject to change.
+Consult the documentation provided by Redhat for up to date instructions.
+====
 
-[source,console]
-----
-NAME                                  READY   STATUS   RESTARTS   AGE
-couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
-----
-
-You can also check the logs to confirm that the Operator is up and running. Look for the message: `starting couchbaseclusters controller`
-
-[source,console]
-----
-oc logs couchbase-operator-1917615544-t5mhp
-----
-
-You should see output similar to the following:
+The following command will install both the DAC and the Operator:
 
 [source,console]
 ----
-time="2018-04-25T03:01:56Z" level=info msg="Obtaining resource lock" module=main
-time="2018-04-25T03:01:56Z" level=info msg="Starting event recorder" module=main
-time="2018-04-25T03:01:56Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
-time="2018-04-25T03:02:13Z" level=info msg="I'm the leader, attempt to start the operator" module=main
-time="2018-04-25T03:02:13Z" level=info msg="Creating the couchbase-operator controller" module=main
-time="2018-04-25T03:02:13Z" level=info msg="Event(v1.ObjectReference{Kind:\"Endpoints\", Namespace:\"default\", Name:\"couchbase-operator\", UID:\"9b86c750-47e7-11e8-866e-080027b2a68d\", APIVersion:\"v1\", ResourceVersion:\"23482\", FieldPath:\"\"}): type: 'Normal' reason: 'LeaderElection' couchbase-operator-75ddfdbdb5-bz7ng became leader" module=event_recorder
-time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controller"
+$ ./cbopcfg --image-pull-secret rh-catalog \
+  --dynamic-admission-controller-image registry.connect.redhat.com/couchbase/admission-controller:2.0.0-1 \
+  --operator-image registry.connect.redhat.com/couchbase/operator:2.0.0-1 | kubectl create -f -
+----
+
+=== Custom Installation
+
+Alternatively, you may wish to install just the DAC in the `camelot` namespace:
+
+[source,console]
+----
+$ oc project camelot
+$ ./cbopcfg --no-operator --image-pull-secret rh-catalog \
+  --dynamic-admission-controller-image registry.connect.redhat.com/couchbase/admission-controller:2.0.0-1 | oc create -f -
+----
+
+And then install just the Operator into the `asgard` namespace:
+
+[source,console]
+----
+$ oc project asgard
+$ ./cbopcfg --no-admission --image-pull-secret rh-catalog \
+  --operator-image registry.connect.redhat.com/couchbase/operator:2.0.0-1 | oc create -f -
+----
+
+For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
+
+== Check the Status of the Operator
+
+You can use the following command to check on the status of the deployments:
+
+[source,console]
+----
+$ oc get deployments
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+couchbase-operator             1/1     1            1           8s
+couchbase-operator-admission   1/1     1            1           8s
+----
+
+The Operator is ready to deploy `CouchbaseCluster` resources when both the DAC and Operator deployments are fully ready and available.
+
+== Installing User Permissions
+
+By default on an OpenShift platform, users will not have permissions to create and modify Couchbase custom resources.
+We provide a cluster role that can be installed once and referenced by any number of user accounts.
+To install the role:
+
+[source,console]
+----
+$ oc create -f cluster-role-user.yaml
+----
+
+To associate the role with a user `merlin` in the namespace `camelot` use the following command:
+
+[source,console]
+----
+$ oc create rolebinding merlin-couchbasecluster --namespace camelot --user merlin --clusterrole couchbasecluster
+----
+
+You can now login as the user `merlin` and manage Couchbase resources in the `camelot` namespace.
+
+== Uninstalling the Operator
+
+Uninstalling the DAC and Operator is the reverse of the installation process:
+
+[source,console]
+----
+$ ./cbopcfg | kubectl delete -f -
+$ oc delete -f crd.yaml
 ----
 
 == Next Steps
 
-xref:deploying-couchbase.adoc[Deploy a Couchbase Server cluster].
-
-== Quick Start Script
-
-The script below has been parameterized for clarity and relies on a set of environment variables that may be tailored to the individual OpenShift environment being deployed in. These variables correspond to the resources being created and used in order to deploy the Operator. These are explained below:
-
-NAMESPACE::
-The Kubernetes namespace/OpenShift project to run the Operator in. This can be changed to any project you have access to.
-
-ADMIN_ACCOUNT::
-The administrator account which has the ability to install custom resource definitions and create role bindings which grant privilege escalation.
-
-OPERATOR_SERVICE_ACCOUNT::
-The service account the Operator should run as. This can be changed to any valid Kubernetes name, however, is scoped to the namespace it is deployed in so it must be unique in that context.
-+
-This value is also used when creating the Operator deployment, see the documentation for the xref:operator-config.adoc[serviceAccountName parameter].
-
-OPERATOR_ROLE::
-The role for the Operator to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
-
-OPERATOR_ROLE_BINDING::
-The name for the rule which binds the Operator role and service account to a namespace. This can be changed to any unique name in the namespace.
-
-USER_ACCOUNT::
-The user account that is used to create and manage CouchbaseCluster resources. This can be changed to any valid user name.
-
-USER_CLUSTER_ROLE::
-The role for the user to inherit that grants access to create and delete required resources. This name is hard coded in the resource YAML file used in this example.
-
-USER_CLUSTER_ROLE_BINDING::
-The name for the rule which binds the user role and account to a name space. This can be changed to any unique name in the namespace.
-
-All steps listed here are fully explained below. If they fail, please consult the relevant documentation.
-
-[source,bash]
-----
-# Evnvironment specific variables
-ADMIN_ACCOUNT=system:admin
-USER_ACCOUNT=developer
-NAMESPACE=operator-example-namespace
-
-# Namespace specific variables, you may need to change these to avoid
-# name space collisions
-OPERATOR_SERVICE_ACCOUNT=couchbase-operator
-OPERATOR_ROLE_BINDING=couchbase-operator-rolebinding
-USER_CLUSTER_ROLE_BINDING=couchbasecluster-developer-rolebinding
-
-# Constant variables (defined in web based resources)
-OPERATOR_ROLE=couchbase-operator
-USER_CLUSTER_ROLE=couchbasecluster
-
-# As an unprivileged user create a project to run the Operator in and a
-# service account to run the Operator as
-oc login -u ${USER_ACCOUNT}
-oc new-project ${NAMESPACE}
-oc create serviceaccount ${OPERATOR_SERVICE_ACCOUNT} --namespace ${NAMESPACE}
-oc logout
-
-# As a privileged user create the custom resource definition, roles and bind
-# them to the service and user accounts
-oc login -u ${ADMIN_ACCOUNT}
-oc create -f crd.yaml
-oc create -f operator-role.yaml --namespace ${NAMESPACE}
-oc create -f cluster-role-user.yaml
-oc create rolebinding ${OPERATOR_ROLE_BINDING} --role ${OPERATOR_ROLE} --serviceaccount ${NAMESPACE}:${OPERATOR_SERVICE_ACCOUNT} --namespace ${NAMESPACE}
-oc create rolebinding ${USER_CLUSTER_ROLE_BINDING} --clusterrole ${USER_CLUSTER_ROLE} --user ${USER_ACCOUNT} --namespace ${NAMESPACE}
-oc logout
-
-# To enable automatic installation of images from the Red Hat Container Catalog,
-# you will require a Red Hat account and configure a kubernetes secret with your
-# Red Hat username and password. Once you create your secret you must assign it
-# to the couchbase-operator and default service accounts.
-oc create secret docker-registry rh-catalog --docker-server=registry.connect.redhat.com \
-  --docker-username=<rhel-username> --docker-password=<rhel-password> --docker-email=<docker-email>
-oc secrets add serviceaccount/couchbase-operator secrets/rh-catalog --for=pull
-oc secrets add serviceaccount/default secrets/rh-catalog --for=pull
-
-# Deploy the Operator as an unprivileged user
-oc login -u ${USER_ACCOUNT}
-oc create -f operator-deployment.yaml -n ${NAMESPACE}
-oc logout
-----
-
-== Uninstalling the Operator
-
-.Uninstalling the Operator is a two-step process:
-
-. Delete the Operator.
-+
-You can delete the Operator as the `developer` or `system:admin` user.
-+
-[source,console]
-----
-kubectl delete deployment couchbase-operator
-----
-+
-NOTE: Deleting the Operator from a namespace will not remove or affect any Couchbase pods in your Kubernetes cluster.
-
-. Delete the CRD.
-+
-NOTE: You can only delete the CRD as the `system:admin` user.
-+
-
-Make sure the Operator has been deleted from all other OpenShift projects in the cluster before you delete the CRD. Once the Operator has been deleted, run the following command to delete the CRD:
-+
-[source,console]
-----
-oc delete crd couchbaseclusters.couchbase.com
-----
+* xref:howto-couchbase-create.adoc[How-to Deploy a Couchbase Cluster]

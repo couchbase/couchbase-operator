@@ -62,7 +62,7 @@ include::{includedir}/persisted-volumes-zoning-guide.adoc[]
 
 :leveloffset: +1
 
-include::{includedir}/deploying-couchbase.adoc[]
+include::{includedir}/howto-couchbase-create.adoc[]
 
 include::{includedir}/cluster-status-guide.adoc[]
 

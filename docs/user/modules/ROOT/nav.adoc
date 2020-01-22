@@ -3,14 +3,8 @@
 * Getting Started
  ** xref:best-practices.adoc[Guidelines and Best Practices]
  ** xref:prerequisite-and-setup.adoc[System Requirements]
- ** xref:cloud-intro.adoc[Managed Cloud]
-  *** xref:install-aks.adoc[Installing on AKS]
-  *** xref:install-eks.adoc[Installing on EKS]
-  *** xref:install-gke.adoc[Installing on GKE]
- ** Installing the Operator
-  *** xref:install-admission-controller.adoc[Install the Admission Controller]
-  *** xref:install-kubernetes.adoc[Install the Operator on Kubernetes]
-  *** xref:install-openshift.adoc[Install the Operator on OpenShift]
+ ** xref:install-kubernetes.adoc[Install the Operator on Kubernetes]
+ ** xref:install-openshift.adoc[Install the Operator on OpenShift]
  ** xref:release-notes.adoc[Release Notes]
 * Learn
  ** Kubernetes Concepts
@@ -34,7 +28,7 @@
   *** xref:logs-troubleshooting.adoc[View Operator Logs]
  ** Couchbase Cluster
   *** Lifecycle
-   **** xref:deploying-couchbase.adoc[Create a Couchbase Deployment]
+   **** xref:howto-couchbase-create.adoc[Create a Couchbase Deployment]
    **** xref:updating-couchbase.adoc[Modify a Couchbase Deployment]
    **** xref:howto-upgrade-couchbase.adoc[Upgrade a Couchbase Deployment]
    **** xref:delete-couchbase-cluster.adoc[Delete a Couchbase Deployment]
@@ -71,6 +65,7 @@
   *** xref:couchbase-role-config.adoc[CouchbaseRole]
   *** xref:couchbase-rolebinding-config.adoc[CouchbaseRoleBinding]
  ** Operator
+  *** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
   *** xref:operator-config.adoc[Operator Deployment Settings]
   *** xref:kubernetes-rbac.adoc[Operator RBAC Settings]
  ** Couchbase Cluster
@@ -79,11 +74,15 @@
   *** xref:helm-operator-config.adoc[Operator Chart Spec]
   *** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
  ** Tools
+  *** xref:reference-cbopcfg.adoc[cbopcfg]
   *** xref:cbopinfo.adoc[cbopinfo]
 * Tutorials
  ** xref:tutorial-tls.adoc[Creating TLS Certificates]
  ** xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS]
  ** xref:tutorial-public-addressability.adoc[Public Networking with External DNS]
+ ** xref:install-aks.adoc[Installing on AKS]
+ ** xref:install-eks.adoc[Installing on EKS]
+ ** xref:install-gke.adoc[Installing on GKE]
  ** xref:demo.adoc[Couchbase Deployment Tutorial]
 * Other Resources
  ** xref:sync-gateway::kubernetes/deploy-cluster.adoc[Sync Gateway on Kubernetes]

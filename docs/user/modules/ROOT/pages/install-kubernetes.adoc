@@ -1,193 +1,91 @@
 = Installing on Kubernetes
 
+[abstract]
 This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on an open source Kubernetes cluster that has _RBAC enabled_.
 
+
+[IMPORTANT]
+====
 If you are looking to upgrade an existing installation of the Operator, see xref:upgrading-the-operator.adoc[Upgrading the Autonomous Operator].
-
-.This guide assumes the following:
-* You have a working knowledge of Kubernetes
-* You have reviewed the xref:prerequisite-and-setup.adoc[prerequisites]
-* You are installing on a new Kubernetes cluster that has RBAC enabled
-**  See the setup documentation for xref:cloud-intro.adoc[public Kubernetes services] if you are using services like EKS, AKS, and GKE.
-* You have administrative privileges for the Kubernetes cluster
-
-If you have a Kubernetes environment that already has a custom setup (non-default), you should be able to modify a few of the parameters in the various commands and configuration files mentioned in this guide to fit your requirements.
-
-IMPORTANT: This guide makes certain assumptions about the role-based access control (RBAC) settings in your Kubernetes environment. Refer to the xref:kubernetes-rbac.adoc[RBAC doumentation] before you install the Operator, as your Kubernetes environment may differ from the environment upon which this guide is based.
+====
 
 == Prerequisites
 
-* Make sure you have installed the xref:install-admission-controller.adoc[admission controller] and that it is running.
-* Download the Operator https://www.couchbase.com/downloads[package^] and unpack it on the same computer where you normally run `kubectl`.
-+
+Download the Operator https://www.couchbase.com/downloads[package^] and unpack it on the same computer where you normally run `kubectl`.
 The Operator package contains YAML configuration files and command-line tools that you will use to install the Operator.
-+
-IMPORTANT: After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`. Make sure to `cd` into this directory before you run the commands in this guide.
+
+[IMPORTANT]
+====
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
+Make sure to `cd` into this directory before you run the commands in this guide.
+====
+
+All commands in this guide are run as a system administrator account; they require the creation of cluster scoped resources or the granting of roles to service accounts (privilege escalation).
 
 == Install the CRD
 
-The first step in installing the Operator is to install the custom resource definition (CRD) that describes the `CouchbaseCluster` resource type.
+The first step in installing the Operator is to install the custom resource definitions (CRD) that describe the Couchbase resource types.
 This can be achieved with the following command:
 
 [source,console]
 ----
-kubectl create -f crd.yaml
+$ kubectl create -f crd.yaml
 ----
 
-== Create a Role
+== Install the Operator
 
-The next step to installing the Operator is to create a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[role^] that allows the Operator to access the resources that it needs to run.
+The operator is composed of two components; a per-cluster dynamic admission controller (DAC) and a per-namespace Operator.
+Refer to the xref:concept-operator.adoc[operator architecture document] for additional information on what is required and security considerations.
 
-[TIP]
-====
-If you plan to run the Operator in more than one https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace^], it may be preferable to create a cluster role because you can assign that role to a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#service-account-permissions[service account^] in any namespace.
-Note that if you chose to to use a cluster role, making modifications to it will affect all instances of the Operator that use it.
-This has the potential to cause adverse affects in production environments, such as removing required premissions used by older instances of the Operator.
-====
-
-To create the role for the Operator, run the following command:
+The following command will install both the DAC and the Operator into the `default` namespace.
 
 [source,console]
 ----
-kubectl create -f operator-role.yaml --namespace default
+$ ./cbopcfg | kubectl create -f -
 ----
 
-== Create a Service Account
+=== Custom Installation
 
-After the role is created, you need to create a service account in the namespace where you are installing the Operator, and then assign the cluster role to that service account using a https://kubernetes.io/docs/reference/access-authn-authz/rbac/#api-overview[cluster role binding^]. (In this example, the service account is created in the namespace called `default`.)
-
-To create the service account:
+Alternatively, you may wish to install just the DAC in the `camelot` namespace:
 
 [source,console]
 ----
-kubectl create -f operator-service-account.yaml --namespace default
+$ ./cbopcfg --no-operator --namespace camelot | kubectl create -n camelot -f -
 ----
 
-To assign the role to the service account:
+And then install just the Operator into the `asgard` namespace:
 
 [source,console]
 ----
-kubectl create -f operator-role-binding.yaml --namespace default
+$ ./cbopcfg --no-admission --namespace asgard | kubectl create -n asgard -f -
 ----
 
-[NOTE]
-====
-If you choose to install the Operator in a namespace other than default, be sure to modify the namespace defined in the `RoleBinding` subjects to match that of your chosen namespace.
-====
+For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
 
-== Create the Operator
+== Check the Status of the Operator
 
-Now that the service account is set up with the appropriate permissions, you can create and start the Operator by running the following command:
+You can use the following command to check on the status of the deployments:
 
 [source,console]
 ----
-kubectl create -f operator-deployment.yaml --namespace default
+$ kubectl get deployments
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+couchbase-operator             1/1     1            1           8s
+couchbase-operator-admission   1/1     1            1           8s
 ----
 
-Running this command downloads the Operator Docker image (specified in the `operator-deployment.yaml` file) and creates a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[deployment^], which manages a single instance of the Operator. The Operator uses a deployment so that it can restart if the pod it's running in dies.
+The Operator is ready to deploy `CouchbaseCluster` resources when both the DAC and Operator deployments are fully ready and available.
 
-After you run the `kubectl create` command, it generally takes less than a minute for Kubernetes to deploy the Operator and for the Operator to be ready to run.
+== Uninstalling the Operator
 
-[IMPORTANT]
-====
-If you encounter a `ErrImagePull` or `ImagePullBackOff` event associated with the Operator pod, check that the container image URL in `operator-deployment.yaml` is reachable, and that the specified image is available.
-
-The images that are specified in the provided YAML files are hosted in common public container registries.
-Couchbase regularly publishes new container images that incorporate the latest security updates and patches.
-In rare cases, a registry's security policy may force the removal of older container images, causing the provided YAML definitions to become invalid.
-It's recommended that you check the registry for new and discontinued container images, and update your deployment accordingly.
-
-To use a newer container image, simply update the container image URL in `operator-deployment.yaml` with the new image name, and then push the definition to your Kubernetes environment.
-Container images are available in the following repository:
-
-* https://hub.docker.com/r/couchbase/operator/tags[Docker Hub (use for open source Kubernetes)^]
-====
-
-=== Check the Status of the Deployment
-
-You can use the following command to check on the status of the deployment:
+Uninstalling the DAC and Operator is the reverse of the installation process:
 
 [source,console]
 ----
-kubectl get deployments
-----
-
-If you run the this command immediately after the Operator is deployed, the output will look something like the following:
-
-[source,console]
-----
-NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-couchbase-operator   1         1         1            0           10s
-----
-
-In this case, the deployment is called `couchbase-operator`. The `DESIRED` field in the output shows that this deployment will create one pod running the Operator. The `CURRENT` field shows that one Operator pod has been created. However, the `AVAILABLE` field indicates that the pod is not ready yet since its value is 0 and not 1. That means that the Operator is still establishing a connection to the Kubernetes master node to allow it to get updates on CouchbaseCluster objects. Once the Operator has completed this task, it will be able to start managing Couchbase Server clusters and the status will be shown as `AVAILABLE`.
-
-You should continue to poll the status of the Operator until the output looks similar to the following:
-
-[source,console]
-----
-NAME                 DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-couchbase-operator   1         1         1            1           47s
-----
-
-=== Check the Status of the Operator
-
-You can use the following command to verify that the Operator has started successfully:
-
-[source,console]
-----
-kubectl get pods -l app=couchbase-operator
-----
-
-If the Operator is up and running, the command returns an output where the `READY` field shows `1/1`, such as:
-
-[source,console]
-----
-NAME                                  READY   STATUS   RESTARTS   AGE
-couchbase-operator-1917615544-t5mhp   1/1     Running  0          57s
-----
-
-You can also check the logs to confirm that the Operator is up and running. Look for the message: `CRD initialized, listening for events... module=controller`.
-
-[source,console]
-----
-kubectl logs couchbase-operator-1917615544-t5mhp
-----
-
-You should see output similar to the following:
-
-[source,console]
-----
-time="2018-04-25T03:01:56Z" level=info msg="Obtaining resource lock" module=main
-time="2018-04-25T03:01:56Z" level=info msg="Starting event recorder" module=main
-time="2018-04-25T03:01:56Z" level=info msg="Attempting to be elected the couchbase-operator leader" module=main
-time="2018-04-25T03:02:13Z" level=info msg="I'm the leader, attempt to start the operator" module=main
-time="2018-04-25T03:02:13Z" level=info msg="Creating the couchbase-operator controller" module=main
-time="2018-04-25T03:02:13Z" level=info msg="Event(v1.ObjectReference{Kind:\"Endpoints\", Namespace:\"default\", Name:\"couchbase-operator\", UID:\"9b86c750-47e7-11e8-866e-080027b2a68d\", APIVersion:\"v1\", ResourceVersion:\"23482\", FieldPath:\"\"}): type: 'Normal' reason: 'LeaderElection' couchbase-operator-75ddfdbdb5-bz7ng became leader" module=event_recorder
-time="2018-04-25T03:02:13Z" level=info msg="CRD initialized, listening for events..." module=controller
-time="2018-04-25T03:02:13Z" level=info msg="starting couchbaseclusters controller"
+$ ./cbopcfg | kubectl delete -f -
+$ kubectl delete -f crd.yaml
 ----
 
 == Next Steps
 
-xref:deploying-couchbase.adoc[Deploy a Couchbase Server cluster].
-
-== Uninstalling the Operator
-
-.Uninstalling the Operator is a two-step process:
-
-. Delete the Operator.
-+
-[source,console]
-----
-kubectl delete deployment couchbase-operator
-----
-
-. Delete the CRD.
-+
-Make sure all instances of the Operator have been deleted from the Kubernetes cluster before you delete the CRD. Once all instances of the Operator have been deleted, run the following command to delete the CRD:
-+
-[source,console]
-----
-kubectl delete crd couchbaseclusters.couchbase.com
-----
+* xref:howto-couchbase-create.adoc[How-to Deploy a Couchbase Cluster]
