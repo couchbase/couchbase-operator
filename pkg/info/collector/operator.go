@@ -37,7 +37,7 @@ func (r *operatorCollector) Kind() string {
 	return "Operator"
 }
 
-// collectHTTP genericly collects paths from a specifc port and saves the data as the specified key.
+// collectHTTP generically collects paths from a specific port and saves the data as the specified key.
 func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, paths map[string]string) error {
 	port, err := netutil.GetFreePort()
 	if err != nil {

@@ -442,13 +442,6 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 		},
 	}
 
-	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
-		if cluster.Spec.Monitoring.Prometheus.Enabled {
-			metricsContainer := createMetricsContainer(cluster.Spec)
-			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
-		}
-	}
-
 	ApplyBaseAnnotations(pod.GetObjectMeta())
 
 	if cluster.Spec.AntiAffinity {
