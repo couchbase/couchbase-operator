@@ -39,7 +39,7 @@ func ApplyBaseAnnotations(object metav1.Object) {
 	annotations := map[string]string{
 		constants.ResourceVersionAnnotation: version.Version,
 	}
-	mergeLabels(annotations, object.GetAnnotations())
+	annotations = mergeLabels(object.GetAnnotations(), annotations)
 	object.SetAnnotations(annotations)
 }
 
@@ -176,13 +176,19 @@ func CascadeDeleteOptions(gracePeriodSeconds int64) *metav1.DeleteOptions {
 }
 
 // mergeLables merges l2 into l1. Conflicting label will be skipped.
-func mergeLabels(l1, l2 map[string]string) {
-	for k, v := range l2 {
-		if _, ok := l1[k]; ok {
-			continue
-		}
-		l1[k] = v
+func mergeLabels(l1, l2 map[string]string) map[string]string {
+	if l1 == nil {
+		return l2
 	}
+
+	m := map[string]string{}
+	for k, v := range l1 {
+		m[k] = v
+	}
+	for k, v := range l2 {
+		m[k] = v
+	}
+	return m
 }
 
 func DeletePod(client *client.Client, namespace, podName string, opts *metav1.DeleteOptions) error {

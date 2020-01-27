@@ -87,19 +87,14 @@ func CreateCouchbasePod(client *client.Client, scheduler scheduler.Scheduler, cl
 			// If we are creating a default mount, then also create an init container to
 			// copy Couchbase's etc directory onto the PVC.
 			if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
-				initContainer := couchbaseInitContainer(cluster.Spec.Image, pvc.Name)
-				// Always attach requirements as some platforms will not allow
-				// you to run without them!!
-				if config.Pod != nil {
-					initContainer.Resources = config.Pod.Resources
-				}
+				initContainer := couchbaseInitContainer(cluster.Spec.Image, pvc.Name, config)
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 			}
 		}
 	}
 
 	// Add ownership information only if we are going to create the resource.
-	addOwnerRefToObject(pod.GetObjectMeta(), cluster.AsOwner())
+	addOwnerRefToObject(pod, cluster.AsOwner())
 	return CreatePod(client, cluster.Namespace, pod)
 }
 
@@ -149,7 +144,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 
 	state := &persistentVolumeClaimState{}
 
-	mountPaths, err := getPathsToPersist(config.Pod.VolumeMounts)
+	mountPaths, err := getPathsToPersist(config.VolumeMounts)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +196,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 			constants.AnnotationVolumeNodeConf:      config.Name,
 			constants.CouchbaseVersionAnnotationKey: version,
 		})
-		ApplyBaseAnnotations(required.GetObjectMeta())
+		ApplyBaseAnnotations(required)
 		if gid := cluster.Spec.GetFSGroup(); gid != nil {
 			required.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
 		}
@@ -339,7 +334,7 @@ func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
 
 	// can be mounted read/write mode to exactly 1 host
-	addOwnerRefToObject(claim.GetObjectMeta(), owner)
+	addOwnerRefToObject(claim, owner)
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
 	if err != nil {
@@ -414,50 +409,64 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
 func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *persistentVolumeClaimState) (*v1.Pod, error) {
-
 	// Create the standard Couchbase container image.
-	container := couchbaseContainer(cluster.Spec.Image)
+	container := couchbaseContainer(cluster.Spec.Image, &config)
 	container.ReadinessProbe = couchbaseReadinessProbe()
-	if config.Pod != nil {
-		container.Resources = config.Pod.Resources
-	}
 	if pvcState != nil {
 		container.VolumeMounts = pvcState.volumeMounts
 	}
 
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   m.Name,
-			Labels: createCouchbasePodLabels(m.Name, cluster.Name, config),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				container,
-			},
-			RestartPolicy:   v1.RestartPolicyNever,
-			Hostname:        m.Name,
-			Subdomain:       cluster.Name,
-			NodeSelector:    map[string]string{},
-			SecurityContext: cluster.Spec.SecurityContext,
-		},
+	// Use the user provided Pod template if provided.
+	pod := &v1.Pod{}
+	if config.Pod != nil {
+		pod.ObjectMeta = config.Pod.ObjectMeta
+		pod.Spec = config.Pod.Spec
 	}
 
-	ApplyBaseAnnotations(pod.GetObjectMeta())
+	// For metadata, override the name and merge the labels and annotations.
+	pod.Name = m.Name
+	pod.Labels = mergeLabels(pod.Labels, createCouchbasePodLabels(m.Name, cluster.Name, config))
+	ApplyBaseAnnotations(pod)
 
+	// Populate the main specification, overriding whatever the template specified.
+	pod.Spec.Containers = []v1.Container{
+		container,
+	}
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
+	pod.Spec.Hostname = m.Name
+	pod.Spec.Subdomain = cluster.Name
+	pod.Spec.SecurityContext = cluster.Spec.SecurityContext
+
+	// If anti-affinity is set then ensure no two pods from the same cluster
+	// run on the same hosts.
 	if cluster.Spec.AntiAffinity {
-		pod = PodWithAntiAffinity(pod, cluster.Name)
+		pod.Spec.Affinity = &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								constants.LabelCluster: cluster.Name,
+							},
+						},
+						TopologyKey: "kubernetes.io/hostname",
+					},
+				},
+			},
+		}
 	}
 
-	applyPodPolicy(pod, config.Pod)
-
-	// Add PVCs before TLS as that may append some stuff to the slice.
+	// If persistent volumes are specified then add them.
 	if pvcState != nil {
-		pod.Spec.Volumes = pvcState.volumes
+		pod.Spec.Volumes = append(pod.Spec.Volumes, pvcState.volumes...)
 	}
+
+	// If TLS is specified then add the certificate volume.
 	if err := applyPodTLSConfiguration(cluster.Spec, pod); err != nil {
 		return nil, err
 	}
 
+	// If monitoring is enabled add the necessary side cars.
 	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
 		if cluster.Spec.Monitoring.Prometheus.Enabled {
 			metricsContainer := createMetricsContainer(cluster.Spec)
@@ -469,10 +478,12 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 		}
 	}
 
+	// Set the Couchbase version metadata.
 	if err := SetCouchbaseVersion(pod, cluster.Spec.Image); err != nil {
 		return nil, err
 	}
 
+	// Add or override any scheduling operation.
 	if serverGroup != "" {
 		if pod.Spec.NodeSelector == nil {
 			pod.Spec.NodeSelector = map[string]string{}
@@ -604,10 +615,10 @@ func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.Ser
 }
 
 func CouchbaseContainer(image string) v1.Container {
-	return couchbaseContainer(image)
+	return couchbaseContainer(image, nil)
 }
 
-func couchbaseContainer(image string) v1.Container {
+func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Container {
 	c := v1.Container{
 		Name:  constants.CouchbaseContainerName,
 		Image: image,
@@ -793,7 +804,12 @@ func couchbaseContainer(image string) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
-		VolumeMounts: []v1.VolumeMount{},
+	}
+
+	if config != nil {
+		c.Env = config.Env
+		c.EnvFrom = config.EnvFrom
+		c.Resources = config.Resources
 	}
 
 	return c
@@ -802,8 +818,8 @@ func couchbaseContainer(image string) v1.Container {
 // Init container is same as runtime container except it used
 // to copy the etc dir into a persisted volume which will be
 // shared with with the Pod's main container
-func couchbaseInitContainer(image, claimName string) v1.Container {
-	initContainer := couchbaseContainer(image)
+func couchbaseInitContainer(image, claimName string, config couchbasev2.ServerConfig) v1.Container {
+	initContainer := couchbaseContainer(image, &config)
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	initContainer.Args = []string{"cp", "-a", "/opt/couchbase/etc", "/mnt/"}
 	initContainer.VolumeMounts = []v1.VolumeMount{
@@ -869,67 +885,6 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 			FailureThreshold:    3,
 		},
 		Resources: resources,
-	}
-}
-
-func PodWithAntiAffinity(pod *v1.Pod, clusterName string) *v1.Pod {
-	// set pod anti-affinity with the pods that belongs to the same couchbase cluster
-	ls := &metav1.LabelSelector{MatchLabels: map[string]string{
-		constants.LabelCluster: clusterName,
-	}}
-	return podWithAntiAffinity(pod, ls)
-}
-
-func podWithAntiAffinity(pod *v1.Pod, ls *metav1.LabelSelector) *v1.Pod {
-	affinity := &v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-				{
-					LabelSelector: ls,
-					TopologyKey:   "kubernetes.io/hostname",
-				},
-			},
-		},
-	}
-
-	pod.Spec.Affinity = affinity
-	return pod
-}
-
-func applyPodPolicy(pod *v1.Pod, policy *couchbasev2.PodPolicy) {
-	if policy == nil {
-		return
-	}
-
-	pod.Spec.ServiceAccountName = policy.ServiceAccountName
-
-	pod.Spec.DNSPolicy = v1.DNSClusterFirst
-	if policy.DNSPolicy != nil {
-		pod.Spec.DNSPolicy = *policy.DNSPolicy
-	}
-	pod.Spec.DNSConfig = policy.DNSConfig
-
-	if len(policy.NodeSelector) != 0 {
-		pod.Spec.NodeSelector = policy.NodeSelector
-	}
-	if len(policy.Tolerations) != 0 {
-		pod.Spec.Tolerations = policy.Tolerations
-	}
-	if policy.AutomountServiceAccountToken != nil {
-		pod.Spec.AutomountServiceAccountToken = policy.AutomountServiceAccountToken
-	}
-	if len(policy.ImagePullSecrets) != 0 {
-		pod.Spec.ImagePullSecrets = policy.ImagePullSecrets
-	}
-
-	mergeLabels(pod.Labels, policy.Labels)
-	mergeLabels(pod.Annotations, policy.Annotations)
-
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == constants.CouchbaseContainerName {
-			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, policy.Env...)
-			pod.Spec.Containers[i].EnvFrom = append(pod.Spec.Containers[i].EnvFrom, policy.EnvFrom...)
-		}
 	}
 }
 

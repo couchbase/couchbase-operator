@@ -467,8 +467,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	//    Data, index and analytics volumes must use the default mount for data persistence.
 	anySupportable := false
 	for _, class := range customResource.Spec.Servers {
-		if class.Pod != nil && class.Pod.VolumeMounts != nil {
-			if class.Pod.VolumeMounts.DefaultClaim != "" || class.Pod.VolumeMounts.LogsClaim != "" {
+		if class.VolumeMounts != nil {
+			if class.VolumeMounts.DefaultClaim != "" || class.VolumeMounts.LogsClaim != "" {
 				anySupportable = true
 			}
 		}
@@ -477,13 +477,13 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	if anySupportable {
 		for index, class := range customResource.Spec.Servers {
 			// Volume mounts must be specified if any others are supportable
-			if class.Pod == nil || class.Pod.VolumeMounts == nil {
-				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d].pod", index)))
+			if class.VolumeMounts == nil {
+				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d]", index)))
 			} else {
 				// These stateful services must have a "default" mount
 				if class.Services.ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) &&
-					class.Pod.VolumeMounts.DefaultClaim == "" {
-					errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index)))
+					class.VolumeMounts.DefaultClaim == "" {
+					errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
 				}
 			}
 		}
@@ -493,8 +493,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// `default` must be provided, and all mounts much pair to associated persistentVolumeClaims.
 	// `logs` claim cannot be used in conjunction with `default` claim.
 	for index, config := range customResource.Spec.Servers {
-		if config.Pod != nil && config.Pod.VolumeMounts != nil {
-			mounts := config.Pod.VolumeMounts
+		if config.VolumeMounts != nil {
+			mounts := config.VolumeMounts
 
 			secondaryMounts := []string{}
 			if mounts.DataClaim != "" {
@@ -510,13 +510,13 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 			// Check the associated service is enabled
 			if mounts.DataClaim != "" && !config.Services.Contains(couchbasev2.DataService) {
-				errs = append(errs, fmt.Errorf("spec.servers[%d].pod.volumeMounts.data requires the data service to be enabled", index))
+				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.data requires the data service to be enabled", index))
 			}
 			if mounts.IndexClaim != "" && !config.Services.Contains(couchbasev2.IndexService) {
-				errs = append(errs, fmt.Errorf("spec.servers[%d].pod.volumeMounts.index requires the index service to be enabled", index))
+				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.index requires the index service to be enabled", index))
 			}
 			if mounts.AnalyticsClaims != nil && !config.Services.Contains(couchbasev2.AnalyticsService) {
-				errs = append(errs, fmt.Errorf("spec.servers[%d].pod.volumeMounts.analytics requires the analytics service to be enabled", index))
+				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.analytics requires the analytics service to be enabled", index))
 			}
 
 			templateNames := customResource.Spec.GetVolumeClaimTemplateNames()
@@ -531,10 +531,10 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				}
 				if mounts.DefaultClaim != "" || hasSecondaryMounts {
 					if mounts.DefaultClaim != "" {
-						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index), "", "default"))
+						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", "default"))
 					}
 					for _, secondaryMount := range secondaryMounts {
-						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index), "", secondaryMount))
+						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", secondaryMount))
 					}
 				}
 			} else if mounts.DefaultClaim != "" {
@@ -559,7 +559,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 					}
 				}
 			} else if hasSecondaryMounts {
-				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].pod.volumeMounts", index)))
+				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
 			}
 		}
 	}

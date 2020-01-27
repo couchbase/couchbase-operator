@@ -284,13 +284,13 @@ func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v
 		},
 	}
 
-	ApplyBaseAnnotations(svc.GetObjectMeta())
+	ApplyBaseAnnotations(svc)
 
 	return svc
 }
 
 func createService(c *client.Client, ns string, svc *v1.Service, owner metav1.OwnerReference) (*v1.Service, error) {
-	addOwnerRefToObject(svc.GetObjectMeta(), owner)
+	addOwnerRefToObject(svc, owner)
 	return c.KubeClient.CoreV1().Services(ns).Create(svc)
 }
 
@@ -482,7 +482,7 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 
 	// Create the basic service.
 	service := createServiceManifest(ConsoleServiceName(cluster.Name), cluster.Spec.Networking.AdminConsoleServiceType, ports, labels, selectors)
-	mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
+	service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
 
 	// If a DNS domain is specified add a DNS name for use with TLS.
 	if cluster.Spec.Networking.DNS != nil {
@@ -787,7 +787,7 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	labels := labelsForNodeService(cluster.Name, name)
 	selectors := getNodeServiceSelectors(cluster, name)
 	service := createServiceManifest(exposedServiceName, cluster.Spec.Networking.ExposedFeatureServiceType, allowedPorts, labels, selectors)
-	mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
+	service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
 
 	if cluster.Spec.IsExposedFeatureServiceTypePublic() {
 		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges

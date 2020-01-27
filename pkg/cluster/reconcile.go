@@ -1763,7 +1763,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 		if err != nil {
 			return err
 		}
-		k8sutil.ApplyBaseAnnotations(requested.GetObjectMeta())
+		k8sutil.ApplyBaseAnnotations(requested)
 
 		// check if restore job already exists
 		currentjob, ok := c.k8s.Jobs.Get(requested.Name)
@@ -1842,7 +1842,7 @@ func (c *Cluster) reconcileCronjobs(backup *couchbasev2.CouchbaseBackup) error {
 	// perform any updates to cronjobs
 	for _, requested := range requestedCronjobs {
 		// apply annotations
-		k8sutil.ApplyBaseAnnotations(requested.GetObjectMeta())
+		k8sutil.ApplyBaseAnnotations(requested)
 
 		specJSON, err := json.Marshal(requested.Spec)
 		if err != nil {

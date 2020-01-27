@@ -291,19 +291,23 @@ func main() {
 				newClass.Services = append(newClass.Services, couchbasev2.Service(service))
 			}
 			if class.Pod != nil {
-				newClass.Pod = &couchbasev2.PodPolicy{
-					Labels:                       class.Pod.Labels,
-					Annotations:                  class.Pod.Annotations,
-					NodeSelector:                 class.Pod.NodeSelector,
-					Resources:                    class.Pod.Resources,
-					Tolerations:                  class.Pod.Tolerations,
-					Env:                          class.Pod.CouchbaseEnv,
-					EnvFrom:                      class.Pod.EnvFrom,
-					AutomountServiceAccountToken: class.Pod.AutomountServiceAccountToken,
-					ImagePullSecrets:             class.Pod.ImagePullSecrets,
+				newClass.Pod = &corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels:      class.Pod.Labels,
+						Annotations: class.Pod.Annotations,
+					},
+					Spec: corev1.PodSpec{
+						NodeSelector:                 class.Pod.NodeSelector,
+						Tolerations:                  class.Pod.Tolerations,
+						AutomountServiceAccountToken: class.Pod.AutomountServiceAccountToken,
+						ImagePullSecrets:             class.Pod.ImagePullSecrets,
+					},
 				}
+				newClass.Env = class.Pod.CouchbaseEnv
+				newClass.EnvFrom = class.Pod.EnvFrom
+				newClass.Resources = class.Pod.Resources
 				if class.Pod.VolumeMounts != nil {
-					newClass.Pod.VolumeMounts = &couchbasev2.VolumeMounts{
+					newClass.VolumeMounts = &couchbasev2.VolumeMounts{
 						DefaultClaim:    class.Pod.VolumeMounts.DefaultClaim,
 						IndexClaim:      class.Pod.VolumeMounts.IndexClaim,
 						DataClaim:       class.Pod.VolumeMounts.DataClaim,

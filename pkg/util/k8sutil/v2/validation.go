@@ -1263,7 +1263,6 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 													},
 													MinLength: &minimumServicesLength,
 												},
-
 												"serverGroups": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "array",
 													Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
@@ -1272,138 +1271,145 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 														},
 													},
 												},
+												"env": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "array",
+													Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+														Schema: &apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																"name": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+																"value": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+															},
+														},
+													},
+												},
+												"envFrom": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+												},
+												"resources": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"limits": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																"cpu": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+																"memory": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+															},
+														},
+														"requests": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "object",
+															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																"cpu": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+																"memory": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+															},
+														},
+													},
+												},
+												"volumeMounts": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "object",
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"default": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+														"data": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+														"index": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+														"analytics": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "array",
+															Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+																Schema: &apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "string",
+																},
+															},
+														},
+														"logs": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+												},
 												"pod": apiextensionsv1beta1.JSONSchemaProps{
 													Type: "object",
 													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-														"env": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "array",
-															Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-																Schema: &apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "object",
-																	Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																		"name": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"value": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																	},
-																},
-															},
-														},
-														"envFrom": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "object",
-														},
-														"imagePullSecrets": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "array",
-															Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-																Schema: &apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "object",
-																},
-															},
-														},
-														"resources": apiextensionsv1beta1.JSONSchemaProps{
+														"metadata": apiextensionsv1beta1.JSONSchemaProps{
 															Type: "object",
 															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																"limits": apiextensionsv1beta1.JSONSchemaProps{
+																"labels": apiextensionsv1beta1.JSONSchemaProps{
 																	Type: "object",
-																	Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																		"cpu": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"memory": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"storage": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																	},
 																},
-																"requests": apiextensionsv1beta1.JSONSchemaProps{
+																"annotations": apiextensionsv1beta1.JSONSchemaProps{
 																	Type: "object",
-																	Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																		"cpu": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"memory": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"storage": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																	},
 																},
 															},
 														},
-														"labels": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "object",
-														},
-														"nodeSelector": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "object",
-														},
-														"tolerations": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "array",
-															Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-																Schema: &apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "object",
-																	Required: []string{
-																		"key",
-																		"operator",
-																		"value",
-																		"effect",
-																	},
-																	Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																		"key": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"operator": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"value": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"effect": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
-																		},
-																		"tolerationSeconds": apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "integer",
-																		},
-																	},
-																},
-															},
-														},
-														"automountServiceAccountToken": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "boolean",
-														},
-														"dnsPolicy": apiextensionsv1beta1.JSONSchemaProps{
-															Type:    "string",
-															Pattern: `^None$`,
-														},
-														"dnsConfig": apiextensionsv1beta1.JSONSchemaProps{
-															Type: "object",
-														},
-														"volumeMounts": apiextensionsv1beta1.JSONSchemaProps{
+														"spec": apiextensionsv1beta1.JSONSchemaProps{
 															Type: "object",
 															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																"default": apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "string",
-																},
-																"data": apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "string",
-																},
-																"index": apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "string",
-																},
-																"analytics": apiextensionsv1beta1.JSONSchemaProps{
+																"imagePullSecrets": apiextensionsv1beta1.JSONSchemaProps{
 																	Type: "array",
 																	Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 																		Schema: &apiextensionsv1beta1.JSONSchemaProps{
-																			Type: "string",
+																			Type: "object",
 																		},
 																	},
 																},
-																"logs": apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "string",
+																"nodeSelector": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "object",
+																},
+																"tolerations": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "array",
+																	Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+																		Schema: &apiextensionsv1beta1.JSONSchemaProps{
+																			Type: "object",
+																			Required: []string{
+																				"key",
+																				"operator",
+																				"value",
+																				"effect",
+																			},
+																			Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+																				"key": apiextensionsv1beta1.JSONSchemaProps{
+																					Type: "string",
+																				},
+																				"operator": apiextensionsv1beta1.JSONSchemaProps{
+																					Type: "string",
+																				},
+																				"value": apiextensionsv1beta1.JSONSchemaProps{
+																					Type: "string",
+																				},
+																				"effect": apiextensionsv1beta1.JSONSchemaProps{
+																					Type: "string",
+																				},
+																				"tolerationSeconds": apiextensionsv1beta1.JSONSchemaProps{
+																					Type: "integer",
+																				},
+																			},
+																		},
+																	},
+																},
+																"automountServiceAccountToken": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "boolean",
+																},
+																"dnsPolicy": apiextensionsv1beta1.JSONSchemaProps{
+																	Type:    "string",
+																	Pattern: `^None$`,
+																},
+																"dnsConfig": apiextensionsv1beta1.JSONSchemaProps{
+																	Type: "object",
 																},
 															},
 														},

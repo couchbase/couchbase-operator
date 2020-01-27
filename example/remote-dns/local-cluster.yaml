@@ -24,14 +24,15 @@ spec:
         - eventing
         - analytics
       pod:
-        dnsPolicy: None
-        # Configuration:
-        # * "10.39.255.231" is the local DNS service IP, as provisioned by local-coredns.yaml.
-        dnsConfig:
-          nameservers:
-          - "10.39.255.231"
-          searches:
-          - cluster.local
+        spec:
+          dnsPolicy: None
+          # Configuration:
+          # * "10.39.255.231" is the local DNS service IP, as provisioned by local-coredns.yaml.
+          dnsConfig:
+            nameservers:
+            - "10.39.255.231"
+            searches:
+            - cluster.local
   xdcr:
     managed: true
     # Configuration:

@@ -3,7 +3,6 @@ package e2eutil
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -714,7 +713,6 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 	}
 
 	// Cleanup left over backup Job Pods.
-	logrus.Info("Deleting orphaned Backup pods")
 	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "master=cb-operator"})
 	if err != nil {
 		fmt.Println("Warning: Unable to list leftover Backup Pods", err)
@@ -726,7 +724,6 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 			}
 			fmt.Println(fmt.Sprintf("Warning: Unable to delete leftover Backup Pod %s", pod.Name), err)
 		}
-		logrus.Infof("Pod deleted: %v", pod.Name)
 	}
 
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {

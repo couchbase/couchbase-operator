@@ -587,21 +587,21 @@ func TestNegValidationCreate(t *testing.T) {
 		},
 		{
 			name:           "TestValidateLogsVolumeMountMutuallyExclusive_1",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/pod/volumeMounts/logs", "couchbase")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/volumeMounts/logs", "couchbase")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[0].pod.volumeMounts.default is a forbidden property"},
+			expectedErrors: []string{"spec.servers[0].volumeMounts.default is a forbidden property"},
 		},
 		{
 			name:           "TestValidateLogsVolumeMountMutuallyExclusive_2",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/pod/volumeMounts/default", "couchbase-log-pv")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/volumeMounts/default", "couchbase-log-pv")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[3].pod.volumeMounts.default is a forbidden property"},
+			expectedErrors: []string{"spec.servers[3].volumeMounts.default is a forbidden property"},
 		},
 		{
 			name:           "TestValidateDefaultVolumeMountRequiredForStatefulServices",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.QueryService, couchbasev2.SearchService, couchbasev2.EventingService, couchbasev2.AnalyticsService})},
 			shouldFail:     true,
-			expectedErrors: []string{"default in spec.servers[3].pod.volumeMounts is required"},
+			expectedErrors: []string{"default in spec.servers[3].volumeMounts is required"},
 		},
 		{
 			name:           "TestValidateLogRetentionTimeInvalidPattern",
@@ -849,19 +849,19 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateServerServiceRequiredForVolumeMountData",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/0")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.data requires the data service to be enabled`},
+			expectedErrors: []string{`spec.servers[1].volumeMounts.data requires the data service to be enabled`},
 		},
 		{
 			name:           "TestValidateServerServiceRequiredForVolumeMountIndex",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/1")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.index requires the index service to be enabled`},
+			expectedErrors: []string{`spec.servers[1].volumeMounts.index requires the index service to be enabled`},
 		},
 		{
 			name:           "TestValidateServerServiceRequiredForVolumeMountAnalytics",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/2")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.servers[1].pod.volumeMounts.analytics requires the analytics service to be enabled`},
+			expectedErrors: []string{`spec.servers[1].volumeMounts.analytics requires the analytics service to be enabled`},
 		},
 		{
 			name:           "TestValidateBackupInvalidCronSchedule",
@@ -958,7 +958,7 @@ func TestNegValidationCreate(t *testing.T) {
 	for mntField, mntName := range volMountsMap {
 		testCase := testDef{
 			name:           "TestValidateVolumeClaimTemplateMustExist_" + mntName,
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/pod/volumeMounts/"+mntField, "invalidClaim")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/volumeMounts/"+mntField, "invalidClaim")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[1]." + mntName + " should be one of [couchbase couchbase-log-pv]"},
 		}
@@ -971,7 +971,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateDefaultVolumeMountRequiredForStatefulService_" + string(statefulService),
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.QueryService, couchbasev2.SearchService, couchbasev2.EventingService, statefulService})},
 			shouldFail:     true,
-			expectedErrors: []string{"default in spec.servers[3].pod.volumeMounts is required"},
+			expectedErrors: []string{"default in spec.servers[3].volumeMounts is required"},
 		}
 		testDefs = append(testDefs, testCase)
 	}
@@ -982,10 +982,10 @@ func TestNegValidationCreate(t *testing.T) {
 		testCase := testDef{
 			name: "TestValidateDefaultVolumeMountRequiredForServiceClaim_" + claimField,
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Replace("/spec/servers/0/pod/volumeMounts/"+claimField, "couchbase").
-				Remove("/spec/servers/0/pod/volumeMounts/default")},
+				Replace("/spec/servers/0/volumeMounts/"+claimField, "couchbase").
+				Remove("/spec/servers/0/volumeMounts/default")},
 			shouldFail:     true,
-			expectedErrors: []string{"default in spec.servers[0].pod.volumeMounts is required"},
+			expectedErrors: []string{"default in spec.servers[0].volumeMounts is required"},
 		}
 		testDefs = append(testDefs, testCase)
 	}
@@ -993,10 +993,10 @@ func TestNegValidationCreate(t *testing.T) {
 	testCase := testDef{
 		name: "TestValidateDefaultVolumeMountRequiredForAnalytics",
 		mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-			Replace("/spec/servers/0/pod/volumeMounts/analytics", []string{"couchbase"}).
-			Remove("/spec/servers/0/pod/volumeMounts/default")},
+			Replace("/spec/servers/0/volumeMounts/analytics", []string{"couchbase"}).
+			Remove("/spec/servers/0/volumeMounts/default")},
 		shouldFail:     true,
-		expectedErrors: []string{"default in spec.servers[0].pod.volumeMounts is required"},
+		expectedErrors: []string{"default in spec.servers[0].volumeMounts is required"},
 	}
 	testDefs = append(testDefs, testCase)
 
@@ -1381,7 +1381,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 		{
 			name:           "TestValidateBackupStrategyImmutable",
-			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/strategy", []string{"full_only", "full_incremental"})},
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/strategy", "full_only")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.strategy in body cannot be updated"},
 		},

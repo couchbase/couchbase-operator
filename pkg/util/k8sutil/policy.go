@@ -29,8 +29,8 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 			},
 		},
 	}
-	ApplyBaseAnnotations(required.GetObjectMeta())
-	addOwnerRefToObject(required.GetObjectMeta(), cluster.AsOwner())
+	ApplyBaseAnnotations(required)
+	addOwnerRefToObject(required, cluster.AsOwner())
 
 	// Get any existing budgets, creating one if it doesn't exist.
 	actual, found := client.PodDisruptionBudgets.Get(name)

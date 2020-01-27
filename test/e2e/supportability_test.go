@@ -1576,15 +1576,13 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	cbCluster := e2espec.NewBasicCluster(clusterSize)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
-	cbCluster.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-			AnalyticsClaims: []string{
-				pvcName,
-				pvcName,
-			},
+	cbCluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
+		AnalyticsClaims: []string{
+			pvcName,
+			pvcName,
 		},
 	}
 	cbCluster.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{

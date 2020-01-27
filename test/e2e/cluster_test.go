@@ -212,11 +212,9 @@ func TestNodeUnschedulable(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(1)
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(strconv.Itoa(int(allocatableMemory*0.7)) + "Mi"),
-			},
+	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(strconv.Itoa(int(allocatableMemory*0.7)) + "Mi"),
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)

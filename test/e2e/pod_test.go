@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -29,14 +28,12 @@ func TestPodResourcesBasic(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memReq),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memLimit),
-			},
+	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memReq),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memLimit),
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -62,14 +59,12 @@ func TestNegPodResourcesBasic(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memReq),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memLimit),
-			},
+	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memReq),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memLimit),
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
@@ -97,11 +92,9 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memReq),
-			},
+	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
@@ -132,11 +125,9 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memReq),
-			},
+	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)

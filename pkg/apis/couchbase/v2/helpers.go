@@ -139,8 +139,8 @@ func (v *VolumeMounts) LogsOnly() bool {
 }
 
 func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
-	if sc != nil && sc.Pod != nil {
-		return sc.Pod.VolumeMounts
+	if sc != nil {
+		return sc.VolumeMounts
 	}
 	return nil
 }

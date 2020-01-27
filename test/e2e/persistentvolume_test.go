@@ -103,11 +103,9 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -155,11 +153,9 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -238,12 +234,10 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -291,12 +285,10 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -342,12 +334,10 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -398,12 +388,10 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -470,12 +458,10 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -539,12 +525,10 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
 	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
@@ -606,12 +590,10 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-			DataClaim:    pvcName,
-			IndexClaim:   pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),

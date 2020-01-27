@@ -257,10 +257,8 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
-	testCouchbase.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{
-			DefaultClaim: pvcName,
-		},
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		pvcTemplate,

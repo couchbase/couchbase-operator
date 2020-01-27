@@ -23,14 +23,13 @@ spec:
         - search
         - eventing
         - analytics
-      pod:
-        volumeMounts:
-          default: couchbase
-          data:  couchbase
-          index: couchbase
-          analytics:
-            - couchbase
-            - couchbase
+      volumeMounts:
+        default: couchbase
+        data:  couchbase
+        index: couchbase
+        analytics:
+          - couchbase
+          - couchbase
   securityContext:
     fsGroup: 1000
   volumeClaimTemplates:

@@ -237,9 +237,9 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster) {
 	if imagePullSecret != "" {
 		for i := range cluster.Spec.Servers {
 			if cluster.Spec.Servers[i].Pod == nil {
-				cluster.Spec.Servers[i].Pod = &couchbasev2.PodPolicy{}
+				cluster.Spec.Servers[i].Pod = &v1.PodTemplateSpec{}
 			}
-			cluster.Spec.Servers[i].Pod.ImagePullSecrets = []v1.LocalObjectReference{
+			cluster.Spec.Servers[i].Pod.Spec.ImagePullSecrets = []v1.LocalObjectReference{
 				{
 					Name: imagePullSecret,
 				},
@@ -321,10 +321,8 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 					couchbasev2.DataService,
 					couchbasev2.IndexService,
 				},
-				Pod: &couchbasev2.PodPolicy{
-					VolumeMounts: &couchbasev2.VolumeMounts{
-						DefaultClaim: "couchbase",
-					},
+				VolumeMounts: &couchbasev2.VolumeMounts{
+					DefaultClaim: "couchbase",
 				},
 			},
 			{
@@ -338,10 +336,8 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 					// back in the cluster.
 					couchbasev2.EventingService,
 				},
-				Pod: &couchbasev2.PodPolicy{
-					VolumeMounts: &couchbasev2.VolumeMounts{
-						LogsClaim: "couchbase",
-					},
+				VolumeMounts: &couchbasev2.VolumeMounts{
+					LogsClaim: "couchbase",
 				},
 			},
 		},
@@ -432,11 +428,11 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 
 	crd := NewBasicCluster(size)
 	couchbase := "couchbase"
-	crd.Spec.Servers[0].Pod = &couchbasev2.PodPolicy{
-		VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: couchbase},
+	crd.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: couchbase,
 	}
 
-	storagePolicy := CreatePodPolicy(v1.ResourceStorage, 1, 1, "Gi")
+	resources := CreateResources(v1.ResourceStorage, 1, 1, "Gi")
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "couchbase",
@@ -444,7 +440,7 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			StorageClassName: &storageClassName,
-			Resources:        storagePolicy.Resources,
+			Resources:        resources,
 		},
 	}
 	crd.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{claim}
@@ -469,18 +465,18 @@ func NewClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2.Co
 }
 
 // Create Pod Policy with memory limit and requests in MB
-func CreateMemoryPodPolicy(request, limit int) *couchbasev2.PodPolicy {
-	return CreatePodPolicy(v1.ResourceMemory, request, limit, "Mi")
+func CreateMemoryResources(request, limit int) v1.ResourceRequirements {
+	return CreateResources(v1.ResourceMemory, request, limit, "Mi")
 }
 
 // Create limit and request pod policy according to scale... ie 'Mi, Gi' where applicable
-func CreatePodPolicy(resourceName v1.ResourceName, request, limit int, scale string) *couchbasev2.PodPolicy {
-	podPolicy := &couchbasev2.PodPolicy{}
-	podPolicy.Resources = v1.ResourceRequirements{
-		Limits:   make(v1.ResourceList),
-		Requests: make(v1.ResourceList),
+func CreateResources(resourceName v1.ResourceName, request, limit int, scale string) v1.ResourceRequirements {
+	return v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			resourceName: resource.MustParse(strconv.Itoa(limit) + scale),
+		},
+		Requests: v1.ResourceList{
+			resourceName: resource.MustParse(strconv.Itoa(request) + scale),
+		},
 	}
-	podPolicy.Resources.Limits[resourceName] = resource.MustParse(strconv.Itoa(limit) + scale)
-	podPolicy.Resources.Requests[resourceName] = resource.MustParse(strconv.Itoa(request) + scale)
-	return podPolicy
 }

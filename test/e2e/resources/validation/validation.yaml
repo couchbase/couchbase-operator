@@ -251,32 +251,29 @@ spec:
         - query
         - search
         - eventing
-      pod:
-        volumeMounts:
-          default: couchbase
+      volumeMounts:
+        default: couchbase
     - size: 1
       name: statefull_services
       services:
         - data
         - index
         - analytics
-      pod:
-        volumeMounts:
-          default: couchbase
-          data: couchbase
-          index: couchbase
-          analytics:
-            - couchbase
-            - couchbase
+      volumeMounts:
+        default: couchbase
+        data: couchbase
+        index: couchbase
+        analytics:
+          - couchbase
+          - couchbase
     - size: 1
       name: server_groups
       services:
         - data
         - index
         - query
-      pod:
-        volumeMounts:
-          default: couchbase
+      volumeMounts:
+        default: couchbase
       serverGroups:
         - RzaGroup-1
         - RzaGroup-2
@@ -286,16 +283,14 @@ spec:
         - query
         - search
         - eventing
-      pod:
-        volumeMounts:
-          logs: couchbase-log-pv
+      volumeMounts:
+        logs: couchbase-log-pv
     - size: 1
       name: data_only
       services:
         - data
-      pod:
-        volumeMounts:
-          default: couchbase
+      volumeMounts:
+        default: couchbase
   securityContext:
     runAsUser: 1000
     runAsNonRoot: false

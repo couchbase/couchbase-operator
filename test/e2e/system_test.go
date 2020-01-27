@@ -246,15 +246,13 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 						couchbasev2.EventingService,
 						couchbasev2.AnalyticsService,
 					},
-					Pod: &couchbasev2.PodPolicy{
-						VolumeMounts: &couchbasev2.VolumeMounts{
-							DefaultClaim: pvcName,
-							DataClaim:    pvcName + "-data",
-							IndexClaim:   pvcName + "-index",
-							AnalyticsClaims: []string{
-								pvcName,
-								pvcName,
-							},
+					VolumeMounts: &couchbasev2.VolumeMounts{
+						DefaultClaim: pvcName,
+						DataClaim:    pvcName + "-data",
+						IndexClaim:   pvcName + "-index",
+						AnalyticsClaims: []string{
+							pvcName,
+							pvcName,
 						},
 					},
 				},

@@ -928,32 +928,15 @@ type ServerConfig struct {
 	// Pod defines the policy to create pod for the couchbase pod.
 	//
 	// Updating Pod does not take effect on any existing couchbase pods.
-	Pod *PodPolicy `json:"pod,omitempty"`
-}
+	Pod *v1.PodTemplateSpec `json:"pod,omitempty"`
 
-// PodPolicy defines the policy to create pod for the couchbase container.
-type PodPolicy struct {
-	// Labels specifies the labels to attach to pods the operator creates for the
-	// couchbase cluster.
-	// "app" and "couchbase_*" labels are reserved for the internal use of the couchbase operator.
-	// Do not overwrite them.
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// Annotations allow custom annotations of Couchbase Server pods.  We reserve the right
-	// to overwrite anything in the couchbase.com namespace.
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// NodeSelector specifies a map of key-value pairs. For the pod to be eligible
-	// to run on a node, the node must have each of the indicated key-value pairs as
-	// labels.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Volume mounts represent persistent volume claims to attach to pod.
+	// If defined new pods will use persistent volumes.
+	VolumeMounts *VolumeMounts `json:"volumeMounts,omitempty"`
 
 	// Resources is the resource requirements for the couchbase container.
 	// This field cannot be updated once the cluster is created.
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
-
-	// Tolerations specifies the pod's tolerations.
-	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 
 	// List of environment variables to set in the couchbase container.
 	// This is used to configure couchbase process. couchbase cluster cannot be
@@ -965,31 +948,6 @@ type PodPolicy struct {
 	// EnvFrom allows the setting of environment variables from things like
 	// Secrets and ConfigMaps.
 	EnvFrom []v1.EnvFromSource `json:"envFrom,omitempty"`
-
-	// Volume mounts represent persistent volume claims to attach to pod.
-	// If defined new pods will use persistent volumes.
-	VolumeMounts *VolumeMounts `json:"volumeMounts,omitempty"`
-
-	// By default, kubernetes will mount a service account token into the couchbase pods.
-	// AutomountServiceAccountToken indicates whether pods running with the service account should have an API token automatically mounted.
-	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
-
-	// ServiceAccountName allows pods to be run under a specific service account
-	// rather than 'default'.  This can be used to inherit image pull secrets
-	// and limit role permissions.
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
-
-	// ImagePullSecrets allows users to pull Couchbase Server images from private repos.
-	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-
-	// DNSPolicy allows the default DNS policy to be modified.  Usually Kubernetes will
-	// use the configured cluster DNS service to serve requests, however this can be set
-	// to "None" to make Kubernetes supply no default DNS servers.
-	DNSPolicy *v1.DNSPolicy `json:"dnsPolicy,omitempty"`
-
-	// DNSConfig allows additional DNS servers to be added to the pod's DNS configuration.
-	// Used in conjunction with DNSPolicy this can completely override Kubernetes DNS.
-	DNSConfig *v1.PodDNSConfig `json:"dnsConfig,omitempty"`
 }
 
 type VolumeMountName string
