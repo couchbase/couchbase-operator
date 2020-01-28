@@ -10,7 +10,7 @@ You also need to be aware of how memory allocations will affect database perform
 
 One of the key features of the Operator is its ability to automatically recover from a pod failure or Couchbase Server crash.
 
-When using persistent volume backing storage with the xref:couchbase-cluster-config.adoc#spec-servers-pod-volumemounts-default[`spec.servers[\].pod.volumeMounts.default`] mount then the Operator will recreate the pod in the event of a failure.
+When using persistent volume backing storage with the xref:couchbase-cluster-config.adoc#spec-servers-volumemounts-default[`spec.servers[\].volumeMounts.default`] mount then the Operator will recreate the pod in the event of a failure.
 This involves deleting the old pod and replacing it with a new one, reusing the existing storage volumes.
 Not only is this form of recovery faster -- using delta-node recovery -- but it also does not require additional Kubernetes resource to re-provision.
 
@@ -19,7 +19,7 @@ For example a cluster containing xref:couchbase-bucket-config.adoc#spec-replicas
 In order to recover in this situation the Operator creates 3 new pods, rebalances data then deletes the old ones.
 In this situation you would potentially need an additional 3 Kubernetes nodes in order to accommodate the new pods.
 
-You will need extra Kubernetes node capacity if using the xref:couchbase-cluster-config.adoc#spec-antiaffinity[`spec.antiAffinity`] attribute, or your xref:couchbase-cluster-config.adoc#spec-servers-pod-resources[`spec.servers[\].pod.resources`] scheduling hints are sufficiently large enough to necessitate the use of a new node for each pod.
+You will need extra Kubernetes node capacity if using the xref:couchbase-cluster-config.adoc#spec-antiaffinity[`spec.antiAffinity`] attribute, or your xref:couchbase-cluster-config.adoc#spec-servers-resources[`spec.servers[\].resources`] scheduling hints are sufficiently large enough to necessitate the use of a new node for each pod.
 
 === Rolling Upgrade
 

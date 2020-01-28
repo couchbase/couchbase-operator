@@ -81,14 +81,15 @@ spec:
              replication: from-my-cluster-to-remote-cluster
   servers:
   - pod:
-      dnsPolicy: None # <.>
-      dnsConfig: # <.>
-        nameservers:
-          - "172.20.92.77"
-        searches:
-          - default.svc.cluster.local
-          - svc.cluster.local
-          - cluster.local
+      spec:
+        dnsPolicy: None # <.>
+        dnsConfig: # <.>
+          nameservers:
+            - "172.20.92.77"
+          searches:
+            - default.svc.cluster.local
+            - svc.cluster.local
+            - cluster.local
 ----
 
 <.> The name `remote-cluster` is unique among remote clusters on this local cluster.
@@ -105,9 +106,9 @@ xref:couchbase-cluster-config.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdc
 
 <.> Replications are selected that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
 
-<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:couchbase-cluster-config.adoc#spec-servers-pod-dnspolicy[`spec.servers[\].pod.dnsPolicy`] field tells Kubernetes to provide no default DNS configuration. 
+<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:couchbase-cluster-config.adoc#spec-servers-pod-spec-dnspolicy[`spec.servers[\].pod.spec.dnsPolicy`] field tells Kubernetes to provide no default DNS configuration.
 
-<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:couchbase-cluster-config.adoc#spec-servers-pod-dnsconfig[`spec.servers[\].pod.dnsConfig`] field explicitly defines the local DNS name server to use.
+<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:couchbase-cluster-config.adoc#spec-servers-pod-spec-dnsconfig[`spec.servers[\].pod.spec.dnsConfig`] field explicitly defines the local DNS name server to use.
 This name server is capable of forwarding DNS requests for the remote cluster to the remote Kubernetes DNS server.
 Other DNS requests are forwarded to the local Kubernetes DNS server.
 DNS search domains should remain as shown, however `default` should be modified to be the same as the namespace the cluster is deployed in.

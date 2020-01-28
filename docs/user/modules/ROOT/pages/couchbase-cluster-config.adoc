@@ -101,48 +101,50 @@ spec:
     - analytics
     serverGroups:
     - us-east-1a
+    env:
+    - name: ENV1
+      value: value
+    envFrom:
+    - secretRef:
+      name: environment-secret
+    resources:
+      limits:
+        cpu: 4
+        memory: 8Gi
+      requests:
+        cpu: 2
+        memory: 8Gi
+    volumeMounts:
+      default: couchbase
+      data:  couchbase
+      index: couchbase
+      analytics:
+      - couchbase
+      - couchbase
     pod:
-      labels:
-        couchbase_services: all
-      annotations:
-        couchbase.acme.com: production
-      nodeSelector:
-        instanceType: large
-      env:
-      - name: ENV1
-        value: value
-      envFrom:
-        - secretRef:
-          name: environment-secret
-      resources:
-        limits:
-          cpu: 4
-          memory: 8Gi
-        requests:
-          cpu: 2
-          memory: 8Gi
-      tolerations:
-      - key: app
-        operator: Equal
-        value: cbapp
-        effect: NoSchedule
-      automountServiceAccountToken: false
-      serviceAccountName: couchbase-pods
-      imagePullSecrets:
-      - name: my-pull-secret
-      dnsPolicy: None
-      dnsConfig:
-        nameservers:
-        - "10.0.0.2"
-        searches:
-        - cluster.local
-      volumeMounts:
-        default: couchbase
-        data:  couchbase
-        index: couchbase
-        analytics:
-        - couchbase
-        - couchbase
+      metadata:
+        labels:
+          couchbase_services: all
+        annotations:
+          couchbase.acme.com: production
+      spec:
+        nodeSelector:
+          instanceType: large
+        tolerations:
+        - key: app
+          operator: Equal
+          value: cbapp
+          effect: NoSchedule
+        automountServiceAccountToken: false
+        serviceAccountName: couchbase-pods
+        imagePullSecrets:
+        - name: my-pull-secret
+        dnsPolicy: None
+        dnsConfig:
+          nameservers:
+          - "10.0.0.2"
+          searches:
+          - cluster.local
   buckets:
     managed: true
     selector:
@@ -264,7 +266,7 @@ ____
 This field specifies whether or not the Operator is currently managing this cluster. This parameter should generally be set to `true`, but may be set to `false` if you decide to make manual changes to the cluster. By disabling the Operator you can change the cluster configuration without having to worry about the Operator reverting the changes. However, before re-enabling the Operator, ensure that the Kubernetes configuration matches the cluster configuration.
 
 ____
-_Field rules:_ The `paused` field is not required and defaults to `false` if not specified.
+_Field rules:_ The `paused` field is optional and defaults to `false` if not specified.
 ____
 
 === spec.antiAffinity
@@ -272,7 +274,7 @@ ____
 This field specifies whether or not two pods in this cluster can be deployed on the same Kubernetes node. In a production setting this parameter should always be set to `true` in order to reduce the chance of data loss in case a Kubernetes node crashes.
 
 ____
-_Field rules:_ The `antiAffinity` field is not required and defaults to `false` if not specified. The value of this field cannot be changed after the cluster is created.
+_Field rules:_ The `antiAffinity` field is optional and defaults to `false` if not specified.
 ____
 
 === spec.softwareUpdateNotifications
@@ -285,7 +287,7 @@ ____
 
 === spec.serverGroups
 
-Setting the server groups field enables automatic management of Couchbase server groups.  The end user is responsible for adding labels to thier Kubernetes nodes which will be used to evenly distribute nodes across server groups so the cluster is tolerant to the loss of an entire data center (or any other desired failure domain).  Nodes are labelled with a key of `failure-domain.beta.kubernetes.io/zone` and an arbitrary name string.  Multiple nodes may have the same server group to allow multiple pods to be scheduled there regardless of anti-affinity settings.  An example of applying the label is as follows:
+Setting the server groups field enables automatic management of Couchbase server groups.  The end user is responsible for adding labels to their Kubernetes nodes which will be used to evenly distribute nodes across server groups so the cluster is tolerant to the loss of an entire data center (or any other desired failure domain).  Nodes are labeled with a key of `failure-domain.beta.kubernetes.io/zone` and an arbitrary name string.  Multiple nodes may have the same server group to allow multiple pods to be scheduled there regardless of anti-affinity settings.  An example of applying the label is as follows:
 
 [source,shell]
 ----
@@ -306,8 +308,10 @@ ____
 
 This field is a Kubernetes PodSecurityContext object which is attached to all pods that are created by the Operator. If unspecified, this will default to the `couchbase` user, mount attached volumes as that user, and ensure that the containers are running as non-root. You may override the default behavior if using a custom container image or for testing purposes.
 
+For additional information, see the xref:howto-non-root-install.adoc[non-root installation how-to].
+
 ____
-_Field rules:_ The `securityContext` field is optional. If set, this will be attached to all new pods that are created by the Operator. This field should not be modified during the cluster lifecycle.
+_Field rules:_ The `securityContext` field is optional. If set, this will be attached to all new pods that are created by the Operator.
 ____
 
 [#spec-platform]
@@ -459,7 +463,7 @@ ____
 
 == spec.cluster.autoCompaction
 
-This object allows configuration of global Couchbase auto-comapaction settings.
+This object allows configuration of global Couchbase auto-compaction settings.
 
 It is far more efficient to append database updates to files rather than rewriting them.
 This gives rise to stale data within the database file.
@@ -526,7 +530,7 @@ ____
 
 === spec.cluster.autoCompaction.parallelCompaction
 
-This field defines wether auto-compaction should be performed in parallel.
+This field defines whether auto-compaction should be performed in parallel.
 
 Setting this field to `true` will potentially yield shorter compaction times.
 This comes at the expense of far greater disk IO that may compete with normal database operation.
@@ -580,7 +584,7 @@ This field defines how frequently tombstones may be purged.
 
 Couchbase Server maintains tombstones.
 These are records of deleted documents.
-Tomestones are retained so that eventually consistent consumers can observe document deletion in the event of a disconnection.
+Tombstones are retained so that eventually consistent consumers can observe document deletion in the event of a disconnection.
 This field defaults to `72h` if not set.
 
 ____
@@ -626,7 +630,25 @@ spec:
 
 === spec.security.rbac.managed
 
+This field specifies whether the Operator should manage Couchbase RBAC.
+This field defaults to `false` allowing the user to manually manage RBAC settings with the xref:howto-ui.adoc[Couchbase web console] or the Couchbase API.
+If set to `true`, the Operator will search for xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources in the namespace under the control of the <<spec-security-rbac-selector,`spec.security.rbac.selector`>> field.
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____
+
 === spec.security.rbac.selector
+
+This field specifies which xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources are considered when the <<spec-security-rbac-managed,`spec.security.rbac.managed`>> field is set to `true`.
+If not specified all xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources are selected.
+If specified, then only xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources containing the same labels as specified in the label selector are selected.
+
+For additional information, see the xref:concept-label-selection.adoc[Couchbase resource label selection] documentation.
+
+____
+_Field rules_: This field is optional and must be a Kubernetes `LabelSelector` object.
+____
 
 == spec.networking
 
@@ -667,7 +689,7 @@ spec:
 This field specifies whether or not the Couchbase Server Web Console should be exposed externally. Exposing the web console is done using a NodePort service and the port for the service can be found in the describe output when describing this cluster. This parameter may be changed while the cluster is running and the Operator will create/destroy the NodePort service as appropriate.
 
 ____
-_Field rules:_ The `exposeAdminConsole` field is not required and defaults to `false` if not specified.  If set to `true` the specification must also have the <<spec-networking-adminconsoleservices>> property defined.
+_Field rules:_ The `exposeAdminConsole` field is optional and defaults to `false` if not specified.  If set to `true` the specification must also have the <<spec-networking-adminconsoleservices>> property defined.
 ____
 
 === spec.networking.adminConsoleServices
@@ -679,7 +701,7 @@ This property allows the UI service to be constrained to pods running one or mor
 If you require access to a specific pod running a specific service, this can also be achieved by using the `admin` option of the <<spec-networking-exposedfeatures>> property.  This will allow access via a node port. You must connect directly to the IP address of the node that the pod is running on. The assigned node port is available via the cluster status structure returned by `kubectl describe`, or via the output of `kubectl get services`. Refer to the xref:services.adoc[services documentation] for more information.
 
 ____
-_Field rules:_ The `adminConsoleServices` list is not required and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing`, and `analytics`, and must be unique. An empty list means that any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
+_Field rules:_ The `adminConsoleServices` list is optional and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing`, and `analytics`, and must be unique. An empty list means that any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
 ____
 
 === spec.networking.adminConsoleServiceType
@@ -753,7 +775,7 @@ IMPORTANT: The individual DNS per-pod exposed service A records should be dynami
 
 IMPORTANT: When creating your cluster TLS certificates you will need to add a wildcard entry in the subject alternate names list for your specified domain.  For the given examples this would be `DNS:*.couchbase-0.us-east-1.example.com`.
 
-TIP: Exposing database services to public networks is inherently dangerous.  XDCR and client connectivity can also be acheived with secure IPSEC tunnels.
+TIP: Exposing database services to public networks is inherently dangerous.  XDCR and client connectivity can also be achieved with secure IPSEC tunnels.
 
 [source,yaml]
 ----
@@ -809,7 +831,7 @@ This field defines the CA certificate and optionally a client certificate and pr
 
 This field is required if any static TLS configuration is specified under `spec.networking.tls.static`.
 This field references a secret containing a key `ca.crt` whose value is a CA certificate.
-The CA certificate must be the root authority for a server certifcate defined in `spec.networking.tls.static.member.serverSecret`.
+The CA certificate must be the root authority for a server certificate defined in `spec.networking.tls.static.member.serverSecret`.
 The xref:tls.adoc[TLS documentation] contains detailed information on generating valid certificates for your cluster.
 
 If `spec.networking.tls.clientCertificatePolicy` is set to `enable` then `operatorSecret` may contain a client certificate and private key.
@@ -829,7 +851,7 @@ This field defines the client certificate policy that Couchbase Server should us
 
 If not defined Couchbase Server will use basic authentication -- username and password -- over server side TLS.
 
-If set to `enable` then Couchbase Server will request a client certifcate and the clients may return one in order to authenticate.
+If set to `enable` then Couchbase Server will request a client certificate and the clients may return one in order to authenticate.
 If a client certificate is not returned by the client Couchbase Server will fall back to basic authentication.
 If you require certificate authentication by the Operator then you may define it in `spec.networking.tls.static.operatorSecret`.
 
@@ -845,13 +867,13 @@ ____
 This list defines how Couchbase Server should parse client certificates in order to extract a valid user.
 
 ____
-_Field rules:_ If using client certifcates this list should contain at least one item.
+_Field rules:_ If using client certificates this list should contain at least one item.
 ____
 
 === spec.networking.tls.clientCertificatePaths[].path
 
 This field defines where to extract the username from.
-Couchbase Server currently allows usernames to be defined in the certifcate subject common name (CN), or subject alternative names (SAN).
+Couchbase Server currently allows usernames to be defined in the certificate subject common name (CN), or subject alternative names (SAN).
 Valid SANs that can be parsed are URI, DNS or EMAIL records.
 
 ____
@@ -870,7 +892,7 @@ ____
 
 === spec.networking.tls.clientCertificatePaths[].delimiter
 
-This field defines whether the username is delimted.
+This field defines whether the username is delimited.
 
 This allows, for example, an EMAIL SAN of `jane.doe@example.com` to be mapped to the username `jane.doe` by specifying a delimiter of `@`.
 
@@ -914,9 +936,16 @@ ____
 == spec.servers[]
 
 This object allows the configuration of the Couchbase cluster topology.
-Servers are grouped in to server classes also known as mutli-dimensional scaling (MDS) groups.
+Servers are grouped in to server classes also known as multi-dimensional scaling (MDS) groups.
 You must specify at least one server class.
 At least one server class must contain the `data` service.
+
+Modifying any field in the `spec.servers` object that affects the underlying pod will trigger an xref:concept-upgrade.adoc#upgrading-pods[upgrade], as pods are immutable.
+Fields that do not trigger an upgrade include:
+
+* `size` -- attribute modification triggers a scaling operation.
+* `name` -- attribute modification replaces the entire server class with a new one.
+* `services` -- attribute is immutable.
 
 [source,yaml]
 ----
@@ -933,48 +962,50 @@ spec:
     - analytics
     serverGroups:
     - us-east-1a
+    env:
+    - name: ENV1
+      value: value
+    envFrom:
+    - secretRef:
+      name: environment-secret
+    resources:
+      limits:
+        cpu: 4
+        memory: 8Gi
+      requests:
+        cpu: 2
+        memory: 8Gi
+    volumeMounts:
+      default: couchbase
+      data:  couchbase
+      index: couchbase
+      analytics:
+      - couchbase
+      - couchbase
     pod:
-      labels:
-        couchbase_services: all
-      annotations:
-        couchbase.acme.com: production
-      nodeSelector:
-        instanceType: large
-      env:
-      - name: ENV1
-        value: value
-      envFrom:
-        - secretRef:
-          name: environment-secret
-      resources:
-        limits:
-          cpu: 4
-          memory: 8Gi
-        requests:
-          cpu: 2
-          memory: 8Gi
-      tolerations:
-      - key: app
-        operator: Equal
-        value: cbapp
-        effect: NoSchedule
-      automountServiceAccountToken: false
-      serviceAccountName: couchbase-pods
-      imagePullSecrets:
-      - name: my-pull-secret
-      dnsPolicy: None
-      dnsConfig:
-        nameservers:
-        - "10.0.0.2"
-        searches:
-        - cluster.local
-      volumeMounts:
-        default: couchbase
-        data:  couchbase
-        index: couchbase
-        analytics:
-        - couchbase
-        - couchbase
+      metadata:
+        labels:
+          couchbase_services: all
+        annotations:
+          couchbase.acme.com: production
+      spec:
+        nodeSelector:
+          instanceType: large
+        tolerations:
+        - key: app
+          operator: Equal
+          value: cbapp
+          effect: NoSchedule
+        automountServiceAccountToken: false
+        serviceAccountName: couchbase-pods
+        imagePullSecrets:
+        - name: my-pull-secret
+        dnsPolicy: None
+        dnsConfig:
+          nameservers:
+          - "10.0.0.2"
+          searches:
+          - cluster.local
 ----
 
 === spec.servers[].size
@@ -990,7 +1021,7 @@ ____
 This field specifies a name for this group of servers.
 
 ____
-_Field rules:_ The `name` field is required and must be unique in comparison to the `name` field of other server definitions. The value of this field cannot be changed after a server has been defined.
+_Field rules:_ The `name` field is required and must be unique in comparison to the `name` field of other server definitions. The value of this field should not be changed after a server class has been defined.  See <<spec-servers,`spec.servers[]`>> for more details.
 ____
 
 === spec.servers[].services
@@ -1005,86 +1036,37 @@ ____
 
 This controls the set of server groups to schedule pods in.  Functionality is identical to that defined in the top level specification, but overrides it and allows the end user to specify exactly where pods of individual server/service configuration are scheduled.  See the <<spec-servergroups,main documentation>> for details.
 
-== spec.servers[].pod
-
-[source,yaml]
-----
-spec:
-  servers:
-  - pod:
-      labels:
-        couchbase_services: all
-      annotations:
-        couchbase.acme.com: production
-      nodeSelector:
-        instanceType: large
-      env:
-      - name: ENV1
-        value: value
-      envFrom:
-        - secretRef:
-          name: environment-secret
-      resources:
-        limits:
-          cpu: 4
-          memory: 8Gi
-        requests:
-          cpu: 2
-          memory: 8Gi
-      tolerations:
-      - key: app
-        operator: Equal
-        value: cbapp
-        effect: NoSchedule
-      automountServiceAccountToken: false
-      serviceAccountName: couchbase-pods
-      imagePullSecrets:
-      - name: my-pull-secret
-      volumeMounts:
-        default: couchbase
-        data:  couchbase
-        index: couchbase
-        analytics:
-        - couchbase
-        - couchbase
-      dnsPolicy: None
-      dnsConfig:
-        nameservers:
-        - "10.0.0.2"
-        searches:
-        - cluster.local
-----
-
-=== spec.servers[].pod.env
+=== spec.servers[].env
 
 This field specifies the environment variables (as key-values pairs) that should be set when the pod is started. This section is optional.
+Specified environment variables will be available in Couchbase server containers only.
 
 ____
-_Field rules:_ The value of this field cannot be changed after a server has been defined.
+_Field rules:_ This field must be a map of key-value pairs where both are strings.
 ____
 
-=== spec.servers[].pod.envFrom
+=== spec.servers[].envFrom
 
 This field specifies a reference to either a `Secret` or `ConfigMap` which is used to create environment variables when the pod is started.
+Specified environment variables will be available in Couchbase server containers only.
 
 ____
-_Field rules:_ The value of this field must be an array of Kubernetes `EnvFromSource` types.  This field is optional and immutable.
+_Field rules:_ The value of this field must be an array of Kubernetes `EnvFromSource` types.  This field is optional.
 ____
 
-=== spec.servers[].pod.resources
+=== spec.servers[].resources
 
 [source,yaml]
 ----
 spec:
   servers:
-  - pod:
-      resources:
-        limits:
-          cpu: 2
-          memory: 8Gi
-        requests:
-          cpu: 1.5
-          memory: 8Gi
+  - resources:
+      limits:
+        cpu: 2
+        memory: 8Gi
+      requests:
+        cpu: 1.5
+        memory: 8Gi
 ----
 
 limits::
@@ -1093,116 +1075,30 @@ This field lets you reserve resources on a specific node. It defines the maximum
 requests::
 This field lets you reserve resources on a specific node. The requests section defines the minimum amount of CPU and memory the pods created in this node specification will reserve.
 
-TIP: In general, CPU limits are specified as the number of threads required on physical hardware (vCPUs if in the cloud), and memory is specified in bytes. Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
+[TIP]
+====
+In general, CPU limits are specified as the number of threads required on physical hardware (vCPUs if in the cloud), and memory is specified in bytes.
+Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
+====
 
-=== spec.servers[].pod.labels
-
-Labels are key-value pairs that are attached to objects in Kubernetes. They are intended to specify identifying attributes of objects that are meaningful to the user and do not directly imply semantics to the core system. Labels can be used to organize and select subsets of objects. They do not need to be unique across multiple objects. This section is optional.
-
-Labels added in this section will apply to all pods added in this cluster. Note that by default we add the following labels to each pod, which should not be overridden.
-
- app:couchbase
- couchbase_cluster:<metadata:name>
-
-In the sample configuration file referenced in this topic, the label would be `couchbase_cluster:cb-example`.
-
-The label for the first pod is of the format: `couchbase_node: <metadata:name>-<gen node id>`.
-
-In the sample configuration file referenced in this topic, the label for the first pod would be `couchbase_node:cb-example-0000`.
-
-For more information, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[labels].
-
-____
-_Field rules:_ The value of this field cannot be changed after a server has been defined.
-____
-
-=== spec.servers[].pod.annotations
-
-Annotations are similar to labels but cannot be used for resource selection.  User supplied annotations should not use the `couchbase.com` key namespace.
-
-For more information, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/[annotations].
-
-____
-_Field rules:_ The value of this field must be a map of key value pairs.  This field is optional and immutable.
-____
-
-=== spec.servers[].pod.nodeSelector
-
-This field specifies a key-value map of the constraints on node placement for pods. For a pod to be eligible to run on a node, the node must have each of the indicated key-value pairs as labels (it can have additional labels as well). If this section is not specified, then Kubernetes will place the pod on any available node. For more information, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors[label selectors].
-
-____
-_Field rules:_ The value of this field cannot be changed after a server has been defined.
-____
-
-=== spec.servers[].pod.tolerations
-
-This field specifies conditions -- that usually prevent pod scheduling or execution -- that should be tolerated when scheduling a pod.
-From the sample configuration file referenced in this topic, any node with a taint `app=cbapp:NoSchedule` would not usually allow the scheduler to start running any new pods upon it.
-You may wish to taint nodes -- marking them as dedicated -- for running Couchbase Server, where you don't also want other application pods to be running on the same node and causing interference.
-In order to allow Couchbase pods to be scheduled to run on a tainted node the pod must tolerate all taints.
-For more information about tolerations, see the Kubernetes documentation on https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[taints and tolerations].
-The tolerations section is optional.
-
-____
-_Field rules:_ The value of this field cannot be changed after a server has been defined.
-____
-
-=== spec.servers[].pod.imagePullSecrets
-
-This field specifies a list of secrets that can be used to authorize Couchbase server containers to be pulled from a private docker registry.
-
-____
-_Field rules:_ The value of this field is optional.  If specified it must be a list of objects mapping `name` to an existing pull `secret` resource.
-____
-
-=== spec.servers[].pod.automountServiceAccountToken
-
-=== spec.servers[].pod.serviceAccountName
-
-=== spec.servers[].pod.dnsPolicy
-
-This field defines how Kubernetes populates Couchbase Server pods' DNS resolver.
-By default, when not specified, this will use the builtin cluster DNS server.
-This field allows the operator to inhibit the population of DNS configuration by Kubernetes.
-Valid values are `None`.
-
-For additional information see https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy[the Kubernetes documentation^].
-
-____
-_Field rules:_ The `dnsPolicy` field is optional and must be a string.
-____
-
-=== spec.servers[].pod.dnsConfig
-
-This object defines DNS configuration in addition to that defined by Kubernetes under the control of the DNS policy.
-The `nameservers` sub-attribute is a list of DNS nameserver IP addresses.
-The `searches` sub-attribute is a list of DNS search domains.
-
-For additional information see https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-config[the Kubernetes documentation^].
-
-____
-_Field rules:_ The `dnsConfig` field is optional and must be a valid Kubernetes DNS configuration object.
-____
-
-== spec.servers[].pod.volumeMounts
+== spec.servers[].volumeMounts
 
 [source,yaml]
 ----
 spec:
   servers:
-  - pod:
-      volumeMounts:
-        default: couchbase
-        data:  couchbase
-        index: couchbase
-        analytics:
-          - couchbase
-          - couchbase
+  - volumeMounts:
+      default: couchbase
+      data:  couchbase
+      index: couchbase
+      analytics:
+        - couchbase
+        - couchbase
 ----
 
 The `VolumeMounts` configuration specifies the claims to use for the storage that is used by the Couchbase Server cluster.
 
-=== spec.servers[].pod.volumeMounts.default
+=== spec.servers[].volumeMounts.default
 
 This field is required when using persistent volumes. The value specifies the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `default` path. This is always `/opt/couchbase/var/lib/couchbase`. The claim must match the name of a `volumeClaimTemplate` within the spec.
 
@@ -1210,7 +1106,7 @@ ____
 _Field rules:_ The `default` volume mount may be specified for production clusters or those that require support.  Please consult xref:best-practices.adoc#storage[the best practices guide] for more information. It must be specified with server classes running any of the `data`, `index` or `analytics` services.  It may however, be used with any service.  It cannot be specified at the same time as the `logs` volume mount for a specific server configuration.
 ____
 
-=== spec.servers[].pod.volumeMounts.data
+=== spec.servers[].volumeMounts.data
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `data` path. When specified, the data path will be `/mnt/data`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
@@ -1218,7 +1114,7 @@ ____
 _Field rules:_ The `data` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `data` service.
 ____
 
-=== spec.servers[].pod.volumeMounts.index
+=== spec.servers[].volumeMounts.index
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `index` path. When specified, the index path will be `/mnt/index`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
@@ -1226,18 +1122,198 @@ ____
 _Field rules:_ The `index` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `index` service.
 ____
 
-=== spec.servers[].pod.volumeMounts.analytics
+=== spec.servers[].volumeMounts.analytics[]
 
-This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `analytics` paths. When specified, the analytics paths will be `/mnt/analytics-00` (where `00` denotes the first path), with all subsequent paths having incrementing values. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
+This field is the name of any `volumeClaimTemplate` that is used to create a persisted volume for the `analytics` paths. When specified, the analytics paths will be `/mnt/analytics-00` (where `00` denotes the first path), with all subsequent paths having incrementing values. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created and the data directory will be part of the "default" volume claim.
 
 _Field rules:_ The `analytics` volume mount can only be specified when the `default` volume claim is also specified.  The `spec.servers.services` field must also contain the `analytics` service.
 
-=== spec.servers[].pod.volumeMounts.logs
+=== spec.servers[].volumeMounts.logs
 
 This field is the name of the `volumeClaimTemplate` that is used to create a persisted volume for the `logs` path.  When specified, the logs path will be `/opt/couchbase/var/lib/couchbase/logs`. The claim must match the name of a `volumeClaimTemplate` within the spec. If this field is not specified, then a volume will not be created.
 
 ____
 _Field rules:_ The `logs` volume mount may be specified for production clusters that require support. Please consult xref:best-practices.adoc#storage[the best practices guide] for more information.  It may only be specified with server classes not running any of the `data`, `index` or `analytics` services.  It cannot be specified at the same time as the `default` volume mount a specific server configuration.
+____
+
+== spec.servers[].pod
+
+The `pod` attribute is based on the Kubernetes `PodTemplateSpec` structure and allows all supported configuration parameters to be modified.
+The Operator will override the following fields, therefore must not be explicitly set by the user:
+
+* `spec.command`
+* `spec.args`
+* `spec.containers`
+* `spec.initContainers`
+* `spec.restartPolicy`
+* `spec.hostname`
+* `spec.subdomain`
+* `spec.securityContext` (see <<spec-securitycontext,`spec.securityContext`>>)
+* `spec.antiAffinity` (if <<spec-antiaffinity,`spec.antiAffinity`>> is set to `true`)
+* `spec.volumes` (if <<spec-servers-volumemounts,`spec.servers[].volumeMounts`>> is set)
+
+The following parameters are modified by the Operator to merge configuration required to function, and caution should be used when setting these parameters as they may be overwritten:
+
+* `metadata.labels`
+* `metadata.annotations`
+* `spec.nodeSelector` (if <<spec-servergroups,`spec.serverGroups`>> or <<spec-servers-servergroups,`spec.servers[].serverGroups`>> is set)
+
+[source,yaml]
+----
+spec:
+  servers:
+   - pod:
+      metadata:
+        labels:
+          couchbase_services: all
+        annotations:
+          couchbase.acme.com: production
+      spec:
+        nodeSelector:
+          instanceType: large
+        tolerations:
+        - key: app
+          operator: Equal
+          value: cbapp
+          effect: NoSchedule
+        automountServiceAccountToken: false
+        serviceAccountName: couchbase-pods
+        imagePullSecrets:
+        - name: my-pull-secret
+        dnsPolicy: None
+        dnsConfig:
+          nameservers:
+          - "10.0.0.2"
+          searches:
+          - cluster.local
+----
+
+=== spec.servers[].pod.metadata.labels
+
+Labels are key-value pairs that are attached to objects in Kubernetes. They are intended to specify identifying attributes of objects that are meaningful to the user and do not directly imply semantics to the core system. Labels can be used to organize and select subsets of objects. They do not need to be unique across multiple objects. This section is optional.
+
+Labels added in this section will apply to all Couchbase server containers created in this cluster.
+Note that by default the Operator will add labels to each pod that may override those stated by this field.
+User supplied annotations should not use the `couchbase.com` key namespace.
+
+For more information, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[labels^].
+
+____
+_Field rules:_ The value of this field cannot be changed after a server has been defined.
+____
+
+=== spec.servers[].pod.metadata.annotations
+
+Annotations are similar to labels but cannot be used for resource selection.
+User supplied annotations should not use the `couchbase.com` key namespace.
+
+For more information, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/[annotations^].
+
+____
+_Field rules:_ The value of this field must be a map of key value pairs.  This field is optional and immutable.
+____
+
+=== spec.servers[].pod.spec.nodeSelector
+
+This field specifies a key-value map of the constraints on node placement for pods. For a pod to be eligible to run on a node, the node must have each of the indicated key-value pairs as labels (it can have additional labels as well). If this section is not specified, then Kubernetes will place the pod on any available node.
+
+For more information on isolating your Couchbase clusters from other workloads, see the xref:concept-scheduling.adoc[pod scheduling concepts document].
+For more information on node selectors, see the Kubernetes documentation about https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors[label selectors^].
+
+____
+_Field rules:_ This field is optional and must be a Kubernetes node selector object.
+____
+
+=== spec.servers[].pod.spec.tolerations
+
+This field specifies conditions -- that usually prevent pod scheduling or execution -- that should be tolerated when scheduling a pod.
+From the sample configuration file referenced in this topic, any node with a taint `app=cbapp:NoSchedule` would not usually allow the scheduler to start running any new pods upon it.
+You may wish to taint nodes -- marking them as dedicated -- for running Couchbase Server, where you don't also want other application pods to be running on the same node and causing interference.
+In order to allow Couchbase pods to be scheduled to run on a tainted node the pod must tolerate all taints.
+
+For more information on isolating your Couchbase clusters from other workloads, see the xref:concept-scheduling.adoc[pod scheduling concepts document].
+For more information about tolerations, see the Kubernetes documentation on https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[taints and tolerations^].
+
+____
+_Field rules:_ This field is optional and must be a list of Kubernetes toleration objects.
+____
+
+=== spec.servers[].pod.spec.imagePullSecrets
+
+Pods created by the Operator need to have permission to access the container images they run.
+Normally Kubernetes will use public images hosted on https://hub.docker.com[Docker hub^] that do not require authentication and authorization.
+When using private repositories -- especially on Redhat OpenShift -- you will need to specify credentials to allow container image access.
+
+This can be achieved in a number of different ways:
+
+* Associating an image pull secret with the `default` service account.
+  This may be a security risk as it will automatically apply to any containers created in the namespace.
+* Using the <<spec-servers-pod-spec-imagepullsecrets,`spec.servers[].pod.spec.imagePullSecrets`>> attribute to explicitly specify secrets that are used for credentials.
+* Using the <<spec-servers-pod-spec-serviceaccountname,`spec.servers[].pod.spec.serviceAccountName`>> attribute to run the pods as a specified service account.
+  This service account may implicitly be associated with secrets that are used for credentials.
+
+For additional information, see the https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/[Kubernetes documentation^].
+
+____
+_Field rules:_ The value of this field is optional and must be a Kubernetes image pull secrets list.
+____
+
+=== spec.servers[].pod.spec.automountServiceAccountToken
+
+By default Kubernetes will mount a secret into all containers in a pod.
+This allows Kubernetes to provide a token that authenticates against the Kubernetes API from within a running container.
+This behavior may be disabled -- for security reasons -- by changing this field to `false`.
+If not specified this field will default to `true`.
+
+____
+_Field rules_: The `automountServiceAccountToken` field is optional and must be a boolean.
+____
+
+=== spec.servers[].pod.spec.serviceAccountName
+
+Pods created by the Operator need to have permission to access the container images they run.
+Normally Kubernetes will use public images hosted on https://hub.docker.com[Docker hub^] that do not require authentication and authorization.
+When using private repositories -- especially on Redhat OpenShift -- you will need to specify credentials to allow container image access.
+
+This can be achieved in a number of different ways:
+
+* Associating an image pull secret with the `default` service account.
+  This may be a security risk as it will automatically apply to any containers created in the namespace.
+* Using the <<spec-servers-pod-spec-imagepullsecrets,`spec.servers[].pod.spec.imagePullSecrets`>> attribute to explicitly specify secrets that are used for credentials.
+* Using the <<spec-servers-pod-spec-serviceaccountname,`spec.servers[].pod.spec.serviceAccountName`>> attribute to run the pods as a specified service account.
+  This service account may implicitly be associated with secrets that are used for credentials.
+
+For additional information, see the https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/[Kubernetes documentation^].
+
+____
+_Field rules_: The `serviceAccountName` field is optional and must be string.
+____
+
+=== spec.servers[].pod.spec.dnsPolicy
+
+This field defines how Kubernetes populates Couchbase Server pods' DNS resolver.
+By default, when not specified, this will use the builtin cluster DNS server.
+This field allows the operator to inhibit the population of DNS configuration by Kubernetes.
+Valid values are `None`.
+
+For additional information on using custom DNS servers, see the xref:concept-couchbase-networking.adoc#inter-kubernetes-networking-with-forwarded-dns[Couchbase networking concepts] documentation.
+For additional information see https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy[the Kubernetes documentation^].
+
+____
+_Field rules:_ The `dnsPolicy` field is optional and must be a string.
+____
+
+=== spec.servers[].pod.spec.dnsConfig
+
+This object defines DNS configuration in addition to that defined by Kubernetes under the control of the DNS policy.
+The `nameservers` sub-attribute is a list of DNS nameserver IP addresses.
+The `searches` sub-attribute is a list of DNS search domains.
+
+For additional information on using custom DNS servers, see the xref:concept-couchbase-networking.adoc#inter-kubernetes-networking-with-forwarded-dns[Couchbase networking concepts] documentation.
+For additional information see https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-config[the Kubernetes documentation^].
+
+____
+_Field rules:_ The `dnsConfig` field is optional and must be a valid Kubernetes DNS configuration object.
 ____
 
 == spec.buckets
@@ -1256,7 +1332,25 @@ spec:
 
 === spec.buckets.managed
 
+This field specifies whether the Operator should manage Couchbase buckets.
+This field defaults to `false` allowing the user to manually manage bucket settings with the xref:howto-ui.adoc[Couchbase web console] or the Couchbase API.
+If set to `true`, the Operator will search for xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources in the namespace under the control of the <<spec-buckets-selector,`spec.buckets.selector`>> field.
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____
+
 === spec.buckets.selector
+
+This field specifies which xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources are considered when the <<spec-buckets-managed,`spec.buckets.managed`>> field is set to `true`.
+If not specified all xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources are selected.
+If specified, then only xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources containing the same labels as specified in the label selector are selected.
+
+For additional information, see the xref:concept-label-selection.adoc[Couchbase resource label selection] documentation.
+
+____
+_Field rules_: This field is optional and must be a Kubernetes `LabelSelector` object.
+____
 
 == spec.xdcr
 
@@ -1335,7 +1429,7 @@ ____
 This field specifies basic authentication on the remote cluster.
 
 This field is only relevant if not using client certificate authentication.
-If specified the autentication secret must refer to a Kuberenetes secret containing the keys `username` and `password`.
+If specified the authentication secret must refer to a Kubernetes secret containing the keys `username` and `password`.
 The user on the remote cluster must have have the correct roles to allow XDCR to write to the target bucket(s).
 
 ____
