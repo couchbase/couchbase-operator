@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RBAC Specs
+// NewDefaultUser creates a new default user
 func NewDefaultUser() *couchbasev2.CouchbaseUser {
 	return &couchbasev2.CouchbaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -16,6 +16,19 @@ func NewDefaultUser() *couchbasev2.CouchbaseUser {
 		Spec: couchbasev2.CouchbaseUserSpec{
 			AuthDomain: couchbasev2.InternalAuthDomain,
 			AuthSecret: e2e_constants.KubeTestSecretName,
+		},
+	}
+
+}
+
+// NewDefaultLDAPUser creates a new LDAP user
+func NewDefaultLDAPUser() *couchbasev2.CouchbaseUser {
+	return &couchbasev2.CouchbaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.CouchbaseLDAPUserName,
+		},
+		Spec: couchbasev2.CouchbaseUserSpec{
+			AuthDomain: couchbasev2.LDAPAuthDomain,
 		},
 	}
 

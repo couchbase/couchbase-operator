@@ -1,0 +1,14 @@
+---
+suite: TestLDAP
+timeout: 4h
+tcGroups:
+  - name: LDAPTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestLDAPCreateAdminUser
+      - name: TestLDAPCDeleteUser
+      - name: TestLDAPDeleteRole
+      - name: TestLDAPUpdateRole
+      - name: TestLDAPRemoveUserFromBinding
+      - name: TestLDAPDeleteBinding

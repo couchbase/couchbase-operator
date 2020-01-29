@@ -24,8 +24,8 @@ var (
 	}
 )
 
+// Couchbase cluster
 var (
-	// Couchbase cluster
 	ClusterNamePrefix          = "test-couchbase-"
 	CouchbaseLabel             = util_const.LabelApp + "=" + util_const.App
 	CouchbaseOperatorLabel     = util_const.LabelApp + "=couchbase-operator"
@@ -45,30 +45,30 @@ var (
 	}
 )
 
+// Secret name in kube used for testing
 var (
-	// Secret name in kube used for testing
 	KubeTestSecretName = "basic-test-secret"
-
-	SecretUsernameKey = util_const.AuthSecretUsernameKey
-	SecretPasswordKey = util_const.AuthSecretPasswordKey
-	CbClusterUsername = "Administrator"
-	CbClusterPassword = "password"
+	SecretUsernameKey  = util_const.AuthSecretUsernameKey
+	SecretPasswordKey  = util_const.AuthSecretPasswordKey
+	CbClusterUsername  = "Administrator"
+	CbClusterPassword  = "password"
 )
 
+// Labels for K8S nodes
 var (
-	// Labels for K8S nodes
 	NodeRoleMasterLabel    = "node-role.kubernetes.io/master"
 	FailureDomainZoneLabel = util_const.ServerGroupLabel
 )
 
+// Operator constants
 const (
-	// Operator constants
 	OperatorRestPort = 8080
 
 	// Couchbase cluster constants
 	CbClusterRestPort int32 = 8091
 )
 
+// different size naming
 const (
 	Size1 = 1
 	Size2 = 2
@@ -77,16 +77,18 @@ const (
 	Size5 = 5
 )
 
+//DefaultBucket naming
 const (
 	DefaultBucket = "default"
 )
 
+// CRD Object naming
 const (
-	// CRD Object naming
-	CouchbaseUserName = "admin"
-	ClusterRoleName   = "admin-role"
-	BucketRoleName    = "bucket-role"
-	RoleBindingName   = "role-binding"
+	CouchbaseUserName     = "admin"
+	CouchbaseLDAPUserName = "ldap-admin"
+	ClusterRoleName       = "admin-role"
+	BucketRoleName        = "bucket-role"
+	RoleBindingName       = "role-binding"
 
 	// Couchbase specific roles
 	ClusterAdminRole = "cluster_admin"
@@ -98,6 +100,7 @@ const (
 	CouchbaseSubjectGroupKind = "CouchbaseGroup"
 )
 
+//ldap naming
 const (
 	LDAPDomain        = "openldap"
 	LDAPLabelSelector = "openldap.couchbase.com"
