@@ -1,49 +1,96 @@
-= Overview
+= Introduction
 
-The Couchbase Autonomous Operator provides a native integration of Couchbase Server with open source Kubernetes and Red Hat OpenShift.
+The Couchbase Autonomous Operator provides native integration of Couchbase Server with open source Kubernetes and Red Hat OpenShift.
 It enables you to automate the management of common Couchbase tasks such as the configuration, creation, scaling, and recovery of Couchbase clusters.
-By reducing the complexity of running a Couchbase cluster, it lets you focus on the desired configuration and not worry about the details of manual deployment and lifecycle management.
+By reducing the complexity of running a Couchbase cluster, it lets you focus on the desired configuration and not worry about the details of manual deployment and life-cycle management.
 
-NOTE: The Couchbase Autonomous Operator is only supported with Couchbase Server Enterprise Edition.
+== What Does it Support?
 
-== How It Works
+The Operator can deploy and manage:
 
-The Operator extends the Kubernetes API by creating a Custom Resource Definition (CRD) and registering a custom Couchbase controller (the Operator) to manage Couchbase clusters.
-The CRD allows you to define a configuration describing what a Couchbase cluster should look like.
-For example, a configuration might define a cluster with three nodes, one bucket, and 8 GB of memory for the data service.
-Once the CouchbaseCluster custom resource is loaded into Kubernetes, the configuration is passed to the Operator which takes actions to ensure a Couchbase cluster with the specified configuration is provisioned.
-The controller can also detect updates to the configuration and reacts to changes that occur in the cluster itself.
-Like all Kubernetes standard built-in resources, the Operator doesn't just manage a single Couchbase cluster, it can manage multiple Couchbase clusters within a Kubernetes namespace.
+* Couchbase Server Enterprise Edition
 
-=== Advantages Over StatefulSets
+The Operator is certified on the following platforms:
 
-StatefulSets are great for certain use-cases, but they don't work that well for running complex software like databases.
-That is because StatefulSets focus on creating and managing pods, not on managing the software running on them.
-For example, if you wanted a four-node cluster and deployed Couchbase using StatefulSets, you would get four uninitialized Couchbase pods that don't know about each other.
-It would then be up to you to join the nodes together into a cluster, and that means extra operational tasks.
+* xref:install-kubernetes.adoc[Kubernetes]
+* xref:install-openshift.adoc[Redhat Openshift]
+* xref:install-eks.adoc[Amazon EKS]
+* xref:install-gke.adoc[Google GKE]
+* xref:install-aks.adoc[Microsoft AKS]
 
-By deploying a unique custom Couchbase controller, Kubernetes gets Couchbase-specific knowledge so that as each Couchbase pod is deployed, it can properly configure it and join it with the other Couchbase pods in the cluster.
-It's also important to keep in mind that provisioning a cluster is just one place where having a custom controller helps to automate tasks — node failure, ad-hoc scaling, and many other management tasks also require Couchbase-specific knowledge within Kubernetes in order to be properly automated.
+[NOTE]
+====
+For more information on supported platforms and versions see the xref:prerequisite-and-setup.adoc[system requirements documentation].
+====
 
-== What It Supports
+== How Does it Work?
 
-The goal of the Operator is to fully manage one or more Couchbase deployments so that you don't need to worry about the operational complexities of running Couchbase. The following is a list of the management tasks that are currently supported:
+The Operator extends Kubernetes by defining types that represent Couchbase clusters and resources.
+These types are declarative; they define what the cluster should look like.
+The Operator monitors Kubernetes for Couchbase resources, creating or updating Couchbase clusters to match the declarative specification.
 
+[NOTE]
+====
+For more information on what the Operator does, its behavior and its architecture see the xref:concept-operator.adoc[Operator architecture concepts documentation].
+====
+
+== What Features Does it Provide?
+
+The goal of the Operator is to fully manage one or more Couchbase deployments so that you don't need to worry about the operational complexities of running Couchbase.
+The following is a list of the management tasks that are currently supported:
+
+* Cluster life-cycle
+ ** xref:howto-couchbase-create.adoc[Cluster provisioning]
+ ** xref:scaling-couchbase.adoc[Cluster scaling]
+ ** xref:howto-upgrade-couchbase.adoc[Cluster upgrade]
+ ** Cluster auto-recovery
 * Cluster configuration
-* Cluster provisioning
-* Ad-hoc scalability
-* Auto recovery
-* Automated Couchbase server upgrade
-* Rolling Kubernetes upgrade
-* Configuration validation
-* Persistent volume support
-* Cross data center replication (XDCR)
-* Server groups
-* Server side TLS and certificate rotation
-* Public and private cluster addressability
-* Certified for OpenShift, Kubernetes, AKS, EKS & GKE
+ ** xref:howto-persistent-volumes.adoc[Persistent volumes]
+ ** xref:howto-server-groups.adoc[Server groups]
+ ** xref:howto-xdcr-external.adoc[Cross data center replication (XDCR)]
+ ** xref:howto-tls.adoc[TLS and certificate rotation]
+ ** User and group management
+ ** Backup and restore
+ ** xref:howto-prometheus.adoc[Prometheus monitoring]
 
-== Get Started
+== Essential Reading
 
-* xref:prerequisite-and-setup.adoc[Prerequisites and Setup]
+Kubernetes and the Operator are complex systems -- you shouldn't go in unprepared.
+The following is a selection of documentation that should be read and understood fully before continuing:
+
+* xref:best-practices.adoc[Best practices] - understand the best way to deploy Couchbase clusters
+* xref:concept-label-selection.adoc[Custom resource label selection] - understand how Couchbase cluster specifications are built
+* xref:concept-couchbase-networking.adoc[Network architectures] - understand how to correctly configure networking for the best experience
+
+== Finding Your Way Around
+
+The documentation is organized into easy to navigate sections that are targeted to specific users.
+The sections are defined as follows:
+
+Getting Started::
+Important platform information and best practice guidelines must be read before proceeding.
+This section is also the home of quick-start installation guides.
+
+Learn::
+High level architectural documentation and feature descriptions.
+This section should be read if you wish to correctly plan and size your Couchbase clusters before deployment.
+
+Manage::
+Simple how-to guides.
+This section documents how to configure your Couchbase cluster resources with simple copy and paste style tutorials.
+
+Reference::
+Detailed resource and component guides.
+This section details low-level functionality of all the resources and fields exposed to the user, their formats and constraints.
+Individual Operator containers and tools are fully documented with detailed command line argument manuals.
+
+Tutorials::
+How to integrate with and configure 3rd party components.
+The Operator itself can provision and manage simple clusters for most use cases.
+In more complex situations that involve complex networking or interaction with other, external services, we need to provide guidance on how to integrate.
+These tutorial are provided as-is and may become inaccurate as 3rd party dependencies evolve.
+
+== Further Reading
+
+* xref:whats-new.adoc[What's New?]
 * xref:release-notes.adoc[Release Notes]
