@@ -93,10 +93,6 @@ func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.TLSInvalidEvent(cl)
 }
 
-func TLSUpdateFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	return k8sutil.TLSUpdateFailedEvent(cl)
-}
-
 // ClusterCreateSequence is a common function for generating cluster creation events.
 func ClusterCreateSequence(size int) eventschema.Validatable {
 	if size == 1 {

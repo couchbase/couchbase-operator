@@ -55,8 +55,8 @@
 * Reference
  ** Resource Types
   *** xref:couchbase-cluster-config.adoc[CouchbaseCluster]
-   **** xref:conditions-and-events.adoc[CouchbaseCluster Events]
-   **** xref:cluster-status-guide.adoc[CouchbaseCluster Status]
+   **** xref:couchbase-cluster-status.adoc[CouchbaseCluster Status]
+   **** xref:couchbase-cluster-events.adoc[CouchbaseCluster Events]
   *** xref:couchbase-bucket-config.adoc[CouchbaseBucket]
   *** xref:couchbase-ephemeral-bucket-config.adoc[CouchbaseEphemeralBucket]
   *** xref:couchbase-memcached-bucket-config.adoc[CouchbaseMemcachedBucket]

@@ -46,7 +46,6 @@ const (
 	EventReasonClusterSettingsEdited   = "ClusterSettingsEdited"
 	EventReasonTLSUpdated              = "TLSUpdated"
 	EventReasonTLSInvalid              = "TLSInvalid"
-	EventReasonTLSUpdateFailed         = "TLSUpdateFailed"
 	EventReasonClientTLSUpdated        = "ClientTLSUpdated"
 	EventReasonClientTLSInvalid        = "ClientTLSInvalid"
 	EventReasonRemoteClusterAdded      = "RemoteClusterAdded"
@@ -337,14 +336,6 @@ func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonTLSInvalid
 	event.Message = EventReasonTLSInvalidMessage
-	return event
-}
-
-func TLSUpdateFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	event := newClusterEvent(cl)
-	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonTLSUpdateFailed
-	event.Message = "TLS configuration was unable to be updated"
 	return event
 }
 

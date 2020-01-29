@@ -94,7 +94,7 @@ spec:
 
 <.> The name `remote-cluster` is unique among remote clusters on this local cluster.
 
-<.> The `uuid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
+<.> The `uuid` has been collected by interrogating the xref:couchbase-cluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
 The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing[SDK configuration how-to], *without* the scheme.
@@ -205,7 +205,7 @@ spec:
 
 <.> The name `remote-cluster` is unique among remote clusters on this local cluster.
 
-<.> The `uuid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
+<.> The `uuid` has been collected by interrogating the xref:couchbase-cluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
 The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[SDK configuration how-to], *without* the scheme.
@@ -293,7 +293,7 @@ spec:
 
 <.> The name `remote-cluster` is unique among remote clusters on this local cluster.
 
-<.> The `uuid` has been collected by interrogating the `status.clusterId` field on the remote cluster.
+<.> The `uuid` has been collected by interrogating the xref:couchbase-cluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use.
 The hostname is calculated as per the xref:howto-client-sdks.adoc#ip-based-addressing[SDK configuration how-to], *without* the scheme.

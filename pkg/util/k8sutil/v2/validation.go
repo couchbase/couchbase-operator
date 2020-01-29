@@ -786,6 +786,12 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 					JSONPath:    ".status.phase",
 				},
 				{
+					Name:        "UUID",
+					Type:        "string",
+					Description: "Cluster UUID",
+					JSONPath:    ".status.clusterId",
+				},
+				{
 					Name:     "Age",
 					Type:     "date",
 					JSONPath: ".metadata.creationTimestamp",

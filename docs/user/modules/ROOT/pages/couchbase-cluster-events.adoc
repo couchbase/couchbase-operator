@@ -1,0 +1,116 @@
+= CouchbaseCluster Resource Events
+
+[abstract]
+Kubernetes events that are raised by the Operator for CouchbaseCluster resources.
+
+Kubernetes can displays extended information about a resource using the `kubectl describe` command.
+The Operator generated life-cycle events as the cluster is provisioned, editied or repaired.
+These events may be used for problem determination or as synchronous triggers for external Kubernetes orchestration.
+
+The lifecycle of a CouchbaseCluster includes the following events (in no particular order):
+
+== Member Lifecycle
+
+MemberCreationFailed::
+A new member was unable to be created.  This may be due to pod scheduling constraints, network issues or TLS configuration.
+NewMemberAdded::
+A new Couchbase node was added to the cluster.
+FailedAddNode::
+A Couchbase node failed to join the cluster.
+FailedAddBackNode::
+A Couchbase node failed to be added back into a cluster after being manually failed over.
+MemberRemoved::
+A Couchbase node was removed from the cluster.
+MemberDown::
+A Couchbase node has been reported as down by its peers.
+MemberRecovered::
+A failed Couchbase node has been recovered from its persistent volume.
+MemberFailedOver::
+A node has either been failed over automatically or manually.
+RebalanceStarted::
+A rebalance operation has started.
+RebalanceIncomplete::
+A rebalance operation has terminated abnormally; nodes may have not been added or ejected as expected.
+RebalanceCompleted::
+A rebalance operation has successfully completed.
+
+== Cluster Upgrade Lifecycle
+
+UpgradeStarted::
+An upgrade operation has started.
+UpgradeFinished::
+An upgrade operation has successfully completed.
+RollbackStarted::
+A rollback operation during a partial upgrade has started.
+RollbackFinished::
+A rollback operation during a partial upgrade has successfully completed.
+
+[NOTE]
+Upgrade events are raised in relation to an upgrade of the entire cluster and not individual nodes.
+Individual node upgrades will raise `NewMemberAdded`, `RebalanceStarted`, `MemberRemoved` and `RebalanceCompleted` member lifecycle events as members are swapped out for upgraded replacements.
+
+== Bucket Lifecycle
+
+BucketCreated::
+A bucket was created.
+BucketDeleted::
+A bucket was deleted.
+BucketEdited::
+A bucket was modified.
+
+== RBAC Lifecycle
+
+UserCreated::
+A Couchbase user was created.
+UserDeleted::
+A Couchbase user was deleted.
+UserEdited::
+A Couchbase user was editied.
+GroupCreated::
+A Couchbase group was created.
+GroupDeleted::
+A Couchbase group was deleted.
+GroupEdited::
+A Couchbase group was edited.
+
+== Service Lifecycle
+
+ServiceCreated::
+A cluster service was created.
+ServiceDeleted::
+A cluster service was deleted.
+NodeServiceCreated::
+A node service was created.
+NodeServiceDeleted::
+A node service was deleted.
+
+== Cluster Lifecycle
+
+ClusterSettingsEdited::
+The cluster specification was modified.
+
+== TLS Lifecycle
+
+TLSUpdated::
+TLS server certificates and keys, and optionally the CA certificate, were updated across the cluster.
+TLSInvalid::
+TLS configuration invalid.  Consult the Operator logs for details.
+ClientTLSUpdated::
+TLS client certificate and keys, and optionally the CA certificate, were updated.
+ClientTLSInvalid::
+TLS client configuration invalid.  Consult the Operator logs for details.
+
+== XDCR Lifecycle
+
+RemoteClusterAdded::
+A remote cluster reference was created.
+RemoteClusterRemoved::
+A remote cluster reference was removed.
+ReplicationAdded::
+A replication was created and associated with a remote cluster.
+ReplicationRemoved::
+A replication was deleted and disassociated from a remote cluster.
+
+== Backup Lifecycle
+
+_Coming soon_
