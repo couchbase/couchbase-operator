@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -22,14 +23,26 @@ const (
 )
 
 // generateCronJobs generates the appropriate backup Cronjobs for a CouchbaseBackup
-func (c *Cluster) generateCronJobs(backup *couchbasev2.CouchbaseBackup) ([]*batchv1beta1.CronJob, error) {
+func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*batchv1beta1.CronJob, error) {
 	var cronjobs []*batchv1beta1.CronJob
 
-	if backup.Spec.Strategy == couchbasev2.FullIncremental {
-		cronjobs = append(cronjobs, c.generateBackupCronjob(backup, Incremental, couchbasev2.FullIncremental))
+	for _, backup := range backups {
+		if backup.Spec.Strategy == couchbasev2.FullIncremental {
+			cronjobs = append(cronjobs, c.generateBackupCronjob(&backup, Incremental, couchbasev2.FullIncremental))
+		}
+
+		cronjobs = append(cronjobs, c.generateBackupCronjob(&backup, Full, backup.Spec.Strategy))
 	}
 
-	cronjobs = append(cronjobs, c.generateBackupCronjob(backup, Full, backup.Spec.Strategy))
+	// apply annotations
+	for _, cronjob := range cronjobs {
+		k8sutil.ApplyBaseAnnotations(cronjob)
+		specJSON, err := json.Marshal(cronjob.Spec)
+		if err != nil {
+			return nil, err
+		}
+		cronjob.Annotations[constants.CronjobSpecAnnotation] = string(specJSON)
+	}
 
 	// if TLS enabled apply TLS config to cronjobs
 	if c.cluster.Spec.Networking.TLS != nil {
@@ -127,14 +140,10 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 			Labels: map[string]string{
 				constants.LabelApp:     constants.App,
 				constants.LabelCluster: c.cluster.Name,
+				constants.LabelBackup:  backup.Name,
 			},
 			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: couchbasev2.Group,
-					Kind:       couchbasev2.BackupCRDResourceKind,
-					Name:       backup.Name,
-					UID:        backup.UID,
-				},
+				c.cluster.AsOwner(),
 			},
 		},
 		Spec: batchv1beta1.CronJobSpec{
@@ -143,7 +152,6 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 			FailedJobsHistoryLimit:     &backup.Spec.FailedJobsHistoryLimit,
 			ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 			JobTemplate: batchv1beta1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
@@ -350,6 +358,16 @@ func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) err
 	return nil
 }
 
+func generateBackupPVCs(backups []couchbasev2.CouchbaseBackup, clusterName string) []*corev1.PersistentVolumeClaim {
+	var pvcs []*corev1.PersistentVolumeClaim
+
+	for _, backup := range backups {
+		pvcs = append(pvcs, generateBackupPVC(backup.Name, clusterName, backup.Spec.Size))
+	}
+
+	return pvcs
+}
+
 // generateBackupPVC returns the PVC that backups will be stored on
 func generateBackupPVC(pvcName, clusterName string, storage *resource.Quantity) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
@@ -368,4 +386,32 @@ func generateBackupPVC(pvcName, clusterName string, storage *resource.Quantity) 
 			},
 		},
 	}
+}
+
+func (c *Cluster) deleteBackups() error {
+	deletedBackups := make(map[string]bool)
+
+	actualCronjobs := c.k8s.CronJobs.List()
+	// loop over the current existing actualCronjobs
+	for _, cronjob := range actualCronjobs {
+		// check if the job has an "owner" backup
+		backupToDelete := cronjob.Labels[constants.LabelBackup]
+
+		// no "owner" backup exists, must have been deleted. cleanup cronjobs which in turn deletes jobs + pods
+		if _, ok := c.k8s.CouchbaseBackups.Get(backupToDelete); !ok {
+			if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(cronjob.Name, &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			log.Info("Backup Cronjob deleted", "cbbackup", backupToDelete, "cronjob", cronjob.Name)
+			// add and raise events later
+			deletedBackups[backupToDelete] = true
+		}
+	}
+
+	for backup := range deletedBackups {
+		log.Info("Backup deleted", "cbbackup", backup)
+		c.raiseEvent(k8sutil.BackupDeleteEvent(backup, c.cluster))
+	}
+
+	return nil
 }

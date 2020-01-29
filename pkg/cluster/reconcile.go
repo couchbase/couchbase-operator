@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/api/batch/v1beta1"
 	"reflect"
 	"sort"
 	"strconv"
@@ -1726,14 +1727,86 @@ func (c *Cluster) reconcileBackup() error {
 		return err
 	}
 
-	// start the backup reconcile process
-	for _, currentBackup := range currentBackups {
-		if err := c.reconcileBackupPVC(&currentBackup); err != nil {
-			return err
+	// get cronjobs from all Backups
+	cronjobs, err := c.generateCronJobs(currentBackups)
+	if err != nil {
+		return err
+	}
+
+	pvcs := generateBackupPVCs(currentBackups, c.cluster.Name)
+
+	// existing backups tells us about the state of the backup CRDs
+	existing := map[string]bool{}
+	// mutated tracks if a backup has been created/updated (aka mutated)
+	// and so  what events need to be raised
+	mutated := map[string]bool{}
+
+	for _, cronjob := range cronjobs {
+		if current, ok := c.k8s.CronJobs.Get(cronjob.Name); ok {
+			// if a backup cronjob needs editing (a backup can have max 2 cronjobs),
+			// add to list and break from the outer backup loop
+			existing[cronjob.Labels[constants.LabelBackup]] = true
+
+			actualSpec := &v1beta1.CronJobSpec{}
+			if annotation, ok := current.Annotations[constants.CronjobSpecAnnotation]; ok {
+				if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
+					return err
+				}
+			}
+
+			requestedSpec := &v1beta1.CronJobSpec{}
+			if err := json.Unmarshal([]byte(cronjob.Annotations[constants.CronjobSpecAnnotation]), requestedSpec); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(actualSpec, requestedSpec) {
+				// update
+				if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(cronjob); err != nil {
+					return err
+				}
+				log.Info("Backup Cronjob updated", "cbbackup", cronjob.Labels[constants.LabelBackup], "cronjob", cronjob.Name)
+				mutated[cronjob.Labels[constants.LabelBackup]] = true
+			}
+		} else {
+			// create new cronjob
+			if _, err = c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(cronjob); err != nil {
+				return err
+			}
+			log.Info("Backup Cronjob created", "cbbackup", cronjob.Labels[constants.LabelBackup], "cronjob", cronjob.Name)
+			mutated[cronjob.Labels[constants.LabelBackup]] = true
 		}
-		if err := c.reconcileCronjobs(&currentBackup); err != nil {
-			return err
+	}
+
+	for _, pvc := range pvcs {
+		if _, ok := c.k8s.PersistentVolumeClaims.Get(pvc.Name); ok {
+			// PVC update for later k8s versions
+			existing[pvc.Name] = true
+		} else {
+			// create new PVC
+			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(pvc); err != nil {
+				return err
+			}
+			log.Info("Backup PVC created", "cbbackup", pvc.Name)
+			mutated[pvc.Name] = true
 		}
+	}
+
+	for backup := range mutated {
+		if existing[backup] {
+			// if a resource is updated or if a resource is left over (existing),
+			// then we create all other resources and we raise a backup updated event
+			log.Info("Backup updated", "cbbackup", backup)
+			c.raiseEvent(k8sutil.BackupUpdateEvent(backup, c.cluster))
+		} else {
+			// if the backup PVC and the cronjob(s) are created then we have
+			// created a backup from scratch and we class this as a backup created event
+			log.Info("Backup created", "cbbackup", backup)
+			c.raiseEvent(k8sutil.BackupCreateEvent(backup, c.cluster))
+		}
+	}
+
+	// delete
+	if err := c.deleteBackups(); err != nil {
+		return err
 	}
 
 	return nil
@@ -1769,19 +1842,18 @@ func (c *Cluster) reconcileBackupRestore() error {
 		currentjob, ok := c.k8s.Jobs.Get(requested.Name)
 		if ok {
 			// update any existing requested specs
-			if currentjob.Annotations[constants.CronJobAnnotation] != requested.Annotations[constants.CronJobAnnotation] {
+			if currentjob.Annotations[constants.CronjobSpecAnnotation] != requested.Annotations[constants.CronjobSpecAnnotation] {
 				updatedRestore, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Update(&currentRestore)
 				if err != nil {
 					return err
 				}
 
 				// compare the specs
-				if updatedRestore.Annotations[constants.CronJobAnnotation] != requested.Annotations[constants.CronJobAnnotation] {
+				if updatedRestore.Annotations[constants.CronjobSpecAnnotation] != requested.Annotations[constants.CronjobSpecAnnotation] {
 					return fmt.Errorf("inconsistency between requested job and actual job")
 				}
 
 				log.Info("restore job updated", "cbrestore", currentRestore.Name, "updated job", requested.Name)
-				c.raiseEvent(k8sutil.BackupRestoreJobEditEvent(currentRestore.Name, requested.Name, c.cluster))
 			}
 
 			// cleanup completed restores
@@ -1791,91 +1863,36 @@ func (c *Cluster) reconcileBackupRestore() error {
 				}
 			}
 		} else {
+			log.Info("Restore created", "cbrestore", currentRestore.Name)
+			c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
+
 			// else try to create the job as it does not exist
 			createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(requested)
 			if err != nil {
 				return err
 			}
 
-			log.Info("restore job created", "cbrestore", currentRestore.Name, "requested job", requested.Name)
-			c.raiseEvent(k8sutil.BackupRestoreJobCreateEvent(currentRestore.Name, createdJob.Name, c.cluster))
+			log.Info("restore job created", "cbrestore", currentRestore.Name, "created job", createdJob.Name)
 		}
 	}
-	return nil
-}
 
-// create PVC if it does not exist
-func (c *Cluster) reconcileBackupPVC(backup *couchbasev2.CouchbaseBackup) error {
-	// each cbbackup has its own pvc
-	pvcName := backup.Name
-
-	// check if pvc already exists, if it does, return
-	_, exists := c.k8s.PersistentVolumeClaims.Get(pvcName)
-	if exists {
-		return nil
-	}
-
-	// else create pvc
-	pvcToCreate := generateBackupPVC(pvcName, c.cluster.Name, backup.Spec.Size)
-	if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(pvcToCreate); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Cluster) reconcileCronjobs(backup *couchbasev2.CouchbaseBackup) error {
-	if backup == nil {
-		return nil
-	}
-
-	// get cronjobs from CouchbaseBackupSpec
-	requestedCronjobs, err := c.generateCronJobs(backup)
-	if err != nil {
-		return err
-	}
-
-	if len(requestedCronjobs) == 0 {
-		return fmt.Errorf("somehow reached unreachable code. No requestedCronjobs exist, but somehow a cbbackup does")
-	}
-
-	// perform any updates to cronjobs
-	for _, requested := range requestedCronjobs {
-		// apply annotations
-		k8sutil.ApplyBaseAnnotations(requested)
-
-		specJSON, err := json.Marshal(requested.Spec)
-		if err != nil {
+	jobs := c.k8s.Jobs.List()
+	// loop over the current existing jobs
+Outerloop:
+	for _, job := range jobs {
+		// check if the job has an "owner" restore
+		for _, currentRestore := range currentRestores {
+			if job.Name == currentRestore.Name {
+				break Outerloop
+			}
+		}
+		// no "owner" restore, must have been deleted. cleanup
+		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(job.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
-		requested.Annotations[constants.CronJobAnnotation] = string(specJSON)
-
-		// if any changes are detected to a found existing cronjob attempt to apply them
-		// otherwise create the cronjob if it does not exist
-		current, ok := c.k8s.CronJobs.Get(requested.Name)
-		if ok {
-			if requested.Annotations[constants.CronJobAnnotation] != current.Annotations[constants.CronJobAnnotation] {
-				// update any existing requested specs
-				updatedCronjob, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(requested)
-				if err != nil {
-					return err
-				}
-
-				// compare the specs
-				if updatedCronjob.Annotations[constants.CronJobAnnotation] != requested.Annotations[constants.CronJobAnnotation] {
-					return fmt.Errorf("inconsistency between requested Cronjob and actual Cronjob")
-				}
-
-				log.Info("Backup Cronjob updated", "cbbackup", backup.Name, "requested", requested.Name)
-				c.raiseEvent(k8sutil.BackupCronjobEditEvent(backup.Name, requested.Name, c.cluster))
-			}
-		} else {
-			if _, err = c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(requested); err != nil {
-				return err
-			}
-			log.Info("Backup Cronjob created", "cbbackup", backup.Name, "requested cronjob", requested.Name)
-			c.raiseEvent(k8sutil.BackupCronjobCreateEvent(backup.Name, requested.Name, c.cluster))
-		}
+		log.Info("Restore deleted", "cbrestore", job.Name)
+		c.raiseEvent(k8sutil.BackupRestoreDeleteEvent(job.Name, c.cluster))
 	}
+
 	return nil
 }

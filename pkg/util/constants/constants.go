@@ -28,7 +28,7 @@ var (
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
 
-	CronJobAnnotation = "cronjob.couchbase.com/spec"
+	CronjobSpecAnnotation = "cronjob.couchbase.com/spec"
 )
 
 // Label types added to pods
@@ -40,6 +40,7 @@ const (
 	LabelNode       = "couchbase_node"
 	LabelNodeConf   = "couchbase_node_conf"
 	LabelVolumeName = "couchbase_volume"
+	LabelBackup     = "couchbase_backup"
 
 	AnnotationVolumeNodeConf    = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
 	AnnotationVolumeMountPath   = "path"

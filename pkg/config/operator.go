@@ -68,6 +68,7 @@ func GetOperatorRole() *rbacv1.Role {
 					"watch",
 					"create",
 					"update",
+					"delete",
 				},
 			},
 			{

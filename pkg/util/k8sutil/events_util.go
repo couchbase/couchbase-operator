@@ -15,46 +15,49 @@ import (
 )
 
 const (
-	EventReasonMemberCreationFailed    = "MemberCreationFailed"
-	EventReasonNewMemberAdded          = "NewMemberAdded"
-	EventReasonMemberRemoved           = "MemberRemoved"
-	EventReasonMemberDown              = "MemberDown"
-	EventReasonMemberRecovered         = "MemberRecovered"
-	EventReasonMemberFailedOver        = "MemberFailedOver"
-	EventReasonRebalanceStarted        = "RebalanceStarted"
-	EventReasonRebalanceIncomplete     = "RebalanceIncomplete"
-	EventReasonRebalanceCompleted      = "RebalanceCompleted"
-	EventReasonFailedAddNode           = "FailedAddNode"
-	EventReasonFailedAddBackNode       = "FailedAddBackNode"
-	EventReasonBucketCreated           = "BucketCreated"
-	EventReasonBucketDeleted           = "BucketDeleted"
-	EventReasonBucketEdited            = "BucketEdited"
-	EventReasonUserCreated             = "UserCreated"
-	EventReasonUserDeleted             = "UserDeleted"
-	EventReasonUserEdited              = "UserEdited"
-	EventReasonGroupCreated            = "GroupCreated"
-	EventReasonGroupDeleted            = "GroupDeleted"
-	EventReasonGroupEdited             = "GroupEdited"
-	EventReasonServiceCreated          = "ServiceCreated"
-	EventReasonServiceDeleted          = "ServiceDeleted"
-	EventReasonNodeServiceCreated      = "NodeServiceCreated"
-	EventReasonNodeServiceDeleted      = "NodeServiceDeleted"
-	EventReasonUpgradeStarted          = "UpgradeStarted"
-	EventReasonUpgradeFinished         = "UpgradeFinished"
-	EventReasonRollbackStarted         = "RollbackStarted"
-	EventReasonRollbackFinished        = "RollbackFinished"
-	EventReasonClusterSettingsEdited   = "ClusterSettingsEdited"
-	EventReasonTLSUpdated              = "TLSUpdated"
-	EventReasonTLSInvalid              = "TLSInvalid"
-	EventReasonClientTLSUpdated        = "ClientTLSUpdated"
-	EventReasonClientTLSInvalid        = "ClientTLSInvalid"
-	EventReasonRemoteClusterAdded      = "RemoteClusterAdded"
-	EventReasonRemoteClusterRemoved    = "RemoteClusterRemoved"
-	EventReasonReplicationAdded        = "ReplicationAdded"
-	EventReasonReplicationRemoved      = "ReplicationRemoved"
-	EventReasonBackupCronjobCreated    = "BackupCronjobCreated"
-	EventReasonBackupCronjobEdited     = "BackupCronjobEdited"
-	EventReasonBackupRestoreJobCreated = "BackupRestoreJobCreated"
+	EventReasonMemberCreationFailed  = "MemberCreationFailed"
+	EventReasonNewMemberAdded        = "NewMemberAdded"
+	EventReasonMemberRemoved         = "MemberRemoved"
+	EventReasonMemberDown            = "MemberDown"
+	EventReasonMemberRecovered       = "MemberRecovered"
+	EventReasonMemberFailedOver      = "MemberFailedOver"
+	EventReasonRebalanceStarted      = "RebalanceStarted"
+	EventReasonRebalanceIncomplete   = "RebalanceIncomplete"
+	EventReasonRebalanceCompleted    = "RebalanceCompleted"
+	EventReasonFailedAddNode         = "FailedAddNode"
+	EventReasonFailedAddBackNode     = "FailedAddBackNode"
+	EventReasonBucketCreated         = "BucketCreated"
+	EventReasonBucketDeleted         = "BucketDeleted"
+	EventReasonBucketEdited          = "BucketEdited"
+	EventReasonUserCreated           = "UserCreated"
+	EventReasonUserDeleted           = "UserDeleted"
+	EventReasonUserEdited            = "UserEdited"
+	EventReasonGroupCreated          = "GroupCreated"
+	EventReasonGroupDeleted          = "GroupDeleted"
+	EventReasonGroupEdited           = "GroupEdited"
+	EventReasonServiceCreated        = "ServiceCreated"
+	EventReasonServiceDeleted        = "ServiceDeleted"
+	EventReasonNodeServiceCreated    = "NodeServiceCreated"
+	EventReasonNodeServiceDeleted    = "NodeServiceDeleted"
+	EventReasonUpgradeStarted        = "UpgradeStarted"
+	EventReasonUpgradeFinished       = "UpgradeFinished"
+	EventReasonRollbackStarted       = "RollbackStarted"
+	EventReasonRollbackFinished      = "RollbackFinished"
+	EventReasonClusterSettingsEdited = "ClusterSettingsEdited"
+	EventReasonTLSUpdated            = "TLSUpdated"
+	EventReasonTLSInvalid            = "TLSInvalid"
+	EventReasonTLSUpdateFailed       = "TLSUpdateFailed"
+	EventReasonClientTLSUpdated      = "ClientTLSUpdated"
+	EventReasonClientTLSInvalid      = "ClientTLSInvalid"
+	EventReasonRemoteClusterAdded    = "RemoteClusterAdded"
+	EventReasonRemoteClusterRemoved  = "RemoteClusterRemoved"
+	EventReasonReplicationAdded      = "ReplicationAdded"
+	EventReasonReplicationRemoved    = "ReplicationRemoved"
+	EventReasonBackupCreated         = "BackupCreated"
+	EventReasonBackupUpdated         = "BackupUpdated"
+	EventReasonBackupDeleted         = "BackupDeleted"
+	EventReasonBackupRestoreCreated  = "BackupRestoreCreated"
+	EventReasonBackupRestoreDeleted  = "BackupRestoreDeleted"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
@@ -147,35 +150,46 @@ func FailedAddBackNodeEvent(memberName string, cl *couchbasev2.CouchbaseCluster)
 	return event
 }
 
-func BackupCronjobCreateEvent(backup, cronjob string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+// no existing backup, PVC and Cronjob(s) successfully created
+func BackupCreateEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonBackupCronjobCreated
-	event.Message = fmt.Sprintf("A new cronjob `%s` for `%s` was created", cronjob, backup)
+	event.Reason = EventReasonBackupCreated
+	event.Message = fmt.Sprintf("A new backup `%s` was created", backup)
 	return event
 }
 
-func BackupCronjobEditEvent(backup, cronjob string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+// backup was either edited or a PVC and/or cronjob(s) recreated if absent
+func BackupUpdateEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonBackupCronjobEdited
-	event.Message = fmt.Sprintf("Cronjob `%s` for `%s` was edited", cronjob, backup)
+	event.Reason = EventReasonBackupUpdated
+	event.Message = fmt.Sprintf("Backup `%s` was edited", backup)
 	return event
 }
 
-func BackupRestoreJobCreateEvent(restore, job string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+// backup and its cronjob(s) deleted, PVC should remain and jobs and their pods may still remain
+func BackupDeleteEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonBackupRestoreJobCreated
-	event.Message = fmt.Sprintf("A new restore job `%s` for `%s` was created", job, restore)
+	event.Reason = EventReasonBackupDeleted
+	event.Message = fmt.Sprintf("Backup `%s` was deleted", backup)
 	return event
 }
 
-func BackupRestoreJobEditEvent(restore, job string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+func BackupRestoreCreateEvent(restore string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonBackupRestoreJobCreated
-	event.Message = fmt.Sprintf("Restore job `%s` for `%s` was edited", job, restore)
+	event.Reason = EventReasonBackupRestoreCreated
+	event.Message = fmt.Sprintf("A new restore `%s` was created", restore)
+	return event
+}
+
+func BackupRestoreDeleteEvent(restore string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupRestoreDeleted
+	event.Message = fmt.Sprintf("A new restore `%s` was deleted", restore)
 	return event
 }
 

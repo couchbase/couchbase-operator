@@ -109,10 +109,7 @@ func TestFullIncremental(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Incremental)},
-		}},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -169,7 +166,7 @@ func TestFullOnly(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -254,7 +251,7 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
@@ -364,8 +361,8 @@ func TestBackupPVCReconcile(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -466,11 +463,8 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: fullBackup.Name},
-		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Incremental)},
-		}},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: fullBackup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -571,11 +565,8 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Incremental)},
-		}},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -679,10 +670,10 @@ func TestBackupAndRestore(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreJobCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -757,7 +748,7 @@ func TestUpdateBackupStatus(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -840,9 +831,8 @@ func TestMultipleBackups(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: fullIncrementalBackup.Name},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: fullBackup.Name},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Incremental)},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: fullIncrementalBackup.Name},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: fullBackup.Name},
 		}},
 	}
 
@@ -933,8 +923,8 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Incremental)},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
 		}},
 	}
 
@@ -1021,7 +1011,7 @@ func TestFullOnlyOverTLS(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCronjobCreated, FuzzyMessage: string(cluster.Full)},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 		}},
 	}
 
