@@ -32,6 +32,8 @@ spec:
             nameservers:
             - "10.39.255.231"
             searches:
+            - remote.svc.cluster.local
+            - svc.cluster.local
             - cluster.local
   xdcr:
     managed: true
@@ -41,7 +43,7 @@ spec:
     #   clusters status field.
     remoteClusters:
     - authenticationSecret: cb-example-auth
-      hostname: cb-example-0000.cb-example.remote.svc:8091
+      hostname: cb-example-srv.remote
       name: remote
       replications: {}
       uuid: 5192c4cbba3cf377f3d6fec6ad0ec80d
