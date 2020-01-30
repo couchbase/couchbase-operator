@@ -18,6 +18,7 @@
   *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
   *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
   *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
+  *** xref:concept-mds.adoc[Couchbase Multi-Dimensional Scaling]
   *** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
   *** xref:concept-sizing.adoc[Couchbase Sizing]
   *** xref:concept-couchbase-networking.adoc[Couchbase Networking]
@@ -38,6 +39,7 @@
   *** Configure
    **** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
    **** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
+   **** xref:howto-mds.adoc[Configure Multi-Dimensional Scaling]
    **** xref:howto-xdcr-external.adoc[Configure XDCR]
    **** xref:howto-public-networking.adoc[Configure Public Networking]
    **** xref:howto-nodeport-networking.adoc[Configure Node Port Networking]

@@ -1,0 +1,45 @@
+= How-to Configure Multi-Dimensional Scaling
+
+[abstract]
+How-to independently scale cluster services.
+
+Couchbase server allows different services to be run on different hosts.
+This allows independent scaling of services as needs dictate.
+
+== Couchbase Cluster Configuration
+
+MDS is modeled with the xref:reference-couchbasecluster.adoc#spec-servers[`spec.servers[\]`] configuration attribute:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  servers: # <.>
+  - name: data # <.>
+    size: 3 # <.>
+    services: # <.>
+    - data
+  - name: index
+    size: 2
+    services:
+    - index
+  - name: query
+    size: 4
+    services:
+    - query
+----
+
+<.> xref:reference-couchbasecluster.adoc#spec-servers[`spec.servers[\]`] is a list of different classes of server.
+Each is independently configurable and can be used to run different services on different classes.
+Different classes may have different scales to handle different workloads on different services.
+The xref:reference-couchbasecluster.adoc#spec-servers-pod[`spec.servers[\].pod`] template can even allow execution on different hardware types.
+
+<.> xref:reference-couchbasecluster.adoc#spec-servers-name[`spec.servers[\].name`] must be a unique per-server class.
+
+<.> xref:reference-couchbasecluster.adoc#spec-servers-size[`spec.servers[\].size`] is the number of pods to create per-server class.
+This can be independently scaled per-server class.
+
+<.> xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers[\].services[\]`] can be independently defined per-server class.
+Services are immutable and cannot be changed once provisioned.
+It is highly recommended that each service only appear in one class -- this simplifies memory allocation.
