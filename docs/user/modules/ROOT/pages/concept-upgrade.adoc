@@ -6,7 +6,7 @@ This includes upgrading the Couchbase Server version and also related Kubernetes
 
 == Upgrading Couchbase Server
 
-The Couchbase Server version can be xref:howto-upgrade-couchbase.adoc[upgraded] by the Operator.
+The Couchbase Server version can be xref:howto-couchbase-upgrade.adoc[upgraded] by the Operator.
 The Operator performs a rolling upgrade of a Couchbase cluster one node at a time.
 This process is as follows:
 

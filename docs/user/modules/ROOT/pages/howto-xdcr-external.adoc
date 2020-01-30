@@ -94,7 +94,7 @@ spec:
 
 <.> The name `remote-cluster` is unique among remote clusters on this local cluster.
 
-<.> The `uuid` has been collected by interrogating the xref:couchbase-cluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
+<.> The `uuid` has been collected by interrogating the xref:reference-couchbasecluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
 The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing[SDK configuration how-to], *without* the scheme.
@@ -102,13 +102,13 @@ The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addr
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 
 <.> **TLS only:** For TLS connections you need to specify the remote cluster CA certificate in order to verify the remote cluster is trusted.
-xref:couchbase-cluster-config.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdcr.remoteClusters[\].tls.secret`] documents the secret format.
+xref:reference-couchbasecluster.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdcr.remoteClusters[\].tls.secret`] documents the secret format.
 
 <.> Replications are selected that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
 
-<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:couchbase-cluster-config.adoc#spec-servers-pod-spec-dnspolicy[`spec.servers[\].pod.spec.dnsPolicy`] field tells Kubernetes to provide no default DNS configuration.
+<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-dnspolicy[`spec.servers[\].pod.spec.dnsPolicy`] field tells Kubernetes to provide no default DNS configuration.
 
-<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:couchbase-cluster-config.adoc#spec-servers-pod-spec-dnsconfig[`spec.servers[\].pod.spec.dnsConfig`] field explicitly defines the local DNS name server to use.
+<.> **Inter-Kubernetes networking with forwarded DNS only:** the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-dnsconfig[`spec.servers[\].pod.spec.dnsConfig`] field explicitly defines the local DNS name server to use.
 This name server is capable of forwarding DNS requests for the remote cluster to the remote Kubernetes DNS server.
 Other DNS requests are forwarded to the local Kubernetes DNS server.
 DNS search domains should remain as shown, however `default` should be modified to be the same as the namespace the cluster is deployed in.
@@ -205,7 +205,7 @@ spec:
 
 <.> The name `remote-cluster` is unique among remote clusters on this local cluster.
 
-<.> The `uuid` has been collected by interrogating the xref:couchbase-cluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
+<.> The `uuid` has been collected by interrogating the xref:reference-couchbasecluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
 The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[SDK configuration how-to], *without* the scheme.
@@ -213,7 +213,7 @@ The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addr
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 
 <.> For TLS connections you need to specify the remote cluster CA certificate in order to verify the remote cluster is trusted.
-xref:couchbase-cluster-config.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdcr.remoteClusters[\].tls.secret`] documents the secret format.
+xref:reference-couchbasecluster.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.xdcr.remoteClusters[\].tls.secret`] documents the secret format.
 
 <.> Replications are selected that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
 
@@ -293,7 +293,7 @@ spec:
 
 <.> The name `remote-cluster` is unique among remote clusters on this local cluster.
 
-<.> The `uuid` has been collected by interrogating the xref:couchbase-cluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
+<.> The `uuid` has been collected by interrogating the xref:reference-couchbasecluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use.
 The hostname is calculated as per the xref:howto-client-sdks.adoc#ip-based-addressing[SDK configuration how-to], *without* the scheme.

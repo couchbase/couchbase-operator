@@ -13,7 +13,7 @@ spec:
   image: couchbase/server:5.5.3 # <.>
 ----
 
-<.> xref:couchbase-cluster-config.adoc#spec-image[spec.image] can be modified to any valid Couchbase Server image, in this example we want to upgrade the version only.
+<.> xref:reference-couchbasecluster.adoc#spec-image[spec.image] can be modified to any valid Couchbase Server image, in this example we want to upgrade the version only.
 
 [source,yaml]
 ----

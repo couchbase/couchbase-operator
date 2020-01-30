@@ -96,7 +96,7 @@ include::{includedir}/conditions-and-events.adoc[]
 
 include::{includedir}/services.adoc[]
 
-include::{includedir}/cbopinfo.adoc[]
+include::{includedir}/reference-cbopinfo.adoc[]
 
 :leveloffset: -1
 

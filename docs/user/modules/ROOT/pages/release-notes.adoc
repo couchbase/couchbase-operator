@@ -78,10 +78,10 @@ This release further fortifies the previously released 1.2.x series with bug fix
 
 | https://issues.couchbase.com/browse/K8S-965[K8S-965]
 | The Operator now uses the default Storage Class of the Kubernetes cluster if none is specified in the CouchbaseCluster configuration.
-In previous releases, you were required to specify xref:couchbase-cluster-config.adoc#spec-volumeclaimtemplates-spec-storageclassname[`spec.volumeClaimTemplates.storageClassName`] even if a default Storage Class was defined in your Kubernetes cluster.
+In previous releases, you were required to specify xref:reference-couchbasecluster.adoc#spec-volumeclaimtemplates-spec-storageclassname[`spec.volumeClaimTemplates.storageClassName`] even if a default Storage Class was defined in your Kubernetes cluster.
 
 | https://issues.couchbase.com/browse/K8S-1017[K8S-1017]
-| Specifying `client` for the xref:couchbase-cluster-config.adoc#spec-networking-exposedfeatures[`exposedFeatures`] property in the CouchbaseCluster configuration now exposes the Couchbase admin ports, including 8091.
+| Specifying `client` for the xref:reference-couchbasecluster.adoc#spec-networking-exposedfeatures[`exposedFeatures`] property in the CouchbaseCluster configuration now exposes the Couchbase admin ports, including 8091.
 In previous releases, you would need to specify both `client` and `admin` to ensure proper communication with the Couchbase SDK, or for performing administration tasks like creating buckets or users via an application.
 |===
 
@@ -160,7 +160,7 @@ The primary purpose of the admission controller is to validate Couchbase cluster
 Couchbase clients must meet certain requirements to support public connectivity, and not all clients are supported at this time.
 Refer to xref:network-requirements.adoc#table-public-connectivity[Supported Clients for Public Connectivity] for more information.
 
-* The log collection experience for xref:cbopinfo.adoc[cbopinfo --collectinfo] has been unified for stateful and stateless deployments.
+* The log collection experience for xref:reference-cbopinfo.adoc[cbopinfo --collectinfo] has been unified for stateful and stateless deployments.
  ** A new table column defines the type of log collection that is applicable, along with a column specifying the detachment time of the logs persistent volume (stateless deployments only).
  ** Selection now defaults to all logs.
  ** Log redaction is now an explicit prompt that defaults to `Yes`.
@@ -225,7 +225,7 @@ This includes things like adding a node or creating a server group.
 
 The one exception is when `disableBucketManagement` is set to `true` in the CouchbaseCluster configuration (the default is `false`).
 If this is the case, the creation and deletion of Couchbase buckets must be done manually.
-Refer to the CouchbaseCluster xref:couchbase-cluster-config.adoc[documentation] for more information.
+Refer to the CouchbaseCluster xref:reference-couchbasecluster.adoc[documentation] for more information.
 
 | https://issues.couchbase.com/browse/K8S-992[K8S-992]
 | *Summary*: The `LoadBalancer` ports are set incorrectly after a topology change (for example after a failover) for clusters using the `LoadBalancer` `exposedFeatureServiceType`.

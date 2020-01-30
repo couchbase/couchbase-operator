@@ -15,7 +15,7 @@ IMPORTANT: After you unpack the download, the resulting directory will be titled
 
 == Preparing the Couchbase Cluster Configuration
 
-To deploy a Couchbase Server cluster using the Operator, all you have to do is create a xref:couchbase-cluster-config.adoc[CouchbaseCluster] configuration file that describes what you want the cluster to look like (e.g. number of nodes, types of services, system resources, etc), and then push that configuration file into Kubernetes. Like all Kubernetes configurations, a CouchbaseCluster is defined using either YAML or JSON (YAML is preferred by Kubernetes).
+To deploy a Couchbase Server cluster using the Operator, all you have to do is create a xref:reference-couchbasecluster.adoc[CouchbaseCluster] configuration file that describes what you want the cluster to look like (e.g. number of nodes, types of services, system resources, etc), and then push that configuration file into Kubernetes. Like all Kubernetes configurations, a CouchbaseCluster is defined using either YAML or JSON (YAML is preferred by Kubernetes).
 
 The Operator package contains an example CouchbaseCluster configuration file (`couchbase-cluster.yaml`), also listed here:
 
@@ -71,7 +71,7 @@ By taking a quick look at this configuration file, you can see that it defines a
 <.> Couchbase image: `couchbase/server:6.0.3`
 <.> Size: 3-node cluster with all services on each node
 
-You can use this example CouchbaseCluster configuration file "as-is" to test out how the Operator deploys a Couchbase Server cluster. However, to deploy a Couchbase cluster that is more specifically tailored to your development and production needs, you need to create your own custom configuration file that conforms to the xref:couchbase-cluster-config.adoc[CouchbaseCluster specification].
+You can use this example CouchbaseCluster configuration file "as-is" to test out how the Operator deploys a Couchbase Server cluster. However, to deploy a Couchbase cluster that is more specifically tailored to your development and production needs, you need to create your own custom configuration file that conforms to the xref:reference-couchbasecluster.adoc[CouchbaseCluster specification].
 
 
 [TIP]
@@ -112,7 +112,7 @@ oc create -f couchbase-cluster.yaml
 --
 ====
 
-After receiving the configuration, the Operator automatically begins creating the cluster. The amount of time it takes to create the cluster depends on the configuration. You can track the progress of cluster creation using the xref:cluster-status-guide.adoc[kubectl describe] command.
+After receiving the configuration, the Operator automatically begins creating the cluster. The amount of time it takes to create the cluster depends on the configuration. You can track the progress of cluster creation using the xref:reference-couchbasecluster-status.adoc[cluster status].
 
 === Verifying the Deployment
 

@@ -122,7 +122,7 @@ Now it's important to apply the `aws-auth-cm.yaml` file so that the worker nodes
 
 Once you've properly deployed the Kubernetes cluster with Amazon EKS, you can xref:install-kubernetes.adoc[install the Operator] and use it to xref:howto-couchbase-create.adoc[deploy a Couchbase cluster] as normal.
 
-IMPORTANT: If you're using public DNS for xref:network-requirements.adoc[client connectivity], then you need to make sure that you configure the xref:couchbase-cluster-config.adoc#spec-platform[spec.platform] field in the CouchbaseCluster configuration.
+IMPORTANT: If you're using public DNS for xref:network-requirements.adoc[client connectivity], then you need to make sure that you configure the xref:reference-couchbasecluster.adoc#spec-platform[spec.platform] field in the CouchbaseCluster configuration.
 Otherwise the load balancers won't deploy correctly, and applications won't be able to access Couchbase Server.
 
 == Configuring XDCR

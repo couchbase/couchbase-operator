@@ -30,7 +30,7 @@ This service again references the admin ports to offer access to the admin UI.  
 
 This service is optional and is enabled with the `spec.exposeAdminConsole` property of the cluster manifest.  By default it references all Couchbase nodes in the cluster, however you may choose to restrict the set of Couchbase nodes referenced by explicitly requiring the node has a specific service enabled.  This is done via the `spec.adminConsoleServices` property of the cluster manifest.  The admin port is also reported in the cluster status for convenience and can be accessed via the `kubectl describe couchbaseclusters` command.
 
-NOTE: For further information on configuring the admin console please refer to the xref:couchbase-cluster-config.adoc[full documentation].
+NOTE: For further information on configuring the admin console please refer to the xref:reference-couchbasecluster.adoc[full documentation].
 
 == couchbase-0000-exposed-ports
 

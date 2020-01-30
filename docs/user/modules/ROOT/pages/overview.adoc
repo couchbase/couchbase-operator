@@ -14,9 +14,9 @@ The Operator is certified on the following platforms:
 
 * xref:install-kubernetes.adoc[Kubernetes]
 * xref:install-openshift.adoc[Redhat Openshift]
-* xref:install-eks.adoc[Amazon EKS]
-* xref:install-gke.adoc[Google GKE]
-* xref:install-aks.adoc[Microsoft AKS]
+* xref:tutorial-eks.adoc[Amazon EKS]
+* xref:tutorial-gke.adoc[Google GKE]
+* xref:tutorial-aks.adoc[Microsoft AKS]
 
 [NOTE]
 ====
@@ -41,8 +41,8 @@ The following is a list of the management tasks that are currently supported:
 
 * Cluster life-cycle
  ** xref:howto-couchbase-create.adoc[Cluster provisioning]
- ** xref:scaling-couchbase.adoc[Cluster scaling]
- ** xref:howto-upgrade-couchbase.adoc[Cluster upgrade]
+ ** xref:howto-couchbase-scale.adoc[Cluster scaling]
+ ** xref:howto-couchbase-upgrade.adoc[Cluster upgrade]
  ** Cluster auto-recovery
 * Cluster configuration
  ** xref:howto-persistent-volumes.adoc[Persistent volumes]

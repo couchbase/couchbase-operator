@@ -122,7 +122,7 @@ ____
 Whether the Operator has acknowledged the cluster is paused.
 
 This field is used for synchronization of external processes.
-It will be present and set to `true` when the Operator has finished processing previous operations, acknowledged that xref:couchbase-cluster-config.adoc#spec-paused[`spec.paused`] is set to `true` and will not perform any more operations on the cluster.
+It will be present and set to `true` when the Operator has finished processing previous operations, acknowledged that xref:reference-couchbasecluster.adoc#spec-paused[`spec.paused`] is set to `true` and will not perform any more operations on the cluster.
 
 The Operator will perform normal reconciliation operations when this field is not present,
 
@@ -162,7 +162,7 @@ ManageConfig::
 This condition exists when cluster configuration updates have been rejected by Couchbase server.
 
 Scaling::
-This condition exists when a cluster is xref:scaling-couchbase.adoc[scaling up or down].
+This condition exists when a cluster is xref:howto-couchbase-scale.adoc[scaling up or down].
 
 Upgrading::
 This condition exists when a cluster is xref:concept-upgrade.adoc[upgrading].

@@ -284,4 +284,4 @@ Kind:		CouchbaseCluster
 ...
 ----
 
-Describing the cluster resource returns the deployed specification and its active status. For more information about the response returned from the describe command, see xref:cluster-status-guide.adoc[Cluster Status Guide].
+Describing the cluster resource returns the deployed specification and its active status. For more information about the response returned from the describe command, see xref:reference-couchbasecluster-status.adoc[Cluster Status Guide].

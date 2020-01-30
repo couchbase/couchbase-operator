@@ -29,10 +29,10 @@
  ** Couchbase Cluster
   *** Lifecycle
    **** xref:howto-couchbase-create.adoc[Create a Couchbase Deployment]
-   **** xref:updating-couchbase.adoc[Modify a Couchbase Deployment]
-   **** xref:howto-upgrade-couchbase.adoc[Upgrade a Couchbase Deployment]
-   **** xref:delete-couchbase-cluster.adoc[Delete a Couchbase Deployment]
-   **** xref:scaling-couchbase.adoc[Scale a Couchbase Deployment]
+   **** xref:howto-couchbase-update.adoc[Modify a Couchbase Deployment]
+   **** xref:howto-couchbase-upgrade.adoc[Upgrade a Couchbase Deployment]
+   **** xref:howto-couchbase-delete.adoc[Delete a Couchbase Deployment]
+   **** xref:howto-couchbase-scale.adoc[Scale a Couchbase Deployment]
   *** Configure
    **** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
    **** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
@@ -54,16 +54,16 @@
   *** xref:helm-managing-guide.adoc[Manage Helm]
 * Reference
  ** Resource Types
-  *** xref:couchbase-cluster-config.adoc[CouchbaseCluster]
-   **** xref:couchbase-cluster-status.adoc[CouchbaseCluster Status]
-   **** xref:couchbase-cluster-events.adoc[CouchbaseCluster Events]
-  *** xref:couchbase-bucket-config.adoc[CouchbaseBucket]
-  *** xref:couchbase-ephemeral-bucket-config.adoc[CouchbaseEphemeralBucket]
-  *** xref:couchbase-memcached-bucket-config.adoc[CouchbaseMemcachedBucket]
-  *** xref:couchbase-replication-config.adoc[CouchbaseReplication]
-  *** xref:couchbase-user-config.adoc[CouchbaseUser]
-  *** xref:couchbase-role-config.adoc[CouchbaseRole]
-  *** xref:couchbase-rolebinding-config.adoc[CouchbaseRoleBinding]
+  *** xref:reference-couchbasecluster.adoc[CouchbaseCluster]
+   **** xref:reference-couchbasecluster-status.adoc[CouchbaseCluster Status]
+   **** xref:reference-couchbasecluster-events.adoc[CouchbaseCluster Events]
+  *** xref:reference-couchbasebucket.adoc[CouchbaseBucket]
+  *** xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket]
+  *** xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket]
+  *** xref:reference-couchbasereplication.adoc[CouchbaseReplication]
+  *** xref:reference-couchbaseuser.adoc[CouchbaseUser]
+  *** xref:reference-couchbaserole.adoc[CouchbaseRole]
+  *** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding]
  ** Operator
   *** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
   *** xref:operator-config.adoc[Operator Deployment Settings]
@@ -75,14 +75,13 @@
   *** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
  ** Tools
   *** xref:reference-cbopcfg.adoc[cbopcfg]
-  *** xref:cbopinfo.adoc[cbopinfo]
+  *** xref:reference-cbopinfo.adoc[cbopinfo]
 * Tutorials
  ** xref:tutorial-tls.adoc[Creating TLS Certificates]
  ** xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS]
  ** xref:tutorial-public-addressability.adoc[Public Networking with External DNS]
- ** xref:install-aks.adoc[Installing on AKS]
- ** xref:install-eks.adoc[Installing on EKS]
- ** xref:install-gke.adoc[Installing on GKE]
- ** xref:demo.adoc[Couchbase Deployment Tutorial]
+ ** xref:tutorial-aks.adoc[Installing on AKS]
+ ** xref:tutorial-eks.adoc[Installing on EKS]
+ ** xref:tutorial-gke.adoc[Installing on GKE]
 * Other Resources
  ** xref:sync-gateway::kubernetes/deploy-cluster.adoc[Sync Gateway on Kubernetes]

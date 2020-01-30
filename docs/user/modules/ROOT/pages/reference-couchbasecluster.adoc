@@ -632,7 +632,7 @@ spec:
 
 This field specifies whether the Operator should manage Couchbase RBAC.
 This field defaults to `false` allowing the user to manually manage RBAC settings with the xref:howto-ui.adoc[Couchbase web console] or the Couchbase API.
-If set to `true`, the Operator will search for xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources in the namespace under the control of the <<spec-security-rbac-selector,`spec.security.rbac.selector`>> field.
+If set to `true`, the Operator will search for xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding`] resources in the namespace under the control of the <<spec-security-rbac-selector,`spec.security.rbac.selector`>> field.
 
 ____
 _Field rules:_ This field is optional and must be a boolean.
@@ -640,9 +640,9 @@ ____
 
 === spec.security.rbac.selector
 
-This field specifies which xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources are considered when the <<spec-security-rbac-managed,`spec.security.rbac.managed`>> field is set to `true`.
-If not specified all xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources are selected.
-If specified, then only xref:couchbase-rolebinding-config.adoc[`CouchbaseRoleBinding`] resources containing the same labels as specified in the label selector are selected.
+This field specifies which xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding`] resources are considered when the <<spec-security-rbac-managed,`spec.security.rbac.managed`>> field is set to `true`.
+If not specified all xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding`] resources are selected.
+If specified, then only xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding`] resources containing the same labels as specified in the label selector are selected.
 
 For additional information, see the xref:concept-label-selection.adoc[Couchbase resource label selection] documentation.
 
@@ -1010,7 +1010,7 @@ spec:
 
 === spec.servers[].size
 
-This field specifies the number of nodes of this type that should be in the cluster. This allows the user to scale up different parts of the cluster as necessary. If this parameter is changed at runtime, the Operator will xref:scaling-couchbase.adoc[automatically scale the cluster].
+This field specifies the number of nodes of this type that should be in the cluster. This allows the user to scale up different parts of the cluster as necessary. If this parameter is changed at runtime, the Operator will xref:howto-couchbase-scale.adoc[automatically scale the cluster].
 
 ____
 _Field rules:_ The `size` is required and can be set to greater than or equal to 1.
@@ -1334,7 +1334,7 @@ spec:
 
 This field specifies whether the Operator should manage Couchbase buckets.
 This field defaults to `false` allowing the user to manually manage bucket settings with the xref:howto-ui.adoc[Couchbase web console] or the Couchbase API.
-If set to `true`, the Operator will search for xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources in the namespace under the control of the <<spec-buckets-selector,`spec.buckets.selector`>> field.
+If set to `true`, the Operator will search for xref:reference-couchbasebucket.adoc[`CouchbaseBucket`], xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket`] and xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket`] resources in the namespace under the control of the <<spec-buckets-selector,`spec.buckets.selector`>> field.
 
 ____
 _Field rules:_ This field is optional and must be a boolean.
@@ -1342,9 +1342,9 @@ ____
 
 === spec.buckets.selector
 
-This field specifies which xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources are considered when the <<spec-buckets-managed,`spec.buckets.managed`>> field is set to `true`.
-If not specified all xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources are selected.
-If specified, then only xref:couchbase-bucket-config.adoc[`CouchbaseBucket`], xref:couchbase-ephemeral-bucket-config.adoc[`CouchbaseEphemeralBucket`] and xref:couchbase-memcached-bucket-config.adoc[`CouchbaseMemcachedBucket`] resources containing the same labels as specified in the label selector are selected.
+This field specifies which xref:reference-couchbasebucket.adoc[`CouchbaseBucket`], xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket`] and xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket`] resources are considered when the <<spec-buckets-managed,`spec.buckets.managed`>> field is set to `true`.
+If not specified all xref:reference-couchbasebucket.adoc[`CouchbaseBucket`], xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket`] and xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket`] resources are selected.
+If specified, then only xref:reference-couchbasebucket.adoc[`CouchbaseBucket`], xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket`] and xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket`] resources containing the same labels as specified in the label selector are selected.
 
 For additional information, see the xref:concept-label-selection.adoc[Couchbase resource label selection] documentation.
 
@@ -1457,7 +1457,7 @@ This field is a list of replications from the local cluster to the remote cluste
 
 === spec.xdcr.remoteClusters[].replications[].selector
 
-This field defines a label selector to choose which xref:couchbase-replication-config.adoc[`CouchbaseReplication`] resources should be included for this remote cluster.
+This field defines a label selector to choose which xref:reference-couchbasereplication.adoc[`CouchbaseReplication`] resources should be included for this remote cluster.
 
 ____
 _Field rules:_ This field is optional and must be a Kubernetes https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[label selector^].

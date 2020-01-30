@@ -50,8 +50,6 @@ The Operator now offers full production support on the following public Kubernet
 * Google Kubernetes Engine (GKE)
 * Microsoft Azure Kubernetes Service (AKS)
 
-See xref:cloud-intro.adoc[Cloud Environment Setup]
-
 == Rolling Upgrade of Kubernetes Clusters
 
 With support for automatic rolling Kubernetes upgrades, the Operator helps take the hassle and anxiety out of upgrading your Kubernetes or OpenShift cluster.
@@ -69,5 +67,5 @@ See xref:tls.adoc[Configuring TLS]
 
 Several enhancements have been made to `cbopinfo`, including a unified log collection experience for stateful and stateless deployments.
 
-See xref:cbopinfo.adoc[cbopinfo]
+See xref:reference-cbopinfo.adoc[cbopinfo]
 

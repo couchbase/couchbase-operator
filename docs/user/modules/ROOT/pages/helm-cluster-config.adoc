@@ -131,7 +131,7 @@ Refer to the couchbase operator documentation for more information about https:/
 
 === additional values
 
-All of the remaining values which can be overridden in this spec are desccribed here in the xref:couchbase-cluster-config.adoc[Couchbase Cluster Config] documentation.
+All of the remaining values which can be overridden in this spec are desccribed here in the xref:reference-couchbasecluster.adoc[Couchbase Cluster Config] documentation.
 
 
 === Persistent Volumes

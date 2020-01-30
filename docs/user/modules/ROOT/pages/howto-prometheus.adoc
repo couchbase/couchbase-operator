@@ -8,13 +8,13 @@ You can set up the Autonomous Operator to use the Couchbase Prometheus Exporter 
 Prometheus is the de facto metrics collection platform for use in Kubernetes environments.
 The Autonomous Operator provides native integration with the https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter^] for collecting and exposing Couchbase Server metrics.
 
-Prometheus metrics collection is enabled in the xref:couchbase-cluster-config.adoc#spec-monitoring[`CouchbaseCluster` resource].
+Prometheus metrics collection is enabled in the xref:reference-couchbasecluster.adoc#spec-monitoring[`CouchbaseCluster` resource].
 The configuration allows you to specify a Couchbase-provided container image that contains the Prometheus Exporter.
 The Autonomous Operator injects the image as a https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#how-pods-manage-multiple-containers["sidecar" container^] in each Couchbase Server pod.
 
 == Configuration
 
-Prometheus metrics collection is enabled in the xref:couchbase-cluster-config.adoc#spec-monitoring[`CouchbaseCluster` resource].
+Prometheus metrics collection is enabled in the xref:reference-couchbasecluster.adoc#spec-monitoring[`CouchbaseCluster` resource].
 
 [source,yaml]
 ----
@@ -28,13 +28,13 @@ spec:
       authorizationSecret: cb-metrics-token # <.>
 ----
 
-<.> Setting xref:couchbase-cluster-config.adoc#spec-monitoring-prometheus-enabled[`spec.monitoring.prometheus.enabled`] to `true` enables injection of the sidecar into Couchbase Server pods.
+<.> Setting xref:reference-couchbasecluster.adoc#spec-monitoring-prometheus-enabled[`spec.monitoring.prometheus.enabled`] to `true` enables injection of the sidecar into Couchbase Server pods.
 
-<.> If the xref:couchbase-cluster-config.adoc#spec-monitoring-prometheus-image[`spec.monitoring.prometheus.image`] field is left unspecified, then the dynamic admission controller will automatically populate it with the most recent container image that was available when the installed version of the Autonomous Operator was released.
+<.> If the xref:reference-couchbasecluster.adoc#spec-monitoring-prometheus-image[`spec.monitoring.prometheus.image`] field is left unspecified, then the dynamic admission controller will automatically populate it with the most recent container image that was available when the installed version of the Autonomous Operator was released.
 The default image for open source Kubernetes comes from https://hub.docker.com/r/couchbase/exporter[Docker Hub^], and the default image for OpenShift comes from https://access.redhat.com/containers/#/vendor/couchbase[Red Hat Container Catalog^].
 +
 If pulling directly from the the Red Hat Container Catalog, then the path will be something similar to `registry.connect.redhat.com/couchbase/prometheus-exporter:1.0.0-1` (you can refer to the catalog for the most recent images).
-If ImagePullSecrets are required to access the image, they are inherited from the Couchbase Server pod and can be set explicitly with the xref:couchbase-cluster-config.adoc#spec-servers-pod-imagepullsecrets[`spec.servers[\].pod.imagePullSecrets`] field or implicitly with a service account specified with the xref:couchbase-cluster-config.adoc#spec-servers-pod-serviceaccountname[`spec.servers[\].pod.serviceAccountName`] field.
+If ImagePullSecrets are required to access the image, they are inherited from the Couchbase Server pod and can be set explicitly with the xref:reference-couchbasecluster.adoc#spec-servers-pod-imagepullsecrets[`spec.servers[\].pod.imagePullSecrets`] field or implicitly with a service account specified with the xref:reference-couchbasecluster.adoc#spec-servers-pod-serviceaccountname[`spec.servers[\].pod.serviceAccountName`] field.
 
 <.> You can optionally specify a Kubernetes Secret that contains a bearer token value that clients will need to use to gain access to the Prometheus metrics.
 

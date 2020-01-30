@@ -28,7 +28,7 @@ The most basic storage topology per node is show below:
 .Basic Storage Topology
 image::pv-Basic.png[]
 
-This uses the xref:couchbase-cluster-config.adoc#spec-servers-volumemounts-default[default] volume mount.
+This uses the xref:reference-couchbasecluster.adoc#spec-servers-volumemounts-default[default] volume mount.
 The volume has two sub volumes, one for configuration data that must be retained for Couchbase recovery, and one for data and logs.
 
 The Operator additionally allows more advanced configurations as shown below:
@@ -37,7 +37,7 @@ The Operator additionally allows more advanced configurations as shown below:
 image::pv-Advanced.png[]
 
 Your workload may require high performance disk I/O for data and index services, however configuration and logs may reside on cheaper storage media.
-For this reason you can specify xref:couchbase-cluster-config.adoc#spec-servers-volumemounts-data[data], xref:couchbase-cluster-config.adoc#spec-servers-volumemounts-index[index] and xref:couchbase-cluster-config.adoc#spec-servers-volumemounts-analytics[analytics] volumes.
+For this reason you can specify xref:reference-couchbasecluster.adoc#spec-servers-volumemounts-data[data], xref:reference-couchbasecluster.adoc#spec-servers-volumemounts-index[index] and xref:reference-couchbasecluster.adoc#spec-servers-volumemounts-analytics[analytics] volumes.
 
 == Supported Storage Classes
 
@@ -45,7 +45,7 @@ The Operator is designed to work with dynamically provisioned storage classes.
 While a Couchbase cluster can be configured to use other storage types they are not rigorously tested.
 
 Couchbase Server pods may have different storage volumes associated with each service.
-For example xref:couchbase-cluster-config.adoc#spec-servers-volumemounts-default[`spec.servers[\].volumeMounts.default`] which is used for configuration and logging may be on cost effective storage whereas xref:couchbase-cluster-config.adoc#spec-servers-volumemounts-data[`spec.servers[\].volumeMounts.data`] may reside on high performance SSD backed storage.
+For example xref:reference-couchbasecluster.adoc#spec-servers-volumemounts-default[`spec.servers[\].volumeMounts.default`] which is used for configuration and logging may be on cost effective storage whereas xref:reference-couchbasecluster.adoc#spec-servers-volumemounts-data[`spec.servers[\].volumeMounts.data`] may reside on high performance SSD backed storage.
 
 In most cloud providers persistent volumes are scheduled across all possible availability zones.
 If these two volumes were provisioned in different availability zones then a pod that they were attached to could not be scheduled.
@@ -73,7 +73,7 @@ This means that Couchbase Server pods are unable to write to the persistent volu
 In order to allow Couchbase Server to write to the persistent storage you must specify a file system group to mount the persistent volume as.
 This mounts the persistent volume so the Couchbase Server user is able to write to the persistent volume.
 
-The xref:couchbase-cluster-config.adoc#spec-securitycontext-fsgroup[`spec.securityContext.fsGroup`] parameter allows this to be explicitly set.
+The xref:reference-couchbasecluster.adoc#spec-securitycontext-fsgroup[`spec.securityContext.fsGroup`] parameter allows this to be explicitly set.
 By default the Operator dynamic admission controller will populate this parameter for you based on whether you are deploying on Kubernetes or Redhat OCP.
 
 [TIP]

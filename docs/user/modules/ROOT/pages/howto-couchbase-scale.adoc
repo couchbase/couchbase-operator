@@ -1,6 +1,6 @@
 = Scaling a CouchbaseCluster
 
-Using the Couchbase Operator, you can easily scale clusters and services up and down. The handling of individual nodes is defined in the servers section of the xref:couchbase-cluster-config.adoc[Couchbase cluster specification]. Here is an example of a definition for a Couchbase cluster where all nodes run the data, index, search, and query services.
+Using the Couchbase Operator, you can easily scale clusters and services up and down. The handling of individual nodes is defined in the servers section of the xref:reference-couchbasecluster.adoc[Couchbase cluster specification]. Here is an example of a definition for a Couchbase cluster where all nodes run the data, index, search, and query services.
 
 [source,yaml]
 ----

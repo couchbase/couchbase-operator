@@ -50,8 +50,8 @@ spec:
         operatorSecret: couchbase-operator-tls # <.>
 ----
 
-<.> xref:couchbase-cluster-config.adoc#spec-networking-tls-static-serversecret[`spec.networking.tls.static.serverSecret`] defines a secret that will be mounted to all Couchbase Server pods.
+<.> xref:reference-couchbasecluster.adoc#spec-networking-tls-static-serversecret[`spec.networking.tls.static.serverSecret`] defines a secret that will be mounted to all Couchbase Server pods.
 It contains the server wildcard certificate and it's private key.
 As the private key is securely mounted to the pod by Kubernetes it is never exposed over the network.
 
-<.> xref:couchbase-cluster-config.adoc#spec-networking-tls-static-operatorsecret[`spec.networking.tls.static.operatorSecret`] defines a secret containing client related certificates.
+<.> xref:reference-couchbasecluster.adoc#spec-networking-tls-static-operatorsecret[`spec.networking.tls.static.operatorSecret`] defines a secret containing client related certificates.

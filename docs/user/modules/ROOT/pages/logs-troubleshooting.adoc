@@ -7,15 +7,15 @@ When troubleshooting the Couchbase Operator, it is important to rule out Kuberne
 
 The following topics are also helpful to understand when troubleshooting the Operator:
 
-* xref:cluster-status-guide.adoc[Cluster Status and Conditions]
- ** xref:conditions-and-events.adoc[Understanding Conditions and Events]
+* xref:reference-couchbasecluster-status.adoc[Cluster Status and Conditions]
+* xref:reference-couchbasecluster-events.adoc[Understanding Conditions and Events]
 * xref:list-and-describe.adoc[Listing And Describing Resources]
 * xref:node-recovery.adoc[Node Recovery]
 * xref:operator-config.adoc[Operator Configuration]
 
 == Full Deployment Logs
 
-The Operator is distributed with a support tool which can automatically collect resources, logs and events from the Kubernetes cluster for use in support cases.  It is also capable of collecting logs from Couchbase server instances via _cbcollect_info_. Please see the xref:cbopinfo.adoc[documentation].
+The Operator is distributed with a support tool which can automatically collect resources, logs and events from the Kubernetes cluster for use in support cases.  It is also capable of collecting logs from Couchbase server instances via _cbcollect_info_. Please see the xref:reference-cbopinfo.adoc[documentation].
 
 == Operator Logs
 
@@ -142,7 +142,7 @@ For additional details on the Go language pprof feature please read the https://
 
 == Couchbase Server Logs
 
-In must situations the xref:cbopinfo.adoc[cbopinfo] command will successfully allow logs to be collected and downloaded.  There are some cases where collection will fail, for example if a stateful service crashes when the Operator recovers the pod continuously.  In this situation as the pod is not alive for long enough to collect logs so we provide a method to manually collect logs.
+In must situations the xref:reference-cbopinfo.adoc[cbopinfo] command will successfully allow logs to be collected and downloaded.  There are some cases where collection will fail, for example if a stateful service crashes when the Operator recovers the pod continuously.  In this situation as the pod is not alive for long enough to collect logs so we provide a method to manually collect logs.
 
 The general log collection process is as follows:
 
