@@ -11,8 +11,10 @@
   *** xref:concept-kubernetes-networking.adoc[Kubernetes Networking]
   *** xref:concept-persistent-volumes.adoc[Persistent Volumes]
   *** xref:upgrading-kubernetes.adoc[Kubernetes Automated Upgrade]
- ** Couchbase Concepts
+ ** Operator Concepts
   *** xref:concept-operator.adoc[Couchbase Operator Architecture]
+  *** xref:concept-operator-logging.adoc[Couchbsae Operator Logging]
+ ** Couchbase Cluster Concepts
   *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
   *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
   *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
@@ -66,12 +68,13 @@
   *** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding]
  ** Operator
   *** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
-  *** xref:operator-config.adoc[Operator Deployment Settings]
-  *** xref:kubernetes-rbac.adoc[Operator RBAC Settings]
+  *** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
+  *** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
+  *** xref:reference-operator-logging.adoc[Operator Logging]
  ** Couchbase Cluster
   *** xref:services.adoc[Monitoring Services]
  ** Helm
-  *** xref:helm-operator-config.adoc[Operator Chart Spec]
+  *** xref:helm-reference-operator-configuration.adoc[Operator Chart Spec]
   *** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
  ** Tools
   *** xref:reference-cbopcfg.adoc[cbopcfg]

@@ -1,0 +1,114 @@
+= Operator Configuration
+
+The Couchbase Autonomous Operator configuration is defined below.
+
+IMPORTANT: Most of the fields in the Operator configuration should never be changed and it is recommended that you use the configuration as is. However, there are some exceptions noted below.
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: couchbase-operator
+spec:
+  replicas: 1 # <.>
+  selector:
+    matchLabels:
+      app: couchbase-operator
+  template:
+    metadata:
+      labels:
+        app: couchbase-operator
+    spec:
+      containers:
+      - name: couchbase-operator
+        image: couchbase/operator:2.0.0 # <.>
+        command:
+        - couchbase-operator
+        args: # <.>
+        - --pod-create-timeout=10m0s
+        env: # <.>
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        ports:
+        - containerPort: 8080 # <.>
+          name: http
+        - containerPort: 8383 # <.>
+          name: prometheus
+      serviceAccountName: couchbase-operator # <.>
+----
+
+<.> The number of replicas should not be changed.
+    The deployment will ensure the Operator is always running.
+    The Operator uses leadership election to ensure only one instance is processing data at once, so replicas are redundant.
+<.> The image should remain unchanged unless you are using a custom image.
+    The Operator is a static binary; the use of an operating system image is redundant and a potential security vulnerability.
+<.> The container arguments can be modified to suit your requirements.
+    Valid flags are documented <<command-line-arguments,below>>.
+<.> The `WATCH_NAMESPACE` and `POD_NAME` environment variables are required by the underlying library and can not be modified.
+<.> The HTTP container port can be modified, however this will affect log collection with the xref:reference-cbopinfo.adoc[`cbopinfo`] tool.
+<.> The Prometheus container port is fixed and cannot be modified at present.
+<.> The Operator must be run as a service account with the xref:reference-operator-rbac.adoc[correct roles] to function.
+
+== Command-line Arguments
+
+You can specify a list of command-line flags to pass on to the Operator to modify its behavior.
+
+[source,yaml]
+----
+    spec:
+      containers:
+      ...
+        args:
+        - --zap-level=info
+        - --concurrency=4
+        - --pod-create-timeout=10m
+        - --listen-addr=8080
+----
+
+--zap-level <string>::
+This argument controls the log level a message has to reach before being printed.
++
+Valid values are:
++
+--
+* `error` - only error messages are printed
+* `info` - errors and informational messages are printed
+* `debug` and `1` - basic debug, error and informational messages are printed
+* `2` - full debug, error and informational messages are printed.
+--
++
+This flag defaults to `info`.
+
+[IMPORTANT]
+====
+When using logging level `2` be aware this will print all data payloads to and from Couchbase server.
+This data may contain user names and passwords in plain text along with any other sensitive information concerning naming of resources.
+====
+
+--concurrency <integer>::
+This argument controls how many Couchbase clusters can be reconciled at the same time.
++
+The Operator can manage multiple Couchbase clusters regardless of this setting, however if set too low clusters may have to wait for a worker to become available before being inspected and reconciled.
+This is especially relevant where a Couchbase cluster can block others from being repaired due to a long running process such as a rebalance.
++
+If not specified this flag defaults to `1`.
+
+--pod-create-timeout <string>::
+The Operator allows the timeout of pod creation to be manually configured.
+It is primarily intended for use on cloud platforms where the deployment of multiple volumes and pulling of a Couchbase Server container image may take a longer time than the default timeout period.
++
+Valid values are any string that can be parsed with the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration^] function.
+This flag defaults to `5m`.
+
+--listen-addr <integer>::
+This argument controls the Operator HTTP server.
+It is primarily used to expose debugging information for support requests.
++
+This flag defaults to `8080`.

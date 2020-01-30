@@ -73,7 +73,7 @@ See the <<deploy-production,production deployment instructions>> for information
 == Deploying the Operator and Couchbase Server
 
 Two https://docs.helm.sh/using_helm/#three-big-concepts[Helm charts^] are available for deploying Couchbase.
-The xref:helm-operator-config.adoc[Couchbase Operator Chart] deploys the xref:install-admission-controller.adoc[admission controller] and the Operator itself.
+The xref:helm-reference-operator-configuration.adoc[Couchbase Operator Chart] deploys the xref:install-admission-controller.adoc[admission controller] and the Operator itself.
 The xref:helm-cluster-config.adoc[Couchbase Cluster Chart] deploys the Couchbase Server cluster.
 
 For production deployments, you'll only use the Operator Chart.
@@ -249,7 +249,7 @@ Due to the complex structure of production configurations (which usually include
 == Customizing Helm Charts
 
 The official Couchbase Helm charts are great to use "as-is" for quickly deploying Couchbase on Kubernetes platforms, but you'll undoubtedly need to customize them for your specific development and production needs.
-All of the values that are exposed by the charts are available within the `values.yaml` file of the xref:helm-operator-config.adoc[Couchbase Operator Chart] and the xref:helm-cluster-config.adoc[Couchbase Cluster Chart].
+All of the values that are exposed by the charts are available within the `values.yaml` file of the xref:helm-reference-operator-configuration.adoc[Couchbase Operator Chart] and the xref:helm-cluster-config.adoc[Couchbase Cluster Chart].
 
 You can customize each chart by using https://docs.helm.sh/using_helm/#customizing-the-chart-before-installing[overrides^].
 There are two methods to specify overrides during chart installation: `--values` and `--set`.
@@ -306,7 +306,7 @@ rbac:
 For more information about each chart, see the following:
 
 .Operator Chart
-* xref:helm-operator-config.adoc[Documentation]
+* xref:helm-reference-operator-configuration.adoc[Documentation]
 * https://github.com/couchbase-partners/helm-charts/tree/master/couchbase-operator[GitHub^]
 
 .Couchbase Cluster Chart

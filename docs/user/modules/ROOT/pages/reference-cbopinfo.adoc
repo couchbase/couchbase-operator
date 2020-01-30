@@ -13,7 +13,7 @@ The output is a compressed archive of resource YAML manifests organized by names
 
 The `cbopinfo` command can also collect and download Couchbase server logs from running pods and orphaned persistent log volumes.
 
-IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deployments, pods, couchbaseclusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:kubernetes-rbac.adoc#operator-role-requirements[required by the operator] but read-only.
+IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deployments, pods, couchbaseclusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:reference-operator-rbac.adoc#operator-role-requirements[required by the operator] but read-only.
 
 == Installation
 

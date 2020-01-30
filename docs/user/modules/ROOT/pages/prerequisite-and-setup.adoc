@@ -91,7 +91,7 @@ Review the xref:best-practices.adoc#persistent-volumes-best-practices[Operator b
 Preparing the Kubernetes cluster to run the Operator may require setting up proper RBAC and network settings in your Kubernetes cluster.
 Before moving forward, review the following documentation:
 
-* xref:kubernetes-rbac.adoc[RBAC]
+* xref:reference-operator-rbac.adoc[RBAC]
 * xref:networking.adoc[Networking]
 
 == Next Steps

@@ -25,7 +25,7 @@ Although the `CouchbaseCluster` does allow the setting of Pod resources with the
 A deployment that exhibited this defect would report that Pods cannot be created due to the required resource limits not being set even when the corresponding configuration is specified in the `CouchbaseCluster` resource.
 
 | https://issues.couchbase.com/browse/K8S-1073[K8S-1073]
-a| The Operator contains logic to xref:operator-config.adoc#command-line-arguments[control the period to wait before declaring `Pod` creation failed].
+a| The Operator contains logic to xref:reference-operator-configuration.adoc#command-line-arguments[control the period to wait before declaring `Pod` creation failed].
 This allows the underlying platform sufficient time to provision `PersistentVolume` storage, provision the Pod itself, and to establish network connectivity.
 
 In certain circumstances this time period would not be honored, declaring a Pod as failed when -- if it had been left alone -- it would have eventually provisioned successfully.

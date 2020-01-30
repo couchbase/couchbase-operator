@@ -1,0 +1,25 @@
+= Couchbase Operator Logging
+
+[abstract]
+How to extract and use Operator logs for problem determination.
+
+The Operator provides flexible logging support to enable failure detection and alerting.
+It is also a key resource when submitting a support request with the xref:reference-cbopinfo.adoc[`cbopinfo`] tool.
+
+Logs are structured as JSON with one entry per line.
+This provides a simple and stable foundation for parsing and ingesting logs into 3rd party logging databases.
+Most popular logging solutions feature native support for JSON input:
+
+* https://docs.fluentd.org/parser/json[Fluentd JSON parser^]
+* https://www.elastic.co/guide/en/logstash/current/plugins-codecs-json_lines.html[Logstash JSON codec^]
+
+Detailed instructions on what can be collected can be found in the xref:reference-operator-logging.adoc[Operator logging reference].
+Detailed instructions on how to configure logging can be found in the xref:reference-operator-configuration.adoc[Operator configuration reference].
+
+[IMPORTANT]
+====
+Couchbase server logs cannot be collected from the pod's standard output as is typical in Kubernetes environments.
+Furthermore Couchbase server pods do not feature any integration with 3rd party log collection technologies so cannot be collected in real time.
+
+The xref:reference-cbopinfo.adoc[`cbopinfo`] support tool can be used to collect a log archive at any time, as can the Couchbase web console.
+====

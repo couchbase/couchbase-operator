@@ -30,7 +30,7 @@ include::{includedir}/install-kubernetes-no-rbac.adoc[]
 
 include::{includedir}/install-openshift.adoc[]
 
-include::{includedir}/operator-config.adoc[]
+include::{includedir}/reference-operator-configuration.adoc[]
 
 :leveloffset: -1
 
@@ -46,7 +46,7 @@ include::{includedir}/networking.adoc[]
 
 include::{includedir}/tls.adoc[]
 
-include::{includedir}/kubernetes-rbac.adoc[]
+include::{includedir}/reference-operator-rbac.adoc[]
 
 include::{includedir}/server-groups.adoc[]
 

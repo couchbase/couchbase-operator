@@ -11,7 +11,7 @@ The following topics are also helpful to understand when troubleshooting the Ope
 * xref:reference-couchbasecluster-events.adoc[Understanding Conditions and Events]
 * xref:list-and-describe.adoc[Listing And Describing Resources]
 * xref:node-recovery.adoc[Node Recovery]
-* xref:operator-config.adoc[Operator Configuration]
+* xref:reference-operator-configuration.adoc[Operator Configuration]
 
 == Full Deployment Logs
 

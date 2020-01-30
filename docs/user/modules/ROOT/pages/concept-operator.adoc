@@ -75,6 +75,7 @@ The dotted box in the diagram denotes namespaced resources.
 Resources highlighted in red must be created by an administrator who has permission to create cluster scoped resources, or those that grant privilege escalation.
 
 The admission controller `Deployment` is associated with a `ServiceAccount` that grants the admission controller permissions to access other resources with a role.
+Detailed role requirements are documented in the xref:reference-admission-rbac.adoc[dynamic admission controller RBAC reference guide].
 Access to resource types allows the admission controller to check that any resources, such as `Secrets`, are present for the Operator to access and use.
 It also allows the admission controller to poll for existing `CouchbaseCluster` resources to check for invariance of certain specification attributes.
 
@@ -117,6 +118,7 @@ Resources highlighted in red must be created by an administrator who has permiss
 ====
 
 The Operator `Deployment` is associated with a `ServiceAccount` that grants the Operator permissions to discover, create, modify and delete resources required to manage a Couchbase cluster.
+Detailed role requirements are documented in the xref:reference-operator-rbac.adoc[Operator RBAC reference guide].
 
 A `Service` is provided to allow access to Operator Prometheus metrics, if desired.
 
