@@ -151,9 +151,9 @@ func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseClus
 	return uuid, nil
 }
 
-// getRemoteUUIDAndHost returns the remote hostname, based on IP and node port, and the cluster UUID.
+// getRemoteUUIDAndHostGeneric returns the remote hostname, based on IP and node port, and the cluster UUID.
 // Used for generic XDCR testing.
-func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
+func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
 	// List the pods on the remote cluster and pick one
 	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name+"-ui", metav1.GetOptions{})
 	if err != nil {
@@ -195,9 +195,9 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 	return uuid, fmt.Sprintf("%s:%d", ip, nodePort), nil
 }
 
-// getRemoteUUIDAndHostTLS returns the remote hostname, based on DNS, and the cluster UUID.
+// getRemoteUUIDAndHost returns the remote hostname, based on DNS, and the cluster UUID.
 // Used for generic XDCR testing.
-func getRemoteUUIDAndHostTLS(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
+func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
 	var err error
 	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
@@ -213,9 +213,9 @@ func getRemoteUUIDAndHostTLS(kubernetes *types.Cluster, cluster *couchbasev2.Cou
 	return uuid, fmt.Sprintf("%s-srv.%s", cluster.Name, cluster.Namespace), nil
 }
 
-// EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
+// EstablishXDCRReplicationGeneric creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) (replication *couchbasev2.CouchbaseReplication, cleanup func(), err error) {
+func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) (replication *couchbasev2.CouchbaseReplication, cleanup func(), err error) {
 	// Create the remote cluster secret.
 	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
 	secret := &corev1.Secret{
@@ -255,7 +255,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	// Create the XDCR remote cluster.
 	clusterName := "remote"
 
-	uuid, host, err := getRemoteUUIDAndHost(dstK8s, target)
+	uuid, host, err := getRemoteUUIDAndHostGeneric(dstK8s, target)
 	if err != nil {
 		return
 	}
@@ -284,9 +284,9 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	return
 }
 
-// EstablishXDCRReplicationTLS creates a remote cluster in the source, and a replication from the source bucket to the destination
+// EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func EstablishXDCRReplicationTLS(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ctx *TLSContext) (cleanup func(), err error) {
+func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ctx *TLSContext) (cleanup func(), err error) {
 	// Create the remote cluster secret.
 	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
 	secret := &corev1.Secret{
@@ -309,28 +309,31 @@ func EstablishXDCRReplicationTLS(srcK8s, dstK8s *types.Cluster, source, target *
 		}
 	}()
 
-	// Define the TLS secret.
-	tlsSecret := fmt.Sprintf("%s-xdcr-tls", target.Name)
-	secret = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: tlsSecret,
-		},
-		Data: map[string][]byte{
-			couchbasev2.RemoteClusterTLSCA: ctx.CA.Certificate,
-		},
-	}
-	if target.Spec.Networking.TLS.ClientCertificatePolicy != nil {
-		secret.Data[couchbasev2.RemoteClusterTLSCertificate] = ctx.ClientCert
-		secret.Data[couchbasev2.RemoteClusterTLSKey] = ctx.ClientKey
-	}
+	// Define the TLS secret if we are using it.
+	tlsSecret := ""
+	if ctx != nil {
+		tlsSecret = fmt.Sprintf("%s-xdcr-tls", target.Name)
+		secret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: tlsSecret,
+			},
+			Data: map[string][]byte{
+				couchbasev2.RemoteClusterTLSCA: ctx.CA.Certificate,
+			},
+		}
+		if target.Spec.Networking.TLS.ClientCertificatePolicy != nil {
+			secret.Data[couchbasev2.RemoteClusterTLSCertificate] = ctx.ClientCert
+			secret.Data[couchbasev2.RemoteClusterTLSKey] = ctx.ClientKey
+		}
 
-	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
-		return
-	}
+		if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
+			return
+		}
 
-	cleanup = func() {
-		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
-		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(tlsSecret, metav1.NewDeleteOptions(0))
+		cleanup = func() {
+			_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
+			_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(tlsSecret, metav1.NewDeleteOptions(0))
+		}
 	}
 
 	// Create the replication.
@@ -352,7 +355,7 @@ func EstablishXDCRReplicationTLS(srcK8s, dstK8s *types.Cluster, source, target *
 	// username or password.
 	clusterName := "remote"
 
-	uuid, host, err := getRemoteUUIDAndHostTLS(dstK8s, target)
+	uuid, host, err := getRemoteUUIDAndHost(dstK8s, target)
 	if err != nil {
 		return
 	}
@@ -364,15 +367,22 @@ func EstablishXDCRReplicationTLS(srcK8s, dstK8s *types.Cluster, source, target *
 				Name:     clusterName,
 				UUID:     uuid,
 				Hostname: host,
-				TLS: &couchbasev2.RemoteClusterTLS{
-					Secret: &tlsSecret,
-				},
 			},
 		},
 	}
-	if target.Spec.Networking.TLS.ClientCertificatePolicy == nil {
+
+	// If we are using TLS then attach the CA and optional client cert/key.
+	if ctx != nil {
+		xdcr.RemoteClusters[0].TLS = &couchbasev2.RemoteClusterTLS{
+			Secret: &tlsSecret,
+		}
+	}
+
+	// If we are not using client authentication then we need the remote username and password.
+	if ctx == nil || target.Spec.Networking.TLS.ClientCertificatePolicy == nil {
 		xdcr.RemoteClusters[0].AuthenticationSecret = &xdcrSecret
 	}
+
 	if _, err = PatchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/Spec/XDCR", xdcr), time.Minute); err != nil {
 		return
 	}
@@ -386,16 +396,16 @@ func EstablishXDCRReplicationTLS(srcK8s, dstK8s *types.Cluster, source, target *
 	return
 }
 
-func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) (*couchbasev2.CouchbaseReplication, func()) {
-	replication, cleanup, err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, srcBucket, dstBucket)
+func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) (*couchbasev2.CouchbaseReplication, func()) {
+	replication, cleanup, err := EstablishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, srcBucket, dstBucket)
 	if err != nil {
 		Die(t, err)
 	}
 	return replication, cleanup
 }
 
-func MustEstablishXDCRReplicationTLS(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ctx *TLSContext) func() {
-	cleanup, err := EstablishXDCRReplicationTLS(srcK8s, dstK8s, source, target, srcBucket, dstBucket, ctx)
+func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ctx *TLSContext) func() {
+	cleanup, err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, srcBucket, dstBucket, ctx)
 	if err != nil {
 		Die(t, err)
 	}

@@ -89,17 +89,20 @@ tcGroups:
       - BasicCluster
       - BasicCluster
     testcases:
-      - name: TestXdcrCreateCluster
-      # TLS based tests require DNS so must be on the same cluster (for now)
-      - name: TestXDCRCreateTLSCluster
-      - name: TestXDCRCreateMututalTLSCluster
-      - name: TestXDCRCreateMandatoryMututalTLSCluster
+      - name: TestXdcrCreateClusterLocal
+      - name: TestXdcrCreateClusterLocalTLS
+      - name: TestXdcrCreateClusterLocalMutualTLS
+      - name: TestXdcrCreateClusterLocalMandatoryMutualTLS
 
   - name: XdcrCases
     clusters:
       - BasicCluster
       - NewCluster1
     testcases:
+      - name: TestXdcrCreateClusterRemote
+      - name: TestXdcrCreateClusterRemoteTLS
+      - name: TestXdcrCreateClusterRemoteMutualTLS
+      - name: TestXdcrCreateClusterRemoteMandatoryMutualTLS
       - name: TestXdcrSourceNodeDown
       - name: TestXdcrSourceNodeAdd
       - name: TestXdcrTargetNodeServiceDelete

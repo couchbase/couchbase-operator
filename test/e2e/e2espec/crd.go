@@ -387,15 +387,12 @@ func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
 }
 
 // basic 3 node cluster with Xdcr cluster
+// TODO: This doesn't appear to do anything special any more.
 func NewBasicXdcrCluster(size int) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{
 			AdminSecret: e2e_constants.KubeTestSecretName,
-		},
-		Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
-			ExposeAdminConsole: true,
-			ExposedFeatures:    []string{"xdcr"},
 		},
 		Buckets: couchbasev2.Buckets{
 			Managed: true,

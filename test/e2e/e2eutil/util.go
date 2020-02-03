@@ -189,62 +189,13 @@ func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace strin
 	}
 }
 
-// NewTLSXdcrClusterBasic creates a new TLS and XDCR enabled basic cluster.
-func NewTLSXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
+// NewXDCRrClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED)
+func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(size)
-	clusterSpec.Name = ctx.ClusterName
-	// Don't use alternate addresses.
-	clusterSpec.Spec.Networking.ExposeAdminConsole = false
-	clusterSpec.Spec.Networking.ExposedFeatures = nil
-	// Enable TLS.
-	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-		Static: &couchbasev2.StaticTLS{
-			ServerSecret:   ctx.ClusterSecretName,
-			OperatorSecret: ctx.OperatorSecretName,
-		},
+	clusterSpec.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
+		ExposeAdminConsole: true,
+		ExposedFeatures:    []string{"xdcr"},
 	}
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
-}
-
-func MustNewTLSXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewTLSXdcrClusterBasic(t, k8s, namespace, size, ctx)
-	if err != nil {
-		Die(t, err)
-	}
-	return cluster
-}
-
-// MustNewMutualTLSXDCRClusterBasic creates a new m and XDCR enabled basic cluster.
-func MustNewMutualTLSXDCRClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
-	clusterSpec := e2espec.NewBasicXdcrCluster(size)
-	clusterSpec.Name = ctx.ClusterName
-	// Don't use alternate addresses.
-	clusterSpec.Spec.Networking.ExposeAdminConsole = false
-	clusterSpec.Spec.Networking.ExposedFeatures = nil
-	// Enable TLS.
-	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-		Static: &couchbasev2.StaticTLS{
-			ServerSecret:   ctx.ClusterSecretName,
-			OperatorSecret: ctx.OperatorSecretName,
-		},
-		ClientCertificatePolicy: &policy,
-		ClientCertificatePaths: []couchbasev2.ClientCertificatePath{
-			{
-				Path: "subject.cn",
-			},
-		},
-	}
-	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
-	if err != nil {
-		Die(t, err)
-	}
-	return cluster
-}
-
-// NewXdcrClusterBasic creates a basic cluster, retrying if an error is encountered and
-// performing garbage collection
-func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXdcrCluster(size)
 	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		Die(t, err)
@@ -253,8 +204,67 @@ func NewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 	return cluster, err
 }
 
-func MustNewXdcrClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewXdcrClusterBasic(t, k8s, namespace, size)
+func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewXDCRClusterGeneric(t, k8s, namespace, size)
+	if err != nil {
+		Die(t, err)
+	}
+	return cluster
+}
+
+// NewXDCRCluster creates a cluster for use with DNS based networking.
+// The DNS configuration is optional for XDCR within the same Kubernetes cluster.
+// The TLS configuration is optional.
+// The TLS policy is optional.
+func NewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicXdcrCluster(size)
+
+	// If DNS is explicitly stated, then add it to the pod templates.
+	if dns != nil {
+		for index := range clusterSpec.Spec.Servers {
+			if clusterSpec.Spec.Servers[index].Pod == nil {
+				clusterSpec.Spec.Servers[index].Pod = &v1.PodTemplateSpec{}
+			}
+			clusterSpec.Spec.Servers[index].Pod.Spec.DNSPolicy = v1.DNSNone
+			clusterSpec.Spec.Servers[index].Pod.Spec.DNSConfig = &v1.PodDNSConfig{
+				Nameservers: []string{
+					dns.Spec.ClusterIP,
+				},
+				Searches: getSearchDomains(k8s),
+			}
+		}
+	}
+
+	// If TLS is explcitly stated, then add it to the pod configuration.
+	if tls != nil {
+		clusterSpec.Name = tls.ClusterName
+		clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+			Static: &couchbasev2.StaticTLS{
+				ServerSecret:   tls.ClusterSecretName,
+				OperatorSecret: tls.OperatorSecretName,
+			},
+		}
+
+		if policy != nil {
+			clusterSpec.Spec.Networking.TLS.ClientCertificatePolicy = policy
+			clusterSpec.Spec.Networking.TLS.ClientCertificatePaths = []couchbasev2.ClientCertificatePath{
+				{
+					Path: "subject.cn",
+				},
+			}
+		}
+	}
+
+	cluster, err := newClusterFromSpec(t, k8s, k8s.Namespace, clusterSpec)
+	if err != nil {
+		Die(t, err)
+	}
+	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
+	return cluster, err
+}
+
+func MustNewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewXDCRCluster(t, k8s, size, dns, tls, policy)
 	if err != nil {
 		Die(t, err)
 	}
