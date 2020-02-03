@@ -1263,6 +1263,7 @@ func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 
 	return nil
 }
+
 func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEphemeralBucket) error {
 	errs := []error{}
 
@@ -1276,12 +1277,28 @@ func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEpheme
 
 	return nil
 }
+
 func CheckImmutableFieldsMemcachedBucket(prev, curr *couchbasev2.CouchbaseMemcachedBucket) error {
 	return nil
 }
+
 func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplication) error {
-	// Todo validate all clusters referencing the replication also reference the
-	// source bucket.
+	errs := []error{}
+
+	if prev.Spec.Bucket != curr.Spec.Bucket {
+		errs = append(errs, util.NewUpdateError("spec.bucket", "body"))
+	}
+	if prev.Spec.RemoteBucket != curr.Spec.RemoteBucket {
+		errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
+	}
+	if prev.Spec.FilterExpression != curr.Spec.FilterExpression {
+		errs = append(errs, util.NewUpdateError("spec.filterExpression", "body"))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
 	return nil
 }
 

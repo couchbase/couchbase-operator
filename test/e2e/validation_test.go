@@ -1385,6 +1385,25 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.strategy in body cannot be updated"},
 		},
+		{
+			name:           "TestValidateReplicationBucketImmutable",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "tinkywinky")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.bucket in body cannot be updated"},
+		},
+		{
+			name:           "TestValidateReplicationRemoteBucketImmutable",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/remoteBucket", "dipsy")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.remoteBucket in body cannot be updated"},
+		},
+		{
+			name:           "TestValidateReplicationFilterExpressionImmutable",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/filterExpression", "lala")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.filterExpression in body cannot be updated"},
+		},
+		// Poor po!
 	}
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
