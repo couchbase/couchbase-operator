@@ -19,11 +19,9 @@ import (
 // mustCreateXDCRBuckets creates default buckets in the source and target clusters, ensuring
 // we don't redefine if the same cluster is used for source and target couchbase instances.
 func mustCreateXDCRBuckets(t *testing.T, k8s1, k8s2 *types.Cluster) {
-	f := framework.Global
-
-	e2eutil.MustNewBucket(t, k8s1, f.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, k8s1, k8s1.Namespace, e2espec.DefaultBucket)
 	if k8s1.Config.Host != k8s2.Config.Host {
-		e2eutil.MustNewBucket(t, k8s2, f.Namespace, e2espec.DefaultBucket)
+		e2eutil.MustNewBucket(t, k8s2, k8s2.Namespace, e2espec.DefaultBucket)
 	}
 }
 
@@ -100,17 +98,14 @@ const (
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
 // nefarious ways.
 func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcrCluster, operation xdcrOperation) {
-	// Platform configuration.
-	f := framework.Global
-
 	// Static configuration.
 	clusterSize := constants.Size3
 	scaleDownSize := constants.Size1
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, k8s2.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -187,8 +182,8 @@ func TestXdcrCreateCluster(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, k8s2.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -230,8 +225,8 @@ func TestXDCRPauseReplication(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, k8s2.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -288,8 +283,8 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, xdcrCluster1Size)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, xdcrCluster2Size)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, k8s1.Namespace, xdcrCluster1Size)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, k8s2.Namespace, xdcrCluster2Size)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -340,8 +335,8 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, k8s2.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -390,8 +385,8 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXdcrClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXdcrClusterBasic(t, k8s2, k8s2.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -474,23 +469,23 @@ func TestXDCRCreateTLSCluster(t *testing.T) {
 	// Static configuration.
 	clusterSize := constants.Size1
 
-	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TLSOpts{})
+	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
 	defer teardown1()
-	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TLSOpts{})
+	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
 	defer teardown2()
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewTLSXdcrClusterBasic(t, k8s1, f.Namespace, clusterSize, tls1)
-	xdcrCluster2 := e2eutil.MustNewTLSXdcrClusterBasic(t, k8s2, f.Namespace, clusterSize, tls2)
+	xdcrCluster1 := e2eutil.MustNewTLSXdcrClusterBasic(t, k8s1, k8s1.Namespace, clusterSize, tls1)
+	xdcrCluster2 := e2eutil.MustNewTLSXdcrClusterBasic(t, k8s2, k8s2.Namespace, clusterSize, tls2)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the XDCR connection.  Ensure TLS is enabled.
 	cleanup := e2eutil.MustEstablishXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name, tls2)
 	defer cleanup()
-	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls1)
-	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls2)
+	e2eutil.MustCheckClusterTLS(t, k8s1, k8s1.Namespace, tls1)
+	e2eutil.MustCheckClusterTLS(t, k8s1, k8s2.Namespace, tls2)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -522,23 +517,23 @@ func testXDCRCreateMututalTLSCluster(t *testing.T, policy couchbasev2.ClientCert
 	// Static configuration.
 	clusterSize := constants.Size1
 
-	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, f.Namespace, &e2eutil.TLSOpts{})
+	tls1, teardown1 := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
 	defer teardown1()
-	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, f.Namespace, &e2eutil.TLSOpts{})
+	tls2, teardown2 := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
 	defer teardown2()
 
 	// Create the clusters.
 	mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewMutualTLSXDCRClusterBasic(t, k8s1, f.Namespace, clusterSize, tls1, policy)
-	xdcrCluster2 := e2eutil.MustNewMutualTLSXDCRClusterBasic(t, k8s2, f.Namespace, clusterSize, tls2, policy)
+	xdcrCluster1 := e2eutil.MustNewMutualTLSXDCRClusterBasic(t, k8s1, k8s1.Namespace, clusterSize, tls1, policy)
+	xdcrCluster2 := e2eutil.MustNewMutualTLSXDCRClusterBasic(t, k8s2, k8s2.Namespace, clusterSize, tls2, policy)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, xdcrCluster1, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s2, xdcrCluster2, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the XDCR connection.  Ensure TLS is enabled.
 	cleanup := e2eutil.MustEstablishXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name, tls2)
 	defer cleanup()
-	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls1)
-	e2eutil.MustCheckClusterTLS(t, k8s1, f.Namespace, tls2)
+	e2eutil.MustCheckClusterTLS(t, k8s1, k8s1.Namespace, tls1)
+	e2eutil.MustCheckClusterTLS(t, k8s1, k8s2.Namespace, tls2)
 
 	// Check the events match what we expect:
 	// * Both clusters created

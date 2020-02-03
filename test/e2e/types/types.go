@@ -25,6 +25,10 @@ type Cluster struct {
 	KubeConfPath string
 	// Context is the context used in the Kubernetes config
 	Context string
+	// Namespace is the namespace to use
+	Namespace string
+	// Name is the cluster name
+	Name string
 
 	// Hacks - remove me
 

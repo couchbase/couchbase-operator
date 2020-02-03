@@ -14,6 +14,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	"gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
@@ -174,8 +175,8 @@ func createK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) e
 	return err
 }
 
-func removeRole(kubeClient kubernetes.Interface, roleName string) error {
-	if err := kubeClient.RbacV1().Roles(Global.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+func removeRole(k8s *types.Cluster, roleName string) error {
+	if err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	return nil
@@ -203,9 +204,9 @@ func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAcc
 // RecreateDockerAuthSecret deletes existing secrets and creates a new one if specified.
 // This secret, if defined, will be added to the operator and admission controllers in
 // order to pull from a private repository.
-func recreateDockerAuthSecret(client kubernetes.Interface) error {
+func recreateDockerAuthSecret(k8s *types.Cluster) error {
 	// Clean up the old authentication secret if it exists
-	if err := client.CoreV1().Secrets(runtimeParams.Namespace).Delete(dockerPullSecretName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(dockerPullSecretName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -236,7 +237,7 @@ func recreateDockerAuthSecret(client kubernetes.Interface) error {
 				".dockerconfigjson": []byte(data),
 			},
 		}
-		if _, err := client.CoreV1().Secrets(runtimeParams.Namespace).Create(secret); err != nil {
+		if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(secret); err != nil {
 			return err
 		}
 
@@ -247,57 +248,57 @@ func recreateDockerAuthSecret(client kubernetes.Interface) error {
 	return nil
 }
 
-func recreateRoles(kubeClient kubernetes.Interface, roleName string) error {
-	if err := removeRole(kubeClient, config.OperatorResourceName); err != nil {
+func recreateRoles(k8s *types.Cluster, roleName string) error {
+	if err := removeRole(k8s, config.OperatorResourceName); err != nil {
 		return nil
 	}
-	if err := removeRole(kubeClient, config.BackupResourceName); err != nil {
+	if err := removeRole(k8s, config.BackupResourceName); err != nil {
 		return nil
 	}
 
-	if err := CreateBackupRole(kubeClient, Global.Namespace); err != nil {
+	if err := CreateBackupRole(k8s.KubeClient, k8s.Namespace); err != nil {
 		return err
 	}
 	roleSpec := config.GetOperatorRole()
 	roleSpec.Name = roleName
-	_, err := kubeClient.RbacV1().Roles(Global.Namespace).Create(roleSpec)
+	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(roleSpec)
 	return err
 }
 
-func RecreateServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAccountName string) error {
-	if err := RemoveServiceAccount(kubeClient, namespace, serviceAccountName); err != nil {
+func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
+	if err := RemoveServiceAccount(k8s.KubeClient, k8s.Namespace, serviceAccountName); err != nil {
 		return err
 	}
 	if serviceAccountName == "default" {
 		return nil
 	}
-	if err := RemoveServiceAccount(kubeClient, namespace, config.BackupResourceName); err != nil {
+	if err := RemoveServiceAccount(k8s.KubeClient, k8s.Namespace, config.BackupResourceName); err != nil {
 		return err
 	}
 
-	if err := CreateBackupServiceAccount(kubeClient, namespace); err != nil {
+	if err := CreateBackupServiceAccount(k8s.KubeClient, k8s.Namespace); err != nil {
 		return err
 	}
 	// Create service account given by the name
 	serviceAccount := config.GetOperatorServiceAccount()
 	serviceAccount.Name = serviceAccountName
-	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccount)
+	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(serviceAccount)
 	return err
 }
 
-func recreateRoleBindings(kubeClient kubernetes.Interface, namespace, clusterRoleName string) error {
-	if err := removeRoleBinding(kubeClient, namespace, config.OperatorResourceName); err != nil {
+func recreateRoleBindings(k8s *types.Cluster, clusterRoleName string) error {
+	if err := removeRoleBinding(k8s.KubeClient, k8s.Namespace, config.OperatorResourceName); err != nil {
 		return err
 	}
-	if err := removeRoleBinding(kubeClient, namespace, config.BackupResourceName); err != nil {
+	if err := removeRoleBinding(k8s.KubeClient, k8s.Namespace, config.BackupResourceName); err != nil {
 		return err
 	}
 
-	if err := CreateBackupRoleBinding(kubeClient, namespace); err != nil {
+	if err := CreateBackupRoleBinding(k8s.KubeClient, k8s.Namespace); err != nil {
 		return err
 	}
-	clusterRoleBindingSpec := config.GetOperatorRoleBinding(Global.Namespace)
-	_, err := kubeClient.RbacV1().RoleBindings(Global.Namespace).Create(clusterRoleBindingSpec)
+	clusterRoleBindingSpec := config.GetOperatorRoleBinding(k8s.Namespace)
+	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(clusterRoleBindingSpec)
 	return err
 }
 

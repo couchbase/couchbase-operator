@@ -156,7 +156,6 @@ func Setup(t *testing.T) (err error) {
 
 	// Initialize Global from runtime info
 	Global = &Framework{
-		Namespace:                   runtimeParams.Namespace,
 		KubeType:                    runtimeParams.KubeType,
 		KubeVersion:                 runtimeParams.KubeVersion,
 		OpImage:                     runtimeParams.OperatorImage,
@@ -183,7 +182,7 @@ func Setup(t *testing.T) (err error) {
 	}
 
 	for _, kubeConf := range runtimeParams.KubeConfig {
-		clusterSpec, cerr := createKubeClusterObject(kubeConf.ClusterConfig, kubeConf.Context)
+		clusterSpec, cerr := createKubeClusterObject(kubeConf)
 		if cerr != nil {
 			return cerr
 		}
@@ -204,6 +203,12 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
 	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
 	logrus.Info(" →  couchbase server upgrade: " + runtimeParams.CouchbaseServerImageUpgrade)
+	for _, config := range Global.ClusterSpec {
+		logrus.Info("Cluster: ", config.Name)
+		logrus.Info(" →  path: " + config.KubeConfPath)
+		logrus.Info(" →  context: " + config.Context)
+		logrus.Info(" →  namespace: " + config.Namespace)
+	}
 	logrus.Info("Kubernetes")
 	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
 	logrus.Info("Logs")
@@ -216,8 +221,8 @@ func Setup(t *testing.T) (err error) {
 	}
 	Global.CbopinfoPath = wd + "/../../build/bin/cbopinfo"
 
-	for kubeName := range Global.ClusterSpec {
-		if err = Global.SetupFramework(kubeName); err != nil {
+	for _, k8s := range Global.ClusterSpec {
+		if err = Global.SetupFramework(k8s); err != nil {
 			return err
 		}
 	}
@@ -225,11 +230,11 @@ func Setup(t *testing.T) (err error) {
 }
 
 func cleanUpNamespace() (err error) {
-	logrus.Infof("Cleaning up namespace: %s", Global.Namespace)
-	for _, targetKube := range Global.ClusterSpec {
+	for _, k8s := range Global.ClusterSpec {
+		logrus.Infof("Cleaning up namespace %s in %s", k8s.Namespace, k8s.Name)
 		// Remove secrets
-		if targetKube.DefaultSecret != nil {
-			if err := e2eutil.DeleteSecret(targetKube.KubeClient, Global.Namespace, targetKube.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
+		if k8s.DefaultSecret != nil {
+			if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, k8s.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
 				if !k8sutil.IsKubernetesResourceNotFoundError(err) {
 					return fmt.Errorf("unable to delete the default secret: %v", err)
 				}
@@ -237,15 +242,15 @@ func cleanUpNamespace() (err error) {
 		}
 
 		// Clean-up Deployments and pods
-		if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, Global.Namespace); err != nil {
+		if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
 			return err
 		}
 
 		// Blow away any couchbase cluster resources (and friends)
-		e2eutil.CleanK8Cluster(targetKube, Global.Namespace)
+		e2eutil.CleanK8Cluster(k8s, k8s.Namespace)
 
 		// Clean up any LDAP Pods & Services
-		if err := e2eutil.CleanLDAPResources(targetKube.KubeClient, Global.Namespace); err != nil {
+		if err := e2eutil.CleanLDAPResources(k8s.KubeClient, k8s.Namespace); err != nil {
 			return err
 		}
 	}
@@ -270,10 +275,10 @@ func Teardown() error {
 	return nil
 }
 
-func createKubeClusterObject(kubeConfPath, context string) (*types.Cluster, error) {
+func createKubeClusterObject(c KubeConfData) (*types.Cluster, error) {
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfPath},
-		&clientcmd.ConfigOverrides{CurrentContext: context},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: c.ClusterConfig},
+		&clientcmd.ConfigOverrides{CurrentContext: c.Context},
 	).ClientConfig()
 	if err != nil {
 		return nil, err
@@ -283,18 +288,20 @@ func createKubeClusterObject(kubeConfPath, context string) (*types.Cluster, erro
 		Config:       config,
 		CRClient:     client.MustNew(config),
 		KubeClient:   kubernetes.NewForConfigOrDie(config),
-		KubeConfPath: kubeConfPath,
-		Context:      context,
+		KubeConfPath: c.ClusterConfig,
+		Context:      c.Context,
+		Namespace:    c.Namespace,
+		Name:         c.ClusterName,
 	}, nil
 }
 
-func (f *Framework) CreateSecretInKubeCluster(kubeName string) error {
-	secret, err := e2eutil.CreateSecret(f.ClusterSpec[kubeName].KubeClient, f.Namespace, e2espec.NewDefaultSecret(f.Namespace))
+func (f *Framework) CreateSecretInKubeCluster(k8s *types.Cluster) error {
+	secret, err := e2eutil.CreateSecret(k8s.KubeClient, k8s.Namespace, e2espec.NewDefaultSecret(k8s.Namespace))
 	if err != nil {
 		err = fmt.Errorf("failed to create default couchbase secret: %v", err)
 		return err
 	}
-	f.ClusterSpec[kubeName].DefaultSecret = secret
+	k8s.DefaultSecret = secret
 	return err
 }
 
@@ -378,37 +385,35 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	})
 }
 
-func (f *Framework) SetupFramework(kubeName string) error {
-	targetKube := f.ClusterSpec[kubeName]
-
-	if err := f.RemoveK8SNodeTaints(targetKube.KubeClient); err != nil {
+func (f *Framework) SetupFramework(k8s *types.Cluster) error {
+	if err := f.RemoveK8SNodeTaints(k8s.KubeClient); err != nil {
 		return err
 	}
 
 	// Creating required namespaces and cluster roles before deploying the operator
-	if err := createK8SNamespace(targetKube.KubeClient, f.Namespace); err != nil {
+	if err := createK8SNamespace(k8s.KubeClient, k8s.Namespace); err != nil {
 		return err
 	}
 
-	logrus.Infof("Cleaning up namespace %s before deployment in %s", f.Namespace, kubeName)
-	if err := DeleteOperatorCompletely(targetKube.KubeClient, Global.Deployment.Name, f.Namespace); err != nil {
+	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
+	if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
 		return fmt.Errorf("failed to delete operator: %v", err)
 	}
 
 	logrus.Infof("Deleting admission controller")
-	if err := deleteAdmissionController(targetKube.KubeClient); err != nil {
+	if err := deleteAdmissionController(k8s.KubeClient); err != nil {
 		return err
 	}
 
-	e2eutil.CleanK8Cluster(targetKube, Global.Namespace)
+	e2eutil.CleanK8Cluster(k8s, k8s.Namespace)
 
 	logrus.Info("Deleting orphaned pods")
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return err
 	}
 	for _, pod := range pods.Items {
-		if err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
@@ -417,56 +422,56 @@ func (f *Framework) SetupFramework(kubeName string) error {
 		logrus.Infof("Pod deleted: %v", pod.Name)
 	}
 
-	endpoints, err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	endpoints, err := k8s.KubeClient.CoreV1().Endpoints(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return err
 	}
 	for _, endpoint := range endpoints.Items {
-		if err := targetKube.KubeClient.CoreV1().Endpoints(f.Namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.KubeClient.CoreV1().Endpoints(k8s.Namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 		logrus.Infof("Endpoint deleted: %v", endpoint.Name)
 	}
 
 	logrus.Info("Deleting secrets")
-	if err := e2eutil.DeleteSecret(targetKube.KubeClient, f.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
+	if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
 		logrus.Infof("Secret deleted: %v", "basic-test-secret")
 	}
 
 	logrus.Info("Recreating CRD")
-	if err := recreateCRDs(targetKube); err != nil {
+	if err := recreateCRDs(k8s); err != nil {
 		return err
 	}
 
 	logrus.Info("Recreating docker auth secret")
-	if err := recreateDockerAuthSecret(targetKube.KubeClient); err != nil {
+	if err := recreateDockerAuthSecret(k8s); err != nil {
 		return err
 	}
 
 	logrus.Info("Recreating role")
-	if err := recreateRoles(targetKube.KubeClient, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoles(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
 	logrus.Info("Recreating service account")
-	if err := RecreateServiceAccount(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := RecreateServiceAccount(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
 	logrus.Info("Recreating role binding")
-	if err := recreateRoleBindings(targetKube.KubeClient, f.Namespace, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoleBindings(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
 	logrus.Info("Creating secret")
-	if err = f.CreateSecretInKubeCluster(kubeName); err != nil {
+	if err = f.CreateSecretInKubeCluster(k8s); err != nil {
 		return err
 	}
 
 	logrus.Infof("Creating admission controller")
-	if err := createAdmissionController(targetKube.KubeClient); err != nil {
+	if err := createAdmissionController(k8s.KubeClient); err != nil {
 		return err
 	}
 
 	logrus.Info("Setting up operator")
-	if err := f.SetupCouchbaseOperator(f.ClusterSpec[kubeName]); err != nil {
+	if err := f.SetupCouchbaseOperator(k8s); err != nil {
 		return fmt.Errorf("failed to setup couchbase operator: %v", err)
 	}
 	logrus.Info("Couchbase operator created successfully")
@@ -474,11 +479,11 @@ func (f *Framework) SetupFramework(kubeName string) error {
 	return nil
 }
 
-func (f *Framework) SetupCouchbaseOperator(targetKube *types.Cluster) error {
-	if _, err := targetKube.KubeClient.AppsV1().Deployments(f.Namespace).Create(f.Deployment); err != nil {
+func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(f.Deployment); err != nil {
 		return err
 	}
-	return e2eutil.WaitUntilOperatorReady(targetKube.KubeClient, f.Namespace, constants.CouchbaseOperatorLabel)
+	return e2eutil.WaitUntilOperatorReady(k8s.KubeClient, k8s.Namespace, constants.CouchbaseOperatorLabel)
 }
 
 func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, namespace string) (int32, error) {

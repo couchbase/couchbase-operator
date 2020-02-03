@@ -16,6 +16,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	// admissionNamespace must be fixed, this prevents the case where we use
+	// the same physical cluster for testing two different operators in different
+	// namespaces and we end up with two instances.
+	admissionNamespace = "default"
+)
+
 // createAdmissionController creates all the necessary resources to deploy the
 // admission controller.  These are:
 //
@@ -35,40 +42,40 @@ func createAdmissionController(client kubernetes.Interface) error {
 			CommonName: config.AdmissionResourceName,
 		},
 		DNSNames: []string{
-			config.AdmissionResourceName + "." + Global.Namespace + ".svc",
+			config.AdmissionResourceName + "." + admissionNamespace + ".svc",
 		},
 	})
 	key, cert, _ := req.Generate(ca, validFrom, validTo)
 
 	serviceAccount := config.GetAdmissionServiceAccount()
-	if _, err := client.CoreV1().ServiceAccounts(Global.Namespace).Create(serviceAccount); err != nil {
+	if _, err := client.CoreV1().ServiceAccounts(admissionNamespace).Create(serviceAccount); err != nil {
 		return err
 	}
 	clusterRole := config.GetAdmissionClusterRole()
 	if _, err := client.RbacV1().ClusterRoles().Create(clusterRole); err != nil {
 		return err
 	}
-	clusterRoleBinding := config.GetAdmissionClusterRoleBinding(Global.Namespace)
+	clusterRoleBinding := config.GetAdmissionClusterRoleBinding(admissionNamespace)
 	if _, err := client.RbacV1().ClusterRoleBindings().Create(clusterRoleBinding); err != nil {
 		return err
 	}
 	secret := config.GetAdmissionSecret(key, cert)
-	if _, err := client.CoreV1().Secrets(Global.Namespace).Create(secret); err != nil {
+	if _, err := client.CoreV1().Secrets(admissionNamespace).Create(secret); err != nil {
 		return err
 	}
 	deployment := config.GetAdmissionDeployment(runtimeParams.AdmissionControllerImage, dockerPullSecretName, "-v", "1")
-	if _, err := client.AppsV1().Deployments(Global.Namespace).Create(deployment); err != nil {
+	if _, err := client.AppsV1().Deployments(admissionNamespace).Create(deployment); err != nil {
 		return err
 	}
 	service := config.GetAdmissionService()
-	if _, err := client.CoreV1().Services(Global.Namespace).Create(service); err != nil {
+	if _, err := client.CoreV1().Services(admissionNamespace).Create(service); err != nil {
 		return err
 	}
-	mutatingWebhook := config.GetAdmissionMutatingWebhook(Global.Namespace, ca.Certificate)
+	mutatingWebhook := config.GetAdmissionMutatingWebhook(admissionNamespace, ca.Certificate)
 	if _, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(mutatingWebhook); err != nil {
 		return err
 	}
-	validatingWebhook := config.GetAdmissionValidatingWebhook(Global.Namespace, ca.Certificate)
+	validatingWebhook := config.GetAdmissionValidatingWebhook(admissionNamespace, ca.Certificate)
 	if _, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(validatingWebhook); err != nil {
 		return err
 	}
@@ -84,7 +91,7 @@ func createAdmissionController(client kubernetes.Interface) error {
 // this unconditionally rather than having to check whether it exists or not which is a lot
 // of boiler plate zzz.
 func deleteAdmissionController(client kubernetes.Interface) error {
-	if err := client.CoreV1().ServiceAccounts(Global.Namespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := client.CoreV1().ServiceAccounts(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	if err := client.RbacV1().ClusterRoles().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
@@ -93,13 +100,13 @@ func deleteAdmissionController(client kubernetes.Interface) error {
 	if err := client.RbacV1().ClusterRoleBindings().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	if err := client.CoreV1().Secrets(Global.Namespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := client.CoreV1().Secrets(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	if err := client.AppsV1().Deployments(Global.Namespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := client.AppsV1().Deployments(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	if err := client.CoreV1().Services(Global.Namespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := client.CoreV1().Services(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	if err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
@@ -115,7 +122,7 @@ func deleteAdmissionController(client kubernetes.Interface) error {
 // and waits for it to become ready.
 func waitAdmissionController(client kubernetes.Interface) error {
 	callback := func() (bool, error) {
-		deployment, err := client.AppsV1().Deployments(Global.Namespace).Get(config.AdmissionResourceName, metav1.GetOptions{})
+		deployment, err := client.AppsV1().Deployments(admissionNamespace).Get(config.AdmissionResourceName, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}

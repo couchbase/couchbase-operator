@@ -159,7 +159,7 @@ func createResources(k8s *types.Cluster, namespace string, resources resourceLis
 		if err != nil {
 			return err
 		}
-		res, err := client.Resource(*groupVersion).Namespace(framework.Global.Namespace).Create(object, metav1.CreateOptions{})
+		res, err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Create(object, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -275,7 +275,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 	targetKube := f.ClusterSpec[kubeName]
 
 	// Stop the operator, we don't actually need it to validate the API and the tests will take forever.
-	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, f.Namespace)
+	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, targetKube.Namespace)
 	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
 
 	for _, test := range testDefs {
@@ -303,7 +303,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				}
 
 				// Do static environment configuration.
-				object.SetNamespace(f.Namespace)
+				object.SetNamespace(targetKube.Namespace)
 
 				// Do dynamic environment configuration.
 				if err := unstructured.SetNestedField(object.Object, targetKube.DefaultSecret.Name, "spec", "security", "adminSecret"); err != nil {
@@ -313,10 +313,10 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				// Do dynamic TLS configuration.
 				tlsOpts := &e2eutil.TLSOpts{
 					ClusterName: object.GetName(),
-					AltNames:    util_x509.MandatorySANs(object.GetName(), f.Namespace),
+					AltNames:    util_x509.MandatorySANs(object.GetName(), targetKube.Namespace),
 				}
 				tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
-				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, f.Namespace, tlsOpts)
+				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOpts)
 				defer teardown()
 
 				if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "serverSecret"); err != nil {
@@ -370,7 +370,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 			// If we are applying a change or deleting a cluster we first need to create it...
 			if command == "apply" {
-				if err := createResources(targetKube, f.Namespace, objects); err != nil {
+				if err := createResources(targetKube, targetKube.Namespace, objects); err != nil {
 					e2eutil.Die(t, err)
 				}
 			}
@@ -385,7 +385,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			// Execute the main test, update the new resource for verification.
 			switch command {
 			case "create":
-				err = createResources(targetKube, f.Namespace, objects)
+				err = createResources(targetKube, targetKube.Namespace, objects)
 			case "apply":
 				err = updateResources(targetKube, objects)
 			}
@@ -422,7 +422,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 	// Removing deployment if any
 	if !f.SkipTeardown {
-		e2eutil.CleanUpCluster(t, targetKube, f.Namespace, f.LogDir, kubeName, t.Name())
+		e2eutil.CleanUpCluster(t, targetKube, targetKube.Namespace, f.LogDir, kubeName, t.Name())
 	}
 }
 

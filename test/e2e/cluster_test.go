@@ -36,7 +36,7 @@ func TestResizeCluster(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
 	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
@@ -74,8 +74,8 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, constants.Size1)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, constants.Size1)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
@@ -119,7 +119,7 @@ func TestEditClusterSettings(t *testing.T) {
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService, // No index service or we cannot update the index settings
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
@@ -155,7 +155,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
 	testCouchbase.Spec.Image = "basecouch/123:enterprise-5.5.0"
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
@@ -179,7 +179,7 @@ func TestInvalidVersion(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
 	testCouchbase.Spec.Image = "couchbase/server:enterprise-9.9.9"
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
@@ -217,7 +217,7 @@ func TestNodeUnschedulable(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(strconv.Itoa(int(allocatableMemory*0.7)) + "Mi"),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// Scales up the cluster exhausting memory, We expect the last node to not schedule. When the
 	// policy is removed the last node will be created successfully and the rest of the cluster
@@ -263,15 +263,15 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
 
 	// Runtime configuration
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
 
 	// When ready kill the Couchbase Server process and await recovery
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustKillCouchbaseService(t, targetKube, f.Namespace, victimName, f.KubeType)
+	e2eutil.MustKillCouchbaseService(t, targetKube, targetKube.Namespace, victimName, f.KubeType)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -304,8 +304,8 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -357,8 +357,8 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	clusterSize := 2
 
 	// create 2 node cluster with admin console
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
 
 	// pause operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
@@ -415,7 +415,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// adding query service
 	t.Log("adding query service")
@@ -549,7 +549,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// adding query service
 	newService := couchbasev2.ServerConfig{
@@ -655,7 +655,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 			},
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -704,7 +704,7 @@ func TestRemoveLastDataService(t *testing.T) {
 			},
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// create connection to couchbase nodes
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, "service2", 2*time.Minute)
@@ -765,7 +765,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureXDCR,
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// Remove a service and ensure things still work.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Servers/1"), time.Minute)
@@ -799,10 +799,10 @@ func TestManageMultipleClusters(t *testing.T) {
 	// Create the clusters.
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	for index := 0; index < 3; index++ {
-		clusters = append(clusters, e2eutil.MustNewClusterBasic(t, targetKube, f.Namespace, clusterSize))
+		clusters = append(clusters, e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize))
 	}
 
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	for _, testCouchbase := range clusters {
 		// When each cluster is ready create a bucket and verify it appears in the
 		// cluster status.

@@ -186,22 +186,22 @@ func CheckJob(t *testing.T, jobStatus map[string]string) {
 func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName string) {
 	targetKube := f.ClusterSpec[kubeName]
 	fmt.Printf("deleting %v\n", jobName)
-	err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Delete(jobName, metav1.NewDeleteOptions(0))
+	err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Delete(jobName, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("failed to delete job %v \n", err)
 	}
-	pods, err := targetKube.KubeClient.CoreV1().Pods(f.Namespace).List(metav1.ListOptions{LabelSelector: "job=" + jobName})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(metav1.ListOptions{LabelSelector: "job=" + jobName})
 	if err != nil {
 		t.Fatalf("failed to list pods for cluster: " + err.Error())
 	}
 	for _, pod := range pods.Items {
-		_ = targetKube.KubeClient.CoreV1().Pods(f.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		_ = targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}
 }
 
 func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *batchv1.Job) *batchv1.Job {
 	targetKube := f.ClusterSpec[kubeName]
-	job, err := targetKube.KubeClient.BatchV1().Jobs(f.Namespace).Create(jobSpec)
+	job, err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Create(jobSpec)
 	if err != nil {
 		t.Fatalf("failed to create job %v", err)
 	}
@@ -302,11 +302,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	for _, name := range bucketNames {
 		bucket := bucketTemplate.DeepCopy()
 		bucket.Name = name
-		e2eutil.MustNewBucket(t, targetKube, f.Namespace, bucket)
+		e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, bucket)
 	}
 
 	// Create the first cluster.
-	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TLSOpts{})
+	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube.KubeClient, targetKube.Namespace, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,10 +320,10 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 			OperatorSecret: ctx1.OperatorSecretName,
 		},
 	}
-	testCouchbase1 = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase1)
+	testCouchbase1 = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase1)
 
 	// Create the second cluster.
-	ctx2, teardown2, err := e2eutil.InitClusterTLS(targetKube.KubeClient, f.Namespace, &e2eutil.TLSOpts{})
+	ctx2, teardown2, err := e2eutil.InitClusterTLS(targetKube.KubeClient, targetKube.Namespace, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,12 +337,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 			OperatorSecret: ctx2.OperatorSecretName,
 		},
 	}
-	testCouchbase2 = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase2)
+	testCouchbase2 = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase2)
 
-	if err := e2eutil.TLSCheckForCluster(t, targetKube, f.Namespace, ctx1); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, targetKube, targetKube.Namespace, ctx1); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
-	if err := e2eutil.TLSCheckForCluster(t, targetKube, f.Namespace, ctx2); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, targetKube, targetKube.Namespace, ctx2); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
@@ -381,8 +381,8 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		buckets: []string{},
 	}
 
-	suffix1 := "." + testCouchbase1.Name + "." + f.Namespace + ".svc"
-	suffix2 := "." + testCouchbase2.Name + "." + f.Namespace + ".svc"
+	suffix1 := "." + testCouchbase1.Name + "." + targetKube.Namespace + ".svc"
+	suffix2 := "." + testCouchbase2.Name + "." + targetKube.Namespace + ".svc"
 	for i := 0; i < clusterSize; i++ {
 		testScope.nodes1 = append(testScope.nodes1, couchbaseutil.CreateMemberName(testCouchbase1.Name, i)+suffix1)
 		testScope.nodes2 = append(testScope.nodes2, couchbaseutil.CreateMemberName(testCouchbase2.Name, i)+suffix2)
@@ -413,7 +413,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	job := CreateJob(t, f, kubeName, jobSpec)
 	// wait for job to succeed
 	singleResults := make(chan map[string]string, 1)
-	go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
+	go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
 	jobStatus := <-singleResults
 	CheckJob(t, jobStatus)
 	DeleteJob(t, f, kubeName, jobStatus["jobName"])
@@ -431,7 +431,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	job = CreateJob(t, f, kubeName, jobSpec)
 	// wait for job to succeed
 	singleResults = make(chan map[string]string, 1)
-	go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
+	go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
 	jobStatus = <-singleResults
 	CheckJob(t, jobStatus)
 	DeleteJob(t, f, kubeName, jobStatus["jobName"])
@@ -476,14 +476,14 @@ outerLoop:
 					// if wait, wait for success before launching next job
 					if op.wait {
 						singleResults := make(chan map[string]string, 1)
-						go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, op.duration, op.timeout, singleResults)
+						go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, op.duration, op.timeout, singleResults)
 						jobStatus := <-singleResults
 						CheckJob(t, jobStatus)
 						if !leaveJobsRunning {
 							DeleteJob(t, f, kubeName, jobStatus["jobName"])
 						}
 					} else {
-						go MonitorJob(job.Name, f.Namespace, targetKube.KubeClient, op.duration, op.timeout, results)
+						go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, op.duration, op.timeout, results)
 						jobList[job.Name] = job
 					}
 					i++

@@ -119,10 +119,10 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// Create a expected RZA results map for verification
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
@@ -155,7 +155,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	clusterSize := 7
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(class1Size)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
@@ -184,7 +184,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 			ServerGroups: class3ServerGroups,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// Creating expected RZA server groups pod maps
 	expected := rzaMap{}
@@ -214,10 +214,10 @@ func TestRzaResizeCluster(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// Create a map for server-groups based on deployed cb-server nodes
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
@@ -263,7 +263,7 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
 	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// When ready scale up, with AA on it should fail.
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
@@ -300,7 +300,7 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// When ready scale up, with AA on it should fail.
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)

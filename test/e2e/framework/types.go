@@ -16,7 +16,6 @@ type Framework struct {
 	CbopinfoPath    string
 	OpImage         string
 	Deployment      *appsv1.Deployment
-	Namespace       string
 	KubeType        string
 	KubeVersion     string
 	ClusterSpec     types.ClusterMap
@@ -46,12 +45,12 @@ type KubeConfData struct {
 	ClusterName   string `yaml:"name"`
 	ClusterConfig string `yaml:"config"`
 	Context       string `yaml:"context"`
+	Namespace     string `yaml:"namespace"`
 }
 
 // Struct to read and store test_config yaml passed by the user during testing
 type TestRunParam struct {
 	KubeType                    string `yaml:"kube-type"`
-	Namespace                   string `yaml:"namespace"`
 	OperatorImage               string `yaml:"operator-image"`
 	AdmissionControllerImage    string `yaml:"admission-controller-image"`
 	CouchbaseServerImage        string `yaml:"couchbase-server-image"`

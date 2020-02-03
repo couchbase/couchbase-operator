@@ -94,13 +94,13 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	numOfDocs := 10
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, sourceBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, destinationBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, metadataBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
 	// When ready, deploy an eventing function to create documents in a destination
@@ -132,13 +132,13 @@ func TestEventingResizeCluster(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, sourceBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, destinationBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, metadataBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
 	// When ready deploy the eventing function and generate workload.  Scale the cluster
@@ -183,14 +183,14 @@ func TestEventingKillEventingPods(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, sourceBucket)
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, destinationBucket)
-	e2eutil.MustNewBucket(t, targetKube, f.Namespace, metadataBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, sourceBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, destinationBucket)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, metadataBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
 	// When ready deploy the eventing function and generate workload.  Kill pods in sequence
