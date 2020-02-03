@@ -796,8 +796,13 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 				}
 			}
 		}
-	} else if domain != cbmgr.LDAPAuthDomain {
-		return fmt.Errorf("unsupported auth domain: %s", user.Spec.AuthDomain)
+	} else if domain == couchbasev2.LDAPAuthDomain {
+		// authSecret not accepted for LDAP user
+		if authSecretName := user.Spec.AuthSecret; authSecretName != "" {
+			errs = append(errs, fmt.Errorf("secret %s not allowed for LDAP user `%s`", authSecretName, user.Name))
+		}
+	} else {
+		return fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)
 	}
 
 	if len(errs) > 0 {

@@ -1489,6 +1489,16 @@ func TestRBACValidationLDAP(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/groups_query")},
 			shouldFail:     true,
 			expectedErrors: []string{"security.ldap.groups_query in body is required"},
+		}, {
+			name:           "TestValidateAuthSecretRejected",
+			mutations:      patchMap{"user2": jsonpatch.NewPatchSet().Add("/spec/authSecret", "auth-secret")},
+			shouldFail:     true,
+			expectedErrors: []string{"secret auth-secret not allowed for LDAP user `user2`"},
+		}, {
+			name:           "TestValidateAuthDomain",
+			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "upnorth")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.authDomain in body should match '^local|ldap$'"},
 		},
 	}
 

@@ -92,6 +92,14 @@ spec:
   authSecret: test-example-auth
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: user2
+spec:
+  fullName: Administrator
+  authDomain: ldap
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseRole
 metadata:
   name: role
