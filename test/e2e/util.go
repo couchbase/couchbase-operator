@@ -164,6 +164,7 @@ var (
 		"TestRBACRemoveUserFromBinding": TestRBACRemoveUserFromBinding,
 		"TestRBACDeleteBinding":         TestRBACDeleteBinding,
 		"TestRBACWithLDAPAuth":          TestRBACWithLDAPAuth,
+		"TestRBACSelection":             TestRBACSelection,
 
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,

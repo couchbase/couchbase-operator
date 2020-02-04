@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // mustCreateBoundUser creates user bound to cluster and bucket admin roles
@@ -281,4 +284,58 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestRBACSelection ensures the operator only creates users that match the
+// label selector.
+func TestRBACSelection(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create first user
+	user, _, binding := mustCreateBoundUser(t, targetKube, f.Namespace)
+
+	// Create second user with labels
+	customUser := e2espec.NewDefaultUser()
+	labels := map[string]string{
+		"loves": "nala",
+	}
+	customUser.Name = "simba"
+	customUser.Labels = labels
+	customUser = e2eutil.MustNewUser(t, targetKube, f.Namespace, customUser)
+
+	// Add second user to role binding
+	subject := couchbasev2.CouchbaseRoleBindingSubject{
+		Kind: e2e_constants.CouchbaseSubjectUserKind,
+		Name: customUser.Name,
+	}
+	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Add("/Spec/Subjects/-", subject), time.Minute)
+
+	// Create a cluster that selects only labelled users.
+	couchbase := e2espec.NewBasicCluster(clusterSize)
+	couchbase.Spec.Security.RBAC.Selector = &metav1.LabelSelector{
+		MatchLabels: labels,
+	}
+	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, couchbase)
+
+	// Ensure the unlabelled user doesn't get created.
+	if err := e2eutil.WaitUntilUserExists(targetKube, couchbase, user, time.Minute); err == nil {
+		e2eutil.Die(t, fmt.Errorf("user created unexpectedly"))
+	}
+
+	// Second user is created
+	e2eutil.MustWaitUntilUserExists(t, targetKube, couchbase, customUser, 2*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * UserCreated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+	}
+	ValidateEvents(t, targetKube, couchbase, expectedEvents)
 }
