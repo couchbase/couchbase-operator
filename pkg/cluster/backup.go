@@ -356,9 +356,6 @@ func generateBackupPVC(pvcName, clusterName string, storage *resource.Quantity) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   pvcName,
 			Labels: k8sutil.LabelsForCluster(clusterName),
-			Annotations: map[string]string{
-				constants.AnnotationVolumeMountPath: "uh-temp", // talk to Simon about this
-			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			Resources: corev1.ResourceRequirements{

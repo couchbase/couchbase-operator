@@ -37,6 +37,7 @@ const (
 	defaultMetricsImage                           = "couchbase/exporter:1.0.0"
 	redhatMetricsImage                            = "http://registry.connect.redhat.com/couchbase/exporter:1.0.0-1"
 	defaultBackupImage                            = "couchbase/operator-backup:6.5.0-1"
+	defaultBackupServiceAccount                   = "couchbase-backup"
 )
 
 var (
@@ -136,6 +137,9 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 	if managedBackup, found, _ := unstructured.NestedBool(object.Object, "spec", "backup", "managed"); found && managedBackup {
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "image"); !found {
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/image", Value: defaultBackupImage})
+		}
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "serviceAccountName"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/serviceAccountName", Value: defaultBackupServiceAccount})
 		}
 	}
 	if enableMonitoring, found, _ := unstructured.NestedBool(object.Object, "spec", "monitoring", "prometheus", "enabled"); found && enableMonitoring {

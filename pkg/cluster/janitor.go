@@ -38,9 +38,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 	logPvcs := []*corev1.PersistentVolumeClaim{}
 	for _, pvc := range pvcs {
 		// If it's not a log volume ignore it.
-		if ok, err := k8sutil.IsLogPVC(pvc); err != nil {
-			return nil, err
-		} else if !ok {
+		if !k8sutil.IsLogPVC(pvc) {
 			continue
 		}
 		logPvcs = append(logPvcs, pvc)

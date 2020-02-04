@@ -1058,12 +1058,12 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, po
 }
 
 // IsLogPVC returns whether this is a volume containing Couchbase logs.
-func IsLogPVC(pvc *v1.PersistentVolumeClaim) (bool, error) {
+func IsLogPVC(pvc *v1.PersistentVolumeClaim) bool {
 	path, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]
 	if !ok {
-		return false, fmt.Errorf("path annotation missing for pvc %s", pvc.Name)
+		return false
 	}
-	return path == CouchbaseVolumeMountLogsDir, nil
+	return path == CouchbaseVolumeMountLogsDir
 }
 
 // exec shells onto a pod and runs a command.

@@ -68,9 +68,7 @@ func listDetachedLogPVCs(context *context.Context) ([]*v1.PersistentVolumeClaim,
 
 	logVolumes := []*v1.PersistentVolumeClaim{}
 	for _, pvc := range pvcs.Items {
-		if ok, err := k8sutil.IsLogPVC(&pvc); err != nil {
-			return nil, err
-		} else if !ok {
+		if !k8sutil.IsLogPVC(&pvc) {
 			continue
 		}
 		if _, ok := pvc.Annotations["pv.couchbase.com/detached"]; !ok {
