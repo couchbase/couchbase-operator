@@ -107,8 +107,6 @@ func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) err
 
 // generateBackupCronjob generates a backup cronjob taking into account the backup strategy and the cbbackupmgr action
 func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction, strategy couchbasev2.Strategy) *batchv1beta1.CronJob {
-	TTLSecs := int32(300)
-
 	var schedule string
 	var container corev1.Container
 
@@ -147,7 +145,6 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 			JobTemplate: batchv1beta1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: batchv1.JobSpec{
-					TTLSecondsAfterFinished: &TTLSecs,
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
@@ -221,7 +218,6 @@ func (c *Cluster) generateBackupContainer(containerName string, strategy couchba
 // generateRestoreJob returns a job that performs a cbbackupmgr restore command
 func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
 	backoffLimit := int32(3)
-	TTLSecs := int32(300)
 
 	var start string
 	var end string
@@ -254,8 +250,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 			},
 		},
 		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: &TTLSecs,
-			BackoffLimit:            &backoffLimit,
+			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
