@@ -19,8 +19,10 @@ cluster-config: resources/cluster_conf.yaml
 # List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
 kube-config:
   #- name: Cluster1
+  #  namespace: default
   #  config: ~/.kube/config
   #- name: Cluster2
+  #  namespace: default
   #  config: ~/.kube/config_new
 
 # Collect cluster logs when test case fails using cbopinfo tool
