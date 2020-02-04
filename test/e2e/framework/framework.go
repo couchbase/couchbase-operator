@@ -169,6 +169,7 @@ func Setup(t *testing.T) (err error) {
 		StorageClassName:            runtimeParams.StorageClassName,
 		TestRetries:                 testRetries,
 		PodCreateTimeout:            5 * time.Minute,
+		SyncGatewayImage:            runtimeParams.SyncGatewayImage,
 	}
 
 	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0, Global.PodCreateTimeout)
@@ -189,6 +190,11 @@ func Setup(t *testing.T) (err error) {
 		Global.ClusterSpec[kubeConf.ClusterName] = clusterSpec
 	}
 
+	// Set any defaults.
+	if Global.SyncGatewayImage == "" {
+		Global.SyncGatewayImage = "couchbase/sync-gateway:2.7.0-enterprise"
+	}
+
 	// Setting required spec values from test_config yaml
 	e2espec.SetStorageClassName(runtimeParams.StorageClassName)
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
@@ -203,6 +209,7 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
 	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
 	logrus.Info(" →  couchbase server upgrade: " + runtimeParams.CouchbaseServerImageUpgrade)
+	logrus.Info(" →  couchbase sync gateway: " + Global.SyncGatewayImage)
 	for _, config := range Global.ClusterSpec {
 		logrus.Info("Cluster: ", config.Name)
 		logrus.Info(" →  path: " + config.KubeConfPath)

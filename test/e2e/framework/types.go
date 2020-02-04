@@ -13,17 +13,18 @@ import (
 // Main framework structure
 type Framework struct {
 	// CbopinfoPath is the absolute path to the cbopinfo binary
-	CbopinfoPath    string
-	OpImage         string
-	Deployment      *appsv1.Deployment
-	KubeType        string
-	KubeVersion     string
-	ClusterSpec     types.ClusterMap
-	LogDir          string
-	SkipTeardown    bool
-	SuiteYmlData    SuiteData
-	ClusterConfFile string
-	CollectLogs     bool
+	CbopinfoPath     string
+	OpImage          string
+	SyncGatewayImage string
+	Deployment       *appsv1.Deployment
+	KubeType         string
+	KubeVersion      string
+	ClusterSpec      types.ClusterMap
+	LogDir           string
+	SkipTeardown     bool
+	SuiteYmlData     SuiteData
+	ClusterConfFile  string
+	CollectLogs      bool
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
@@ -53,6 +54,7 @@ type TestRunParam struct {
 	KubeType                    string `yaml:"kube-type"`
 	OperatorImage               string `yaml:"operator-image"`
 	AdmissionControllerImage    string `yaml:"admission-controller-image"`
+	SyncGatewayImage            string `yaml:"sync-gateway-image"`
 	CouchbaseServerImage        string `yaml:"couchbase-server-image"`
 	CouchbaseServerImageUpgrade string `yaml:"couchbase-server-image-upgrade"`
 	SuiteToRun                  string `yaml:"suite"`

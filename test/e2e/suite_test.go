@@ -183,6 +183,11 @@ func operatorRestarted(before map[string]int) bool {
 func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	f := framework.Global
 
+	// Do any pre-test clean up actions
+	for _, cluster := range f.ClusterSpec {
+		e2eutil.DeleteSyncGateway(cluster)
+	}
+
 	// Run the test, catch and report any goroutine leaks or operator crashes
 	restartCounts := getOperatorRestartCounts()
 	preGoroutines := runtime.NumGoroutine()

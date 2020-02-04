@@ -121,6 +121,35 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 	}
 }
 
+// VerifyDocCountInBucketNonZerp polls the Couchbase API for the named bucket and checks whether the
+// document count is non-zero.
+func VerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, time.Second, func() error {
+		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
+		defer cleanup()
+
+		info, err := client.GetBucketStatus(bucket)
+		if err != nil {
+			return err
+		}
+
+		if info.BasicStats.ItemCount == 0 {
+			return fmt.Errorf("document count zero")
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
+	if err := VerifyDocCountInBucketNonZero(t, k8s, cluster, bucket, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 // getRemoteUUID returns the UUID of the remote cluster, or if it is not populated polls until
 // it is populated.
 func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, error) {

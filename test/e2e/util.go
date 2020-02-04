@@ -144,6 +144,16 @@ var (
 		"TestXdcrCreateClusterRemoteMutualTLS":          TestXdcrCreateClusterRemoteMutualTLS,
 		"TestXdcrCreateClusterRemoteMandatoryMutualTLS": TestXdcrCreateClusterRemoteMandatoryMutualTLS,
 
+		// SGW tests
+		"TestSyncGatewayCreateLocal":                    TestSyncGatewayCreateLocal,
+		"TestSyncGatewayCreateLocalTLS":                 TestSyncGatewayCreateLocalTLS,
+		"TestSyncGatewayCreateLocalMutualTLS":           TestSyncGatewayCreateLocalMutualTLS,
+		"TestSyncGatewayCreateLocalMandatoryMutualTLS":  TestSyncGatewayCreateLocalMandatoryMutualTLS,
+		"TestSyncGatewayCreateRemote":                   TestSyncGatewayCreateRemote,
+		"TestSyncGatewayCreateRemoteTLS":                TestSyncGatewayCreateRemoteTLS,
+		"TestSyncGatewayCreateRemoteMutualTLS":          TestSyncGatewayCreateRemoteMutualTLS,
+		"TestSyncGatewayCreateRemoteMandatoryMutualTLS": TestSyncGatewayCreateRemoteMandatoryMutualTLS,
+
 		// RBAC cases
 		"TestRBACValidationCreate":      TestRBACValidationCreate,
 		"TestRBACValidationLDAP":        TestRBACValidationLDAP,
