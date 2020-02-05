@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sync-gateway
+imagePullSecrets:
+- name: MY_REDHAT_CONTAINER_REGISTRY_CREDENTIALS
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sync-gateway
+stringData:
+  config.json: |-
+    {
+      "logging": {
+        "console": {
+          "enabled": true,
+          "log_level": "info",
+          "log_keys": [
+            "*"
+          ]
+        }
+      },
+      "databases": {
+        "cb-example": {
+          "server": "couchbase://cb-example",
+          "bucket": "default",
+          "username": "Administrator",
+          "password": "password",
+          "users": {
+            "GUEST": {
+              "disabled": false,
+              "admin_channels": [
+                "*"
+              ]
+            }
+          },
+          "allow_conflicts": false,
+          "revs_limit": 20,
+          "enable_shared_bucket_access": true
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sync-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sync-gateway
+  template:
+    metadata:
+      labels:
+        app: sync-gateway
+    spec:
+      containers:
+      - name: sync-gateway
+        image: registry.connect.redhat.com/couchbase/sync-gateway:2.7.0-1
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sync_gateway
+          readOnly: true
+        env:
+        - name: GOMAXPROCS
+          value: "1"
+      volumes:
+      - name: config
+        secret:
+          secretName: sync-gateway
+      serviceAccountName: sync-gateway

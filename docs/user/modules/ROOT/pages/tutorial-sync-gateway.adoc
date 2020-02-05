@@ -1,0 +1,196 @@
+= Sync Gateway Tutorial
+
+[abstract]
+Connect Couchbase Sync-Gateway to a Couchbase cluster.
+
+Sync-Gateway is a service that allows mobile devices to connect to Couchbase server and continue functioning when connectivity drops.
+This tutorial defines basic connectivity between Sync-Gateway and a Couchbase Cluster deployed by the Operator.
+
+== Configuring Sync-Gateway
+
+Sync-Gateway is configured with a configuration file within its container.
+The configuration contains sensitive data such as usernames, passwords and TLS private keys.
+We therefore should define the configuration as a secret.
+Relevant configuration variables are documented below:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sync-gateway
+stringData:
+  config.json: |-
+    {
+      "logging": {
+        "console": {
+          "enabled": true, # <.>
+          "log_level": "info", # <.>
+          "log_keys": [
+            "*"
+          ]
+        }
+      },
+      "databases": {
+        "cb-example": { # <.>
+          "server": "couchbase://cb-example", # <.>
+          "bucket": "default", # <.>
+          "username": "Administrator", # <.>
+          "password": "password", # <.>
+          "users": {
+            "GUEST": {
+              "disabled": false,
+              "admin_channels": [
+                "*"
+              ]
+            }
+          },
+          "allow_conflicts": false,
+          "revs_limit": 20,
+          "enable_shared_bucket_access": true
+        }
+      }
+    }
+----
+
+<.> `logging.console.enabled` enables logging to the console.
+    This is especially relevant on Kubernetes where applications are expected to log to standard out.
+
+<.> `logging.console.log_level` defines what messages are printed.
+    For most use cases `info` is sufficient, however `debug` may provide additional information that can aid in problem determination.
+
+<.> `databases.cb-example` is the names of a database connection.
+    The database name is arbitrary.
+    In this instance we have named it after the `CouchbaseCluster` resource it references.
+
+<.> `databases.cb-example.server` defines the Couchbase server instance to connect to.
+    The connection string may be determined the same way as for xref:howto-client-sdks.adoc[client SDKs].
+    The connection options are dependent on your chosen xref:concept-couchbase-networking.adoc[network architecture].
+
+<.> `databases.cb-example.bucket` defines the xref:reference-couchbasebucket.adoc#metadata-name[bucket name] to connect to and use to store mobile data.
+
+<.> `databases.cb-example.username` defines the user that will be used to connect to the cluster.
+
+<.> `databases.cb-example.password` defines the user password that will be used to connect to the cluster.
+
+=== TLS Support
+
+TLS is fully supported between Sync-Gateway and Couchbase Server.
+This includes xref:concept-tls.adoc[server-side TLS or mutual TLS].
+
+Your Sync-Gateway configuration can be modified to allow use of TLS as follows:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sync-gateway
+stringData:
+  config.json: |-
+    {
+      "databases": {
+        "cb-example": {
+            "cacertpath": "/etc/sync_gateway/ca.pem", # <.>
+            "certpath": "/etc/sync_gateway/cert.pem", # <.>
+            "keypath": "/etc/sync_gateway/key.pem", # <.>
+        }
+      }
+    }
+  ca.pem: |- # <.>
+    -----BEGIN CERTIFICATE-----
+    MIIDSzCCAjOgAwIBAgIUDsYnaG+RFwhtoz9hSMwyzfoxOCcwDQYJKoZIhvcNAQEL
+    ...
+  cert.pem: |- # <.>
+    -----BEGIN CERTIFICATE-----
+    MIIDXDCCAkSgAwIBAgIRAOUsHgVlGyJbvOIYuxD90x4wDQYJKoZIhvcNAQELBQAw
+    ...
+  key.pem: |- # <.>
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLaRvd8BxDBsPc
+    ...
+----
+
+Certificates have been truncated for brevity.
+
+<.> `databases.cb-example.cacertpath` defines where the CA certificate will be read from.
+    This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
+
+<.> **Mutual TLS Only:** `databases.cb-example.certpath` defines where the client certificate chain will be read from.
+    This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
+
+<.> **Mutual TLS Only:** `databases.cb-example.keypath` defines where the client key will be read from.
+    This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
+
+<.> The `ca.pem` secret is the CA certificate.
+    The name of this secret data item defines the file name as used by `databases.cb-example.cacertpath` in the Sync-Gateway configuration.
+
+<.> **Mutual TLS Only:** The `cert.pem` secret is the client certificate chain.
+    The name of this secret data item defines the file name as used by `databases.cb-example.certpath` in the Sync-Gateway configuration.
+
+<.> **Mutual TLS Only:** The `key.pem` secret is the client key.
+    The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync-Gateway configuration.
+
+== Deploying Sync-Gateway
+
+Sync-Gateway is a simple state-less application so does not require any application specific controller like the Operator.
+An typical configuration is as described below:
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sync-gateway
+spec:
+  replicas: 1 # <.>
+  selector:
+    matchLabels:
+      app: sync-gateway
+  template:
+    metadata:
+      labels:
+        app: sync-gateway
+    spec:
+      containers:
+      - name: sync-gateway
+        image: couchbase/sync-gateway:2.7.0-enterprise # <.>
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sync_gateway # <.>
+          readOnly: true
+        env:
+        - name: GOMAXPROCS
+          value: "1"
+      volumes:
+      - name: config
+        secret:
+          secretName: sync-gateway # <.>
+----
+
+<.> `spec.replicas` defines how many Sync-Gateway pods to create.
+    As Sync-Gateway is stateless you can modify this attribute to horizontally scale your deployment as needs require.
+
+<.> `spec.template.spec.containers[0].image` defines the container image to deploy.
+    Version 2.7.0 or higher is recommended in order to support connecting to a cluster using xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[public networking with external-DNS] or xref:concept-couchbase-networking.adoc#generic-networking[generic networking].
+
+<.> `spec.template.spec.containers[0].volumeMounts[0].mountPath` mounts the configuration secret in the correct location.
+    By default the Sync-Gateway container will try to load configuration from `/etc/sync_gateway/config.json`, and this is how the `Secret` and `Deployment` are configured.
+
+<.> `spec.template.spec.volumes[0].secret.secretName` references the <<configuring-syncgateway,Sync-Gateway configuration>> `Secret` that is mounted in the Sync-Gateway container.
+
+== Templates
+
+Template files are provided in the Operator binary distribution as `sync-gateway.yaml`.
+They can be deployed -- as is -- into the same namespace as the provided `couchbase-cluster.yaml` template.
+These files are provided as evaluation examples -- they should not be used for production workloads.
+
+[IMPORTANT]
+====
+Redhat OCP users will need to modify the provided template to reference an image pull secret.
+This must grant permission to pull container images from the Redhat Container Registry.
+====
+
+== Further Reading
+
+* xref:sync-gateway::introduction.adoc[Sync-Gateway Documentation]
