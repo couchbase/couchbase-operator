@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/x509"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -62,10 +63,8 @@ func TestExposedFeatureDNS(t *testing.T) {
 	// Create the cluster.
 	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
-		AltNames: []string{
-			"localhost",
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
+		ExtraAltNames: []string{
+			fmt.Sprintf("*.%s", domain),
 		},
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
@@ -110,9 +109,8 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
-		AltNames: []string{
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
+		ExtraAltNames: []string{
+			fmt.Sprintf("*.%s", domain),
 		},
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
@@ -139,10 +137,8 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, targetKube, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
-	subjectAltNames := []string{
-		fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-		fmt.Sprintf("*.%s.%s", clusterName, newDomain),
-	}
+	subjectAltNames := x509.MandatorySANs(testCouchbase.Name, testCouchbase.Namespace)
+	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
 	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/DNS/Domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, newDomain, 5*time.Minute)
@@ -166,9 +162,8 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
-		AltNames: []string{
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
+		ExtraAltNames: []string{
+			fmt.Sprintf("*.%s", domain),
 		},
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
@@ -213,10 +208,8 @@ func TestConsoleServiceDNS(t *testing.T) {
 	// Create the cluster.
 	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
-		AltNames: []string{
-			"localhost",
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
+		ExtraAltNames: []string{
+			fmt.Sprintf("*.%s", domain),
 		},
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
@@ -259,9 +252,8 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
-		AltNames: []string{
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
+		ExtraAltNames: []string{
+			fmt.Sprintf("*.%s", domain),
 		},
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
@@ -288,10 +280,8 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	// Verify that all nodes advertise a DNS based alternate address, and it changes when updated.
 	e2eutil.MustCheckForDNSAdminAnnotation(t, targetKube, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
-	subjectAltNames := []string{
-		fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-		fmt.Sprintf("*.%s.%s", clusterName, newDomain),
-	}
+	subjectAltNames := x509.MandatorySANs(testCouchbase.Name, testCouchbase.Namespace)
+	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
 	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/DNS/Domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAdminAnnotation(t, targetKube, testCouchbase, newDomain, 5*time.Minute)
@@ -313,9 +303,8 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	tlsOptions := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
-		AltNames: []string{
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
+		ExtraAltNames: []string{
+			fmt.Sprintf("*.%s", domain),
 		},
 	}
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)

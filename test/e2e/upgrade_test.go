@@ -610,7 +610,7 @@ func TestUpgradeEnv(t *testing.T) {
 			Value: "bunny",
 		},
 	}
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/Spec/Servers/0/Pod/Env", env), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/Spec/Servers/0/Env", env), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
@@ -664,7 +664,7 @@ func TestUpgradeToSupportable(t *testing.T) {
 	}
 	patchset := jsonpatch.NewPatchSet().
 		Add("/Spec/VolumeClaimTemplates", templates).
-		Add("/Spec/Servers/0/Pod/VolumeMounts", mounts)
+		Add("/Spec/Servers/0/VolumeMounts", mounts)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)

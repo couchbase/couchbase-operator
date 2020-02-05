@@ -267,7 +267,7 @@ func (c *Cluster) reconcileTLS() error {
 	}
 	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace)
 	if c.cluster.Spec.Networking.DNS != nil {
-		subjectAltNames = append(subjectAltNames, c.cluster.Spec.Networking.DNS.Domain)
+		subjectAltNames = append(subjectAltNames, "*."+c.cluster.Spec.Networking.DNS.Domain)
 	}
 
 	if errs := util_x509.Verify(cacert, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames); len(errs) != 0 {

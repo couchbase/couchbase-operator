@@ -460,6 +460,8 @@ type TLSOpts struct {
 	KeyType *KeyType
 	// altNames is the set of DNS alternative names to use.  Defaults to the cluster wildcard and localhost.
 	AltNames []string
+	// ExtraAltNames is the set of additional alternative names to append to the AltNames.
+	ExtraAltNames []string
 	// validFrom is the valid from date for the certificate. Defaults to now.
 	ValidFrom *time.Time
 	// validTo is the valid to date for the certificate.  Defaults to 10 years from now.
@@ -500,6 +502,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 	if len(opts.AltNames) > 0 {
 		altNames = opts.AltNames
 	}
+	altNames = append(altNames, opts.ExtraAltNames...)
 
 	// Set the certificate parameters
 	keyType := KeyTypeRSA
