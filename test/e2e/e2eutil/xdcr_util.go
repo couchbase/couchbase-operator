@@ -244,7 +244,7 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 
 // EstablishXDCRReplicationGeneric creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) (replication *couchbasev2.CouchbaseReplication, cleanup func(), err error) {
+func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (replicationSpec *couchbasev2.CouchbaseReplication, cleanup func(), err error) {
 	// Create the remote cluster secret.
 	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
 	secret := &corev1.Secret{
@@ -267,17 +267,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 		}
 	}()
 
-	// Create the replication.
-	replication = &couchbasev2.CouchbaseReplication{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-replication",
-		},
-		Spec: couchbasev2.CouchbaseReplicationSpec{
-			Bucket:       srcBucket,
-			RemoteBucket: dstBucket,
-		},
-	}
-	if replication, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
+	if replicationSpec, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
 		return
 	}
 
@@ -305,7 +295,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 	}
 
 	// Wait for the operator to successfully connect before continuing.
-	name := fmt.Sprintf("%s/%s/%s", clusterName, srcBucket, dstBucket)
+	name := fmt.Sprintf("%s/%s/%s", clusterName, replication.Spec.Bucket, replication.Spec.RemoteBucket)
 	if err = WaitForClusterEvent(srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name), 5*time.Minute); err != nil {
 		return
 	}
@@ -315,7 +305,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 
 // EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ctx *TLSContext) (cleanup func(), err error) {
+func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, ctx *TLSContext) (cleanup func(), err error) {
 	// Create the remote cluster secret.
 	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
 	secret := &corev1.Secret{
@@ -365,16 +355,6 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		}
 	}
 
-	// Create the replication.
-	replication := &couchbasev2.CouchbaseReplication{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-replication",
-		},
-		Spec: couchbasev2.CouchbaseReplicationSpec{
-			Bucket:       srcBucket,
-			RemoteBucket: dstBucket,
-		},
-	}
 	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
 		return
 	}
@@ -417,7 +397,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	}
 
 	// Wait for the operator to successfully connect before continuing.
-	name := fmt.Sprintf("%s/%s/%s", clusterName, srcBucket, dstBucket)
+	name := fmt.Sprintf("%s/%s/%s", clusterName, replication.Spec.Bucket, replication.Spec.RemoteBucket)
 	if err = WaitForClusterEvent(srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name), 5*time.Minute); err != nil {
 		return
 	}
@@ -425,18 +405,38 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	return
 }
 
-func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string) (*couchbasev2.CouchbaseReplication, func()) {
-	replication, cleanup, err := EstablishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, srcBucket, dstBucket)
+func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Delete(replication.Name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+		// Everything successful
+		return nil
+	})
+}
+
+func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*couchbasev2.CouchbaseReplication, func()) {
+	replication, cleanup, err := EstablishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, replication)
 	if err != nil {
 		Die(t, err)
 	}
 	return replication, cleanup
 }
 
-func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, srcBucket, dstBucket string, ctx *TLSContext) func() {
-	cleanup, err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, srcBucket, dstBucket, ctx)
+func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, ctx *TLSContext) func() {
+	cleanup, err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, replication, ctx)
 	if err != nil {
 		Die(t, err)
 	}
 	return cleanup
+}
+
+func MustDeleteXDCRReplication(t *testing.T, k8s *types.Cluster, source *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) {
+	err := DeleteXDCRReplication(k8s, source, replication, timeout)
+	if err != nil {
+		Die(t, err)
+	}
 }

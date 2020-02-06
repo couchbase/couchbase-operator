@@ -1,6 +1,8 @@
 package e2eutil
 
 import (
+	"fmt"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -91,6 +93,11 @@ func TLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 
 func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.TLSInvalidEvent(cl)
+}
+
+func ReplicationRemovedEvent(c *couchbasev2.CouchbaseCluster, remote, source, destination string) *v1.Event {
+	name := fmt.Sprintf("%s/%s/%s", remote, source, destination)
+	return k8sutil.ReplicationRemovedEvent(c, name)
 }
 
 // ClusterCreateSequence is a common function for generating cluster creation events.

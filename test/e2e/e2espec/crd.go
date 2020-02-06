@@ -1,12 +1,12 @@
 package e2espec
 
 import (
-	"github.com/couchbase/couchbase-operator/pkg/config"
 	"strconv"
 	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
 
@@ -67,6 +67,18 @@ var (
 	}
 )
 
+func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplication {
+	replication := &couchbasev2.CouchbaseReplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.DefaultReplication,
+		},
+		Spec: couchbasev2.CouchbaseReplicationSpec{
+			Bucket:       srcBucket,
+			RemoteBucket: dstBucket,
+		},
+	}
+	return replication
+}
 func NewResourceQuantityMi(value int64) *resource.Quantity {
 	return resource.NewQuantity(value<<20, resource.BinarySI)
 }

@@ -82,6 +82,11 @@ const (
 	DefaultBucket = "default"
 )
 
+//DefaultReplication naming
+const (
+	DefaultReplication = "test-replication"
+)
+
 // CRD Object naming
 const (
 	CouchbaseUserName     = "admin"

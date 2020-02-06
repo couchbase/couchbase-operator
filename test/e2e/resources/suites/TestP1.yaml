@@ -92,6 +92,8 @@ tcGroups:
       - name: TestXdcrRemoveTargetClusterNodes
       - name: TestXdcrResizedOutSourceClusterNodes
       - name: TestXdcrResizedOutTargetClusterNodes
+      - name: TestXDCRDeleteReplication
+      - name: TestXDCRFilterExp
 
   - name: RzaTests
     clusters:
