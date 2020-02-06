@@ -3,7 +3,6 @@
 :toc: macro
 
 The Couchbase Autonomous Operator operates on `CouchbaseCluster` objects.
-Role bindings are decoupled from this configuration and are selected for inclusion within a cluster with configurable label selectors.
 
 `CouchbaseRoleBinding` resources are analogous to Kubernetes `RoleBinding` resources.
 
@@ -17,8 +16,6 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseRoleBinding
 metadata:
   name: my-role-binding
-  labels:
-    cluster: my-cluster
 spec:
   subjects:
   - kind: CouchbaseUser
@@ -40,8 +37,6 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseRoleBinding
 metadata:
   name: my-bucket
-  labels:
-    cluster: my-cluster
 ----
 
 === apiVersion
@@ -67,15 +62,6 @@ The name must be unique for the kind defined.
 
 ____
 _Field rules:_ This field is required and must be unique as described above.
-____
-
-=== metadata.labels
-
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
-Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources] and xref:concept-user-rbac.adoc[RBAC page].
-
-____
-_Field rules:_ This field is optional and must be a map of string key/value pairs.
 ____
 
 == spec

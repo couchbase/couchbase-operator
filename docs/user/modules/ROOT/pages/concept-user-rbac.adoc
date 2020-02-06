@@ -1,0 +1,162 @@
+= Couchbase User RBAC
+
+[abstract]
+The Couchbase Autonomous Operator manages Couchbase Role-Based Access Control (RBAC) for the authorization of administrative users and groups.
+
+== Overview
+
+Users are created when a xref:reference-couchbaseuser.adoc[`CouchbaseUser` resource] is bound to one or more xref:reference-couchbasegroup.adoc[`CouchbaseGroup` resources] using a xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding` resource].
+The `CouchbaseGroup` resource contains a set of roles that are to be applied to one or more users.
+
+[#image-user-binding-model]
+.Basic User Role Binding
+image::user-binding-default.png[]
+
+The Autonomous Operator only creates users that are bound to groups.
+Therefore, all three resources are required in order to create an authorized user.
+
+== User Role Binding
+
+A `CouchbaseRoleBinding` resource can bind multiple users to a single group.
+This model is similar to Kubernetes RBAC which allows multiple service accounts to inherit roles from a single resource.
+Separating user resources in this manner allows role definitions to easily be shared by multiple users.
+Consider the following example that creates user accounts for a developer and security admin with overlapping roles.
+
+[#multi-user-binding-model]
+.Shared User Roles
+image::multi-user-binding-example.png[]
+
+In the diagram above, two users are created with the following privileges:
+
+[#table-example-roles,cols="1,2",options="header"]
+|===
+| Role
+| Privileges
+
+| *Application Developer*
+a| * **data_reader+writer:** Read/write access to data on all buckets
+   * **replication_admin:** XDCR and web console access
+
+| *Security Administrator*
+a| * **security_admin:** Management of user roles
+   * **replication_admin:** XDCR and bucket data access
+
+|===
+
+== Managing Groups
+
+The `CouchbaseGroup` represents a collection of administrative and bucket roles which can be applied to users.
+There is a direct association between the `CouchbaseGroup` resource and xref:server:learn:security/authorization-overview.adoc[Couchbase Server RBAC groups] such that Couchbase Server RBAC groups are created and deleted when corresponding `CouchbaseGroup` resources are created and deleted.
+
+Whenever users are bound to a group, the Autonomous Operator ensures that the corresponding Couchbase Server RBAC group exists with the requested roles, and then proceeds to add the requested users to the group.
+
+=== Setting Roles
+
+Roles within a `CouchbaseGroup` resource can be added, removed, or changed.
+Users only need to be bound once, and will automatically inherit any future changes to the roles in the group.
+
+By default, bucket roles provide a user with access to all buckets.
+The name of a bucket can be added to a bucket role to explicitly define which bucket the role should be applied to.
+The following example demonstrates how to restrict data writing to the default bucket, while allowing the user to read from any bucket.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: data_role
+spec:
+  roles:
+  - name: data_reader
+  - name: data_writer
+    bucket: default
+----
+
+=== Referencing LDAP Groups
+
+Couchbase Server provides LDAP integration which allows external user authentication.
+The Autonomous Operator can be used to enable this functionality when an `ldap_group_ref` is specified within the `CouchbaseGroup` resource.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: data_role
+spec:
+  ldap_group_ref: cn=mygroup,ou=Groups,dc=example,dc=com
+  roles:
+  - name: cluster_admin
+----
+
+The example above demonstrates the creation of a Couchbase Server RBAC group which grants the `cluster_admin` role to all LDAP users within the reference group.
+
+Note that you'll need to have LDAP connectivity configured in the xref:reference-couchbasecluster.adoc[`CouchbaseCluster` resource] in order use this functionality.
+
+== Managing Users
+
+A user is created when it is bound to group.
+A user is also deleted whenever its corresponding `CouchbaseUser` resource is deleted, or if it is no longer bound to any groups.
+Therefore, the deletion of a `CouchbaseGroup` or `CouchbaseRoleBinding` resource may result in user deletion when doing so results in the user being unbound from a group.
+The reason why unbound users are deleted is because there are no clear privileges to apply to the user.
+
+=== Label Selection
+
+If you have more than one `CouchbaseCluster` resource deployed in the same namespace, you'll need to use xref:concept-label-selection.adoc[resource label selection] to ensure that users and groups get created on the correct cluster.
+Like with other Couchbase custom resources, this means specifying a label for RBAC resources which matches the corresponding label selector of the `CouchbaseCluster` resource that you want the resources aggregated to.
+
+It's recommended that you start by adding a label selector to the `CouchbaseCluster` resource.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: my-cluster
+spec:
+  rbac:
+    managed: true
+    selector:
+      matchLabels:
+        cluster: my-cluster
+----
+
+The `CouchbaseCluster` resource configuration above will only select `CouchbaseUser` and `CouchbaseGroup` resources that are labeled with `cluster: my-cluster`.
+
+[source,yaml]
+----
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: my-user
+  labels:
+    cluster: my-cluster
+
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: my-group
+  labels:
+    cluster: my-cluster
+----
+
+Note that `CouchbaseRoleBinding` resources don't support labels and don't directly utilize label selection.
+Instead, the Autonomous Operator looks at the names of the users and groups specified in the `CouchbaseRoleBinding` resource.
+If those names match the `CouchbaseUser` and `CouchbaseGroup` resources that are both being selected by the same cluster, then they will be bound together.
+Therefore, so long as the `CouchbaseUser` and `CouchbaseGroup` resources have the same label, the users and groups specified in the `CouchbaseRoleBinding` resource will be bound together.
+
+
+NOTE: Users and groups must match the labels of the same cluster when being bound together, otherwise a scheduling conflict will occur if one cluster is only selecting a user but not selecting the group it belongs to.
+
+==== Example Label Selection
+
+The following diagram shows an example of users and groups partitioned across a multi-cluster deployment.
+
+[#image-user-label-example]
+.User and Group Selection Across Clusters
+image::user-label-example.png[]
+
+In the example above, the individual users are each selected by different clusters, and each bound to cluster-specific groups.
+However, each user is also bound to a shared XDCR group that is selected by both clusters.
