@@ -172,12 +172,7 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 }
 
 // testXDCRCreateCluster tests cluster creation using any combination of DNS/TLS.
-func testXDCRCreateCluster(t *testing.T, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
-	// Platform configuration.
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
-
+func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	// Static configuration.
 	clusterSize := constants.Size3
 
@@ -220,39 +215,41 @@ func testXDCRCreateCluster(t *testing.T, dns *corev1.Service, tls *e2eutil.TLSCo
 
 // TestXdcrCreateClusterLocal tests establishing an XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocal(t *testing.T) {
-	testXDCRCreateCluster(t, nil, nil, nil)
+	k8s1 := framework.Global.GetCluster(0)
+
+	testXDCRCreateCluster(t, k8s1, k8s1, nil, nil, nil)
 }
 
 // TestXdcrCreateClusterLocalTLS tests establishing a TLS XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocalTLS(t *testing.T) {
-	k8s2 := framework.Global.GetCluster(1)
+	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
 
-	testXDCRCreateCluster(t, nil, tls, nil)
+	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, nil)
 }
 
 // TestXdcrCreateClusterLocalMutualTLS tests establishing an mTLS XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocalMutualTLS(t *testing.T) {
-	k8s2 := framework.Global.GetCluster(1)
+	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	testXDCRCreateCluster(t, nil, tls, &policy)
+	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
 }
 
 // TestXdcrCreateClusterLocalMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
-	k8s2 := framework.Global.GetCluster(1)
+	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	testXDCRCreateCluster(t, nil, tls, &policy)
+	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
 }
 
 // TestXdcrCreateClusterRemote tests establishing an XDCR connection to a k8s2 cluster.
@@ -263,7 +260,7 @@ func TestXdcrCreateClusterRemote(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	testXDCRCreateCluster(t, dns, nil, nil)
+	testXDCRCreateCluster(t, k8s1, k8s2, dns, nil, nil)
 }
 
 // TestXdcrCreateClusterRemoteTLS tests establishing a TLS XDCR connection to a k8s2 cluster.
@@ -277,7 +274,7 @@ func TestXdcrCreateClusterRemoteTLS(t *testing.T) {
 	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
 
-	testXDCRCreateCluster(t, dns, tls, nil)
+	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, nil)
 }
 
 // TestXdcrCreateClusterRemoteMutualTLS tests establishing an mTLS XDCR connection to a k8s2 cluster.
@@ -292,7 +289,7 @@ func TestXdcrCreateClusterRemoteMutualTLS(t *testing.T) {
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	testXDCRCreateCluster(t, dns, tls, &policy)
+	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
 }
 
 // TestXdcrCreateClusterRemoteMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection to a k8s2 cluster.
@@ -307,7 +304,7 @@ func TestXdcrCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	testXDCRCreateCluster(t, dns, tls, &policy)
+	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
 }
 
 // TestXdcrCreateCluster tests establishing an XDCR connection.

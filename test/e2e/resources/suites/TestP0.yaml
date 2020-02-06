@@ -87,7 +87,6 @@ tcGroups:
   - name: XdcrCasesIntraCluster
     clusters:
       - BasicCluster
-      - BasicCluster
     testcases:
       - name: TestXdcrCreateClusterLocal
       - name: TestXdcrCreateClusterLocalTLS
