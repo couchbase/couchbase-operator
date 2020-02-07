@@ -73,3 +73,22 @@ It is possible to segregate workloads exclusively with node selectors.
 The downside is that all other workloads would need to be explicitly scheduled.
 It is therefore highly recommended that taints be used to implicitly schedule 3rd party workloads away from Couchbase server nodes.
 ====
+
+== Quality of Service
+
+<<cluster-isolation>> provides guaranteed resources for Couchbase clusters to use.
+It is, however, relatively complex to plan and implement.
+It may be sufficient to ensure that Couchbase pods are scheduled and cannot be terminated by accident.
+
+By default, when Kubernetes schedules pods, it will place them on nodes with enough resource to accommodate them.
+It may also distribute pods across the cluster in order to spread the load.
+This may lead to a situation where there are no nodes capable of satisfying a Couchbase pod's memory requests.
+Being a database, this may lead to the entire application stack not functioning.
+
+Kubernetes provides https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/[priority classes^] in order to avoid these deadlock situations.
+By default all pods created by the user are run with the same priority class.
+It is possible to run pods with an elevated priority.
+If a high priority pod cannot be scheduled then it is possible for it to preempt pods of a lower priority -- evict them from a node so that the high priority pod may be scheduled.
+If designed correctly, your platform will be able to tolerate evictions as those lower priority pods will be stateless and part of a highly available deployment.
+
+Priority classes can be assigned to Couchbase server pods with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-priorityclassname[`spec.servers[\].pod.spec.priorityClassName`] parameter.

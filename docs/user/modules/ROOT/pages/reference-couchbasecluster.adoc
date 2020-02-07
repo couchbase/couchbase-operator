@@ -135,6 +135,7 @@ spec:
           operator: Equal
           value: cbapp
           effect: NoSchedule
+        priorityClassName: high-priority
         automountServiceAccountToken: false
         serviceAccountName: couchbase-pods
         imagePullSecrets:
@@ -996,6 +997,7 @@ spec:
           operator: Equal
           value: cbapp
           effect: NoSchedule
+        priorityClassName: high-priority
         automountServiceAccountToken: false
         serviceAccountName: couchbase-pods
         imagePullSecrets:
@@ -1176,6 +1178,7 @@ spec:
           operator: Equal
           value: cbapp
           effect: NoSchedule
+        priorityClassName: high-priority
         automountServiceAccountToken: false
         serviceAccountName: couchbase-pods
         imagePullSecrets:
@@ -1236,6 +1239,17 @@ For more information about tolerations, see the Kubernetes documentation on http
 
 ____
 _Field rules:_ This field is optional and must be a list of Kubernetes toleration objects.
+____
+
+=== spec.servers[].pod.spec.priorityClassName
+
+This field allows Couchbase server pods to be run with an increased priority over other pods.
+Increased priority can evict lower priority pods from a node in order to accommodate resource requirements where a pod cannot be scheduled on any node.
+
+For more information, see the Kubernetes documentation on https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/[priority classes and preemption^].
+
+____
+_Field rules:_ This field is optional and must be the name of an existing `PriorityClass` resource.
 ____
 
 === spec.servers[].pod.spec.imagePullSecrets
