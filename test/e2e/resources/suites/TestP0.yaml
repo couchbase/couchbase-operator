@@ -108,7 +108,7 @@ tcGroups:
       - name: TestXdcrTargetNodeServiceDelete
 
   - name: SyncGatewayIntraCluster
-    cluster:
+    clusters:
       - BasicCluster
     testcases:
       - name: TestSyncGatewayCreateLocal
@@ -117,11 +117,11 @@ tcGroups:
       - name: TestSyncGatewayCreateLocalMandatoryMutualTLS
 
   - name: SyncGatewayInterCluster
-    cluster:
+    clusters:
       - BasicCluster
       - NewCluster1
     testcases:
-      - name: TestSyncGatewayCreate
+      - name: TestSyncGatewayCreateRemote
       - name: TestSyncGatewayCreateRemoteTLS
       - name: TestSyncGatewayCreateRemoteMutualTLS
       - name: TestSyncGatewayCreateRemoteMandatoryMutualTLS
