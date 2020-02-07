@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrClusterCreating              = E.New("existing cluster failed during prior initialization, state unknown")
-	ErrUnknownCreatePod             = E.New("unknown error occurred creating pod")
-	ErrUnboundPersistedVolumeClaims = "unbound immediate PersistentVolumeClaims"
+	ErrClusterCreating       = E.New("existing cluster failed during prior initialization, state unknown")
+	ErrUnknownCreatePod      = E.New("unknown error occurred creating pod")
+	ErrResourceLabelMismatch = E.New("resource does not match label selection")
 )
 
 type rebalanceNotObservedError struct{}

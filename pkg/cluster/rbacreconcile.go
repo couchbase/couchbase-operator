@@ -73,23 +73,11 @@ func (c *Cluster) reconcileRBACResources() error {
 // gatherRequestResources gets all requested RBAC resources
 func (c *Cluster) gatherRequestResources() (rbac.ResourceList, error) {
 
-	selector := labels.Everything()
-	if c.cluster.Spec.Security.RBAC.Selector != nil {
-		var err error
-		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector); err != nil {
-			return nil, err
-		}
-	}
-
 	resourceList := make(rbac.ResourceList)
 
 	// Fetch roles referred to by bindings
 	couchbaseRoleBindings := c.k8s.CouchbaseRoleBindings.List()
 	for _, roleBinding := range couchbaseRoleBindings {
-
-		if !selector.Matches(labels.Set(roleBinding.Labels)) {
-			continue
-		}
 
 		// gather roles
 		roles := []couchbasev2.Role{}
@@ -103,8 +91,8 @@ func (c *Cluster) gatherRequestResources() (rbac.ResourceList, error) {
 		} else {
 			// warn if role is missing because resource may
 			// be deleted if there are no roles to bind
-			err = fmt.Errorf("rolebinding `%s` refers to a missing role resource `%s`", roleBinding.Name, roleName)
-			log.Error(err, "RBAC Resources may be deleted if no longer bound to roles", "cluster", c.namespacedName())
+			msg := fmt.Sprintf("Rolebinding `%s` refers to a missing role `%s`", roleBinding.Name, roleName)
+			log.V(1).Info(msg, "cluster", c.namespacedName())
 			continue
 		}
 
@@ -133,12 +121,13 @@ func (c *Cluster) gatherRequestResources() (rbac.ResourceList, error) {
 
 					// Fetch subject from k8s
 					if resource, err = c.getRoleBindingSubject(roleSubject); err == nil {
-
 						// Add to list
 						resourceList.Add(resource)
 					} else {
-						err = fmt.Errorf("rolebinding `%s` refers to a missing role subject `%s`", roleBinding.Name, roleSubject.Name)
-						log.Error(err, "Roles cannot be add to missing subjects", "cluster", c.namespacedName())
+						if err != cberrors.ErrResourceLabelMismatch {
+							msg := fmt.Sprintf("Rolebinding `%s` refers to a missing role subject, `%s` will not be created", roleBinding.Name, roleSubject.Name)
+							log.V(1).Info(msg, "cluster", c.namespacedName())
+						}
 						continue
 					}
 				}
@@ -160,11 +149,24 @@ func (c *Cluster) getRoleBindingSubject(roleSubject couchbasev2.CouchbaseRoleBin
 
 	opts := rbac.ResourceOpts{}
 
+	// only choose selected resources
+	selector := labels.Everything()
+	if c.cluster.Spec.Security.RBAC.Selector != nil {
+		var err error
+		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector); err != nil {
+			return nil, err
+		}
+	}
+
 	switch roleSubject.Kind {
 	case couchbasev2.RoleBindingTypeUser:
 
 		// fetch resource as couchbase user
 		if user, found := c.k8s.CouchbaseUsers.Get(roleSubject.Name); found {
+
+			if !selector.Matches(labels.Set(user.Labels)) {
+				return nil, cberrors.ErrResourceLabelMismatch
+			}
 
 			// Require password when using internal auth domain
 			if user.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
@@ -180,6 +182,9 @@ func (c *Cluster) getRoleBindingSubject(roleSubject couchbasev2.CouchbaseRoleBin
 	case couchbasev2.RoleBindingTypeGroup:
 		// fetch resource as couchbase group
 		if group, found := c.k8s.CouchbaseGroups.Get(roleSubject.Name); found {
+			if !selector.Matches(labels.Set(group.Labels)) {
+				return nil, cberrors.ErrResourceLabelMismatch
+			}
 			return rbac.NewResource(group, &opts)
 		}
 	default:
