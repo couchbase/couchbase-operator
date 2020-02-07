@@ -185,3 +185,33 @@ tcGroups:
       - name: TestConsoleServiceDNSModify
       - name: TestConsoleServiceTypeModify
       - name: TestExposedFeatureTrafficPolicyCluster
+
+  - name: RBACTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRBACValidationCreate
+      - name: TestRBACValidationLDAP
+      - name: TestRBACDeleteUser
+      - name: TestRBACUpdateRole
+      - name: TestRBACDeleteRole
+
+  - name: LDAPTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestLDAPCreateAdminUser
+      - name: TestLDAPCDeleteUser
+      - name: TestLDAPDeleteRole
+      - name: TestLDAPUpdateRole
+
+  - name: AutomatedBackupTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestFullIncremental
+      - name: TestFullOnly
+      - name: TestBackupAndRestore
+      - name: TestFullIncrementalOverTLS
+      - name: TestFullOnlyOverTLS
+      - name: TestMultipleBackups

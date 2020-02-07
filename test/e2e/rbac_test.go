@@ -297,7 +297,7 @@ func TestRBACSelection(t *testing.T) {
 	clusterSize := 1
 
 	// Create first user
-	user, _, binding := mustCreateBoundUser(t, targetKube, f.Namespace)
+	user, _, binding := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
 
 	// Create second user with labels
 	customUser := e2espec.NewDefaultUser()
@@ -306,7 +306,7 @@ func TestRBACSelection(t *testing.T) {
 	}
 	customUser.Name = "simba"
 	customUser.Labels = labels
-	customUser = e2eutil.MustNewUser(t, targetKube, f.Namespace, customUser)
+	customUser = e2eutil.MustNewUser(t, targetKube, targetKube.Namespace, customUser)
 
 	// Add second user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
@@ -320,7 +320,7 @@ func TestRBACSelection(t *testing.T) {
 	couchbase.Spec.Security.RBAC.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
-	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, f.Namespace, couchbase)
+	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, couchbase)
 
 	// Ensure the unlabelled user doesn't get created.
 	if err := e2eutil.WaitUntilUserExists(targetKube, couchbase, user, time.Minute); err == nil {

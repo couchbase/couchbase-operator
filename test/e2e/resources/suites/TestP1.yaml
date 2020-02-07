@@ -160,3 +160,29 @@ tcGroups:
       - BasicCluster
     testcases:
       - name: TestStatusRecovery
+
+  - name: RBACTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRBACRemoveUserFromBinding
+      - name: TestRBACDeleteBinding
+      - name: TestRBACWithLDAPAuth
+      - name: TestRBACSelection
+
+  - name: LDAPTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestLDAPRemoveUserFromBinding
+      - name: TestLDAPDeleteBinding
+
+  - name: AutomatedBackupTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestFailedBackupBehaviour
+      - name: TestBackupPVCReconcile
+      - name: TestReplaceFullOnlyBackup
+      - name: TestReplaceFullIncrementalBackup
+      - name: TestUpdateBackupStatus
