@@ -11,19 +11,13 @@ spec:
 apiVersion: couchbase.com/v2
 kind: CouchbaseGroup
 metadata:
-  name: ldap-group
-spec:
-  ldapGroupRef: cn=mygroup,ou=Groups,dc=example,dc=com
----
-apiVersion: couchbase.com/v2
-kind: CouchbaseRole
-metadata:
-  name: admin-role
+  name: admin-group
 spec:
   roles:
   - name: cluster_admin
   - name: bucket_admin
     bucket: default
+  ldapGroupRef: cn=mygroup,ou=Groups,dc=example,dc=com
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseRoleBinding
@@ -31,10 +25,8 @@ metadata:
   name: admin-role-binding
 spec:
   roleRef:
-    kind: CouchbaseRole
-    name: admin-role
+    kind: CouchbaseGroup
+    name: admin-group
   subjects:
   - kind: CouchbaseUser
     name: admin-user
-  - kind: CouchbaseGroup
-    name: ldap-group

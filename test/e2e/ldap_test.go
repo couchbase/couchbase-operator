@@ -18,11 +18,11 @@ import (
 )
 
 // mustCreateBoundUser creates user bound to cluster and bucket admin roles
-func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseRole, *couchbasev2.CouchbaseRoleBinding) {
+func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
 	user := e2eutil.MustNewUser(t, k8s, namespace, e2espec.NewDefaultLDAPUser())
-	role := e2eutil.MustNewRole(t, k8s, namespace, e2espec.NewClusterAdminRole())
+	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
 	binding := e2eutil.MustNewRoleBinding(t, k8s, namespace, e2espec.NewClusterRoleBinding())
-	return user, role, binding
+	return user, group, binding
 }
 
 func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.CouchbaseCluster {
@@ -67,6 +67,7 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 	// Validation
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -100,13 +101,14 @@ func TestLDAPCDeleteUser(t *testing.T) {
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestLDAPDeleteRole verifies that deleting a role results in deleting User
+// TestLDAPDeleteRole verifies that deleting a group results in deleting User
 func TestLDAPDeleteRole(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -121,11 +123,11 @@ func TestLDAPDeleteRole(t *testing.T) {
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
-	user, role, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, group, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
-	// Delete role and wait for user deletion from cluster
-	e2eutil.MustDeleteRole(t, targetKube, targetKube.Namespace, role)
+	// Delete group and wait for user deletion from cluster
+	e2eutil.MustDeleteGroup(t, targetKube, targetKube.Namespace, group)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
 	// Ensure user delete event emitted
@@ -134,7 +136,9 @@ func TestLDAPDeleteRole(t *testing.T) {
 	// Validation
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonGroupDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -152,11 +156,11 @@ func TestLDAPUpdateRole(t *testing.T) {
 	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
 
 	// User
-	user, role, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, group, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Change to bucket role user
-	e2eutil.MustPatchRole(t, targetKube, role, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", "bucket_admin"), time.Minute)
+	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", "bucket_admin"), time.Minute)
 	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", "bucket_admin"), time.Minute)
 
 	// Check the events match what we expect:
@@ -164,6 +168,7 @@ func TestLDAPUpdateRole(t *testing.T) {
 	// * UserCreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserEdited},
 	}
@@ -221,6 +226,7 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 	// * UserCreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
@@ -260,7 +266,9 @@ func TestLDAPDeleteBinding(t *testing.T) {
 	// Validation
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonGroupDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

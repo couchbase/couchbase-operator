@@ -1075,17 +1075,17 @@ func MustWaitForUserDeletion(t *testing.T, k8s *types.Cluster, namespace string,
 	}
 }
 
-func WaitForRoleDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
+func WaitForGroupDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	callback := func() error {
-		roles, err := k8s.CRClient.CouchbaseV2().CouchbaseRoles(namespace).List(metav1.ListOptions{})
+		groups, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
-		if len(roles.Items) != 0 {
-			return fmt.Errorf("waiting for %v couchbase user roles to delete", len(roles.Items))
+		if len(groups.Items) != 0 {
+			return fmt.Errorf("waiting for %v couchbase user groups to delete", len(groups.Items))
 		}
 		return nil
 	}

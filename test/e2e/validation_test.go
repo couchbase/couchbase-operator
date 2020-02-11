@@ -1420,14 +1420,14 @@ func TestRBACValidationCreate(t *testing.T) {
 			shouldFail: false,
 		}, {
 			name:        "TestValidateClusterRole",
-			mutations:   patchMap{"role": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "cluster_admin")},
-			validations: patchMap{"role": jsonpatch.NewPatchSet().Test("/spec/roles/0/name", "cluster_admin")},
+			mutations:   patchMap{"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "cluster_admin")},
+			validations: patchMap{"admin-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/name", "cluster_admin")},
 			shouldFail:  false,
 		},
 		{
 			name:           "TestRejectBucketForClusterRole",
-			mutations:      patchMap{"role": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "default")},
-			validations:    patchMap{"role": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "default")},
+			mutations:      patchMap{"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "default")},
+			validations:    patchMap{"admin-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "default")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.roles[0].bucket for cluster role.admin is a forbidden property"},
 		},
@@ -1452,7 +1452,7 @@ func TestRBACValidationCreate(t *testing.T) {
 		},
 		{
 			name:        "TestValidateDefaultBucketRole",
-			validations: patchMap{"bucket-role": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "*")},
+			validations: patchMap{"data-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "*")},
 			shouldFail:  false,
 		},
 	}

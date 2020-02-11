@@ -21,11 +21,11 @@ import (
 )
 
 // mustCreateBoundUser creates user bound to cluster and bucket admin roles
-func mustCreateBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseRole, *couchbasev2.CouchbaseRoleBinding) {
+func mustCreateBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
 	user := e2eutil.MustNewUser(t, k8s, namespace, e2espec.NewDefaultUser())
-	role := e2eutil.MustNewRole(t, k8s, namespace, e2espec.NewClusterAdminRole())
+	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
 	binding := e2eutil.MustNewRoleBinding(t, k8s, namespace, e2espec.NewClusterRoleBinding())
-	return user, role, binding
+	return user, group, binding
 }
 
 // Create cluster with user and cluster admin binding
@@ -49,6 +49,7 @@ func TestRBACCreateAdminUser(t *testing.T) {
 	// * UserCreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -82,6 +83,7 @@ func TestRBACDeleteUser(t *testing.T) {
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
@@ -104,11 +106,11 @@ func TestRBACDeleteRole(t *testing.T) {
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
-	user, role, _ := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
+	user, group, _ := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
-	// Delete role and wait for user deletion from cluster
-	e2eutil.MustDeleteRole(t, targetKube, targetKube.Namespace, role)
+	// Delete group and wait for user deletion from cluster
+	e2eutil.MustDeleteGroup(t, targetKube, targetKube.Namespace, group)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
 	// Ensure user delete event emitted
@@ -117,7 +119,9 @@ func TestRBACDeleteRole(t *testing.T) {
 	// Validation
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonGroupDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -135,11 +139,11 @@ func TestRBACUpdateRole(t *testing.T) {
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
 
 	// User
-	user, role, _ := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
+	user, group, _ := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Change to bucket role user
-	e2eutil.MustPatchRole(t, targetKube, role, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", "bucket_admin"), time.Minute)
+	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", "bucket_admin"), time.Minute)
 	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", "bucket_admin"), time.Minute)
 
 	// Check the events match what we expect:
@@ -147,8 +151,9 @@ func TestRBACUpdateRole(t *testing.T) {
 	// * UserCreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonUserEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonGroupEdited},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -204,6 +209,7 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 	// * UserCreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
@@ -243,6 +249,7 @@ func TestRBACDeleteBinding(t *testing.T) {
 	// Validation
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
@@ -297,7 +304,7 @@ func TestRBACSelection(t *testing.T) {
 	clusterSize := 1
 
 	// Create first user
-	user, _, binding := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
+	user, group, binding := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
 
 	// Create second user with labels
 	customUser := e2espec.NewDefaultUser()
@@ -307,6 +314,9 @@ func TestRBACSelection(t *testing.T) {
 	customUser.Name = "simba"
 	customUser.Labels = labels
 	customUser = e2eutil.MustNewUser(t, targetKube, targetKube.Namespace, customUser)
+
+	// Patch group with labels
+	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Add("/Labels", labels), time.Minute)
 
 	// Add second user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
@@ -335,6 +345,7 @@ func TestRBACSelection(t *testing.T) {
 	// * UserCreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 	}
 	ValidateEvents(t, targetKube, couchbase, expectedEvents)

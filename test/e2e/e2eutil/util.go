@@ -761,10 +761,10 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 	} else if err := WaitForAllUserDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
 	}
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseRoles(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaseroles: ", err)
-	} else if err := WaitForRoleDeletion(k8s, namespace, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaseroles: ", err)
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
+	} else if err := WaitForGroupDeletion(k8s, namespace, time.Minute); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
 	}
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)

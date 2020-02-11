@@ -37,25 +37,25 @@ func MustDeleteUser(t *testing.T, k8s *types.Cluster, namespace string, user *co
 	}
 }
 
-// NewRole creates a new couchbase role
-func NewRole(k8s *types.Cluster, namespace string, role *couchbasev2.CouchbaseRole) (*couchbasev2.CouchbaseRole, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseRoles(namespace).Create(role)
+// NewRole creates a new couchbase group
+func NewGroup(k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) (*couchbasev2.CouchbaseGroup, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).Create(group)
 }
 
-func MustNewRole(t *testing.T, k8s *types.Cluster, namespace string, role *couchbasev2.CouchbaseRole) *couchbasev2.CouchbaseRole {
-	newRole, err := NewRole(k8s, namespace, role)
+func MustNewGroup(t *testing.T, k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) *couchbasev2.CouchbaseGroup {
+	newGroup, err := NewGroup(k8s, namespace, group)
 	if err != nil {
 		Die(t, err)
 	}
-	return newRole
+	return newGroup
 }
 
-func DeleteRole(k8s *types.Cluster, namespace string, role *couchbasev2.CouchbaseRole) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseRoles(namespace).Delete(role.Name, metav1.NewDeleteOptions(0))
+func DeleteGroup(k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).Delete(group.Name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteRole(t *testing.T, k8s *types.Cluster, namespace string, role *couchbasev2.CouchbaseRole) {
-	if err := DeleteRole(k8s, namespace, role); err != nil {
+func MustDeleteGroup(t *testing.T, k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) {
+	if err := DeleteGroup(k8s, namespace, group); err != nil {
 		Die(t, err)
 	}
 }
@@ -83,20 +83,20 @@ func MustDeleteRoleBinding(t *testing.T, k8s *types.Cluster, namespace string, b
 	}
 }
 
-// Patch CouchbaseRole
-func PatchRole(k8s *types.Cluster, role *couchbasev2.CouchbaseRole, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseRole, error) {
+// Patch CouchbaseGroup
+func PatchGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseGroup, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return role, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return group, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 
-		// get the role
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseRoles(role.Namespace).Get(role.Name, metav1.GetOptions{})
+		// get the group
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Get(group.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
-		// Apply the patch set to the role
+		// Apply the patch set to the group
 		after := before.DeepCopy()
 		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
 			return false, retryutil.RetryOkError(err)
@@ -107,25 +107,25 @@ func PatchRole(k8s *types.Cluster, role *couchbasev2.CouchbaseRole, patches json
 			return true, nil
 		}
 
-		// Attempt to post the update, updating the role
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseRoles(role.Namespace).Update(after)
+		// Attempt to post the update, updating the group
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Update(after)
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
-		role = updated
+		group = updated
 
 		// Everything successful
 		return true, nil
 	})
 }
 
-func MustPatchRole(t *testing.T, k8s *types.Cluster, role *couchbasev2.CouchbaseRole, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseRole {
-	role, err := PatchRole(k8s, role, patches, timeout)
+func MustPatchGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseGroup {
+	group, err := PatchGroup(k8s, group, patches, timeout)
 	if err != nil {
 		Die(t, err)
 	}
-	return role
+	return group
 }
 
 // Patch CouchbaseRoleBinding

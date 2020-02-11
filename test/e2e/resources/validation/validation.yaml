@@ -100,17 +100,17 @@ spec:
   authDomain: ldap
 ---
 apiVersion: couchbase.com/v2
-kind: CouchbaseRole
+kind: CouchbaseGroup
 metadata:
-  name: role
+  name: admin-group
 spec:
   roles:
    - name: admin
 ---
 apiVersion: couchbase.com/v2
-kind: CouchbaseRole
+kind: CouchbaseGroup
 metadata:
-  name: bucket-role
+  name: data-group
 spec:
   roles:
    - name: data_writer
@@ -121,8 +121,8 @@ metadata:
   name: role-binding
 spec:
   roleRef:
-    kind: CouchbaseRole
-    name: role
+    kind: CouchbaseGroup
+    name: admin-group
   subjects:
   - kind: CouchbaseUser
     name: user1
@@ -134,7 +134,7 @@ metadata:
 spec:
   roleRef:
     kind: CouchbaseRole
-    name: bucket-role
+    name: data-group
   subjects:
   - kind: CouchbaseUser
     name: user1

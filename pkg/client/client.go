@@ -63,9 +63,6 @@ type Client struct {
 	// CouchbaseGroups is a read only cache of couchbase groups (namespace scoped)
 	CouchbaseGroups *CouchbaseGroupCache
 
-	// CouchbaseRoles is a read only cache of couchbase roles (namespace scoped)
-	CouchbaseRoles *CouchbaseRoleCache
-
 	// CouchbaseRoleBindings is a read only cache of couchbase rolebindings (namespace scoped)
 	CouchbaseRoleBindings *CouchbaseRoleBindingCache
 
@@ -157,11 +154,6 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
-	c.CouchbaseRoles, err = newCouchbaseRoleCache(ctx, c.CouchbaseClient, namespace)
-	if err != nil {
-		return nil, err
-	}
-
 	c.CouchbaseRoleBindings, err = newCouchbaseRoleBindingCache(ctx, c.CouchbaseClient, namespace)
 	if err != nil {
 		return nil, err
@@ -203,7 +195,6 @@ func (c *Client) Shutdown() {
 	c.CouchbaseReplications.stop()
 	c.CouchbaseUsers.stop()
 	c.CouchbaseGroups.stop()
-	c.CouchbaseRoles.stop()
 	c.CouchbaseRoleBindings.stop()
 	c.Jobs.stop()
 	c.CronJobs.stop()

@@ -30,12 +30,12 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			return validationv2.ApplyMemcachedBucketDefaults(v, object)
 		case couchbasev2.ReplicationCRDResourceKind:
 			return validationv2.ApplyReplicationDefaults(v, object)
-		case couchbasev2.RoleCRDResourceKind:
-			return validationv2.ApplyRoleDefaults(v, object)
 		case couchbasev2.BackupCRDResourceKind:
 			return validationv2.ApplyBackupDefaults(object)
 		case couchbasev2.BackupRestoreCRDResourceKind:
 			return validationv2.ApplyBackupRestoreDefaults(object)
+		case couchbasev2.GroupCRDResourceKind:
+			return validationv2.ApplyGroupDefaults(v, object)
 		}
 	}
 	return nil
@@ -55,8 +55,8 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) error {
 		return validationv2.CheckConstraintsReplication(v, t)
 	case *couchbasev2.CouchbaseUser:
 		return validationv2.CheckConstraintsCouchbaseUser(v, t)
-	case *couchbasev2.CouchbaseRole:
-		return validationv2.CheckConstraintsCouchbaseRole(v, t)
+	case *couchbasev2.CouchbaseGroup:
+		return validationv2.CheckConstraintsCouchbaseGroup(v, t)
 	case *couchbasev2.CouchbaseBackup:
 		return validationv2.CheckConstraintsBackup(v, t)
 	case *couchbasev2.CouchbaseBackupRestore:

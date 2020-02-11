@@ -255,7 +255,7 @@ func ApplyReplicationDefaults(v *types.Validator, object *unstructured.Unstructu
 	return patch
 }
 
-func ApplyRoleDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
+func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 	roles, _, _ := unstructured.NestedSlice(object.Object, "spec", "roles")
 	for i, role := range roles {
@@ -882,10 +882,10 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 	return nil
 }
 
-func CheckConstraintsCouchbaseRole(v *types.Validator, role *couchbasev2.CouchbaseRole) error {
+func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.CouchbaseGroup) error {
 	errs := []error{}
 
-	for index, role := range role.Spec.Roles {
+	for index, role := range group.Spec.Roles {
 		// role itself must be valid
 		isCluterRole := couchbasev2.IsClusterRole(role.Name)
 		// Bucket cannot be used with cluster role

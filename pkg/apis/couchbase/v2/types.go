@@ -382,30 +382,10 @@ type CouchbaseGroup struct {
 }
 
 type CouchbaseGroupSpec struct {
-	// LDAPGroupRef is optional reference to LDAP
-	// group that this couchbase group refers to
-	LDAPGroupRef string `json:"ldapGroupRef"`
-}
-
-// CouchbaseGroupList is a list of Couchbase groups .
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type CouchbaseGroupList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CouchbaseGroup `json:"items"`
-}
-
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type CouchbaseRole struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              CouchbaseRoleSpec `json:"spec"`
-}
-
-type CouchbaseRoleSpec struct {
 	// role identifier
 	Roles []Role `json:"roles"`
+	// optional reference to LDAP group
+	LDAPGroupRef string `json:"ldap_group_ref"`
 }
 
 type Role struct {
@@ -415,12 +395,12 @@ type Role struct {
 	Bucket string `json:"bucket"`
 }
 
-// CouchbaseRoleList is a list of Couchbase users.
+// CouchbaseGroupList is a list of Couchbase users.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type CouchbaseRoleList struct {
+type CouchbaseGroupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CouchbaseRole `json:"items"`
+	Items           []CouchbaseGroup `json:"items"`
 }
 
 // +genclient
@@ -444,7 +424,7 @@ const (
 	// RoleBindingTypeUser applies role to Couchbase User
 	RoleBindingTypeUser RoleBindingType = "CouchbaseUser"
 
-	// RoleBindingTypeUser applies role to Couchbase Group
+	// TODO: rm RoleBindingTypeUser applies role to Couchbase Group
 	RoleBindingTypeGroup RoleBindingType = "CouchbaseGroup"
 )
 

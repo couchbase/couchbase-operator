@@ -565,51 +565,6 @@ func (c *CouchbaseGroupCache) stop() {
 	c.resourceCache.stop()
 }
 
-// CouchbaseRoleCache is a wrapper around a resourceCache that provides concrete typing for
-// CouchbaseRole resources.
-type CouchbaseRoleCache struct {
-	resourceCache *resourceCache
-	namespace     string
-}
-
-// newCouchbaseRoleCache creates a new synchronized cache for CouchbaseRole resources.
-func newCouchbaseRoleCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseRoleCache, error) {
-	selector := labels.Everything()
-	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseRole{}, selector, couchbasev2.RoleCRDResourcePlural, namespace)
-	if err != nil {
-		return nil, err
-	}
-	return &CouchbaseRoleCache{
-		resourceCache: resourceCache,
-		namespace:     namespace,
-	}, nil
-}
-
-// get returns the requested couchbaserole based on name.
-func (c *CouchbaseRoleCache) Get(name string) (*couchbasev2.CouchbaseRole, bool) {
-	key := c.namespace + "/" + name
-	// Cannot error
-	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
-	if !exists {
-		return nil, exists
-	}
-	return obj.(*couchbasev2.CouchbaseRole), true
-}
-
-// list returns all couchbaseroles.
-func (c *CouchbaseRoleCache) List() (resources []*couchbasev2.CouchbaseRole) {
-	objs := c.resourceCache.informer.GetStore().List()
-	for _, obj := range objs {
-		resources = append(resources, obj.(*couchbasev2.CouchbaseRole))
-	}
-	return
-}
-
-// stop stops the cache synchronization and frees resources.
-func (c *CouchbaseRoleCache) stop() {
-	c.resourceCache.stop()
-}
-
 // CouchbaseRoleBindingCache is a wrapper around a resourceCache that provides concrete typing for
 // CouchbaseRoleBinding resources.
 type CouchbaseRoleBindingCache struct {

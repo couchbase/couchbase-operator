@@ -33,7 +33,7 @@ var (
 		resource.NewCouchbaseMemcachedBucketResource,
 		resource.NewCouchbaseReplicationResource,
 		resource.NewCouchbaseUserResource,
-		resource.NewCouchbaseRoleResource,
+		resource.NewCouchbaseGroupResource,
 		resource.NewCouchbaseRoleBindingResource,
 		resource.NewDeploymentResource,
 		resource.NewEndpointResource,

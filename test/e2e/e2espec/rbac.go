@@ -34,19 +34,19 @@ func NewDefaultLDAPUser() *couchbasev2.CouchbaseUser {
 
 }
 
-// NewClusterAdminRole creates role to grant user cluster admin privilege
-func NewClusterAdminRole() *couchbasev2.CouchbaseRole {
+// NewClusterAdminGroup creates group to grant user cluster admin privilege
+func NewClusterAdminGroup() *couchbasev2.CouchbaseGroup {
 
-	// couchbase cluster role
+	// couchbase cluster privilege
 	clusterAdminRole := couchbasev2.Role{
 		Name: e2e_constants.ClusterAdminRole,
 	}
-	spec := couchbasev2.CouchbaseRoleSpec{
+	spec := couchbasev2.CouchbaseGroupSpec{
 		Roles: []couchbasev2.Role{clusterAdminRole},
 	}
 
 	// crd
-	return &couchbasev2.CouchbaseRole{
+	return &couchbasev2.CouchbaseGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: e2e_constants.ClusterRoleName,
 		},
@@ -54,8 +54,8 @@ func NewClusterAdminRole() *couchbasev2.CouchbaseRole {
 	}
 }
 
-// NewClusterAdminRole creates role to grant user admin privilege to all bucket
-func NewBucketAdminRole() *couchbasev2.CouchbaseRole {
+// NewBucketAdminGroup creates group to grant user admin privilege to all bucket
+func NewBucketAdminGroup() *couchbasev2.CouchbaseGroup {
 
 	// couchbase bucket role
 	bucketAdminRole := couchbasev2.Role{
@@ -63,12 +63,12 @@ func NewBucketAdminRole() *couchbasev2.CouchbaseRole {
 		Bucket: "*",
 	}
 
-	spec := couchbasev2.CouchbaseRoleSpec{
+	spec := couchbasev2.CouchbaseGroupSpec{
 		Roles: []couchbasev2.Role{bucketAdminRole},
 	}
 
 	// crd
-	return &couchbasev2.CouchbaseRole{
+	return &couchbasev2.CouchbaseGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: e2e_constants.BucketRoleName,
 		},

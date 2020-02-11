@@ -36,8 +36,6 @@ type KubeAbstraction interface {
 	GetCouchbaseUsers(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseUserList, error)
 	// GetCouchbaseGroups returns all groups for a specified selector
 	GetCouchbaseGroups(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseGroupList, error)
-	// GetCouchbaseRoles returns all user roles for a specified selector
-	GetCouchbaseRoles(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleList, error)
 	// GetCouchbaseRoleBindings returns all user role bindings for a specified selector
 	GetCouchbaseRoleBindings(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleBindingList, error)
 	// GetCouchbaseBackups returns all backups for a specified selector.
@@ -140,15 +138,6 @@ func (ab *kubeAbstractionImpl) GetCouchbaseGroups(namespace string, selector *me
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseGroups(namespace).List(listOpts)
-}
-
-// GetCouchbaseRoles returns all user roles for a specified selector
-func (ab *kubeAbstractionImpl) GetCouchbaseRoles(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleList, error) {
-	listOpts := metav1.ListOptions{}
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
-	}
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseRoles(namespace).List(listOpts)
 }
 
 // GetCouchbaseRoleBindings returns all user role bindings for a specified selector

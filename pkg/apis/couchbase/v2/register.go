@@ -26,8 +26,6 @@ const (
 	UserCRDResourcePlural             = "couchbaseusers"
 	GroupCRDResourceKind              = "CouchbaseGroup"
 	GroupCRDResourcePlural            = "couchbasegroups"
-	RoleCRDResourceKind               = "CouchbaseRole"
-	RoleCRDResourcePlural             = "couchbaseroles"
 	RoleBindingCRDResourceKind        = "CouchbaseRoleBinding"
 	RoleBindingCRDResourcePlural      = "couchbaserolebindings"
 	GroupVersion                      = "v2"
@@ -42,7 +40,6 @@ const (
 	ReplicationCRDName                = ReplicationCRDResourcePlural + "." + GroupName
 	UserCRDName                       = UserCRDResourcePlural + "." + GroupName
 	GroupCRDName                      = GroupCRDResourcePlural + "." + GroupName
-	RoleCRDName                       = RoleCRDResourcePlural + "." + GroupName
 	RoleBindingCRDName                = RoleBindingCRDResourcePlural + "." + GroupName
 )
 
@@ -62,7 +59,6 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseReplication{}, &CouchbaseReplicationList{})
 	SchemeBuilder.Register(&CouchbaseUser{}, &CouchbaseUserList{})
 	SchemeBuilder.Register(&CouchbaseGroup{}, &CouchbaseGroupList{})
-	SchemeBuilder.Register(&CouchbaseRole{}, &CouchbaseRoleList{})
 	SchemeBuilder.Register(&CouchbaseRoleBinding{}, &CouchbaseRoleBindingList{})
 	SchemeBuilder.Register(&CouchbaseBackup{}, &CouchbaseBackupList{})
 	SchemeBuilder.Register(&CouchbaseBackupRestore{}, &CouchbaseBackupRestoreList{})
@@ -84,8 +80,6 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: UserCRDResourceKind}
 	case "couchbasegroup":
 		return schema.GroupResource{Group: GroupName, Resource: GroupCRDResourceKind}
-	case "couchbaserole":
-		return schema.GroupResource{Group: GroupName, Resource: RoleCRDResourceKind}
 	case "couchbaserolebinding":
 		return schema.GroupResource{Group: GroupName, Resource: RoleBindingCRDResourceKind}
 	case "couchbasebackup":
