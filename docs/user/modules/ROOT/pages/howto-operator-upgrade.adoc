@@ -1,12 +1,18 @@
 = Upgrading the Autonomous Operator
 :tabs:
 
+[IMPORTANT]
+====
+Users upgrading from Operator version 1.x.x must fully read and understand the <<update-resources,resource update>> step before continuing.
+====
+
 Upgrading the Couchbase Autonomous Operator is a four-step process:
 
 - <<download-operator, Step 1: Download the New Operator Package>>
 - <<uninstall-operator, Step 2: Uninstall the Old Operator>>
-- <<update-crd, Step 3: Update the CRD>>
-- <<install-operator, Step 4: Install the New Operator>>
+- <<update-crd, Step 3: Update the CRDs>>
+- <<update-resources, Step 4: (Optional) Update the Resources>>
+- <<install-operator, Step 5: Install the New Operator>>
 
 [#download-operator]
 == Step 1: Download the New Operator Package
@@ -33,84 +39,22 @@ Never delete existing CRDs.
 If an existing CRD is deleted, any `CouchbaseCluster` resources will also be deleted.
 ====
 
-To uninstall version 1.2.0 of the Operator, first change into the original install package directory, then perform the following steps:
-
-[{tabs}]
-====
-Kubernetes::
-+
---
-. Uninstall the Operator from all namespaces.
-+
-[source,console]
-----
-kubectl delete --namespace default -f operator-deployment.yaml
-----
-+
-[source,console]
-----
-kubectl delete --namespace default -f operator-role-binding.yaml
-----
-+
-[source,console]
-----
-kubectl delete --namespace default -f operator-role.yaml
-----
-+
-[source,console]
-----
-kubectl delete --namespace default -f operator-service-account.yaml
-----
-
-. Uninstall the Dynamic Admission Controller.
-+
-[source,console]
-----
-kubectl delete -f admission.yaml
-----
---
-
-OpenShift::
-+
---
-. Uninstall the Operator from all namespaces.
-+
-[source,console]
-----
-oc delete --namespace default -f operator-deployment.yaml
-----
-+
-[source,console]
-----
-oc delete --namespace default -f operator-role-binding.yaml
-----
-+
-[source,console]
-----
-oc delete --namespace default -f operator-role.yaml
-----
-+
-[source,console]
-----
-oc delete --namespace default -f operator-service-account.yaml
-----
-
-. Uninstall the Dynamic Admission Controller.
-+
-[source,console]
-----
-oc delete -f admission.yaml
-----
---
-====
+To uninstall the current Operator version, instructions are provided for xref:install-kubernetes.adoc#uninstalling-the-operator[Kubernetes] and xref:install-openshift.adoc#uninstalling-the-operator[OpenShift].
 
 [#update-crd]
-== Step 3: Update the CRD
+== Step 3: Update the CRDs
 
-In the Operator package you downloaded, you'll find the updated version of the CRD: `crd.yaml`.
-For minor releases of the Operator, the CRD (which defines acceptable CouchbaseCluster configurations) may undergo small changes that don't affect backward compatibility, but may add new fields or make changes to the validation code that ensures valid CouchbaseCluster configurations.
+In the Operator package you downloaded, you'll find the updated version of the CRDs: `crd.yaml`.
+Between releases of the Operator, the CRDs may undergo small changes that don't affect backward compatibility, and may add new fields or make changes to validation, therefore must be reinstalled.
+New CRDs may also be introduced that need installing.
 
-To update the CRD, run the following command:
+[IMPORTANT]
+====
+CRDs are distributed as a single file.
+During the upgrade procedure, errors are expected during the `create` operation if a CRD already exists for a resource type.
+====
+
+To update the CRDs, run the following command:
 
 [{tabs}]
 ====
@@ -119,7 +63,8 @@ Kubernetes::
 --
 [source,console]
 ----
-kubectl replace -f crd.yaml
+$ kubectl replace -f crd.yaml
+$ kubectl create -f crd.yaml
 ----
 --
 
@@ -128,14 +73,58 @@ OpenShift::
 --
 [source,console]
 ----
-oc replace -f crd.yaml
+$ oc replace -f crd.yaml
+$ oc create -f crd.yaml
 ----
 --
+====
+
+[#update-resources]
+== Step 4: (Optional) Update the Resources
+
+If you are *not* upgrading from Operator 1.x, skip to the <<install-operator,next step>>.
+
+Couchbase custom resources -- such as xref:reference-couchbasecluster.adoc[`CouchbaseCluster`] -- changed in a way that is not backwards compatible between Operator versions 1 and 2.
+There is no Kubernetes-native upgrade path, so we provide a tool to perform this step for you.
+
+[IMPORTANT]
+====
+* The following process cannot be undone; ensure your data is fully backed up before continuing.
+* The supported Kubernetes versions are unable run different custom resource versions at the same time.
+  Ensure all instances of the Operator in different namespaces are shut down before continuing.
+* All `CouchbaseCluster` resources in a namespace must be upgraded before restarting the Operator in that namespace.
+====
+
+The `cbopconv` tool takes a version 1 `CouchbaseCluster` and converts it to version 2.
+Beginning with Operator version 2, data buckets are defined as separate resources, so `cbopconv` will automatically create these for you.
+Clusters and buckets will be automatically populated with explicit xref:concept-label-selection.adoc[label selection].
+The Operator now persists cluster related data in a `ConfigMap` and `cbopconv` will create this for you.
+
+The resources that `cbopconv` creates will be a like for like replacement.
+No new features will be enabled (e.g. managed XDCR or RBAC), with the exception of auto-compaction settings.
+Be aware that auto-compaction settings will be set to Couchbase server defaults and you may wish to edit them before restarting the Operator in <<install-operator,step 5>>.
+
+The `cbopcfg` command is interactive and will check that resources are valid before continuing, display the intended upgraded and new resources, and finally prompt for permission to continue.
+The user may take this opportunity to review the proposed changes before committing them, or abort the process.
+
+The `cbopconv` command is distributed in the Operator package downloaded in <<download-operator,step 1>>.
+To run the upgrade, in each required namespace, run the following.
+
+[source,console]
+----
+$ ./cbopconv --namespace default
+----
+
+[NOTE]
+====
+You can safely install the Dynamic Admission Controller -- on its own -- before running this update step.
+This will provide additional safety by validating updated and new resources for correctness.
+Separate installation instructions are documented for xref:install-kubernetes.adoc#custom-installation[Kubernetes] and xref:install-openshift.adoc#custom-installation[OpenShift].
 ====
 
 [#install-operator]
-== Step 4: Install the New Operator
+== Step 5: Install the New Operator
 
-After <<update-crd, updating the CRD>>, you can move on to upgrading the Operator itself.
+After all the previous steps, you can move on to upgrading the Operator itself.
 Upgrading the Operator is exactly the same as the initial installation, except that you don't re-install the CRD.
 To re-install the Operator in all namespaces where previous instances operated on, see the relevant documentation for xref:install-kubernetes.adoc[Kubernetes] or xref:install-openshift.adoc[OpenShift].
