@@ -189,8 +189,6 @@ tcGroups:
     clusters:
       - NewCluster1
     testcases:
-      - name: TestRBACValidationCreate
-      - name: TestRBACValidationLDAP
       - name: TestRBACDeleteUser
       - name: TestRBACUpdateRole
       - name: TestRBACDeleteRole

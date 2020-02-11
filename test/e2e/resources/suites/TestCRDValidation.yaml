@@ -16,3 +16,5 @@ tcGroups:
       - name: TestValidationDefaultApply
       - name: TestNegValidationConstraintsApply
       - name: TestNegValidationImmutableApply
+      - name: TestRBACValidationCreate
+      - name: TestRBACValidationLDAP
